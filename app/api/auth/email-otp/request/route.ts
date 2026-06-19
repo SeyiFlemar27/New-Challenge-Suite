@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
-import { getEmailConfigStatus, sendEmail } from "@/lib/server/email";
-import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { getEmailConfigStatus, logEmailDeliveryError, safeEmailErrorDetails, sendEmail } from "@/lib/server/email";
+import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 
 const OTP_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -41,7 +41,16 @@ export async function POST(request: Request) {
   }
   const emailStatus = getEmailConfigStatus();
   if (!emailStatus.configured) {
-    return fail("Email delivery is not configured.", 503, { missing: emailStatus.missing }, "EMAIL_CONFIGURATION_ERROR");
+    console.error("[email] configuration error", {
+      provider: emailStatus.provider,
+      missing: emailStatus.missing,
+      invalid: emailStatus.invalid,
+      hasResendApiKey: emailStatus.hasResendApiKey,
+      hasEmailFrom: emailStatus.hasEmailFrom,
+      fromDomain: emailStatus.fromDomain,
+      fromUsesResendTestingDomain: emailStatus.fromUsesResendTestingDomain
+    });
+    return fail("Email delivery is not configured.", 503, { missing: emailStatus.missing, invalid: emailStatus.invalid }, "EMAIL_CONFIGURATION_ERROR");
   }
 
   const now = new Date();
@@ -81,9 +90,12 @@ export async function POST(request: Request) {
     return ok({ email: user.email, expiresAt, resendCooldownSeconds: RESEND_COOLDOWN_SECONDS }, "Verification code sent.");
   } catch (error) {
     await ref.delete().catch(() => undefined);
-    return serverError("Verification code could not be sent.", error instanceof Error ? error.message : error);
+    const details = safeEmailErrorDetails(error);
+    logEmailDeliveryError("verification-code-send-failed", error, {
+      fromDomain: emailStatus.fromDomain,
+      fromUsesResendTestingDomain: emailStatus.fromUsesResendTestingDomain,
+      recipientDomain: user.email.split("@").pop()?.toLowerCase() ?? null
+    });
+    return fail("Verification code could not be sent.", 502, details, "EMAIL_SEND_FAILED");
   }
 }
-
-
-
