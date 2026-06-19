@@ -8,9 +8,8 @@ import {
   signOut,
   type User
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "./client";
-import type { AppRole } from "@/lib/types";
+import { auth, isFirebaseConfigured } from "./client";
+import type { AppRole, UserPlanId } from "@/lib/types";
 
 export interface SignupInput {
   firstName: string;
@@ -27,9 +26,16 @@ export interface AuthProfile {
   displayName: string;
   email: string;
   role: AppRole;
+  planId?: UserPlanId;
+  doroBalance?: number;
   premium: boolean;
   verified: boolean;
   isAdmin: boolean;
+}
+
+interface BootstrapResponse {
+  profileExists: boolean;
+  user: AuthProfile;
 }
 
 export const demoAuthEnabled = false;
@@ -43,12 +49,28 @@ export function listenToAuth(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, callback);
 }
 
+async function callProfileBootstrap(user: User, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+  headers.set("Authorization", `Bearer ${await user.getIdToken(true)}`);
+
+  const response = await fetch("/api/auth/profile/bootstrap", { ...init, headers });
+  const body = await response.json().catch(() => ({ ok: false, message: "Invalid server response." }));
+  if (!response.ok || !body.ok) {
+    throw new Error(typeof body.message === "string" ? body.message : "Profile could not be prepared.");
+  }
+  return body.data as BootstrapResponse;
+}
+
 export async function signUpWithProfile(input: SignupInput) {
   if (!isFirebaseConfigured) throw new Error("Account creation is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
 
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
-  await createOrUpdateUserProfile(credential.user, input);
+  await callProfileBootstrap(credential.user, {
+    method: "POST",
+    body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role })
+  });
   return { mode: "firebase" as const, user: credential.user };
 }
 
@@ -73,54 +95,7 @@ export async function logout() {
 }
 
 export async function getCurrentProfile(uid: string) {
-  if (!db) return null;
-  const snap = await getDoc(doc(db, "profiles", uid));
-  return snap.exists() ? (snap.data() as AuthProfile) : null;
-}
-
-async function createOrUpdateUserProfile(user: User, input: SignupInput) {
-  if (!db) throw new Error("Account setup is not configured yet.");
-  const displayName = `${input.firstName} ${input.lastName}`.trim();
-  const adminEmails = (process.env.NEXT_PUBLIC_INITIAL_ADMIN_EMAILS || "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-  const isAdmin = adminEmails.includes(input.email.toLowerCase());
-  const profile: AuthProfile = {
-    uid: user.uid,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    displayName,
-    email: input.email,
-    role: input.role,
-    premium: false,
-    verified: false,
-    isAdmin
-  };
-
-  await setDoc(doc(db, "users", user.uid), {
-    uid: user.uid,
-    email: input.email,
-    role: input.role,
-    isAdmin,
-    emailVerified: false,
-    verificationStatus: "pending",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-
-  await setDoc(doc(db, "profiles", user.uid), {
-    ...profile,
-    emailVerified: false,
-    verificationStatus: "pending",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-
-  await setDoc(doc(db, "doroCoinWallets", user.uid), {
-    userId: user.uid,
-    balance: 0,
-    lockedBalance: 0,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  if (!auth?.currentUser || auth.currentUser.uid !== uid) return null;
+  const result = await callProfileBootstrap(auth.currentUser, { method: "GET" });
+  return result.user;
 }

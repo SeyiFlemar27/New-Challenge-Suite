@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
-import { db } from "@/lib/firebase/client";
+import { fetchBootstrapProfile } from "@/lib/api/services";
 import type { AppRole, UserPlanId } from "@/lib/types";
 
 export interface CurrentUserProfile {
@@ -46,42 +45,32 @@ export function useCurrentUser() {
         setError(null);
         return;
       }
-      if (!db) {
-        setCurrentUser(null);
-        setLoadingProfile(false);
-        setError("Firestore is not configured.");
-        return;
-      }
 
       setLoadingProfile(true);
       setError(null);
 
       try {
-        const [profileSnap, userSnap, walletSnap] = await Promise.all([
-          getDoc(doc(db, "profiles", auth.user.uid)),
-          getDoc(doc(db, "users", auth.user.uid)),
-          getDoc(doc(db, "doroCoinWallets", auth.user.uid))
-        ]);
-
+        const result = await fetchBootstrapProfile();
         if (cancelled) return;
+        if (!result.ok || !result.data?.user) {
+          throw new Error(result.message || "Profile could not be loaded.");
+        }
 
-        const profile = profileSnap.exists() ? profileSnap.data() : {};
-        const user = userSnap.exists() ? userSnap.data() : {};
-        const wallet = walletSnap.exists() ? walletSnap.data() : {};
+        const profile = result.data.user;
         const displayName = String(profile.displayName || auth.user.displayName || auth.user.email || "");
-        const planId = typeof user.planId === "string" ? user.planId as UserPlanId : undefined;
+        const planId = typeof profile.planId === "string" ? profile.planId as UserPlanId : undefined;
 
         setCurrentUser({
           uid: auth.user.uid,
-          email: String(auth.user.email || profile.email || user.email || ""),
+          email: String(auth.user.email || profile.email || ""),
           displayName,
-          initials: initialsFromName(displayName || auth.user.email || ""),
-          role: typeof user.role === "string" ? user.role as AppRole : typeof profile.role === "string" ? profile.role as AppRole : undefined,
+          initials: profile.initials || initialsFromName(displayName || auth.user.email || ""),
+          role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           planId,
-          doroBalance: typeof wallet.balance === "number" ? wallet.balance : null,
+          doroBalance: typeof profile.doroBalance === "number" ? profile.doroBalance : null,
           verified: Boolean(profile.verified ?? auth.user.emailVerified),
           premium: Boolean(profile.premium || (planId && planId !== "observer")),
-          isAdmin: Boolean(user.isAdmin || profile.isAdmin)
+          isAdmin: Boolean(profile.isAdmin)
         });
       } catch (caught) {
         if (!cancelled) {

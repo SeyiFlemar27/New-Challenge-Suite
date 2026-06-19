@@ -41,6 +41,7 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
 3. Create a Firebase Admin service account key from Firebase Console > Project settings > Service accounts > Generate new private key. Add these values from the downloaded JSON:
    - `FIREBASE_CLIENT_EMAIL` from `client_email`
    - `FIREBASE_PRIVATE_KEY` from `private_key`
+   - `FIREBASE_STORAGE_BUCKET` from Firebase Console > Storage, using the exact bucket name without `gs://`
 
    Keep the private key on one env line with escaped newlines:
 
@@ -49,6 +50,8 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    ```
 
    Server API routes intentionally fail with `503` until Firebase Admin is configured. They should not silently return demo data for production reads or writes.
+
+   For Storage health checks, prefer `FIREBASE_STORAGE_BUCKET` for the Admin SDK. Use the bucket shown in Firebase Storage, without `gs://`. In some newer projects the web config value can look like `project-id.firebasestorage.app`, while the Admin SDK bucket may be the bucket name shown directly in Storage settings.
 4. Fill Stripe secret, webhook secret, publishable key, and plan price IDs:
    - `STRIPE_PRICE_CREATOR`
    - `STRIPE_PRICE_COMPETITOR`
@@ -88,4 +91,3 @@ If email delivery is not configured, OTP routes fail clearly instead of pretendi
 ## Legal Note
 
 The included agreement text is operational draft copy for implementation and testing. Replace it with attorney-reviewed language before production launch.
-

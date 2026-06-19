@@ -34,7 +34,7 @@ export function serverUnavailable(feature: string) {
   return NextResponse.json({
     ok: false,
     code: "SERVER_CONFIGURATION_ERROR",
-    message: `${feature} requires Firebase Admin credentials. Configure NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY before this API can read or write production data.`
+    message: `${feature} requires Firebase Admin credentials. Configure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and FIREBASE_STORAGE_BUCKET or NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET before this API can read or write production data.`
   }, { status: 503 });
 }
 

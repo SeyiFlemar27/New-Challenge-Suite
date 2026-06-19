@@ -38,6 +38,25 @@ export function requestEmailVerificationCode() {
 export function verifyEmailCode(code: string) {
   return apiRequest<{ verified: boolean }>("/api/auth/email-otp/verify", { method: "POST", body: JSON.stringify({ code }) });
 }
+export function fetchBootstrapProfile() {
+  return apiRequest<{
+    profileExists: boolean;
+    user: {
+      uid: string;
+      firstName?: string;
+      lastName?: string;
+      displayName: string;
+      email: string;
+      role?: string;
+      planId?: string;
+      doroBalance?: number;
+      initials?: string;
+      premium: boolean;
+      verified: boolean;
+      isAdmin: boolean;
+    };
+  }>("/api/auth/profile/bootstrap");
+}
 export function fetchDashboard() {
   return apiRequest<DashboardResponse>("/api/dashboard");
 }
@@ -223,4 +242,3 @@ export function registerForEvent(eventId: string, payload: unknown) {
 export function fetchNotifications() {
   return apiRequest<{ notifications: unknown[] }>("/api/notifications");
 }
-

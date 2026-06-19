@@ -27,7 +27,9 @@ export async function GET(request: Request) {
       details: {
         missing: config.missing,
         projectId: config.projectId ?? null,
-        storageBucket: config.storageBucket ?? null
+        storageBucket: config.storageBucket ?? null,
+        publicStorageBucket: config.publicStorageBucket ?? null,
+        storageBucketSource: config.storageBucketSource
       }
     },
     adminInitialization: { ok: false, message: "Firebase Admin has not been initialized." },
@@ -85,7 +87,8 @@ export async function GET(request: Request) {
       ok: exists,
       message: exists ? "Firebase Storage bucket exists and is reachable." : "Firebase Storage bucket was configured but could not be found.",
       details: {
-        bucket: bucket.name
+        bucket: bucket.name,
+        source: config.storageBucketSource
       }
     };
 

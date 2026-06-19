@@ -5,13 +5,14 @@ import { getStorage } from "firebase-admin/storage";
 
 export function getFirebaseAdminConfigStatus() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const publicStorageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || publicStorageBucket;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   const missing = [
     !projectId ? "NEXT_PUBLIC_FIREBASE_PROJECT_ID" : null,
-    !storageBucket ? "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" : null,
+    !storageBucket ? "FIREBASE_STORAGE_BUCKET or NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" : null,
     !clientEmail ? "FIREBASE_CLIENT_EMAIL" : null,
     !privateKey ? "FIREBASE_PRIVATE_KEY" : null
   ].filter(Boolean) as string[];
@@ -20,7 +21,9 @@ export function getFirebaseAdminConfigStatus() {
     configured: missing.length === 0,
     missing,
     projectId,
-    storageBucket
+    storageBucket,
+    publicStorageBucket,
+    storageBucketSource: process.env.FIREBASE_STORAGE_BUCKET ? "FIREBASE_STORAGE_BUCKET" : "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"
   };
 }
 
