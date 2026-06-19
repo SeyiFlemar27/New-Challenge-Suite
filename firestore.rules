@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /legalDocumentVersions/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /userConsents/{consentId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && userId == request.auth.uid;
+      allow read: if signedIn() && userId == request.auth.uid;
+      allow update: if signedIn() && userId == request.auth.uid
+        && !("isAdmin" in request.resource.data.diff(resource.data).changedKeys());
+      allow delete: if false;
+    }
+
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create: if signedIn() && userId == request.auth.uid;
+      allow update: if signedIn() && userId == request.auth.uid
+        && !("isAdmin" in request.resource.data.diff(resource.data).changedKeys())
+        && !("premium" in request.resource.data.diff(resource.data).changedKeys());
+      allow delete: if false;
+    }
+
+    match /doroCoinWallets/{userId} {
+      allow read: if signedIn() && userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /doroCoinTransactions/{transactionId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /votes/{voteId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /challengeParticipants/{participantId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /boosts/{boostId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /sponsorships/{sponsorshipId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /eventRegistrations/{registrationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /winnerClaims/{claimId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /notificationPreferences/{userId} {
+      allow read: if signedIn() && userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /subscriptionEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /adminActions/{actionId} {
+      allow read, write: if false;
+    }
+
+    match /fraudFlags/{flagId} {
+      allow read, write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /mediaUploads/{uploadId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /leaderboards/{leaderboardId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /winners/{winnerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}
