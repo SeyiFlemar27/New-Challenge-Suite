@@ -53,6 +53,8 @@ export function fetchBootstrapProfile() {
       initials?: string;
       premium: boolean;
       verified: boolean;
+      emailVerified?: boolean;
+      emailVerifiedAt?: string | null;
       isAdmin: boolean;
     };
   }>("/api/auth/profile/bootstrap");

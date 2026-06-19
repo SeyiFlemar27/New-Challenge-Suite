@@ -2,24 +2,34 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
+import { useAuth } from "@/components/auth-provider";
 import { requestEmailVerificationCode, verifyEmailCode } from "@/lib/api/services";
 import { auth } from "@/lib/firebase/client";
 
 const RESEND_SECONDS = 60;
 
+function getReturnUrl() {
+  if (typeof window === "undefined") return "/dashboard";
+  const value = new URLSearchParams(window.location.search).get("returnUrl");
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+}
+
 export default function VerifyEmailPage() {
   const router = useRouter();
+  const authState = useAuth();
+  const requestedInitialCode = useRef(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [verified, setVerified] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const maskedEmail = useMemo(() => email || "your email", [email]);
@@ -27,8 +37,20 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     const storedEmail = localStorage.getItem("challenge_suite_signup_email") || auth?.currentUser?.email || "";
     setEmail(storedEmail);
-    void requestCode(false);
   }, []);
+
+  useEffect(() => {
+    if (authState.loading) return;
+    if (authState.verified) {
+      setVerified(true);
+      setRedirecting(true);
+      const timer = window.setTimeout(() => router.replace(getReturnUrl()), 900);
+      return () => window.clearTimeout(timer);
+    }
+    if (!authState.user || requestedInitialCode.current) return;
+    requestedInitialCode.current = true;
+    void requestCode(false);
+  }, [authState.loading, authState.user, authState.verified, router]);
 
   useEffect(() => {
     if (verified || seconds <= 0) return;
@@ -37,6 +59,7 @@ export default function VerifyEmailPage() {
   }, [seconds, verified]);
 
   async function requestCode(showSuccess = true) {
+    if (verified || redirecting) return;
     setRequesting(true);
     setError("");
     setNotice("");
@@ -46,7 +69,7 @@ export default function VerifyEmailPage() {
     if (!result.ok || !result.data) {
       const retryAfter = (result as any).details?.retryAfterSeconds;
       if (typeof retryAfter === "number") setSeconds(retryAfter);
-      setError(result.message || "We couldn’t send a code right now. Please try again.");
+      setError(result.message || "We couldn't send a code right now. Please try again.");
       return;
     }
 
@@ -68,21 +91,29 @@ export default function VerifyEmailPage() {
     setError("");
     setNotice("");
     const result = await verifyEmailCode(trimmed);
-    setVerifying(false);
 
     if (!result.ok) {
+      setVerifying(false);
       if ((result as any).code === "OTP_EXPIRED") {
         setError("Your code has expired. Request a new one.");
       } else if ((result as any).code === "OTP_INVALID") {
         setError("That code is not correct. Please try again.");
       } else {
-        setError(result.message || "We couldn’t verify that code. Please try again.");
+        setError(result.message || "We couldn't verify that code. Please try again.");
       }
       return;
     }
 
+    await auth?.currentUser?.reload().catch(() => undefined);
     await auth?.currentUser?.getIdToken(true).catch(() => undefined);
+    window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+    await authState.refreshProfile().catch(() => null);
+    localStorage.removeItem("challenge_suite_signup_email");
     setVerified(true);
+    setRedirecting(true);
+    setVerifying(false);
+    setNotice("Email verified successfully. Redirecting...");
+    window.setTimeout(() => router.replace(getReturnUrl()), 900);
   }
 
   return (
@@ -94,9 +125,9 @@ export default function VerifyEmailPage() {
             <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 180 }}>
               <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
             </motion.div>
-            <h1 className="mt-6 text-4xl font-black">Email Verified</h1>
-            <p className="mt-3 text-slate-300">Your account is ready. Continue to your dashboard.</p>
-            <Button className="mt-8 w-full" onClick={() => router.push("/dashboard")}>Continue to Dashboard</Button>
+            <h1 className="mt-6 text-4xl font-black">Email verified successfully</h1>
+            <p className="mt-3 text-slate-300">Redirecting you to your dashboard...</p>
+            <Button className="mt-8 w-full" onClick={() => router.replace(getReturnUrl())}>Continue to Dashboard</Button>
           </div>
         ) : (
           <>
@@ -120,16 +151,16 @@ export default function VerifyEmailPage() {
               </Field>
               {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
               {notice ? <p className="rounded-[8px] bg-emerald-950/40 p-3 text-sm text-emerald-200">{notice}</p> : null}
-              <Button className="w-full" disabled={verifying}>{verifying ? "Checking code..." : "Verify Code"}</Button>
+              <Button className="w-full" disabled={verifying || redirecting}>{verifying ? "Checking code..." : "Verify Code"}</Button>
             </form>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <Button type="button" variant="secondary" onClick={() => requestCode(true)} disabled={requesting || seconds > 0}>
+              <Button type="button" variant="secondary" onClick={() => requestCode(true)} disabled={requesting || seconds > 0 || redirecting}>
                 {requesting ? "Sending..." : seconds > 0 ? `Resend in ${seconds}s` : "Resend Code"}
               </Button>
               <Link href="/auth/register" className="inline-flex h-11 items-center justify-center rounded-[8px] border border-white/10 bg-[#1d1d1d] px-5 text-sm font-bold text-white transition hover:bg-[#242424]">Change Email</Link>
             </div>
             <div className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-slate-500">
-              <ShieldCheck size={14} /> Didn’t receive it? Check spam or request a new code.
+              <ShieldCheck size={14} /> Didn't receive it? Check spam or request a new code.
             </div>
           </>
         )}

@@ -56,8 +56,8 @@ export async function POST(request: Request) {
   try {
     await Promise.all([
       record.ref.update({ usedAt: now, attempts: Number(record.attempts ?? 0) + 1 }),
-      db.collection("profiles").doc(user.uid).set({ verified: true, emailVerified: true, updatedAt: now }, { merge: true }),
-      db.collection("users").doc(user.uid).set({ emailVerified: true, verificationStatus: "verified", updatedAt: now }, { merge: true }),
+      db.collection("profiles").doc(user.uid).set({ verified: true, emailVerified: true, emailVerifiedAt: now, verification: { email: { status: "verified", verifiedAt: now } }, updatedAt: now }, { merge: true }),
+      db.collection("users").doc(user.uid).set({ emailVerified: true, emailVerifiedAt: now, verificationStatus: "verified", updatedAt: now }, { merge: true }),
       adminAuth.updateUser(user.uid, { emailVerified: true })
     ]);
     return ok({ verified: true }, "Email verified.");
@@ -65,6 +65,3 @@ export async function POST(request: Request) {
     return serverError("Email verification could not be completed.", error instanceof Error ? error.message : error);
   }
 }
-
-
-

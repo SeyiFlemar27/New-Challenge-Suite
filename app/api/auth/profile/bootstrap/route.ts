@@ -37,7 +37,9 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
     initials: String(profile.initials ?? initialsFromName(displayName || String(user.email ?? ""))),
     premium: Boolean(profile.premium || account.premium || (account.planId && account.planId !== "observer")),
-    verified: Boolean(profile.verified ?? account.emailVerified ?? user.emailVerified),
+    verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
+    emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
+    emailVerifiedAt: profile.emailVerifiedAt ?? account.emailVerifiedAt ?? null,
     isAdmin: Boolean(account.isAdmin || profile.isAdmin)
   };
 }

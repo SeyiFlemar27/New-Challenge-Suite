@@ -68,7 +68,7 @@ export function useCurrentUser() {
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           planId,
           doroBalance: typeof profile.doroBalance === "number" ? profile.doroBalance : null,
-          verified: Boolean(profile.verified ?? auth.user.emailVerified),
+          verified: Boolean(profile.verified || profile.emailVerified || auth.user.emailVerified),
           premium: Boolean(profile.premium || (planId && planId !== "observer")),
           isAdmin: Boolean(profile.isAdmin)
         });

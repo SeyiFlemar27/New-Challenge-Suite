@@ -15,7 +15,7 @@ export function VerificationGuard({ children }: { children: React.ReactNode }) {
   if (publicPage || !firebaseConfigured) return <>{children}</>;
   if (loading) return <LoadingGate />;
   if (!user) return <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref="/auth/login" actionLabel="Sign In" />;
-  if (!verified) return <Gate title="Verify your email" body="You need to verify your email before continuing with the app." actionHref="/auth/verify-email" actionLabel="Verify Email" />;
+  if (!verified) return <Gate title="Check your email" body="Enter the 6-digit code we sent to continue into Challenge Suite." actionHref="/auth/verify-email" actionLabel="Enter Code" />;
   return <>{children}</>;
 }
 

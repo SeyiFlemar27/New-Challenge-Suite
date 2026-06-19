@@ -30,6 +30,7 @@ export interface AuthProfile {
   doroBalance?: number;
   premium: boolean;
   verified: boolean;
+  emailVerified?: boolean;
   isAdmin: boolean;
 }
 
@@ -78,7 +79,8 @@ export async function loginWithEmail(email: string, password: string) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
   const credential = await signInWithEmailAndPassword(auth, email, password);
-  return { mode: "firebase" as const, user: credential.user, emailVerified: credential.user.emailVerified };
+  const profile = await getCurrentProfile(credential.user.uid).catch(() => null);
+  return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile?.verified || profile?.emailVerified || credential.user.emailVerified) };
 }
 
 export async function sendResetEmail(email: string) {
