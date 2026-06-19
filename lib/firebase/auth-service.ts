@@ -3,7 +3,6 @@
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -33,61 +32,43 @@ export interface AuthProfile {
   isAdmin: boolean;
 }
 
-export const demoAuthEnabled = !isFirebaseConfigured;
+export const demoAuthEnabled = false;
 
 export function listenToAuth(callback: (user: User | null) => void) {
   if (!isFirebaseConfigured) {
     callback(null);
     return () => undefined;
   }
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
+  if (!auth) throw new Error("Authentication is not configured yet.");
   return onAuthStateChanged(auth, callback);
 }
 
 export async function signUpWithProfile(input: SignupInput) {
-  if (!isFirebaseConfigured) {
-    persistDemoAuth(input.email, `${input.firstName} ${input.lastName}`, input.role, false);
-    return { mode: "demo" as const, email: input.email };
-  }
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
+  if (!isFirebaseConfigured) throw new Error("Account creation is not configured yet.");
+  if (!auth) throw new Error("Authentication is not configured yet.");
 
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
   await createOrUpdateUserProfile(credential.user, input);
-  await sendEmailVerification(credential.user);
   return { mode: "firebase" as const, user: credential.user };
 }
 
 export async function loginWithEmail(email: string, password: string) {
-  if (!isFirebaseConfigured) {
-    persistDemoAuth(email, "Demo User", "user", true);
-    return { mode: "demo" as const, emailVerified: true };
-  }
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
+  if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
+  if (!auth) throw new Error("Authentication is not configured yet.");
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return { mode: "firebase" as const, user: credential.user, emailVerified: credential.user.emailVerified };
 }
 
-export async function resendCurrentVerificationEmail() {
-  if (!isFirebaseConfigured) return { mode: "demo" as const };
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
-  if (!auth.currentUser) throw new Error("No signed-in user found.");
-  await sendEmailVerification(auth.currentUser);
-  return { mode: "firebase" as const };
-}
-
 export async function sendResetEmail(email: string) {
-  if (!isFirebaseConfigured) return { mode: "demo" as const };
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
+  if (!isFirebaseConfigured) throw new Error("Password reset is not configured yet.");
+  if (!auth) throw new Error("Authentication is not configured yet.");
   await sendPasswordResetEmail(auth, email);
   return { mode: "firebase" as const };
 }
 
 export async function logout() {
-  if (!isFirebaseConfigured) {
-    localStorage.removeItem("challenge_suite_demo_auth");
-    return;
-  }
-  if (!auth) throw new Error("Firebase Auth is not initialized.");
+  if (!isFirebaseConfigured) return;
+  if (!auth) throw new Error("Authentication is not configured yet.");
   await signOut(auth);
 }
 
@@ -98,7 +79,7 @@ export async function getCurrentProfile(uid: string) {
 }
 
 async function createOrUpdateUserProfile(user: User, input: SignupInput) {
-  if (!db) throw new Error("Firestore is not initialized.");
+  if (!db) throw new Error("Account setup is not configured yet.");
   const displayName = `${input.firstName} ${input.lastName}`.trim();
   const adminEmails = (process.env.NEXT_PUBLIC_INITIAL_ADMIN_EMAILS || "")
     .split(",")
@@ -113,7 +94,7 @@ async function createOrUpdateUserProfile(user: User, input: SignupInput) {
     email: input.email,
     role: input.role,
     premium: false,
-    verified: user.emailVerified,
+    verified: false,
     isAdmin
   };
 
@@ -122,13 +103,16 @@ async function createOrUpdateUserProfile(user: User, input: SignupInput) {
     email: input.email,
     role: input.role,
     isAdmin,
-    emailVerified: user.emailVerified,
+    emailVerified: false,
+    verificationStatus: "pending",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
 
   await setDoc(doc(db, "profiles", user.uid), {
     ...profile,
+    emailVerified: false,
+    verificationStatus: "pending",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
@@ -139,8 +123,4 @@ async function createOrUpdateUserProfile(user: User, input: SignupInput) {
     lockedBalance: 0,
     updatedAt: serverTimestamp()
   }, { merge: true });
-}
-
-function persistDemoAuth(email: string, displayName: string, role: AppRole, verified: boolean) {
-  localStorage.setItem("challenge_suite_demo_auth", JSON.stringify({ email, displayName, role, verified }));
 }

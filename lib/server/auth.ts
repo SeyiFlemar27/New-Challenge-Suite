@@ -29,14 +29,14 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
       email: decoded.email,
       role: profile?.role,
       isAdmin: Boolean(profile?.isAdmin),
-      emailVerified: decoded.email_verified
+      emailVerified: Boolean(decoded.email_verified || profile?.emailVerified || profile?.verificationStatus === "verified")
     };
   }
 
   return null;
 }
 
-export async function requireRequestUser(request: Request) {
+export async function requireAuthenticatedUser(request: Request) {
   if (!getAdminAuth()) {
     return { user: null, response: serverUnavailable("Authenticated API routes") };
   }
@@ -44,10 +44,16 @@ export async function requireRequestUser(request: Request) {
   if (!user) {
     return { user: null, response: unauthorized() };
   }
-  if (!user.emailVerified) {
+  return { user, response: null };
+}
+
+export async function requireRequestUser(request: Request) {
+  const result = await requireAuthenticatedUser(request);
+  if (result.response) return result;
+  if (!result.user?.emailVerified) {
     return { user: null, response: forbidden("Email verification is required before this action.") };
   }
-  return { user, response: null };
+  return result;
 }
 
 export async function getOptionalRequestUser(request: Request) {

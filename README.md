@@ -70,6 +70,22 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    curl -H "Authorization: Bearer <firebase-id-token>" http://localhost:3000/api/backend/health
    ```
 
+
+## Email OTP Verification
+
+Challenge Suite uses an in-app 6-digit email code flow for account verification. The code is generated server-side, hashed with `OTP_HASH_SECRET`, stored in Firestore, and expires after 10 minutes. Plain OTP values are never stored.
+
+Required email variables:
+
+```env
+OTP_HASH_SECRET="use-a-long-random-secret"
+EMAIL_PROVIDER=resend
+RESEND_API_KEY="re_..."
+EMAIL_FROM="Challenge Suite <verify@your-domain.com>"
+```
+
+If email delivery is not configured, OTP routes fail clearly instead of pretending a code was sent.
 ## Legal Note
 
 The included agreement text is operational draft copy for implementation and testing. Replace it with attorney-reviewed language before production launch.
+

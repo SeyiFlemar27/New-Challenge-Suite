@@ -30,6 +30,14 @@ export interface DashboardResponse {
   notifications: unknown[];
 }
 
+
+export function requestEmailVerificationCode() {
+  return apiRequest<{ email: string; expiresAt: string; resendCooldownSeconds: number }>("/api/auth/email-otp/request", { method: "POST", body: JSON.stringify({}) });
+}
+
+export function verifyEmailCode(code: string) {
+  return apiRequest<{ verified: boolean }>("/api/auth/email-otp/verify", { method: "POST", body: JSON.stringify({ code }) });
+}
 export function fetchDashboard() {
   return apiRequest<DashboardResponse>("/api/dashboard");
 }
@@ -215,3 +223,4 @@ export function registerForEvent(eventId: string, payload: unknown) {
 export function fetchNotifications() {
   return apiRequest<{ notifications: unknown[] }>("/api/notifications");
 }
+

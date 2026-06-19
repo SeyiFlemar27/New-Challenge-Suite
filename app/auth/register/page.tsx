@@ -52,7 +52,6 @@ export default function RegisterPage() {
       });
       localStorage.setItem("challenge_suite_signup_email", form.email);
       localStorage.setItem("challenge_suite_auth_mode", result.mode);
-      if (result.mode === "demo") localStorage.setItem("challenge_suite_verification_code", "246810");
       router.push("/auth/verify-email");
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Could not create account." });
@@ -111,3 +110,4 @@ function PasswordField({ label, shown, onToggle, value, onChange }: { label: str
     </Field>
   );
 }
+
