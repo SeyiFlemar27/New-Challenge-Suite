@@ -5,6 +5,22 @@ import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
+type WalletQueryName = "ensureWallet" | "wallet" | "profile" | "user" | "transactions";
+
+type WalletQueryError = Error & {
+  queryName?: WalletQueryName;
+  code?: unknown;
+  details?: unknown;
+};
+
+const WALLET_QUERY_DESCRIPTIONS: Record<WalletQueryName, string> = {
+  ensureWallet: "doroCoinWallets/{uid} create if missing",
+  wallet: "doroCoinWallets/{uid}",
+  profile: "profiles/{uid}",
+  user: "users/{uid}",
+  transactions: "doroCoinTransactions where userId == uid, sorted by createdAt desc in API"
+};
+
 function toIso(value: unknown): string | null {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -15,6 +31,54 @@ function toIso(value: unknown): string | null {
   return null;
 }
 
+function createdAtMs(value: unknown) {
+  const iso = toIso(value);
+  if (!iso) return 0;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+async function runWalletQuery<T>(queryName: WalletQueryName, query: Promise<T>) {
+  try {
+    return await query;
+  } catch (error) {
+    const wrapped = error instanceof Error ? error as WalletQueryError : new Error("Wallet query failed.") as WalletQueryError;
+    wrapped.queryName = queryName;
+    throw wrapped;
+  }
+}
+
+function isFirestoreIndexError(error: unknown) {
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
+  const text = `${String(candidate?.code ?? "")} ${String(candidate?.message ?? "")} ${String(candidate?.details ?? "")}`.toLowerCase();
+  return text.includes("failed_precondition") || text.includes("requires an index") || text.includes("index");
+}
+
+function walletErrorDetails(error: unknown) {
+  const candidate = error as WalletQueryError;
+  const queryName = candidate?.queryName ?? null;
+  const firestoreMessage = typeof candidate?.message === "string" ? candidate.message : "Wallet query failed.";
+
+  if (isFirestoreIndexError(error)) {
+    return {
+      reason: "firestore_index_required",
+      queryName,
+      query: queryName ? WALLET_QUERY_DESCRIPTIONS[queryName] : null,
+      firestoreCode: candidate?.code ?? null,
+      firestoreMessage,
+      requiredIndex: null
+    };
+  }
+
+  return {
+    reason: "wallet_query_failed",
+    queryName,
+    query: queryName ? WALLET_QUERY_DESCRIPTIONS[queryName] : null,
+    firestoreCode: candidate?.code ?? null,
+    firestoreMessage
+  };
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -23,15 +87,15 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Wallet");
 
   try {
-    const walletRef = await ensureWallet(db, user.uid);
+    const walletRef = await runWalletQuery("ensureWallet", ensureWallet(db, user.uid));
     const [walletSnap, profileSnap, userSnap, transactionSnap] = await Promise.all([
-      walletRef.get(),
-      db.collection("profiles").doc(user.uid).get(),
-      db.collection("users").doc(user.uid).get(),
-      db.collection("doroCoinTransactions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get()
+      runWalletQuery("wallet", walletRef.get()),
+      runWalletQuery("profile", db.collection("profiles").doc(user.uid).get()),
+      runWalletQuery("user", db.collection("users").doc(user.uid).get()),
+      runWalletQuery("transactions", db.collection("doroCoinTransactions").where("userId", "==", user.uid).limit(100).get())
     ]);
 
-    const wallet = walletSnap.data() ?? {};
+    const wallet = walletSnap.exists ? walletSnap.data() ?? {} : { userId: user.uid, balance: 0, lockedBalance: 0, updatedAt: null };
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
 
@@ -56,9 +120,11 @@ export async function GET(request: Request) {
           id: doc.id,
           createdAt: toIso(data.createdAt)
         };
-      })
+      }).sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt)).slice(0, 50)
     }, "Wallet loaded.");
   } catch (error) {
-    return serverError("Wallet could not be loaded.", error instanceof Error ? error.message : error);
+    const details = walletErrorDetails(error);
+    console.error("[wallet] load failed", details);
+    return serverError("Wallet could not be loaded.", details);
   }
 }

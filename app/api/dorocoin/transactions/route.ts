@@ -1,15 +1,80 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminUser, requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
-import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { fail, ok, serverError, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+
+type TransactionQueryError = Error & {
+  queryName?: "transactions";
+  code?: unknown;
+  details?: unknown;
+};
+
+function toIso(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+  return null;
+}
+
+function createdAtMs(value: unknown) {
+  const iso = toIso(value);
+  if (!iso) return 0;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function isFirestoreIndexError(error: unknown) {
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
+  const text = `${String(candidate?.code ?? "")} ${String(candidate?.message ?? "")} ${String(candidate?.details ?? "")}`.toLowerCase();
+  return text.includes("failed_precondition") || text.includes("requires an index") || text.includes("index");
+}
+
+function transactionErrorDetails(error: unknown) {
+  const candidate = error as TransactionQueryError;
+  const firestoreMessage = typeof candidate?.message === "string" ? candidate.message : "DoroCoin transaction query failed.";
+
+  if (isFirestoreIndexError(error)) {
+    return {
+      reason: "firestore_index_required",
+      queryName: "transactions",
+      query: "doroCoinTransactions where userId == uid, sorted by createdAt desc in API",
+      firestoreCode: candidate?.code ?? null,
+      firestoreMessage,
+      requiredIndex: null
+    };
+  }
+
+  return {
+    reason: "dorocoin_transactions_query_failed",
+    queryName: "transactions",
+    query: "doroCoinTransactions where userId == uid, sorted by createdAt desc in API",
+    firestoreCode: candidate?.code ?? null,
+    firestoreMessage
+  };
+}
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("DoroCoin transaction history");
-  const snap = await db.collection("doroCoinTransactions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get();
-  return ok({ transactions: snap.docs.map((doc) => doc.data()) }, "DoroCoin transaction history loaded.");
+
+  try {
+    const snap = await db.collection("doroCoinTransactions").where("userId", "==", user.uid).limit(100).get();
+    return ok({
+      transactions: snap.docs.map((doc) => {
+        const data = doc.data();
+        return { ...data, id: doc.id, createdAt: toIso(data.createdAt) };
+      }).sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt)).slice(0, 50)
+    }, "DoroCoin transaction history loaded.");
+  } catch (error) {
+    const details = transactionErrorDetails(error);
+    console.error("[dorocoin-transactions] load failed", details);
+    return serverError("DoroCoin transaction history could not be loaded.", details);
+  }
 }
 
 export async function POST(request: Request) {
