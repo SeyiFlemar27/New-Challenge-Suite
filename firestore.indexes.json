@@ -41,6 +41,14 @@
         { "fieldPath": "challengeId", "order": "ASCENDING" },
         { "fieldPath": "weightedVoteCount", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

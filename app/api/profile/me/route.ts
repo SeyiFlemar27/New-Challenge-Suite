@@ -26,6 +26,36 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
+function safeErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function runProfileRead<T>(label: string, userId: string, read: () => Promise<T>) {
+  try {
+    return await read();
+  } catch (error) {
+    console.error("[api/profile/me] Firestore read failed", {
+      label,
+      userId,
+      error: safeErrorMessage(error)
+    });
+    throw new Error(`Profile read failed: ${label}`);
+  }
+}
+
+async function runOptionalProfileRead<T>(label: string, userId: string, fallback: T, read: () => Promise<T>) {
+  try {
+    return await read();
+  } catch (error) {
+    console.error("[api/profile/me] Optional Firestore read failed", {
+      label,
+      userId,
+      error: safeErrorMessage(error)
+    });
+    return fallback;
+  }
+}
+
 const profileUpdateSchema = z.object({
   displayName: z.string().trim().min(2, "Display name must be at least 2 characters.").max(80, "Display name must be 80 characters or fewer."),
   selfDeclaredRegion: z.enum(["US", "NG"], { message: "Select United States or Nigeria." })
@@ -39,20 +69,55 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Profile");
 
   try {
-    const walletRef = await ensureWallet(db, user.uid);
-    const [accountSnap, profileSnap, walletSnap, submissionsSnap, badgesSnap] = await Promise.all([
-      db.collection("users").doc(user.uid).get(),
-      db.collection("profiles").doc(user.uid).get(),
-      walletRef.get(),
-      db.collection("submissions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get(),
-      db.collection("badges").where("userId", "==", user.uid).limit(50).get()
+    const walletRef = await runProfileRead("ensure doroCoinWallets document", user.uid, () => ensureWallet(db, user.uid));
+    const [accountSnap, profileSnap, walletSnap] = await Promise.all([
+      runProfileRead("users document", user.uid, () => db.collection("users").doc(user.uid).get()),
+      runProfileRead("profiles document", user.uid, () => db.collection("profiles").doc(user.uid).get()),
+      runProfileRead("doroCoinWallets document", user.uid, () => walletRef.get())
     ]);
 
-    const account = accountSnap.exists ? accountSnap.data() ?? {} : {};
-    const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
-    const wallet = walletSnap.data() ?? {};
+    let account = accountSnap.exists ? accountSnap.data() ?? {} : {};
+    let profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
+    const wallet = walletSnap.exists ? walletSnap.data() ?? {} : {};
+    const now = new Date().toISOString();
+    const fallbackDisplayName = String(profile.displayName ?? account.displayName ?? user.email ?? "Challenge Suite Member");
+    const fallbackInitials = initialsFromName(fallbackDisplayName || String(user.email ?? ""));
+
+    if (!accountSnap.exists || !profileSnap.exists) {
+      const baseProfile = {
+        uid: user.uid,
+        email: user.email ?? "",
+        displayName: fallbackDisplayName,
+        initials: fallbackInitials,
+        role: String(account.role ?? profile.role ?? "user"),
+        planId: String(account.planId ?? profile.planId ?? "observer"),
+        premium: Boolean(profile.premium || account.premium || (account.planId && account.planId !== "observer")),
+        verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || user.emailVerified),
+        emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || user.emailVerified),
+        createdAt: String(profile.createdAt ?? account.createdAt ?? now),
+        updatedAt: now
+      };
+
+      await Promise.all([
+        !accountSnap.exists
+          ? runProfileRead("bootstrap users document", user.uid, () => db.collection("users").doc(user.uid).set(baseProfile, { merge: true }))
+          : Promise.resolve(),
+        !profileSnap.exists
+          ? runProfileRead("bootstrap profiles document", user.uid, () => db.collection("profiles").doc(user.uid).set(baseProfile, { merge: true }))
+          : Promise.resolve()
+      ]);
+
+      account = { ...baseProfile, ...account };
+      profile = { ...baseProfile, ...profile };
+    }
+
+    const [submissionsSnap, badgesSnap] = await Promise.all([
+      runOptionalProfileRead("submissions where userId == uid orderBy createdAt desc", user.uid, null, () => db.collection("submissions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get()),
+      runOptionalProfileRead("badges where userId == uid", user.uid, null, () => db.collection("badges").where("userId", "==", user.uid).limit(50).get())
+    ]);
+
     const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
-    const submissions: Array<Record<string, unknown>> = submissionsSnap.docs.map((doc) => {
+    const submissions: Array<Record<string, unknown>> = submissionsSnap ? submissionsSnap.docs.map((doc) => {
       const data = doc.data();
       return {
         ...data,
@@ -60,19 +125,19 @@ export async function GET(request: Request) {
         createdAt: toIso(data.createdAt),
         submittedAt: toIso(data.submittedAt)
       };
-    });
-    const badges = badgesSnap.docs.map((doc) => {
+    }) : [];
+    const badges = badgesSnap ? badgesSnap.docs.map((doc) => {
       const data = doc.data();
       return {
         ...data,
         id: doc.id,
         earnedAt: toIso(data.earnedAt ?? data.createdAt)
       };
-    });
+    }) : [];
     const totalLikes = submissions.reduce((sum, submission) => sum + Number(submission.likes ?? submission.voteCount ?? submission.weightedVoteCount ?? 0), 0);
 
     return ok({
-      profileExists: profileSnap.exists,
+      profileExists: true,
       user: {
         uid: user.uid,
         email: user.email ?? profile.email ?? account.email ?? "",
