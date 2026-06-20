@@ -75,7 +75,7 @@ export default function LiveEventsPage() {
     <AppShell>
       <div className="flex max-w-6xl flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <PageTitle title="Live In-Person Events" subtitle="Discover offline competitions and physical gatherings." />
-        {canHostLiveEvents ? <LinkButton href="/live-events/create">Become a Verified Host</LinkButton> : <LinkButton href="/subscriptions" variant="secondary">Upgrade to Host Events</LinkButton>}
+        {canHostLiveEvents ? <LinkButton href="/live-events/host/apply">Become a Verified Host</LinkButton> : <LinkButton href="/subscriptions" variant="secondary">Upgrade to Host Events</LinkButton>}
       </div>
       {loading ? (
         <div className="mt-12 grid max-w-5xl gap-10 border-t border-white/10 pt-12 md:grid-cols-2">
