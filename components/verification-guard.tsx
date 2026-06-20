@@ -5,7 +5,7 @@ import { Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 
-const publicPrefixes = ["/landing", "/auth"];
+const publicPrefixes = ["/landing", "/auth", "/mobile-preview"];
 
 export function VerificationGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
