@@ -7,6 +7,7 @@ import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, PremiumBadge } from "./brand";
+import { findCustomizationOption } from "@/lib/customization/options";
 
 const nav = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -29,6 +30,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [notificationStatus, setNotificationStatus] = useState("");
   const { user, loading, signedOut, error } = useCurrentUser();
+  const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
 
   async function enableNotifications() {
     if (!("Notification" in window)) {
@@ -73,7 +75,7 @@ export function Sidebar() {
           <Diamond size={16} className="text-sky-400" /> Premium
         </Link>
         <div className="flex items-center gap-3 pt-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500">{loading ? "" : user?.initials || "?"}</div>
+          <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
           <div>
             {loading ? (
               <div className="font-bold text-slate-300">Loading profile</div>

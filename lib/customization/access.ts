@@ -63,7 +63,8 @@ export function validateCustomizationForProfile(profile: Record<string, unknown>
     canUseOption(plan, customization.profileFrameId, "profileFrame"),
     canUseOption(plan, customization.dashboardStyleId, "dashboardStyle"),
     canUseOption(plan, customization.cardStyleId, "dashboardStyle"),
-    canUseOption(plan, customization.celebrationEffectId, "celebrationEffect")
+    canUseOption(plan, customization.celebrationEffectId, "celebrationEffect"),
+    canUseOption(plan, customization.voteEffectId, "celebrationEffect")
   ];
   const denied = checks.find((check) => !check.allowed);
   if (denied) return denied;
@@ -71,4 +72,3 @@ export function validateCustomizationForProfile(profile: Record<string, unknown>
   if (customization.hostBadgeStyleId && !plan.canUseVerifiedHostBranding) return { allowed: false, code: "VERIFIED_HOST_REQUIRED", message: "Verified Host branding requires Verified Host access." };
   return { allowed: true, code: null, message: "Customization allowed." };
 }
-

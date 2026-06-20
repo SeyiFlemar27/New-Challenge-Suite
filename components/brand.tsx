@@ -1,4 +1,4 @@
-import { BadgeCheck } from "lucide-react";
+import { Award, BadgeCheck, Crown, Diamond, Flame, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserPlanId } from "@/lib/types";
 import { findCustomizationOption } from "@/lib/customization/options";
@@ -24,10 +24,18 @@ export function PremiumBadge({ planId, compact = false, badgeStyleId }: { planId
   const label = planBadgeLabel(planId);
   const premium = label !== "Free Member";
   const badgeStyle = badgeStyleId ? findCustomizationOption(badgeStyleId, "badge") : null;
+  const BadgeIcon = badgeStyleId === "premium_gold" ? Star
+    : badgeStyleId === "premium_diamond" ? Diamond
+      : badgeStyleId === "creator_pro" ? Crown
+        : badgeStyleId === "top_voter" ? Flame
+          : badgeStyleId === "rising_star" ? Sparkles
+            : badgeStyleId === "verified_host" ? ShieldCheck
+              : badgeStyleId === "elite_host" ? Award
+                : BadgeCheck;
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full border font-black", badgeStyle?.previewClass ?? (premium ? "border-sky-400/40 bg-sky-500/15 text-sky-300" : "border-white/10 bg-white/5 text-slate-300"), compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
-      <BadgeCheck size={compact ? 14 : 16} className={premium ? "fill-sky-400 text-black" : "text-slate-400"} />
-      {label}
+      <BadgeIcon size={compact ? 14 : 16} className={premium ? "text-current" : "text-slate-400"} />
+      {badgeStyle?.name ?? label}
     </span>
   );
 }
