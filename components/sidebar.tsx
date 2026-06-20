@@ -89,7 +89,7 @@ export function Sidebar() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 font-bold">{user?.displayName}<PremiumBadge planId={user?.planId} compact /></div>
+                <div className="flex items-center gap-2 font-bold">{user?.displayName}<PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div>
                 <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
               </>
             )}

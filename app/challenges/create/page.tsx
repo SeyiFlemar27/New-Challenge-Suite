@@ -2,11 +2,14 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, Save } from "lucide-react";
+import { CheckCircle2, LockKeyhole, Save } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { redistributeSponsorship } from "@/lib/legal";
 import { challengeSchema } from "@/lib/validation";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getUserPlanAccess } from "@/lib/plan-access";
+import { createChallenge } from "@/lib/api/services";
 
 const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize & Monetization", "Media", "Preview & Publish"];
 
@@ -30,10 +33,13 @@ function CreateChallengeFallback() {
 
 function CreateChallengeWizard() {
   const searchParams = useSearchParams();
+  const { user } = useCurrentUser();
+  const planAccess = getUserPlanAccess({ planId: user?.planId });
   const defaultType = searchParams.get("mode") === "private" ? "Private / Exclusive" : "Public Challenge";
   const [step, setStep] = useState(0);
   const [stage, setStage] = useState<"wizard" | "success">("wizard");
   const [draftSaved, setDraftSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     title: "The Ultimate Showdown",
@@ -54,6 +60,9 @@ function CreateChallengeWizard() {
   ]);
   const normalized = useMemo(() => redistributeSponsorship(15, allocations), [allocations]);
   const braggingRights = form.prizeType === "Bragging Rights (Leaderboard Ranking)";
+  const monetizedLocked = !planAccess.canCreatePaidChallenges && !braggingRights && Number(form.entryFee) > 0;
+  const prizeLocked = !planAccess.canCreatePrizeChallenges && !braggingRights;
+  const privateLocked = !planAccess.canCreatePrivateChallenges && form.type === "Private / Exclusive";
 
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -81,7 +90,40 @@ function CreateChallengeWizard() {
     setStep((value) => Math.min(value + 1, steps.length - 1));
   }
 
-  function publish() {
+  function challengePayload(publish: boolean) {
+    return {
+      title: form.title,
+      description: form.description,
+      category: form.category === "Other" ? form.customCategory : form.category,
+      customCategory: form.category === "Other" ? form.customCategory : undefined,
+      type: form.type,
+      visibility: form.type === "Private / Exclusive" ? "private" : "public",
+      acceptedSubmissionTypes: form.submissionTypes,
+      competitionFormat: form.competitionFormat,
+      bestOf: form.bestOf,
+      prizeType: form.prizeType,
+      entryFee: braggingRights ? 0 : Number(form.entryFee),
+      prizePool: braggingRights ? 0 : Number(form.entryFee) * 100,
+      registrationDeadline: "2026-01-22",
+      startsAt: "2026-01-24",
+      endsAt: "2026-02-01",
+      publish
+    };
+  }
+
+  async function saveDraft() {
+    setSaving(true);
+    setError("");
+    const result = await createChallenge(challengePayload(false));
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.message || "Draft could not be saved.");
+      return;
+    }
+    setDraftSaved(true);
+  }
+
+  async function publish() {
     const result = challengeSchema.safeParse({
       title: form.title,
       description: form.description,
@@ -98,6 +140,13 @@ function CreateChallengeWizard() {
     });
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Invalid challenge");
+      return;
+    }
+    setSaving(true);
+    const response = await createChallenge(challengePayload(true));
+    setSaving(false);
+    if (!response.ok) {
+      setError(response.message || "Challenge could not be published.");
       return;
     }
     setStage("success");
@@ -123,15 +172,45 @@ function CreateChallengeWizard() {
     <AppShell>
       <Card className="mx-auto max-w-[960px] border-yellow-500/50 p-6 gold-glow md:p-10">
         <PageTitle title="Create New Challenge" subtitle="Build a public or private challenge through a guided setup." />
+        <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-sm font-bold text-[var(--gold-2)]">Current plan: {planAccess.planName}</div>
+              <p className="mt-1 text-sm text-slate-300">Active challenge limit: {planAccess.activeChallengeLimit}. Creator Pro unlocks paid, prize, private, sponsored, and analytics tools.</p>
+            </div>
+            {!planAccess.isCreatorPro ? <LinkButton href="/subscriptions" variant="secondary">Upgrade to Creator Pro</LinkButton> : null}
+          </div>
+        </Card>
+        {privateLocked || monetizedLocked || prizeLocked ? (
+          <Card className="mt-4 border-yellow-500/30 bg-yellow-950/20 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex gap-3 text-yellow-100">
+                <LockKeyhole className="mt-1 shrink-0" size={20} />
+                <div>
+                  <div className="font-black">Some selected options require Creator Pro</div>
+                  <p className="mt-1 text-sm text-yellow-100/80">You can upgrade, or continue with a free public bragging-rights challenge.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <LinkButton href="/subscriptions">Upgrade to Creator Pro</LinkButton>
+                <Button variant="secondary" onClick={() => {
+                  update("type", "Public Challenge");
+                  update("prizeType", "Bragging Rights (Leaderboard Ranking)");
+                  update("entryFee", "0");
+                }}>Continue with Free Public Challenge</Button>
+              </div>
+            </div>
+          </Card>
+        ) : null}
         <div className="mt-8 grid gap-2 md:grid-cols-6">
           {steps.map((label, index) => <button key={label} onClick={() => setStep(index)} className={`rounded-[8px] p-3 text-xs font-black ${step === index ? "bg-[var(--gold)] text-black" : "bg-[#1b1b1b] text-slate-300"}`}>{index + 1}. {label}</button>)}
         </div>
 
         <div className="mt-8 min-h-[470px]">
-          {step === 0 ? <StepBasic form={form} update={update} /> : null}
+          {step === 0 ? <StepBasic form={form} update={update} planAccess={planAccess} /> : null}
           {step === 1 ? <StepFormat form={form} update={update} toggleSubmission={toggleSubmission} /> : null}
           {step === 2 ? <StepDates /> : null}
-          {step === 3 ? <StepPrize form={form} update={update} braggingRights={braggingRights} normalized={normalized} setAllocations={setAllocations} /> : null}
+          {step === 3 ? <StepPrize form={form} update={update} braggingRights={braggingRights} normalized={normalized} setAllocations={setAllocations} planAccess={planAccess} /> : null}
           {step === 4 ? <StepMedia /> : null}
           {step === 5 ? <StepPreview form={form} /> : null}
         </div>
@@ -140,10 +219,10 @@ function CreateChallengeWizard() {
         {draftSaved ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved locally.</p> : null}
 
         <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-white/10 pt-6">
-          <Button variant="secondary" onClick={() => setDraftSaved(true)}><Save size={17} /> Save Draft</Button>
+          <Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> {saving ? "Saving..." : "Save Draft"}</Button>
           <div className="flex gap-3">
             <Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button>
-            {step < steps.length - 1 ? <Button onClick={next}>Next</Button> : <Button onClick={publish}>{form.type === "Private / Exclusive" ? "Publish Privately" : "Publish Publicly"}</Button>}
+            {step < steps.length - 1 ? <Button onClick={next}>Next</Button> : <Button onClick={publish} disabled={saving}>{saving ? "Publishing..." : form.type === "Private / Exclusive" ? "Publish Privately" : "Publish Publicly"}</Button>}
           </div>
         </div>
       </Card>
@@ -151,9 +230,9 @@ function CreateChallengeWizard() {
   );
 }
 
-function StepBasic({ form, update }: { form: any; update: any }) {
+function StepBasic({ form, update, planAccess }: { form: any; update: any; planAccess: ReturnType<typeof getUserPlanAccess> }) {
   const categories = form.type === "Private / Exclusive" ? ["Invite-only", "Premium Creator", "Sponsor-Only", "VIP Community", "Other"] : ["Fitness", "Creative", "Photography", "Food", "Gaming", "Other"];
-  return <section><h2 className="text-2xl font-black">Step 1: Basic Details</h2><div className="mt-5 grid gap-3 rounded-[8px] bg-black p-2 md:grid-cols-2"><Button onClick={() => update("type", "Public Challenge")} variant={form.type === "Public Challenge" ? "primary" : "ghost"}>Public Challenge</Button><Button onClick={() => update("type", "Private / Exclusive")} variant={form.type === "Private / Exclusive" ? "primary" : "ghost"}>Private / Exclusive</Button></div><div className="mt-6 grid gap-6 md:grid-cols-[1fr_260px]"><Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label={form.type === "Private / Exclusive" ? "Private / Exclusive Category" : "Public Category"}><select className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field></div>{form.category === "Other" ? <div className="mt-5"><Field label="Custom Category"><input className={inputClass} value={form.customCategory} onChange={(event) => update("customCategory", event.target.value)} /></Field></div> : null}<div className="mt-5"><Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field></div>{form.type === "Private / Exclusive" ? <Card className="mt-5 grid gap-4 p-5 md:grid-cols-2"><Field label="Invite Code Generation"><input className={inputClass} defaultValue="VAULT2026" /></Field><Field label="Approved Participant List"><textarea className={textareaClass} placeholder="Add approved emails, one per line" /></Field><label className="font-bold"><input className="mr-3" type="checkbox" defaultChecked /> Require access request approval</label><label className="font-bold"><input className="mr-3" type="checkbox" defaultChecked /> Invite-only access</label></Card> : null}</section>;
+  return <section><h2 className="text-2xl font-black">Step 1: Basic Details</h2><div className="mt-5 grid gap-3 rounded-[8px] bg-black p-2 md:grid-cols-2"><Button onClick={() => update("type", "Public Challenge")} variant={form.type === "Public Challenge" ? "primary" : "ghost"}>Public Challenge</Button><Button onClick={() => update("type", "Private / Exclusive")} variant={form.type === "Private / Exclusive" ? "primary" : "ghost"}>Private / Exclusive {!planAccess.canCreatePrivateChallenges ? "Locked" : ""}</Button></div>{!planAccess.canCreatePrivateChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Private and exclusive challenges require Creator Pro. You can still preview the fields, but publishing is blocked until you upgrade.</Card> : null}<div className="mt-6 grid gap-6 md:grid-cols-[1fr_260px]"><Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label={form.type === "Private / Exclusive" ? "Private / Exclusive Category" : "Public Category"}><select className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field></div>{form.category === "Other" ? <div className="mt-5"><Field label="Custom Category"><input className={inputClass} value={form.customCategory} onChange={(event) => update("customCategory", event.target.value)} /></Field></div> : null}<div className="mt-5"><Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field></div>{form.type === "Private / Exclusive" ? <Card className="mt-5 grid gap-4 p-5 md:grid-cols-2"><Field label="Invite Code Generation"><input className={inputClass} defaultValue="VAULT2026" /></Field><Field label="Approved Participant List"><textarea className={textareaClass} placeholder="Add approved emails, one per line" /></Field><label className="font-bold"><input className="mr-3" type="checkbox" defaultChecked /> Require access request approval</label><label className="font-bold"><input className="mr-3" type="checkbox" defaultChecked /> Invite-only access</label></Card> : null}</section>;
 }
 
 function StepFormat({ form, update, toggleSubmission }: { form: any; update: any; toggleSubmission: (type: string) => void }) {
@@ -164,8 +243,8 @@ function StepDates() {
   return <section><h2 className="text-2xl font-black">Step 3: Dates & Eligibility</h2><div className="mt-6 grid gap-5 md:grid-cols-3">{["Registration Deadline", "Start Date", "End Date"].map((label) => <Field key={label} label={label}><div className="flex gap-2"><input className={inputClass} type="date" /><Button variant="ghost">OK</Button></div></Field>)}</div><div className="mt-6 grid gap-5 md:grid-cols-2"><label className="font-bold"><input className="mr-3" type="checkbox" /> Age restriction</label><Field label="Minimum Age"><input className={inputClass} type="number" placeholder="13" /></Field><Field label="Location Restrictions"><select className={inputClass}><option>No restriction</option><option>United States only</option><option>Nigeria only</option><option>Invite list only</option></select></Field></div></section>;
 }
 
-function StepPrize({ form, update, braggingRights, normalized, setAllocations }: { form: any; update: any; braggingRights: boolean; normalized: any[]; setAllocations: any }) {
-  return <section><h2 className="text-2xl font-black">Step 4: Prize & Monetization</h2><div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option>Cash Jackpot</option><option>DoroCoin</option><option>Product Prize</option><option>Bragging Rights (Leaderboard Ranking)</option></select></Field>{!braggingRights ? <Field label="Entry Fee ($)"><input className={inputClass} type="number" min="0.01" value={form.entryFee} onChange={(event) => update("entryFee", event.target.value)} /></Field> : <Card className="p-4 text-slate-300">Payout and entry fee fields are hidden for Bragging Rights competitions.</Card>}</div><div className="mt-6 rounded-[8px] border border-blue-500/30 bg-blue-950/20 p-5"><label className="font-bold"><input className="mr-3" type="checkbox" /> Enable Sponsorship Collaboration</label><div className="mt-5 grid gap-4 md:grid-cols-3">{normalized.map((bucket, index) => <label key={bucket.bucket} className="rounded-[8px] bg-black/40 p-4 text-sm"><input className="mr-2" type="checkbox" checked={bucket.enabled} onChange={() => setAllocations((items: any[]) => items.map((item: any, i: number) => i === index ? { ...item, enabled: !item.enabled } : item))} /> {bucket.bucket}: <b>{bucket.percent}%</b></label>)}</div></div></section>;
+function StepPrize({ form, update, braggingRights, normalized, setAllocations, planAccess }: { form: any; update: any; braggingRights: boolean; normalized: any[]; setAllocations: any; planAccess: ReturnType<typeof getUserPlanAccess> }) {
+  return <section><h2 className="text-2xl font-black">Step 4: Prize & Monetization</h2>{!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Paid entry, prize, and sponsored challenge tools require Creator Pro. Free members can publish public bragging-rights challenges.</Card> : null}<div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option>Cash Jackpot</option><option>DoroCoin</option><option>Product Prize</option><option>Bragging Rights (Leaderboard Ranking)</option></select></Field>{!braggingRights ? <Field label="Entry Fee ($)"><input className={inputClass} type="number" min="0.01" value={form.entryFee} onChange={(event) => update("entryFee", event.target.value)} /></Field> : <Card className="p-4 text-slate-300">Payout and entry fee fields are hidden for Bragging Rights competitions.</Card>}</div><div className="mt-6 rounded-[8px] border border-blue-500/30 bg-blue-950/20 p-5"><label className="font-bold"><input className="mr-3" type="checkbox" disabled={!planAccess.canCreateSponsoredChallenges} /> Enable Sponsorship Collaboration {!planAccess.canCreateSponsoredChallenges ? "(Creator Pro)" : ""}</label><div className="mt-5 grid gap-4 md:grid-cols-3">{normalized.map((bucket, index) => <label key={bucket.bucket} className="rounded-[8px] bg-black/40 p-4 text-sm"><input className="mr-2" type="checkbox" checked={bucket.enabled} disabled={!planAccess.canCreateSponsoredChallenges} onChange={() => setAllocations((items: any[]) => items.map((item: any, i: number) => i === index ? { ...item, enabled: !item.enabled } : item))} /> {bucket.bucket}: <b>{bucket.percent}%</b></label>)}</div></div></section>;
 }
 
 function StepMedia() {

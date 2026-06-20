@@ -2,6 +2,7 @@
 
 import { apiRequest } from "./client";
 import type { SubscriptionPlan } from "@/lib/types";
+import type { ProfileCustomization } from "@/lib/customization/options";
 
 export interface DashboardResponse {
   user: {
@@ -15,6 +16,7 @@ export interface DashboardResponse {
     verified: boolean;
     totalPoints: number;
     doroBalance: number;
+    customization?: ProfileCustomization;
   };
   stats: {
     activeChallenges: number;
@@ -56,6 +58,7 @@ export function fetchBootstrapProfile() {
       emailVerified?: boolean;
       emailVerifiedAt?: string | null;
       isAdmin: boolean;
+      customization?: ProfileCustomization;
     };
   }>("/api/auth/profile/bootstrap");
 }
@@ -127,6 +130,9 @@ export function fetchMyProfile() {
       premium: boolean;
       joinedAt?: string | null;
       doroBalance: number;
+      customization?: ProfileCustomization;
+      customizationUpdatedAt?: string | null;
+      customizationUnlockedByPlan?: string | null;
     };
     stats: {
       totalPoints: number;
@@ -181,6 +187,14 @@ export function createSubscriptionCheckout(planId: string) {
 
 export function updateMyProfile(payload: { displayName: string; selfDeclaredRegion: "US" | "NG" }) {
   return apiRequest<{ user: unknown }>("/api/profile/me", { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function fetchProfileCustomization() {
+  return apiRequest<{ customization: ProfileCustomization; access: unknown; options: unknown }>("/api/profile/customization");
+}
+
+export function updateProfileCustomization(customization: ProfileCustomization) {
+  return apiRequest<{ customization: ProfileCustomization }>("/api/profile/customization", { method: "PATCH", body: JSON.stringify({ customization }) });
 }
 
 export function fetchDoroCoinPackages() {

@@ -7,6 +7,9 @@ import { Card, EmptyState, LinkButton } from "@/components/ui";
 import { PremiumBadge } from "@/components/brand";
 import { fetchMyProfile } from "@/lib/api/services";
 import type { UserPlanId } from "@/lib/types";
+import type { ProfileCustomization } from "@/lib/customization/options";
+import { findCustomizationOption } from "@/lib/customization/options";
+import { cn } from "@/lib/utils";
 
 interface ProfileState {
   profileExists: boolean;
@@ -20,6 +23,7 @@ interface ProfileState {
     planId?: string | null;
     joinedAt?: string | null;
     doroBalance: number;
+    customization?: ProfileCustomization;
   };
   stats: {
     totalPoints: number;
@@ -116,14 +120,15 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
-      <Card className="bg-yellow-500/5 p-10">
+      <Card className={cn("bg-yellow-500/5 p-10", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
         <div className="flex items-start justify-between">
           <div className="flex gap-8">
-            <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-yellow-500/30 bg-indigo-500 text-4xl">
+            <div className={cn("flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-yellow-500/30 bg-indigo-500 text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
               {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
             </div>
             <div>
-              <h1 className="flex items-center gap-3 text-4xl font-black">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} /></h1>
+              <h1 className="flex items-center gap-3 text-4xl font-black">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} /></h1>
+              {profile.user.customization?.profileTagline ? <p className="mt-3 text-lg font-bold text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : null}
               <p className="mt-3 font-bold">{profile.user.username ? `@${profile.user.username} · ` : ""}{profile.user.email}</p>
               <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.role ?? "Role unavailable"} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
               <LinkButton href="/profile/edit" className="mt-8 w-36">Edit Profile</LinkButton>

@@ -3,6 +3,8 @@ import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { canCreateChallenge, getUserPlanAccess } from "@/lib/plan-access";
+import { fail } from "@/lib/server/responses";
 
 export async function GET() {
   const db = getAdminDb();
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Challenge creation");
-  const permission = requireRole(user, ["creator", "sponsor"]);
+  const permission = requireRole(user, ["user", "creator", "sponsor"]);
   if (permission) return permission;
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
@@ -33,6 +35,24 @@ export async function POST(request: Request) {
   if (Object.keys(fieldErrors).length) return validationError(fieldErrors);
 
   const now = new Date().toISOString();
+  const [accountSnap, profileSnap, ownedChallengesSnap] = await Promise.all([
+    db.collection("users").doc(user.uid).get(),
+    db.collection("profiles").doc(user.uid).get(),
+    db.collection("challenges").where("creatorId", "==", user.uid).limit(100).get()
+  ]);
+  const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
+  const planAccess = getUserPlanAccess(planProfile);
+  const activeChallengeCount = ownedChallengesSnap.docs.filter((doc) => {
+    const data = doc.data();
+    const status = String(data.status ?? "").toLowerCase();
+    const visibility = String(data.visibility ?? data.type ?? "public").toLowerCase();
+    return ["published", "active", "upcoming"].includes(status) && !visibility.includes("private");
+  }).length;
+  const creationAccess = canCreateChallenge(planProfile, body as Record<string, unknown>, activeChallengeCount);
+  if (!creationAccess.allowed) {
+    return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess, activeChallengeCount }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
+  }
+
   const ref = db.collection("challenges").doc();
   const challenge = {
     id: ref.id,
@@ -41,6 +61,9 @@ export async function POST(request: Request) {
     description: body.description,
     category: body.category,
     type: body.type ?? "public",
+    visibility: body.visibility ?? body.type ?? "public",
+    premiumOnly: Boolean(body.premiumOnly),
+    planRequired: body.premiumOnly ? "premium" : null,
     status: body.publish ? "published" : "draft",
     registrationDeadline: body.registrationDeadline,
     startsAt: body.startsAt,
@@ -56,6 +79,7 @@ export async function POST(request: Request) {
     voteCount: 0,
     weightedVoteCount: 0,
     requiresSubmissionApproval: true,
+    creatorPlanId: planAccess.planId,
     createdAt: now,
     updatedAt: now
   };

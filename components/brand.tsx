@@ -1,6 +1,7 @@
 import { BadgeCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserPlanId } from "@/lib/types";
+import { findCustomizationOption } from "@/lib/customization/options";
 
 export const logoUrl = "https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg";
 
@@ -12,13 +13,21 @@ export function BrandLogo({ className, imageClassName }: { className?: string; i
   );
 }
 
-export function PremiumBadge({ planId, compact = false }: { planId?: UserPlanId; compact?: boolean }) {
-  const premium = planId && planId !== "observer";
-  if (!premium) return null;
+function planBadgeLabel(planId?: UserPlanId) {
+  if (planId === "verified_host" || planId === "executive_host" || planId === "chief_producer") return "Verified Host";
+  if (planId === "creator_pro") return "Creator Pro";
+  if (planId === "premium" || planId === "creator" || planId === "competitor") return "Premium";
+  return "Free Member";
+}
+
+export function PremiumBadge({ planId, compact = false, badgeStyleId }: { planId?: UserPlanId; compact?: boolean; badgeStyleId?: string }) {
+  const label = planBadgeLabel(planId);
+  const premium = label !== "Free Member";
+  const badgeStyle = badgeStyleId ? findCustomizationOption(badgeStyleId, "badge") : null;
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-500/15 font-black text-sky-300", compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
-      <BadgeCheck size={compact ? 14 : 16} className="fill-sky-400 text-black" />
-      Premium
+    <span className={cn("inline-flex items-center gap-1 rounded-full border font-black", badgeStyle?.previewClass ?? (premium ? "border-sky-400/40 bg-sky-500/15 text-sky-300" : "border-white/10 bg-white/5 text-slate-300"), compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
+      <BadgeCheck size={compact ? 14 : 16} className={premium ? "fill-sky-400 text-black" : "text-slate-400"} />
+      {label}
     </span>
   );
 }

@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { sanitizeCustomization } from "@/lib/customization/access";
 
 type DashboardQueryName =
   | "user"
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
     const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const leaderboardData = leaderboardSnap.exists ? leaderboardSnap.data() : {};
     const leaderboardEntries = Array.isArray(leaderboardData?.entries) ? leaderboardData.entries : [];
+    const customization = sanitizeCustomization((profile?.customization ?? account?.customization) as any);
 
     return ok({
       user: {
@@ -121,7 +123,8 @@ export async function GET(request: Request) {
         premium: Boolean(profile?.premium || (account?.planId && account.planId !== "observer")),
         verified: Boolean(profile?.verified ?? user.emailVerified),
         totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
-        doroBalance: Number(wallet?.balance ?? 0)
+        doroBalance: Number(wallet?.balance ?? 0),
+        customization
       },
       stats: {
         activeChallenges: challenges.filter((challenge) => ["published", "registration_open", "active", "voting"].includes(String(challenge.status))).length,

@@ -2,6 +2,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
+import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,7 @@ function initialsFromName(name: string) {
 
 function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>) {
   const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
+  const planAccess = getUserPlanAccess({ ...profile, ...account });
   return {
     uid: user.uid,
     firstName: String(profile.firstName ?? account.firstName ?? ""),
@@ -33,10 +36,11 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     displayName,
     email: String(user.email ?? profile.email ?? account.email ?? ""),
     role: typeof account.role === "string" ? account.role : typeof profile.role === "string" ? profile.role : "user",
-    planId: typeof account.planId === "string" ? account.planId : typeof profile.planId === "string" ? profile.planId : "observer",
+    ...planAccess,
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
+    customization: sanitizeCustomization((profile.customization ?? account.customization) as any),
     initials: String(profile.initials ?? initialsFromName(displayName || String(user.email ?? ""))),
-    premium: Boolean(profile.premium || account.premium || (account.planId && account.planId !== "observer")),
+    premium: planAccess.isPremium,
     verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerifiedAt: profile.emailVerifiedAt ?? account.emailVerifiedAt ?? null,
@@ -102,6 +106,8 @@ export async function POST(request: Request) {
       .filter(Boolean);
     const isAdmin = Boolean(email && adminEmails.includes(email.toLowerCase()));
 
+    const planFields = planFieldsFor("free");
+
     await Promise.all([
       db.collection("users").doc(user.uid).set({
         uid: user.uid,
@@ -110,7 +116,7 @@ export async function POST(request: Request) {
         lastName: parsed.data.lastName,
         displayName,
         role: parsed.data.role,
-        planId: "observer",
+        ...planFields,
         isAdmin,
         emailVerified: Boolean(user.emailVerified),
         verificationStatus: user.emailVerified ? "verified" : "pending",
@@ -125,11 +131,14 @@ export async function POST(request: Request) {
         initials: initialsFromName(displayName || email),
         email,
         role: parsed.data.role,
-        premium: false,
+        ...planFields,
+        premium: planFields.isPremium,
         verified: Boolean(user.emailVerified),
         emailVerified: Boolean(user.emailVerified),
         verificationStatus: user.emailVerified ? "verified" : "pending",
         isAdmin,
+        customization: sanitizeCustomization(null),
+        customizationUnlockedByPlan: "free",
         createdAt: now,
         updatedAt: now
       }, { merge: true }),

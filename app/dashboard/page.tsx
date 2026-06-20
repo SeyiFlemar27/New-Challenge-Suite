@@ -10,6 +10,8 @@ import { BrandLogo, PremiumBadge } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import type { UserPlanId } from "@/lib/types";
+import { findCustomizationOption } from "@/lib/customization/options";
+import { cn } from "@/lib/utils";
 
 type LeaderboardEntry = {
   displayName?: string;
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const displayName = dashboard?.user.displayName || "there";
   const planId = dashboard?.user.planId as UserPlanId | undefined;
+  const dashboardStyle = findCustomizationOption(dashboard?.user.customization?.dashboardStyleId, "dashboardStyle")?.previewClass;
 
   return (
     <AppShell>
@@ -62,9 +65,9 @@ export default function DashboardPage() {
         </Card>
       ) : null}
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <Stat icon={<Swords />} title="Active Challenges" value={isLoading ? "..." : String(dashboard?.stats.activeChallenges ?? 0)} label="In Progress" />
-        <Stat icon={<Diamond />} title="Points Earned" value={isLoading ? "..." : String(dashboard?.stats.totalPoints ?? 0)} label="Total Points" />
-        <Stat icon={<Medal />} title="Badges Collected" value={isLoading ? "..." : String(dashboard?.stats.badgeCount ?? 0)} label="Total Earned" />
+        <Stat className={dashboardStyle} icon={<Swords />} title="Active Challenges" value={isLoading ? "..." : String(dashboard?.stats.activeChallenges ?? 0)} label="In Progress" />
+        <Stat className={dashboardStyle} icon={<Diamond />} title="Points Earned" value={isLoading ? "..." : String(dashboard?.stats.totalPoints ?? 0)} label="Total Points" />
+        <Stat className={dashboardStyle} icon={<Medal />} title="Badges Collected" value={isLoading ? "..." : String(dashboard?.stats.badgeCount ?? 0)} label="Total Earned" />
       </div>
       <Card className="mt-8 p-6 md:p-8">
         <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
@@ -119,6 +122,6 @@ export default function DashboardPage() {
   );
 }
 
-function Stat({ icon, title, value, label }: { icon: React.ReactNode; title: string; value: string; label: string }) {
-  return <Card className="flex items-center gap-5 p-6"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-indigo-950 text-purple-300">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black">{value} <span className="text-base text-emerald-400">+0</span></div><div className="text-sm text-slate-300">{label}</div></div></Card>;
+function Stat({ icon, title, value, label, className }: { icon: React.ReactNode; title: string; value: string; label: string; className?: string | null }) {
+  return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-indigo-950 text-purple-300">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black">{value} <span className="text-base text-emerald-400">+0</span></div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }

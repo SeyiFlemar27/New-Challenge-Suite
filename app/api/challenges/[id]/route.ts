@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
+import { canAccessChallenge } from "@/lib/plan-access";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +14,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const user = await getOptionalRequestUser(request);
+  if (user) {
+    const [accountSnap, profileSnap] = await Promise.all([
+      db.collection("users").doc(user.uid).get(),
+      db.collection("profiles").doc(user.uid).get()
+    ]);
+    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, challengeSnap.data() ?? {});
+    if (!access.allowed) {
+      return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Creator Pro is required to view this private or exclusive challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
+    }
+  }
   const [submissionsSnap, sponsorshipsSnap, votesSnap, participantSnap] = await Promise.all([
     db.collection("submissions").where("challengeId", "==", id).orderBy("weightedVoteCount", "desc").limit(50).get(),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),

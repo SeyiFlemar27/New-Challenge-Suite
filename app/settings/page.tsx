@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, CheckCircle2, Shield, Settings as SettingsIcon } from "lucide-react";
+import { Bell, CheckCircle2, Palette, Shield, Settings as SettingsIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, PageTitle } from "@/components/ui";
+import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
 
 export default function SettingsPage() {
   const [notifications, setNotifications] = useState(false);
@@ -34,6 +34,11 @@ export default function SettingsPage() {
           <h2 className="flex items-center gap-2 text-2xl font-black"><Shield className="text-[var(--gold)]" /> Compliance</h2>
           <p className="mt-3 text-slate-300">Legal agreements are shown contextually for signup, voting, challenge entry, sponsorship, live events, and winner claims.</p>
           <div className="mt-6 rounded-[8px] border border-white/10 bg-black/30 p-4 font-bold">Current account agreement version accepted once per version.</div>
+        </Card>
+        <Card className="p-7">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><Palette className="text-[var(--gold)]" /> Customization</h2>
+          <p className="mt-3 text-slate-300">Choose approved themes, badge styles, avatar rings, profile frames, and creator branding based on your plan.</p>
+          <LinkButton href="/settings/customization" className="mt-6">Customize Your Experience</LinkButton>
         </Card>
       </div>
     </AppShell>

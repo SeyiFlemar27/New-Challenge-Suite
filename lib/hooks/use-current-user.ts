@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import type { AppRole, UserPlanId } from "@/lib/types";
+import type { ProfileCustomization } from "@/lib/customization/options";
 
 export interface CurrentUserProfile {
   uid: string;
@@ -16,6 +17,7 @@ export interface CurrentUserProfile {
   verified: boolean;
   premium: boolean;
   isAdmin: boolean;
+  customization?: ProfileCustomization;
 }
 
 function initialsFromName(name: string) {
@@ -70,7 +72,8 @@ export function useCurrentUser() {
           doroBalance: typeof profile.doroBalance === "number" ? profile.doroBalance : null,
           verified: Boolean(profile.verified || profile.emailVerified || auth.user.emailVerified),
           premium: Boolean(profile.premium || (planId && planId !== "observer")),
-          isAdmin: Boolean(profile.isAdmin)
+          isAdmin: Boolean(profile.isAdmin),
+          customization: profile.customization as ProfileCustomization | undefined
         });
       } catch (caught) {
         if (!cancelled) {

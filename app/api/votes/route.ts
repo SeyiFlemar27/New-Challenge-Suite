@@ -1,7 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { castVote } from "@/lib/server/voting";
+import { getUserPlanAccess } from "@/lib/plan-access";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -22,13 +23,13 @@ export async function POST(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Voting");
 
-  const profileSnap = await db.collection("users").doc(user.uid).get();
-  const planId = profileSnap.data()?.planId || "observer";
-  if (voteMode === "dorocoin" && planId === "observer") {
-    return forbidden("Paid DoroCoin voting requires a paid subscription plan.");
-  }
+  const [accountSnap, profileSnap] = await Promise.all([
+    db.collection("users").doc(user.uid).get(),
+    db.collection("profiles").doc(user.uid).get()
+  ]);
+  const planAccess = getUserPlanAccess({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) });
   try {
-    const vote = await castVote(db, { userId: user.uid, challengeId, submissionId, voteMode, planId });
+    const vote = await castVote(db, { userId: user.uid, challengeId, submissionId, voteMode, planId: planAccess.planId, dailyFreeVoteLimit: planAccess.dailyFreeVoteLimit });
     return ok({ vote }, voteMode === "dorocoin" ? "Paid vote counted. 1 DoroCoin was spent." : "Free vote counted.");
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Vote could not be recorded.", 409, undefined, "VOTE_REJECTED");

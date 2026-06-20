@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { subscriptionPlans } from "@/lib/server/subscriptions";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { getUserPlanAccess } from "@/lib/plan-access";
 
 export const dynamic = "force-dynamic";
 
@@ -40,16 +40,15 @@ export async function GET(request: Request) {
 
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
-    const currentPlanId = String(account.planId ?? profile.planId ?? "observer");
-    const plan = subscriptionPlans.find((item) => item.id === currentPlanId) ?? subscriptionPlans[0];
+    const plan = getUserPlanAccess({ ...profile, ...account });
     const registeredEventIds = new Set(registrationsSnap.docs.map((doc) => String(doc.data().eventId ?? "")));
 
     const events = eventsSnap.docs
       .map((doc) => {
         const data = doc.data();
         const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
-        const requiredPlan = requiredPlanId ? subscriptionPlans.find((item) => item.id === requiredPlanId) : null;
-        const planRequired = Boolean(requiredPlan && !plan.canHostLiveEvents && requiredPlan.canHostLiveEvents);
+        const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
+        const planRequired = Boolean(requiredPlan && requiredPlan.canHostLiveEvents && !plan.canHostLiveEvents);
         const capacity = Number(data.capacity ?? data.maxAttendees ?? 0);
         const attending = Number(data.attending ?? data.attendeeCount ?? data.registrationCount ?? 0);
         return {
@@ -78,7 +77,8 @@ export async function GET(request: Request) {
       user: {
         uid: user.uid,
         email: user.email ?? account.email ?? profile.email ?? "",
-        planId: plan.id,
+        planId: plan.planId,
+        planName: plan.planName,
         subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free",
         canHostLiveEvents: plan.canHostLiveEvents
       },

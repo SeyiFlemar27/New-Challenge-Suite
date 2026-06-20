@@ -1,8 +1,13 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { todayKey } from "@/lib/utils";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
+import { normalizePlanId } from "@/lib/plan-access";
 
 const weightByPlan: Record<string, number> = {
+  free: 1,
+  premium: 1.15,
+  creator_pro: 1.5,
+  verified_host: 2,
   observer: 1,
   creator: 1.1,
   competitor: 1.25,
@@ -12,10 +17,11 @@ const weightByPlan: Record<string, number> = {
   enterprise_sponsor: 1
 };
 
-export async function castVote(db: Firestore, input: { userId: string; challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; planId?: string }) {
+export async function castVote(db: Firestore, input: { userId: string; challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; planId?: string; dailyFreeVoteLimit?: number }) {
   const now = new Date().toISOString();
   const voteDate = todayKey();
-  const weight = weightByPlan[input.planId || "observer"] ?? 1;
+  const normalizedPlanId = normalizePlanId(input.planId);
+  const weight = weightByPlan[normalizedPlanId] ?? weightByPlan[input.planId || "free"] ?? 1;
 
   return db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(input.challengeId);
@@ -30,6 +36,15 @@ export async function castVote(db: Firestore, input: { userId: string; challenge
     if (submissionSnap.data()?.challengeId !== input.challengeId) throw new Error("Submission does not belong to this challenge.");
 
     if (input.voteMode === "free") {
+      const dailyVoteLimit = Number(input.dailyFreeVoteLimit ?? 1);
+      const dailyFreeVoteQuery = db.collection("votes")
+        .where("userId", "==", input.userId)
+        .where("voteDate", "==", voteDate)
+        .where("voteMode", "==", "free")
+        .limit(Math.max(dailyVoteLimit, 1));
+      const todayVotes = await transaction.get(dailyFreeVoteQuery);
+      if (todayVotes.size >= dailyVoteLimit) throw new Error(`Daily free vote limit reached. Your plan includes ${dailyVoteLimit} free votes per day.`);
+
       const freeVoteQuery = db.collection("votes")
         .where("userId", "==", input.userId)
         .where("challengeId", "==", input.challengeId)

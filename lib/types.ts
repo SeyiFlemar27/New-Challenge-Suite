@@ -12,7 +12,9 @@ export type AgreementType =
   | "winner_claim"
   | "anti_fraud";
 
-export type UserPlanId = "observer" | "creator" | "competitor" | "executive_host" | "chief_producer" | "brand_partner" | "enterprise_sponsor";
+export type ProductPlanId = "free" | "premium" | "creator_pro" | "verified_host";
+export type LegacyPlanId = "observer" | "creator" | "competitor" | "executive_host" | "chief_producer" | "brand_partner" | "enterprise_sponsor";
+export type UserPlanId = ProductPlanId | LegacyPlanId;
 export type AppRole = "user" | "creator" | "sponsor";
 
 export interface UserProfile {

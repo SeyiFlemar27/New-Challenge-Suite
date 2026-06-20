@@ -2,6 +2,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
+import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -90,10 +92,12 @@ export async function GET(request: Request) {
         displayName: fallbackDisplayName,
         initials: fallbackInitials,
         role: String(account.role ?? profile.role ?? "user"),
-        planId: String(account.planId ?? profile.planId ?? "observer"),
-        premium: Boolean(profile.premium || account.premium || (account.planId && account.planId !== "observer")),
+        ...planFieldsFor("free"),
+        premium: false,
         verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || user.emailVerified),
         emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || user.emailVerified),
+        customization: sanitizeCustomization(null),
+        customizationUnlockedByPlan: "free",
         createdAt: String(profile.createdAt ?? account.createdAt ?? now),
         updatedAt: now
       };
@@ -117,6 +121,8 @@ export async function GET(request: Request) {
     ]);
 
     const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
+    const planAccess = getUserPlanAccess({ ...profile, ...account });
+    const customization = sanitizeCustomization((profile.customization ?? account.customization) as any);
     const submissions: Array<Record<string, unknown>> = submissionsSnap ? submissionsSnap.docs.map((doc) => {
       const data = doc.data();
       return {
@@ -146,12 +152,15 @@ export async function GET(request: Request) {
         initials: profile.initials ?? initialsFromName(displayName || String(user.email ?? "")),
         avatarUrl: profile.avatarUrl ?? profile.photoURL ?? account.avatarUrl ?? null,
         role: account.role ?? profile.role ?? null,
-        planId: account.planId ?? profile.planId ?? "observer",
+        ...planAccess,
         selfDeclaredRegion: profile.selfDeclaredRegion ?? account.selfDeclaredRegion ?? null,
         verified: Boolean(profile.verified ?? user.emailVerified),
-        premium: Boolean(profile.premium || (account.planId && account.planId !== "observer")),
+        premium: planAccess.isPremium,
         joinedAt: toIso(profile.createdAt ?? account.createdAt),
-        doroBalance: Number(wallet.balance ?? 0)
+        doroBalance: Number(wallet.balance ?? 0),
+        customization,
+        customizationUpdatedAt: profile.customizationUpdatedAt ?? account.customizationUpdatedAt ?? null,
+        customizationUnlockedByPlan: profile.customizationUnlockedByPlan ?? account.customizationUnlockedByPlan ?? planAccess.planId
       },
       stats: {
         totalPoints: Number(profile.totalPoints ?? account.totalPoints ?? 0),

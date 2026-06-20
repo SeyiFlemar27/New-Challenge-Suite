@@ -39,12 +39,28 @@ function initializeAdmin() {
 
 type SeedDoc = { id: string } & Record<string, unknown>;
 
+const planSeedFields = {
+  free: { planId: "free", planName: "Free Member", isPremium: false, isCreatorPro: false, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 1, dailyFreeVoteLimit: 5, canCreatePaidChallenges: false, canCreatePrivateChallenges: false, canCreatePrizeChallenges: false, canCreateSponsoredChallenges: false, canHostLiveEvents: false, canAccessPremiumChallenges: false, canUseAdvancedAnalytics: false },
+  premium: { planId: "premium", planName: "Premium Member", isPremium: true, isCreatorPro: false, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 5, dailyFreeVoteLimit: 20, canCreatePaidChallenges: false, canCreatePrivateChallenges: false, canCreatePrizeChallenges: false, canCreateSponsoredChallenges: false, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: false },
+  creator_pro: { planId: "creator_pro", planName: "Creator Pro", isPremium: true, isCreatorPro: true, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 25, dailyFreeVoteLimit: 50, canCreatePaidChallenges: true, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true },
+  verified_host: { planId: "verified_host", planName: "Verified Host", isPremium: true, isCreatorPro: true, isVerifiedHost: true, planStatus: "active", activeChallengeLimit: 50, dailyFreeVoteLimit: 50, canCreatePaidChallenges: true, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: true, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true }
+};
+
+const customizationSeedFields = {
+  free: { customization: { appThemeId: "default_black_gold", accentColorId: "gold", profileBadgeId: "free_member", profileFrameId: "default", avatarRingId: "none", dashboardStyleId: "classic_dark", cardStyleId: "classic_dark", celebrationEffectId: "none", profileTagline: "" }, customizationUnlockedByPlan: "free" },
+  premium: { customization: { appThemeId: "royal_purple_gold", accentColorId: "purple", profileBadgeId: "premium_diamond", profileFrameId: "premium_glow", avatarRingId: "purple_glow", dashboardStyleId: "glass_arena", cardStyleId: "gold_accent", celebrationEffectId: "gold_spark", profileTagline: "Premium competitor with arena style." }, customizationUnlockedByPlan: "premium" },
+  creator_pro: { customization: { appThemeId: "creator_studio", accentColorId: "crimson", profileBadgeId: "creator_pro", profileFrameId: "creator_studio_frame", avatarRingId: "creator_ring", dashboardStyleId: "creator_studio", cardStyleId: "creator_studio", celebrationEffectId: "champion_glow", profileTagline: "Building premium challenge experiences.", publicProfileThemeId: "creator_studio", creatorBrandColorId: "crimson" }, customizationUnlockedByPlan: "creator_pro" },
+  verified_host: { customization: { appThemeId: "verified_host_elite", accentColorId: "platinum", profileBadgeId: "verified_host", profileFrameId: "verified_host_frame", avatarRingId: "verified_host_ring", dashboardStyleId: "host_elite", cardStyleId: "host_elite", celebrationEffectId: "champion_glow", profileTagline: "Verified host for live Challenge Suite events.", publicProfileThemeId: "verified_host_elite", creatorBrandColorId: "platinum", hostBadgeStyleId: "elite_host" }, customizationUnlockedByPlan: "verified_host" }
+};
+
 const demoProfiles: SeedDoc[] = [
-  { id: "demo-creator-lens-league", displayName: "Lens League", initials: "LL", role: "creator", planId: "chief_producer", premium: true, totalPoints: 18420, email: "lens@example.com" },
-  { id: "demo-creator-move-district", displayName: "Move District", initials: "MD", role: "creator", planId: "pro_creator", premium: true, totalPoints: 16900, email: "move@example.com" },
-  { id: "demo-user-nia-stone", displayName: "Nia Stone", initials: "NS", role: "user", planId: "chief_producer", premium: true, totalPoints: 18420, email: "nia@example.com" },
-  { id: "demo-user-theo-grant", displayName: "Theo Grant", initials: "TG", role: "user", planId: "pro_creator", premium: true, totalPoints: 16900, email: "theo@example.com" },
-  { id: demoUserId, displayName: "Demo Member", initials: "DM", role: "creator", planId: "chief_producer", premium: true, totalPoints: 12840, email: "demo-member@example.com" }
+  { id: "demo-user-free-member", displayName: "Free Member Demo", initials: "FM", role: "user", ...planSeedFields.free, ...customizationSeedFields.free, premium: false, totalPoints: 420, email: "free@example.com" },
+  { id: "demo-user-premium-member", displayName: "Premium Member Demo", initials: "PM", role: "user", ...planSeedFields.premium, ...customizationSeedFields.premium, premium: true, totalPoints: 6420, email: "premium@example.com" },
+  { id: "demo-creator-move-district", displayName: "Move District", initials: "MD", role: "creator", ...planSeedFields.creator_pro, ...customizationSeedFields.creator_pro, premium: true, totalPoints: 16900, email: "move@example.com" },
+  { id: "demo-creator-lens-league", displayName: "Lens League", initials: "LL", role: "creator", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 18420, email: "lens@example.com" },
+  { id: "demo-user-nia-stone", displayName: "Nia Stone", initials: "NS", role: "user", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 18420, email: "nia@example.com" },
+  { id: "demo-user-theo-grant", displayName: "Theo Grant", initials: "TG", role: "user", ...planSeedFields.creator_pro, ...customizationSeedFields.creator_pro, premium: true, totalPoints: 16900, email: "theo@example.com" },
+  { id: demoUserId, displayName: "Demo Member", initials: "DM", role: "creator", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 12840, email: "demo-member@example.com" }
 ];
 
 const challenges: SeedDoc[] = [
