@@ -33,6 +33,14 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "sortOrder", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "challengeId", "order": "ASCENDING" },
+        { "fieldPath": "weightedVoteCount", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
