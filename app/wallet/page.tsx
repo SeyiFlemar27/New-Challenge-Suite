@@ -5,7 +5,7 @@ import { Coins, LockKeyhole, TrendingUp, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { money } from "@/lib/utils";
-import { fetchDoroCoinPackages, fetchWallet, purchaseDoroCoins } from "@/lib/api/services";
+import { fetchDoroCoinPackages, fetchWallet, purchaseCustomDoroCoins, purchaseDoroCoins } from "@/lib/api/services";
 
 interface DoroPackage {
   id: string;
@@ -44,6 +44,7 @@ export default function WalletPage() {
   const [checkoutPackageId, setCheckoutPackageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(false);
+  const [customCoins, setCustomCoins] = useState("250");
 
   async function loadWallet() {
     setLoading(true);
@@ -110,6 +111,28 @@ export default function WalletPage() {
     window.location.href = result.data.url;
   }
 
+  async function buyCustomCoins() {
+    const coins = Number(customCoins);
+    if (!Number.isInteger(coins) || coins < 50 || coins > 10000) {
+      setStatus("Enter a whole DoroCoin amount between 50 and 10,000.");
+      return;
+    }
+    setCheckoutPackageId("custom");
+    setStatus("");
+    const result = await purchaseCustomDoroCoins(coins);
+    setCheckoutPackageId(null);
+    if (result.ok && result.data?.url) {
+      setStatus("Checkout started. Your wallet updates after Stripe confirms payment.");
+      window.location.href = result.data.url;
+      return;
+    }
+    if (result.ok && result.data?.paymentPending) {
+      setStatus("Payment request created. Stripe checkout still needs configuration before this can be paid.");
+      return;
+    }
+    setStatus(result.message || "Custom DoroCoin checkout could not be started.");
+  }
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -145,6 +168,23 @@ export default function WalletPage() {
 
       {!loading && !unauthenticated && !error ? <section className="mt-10">
         <h2 className="text-2xl font-black">Buy DoroCoins</h2>
+        <Card className="mt-5 p-6">
+          <div className="grid gap-5 lg:grid-cols-[1fr_220px_220px] lg:items-end">
+            <div>
+              <h3 className="text-xl font-black">Custom Purchase</h3>
+              <p className="mt-2 text-sm text-slate-300">Enter the exact amount you want. MVP rate: 1 DoroCoin = $0.02.</p>
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold text-slate-300">DoroCoins</span>
+              <input className="h-12 w-full rounded-[8px] border border-white/10 bg-[#11151d] px-4 font-bold outline-none focus:border-[var(--gold)]" value={customCoins} onChange={(event) => setCustomCoins(event.target.value.replace(/[^\d]/g, ""))} />
+            </label>
+            <div className="rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4">
+              <div className="text-sm font-bold text-slate-300">Estimated total</div>
+              <div className="text-2xl font-black text-[var(--gold)]">{money((Number(customCoins || 0) * 0.02) || 0)}</div>
+            </div>
+          </div>
+          <Button className="mt-5 w-full md:w-auto" onClick={buyCustomCoins} disabled={checkoutPackageId === "custom"}>{checkoutPackageId === "custom" ? "Preparing Payment..." : "Continue to Payment"}</Button>
+        </Card>
         {packages.length ? <div className="mt-5 grid gap-6 md:grid-cols-3">
           {packages.map((pack) => (
             <Card key={pack.id} className="p-6">

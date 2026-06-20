@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   const fieldErrors: Record<string, string> = {};
   if (!body?.challengeId) fieldErrors.challengeId = "Challenge ID is required.";
   if (!body?.title) fieldErrors.title = "Title is required.";
-  if (!body?.mediaUrl) fieldErrors.mediaUrl = "Media URL is required.";
+  const mediaUploadPending = body?.mediaUploadPending === true;
+  if (!body?.mediaUrl && !mediaUploadPending) fieldErrors.mediaUrl = "Media URL is required.";
   if (body?.mediaType && !["image", "video"].includes(body.mediaType)) fieldErrors.mediaType = "Media type must be image or video.";
   if (Object.keys(fieldErrors).length) return validationError(fieldErrors);
 
@@ -36,9 +37,12 @@ export async function POST(request: Request) {
     title: body.title,
     description: body.description ?? "",
     caption: body.caption ?? "",
-    mediaUrl: body.mediaUrl,
+    mediaUrl: body.mediaUrl ?? "",
     mediaType,
-    status: "pending_approval",
+    status: mediaUploadPending ? "media_upload_pending" : "pending_approval",
+    mediaUploadPending,
+    originalFileName: body.originalFileName ?? "",
+    fileSize: Number(body.fileSize ?? 0),
     voteCount: 0,
     weightedVoteCount: 0,
     createdAt: now,
@@ -50,6 +54,6 @@ export async function POST(request: Request) {
     const freshChallengeSnap = await transaction.get(challengeRef);
     transaction.set(challengeRef, { submissionCount: Number(freshChallengeSnap.data()?.submissionCount ?? 0) + 1, updatedAt: now }, { merge: true });
   });
-  await createNotification(db, { userId: user.uid, type: "submission_uploaded", title: "Submission uploaded", body: "Your submission is pending approval.", targetId: ref.id });
-  return ok({ submission }, "Submission uploaded and pending approval.");
+  await createNotification(db, { userId: user.uid, type: "submission_uploaded", title: mediaUploadPending ? "Submission received" : "Submission uploaded", body: mediaUploadPending ? "Your submission metadata was saved and media upload is pending." : "Your submission is pending approval.", targetId: ref.id });
+  return ok({ submission }, mediaUploadPending ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded and pending approval.");
 }

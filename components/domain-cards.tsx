@@ -78,7 +78,7 @@ export function WinnerCard({ submission }: { submission: SubmissionWithProfile }
           <span className="flex items-center gap-2 font-black">{submission.userName}<PremiumBadge planId={submission.userPlanId} compact /></span>
         </div>
         <div className="mt-5 border-t border-white/10 pt-4 font-bold"><Heart size={17} className="mr-2 inline fill-pink-500 text-pink-500" /> {submission.likes.toLocaleString()} Votes</div>
-        <LinkButton href={`/submissions/${submission.id}`} className="mt-4 w-full">View Winner</LinkButton>
+        <LinkButton href={`/winners/${submission.id}`} className="mt-4 w-full">View Winner</LinkButton>
       </div>
     </Card>
   );

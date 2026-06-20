@@ -82,8 +82,8 @@ export function checkPrivateInviteCode(inviteCode: string) {
   return apiRequest<{ challengeId: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "check_code", inviteCode }) });
 }
 
-export function requestPrivateAccess(challengeId?: string) {
-  return apiRequest<{ requestId: string; status: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "request_access", challengeId }) });
+export function requestPrivateAccess(payload: { challengeId?: string; reason: string; note?: string }) {
+  return apiRequest<{ requestId: string; status: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "request_access", ...payload }) });
 }
 
 export function fetchChallengeDetails(challengeId: string) {
@@ -231,12 +231,24 @@ export function fetchWinners() {
   return apiRequest<{ winners: unknown[] }>("/api/winners");
 }
 
+export function fetchWinnerDetails(winnerId: string) {
+  return apiRequest<{ winner: unknown; challenge: unknown | null; profile: unknown | null; leaderboard: unknown[] }>(`/api/winners/${winnerId}`);
+}
+
+export function fetchLeaderboards(board = "global") {
+  return apiRequest<{ board: string; entries: unknown[]; source: string; updatedAt: string | null }>(`/api/leaderboards?board=${encodeURIComponent(board)}`);
+}
+
 export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin" }) {
   return apiRequest<{ vote: unknown }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function purchaseDoroCoins(packageId: string) {
   return apiRequest<{ url?: string }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ packageId }) });
+}
+
+export function purchaseCustomDoroCoins(coins: number) {
+  return apiRequest<{ url?: string; purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customCoins: coins }) });
 }
 
 export function recordDoroCoinTransaction(payload: unknown) {

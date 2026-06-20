@@ -6,10 +6,9 @@ import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
 import { Award, Diamond, Flame, Medal, Swords, Trophy, Users } from "lucide-react";
-import { BrandLogo, PremiumBadge } from "@/components/brand";
+import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
-import type { UserPlanId } from "@/lib/types";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
 
@@ -41,8 +40,7 @@ export default function DashboardPage() {
   const leaderboard = (dashboard?.leaderboard ?? []) as LeaderboardEntry[];
   const badges = (dashboard?.badges ?? []) as BadgeRecord[];
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
-  const displayName = dashboard?.user.displayName || "there";
-  const planId = dashboard?.user.planId as UserPlanId | undefined;
+  const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
   const dashboardStyle = findCustomizationOption(dashboard?.user.customization?.dashboardStyleId, "dashboardStyle")?.previewClass;
 
   return (
@@ -50,12 +48,12 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-4">
           <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
-          <PageTitle title="Dashboard" subtitle={isLoading ? "Loading your dashboard..." : `Welcome back, ${displayName}. Ready to take on new challenges?`} />
-          {!isLoading ? <PremiumBadge planId={planId} /> : null}
+          <PageTitle title="Dashboard" subtitle={isLoading ? "Loading your dashboard..." : `Welcome back, ${firstName}. Ready to compete today?`} />
         </div>
         <div className="flex flex-wrap gap-4">
           <LinkButton href="/challenges" variant="secondary">Find Challenge</LinkButton>
           <LinkButton href="/challenges/create">Create Challenge</LinkButton>
+          <LinkButton href="/wallet" variant="ghost">View Wallet</LinkButton>
         </div>
       </div>
       {errorMessage ? (

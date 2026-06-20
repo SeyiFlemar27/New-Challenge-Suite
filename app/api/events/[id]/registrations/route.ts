@@ -3,6 +3,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { subscriptionPlans } from "@/lib/server/subscriptions";
 import { conflict, fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { logEmailDeliveryError, sendEmail } from "@/lib/server/email";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     db.collection("liveEvents").doc(id).get(),
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
-    db.collection("eventRegistrations").doc(`${id}_${user.uid}`).get()
+    db.collection("liveEventRegistrations").doc(`${id}_${user.uid}`).get()
   ]);
   if (!eventSnap.exists) return fail("Live event not found.", 404, { fieldErrors: { eventId: "Live event does not exist." } }, "NOT_FOUND");
   if (existingRegistrationSnap.exists) return conflict("You are already registered for this event.");
@@ -52,9 +53,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!body?.phone) fieldErrors.phone = "Phone is required.";
   if (body?.acceptedAgreement !== true) fieldErrors.acceptedAgreement = "Live event agreement is required.";
   if (Object.keys(fieldErrors).length) return validationError(fieldErrors);
-  const ref = db.collection("eventRegistrations").doc(`${id}_${user.uid}`);
+  const ref = db.collection("liveEventRegistrations").doc(`${id}_${user.uid}`);
   const now = new Date().toISOString();
-  const registration = { id: ref.id, eventId: id, userId: user.uid, fullName: body.fullName, email: body.email, phone: body.phone, notes: body.notes ?? "", ticketType: body.ticketType ?? "general", status: "confirmed", confirmationSent: true, acceptedAgreement: true, createdAt: now };
+  const registration = { id: ref.id, eventId: id, userId: user.uid, fullName: body.fullName, email: body.email, phone: body.phone, notes: body.notes ?? "", ticketType: body.ticketType ?? "general", status: "confirmed", confirmationSent: false, emailStatus: "pending", acceptedAgreement: true, createdAt: now };
   try {
     await db.runTransaction(async (transaction) => {
       const currentEventSnap = await transaction.get(db.collection("liveEvents").doc(id));
@@ -75,6 +76,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return conflict(error instanceof Error ? error.message : "Event registration could not be completed.");
   }
-  await createNotification(db, { userId: user.uid, type: "event_registration", title: "Event registration confirmed", body: "Event details have been sent to your email.", targetId: id });
-  return ok({ registration }, "Event registration confirmed. Details were sent to your email.");
+  let emailWarning: string | null = null;
+  try {
+    await sendEmail({
+      to: body.email,
+      subject: `Registration confirmed: ${String(event.title ?? "Challenge Suite Live Event")}`,
+      text: `Registration confirmed for ${String(event.title ?? "Challenge Suite Live Event")}.\nDate: ${String(event.date ?? event.startsAt ?? "")}\nLocation: ${String(event.location ?? event.venue ?? "")}`,
+      html: `<p>Registration confirmed for <strong>${String(event.title ?? "Challenge Suite Live Event")}</strong>.</p><p>Date: ${String(event.date ?? event.startsAt ?? "")}</p><p>Location: ${String(event.location ?? event.venue ?? "")}</p>`
+    });
+    await ref.set({ confirmationSent: true, emailStatus: "sent", emailSentAt: new Date().toISOString() }, { merge: true });
+    registration.confirmationSent = true;
+    registration.emailStatus = "sent";
+  } catch (error) {
+    emailWarning = "Registered, but email could not be sent.";
+    logEmailDeliveryError("live event registration confirmation failed", error, { eventId: id, userId: user.uid });
+    await ref.set({ emailStatus: "failed", emailFailureReason: "EMAIL_SEND_FAILED", updatedAt: new Date().toISOString() }, { merge: true });
+  }
+
+  await createNotification(db, { userId: user.uid, type: "event_registration", title: "Event registration confirmed", body: emailWarning ?? "Event details have been sent to your email.", targetId: id });
+  return ok({ registration, emailWarning }, emailWarning ?? "Event registration confirmed. Details were sent to your email.");
 }

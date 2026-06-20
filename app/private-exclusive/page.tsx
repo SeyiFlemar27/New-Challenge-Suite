@@ -17,6 +17,8 @@ export default function PrivateExclusivePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [accessForm, setAccessForm] = useState({ reason: "", note: "" });
 
   async function loadPrivateChallenges() {
     setLoading(true);
@@ -48,9 +50,14 @@ export default function PrivateExclusivePage() {
   }
 
   async function requestAccess() {
+    if (!accessForm.reason.trim()) {
+      setStatus("Tell us why you want access before sending the request.");
+      return;
+    }
     setSubmitting(true);
-    const result = await requestPrivateAccess();
-    setStatus(result.message || (result.ok ? "Access request sent. Status: Pending Review." : "Access request could not be sent."));
+    const result = await requestPrivateAccess({ reason: accessForm.reason, note: accessForm.note });
+    setStatus(result.message || (result.ok ? "Access request sent." : "Access request could not be sent."));
+    if (result.ok) setRequestOpen(false);
     setSubmitting(false);
   }
 
@@ -84,7 +91,7 @@ export default function PrivateExclusivePage() {
             <Field label="Invite Code"><input className={inputClass} value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder="Enter invite code" /></Field>
             <div className="flex gap-3">
               <Button className="flex-1" onClick={checkCode} disabled={submitting}>Check Code</Button>
-              <Button variant="secondary" className="flex-1" onClick={requestAccess} disabled={submitting}>Request Access</Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>
             </div>
             {status ? <p className={`flex items-center gap-2 rounded-[8px] p-3 text-sm font-bold ${status.startsWith("Invalid") ? "bg-red-950/40 text-red-200" : "bg-emerald-950/40 text-emerald-200"}`}><CheckCircle2 size={17} /> {status}</p> : null}
           </div>
@@ -105,8 +112,24 @@ export default function PrivateExclusivePage() {
           {privateChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}
         </div>
       ) : (
-        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title="No private challenges available" body="Request an invite or check back when exclusive creator challenges open." action={<Button onClick={requestAccess} disabled={submitting}>Request Access</Button>} /></Card>
+        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title="No private challenges available" body="Request an invite or check back when exclusive creator challenges open." action={<Button onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>} /></Card>
       )}
+      {requestOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur sm:items-center sm:justify-center">
+          <Card className="w-full max-w-lg p-6">
+            <h2 className="text-2xl font-black">Request Private Access</h2>
+            <p className="mt-2 text-sm text-slate-300">Tell the creator or admin why you should be approved for private and exclusive access.</p>
+            <div className="mt-5 space-y-4">
+              <Field label="Reason for access"><input className={inputClass} value={accessForm.reason} onChange={(event) => setAccessForm((value) => ({ ...value, reason: event.target.value }))} placeholder="I was invited by the host..." /></Field>
+              <Field label="Optional note"><textarea className="min-h-28 w-full rounded-[8px] border border-white/10 bg-[#11151d] px-4 py-3 outline-none focus:border-[var(--gold)]" value={accessForm.note} onChange={(event) => setAccessForm((value) => ({ ...value, note: event.target.value }))} /></Field>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Button className="flex-1" onClick={requestAccess} disabled={submitting}>{submitting ? "Sending..." : "Send Request"}</Button>
+              <Button variant="ghost" className="flex-1" onClick={() => setRequestOpen(false)}>Cancel</Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

@@ -21,6 +21,7 @@ export default function JoinChallengePage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -50,10 +51,6 @@ export default function JoinChallengePage() {
       setError("Accept the challenge rules before submitting.");
       return;
     }
-    if (!storage) {
-      setError("Firebase Storage is not configured.");
-      return;
-    }
     if (unavailable) {
       setError("This challenge is not available for new entries.");
       return;
@@ -76,18 +73,36 @@ export default function JoinChallengePage() {
       return;
     }
     const mediaType = file.type.startsWith("video/") ? "video" : "image";
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setError("INVALID_FILE_TYPE: Upload an image or video file.");
+      return;
+    }
     if (!currentChallenge.acceptedSubmissionTypes.includes(mediaType)) {
       setError(`This challenge accepts: ${currentChallenge.acceptedSubmissionTypes.join(", ")}.`);
+      return;
+    }
+    const maxBytes = mediaType === "video" ? 250 * 1024 * 1024 : 15 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setError(`FILE_TOO_LARGE: ${mediaType === "video" ? "Video" : "Image"} uploads must be ${mediaType === "video" ? "250MB" : "15MB"} or smaller.`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `users/${auth.user.uid}/submissions/${currentChallenge.id}-${Date.now()}-${safeName}`;
-      const uploadRef = ref(storage, path);
-      await uploadBytes(uploadRef, file, { contentType: file.type });
-      const mediaUrl = await getDownloadURL(uploadRef);
+      let mediaUrl = "";
+      let pendingMedia = false;
+      if (storage) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `users/${auth.user.uid}/submissions/${currentChallenge.id}-${Date.now()}-${safeName}`;
+        const uploadRef = ref(storage, path);
+        await Promise.race([
+          uploadBytes(uploadRef, file, { contentType: file.type }),
+          new Promise((_, reject) => window.setTimeout(() => reject(new Error("STORAGE_UPLOAD_TIMEOUT")), 45_000))
+        ]);
+        mediaUrl = await getDownloadURL(uploadRef);
+      } else {
+        pendingMedia = true;
+      }
 
       const joinResult = await joinChallenge(currentChallenge.id);
       if (!joinResult.ok) throw new Error(joinResult.message);
@@ -98,13 +113,19 @@ export default function JoinChallengePage() {
         description,
         caption: description,
         mediaUrl,
-        mediaType
+        mediaType,
+        mediaUploadPending: pendingMedia,
+        originalFileName: file.name,
+        fileSize: file.size
       });
       if (!submissionResult.ok) throw new Error(submissionResult.message);
 
+      const submission = submissionResult.data?.submission as { id?: string } | undefined;
+      setSuccessSubmission({ id: submission?.id, title, pendingMedia });
       setSubmitted(true);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Entry could not be submitted.");
+      const message = caught instanceof Error ? caught.message : "Entry could not be submitted.";
+      setError(message === "STORAGE_UPLOAD_TIMEOUT" ? "STORAGE_NOT_CONFIGURED: Media upload timed out. Try again or contact support." : message);
     } finally {
       setSubmitting(false);
     }
@@ -151,9 +172,14 @@ export default function JoinChallengePage() {
       <AppShell>
         <Card className="mx-auto max-w-2xl p-10 text-center">
           <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
-          <h1 className="mt-6 text-4xl font-black">Entry Submitted</h1>
-          <p className="mt-3 text-slate-300">You joined {currentChallenge.title}. Your participant status and submission are now recorded.</p>
-          <LinkButton href={`/challenges/${currentChallenge.id}`} className="mt-8">View Challenge</LinkButton>
+          <h1 className="mt-6 text-4xl font-black">Submission received</h1>
+          <p className="mt-3 text-slate-300"><b>{successSubmission?.title}</b> was recorded for {currentChallenge.title}.</p>
+          <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Media upload is pending storage configuration. Your submission metadata is saved and ready to be completed." : "Your media was uploaded and the submission is pending approval."}</p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <LinkButton href={`/challenges/${currentChallenge.id}`}>View Challenge</LinkButton>
+            <LinkButton href="/my-challenges" variant="secondary">View My Submissions</LinkButton>
+            <LinkButton href="/dashboard" variant="ghost">Go to Dashboard</LinkButton>
+          </div>
         </Card>
       </AppShell>
     );

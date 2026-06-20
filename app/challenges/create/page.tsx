@@ -41,6 +41,7 @@ function CreateChallengeWizard() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createdChallengeId, setCreatedChallengeId] = useState("");
   const [form, setForm] = useState({
     title: "The Ultimate Showdown",
     category: "Fitness",
@@ -88,6 +89,19 @@ function CreateChallengeWizard() {
       return;
     }
     setStep((value) => Math.min(value + 1, steps.length - 1));
+  }
+
+  function goToStep(targetStep: number) {
+    if (targetStep <= step) {
+      setStep(targetStep);
+      return;
+    }
+    const problem = validateCurrentStep();
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setStep(Math.min(targetStep, step + 1));
   }
 
   function challengePayload(publish: boolean) {
@@ -149,6 +163,8 @@ function CreateChallengeWizard() {
       setError(response.message || "Challenge could not be published.");
       return;
     }
+    const challenge = response.data?.challenge as { id?: string } | undefined;
+    setCreatedChallengeId(challenge?.id ?? "");
     setStage("success");
   }
 
@@ -160,8 +176,10 @@ function CreateChallengeWizard() {
           <h1 className="mt-6 text-4xl font-black">Challenge Published</h1>
           <p className="mt-3 text-slate-300">Your challenge is now ready for participants, voting, and media submissions.</p>
           <div className="mt-8 flex justify-center gap-3">
-            <LinkButton href="/challenges">View Challenges</LinkButton>
+            <LinkButton href={createdChallengeId ? `/challenges/${createdChallengeId}` : "/challenges"}>View Challenge</LinkButton>
+            <LinkButton href="/challenges/create" variant="secondary">Create Another</LinkButton>
             <LinkButton href="/my-challenges" variant="secondary">My Challenges</LinkButton>
+            <LinkButton href="/dashboard" variant="ghost">Go to Dashboard</LinkButton>
           </div>
         </Card>
       </AppShell>
@@ -203,7 +221,7 @@ function CreateChallengeWizard() {
           </Card>
         ) : null}
         <div className="mt-8 grid gap-2 md:grid-cols-6">
-          {steps.map((label, index) => <button key={label} onClick={() => setStep(index)} className={`rounded-[8px] p-3 text-xs font-black ${step === index ? "bg-[var(--gold)] text-black" : "bg-[#1b1b1b] text-slate-300"}`}>{index + 1}. {label}</button>)}
+          {steps.map((label, index) => <button key={label} onClick={() => goToStep(index)} className={`rounded-[8px] p-3 text-xs font-black ${step === index ? "bg-[var(--gold)] text-black" : "bg-[#1b1b1b] text-slate-300"}`}>{index + 1}. {label}</button>)}
         </div>
 
         <div className="mt-8 min-h-[470px]">

@@ -10,7 +10,7 @@ import { fetchFeed } from "@/lib/api/services";
 import { normalizeChallenge } from "@/lib/api/normalizers";
 import type { Challenge } from "@/lib/types";
 
-const tabs = ["Active", "Trending", "Recommended", "Open"];
+const tabs = ["Active", "Trending", "Recommended", "Open", "Premium"];
 
 export default function FeedPage() {
   const [tab, setTab] = useState("Active");
@@ -46,7 +46,7 @@ export default function FeedPage() {
       const matchesCategory = category === "All" || challenge.category === category;
       const matchesQuery = !normalized || `${challenge.title} ${challenge.description} ${challenge.category}`.toLowerCase().includes(normalized);
       const status = getChallengeDisplayStatus(challenge);
-      const matchesTab = tab === "Active" ? ["Active", "Closing Soon", "Voting Open"].includes(status) : tab === "Open" ? status === "Open" : true;
+      const matchesTab = tab === "Active" ? ["Active", "Closing Soon", "Voting Open"].includes(status) : tab === "Open" ? status === "Open" : tab === "Premium" ? Boolean((challenge as any).premiumOnly || (challenge as any).planRequired) : true;
       return matchesCategory && matchesQuery && matchesTab;
     });
   }, [category, query, tab]);

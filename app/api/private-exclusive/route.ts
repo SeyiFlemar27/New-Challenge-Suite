@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     const inviteSnap = await db.collection("privateChallengeInvites").where("code", "==", code).where("status", "==", "active").limit(1).get();
     if (inviteSnap.empty) {
-      return fail("Invalid invite code. Request access or try again.", 404, { fieldErrors: { inviteCode: "Invite code was not found or is inactive." } }, "NOT_FOUND");
+      return fail("Invalid or expired invite code.", 404, { fieldErrors: { inviteCode: "Invite code was not found or is inactive." } }, "INVALID_INVITE_CODE");
     }
 
     const inviteDoc = inviteSnap.docs[0];
@@ -101,21 +101,25 @@ export async function POST(request: Request) {
       updatedAt: now
     }, { merge: true });
 
-    return ok({ challengeId }, "Access granted. Private challenge unlocked.");
+    return ok({ challengeId, challenge: { id: challengeSnap.id, ...challengeSnap.data() } }, "Access granted. Private challenge unlocked.");
   }
 
   if (action === "request_access") {
-    const ref = db.collection("privateChallengeAccessRequests").doc();
+    const reason = String(parsed.body?.reason ?? "").trim();
+    if (!reason) return validationError({ reason: "Reason for access is required." });
+    const ref = db.collection("privateAccessRequests").doc();
     await ref.set({
       id: ref.id,
       userId: user.uid,
       challengeId: parsed.body?.challengeId ?? null,
+      reason,
+      note: parsed.body?.note ?? "",
       status: "pending_review",
       createdAt: now,
       updatedAt: now
     });
 
-    return ok({ requestId: ref.id, status: "pending_review" }, "Access request sent. Status: Pending Review.");
+    return ok({ requestId: ref.id, status: "pending_review" }, "Access request sent.");
   }
 
   return validationError({ action: "Action must be check_code or request_access." });

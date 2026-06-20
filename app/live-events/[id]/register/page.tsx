@@ -41,6 +41,7 @@ export default function EventRegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [unauthenticated, setUnauthenticated] = useState(false);
+  const [emailWarning, setEmailWarning] = useState("");
 
   async function loadEvent() {
     setLoading(true);
@@ -111,6 +112,7 @@ export default function EventRegistrationPage() {
       await loadEvent();
       return;
     }
+    setEmailWarning(String((result.data as any)?.emailWarning ?? ""));
     setSubmitted(true);
   }
 
@@ -161,9 +163,17 @@ export default function EventRegistrationPage() {
         <Card className="mx-auto max-w-2xl p-10 text-center">
           <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
           <h1 className="mt-6 text-4xl font-black">Registration Confirmed</h1>
-          <p className="mt-3 text-slate-300">You are registered for {event.title}. Event details have been sent to your email.</p>
+          <p className="mt-3 text-slate-300">You are registered for {event.title}.</p>
+          <div className="mt-6 rounded-[8px] border border-white/10 bg-black/30 p-5 text-left">
+            <p><b>Date:</b> {formatDate(event.date)}</p>
+            <p><b>Time:</b> {event.time || "Time unavailable"}</p>
+            <p><b>Location:</b> {event.location}</p>
+            <p><b>Access:</b> {event.ticketType}</p>
+          </div>
+          <p className={`mt-4 rounded-[8px] p-3 text-sm font-bold ${emailWarning ? "bg-yellow-950/40 text-yellow-100" : "bg-emerald-950/40 text-emerald-200"}`}>{emailWarning || "Event details have been sent to your email."}</p>
           <div className="mt-8 flex justify-center gap-3">
             <LinkButton href="/live-events">Back to Events</LinkButton>
+            <Button variant="secondary">Add to Calendar</Button>
             <LinkButton href="/dashboard" variant="secondary">Dashboard</LinkButton>
           </div>
         </Card>
