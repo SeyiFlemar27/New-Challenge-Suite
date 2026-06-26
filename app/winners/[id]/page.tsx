@@ -35,15 +35,15 @@ export default function WinnerDetailPage() {
 
   return (
     <AppShell>
-      {isLoading ? <Card className="h-[620px] animate-pulse bg-[#151515]" /> : errorMessage || !winner ? (
+      {isLoading ? <Card className="h-[420px] animate-pulse bg-[#151515] sm:h-[620px]" /> : errorMessage || !winner ? (
         <Card><EmptyState icon={<Trophy />} title="Winner unavailable" body={errorMessage ?? "This winner could not be found."} action={<LinkButton href="/winners">Back to Winners</LinkButton>} /></Card>
       ) : (
-        <div className="grid gap-8 xl:grid-cols-[1.2fr_.8fr]">
+        <div className="grid gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
           <Card className="overflow-hidden">
-            {winner.mediaUrl ? <img src={winner.mediaUrl} alt={winner.title} className="h-[420px] w-full object-cover" /> : <div className="flex h-[420px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] text-2xl font-black text-[var(--gold)]">Challenge Suite Winner</div>}
-            <div className="p-7">
+            {winner.mediaUrl ? <img src={winner.mediaUrl} alt={winner.title} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" /> : <div className="flex h-[280px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] px-6 text-center text-xl font-black text-[var(--gold)] sm:h-[360px] sm:text-2xl lg:h-[420px]">Challenge Suite Winner</div>}
+            <div className="p-5 sm:p-7">
               <PageTitle title={winner.title} subtitle={String(winnerMeta?.caption ?? winner.description ?? "Winning submission")} icon={<Trophy className="text-[var(--gold)]" />} />
-              <div className="mt-6 grid gap-4 md:grid-cols-4">
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Stat label="Votes" value={winner.likes.toLocaleString()} />
                 <Stat label="Rank" value={`#${Number(winnerMeta?.rank ?? 1)}`} />
                 <Stat label="Result" value={String(winnerMeta?.status ?? "announced").replaceAll("_", " ")} />
@@ -54,11 +54,11 @@ export default function WinnerDetailPage() {
             </div>
           </Card>
           <div className="space-y-6">
-            <Card className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600 text-lg font-black">{profile?.initials ?? winner.userInitials}</div>
-                <div>
-                  <h2 className="text-2xl font-black">{profile?.displayName ?? winner.userName}</h2>
+            <Card className="p-5 sm:p-6">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-base font-black sm:h-16 sm:w-16 sm:text-lg">{profile?.initials ?? winner.userInitials}</div>
+                <div className="min-w-0">
+                  <h2 className="break-words text-xl font-black sm:text-2xl">{profile?.displayName ?? winner.userName}</h2>
                   <PremiumBadge planId={profile?.planId as UserPlanId | undefined} badgeStyleId={profile?.customization?.profileBadgeId} compact />
                 </div>
               </div>
@@ -70,10 +70,10 @@ export default function WinnerDetailPage() {
                 <Button variant="ghost"><UserPlus size={16} /> Follow Creator</Button>
               </div>
             </Card>
-            <Card className="p-6">
+            <Card className="p-5 sm:p-6">
               <h2 className="text-xl font-black">Leaderboard Snapshot</h2>
               <div className="mt-4 space-y-3">
-                {leaderboard.length ? leaderboard.map((row) => <div key={String(row.id)} className="flex items-center justify-between rounded-[8px] bg-[#181818] p-4"><span className="font-black">#{row.rank} {row.userName ?? row.title ?? "Submission"}</span><span className="text-[var(--gold)]">{Number(row.weightedVoteCount ?? row.voteCount ?? 0).toLocaleString()} votes</span></div>) : <p className="text-slate-300">Leaderboard snapshot is not available yet.</p>}
+                {leaderboard.length ? leaderboard.map((row) => <div key={String(row.id)} className="grid gap-2 rounded-[8px] bg-[#181818] p-4 sm:flex sm:items-center sm:justify-between"><span className="min-w-0 break-words font-black">#{row.rank} {row.userName ?? row.title ?? "Submission"}</span><span className="shrink-0 text-[var(--gold)]">{Number(row.weightedVoteCount ?? row.voteCount ?? 0).toLocaleString()} votes</span></div>) : <p className="text-slate-300">Leaderboard snapshot is not available yet.</p>}
               </div>
             </Card>
           </div>
@@ -84,7 +84,7 @@ export default function WinnerDetailPage() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><div className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">{label}</div><div className="mt-2 text-xl font-black text-white">{value}</div></div>;
+  return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><div className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">{label}</div><div className="mt-2 break-words text-lg font-black text-white sm:text-xl">{value}</div></div>;
 }
 
 
