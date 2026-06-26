@@ -20,12 +20,23 @@ export async function applyDoroCoinTransaction(
     description: string;
     createdBy: string;
     sourceId?: string;
+    transactionId?: string;
+    idempotencyKey?: string;
   }
 ) {
   if (!Number.isFinite(input.amount) || input.amount === 0) throw new Error("A non-zero DoroCoin amount is required.");
 
   return db.runTransaction(async (transaction) => {
     const walletRef = db.collection("doroCoinWallets").doc(input.userId);
+    const txnRef = input.transactionId || input.idempotencyKey
+      ? db.collection("doroCoinTransactions").doc(input.transactionId ?? input.idempotencyKey!)
+      : db.collection("doroCoinTransactions").doc();
+
+    if (input.transactionId || input.idempotencyKey) {
+      const existingTxn = await transaction.get(txnRef);
+      if (existingTxn.exists) return { id: txnRef.id, ...existingTxn.data(), idempotentReplay: true };
+    }
+
     const walletSnap = await transaction.get(walletRef);
     const currentBalance = walletSnap.exists ? Number(walletSnap.data()?.balance ?? 0) : 0;
     const nextBalance = currentBalance + input.amount;
@@ -39,7 +50,6 @@ export async function applyDoroCoinTransaction(
       updatedAt: now
     }, { merge: true });
 
-    const txnRef = db.collection("doroCoinTransactions").doc();
     const record = {
       id: txnRef.id,
       userId: input.userId,
@@ -48,6 +58,7 @@ export async function applyDoroCoinTransaction(
       type: input.type,
       description: input.description,
       sourceId: input.sourceId ?? null,
+      idempotencyKey: input.idempotencyKey ?? input.transactionId ?? null,
       createdBy: input.createdBy,
       createdAt: now
     };

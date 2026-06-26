@@ -1,8 +1,9 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { isChallengeEligibleForBoost } from "@/lib/challenge-status";
 import { requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { createNotification } from "@/lib/server/notifications";
+import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const packageId = parsed.body?.packageId;
+  const idempotencyKey = getRequestIdempotencyKey(request, parsed.body);
   if (typeof packageId !== "string") return validationError({ packageId: "Select a valid boost package." });
   const [challengeSnap, packageSnap] = await Promise.all([
     db.collection("challenges").doc(id).get(),
@@ -31,9 +33,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const now = new Date();
   const endsAt = new Date(now);
   endsAt.setDate(endsAt.getDate() + durationDays);
-  const ref = db.collection("boosts").doc();
+  const boostId = idempotencyKey ? deterministicId("boost", id, user.uid, packageId, idempotencyKey) : undefined;
+  const ref = boostId ? db.collection("boosts").doc(boostId) : db.collection("boosts").doc();
+  if (boostId) {
+    const existingBoost = await ref.get();
+    if (existingBoost.exists) return ok({ boost: { id: ref.id, ...existingBoost.data() }, idempotentReplay: true }, "Challenge boost is already active.");
+  }
   try {
-    await applyDoroCoinTransaction(db, { userId: user.uid, amount: -coins, type: "boost_spend", description: `Boost challenge ${id}`, sourceId: ref.id, createdBy: user.uid });
+    await applyDoroCoinTransaction(db, { userId: user.uid, amount: -coins, type: "boost_spend", description: `Boost challenge ${id}`, sourceId: ref.id, transactionId: deterministicId("boost", ref.id, "spend"), idempotencyKey: boostId ?? undefined, createdBy: user.uid });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Challenge boost could not be purchased.", 409, undefined, "BOOST_REJECTED");
   }

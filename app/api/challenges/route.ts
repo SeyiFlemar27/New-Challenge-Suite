@@ -118,6 +118,7 @@ export async function POST(request: Request) {
     ref.set(challenge),
     writeDisabledPrizePoolFoundation(db, ref.id, now),
     writeCashTransactionPlaceholder(db, {
+      id: `challenge_${ref.id}_prize_placeholder`,
       userId: user.uid,
       type: "prize_placeholder_created",
       status: "recorded",

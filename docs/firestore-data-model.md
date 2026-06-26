@@ -1029,3 +1029,34 @@ Operational warnings:
 - Payout providers are not connected.
 - DoroCoin cannot be converted to cash.
 - No withdraw button or payout execution route should be exposed.
+
+## Phase 3.4 Financial Safety & Idempotency
+
+Financial placeholder records are review-only foundations. They do not represent settled cash, withdrawable balance, released sponsor funds, processed refunds, or completed payouts.
+
+Deterministic IDs are used wherever a financial placeholder is tied to a stable parent record:
+
+- `cashTransactions/challenge_{challengeId}_prize_placeholder` for disabled challenge prize foundations.
+- `cashTransactions/sponsorship_{sponsorshipId}_contribution_requested` for sponsor contribution requests.
+- `winnerClaims/winner_claim_{submissionId}_{userId}` for winner claim review requests.
+- `payouts/winner_claim_{claimId}_payout` for winner-claim payout review placeholders.
+- `cashTransactions/winner_claim_{claimId}_payout_review` for winner-claim payout ledger placeholders.
+- `doroCoinTransactions/stripe_session_{sessionId}_dorocoin_purchase` for Stripe-backed DoroCoin purchase credits.
+- `subscriptionEvents/stripe_session_{sessionId}_subscription` for Stripe subscription checkout session records.
+
+Stripe webhook events are tracked in `stripeWebhookEvents/{eventId}` with `processing`, `processed`, or `failed` status. DoroCoin purchase credits are additionally idempotent by Stripe checkout session ID so a webhook retry cannot double-credit the same purchase when the event record is replayed.
+
+DoroCoin transaction helpers accept deterministic `transactionId` / `idempotencyKey` values. When a matching transaction already exists, the helper returns the existing transaction and does not adjust wallet balance again.
+
+Vote and boost requests may include `Idempotency-Key`, `X-Idempotency-Key`, or `idempotencyKey` in the request body. Existing clients are not required to send a key. When a key is present:
+
+- Boost purchase records use deterministic boost IDs and deterministic DoroCoin spend transaction IDs.
+- DoroCoin vote requests write `voteRequests/{requestId}` with the processed result and deterministic vote/spend IDs, so retries return the previous result instead of incrementing counts again.
+
+Blocking financial-review write groups:
+
+- Challenge creation blocks on the challenge record, disabled prize pool foundation, and review-only cash ledger placeholder.
+- Sponsorship proposal submission blocks on the proposal, review-only cash ledger placeholder, and sponsor prize-pool placeholder when applicable.
+- Winner claim submission blocks on the claim, payout review placeholder, and review-only cash ledger placeholder.
+
+Locked systems remain inactive: real cash payouts, cash withdrawals, automatic refunds, sponsor money release, paid-entry prize pools, KYC processing, payout provider integrations, DoroCoin-to-cash conversion, and admin financial review UI.

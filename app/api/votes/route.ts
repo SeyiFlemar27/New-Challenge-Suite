@@ -5,6 +5,7 @@ import { castVote } from "@/lib/server/voting";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { voteRequestSchema, zodFieldErrors } from "@/lib/server/vote-validation";
 import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-signals";
+import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
   const voteInput = voteRequestSchema.safeParse(parsed.body ?? {});
   if (!voteInput.success) return validationError(zodFieldErrors(voteInput.error));
   const body = voteInput.data;
+  const requestIdempotencyKey = getRequestIdempotencyKey(request, parsed.body);
 
   const db = getAdminDb();
   if (!db) return serverUnavailable("Voting");
@@ -39,7 +41,8 @@ export async function POST(request: Request) {
       profile: { ...profile, planId: planAccess.normalizedPlanId, accountType: planAccess.accountType },
       ipHash: signalHashes.ipHash,
       userAgentHash: signalHashes.userAgentHash,
-      suspiciousSignals: signals
+      suspiciousSignals: signals,
+      requestIdempotencyKey
     });
     return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, coinCost: result.coinCost, walletTransactionId: result.walletTransactionId }, body.voteMode === "dorocoin" ? `${result.quantity} DoroCoin vote${result.quantity === 1 ? "" : "s"} counted.` : "Free vote counted.");
   } catch (error) {

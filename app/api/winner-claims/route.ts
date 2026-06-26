@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     ref.set(claim),
     payoutRef.set(payout),
     writeCashTransactionPlaceholder(db, {
-      id: `winner-claim-${ref.id}-payout-review`,
+      id: `winner_claim_${ref.id}_payout_review`,
       userId: user.uid,
       type: "payout_review_created",
       status: "pending_review",

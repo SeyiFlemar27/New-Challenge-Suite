@@ -93,7 +93,7 @@ export async function writeCashTransactionPlaceholder(db: Firestore, input: Omit
   await ensureCashWalletFoundation(db, input.userId);
   const ref = input.id ? db.collection("cashTransactions").doc(input.id) : db.collection("cashTransactions").doc();
   const record = createCashTransactionPlaceholder({ ...input, id: ref.id });
-  await ref.set(record, { merge: false });
+  await ref.set(record, { merge: true });
   return record;
 }
 

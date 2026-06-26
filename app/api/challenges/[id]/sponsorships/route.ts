@@ -37,6 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const writes: Promise<unknown>[] = [
     ref.set(proposal),
     writeCashTransactionPlaceholder(db, {
+      id: `sponsorship_${ref.id}_contribution_requested`,
       userId: user.uid,
       type: "sponsor_contribution_requested",
       status: "pending_review",

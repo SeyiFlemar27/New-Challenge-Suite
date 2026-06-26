@@ -1,7 +1,8 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
+import { deterministicId } from "@/lib/server/idempotency";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 export async function POST(request: Request) {
@@ -47,16 +48,19 @@ export async function POST(request: Request) {
           type: "purchase",
           description: `Purchased ${session.metadata.coins} DoroCoins`,
           sourceId: session.id,
+          transactionId: deterministicId("stripe_session", session.id, "dorocoin_purchase"),
+          idempotencyKey: event.id,
           createdBy: "stripe"
         });
       } else if (session.metadata?.planId) {
-        await db.collection("subscriptionEvents").add({
+        await db.collection("subscriptionEvents").doc(deterministicId("stripe_session", session.id, "subscription")).set({
           stripeSessionId: session.id,
           customerId: session.customer,
           planId: session.metadata.planId,
           userId: session.metadata.userId ?? null,
-          createdAt: now
-        });
+          createdAt: now,
+          updatedAt: now
+        }, { merge: true });
         if (session.metadata.userId) {
           await Promise.all([
             db.collection("users").doc(session.metadata.userId).set({

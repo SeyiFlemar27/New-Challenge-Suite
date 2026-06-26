@@ -4,6 +4,7 @@ import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { getVoteWeight } from "@/lib/plan-access";
 import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { writeAuditLog } from "@/lib/server/audit";
+import { deterministicId } from "@/lib/server/idempotency";
 
 export type VoteMode = "free" | "dorocoin";
 
@@ -19,6 +20,7 @@ export interface CastVoteInput {
   ipHash?: string | null;
   userAgentHash?: string | null;
   suspiciousSignals?: string[];
+  requestIdempotencyKey?: string | null;
 }
 
 function votingSettings(challenge: Record<string, unknown>) {
@@ -43,6 +45,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
   const now = new Date().toISOString();
   const voteDateKey = todayKey();
   const profile = { ...(input.profile ?? {}), planId: input.planId ?? input.profile?.planId ?? "free" };
+  const voteRequestId = input.requestIdempotencyKey
+    ? deterministicId("vote_request", input.userId, input.challengeId, input.submissionId, input.voteMode, input.requestIdempotencyKey)
+    : null;
 
   if (isSponsorProfile(profile)) {
     throw voteReject("Sponsor accounts cannot vote in normal user challenges yet.", "SPONSOR_ACCOUNT_BLOCKED");
@@ -54,10 +59,28 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
   const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(input.challengeId);
     const submissionRef = db.collection("submissions").doc(input.submissionId);
-    const [challengeSnap, submissionSnap] = await Promise.all([
+    const leaderboardRef = db.collection("leaderboards").doc(input.challengeId);
+    const voteRequestRef = voteRequestId ? db.collection("voteRequests").doc(voteRequestId) : null;
+    const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap] = await Promise.all([
       transaction.get(challengeRef),
-      transaction.get(submissionRef)
+      transaction.get(submissionRef),
+      transaction.get(leaderboardRef),
+      voteRequestRef ? transaction.get(voteRequestRef) : Promise.resolve(null)
     ]);
+
+    if (voteRequestSnap?.exists) {
+      return voteRequestSnap.data()?.result as {
+        votes: Record<string, unknown>[];
+        vote: Record<string, unknown>;
+        quantity: number;
+        voteWeight: number;
+        weightedVoteCount: number;
+        coinCost: number;
+        walletTransactionId: string | null;
+        suspiciousSignals: string[];
+        idempotentReplay?: boolean;
+      };
+    }
 
     if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
@@ -103,7 +126,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       const balance = Number(walletSnap.data()?.balance ?? 0);
       if (balance < coinCost) throw voteReject("Insufficient DoroCoins. 1 DoroCoin equals 1 vote.", "INSUFFICIENT_DOROCOINS");
       transaction.set(walletRef, { userId: input.userId, balance: balance - coinCost, lockedBalance: Number(walletSnap.data()?.lockedBalance ?? 0), updatedAt: now }, { merge: true });
-      const txnRef = db.collection("doroCoinTransactions").doc();
+      const txnRef = voteRequestId
+        ? db.collection("doroCoinTransactions").doc(deterministicId("vote", voteRequestId, "dorocoin_spend"))
+        : db.collection("doroCoinTransactions").doc();
       walletTransactionId = txnRef.id;
       transaction.set(txnRef, {
         id: txnRef.id,
@@ -114,6 +139,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         description: `${quantity} vote${quantity === 1 ? "" : "s"} on submission ${input.submissionId}`,
         sourceId: input.submissionId,
         challengeId: input.challengeId,
+        idempotencyKey: voteRequestId,
         createdBy: input.userId,
         createdAt: now
       });
@@ -122,7 +148,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const voteWeight = getVoteWeight(profile, settings.weightedVotes);
     const voteRecords: Record<string, unknown>[] = [];
     for (let index = 0; index < quantity; index += 1) {
-      const voteRef = db.collection("votes").doc();
+      const voteRef = voteRequestId
+        ? db.collection("votes").doc(deterministicId("vote", voteRequestId, index))
+        : db.collection("votes").doc();
       const vote = {
         id: voteRef.id,
         challengeId: input.challengeId,
@@ -140,6 +168,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         voteDate: voteDateKey,
         status: "counted",
         walletTransactionId,
+        requestIdempotencyKey: voteRequestId,
         ipHash: input.ipHash ?? null,
         userAgentHash: input.userAgentHash ?? null,
         createdAt: now
@@ -161,8 +190,6 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       updatedAt: now
     }, { merge: true });
 
-    const leaderboardRef = db.collection("leaderboards").doc(input.challengeId);
-    const leaderboardSnap = await transaction.get(leaderboardRef);
     transaction.set(leaderboardRef, {
       id: input.challengeId,
       challengeId: input.challengeId,
@@ -172,7 +199,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       updatedAt: now
     }, { merge: true });
 
-    return {
+    const voteResult = {
       votes: voteRecords,
       vote: voteRecords[0],
       quantity,
@@ -180,8 +207,26 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       weightedVoteCount: weightedIncrement,
       coinCost,
       walletTransactionId,
-      suspiciousSignals: input.suspiciousSignals ?? []
+      suspiciousSignals: input.suspiciousSignals ?? [],
+      idempotentReplay: false
     };
+
+    if (voteRequestRef) {
+      transaction.set(voteRequestRef, {
+        id: voteRequestRef.id,
+        userId: input.userId,
+        challengeId: input.challengeId,
+        submissionId: input.submissionId,
+        voteMode: input.voteMode,
+        quantity,
+        status: "processed",
+        result: voteResult,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    return voteResult;
   });
 
   void writeAuditLog({
@@ -197,12 +242,14 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       quantity,
       coinCost: result.coinCost,
       voteWeight: result.voteWeight,
-      suspiciousSignals: input.suspiciousSignals ?? []
+      suspiciousSignals: input.suspiciousSignals ?? [],
+      idempotentReplay: Boolean(result.idempotentReplay)
     },
     metadata: {
       challengeId: input.challengeId,
       submissionId: input.submissionId,
       quantity,
+      requestIdempotencyKey: voteRequestId,
       ipHash: input.ipHash ?? null,
       userAgentHash: input.userAgentHash ?? null
     }
