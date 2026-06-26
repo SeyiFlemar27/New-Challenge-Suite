@@ -3,8 +3,9 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { isStripeDevMockEnabled, stripeDevMockCheckout } from "@/lib/server/stripe-dev";
-function resolveDoroCoinStripePriceId(pack: Record<string, unknown>, packageId: string, coins: number) {
-  const envCandidates = [
+
+function getDoroCoinPriceEnvCandidates(pack: Record<string, unknown>, packageId: string, coins: number) {
+  return [
     typeof pack.stripePriceEnv === "string" ? pack.stripePriceEnv : null,
     packageId ? `STRIPE_${packageId.toUpperCase()}_PRICE_ID` : null,
     coins === 50 ? "STRIPE_DOROCOIN_SMALL_PRICE_ID" : null,
@@ -12,8 +13,17 @@ function resolveDoroCoinStripePriceId(pack: Record<string, unknown>, packageId: 
     coins === 500 ? "STRIPE_DOROCOIN_LARGE_PRICE_ID" : null,
     coins ? `STRIPE_PRICE_DOROCOIN_${coins}` : null
   ].filter(Boolean) as string[];
+}
+
+function resolveDoroCoinStripePriceId(pack: Record<string, unknown>, packageId: string, coins: number) {
+  const envCandidates = getDoroCoinPriceEnvCandidates(pack, packageId, coins);
   const configuredEnv = envCandidates.find((name) => Boolean(process.env[name]));
-  return typeof pack.stripePriceId === "string" && pack.stripePriceId ? pack.stripePriceId : configuredEnv ? process.env[configuredEnv] ?? null : null;
+  const directPriceId = typeof pack.stripePriceId === "string" && pack.stripePriceId ? pack.stripePriceId : null;
+  return {
+    priceId: directPriceId ?? (configuredEnv ? process.env[configuredEnv] ?? null : null),
+    configuredEnv: directPriceId ? "firestore.stripePriceId" : configuredEnv ?? null,
+    envCandidates
+  };
 }
 
 export async function POST(request: Request) {
@@ -35,20 +45,22 @@ export async function POST(request: Request) {
   if (!Number.isFinite(coins) || coins <= 0) return validationError({ packageId: "DoroCoin package is missing a valid coin amount." });
   const amountUsd = customCoins ? Number((coins * 0.02).toFixed(2)) : Number(pack.price ?? 0);
   const stripe = getStripe();
-  const stripePriceId = !customCoins ? resolveDoroCoinStripePriceId(pack, packageId, coins) : null;
-  if (!stripe || (!customCoins && !stripePriceId)) {
+  const priceConfig = !customCoins ? resolveDoroCoinStripePriceId(pack, packageId, coins) : { priceId: null, configuredEnv: null, envCandidates: [] as string[] };
+  const missing = !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID";
+  if (!stripe || (!customCoins && !priceConfig.priceId)) {
+    const details = { missing, acceptedPriceEnvs: priceConfig.envCandidates, configuredPriceEnv: priceConfig.configuredEnv };
     if (isStripeDevMockEnabled()) {
       const payload = stripeDevMockCheckout({ kind: "dorocoin", targetUrl: `/wallet?checkout=mock-success&coins=${encodeURIComponent(String(coins))}`, label: `${coins} DoroCoins` });
-      return ok({ ...payload, packageId: packageId || null, coins, amountUsd, missing: !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID" }, payload.message);
+      return ok({ ...payload, packageId: packageId || null, coins, amountUsd, ...details }, payload.message);
     }
-    return fail("Stripe DoroCoin checkout is not configured.", 503, { missing: !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID" }, "PAYMENT_CONFIGURATION_ERROR");
+    return fail("Stripe DoroCoin checkout is not configured.", 503, details, "PAYMENT_CONFIGURATION_ERROR");
   }
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: customCoins
       ? [{ price_data: { currency: "usd", unit_amount: Math.round(amountUsd * 100), product_data: { name: `${coins} DoroCoins` } }, quantity: 1 }]
-      : [{ price: stripePriceId!, quantity: 1 }],
+      : [{ price: priceConfig.priceId!, quantity: 1 }],
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel`,
     metadata: { type: "dorocoin_purchase", packageId, customCoins: customCoins ? "true" : "false", userId: user.uid, coins: String(coins) }

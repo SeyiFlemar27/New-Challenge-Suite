@@ -94,6 +94,10 @@ export default function WalletPage() {
 
   useEffect(() => {
     loadWallet();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "mock-success") {
+      setStatus("Development checkout completed. No payment was processed and no DoroCoins were credited.");
+    }
   }, []);
 
   async function buyPackage(packageId: string) {
@@ -107,7 +111,11 @@ export default function WalletPage() {
       return;
     }
 
-    setStatus("Checkout started. Your wallet updates after Stripe confirms payment.");
+    if ((result.data as any).mode === "mock" || (result.data as any).developmentOnly) {
+      setStatus(result.message || "Development checkout started. No payment will be processed and no DoroCoins will be credited.");
+    } else {
+      setStatus("Checkout started. Your wallet updates after Stripe webhook confirmation.");
+    }
     window.location.href = result.data.url;
   }
 
@@ -122,7 +130,11 @@ export default function WalletPage() {
     const result = await purchaseCustomDoroCoins(coins);
     setCheckoutPackageId(null);
     if (result.ok && result.data?.url) {
-      setStatus("Checkout started. Your wallet updates after Stripe confirms payment.");
+      if ((result.data as any).mode === "mock" || (result.data as any).developmentOnly) {
+        setStatus(result.message || "Development checkout started. No payment will be processed and no DoroCoins will be credited.");
+      } else {
+        setStatus("Checkout started. Your wallet updates after Stripe webhook confirmation.");
+      }
       window.location.href = result.data.url;
       return;
     }
@@ -197,7 +209,7 @@ export default function WalletPage() {
             </Card>
           ))}
         </div> : <Card className="mt-5"><EmptyState icon={<Coins />} title="No packages available" body="DoroCoin packages have not been configured yet." action={<Button onClick={loadWallet}>Retry</Button>} /></Card>}
-        {status ? <p className={`mt-5 rounded-[8px] p-4 font-bold ${status.startsWith("Checkout started") ? "bg-emerald-950/40 text-emerald-200" : "bg-red-950/40 text-red-200"}`}>{status}</p> : null}
+        {status ? <p className={`mt-5 rounded-[8px] p-4 font-bold ${status.startsWith("Checkout started") || status.startsWith("Development checkout") ? "bg-emerald-950/40 text-emerald-200" : "bg-red-950/40 text-red-200"}`}>{status}</p> : null}
       </section> : null}
 
       {!loading && !unauthenticated && !error ? <section className="mt-10">

@@ -73,10 +73,23 @@ Current pricing decision:
 - 100 DoroCoins = $7.99
 - 500 DoroCoins = $19.99
 
-Create Stripe prices for these packages and add:
+DoroCoins are internal platform credits only. They cannot be withdrawn, converted to cash, or treated as payout balance.
+
+Create Stripe test-mode prices for these packages and add either the legacy names or size aliases:
 
 ```bash
 STRIPE_PRICE_DOROCOIN_50=
 STRIPE_PRICE_DOROCOIN_100=
 STRIPE_PRICE_DOROCOIN_500=
+STRIPE_DOROCOIN_SMALL_PRICE_ID=
+STRIPE_DOROCOIN_MEDIUM_PRICE_ID=
+STRIPE_DOROCOIN_LARGE_PRICE_ID=
 ```
+
+For local Stripe webhook testing, run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout success pages do not activate plans or credit DoroCoins directly; those updates happen only after the verified Stripe webhook is processed.

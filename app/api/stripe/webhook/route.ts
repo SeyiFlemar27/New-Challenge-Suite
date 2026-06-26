@@ -5,6 +5,18 @@ import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
+function assertPaidPaymentSession(session: { mode?: string | null; payment_status?: string | null; metadata?: Record<string, string> | null }) {
+  if (session.mode !== "payment") throw new Error("Stripe DoroCoin checkout session was not a payment session.");
+  if (session.payment_status !== "paid") throw new Error("Stripe DoroCoin checkout session is not paid.");
+  if (!session.metadata?.userId || !session.metadata.coins) throw new Error("Stripe DoroCoin checkout session is missing required metadata.");
+}
+
+function assertSubscriptionSession(session: { mode?: string | null; payment_status?: string | null; metadata?: Record<string, string> | null }) {
+  if (session.mode !== "subscription") throw new Error("Stripe subscription checkout session was not a subscription session.");
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") throw new Error("Stripe subscription checkout session is not payment-confirmed.");
+  if (!session.metadata?.planId || !session.metadata.userId) throw new Error("Stripe subscription checkout session is missing required metadata.");
+}
+
 export async function POST(request: Request) {
   const stripe = getStripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -21,8 +33,10 @@ export async function POST(request: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
+    const isDoroCoinPurchase = session.metadata?.type === "dorocoin_purchase";
+    const isSubscriptionCheckout = Boolean(session.metadata?.planId);
     const db = getAdminDb();
-    if (!db && (session.metadata?.type === "dorocoin_purchase" || session.metadata?.planId)) {
+    if (!db && (isDoroCoinPurchase || isSubscriptionCheckout)) {
       return serverUnavailable("Stripe webhook persistence");
     }
     if (!db) return ok({ received: true }, "Stripe webhook received.");
@@ -41,42 +55,43 @@ export async function POST(request: Request) {
     }
 
     try {
-      if (session.metadata?.type === "dorocoin_purchase" && session.metadata.userId && session.metadata.coins) {
+      if (isDoroCoinPurchase) {
+        assertPaidPaymentSession(session);
         await applyDoroCoinTransaction(db, {
-          userId: session.metadata.userId,
-          amount: Number(session.metadata.coins),
+          userId: session.metadata!.userId,
+          amount: Number(session.metadata!.coins),
           type: "purchase",
-          description: `Purchased ${session.metadata.coins} DoroCoins`,
+          description: `Purchased ${session.metadata!.coins} DoroCoins`,
           sourceId: session.id,
           transactionId: deterministicId("stripe_session", session.id, "dorocoin_purchase"),
           idempotencyKey: event.id,
           createdBy: "stripe"
         });
-      } else if (session.metadata?.planId) {
+      } else if (isSubscriptionCheckout) {
+        assertSubscriptionSession(session);
         await db.collection("subscriptionEvents").doc(deterministicId("stripe_session", session.id, "subscription")).set({
           stripeSessionId: session.id,
           customerId: session.customer,
-          planId: session.metadata.planId,
-          userId: session.metadata.userId ?? null,
+          planId: session.metadata!.planId,
+          userId: session.metadata!.userId,
+          paymentStatus: session.payment_status,
           createdAt: now,
           updatedAt: now
         }, { merge: true });
-        if (session.metadata.userId) {
-          await Promise.all([
-            db.collection("users").doc(session.metadata.userId).set({
-              planId: session.metadata.planId,
-              subscriptionStatus: "active",
-              stripeCustomerId: session.customer ?? null,
-              updatedAt: now
-            }, { merge: true }),
-            db.collection("profiles").doc(session.metadata.userId).set({
-              planId: session.metadata.planId,
-              premium: true,
-              subscriptionStatus: "active",
-              updatedAt: now
-            }, { merge: true })
-          ]);
-        }
+        await Promise.all([
+          db.collection("users").doc(session.metadata!.userId).set({
+            planId: session.metadata!.planId,
+            subscriptionStatus: "active",
+            stripeCustomerId: session.customer ?? null,
+            updatedAt: now
+          }, { merge: true }),
+          db.collection("profiles").doc(session.metadata!.userId).set({
+            planId: session.metadata!.planId,
+            premium: true,
+            subscriptionStatus: "active",
+            updatedAt: now
+          }, { merge: true })
+        ]);
       }
       await eventRef.set({ status: "processed", processedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
     } catch (error) {
@@ -86,4 +101,3 @@ export async function POST(request: Request) {
   }
   return ok({ received: true }, "Stripe webhook received.");
 }
-

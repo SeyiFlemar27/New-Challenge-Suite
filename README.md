@@ -52,20 +52,53 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    Server API routes intentionally fail with `503` until Firebase Admin is configured. They should not silently return demo data for production reads or writes.
 
    For Storage health checks, prefer `FIREBASE_STORAGE_BUCKET` for the Admin SDK. Use the bucket shown in Firebase Storage, without `gs://`. In some newer projects the web config value can look like `project-id.firebasestorage.app`, while the Admin SDK bucket may be the bucket name shown directly in Storage settings.
-4. Fill Stripe secret, webhook secret, publishable key, and plan price IDs when you are ready for real Stripe testing. Leave these blank for local mock checkout only; production never silently mocks Stripe:
-   - `STRIPE_PRICE_CREATOR`
-   - `STRIPE_PRICE_COMPETITOR`
-   - `STRIPE_PRICE_EXECUTIVE_HOST`
-   - `STRIPE_PRICE_CHIEF_PRODUCER`
-   - `STRIPE_PRICE_BRAND_PARTNER`
-   - `STRIPE_PRICE_ENTERPRISE_SPONSOR`
-   - `STRIPE_CREATOR_PRICE_ID`
-   - `STRIPE_PRO_PRICE_ID`
-   - `STRIPE_HOST_PRICE_ID`
-   - `STRIPE_ENTERPRISE_PRICE_ID`
-   - `STRIPE_DOROCOIN_SMALL_PRICE_ID`
-   - `STRIPE_DOROCOIN_MEDIUM_PRICE_ID`
-   - `STRIPE_DOROCOIN_LARGE_PRICE_ID`
+4. Fill Stripe test-mode variables only when you are ready for real Stripe testing. Leave these blank for local mock checkout only; production never silently mocks Stripe. Do not commit live keys or local secrets.
+
+   Required for real Stripe test checkout and webhook verification:
+
+   ```env
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
+
+   Subscription price IDs can use the legacy names or blueprint aliases:
+
+   ```env
+   STRIPE_PRICE_CREATOR=
+   STRIPE_PRICE_COMPETITOR=
+   STRIPE_PRICE_EXECUTIVE_HOST=
+   STRIPE_PRICE_CHIEF_PRODUCER=
+   STRIPE_PRICE_BRAND_PARTNER=
+   STRIPE_PRICE_ENTERPRISE_SPONSOR=
+   STRIPE_CREATOR_PRICE_ID=
+   STRIPE_PRO_PRICE_ID=
+   STRIPE_HOST_PRICE_ID=
+   STRIPE_ENTERPRISE_PRICE_ID=
+   STRIPE_SPONSOR_STARTER_PRICE_ID=
+   STRIPE_BRAND_PARTNER_PRICE_ID=
+   STRIPE_ENTERPRISE_PARTNER_PRICE_ID=
+   ```
+
+   DoroCoin package price IDs can use the legacy package names or the package-size aliases:
+
+   ```env
+   STRIPE_PRICE_DOROCOIN_50=
+   STRIPE_PRICE_DOROCOIN_100=
+   STRIPE_PRICE_DOROCOIN_500=
+   STRIPE_DOROCOIN_SMALL_PRICE_ID=
+   STRIPE_DOROCOIN_MEDIUM_PRICE_ID=
+   STRIPE_DOROCOIN_LARGE_PRICE_ID=
+   ```
+
+   For local webhook testing, run the Stripe CLI and copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`:
+
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+
+   Checkout success pages only show receipt state. Plans and DoroCoins update only after the verified Stripe webhook is received. Local mock checkout returns an internal URL and processes no payment, credits no DoroCoins, and activates no subscription.
 5. Install dependencies.
 6. Run `pnpm dev`.
 7. Verify the backend foundation:

@@ -38,6 +38,10 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     loadPlans();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "mock-success") {
+      setCheckoutMessage("Development checkout completed. No payment was processed and no subscription was activated.");
+    }
   }, []);
 
   async function checkout(planId: string) {
@@ -50,7 +54,11 @@ export default function SubscriptionsPage() {
       setError(result.message || "Checkout could not be started. Please try again.");
       return;
     }
-    setCheckoutMessage("Checkout started. Your plan updates after Stripe confirms payment.");
+    if ((result.data as any).mode === "mock" || (result.data as any).developmentOnly) {
+      setCheckoutMessage(result.message || "Development checkout started. No payment will be processed and no subscription will be activated.");
+    } else {
+      setCheckoutMessage("Checkout started. Your plan updates after Stripe webhook confirmation.");
+    }
     window.location.href = result.data.url;
   }
 

@@ -185,6 +185,19 @@ export function fetchLiveEvents(limit = 30) {
   }>(`/api/live-events?limit=${limit}`);
 }
 
+
+type CheckoutResponse = {
+  url?: string;
+  checkoutUrl?: string;
+  mode?: "mock";
+  message?: string;
+  developmentOnly?: boolean;
+  paymentProcessed?: boolean;
+  coinsCredited?: boolean;
+  subscriptionActivated?: boolean;
+  planActivated?: boolean;
+};
+
 export function fetchLiveEventDetails(eventId: string) {
   return apiRequest<{
     user: {
@@ -200,7 +213,7 @@ export function fetchLiveEventDetails(eventId: string) {
 }
 
 export function createSubscriptionCheckout(planId: string) {
-  return apiRequest<{ url?: string }>("/api/stripe/checkout", { method: "POST", body: JSON.stringify({ planId }) });
+  return apiRequest<CheckoutResponse>("/api/stripe/checkout", { method: "POST", body: JSON.stringify({ planId }) });
 }
 
 export function updateMyProfile(payload: { displayName: string; selfDeclaredRegion: "US" | "NG" }) {
@@ -267,11 +280,11 @@ export function voteForSubmission(payload: { challengeId: string; submissionId: 
 }
 
 export function purchaseDoroCoins(packageId: string) {
-  return apiRequest<{ url?: string }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ packageId }) });
+  return apiRequest<CheckoutResponse>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ packageId }) });
 }
 
 export function purchaseCustomDoroCoins(coins: number) {
-  return apiRequest<{ url?: string; purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customCoins: coins }) });
+  return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customCoins: coins }) });
 }
 
 export function recordDoroCoinTransaction(payload: unknown) {
