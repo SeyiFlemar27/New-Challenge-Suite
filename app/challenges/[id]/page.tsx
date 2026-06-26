@@ -35,11 +35,11 @@ export default function ChallengeDetailPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="grid max-w-[1240px] gap-8 xl:grid-cols-[1fr_370px]">
+        <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
           <div>
-            <Card className="h-[400px] animate-pulse rounded-[16px] bg-[#171717]" />
+            <Card className="h-[280px] animate-pulse rounded-[16px] bg-[#171717] sm:h-[340px] md:h-[400px]" />
             <div className="mt-8 h-12 max-w-2xl animate-pulse rounded bg-[#171717]" />
-            <div className="mt-8 grid gap-5 md:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-28 animate-pulse bg-[#171717]" />)}</div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-28 animate-pulse bg-[#171717]" />)}</div>
           </div>
           <aside className="space-y-6 xl:pt-[432px]"><Card className="h-52 animate-pulse bg-[#171717]" /></aside>
         </div>
@@ -51,8 +51,8 @@ export default function ChallengeDetailPage() {
     const notFound = data.message.toLowerCase().includes("not found");
     return (
       <AppShell>
-        <Card className="max-w-3xl p-8">
-          <h1 className="text-3xl font-black text-[var(--gold-2)]">{notFound ? "Challenge not found" : "Challenge could not load"}</h1>
+        <Card className="max-w-3xl p-6 sm:p-8">
+          <h1 className="text-2xl font-black text-[var(--gold-2)] sm:text-3xl">{notFound ? "Challenge not found" : "Challenge could not load"}</h1>
           <p className="mt-3 text-slate-300">{data.message}</p>
           <LinkButton href="/challenges" className="mt-6">Back to Challenges</LinkButton>
         </Card>
@@ -63,8 +63,8 @@ export default function ChallengeDetailPage() {
   if (!challenge) {
     return (
       <AppShell>
-        <Card className="max-w-3xl p-8">
-          <h1 className="text-3xl font-black text-[var(--gold-2)]">Challenge not found</h1>
+        <Card className="max-w-3xl p-6 sm:p-8">
+          <h1 className="text-2xl font-black text-[var(--gold-2)] sm:text-3xl">Challenge not found</h1>
           <p className="mt-3 text-slate-300">This challenge does not exist or is not available.</p>
           <LinkButton href="/challenges" className="mt-6">Back to Challenges</LinkButton>
         </Card>
@@ -84,20 +84,20 @@ export default function ChallengeDetailPage() {
 
   return (
     <AppShell>
-      <div className="grid max-w-[1240px] gap-8 xl:grid-cols-[1fr_370px]">
-        <div>
-          <div className="relative h-[320px] overflow-hidden rounded-[16px] md:h-[400px]">
+      <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <div className="min-w-0">
+          <div className="relative h-[260px] overflow-hidden rounded-[16px] sm:h-[320px] md:h-[400px]">
             <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" />
-            <span className="absolute right-5 top-5 rounded-full bg-[var(--gold)] px-5 py-3 text-sm font-black uppercase text-black">{challenge.type}</span>
-            <span className={`absolute bottom-5 left-5 rounded-full px-5 py-3 text-sm font-black ${statusClassName(displayStatus)}`}>{displayStatus}</span>
+            <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
+            <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus)}`}>{displayStatus}</span>
           </div>
-          <h1 className="mt-8 text-4xl font-black md:text-5xl">{challenge.title}</h1>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <LinkButton href={`/challenges/${challenge.id}/boost`}><Rocket size={17} /> Boost Challenge</LinkButton>
-            <Button variant="secondary" onClick={() => setShared(true)}><Share2 size={17} /> {shared ? "Link Copied" : "Share"}</Button>
+          <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
+          <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
+            <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setShared(true)}><Share2 size={17} /> {shared ? "Link Copied" : "Share"}</Button>
           </div>
-          <p className="mt-4 text-xl text-slate-200">{challenge.description}</p>
-          <div className="mt-8 grid gap-5 md:grid-cols-4">
+          <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" />
             <Metric value={prizeValue} label="Prize Details" />
             <Metric value={displayStatus} label="Status" />
@@ -105,9 +105,9 @@ export default function ChallengeDetailPage() {
           </div>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
 
-          <Card className="mt-10 p-7">
+          <Card className="mt-10 p-5 sm:p-7">
             <h2 className="text-2xl font-black">Challenge Guide</h2>
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Info title="Overview" body={challenge.description} />
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
@@ -123,7 +123,7 @@ export default function ChallengeDetailPage() {
             <h2 className="text-2xl font-black">Community Submissions</h2>
             {leaderboard?.message ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-5 text-[var(--gold)]">{leaderboard.message}</Card> : null}
             {challengeSubmissions.length ? (
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="mt-6 grid gap-5 md:grid-cols-2">
                 {challengeSubmissions.map((entry, index) => <SubmissionVoteCard key={entry.id} rank={index + 1} submission={entry} votingOpen={votingOpen} />)}
               </div>
             ) : (
@@ -133,14 +133,14 @@ export default function ChallengeDetailPage() {
 
           <section className="mt-12 border-t border-white/10 pt-10">
             <h2 className="text-2xl font-black">Comments</h2>
-            <Card className="mt-6 p-6">
+            <Card className="mt-6 p-5 sm:p-6">
               <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">Comments are not available for this challenge yet.</p>
             </Card>
           </section>
         </div>
 
-        <aside className="space-y-6 xl:pt-[432px]">
-          <Card className="p-8 text-center">
+        <aside className="space-y-5 xl:pt-[432px]">
+          <Card className="p-5 text-center sm:p-8">
             <h3 className="text-xl font-black">Ready to join?</h3>
             <p className="mt-2 text-slate-300">Enroll first, then upload an accepted image or video submission.</p>
             {!joinOpen ? (
@@ -153,17 +153,17 @@ export default function ChallengeDetailPage() {
             <Button variant="secondary" className="mt-4 w-full" onClick={() => setWatching(true)}>{watching ? "Watching Challenge" : "Interested in watching"}</Button>
           </Card>
 
-          <Card className="border-yellow-500/30 bg-yellow-950/10 p-8 text-center">
+          <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Funding/release is not active yet, and ROI reporting remains under review.</p>
-            <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5">Propose Sponsorship</LinkButton>
+            <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card>
 
-          <Card id="vote" className="p-8">
+          <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
             <div className="mt-5">
-              {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`}><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button disabled><Vote size={17} /> Voting Closed</Button>}
+              {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> Voting Closed</Button>}
             </div>
             <p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
           </Card>
@@ -174,7 +174,7 @@ export default function ChallengeDetailPage() {
 }
 
 function Metric({ value, label }: { value: string; label: string }) {
-  return <Card className="p-6 text-center"><div className="text-3xl font-black capitalize text-[var(--gold-2)]">{value}</div><div className="mt-3 text-sm text-slate-300">{label}</div></Card>;
+  return <Card className="p-4 text-center sm:p-6"><div className="break-words text-2xl font-black capitalize text-[var(--gold-2)] sm:text-3xl">{value}</div><div className="mt-3 text-sm text-slate-300">{label}</div></Card>;
 }
 
 function Info({ title, body }: { title: string; body: string }) {
@@ -189,13 +189,15 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
         <span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-xs font-black">Rank #{rank}</span>
       </div>
       <div className="p-5">
-        <h3 className="text-lg font-black">{submission.title}</h3>
+        <h3 className="break-words text-lg font-black">{submission.title}</h3>
         <p className="mt-2 text-sm text-slate-300">by @{submission.userName}</p>
         <p className="mt-3 text-sm text-slate-300">{submission.description}</p>
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-5 grid gap-3 sm:flex sm:items-center sm:justify-between">
           <span className="flex items-center gap-2 font-black text-[var(--gold)]"><Trophy size={16} /> {submission.likes} votes</span>
-          <LinkButton href={`/submissions/${submission.id}`} variant="secondary">Preview</LinkButton>
-          <LinkButton href={`/challenges/${submission.challengeId}/votes`} variant="ghost">{votingOpen ? "Vote" : "Closed"}</LinkButton>
+          <div className="grid grid-cols-2 gap-3 sm:flex">
+            <LinkButton href={`/submissions/${submission.id}`} variant="secondary" className="w-full sm:w-auto">Preview</LinkButton>
+            <LinkButton href={`/challenges/${submission.challengeId}/votes`} variant="ghost" className="w-full sm:w-auto">{votingOpen ? "Vote" : "Closed"}</LinkButton>
+          </div>
         </div>
       </div>
     </Card>

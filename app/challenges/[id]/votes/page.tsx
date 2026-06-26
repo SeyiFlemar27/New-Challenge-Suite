@@ -117,9 +117,9 @@ export default function PurchaseVotesPage() {
   if (auth.loading || detailsQuery.isLoading || packagesQuery.isLoading || currentUser.loading) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-4xl p-8">
+        <Card className="mx-auto max-w-4xl p-5 sm:p-8">
           <div className="h-12 max-w-lg animate-pulse rounded bg-[#1a1a1a]" />
-          <div className="mt-8 grid gap-5 md:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-32 animate-pulse bg-[#151515]" />)}</div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-32 animate-pulse bg-[#151515]" />)}</div>
         </Card>
       </AppShell>
     );
@@ -128,10 +128,10 @@ export default function PurchaseVotesPage() {
   if (detailsQuery.data && !detailsQuery.data.ok) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-4xl p-8">
+        <Card className="mx-auto max-w-4xl p-5 sm:p-8">
           <PageTitle title="Record Additional DoroCoin Votes" subtitle="Challenge unavailable" icon={<Vote className="text-[var(--gold)]" />} />
           <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">{detailsQuery.data.message}</p>
-          <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
+          <LinkButton href="/challenges" className="mt-8 w-full sm:w-auto">Back to Challenges</LinkButton>
         </Card>
       </AppShell>
     );
@@ -140,9 +140,9 @@ export default function PurchaseVotesPage() {
   if (!challenge) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-4xl p-8">
+        <Card className="mx-auto max-w-4xl p-5 sm:p-8">
           <PageTitle title="Record Additional DoroCoin Votes" subtitle="Challenge not found" icon={<Vote className="text-[var(--gold)]" />} />
-          <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
+          <LinkButton href="/challenges" className="mt-8 w-full sm:w-auto">Back to Challenges</LinkButton>
         </Card>
       </AppShell>
     );
@@ -150,23 +150,23 @@ export default function PurchaseVotesPage() {
 
   return (
     <AppShell>
-      <Card className="mx-auto max-w-4xl p-8">
+      <Card className="mx-auto max-w-4xl p-5 sm:p-8">
         <PageTitle title="Record Additional DoroCoin Votes" subtitle={challenge.title} icon={<Vote className="text-[var(--gold)]" />} />
         {success ? (
           <div className="mt-8 text-center">
-            <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
-            <h2 className="mt-5 text-3xl font-black">DoroCoin Votes Recorded</h2>
+            <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400 sm:h-20 sm:w-20" />
+            <h2 className="mt-5 text-2xl font-black sm:text-3xl">DoroCoin Votes Recorded</h2>
             <p className="mt-3 text-slate-300">{successMessage}</p>
-            <LinkButton href={`/challenges/${challenge.id}`} className="mt-8">Return to Challenge</LinkButton>
+            <LinkButton href={`/challenges/${challenge.id}`} className="mt-8 w-full sm:w-auto">Return to Challenge</LinkButton>
           </div>
         ) : (
           <>
             {!auth.user ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Sign in before voting.</p> : null}
             {!votingOpen ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Voting is closed for this challenge.</p> : null}
             {!submissions.length ? <p className="mt-6 rounded-[8px] bg-[#151515] p-3 text-slate-300">No active or approved submissions are available for voting yet.</p> : null}
-            <div className="mt-8 grid gap-5 md:grid-cols-4">
-              {votePackages.map((item) => <button key={item.id} onClick={() => setSelected(item.id)} className={`rounded-[8px] border p-5 text-left ${selectedId === item.id ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="text-xl font-black">{item.label ?? item.name ?? `${item.votes} votes`}</h3><p className="mt-3 text-[var(--gold)]">{item.coins} DoroCoins</p></button>)}
-              <button onClick={() => setSelected("custom")} className={`rounded-[8px] border p-5 text-left ${selectedId === "custom" ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="text-xl font-black">Custom</h3><p className="mt-3 text-slate-300">Choose amount</p></button>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {votePackages.map((item) => <button key={item.id} onClick={() => setSelected(item.id)} className={`min-h-28 rounded-[8px] border p-4 text-left sm:p-5 ${selectedId === item.id ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="break-words text-lg font-black sm:text-xl">{item.label ?? item.name ?? `${item.votes} votes`}</h3><p className="mt-3 text-[var(--gold)]">{item.coins} DoroCoins</p></button>)}
+              <button onClick={() => setSelected("custom")} className={`min-h-28 rounded-[8px] border p-4 text-left sm:p-5 ${selectedId === "custom" ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="text-lg font-black sm:text-xl">Custom</h3><p className="mt-3 text-slate-300">Choose amount</p></button>
             </div>
             {selectedId === "custom" ? <div className="mt-6"><Field label="Custom Vote Amount"><input className={inputClass} type="number" min="1" value={custom} onChange={(event) => setCustom(event.target.value)} /></Field></div> : null}
             <div className="mt-6">
@@ -177,11 +177,11 @@ export default function PurchaseVotesPage() {
                 </select>
               </Field>
             </div>
-            <Card className="mt-6 bg-black/30 p-5">
+            <Card className="mt-6 bg-black/30 p-4 sm:p-5">
               <p><b>Wallet:</b> {walletBalance} DoroCoins</p>
               <p className="mt-2"><b>DoroCoin vote request:</b> {votes || 0} votes for {coins || 0} DoroCoins</p>
             </Card>
-            <label className="mt-6 flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I acknowledge DoroCoin votes are final once recorded and are subject to the voting policy. DoroCoin is an internal platform credit, not cash.</label>
+            <label className="mt-6 flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I acknowledge DoroCoin votes are final once recorded and are subject to the voting policy. DoroCoin is an internal platform credit, not cash.</span></label>
             {packagesQuery.data && !packagesQuery.data.ok ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{packagesQuery.data.message}</p> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm DoroCoin Votes"}</Button>

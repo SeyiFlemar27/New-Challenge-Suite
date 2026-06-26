@@ -80,7 +80,7 @@ export default function SponsorChallengePage() {
   if (auth.loading || detailsQuery.isLoading) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-3xl p-8">
+        <Card className="mx-auto max-w-3xl p-5 sm:p-8">
           <div className="h-12 max-w-lg animate-pulse rounded bg-[#171717]" />
           <div className="mt-8 space-y-5">{[0, 1, 2, 3].map((item) => <div key={item} className="h-11 animate-pulse rounded-[8px] bg-[#171717]" />)}</div>
         </Card>
@@ -91,10 +91,10 @@ export default function SponsorChallengePage() {
   if (detailsQuery.data && !detailsQuery.data.ok) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-2xl p-10 text-center">
-          <h1 className="text-4xl font-black">{detailsQuery.data.message.toLowerCase().includes("not found") ? "Challenge Not Found" : "Challenge Unavailable"}</h1>
+        <Card className="mx-auto max-w-2xl p-6 text-center sm:p-8 lg:p-10">
+          <h1 className="text-3xl font-black sm:text-4xl">{detailsQuery.data.message.toLowerCase().includes("not found") ? "Challenge Not Found" : "Challenge Unavailable"}</h1>
           <p className="mt-3 text-slate-300">{detailsQuery.data.message}</p>
-          <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
+          <LinkButton href="/challenges" className="mt-8 w-full sm:w-auto">Back to Challenges</LinkButton>
         </Card>
       </AppShell>
     );
@@ -103,10 +103,10 @@ export default function SponsorChallengePage() {
   if (!challenge) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-2xl p-10 text-center">
-          <h1 className="text-4xl font-black">Challenge Not Found</h1>
+        <Card className="mx-auto max-w-2xl p-6 text-center sm:p-8 lg:p-10">
+          <h1 className="text-3xl font-black sm:text-4xl">Challenge Not Found</h1>
           <p className="mt-3 text-slate-300">This challenge does not exist or is not available.</p>
-          <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
+          <LinkButton href="/challenges" className="mt-8 w-full sm:w-auto">Back to Challenges</LinkButton>
         </Card>
       </AppShell>
     );
@@ -115,12 +115,12 @@ export default function SponsorChallengePage() {
   if (success) {
     return (
       <AppShell>
-        <Card className="mx-auto max-w-2xl p-10 text-center">
-          <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
-          <h1 className="mt-6 text-4xl font-black">Proposal Submitted</h1>
+        <Card className="mx-auto max-w-2xl p-6 text-center sm:p-8 lg:p-10">
+          <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400 sm:h-20 sm:w-20" />
+          <h1 className="mt-6 text-3xl font-black sm:text-4xl">Proposal Submitted</h1>
           <p className="mt-3 text-slate-300">Your sponsorship proposal is pending review.</p>
           <div className="mt-6 rounded-[8px] bg-yellow-500/10 p-4 font-black text-[var(--gold)]">Status: Pending Review</div>
-          <LinkButton href={`/challenges/${challenge.id}`} className="mt-8">Back to Challenge</LinkButton>
+          <LinkButton href={`/challenges/${challenge.id}`} className="mt-8 w-full sm:w-auto">Back to Challenge</LinkButton>
         </Card>
       </AppShell>
     );
@@ -128,7 +128,7 @@ export default function SponsorChallengePage() {
 
   return (
     <AppShell>
-      <Card className="mx-auto max-w-3xl p-8">
+      <Card className="mx-auto max-w-3xl p-5 sm:p-8">
         <PageTitle title="Sponsorship Proposal" subtitle={challenge.title} />
         {!auth.user ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Sign in with a sponsor account before submitting a sponsorship proposal.</p> : null}
         {!eligible ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">This challenge is not eligible for sponsorship.</p> : null}
@@ -143,19 +143,19 @@ export default function SponsorChallengePage() {
             </div>
             <Field label="Branding Preference"><select name="brandingPreference" className={inputClass}><option>Logo on challenge page</option><option>Featured sponsor badge</option><option>Custom CTA placement</option></select></Field>
             <Field label="Sponsorship Message"><textarea name="message" className={textareaClass} required /></Field>
-            <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" required /> I accept review-only sponsor terms. Money capture/release is not active yet, and no ROI is promised.</label>
+            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" required /> <span>I accept review-only sponsor terms. Money capture/release is not active yet, and no ROI is promised.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || !eligible}>Review Proposal</Button>
           </form>
         ) : (
           <div className="mt-8">
-            <h2 className="text-2xl font-black">Review Sponsorship</h2>
+            <h2 className="text-xl font-black sm:text-2xl">Review Sponsorship</h2>
             <p className="mt-3 text-slate-300">Confirm the sponsorship proposal for review. Sponsor contribution requests and branding placement remain pending review. Money capture/release is not active yet, and no ROI is promised.</p>
             {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsor proposal with ${proposal.prizePoolContribution.toLocaleString()} contribution request. Money capture/release is not active yet.</p></div> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setReview(false)}>Back</Button>
-              <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? "Submitting" : "Submit Proposal"}</Button>
+            <div className="mt-6 grid gap-3 sm:flex sm:justify-end">
+              <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setReview(false)}>Back</Button>
+              <Button className="w-full sm:w-auto" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? "Submitting" : "Submit Proposal"}</Button>
             </div>
           </div>
         )}
