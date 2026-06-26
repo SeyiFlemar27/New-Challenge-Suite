@@ -28,54 +28,54 @@ export default function LandingPage() {
   const visibleLeaders = expanded ? leaders : leaders.slice(0, 3);
 
   return (
-    <main className="min-h-screen bg-[#11111a]">
-      <section className="relative flex min-h-[900px] flex-col items-center justify-center overflow-hidden px-6 text-center">
-        <BrandLogo className="mb-8" imageClassName="h-28 w-28 border-2 border-[var(--gold)] gold-glow" />
+    <main className="min-h-screen overflow-x-hidden bg-[#11111a]">
+      <section className="relative flex min-h-[680px] flex-col items-center justify-center overflow-hidden px-4 py-20 text-center sm:px-6 lg:min-h-[900px] lg:py-28">
+        <BrandLogo className="mb-7 lg:mb-8" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24 lg:h-28 lg:w-28" />
         <FloatingCard className="left-[10%] top-[12%]" icon={<Camera size={48} />} label="Creative Challenges" />
         <FloatingCard className="left-[15%] top-[38%]" icon={<Globe size={48} />} label="Global Community" />
         <FloatingCard className="right-[15%] top-[37%]" icon={<Trophy size={48} />} label="Prize Foundations" />
-        <h1 className="text-6xl font-black tracking-normal">Welcome to <span className="text-[var(--gold)]">ChallengeSuite</span></h1>
-        <p className="mt-10 max-w-3xl text-2xl leading-10 text-[#9cb5d8]">Join creative challenges, showcase your talent, and compete with a global community</p>
-        <div className="mt-12 flex flex-wrap justify-center gap-6">
-          <LinkButton href="/auth/register" variant="purple" className="h-16 w-72 text-lg">Get Started Free</LinkButton>
-          <LinkButton href="/auth/login" variant="ghost" className="h-16 w-40 text-lg">Sign In</LinkButton>
+        <h1 className="max-w-5xl text-4xl font-black leading-tight tracking-normal sm:text-5xl lg:text-6xl">Welcome to <span className="text-[var(--gold)]">ChallengeSuite</span></h1>
+        <p className="mt-6 max-w-3xl text-lg leading-8 text-[#9cb5d8] sm:mt-8 sm:text-xl lg:mt-10 lg:text-2xl lg:leading-10">Join creative challenges, showcase your talent, and compete with a global community</p>
+        <div className="mt-9 flex w-full max-w-sm flex-col justify-center gap-3 sm:mt-12 sm:max-w-none sm:flex-row sm:flex-wrap sm:gap-6">
+          <LinkButton href="/auth/register" variant="purple" className="min-h-14 w-full text-base sm:h-16 sm:w-72 sm:text-lg">Get Started Free</LinkButton>
+          <LinkButton href="/auth/login" variant="ghost" className="min-h-14 w-full text-base sm:h-16 sm:w-40 sm:text-lg">Sign In</LinkButton>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1340px] px-6 pb-24">
-        <h2 className="text-center text-5xl font-black text-[#d5a7ff]">Why Join ChallengeSuite?</h2>
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
+      <section className="mx-auto max-w-[1340px] px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-24">
+        <h2 className="text-center text-3xl font-black leading-tight text-[#d5a7ff] sm:text-4xl lg:text-5xl">Why Join ChallengeSuite?</h2>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3 lg:gap-8">
           {features.map((feature) => {
             const Icon = feature.icon;
-            return <Card key={feature.title} className="min-h-[330px] p-10 text-center"><Icon className="mx-auto text-white" size={54} /><h3 className="mt-9 text-2xl font-black">{feature.title}</h3><p className="mt-5 text-lg leading-8 text-[#9cb5d8]">{feature.body}</p></Card>;
+            return <Card key={feature.title} className="p-6 text-center sm:min-h-[280px] lg:min-h-[330px] lg:p-10"><Icon className="mx-auto text-white" size={46} /><h3 className="mt-6 text-xl font-black lg:mt-9 lg:text-2xl">{feature.title}</h3><p className="mt-4 text-base leading-7 text-[#9cb5d8] lg:mt-5 lg:text-lg lg:leading-8">{feature.body}</p></Card>;
           })}
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-[#211a3b] py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 px-6 text-center md:grid-cols-4">
-          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label}><div className="text-6xl font-black text-[#765cf6]">{value}</div><div className="mt-4 text-xl font-bold text-[#9cb5d8]">{label}</div></div>)}
+      <section className="border-y border-white/10 bg-[#211a3b] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 text-center sm:px-6 md:grid-cols-4 lg:gap-10">
+          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label} className="min-w-0"><div className="break-words text-4xl font-black text-[#765cf6] sm:text-5xl lg:text-6xl">{value}</div><div className="mt-3 text-sm font-bold leading-6 text-[#9cb5d8] sm:text-base lg:mt-4 lg:text-xl">{label}</div></div>)}
         </div>
 
-        <Card className="mx-auto mt-20 max-w-3xl p-8">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="flex items-center gap-2 text-3xl font-black"><Crown className="text-[var(--gold)]" /> Homepage Leaderboard</h2>
-            {!expanded ? <Button onClick={() => setExpanded(true)} variant="secondary">View Leaderboards</Button> : <LinkButton href="/leaderboards">Show More</LinkButton>}
+        <Card className="mx-4 mt-12 max-w-3xl p-5 sm:mx-auto sm:mt-16 sm:p-8 lg:mt-20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="flex min-w-0 items-center gap-2 text-2xl font-black sm:text-3xl"><Crown className="shrink-0 text-[var(--gold)]" /> <span className="min-w-0">Homepage Leaderboard</span></h2>
+            {!expanded ? <Button onClick={() => setExpanded(true)} variant="secondary" className="w-full sm:w-auto">View Leaderboards</Button> : <LinkButton href="/leaderboards" className="w-full sm:w-auto">Show More</LinkButton>}
           </div>
           <div className="mt-6 space-y-3">
             {visibleLeaders.map(([name, score, plan], index) => (
-              <div key={name} className="flex items-center justify-between rounded-[8px] bg-black/30 p-4">
-                <span className="flex items-center gap-3 font-black">#{index + 1} {name}<PremiumBadge planId={plan as any} compact /></span>
-                <span className="text-[var(--gold)]">{score}</span>
+              <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-black/30 p-4">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 font-black">#{index + 1} <span className="truncate">{name}</span><PremiumBadge planId={plan as any} compact /></span>
+                <span className="shrink-0 text-sm font-black text-[var(--gold)] sm:text-base">{score}</span>
               </div>
             ))}
           </div>
         </Card>
 
-        <div className="mt-20 text-center">
-          <h2 className="text-5xl font-black">Ready to Start Your Journey?</h2>
-          <p className="mt-7 text-2xl text-[#9cb5d8]">Join thousands of creators showcasing their talent</p>
-          <LinkButton href="/auth/register" variant="purple" className="mt-10 h-16 w-80 text-lg">Create Free Account</LinkButton>
+        <div className="mx-auto mt-14 max-w-3xl px-4 text-center sm:mt-16 lg:mt-20">
+          <h2 className="text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">Ready to Start Your Journey?</h2>
+          <p className="mt-5 text-lg leading-8 text-[#9cb5d8] sm:mt-7 sm:text-2xl">Join thousands of creators showcasing their talent</p>
+          <LinkButton href="/auth/register" variant="purple" className="mt-8 min-h-14 w-full max-w-sm text-base sm:mt-10 sm:h-16 sm:w-80 sm:text-lg">Create Free Account</LinkButton>
         </div>
       </section>
       <footer className="py-10 text-center text-[#58719a]">ChallengeSuite. All rights reserved.</footer>
