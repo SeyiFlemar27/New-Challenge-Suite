@@ -96,7 +96,7 @@ export default function PurchaseVotesPage() {
       return;
     }
     if (!agreed) {
-      setError("Accept the paid voting agreement to continue.");
+      setError("Accept the DoroCoin voting agreement to continue.");
       return;
     }
     if (!votingOpen) {

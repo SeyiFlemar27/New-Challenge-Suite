@@ -1,6 +1,6 @@
 ﻿export type RegionCode = "US" | "NG";
 export type SubmissionType = "image" | "video";
-export type PrizeType = "Cash Jackpot" | "Product Prize" | "Bragging Rights (Leaderboard Ranking)" | "DoroCoin";
+export type PrizeType = "Prize Details Pending Review" | "Prize Foundation" | "Prize Review" | "Product Prize" | "Bragging Rights (Leaderboard Ranking)" | "DoroCoin" | "Cash Jackpot"; // Cash Jackpot is legacy/read-only compatibility, not an active payout feature.
 export type AgreementType =
   | "master_account"
   | "challenge_entry"

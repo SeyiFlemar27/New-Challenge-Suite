@@ -42,6 +42,9 @@ Legacy read aliases only: older Firestore/demo records may still contain challen
 
 Money-sensitive systems are intentionally locked for the current production foundation: paid-entry prize pools, prize pool release, real cash payouts, automatic refunds, sponsor money release, and KYC document processing are not active. Store review/status foundations only until those systems are intentionally enabled.
 
+Legacy/mock terminology note: older seeded or mock records may still contain labels such as `Cash Jackpot`, `Platform ROI`, or paid-voting copy. These terms are read-compatibility only. New records and user-facing copy should use `Prize Details Pending Review`, `Prize Foundation`, `Prize Review`, `Platform Operations`, and DoroCoin/internal-credit voting language. `Cash Jackpot` is not an active cash payout feature, `Platform ROI` must not be used as a promise, and paid voting wording should refer to DoroCoin votes only. Future Firestore indexes for cash, payout, refund, and dispute review views should be added when those review views are actually built.
+
+
 ## Collections
 
 ### `users/{uid}`

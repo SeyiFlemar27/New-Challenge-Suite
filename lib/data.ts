@@ -103,7 +103,7 @@ export const plans: SubscriptionPlan[] = [
     subtitle: "Enterprise campaigns",
     priceMonthly: 1250,
     stripePriceEnv: "STRIPE_PRICE_ENTERPRISE_SPONSOR",
-    features: ["Unlimited sponsored challenges", "Logo on challenge feed", "Weekly Featured Sponsor banner", "Direct ROI analytics", "Co-branded live event integration"],
+    features: ["Unlimited sponsored challenges", "Logo on challenge feed", "Weekly Featured Sponsor banner", "Campaign performance insights", "Co-branded live event integration"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
@@ -123,7 +123,7 @@ export const challenges: Challenge[] = [
     competitionFormat: "1 vs 1 Battle",
     bestOf: "Best of 3",
     acceptedSubmissionTypes: ["image", "video"],
-    prizeType: "Cash Jackpot",
+    prizeType: "Prize Details Pending Review",
     entryFee: 0,
     prizePool: 6900,
     startsAt: "2026-01-24",
@@ -134,12 +134,12 @@ export const challenges: Challenge[] = [
     rules: [
       { id: "community", label: "Community guidelines apply", enabled: true, editableText: "Standard platform policies apply." },
       { id: "vote-limit", label: "Free vote limit", enabled: true, editableText: "Free users get 1 vote per challenge/day." },
-      { id: "purchase", label: "Additional votes", enabled: true, editableText: "Users may purchase additional votes after accepting the paid voting agreement." }
+      { id: "purchase", label: "Additional votes", enabled: true, editableText: "Users may purchase additional DoroCoin votes after accepting the DoroCoin voting agreement." }
     ],
     ageRestriction: { enabled: false },
     timeLimitedUploads: { enabled: false },
     sponsorshipAllocation: [
-      { bucket: "Platform ROI", percent: 12, enabled: true },
+      { bucket: "Platform Operations", percent: 12, enabled: true },
       { bucket: "Creator Share", percent: 3, enabled: true }
     ]
   },
@@ -166,7 +166,7 @@ export const challenges: Challenge[] = [
     ageRestriction: { enabled: true, minimumAge: 13 },
     timeLimitedUploads: { enabled: true, startsAt: "2026-01-24", endsAt: "2026-01-27" },
     sponsorshipAllocation: [
-      { bucket: "Platform ROI", percent: 12, enabled: true },
+      { bucket: "Platform Operations", percent: 12, enabled: true },
       { bucket: "Creator Share", percent: 3, enabled: true }
     ]
   },
@@ -197,7 +197,7 @@ export const challenges: Challenge[] = [
     ageRestriction: { enabled: true, minimumAge: 18 },
     timeLimitedUploads: { enabled: true, startsAt: "2026-02-05", endsAt: "2026-02-10" },
     sponsorshipAllocation: [
-      { bucket: "Platform ROI", percent: 10, enabled: true },
+      { bucket: "Platform Operations", percent: 10, enabled: true },
       { bucket: "Creator Share", percent: 5, enabled: true }
     ]
   }

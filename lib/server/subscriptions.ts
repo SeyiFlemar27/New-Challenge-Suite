@@ -87,7 +87,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     subtitle: "Enterprise campaigns",
     priceMonthly: 1250,
     stripePriceEnv: "STRIPE_PRICE_ENTERPRISE_SPONSOR",
-    features: ["Unlimited sponsored challenges", "Logo on challenge feed", "Weekly Featured Sponsor banner", "Direct ROI analytics", "Co-branded live event integration"],
+    features: ["Unlimited sponsored challenges", "Logo on challenge feed", "Weekly Featured Sponsor banner", "Campaign performance insights", "Co-branded live event integration"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
