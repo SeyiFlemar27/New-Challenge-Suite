@@ -1,5 +1,5 @@
-import { getAdminDb } from "@/lib/firebase/admin";
-import { getChallengeDisplayStatus } from "@/lib/challenge-status";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getChallengeDisplayStatus, isPublicChallengeStatus, isSubmissionVotableStatus } from "@/lib/challenge-status";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +18,13 @@ function isPublicChallenge(data: FirebaseFirestore.DocumentData) {
   const status = String(data.status ?? "").toLowerCase();
   const type = String(data.type ?? "public").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
-  return status !== "draft" && status !== "deleted" && status !== "removed" && type !== "private" && visibility !== "private";
+  return isPublicChallengeStatus(status) && status !== "deleted" && status !== "removed" && type !== "private" && visibility !== "private";
 }
 
 function isPublicSubmission(data: FirebaseFirestore.DocumentData) {
   const status = String(data.status ?? "").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
-  return ["approved", "published", "winner"].includes(status) && visibility !== "private" && Boolean(data.mediaUrl);
+  return isSubmissionVotableStatus(status) && visibility !== "private" && Boolean(data.mediaUrl);
 }
 
 export async function GET(request: Request) {
@@ -77,3 +77,4 @@ export async function GET(request: Request) {
     return serverError("Feed could not be loaded.", error instanceof Error ? error.message : error);
   }
 }
+

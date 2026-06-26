@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Coins, LockKeyhole, TrendingUp, Vote } from "lucide-react";
+import { Coins, LockKeyhole, ShieldCheck, TrendingUp, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { money } from "@/lib/utils";
@@ -136,9 +136,9 @@ export default function WalletPage() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title="Wallet / DoroCoin" subtitle="Use DoroCoins for votes, challenge boosts, premium entries, and rewards." icon={<Coins className="text-[var(--gold)]" />} />
+        <PageTitle title="Wallet / DoroCoin" subtitle="DoroCoins are internal platform credits for votes, boosts, and future promotional features. They cannot be withdrawn or converted to cash." icon={<Coins className="text-[var(--gold)]" />} />
         <Card className="px-7 py-5 text-right">
-          <div className="text-sm font-bold text-slate-400">Available Balance</div>
+          <div className="text-sm font-bold text-slate-400">DoroCoin Balance</div>
           <div className="text-4xl font-black text-[var(--gold)]">{balance}</div>
         </Card>
       </div>
@@ -185,6 +185,7 @@ export default function WalletPage() {
           </div>
           <Button className="mt-5 w-full md:w-auto" onClick={buyCustomCoins} disabled={checkoutPackageId === "custom"}>{checkoutPackageId === "custom" ? "Preparing Payment..." : "Continue to Payment"}</Button>
         </Card>
+        <p className="mt-5 max-w-3xl text-sm text-slate-400">Purchases add internal DoroCoin credits only. DoroCoins have no cash value, cannot be withdrawn, and cannot be converted into payout balance.</p>
         {packages.length ? <div className="mt-5 grid gap-6 md:grid-cols-3">
           {packages.map((pack) => (
             <Card key={pack.id} className="p-6">
@@ -209,7 +210,7 @@ export default function WalletPage() {
               <span className="font-bold">{formatType(txn.type)}</span>
               <span className={`text-right font-black ${txn.amount > 0 ? "text-emerald-300" : "text-red-300"}`}>{txn.amount > 0 ? "+" : ""}{txn.amount}</span>
             </div>
-          )) : <EmptyState icon={<Coins />} title="No transactions yet" body="Purchases, votes, boosts, rewards, and grants will appear here." />}
+          )) : <EmptyState icon={<Coins />} title="No transactions yet" body="DoroCoin purchases, votes, boosts, and admin grants will appear here." />}
         </Card>
       </section> : null}
     </AppShell>

@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -7,6 +7,8 @@ import { canCreateChallenge, getUserPlanAccess } from "@/lib/plan-access";
 import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
+import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
+import { writeDisabledPrizePoolFoundation } from "@/lib/server/prize-pools";
 
 export async function GET() {
   const db = getAdminDb();
@@ -112,7 +114,22 @@ export async function POST(request: Request) {
     publishedAt: body.publish && lifecycleStatus !== "pending_review" ? now : null
   };
 
-  await ref.set(challenge);
+  await Promise.all([
+    ref.set(challenge),
+    writeDisabledPrizePoolFoundation(db, ref.id, now),
+    writeCashTransactionPlaceholder(db, {
+      userId: user.uid,
+      type: "prize_placeholder_created",
+      status: "recorded",
+      amountCents: 0,
+      currency: "USD",
+      sourceType: "challenge",
+      sourceId: ref.id,
+      challengeId: ref.id,
+      description: `Prize foundation placeholder created for challenge ${ref.id}. No cash prize or payout movement is active.`,
+      now
+    })
+  ]);
   await createNotification(db, { userId: user.uid, type: "challenge_created", title: body.publish ? "Challenge submitted" : "Challenge draft saved", body: `${challenge.title} is ${challenge.status.replaceAll("_", " ")}.`, targetId: ref.id });
   await writeAuditLog({
     actorId: user.uid,

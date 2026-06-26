@@ -11,156 +11,36 @@ This document is the production backend contract for Challenge Suite. The app ke
 - Status fields must use the enums below. Do not invent new statuses in routes without updating this contract.
 - Monetary values should be stored in integer cents where possible. DoroCoin values are integer coin counts.
 
-
-## Phase 1 Account, Plan, Sponsor, and Review Foundations
-
-Phase 1 keeps the current Next.js/Firebase/Stripe backend architecture and adds normalized account routing foundations without building admin UI.
-
-### Account Types
-
-Canonical account types:
-
-```ts
-type AccountType = "user" | "sponsor" | "admin";
-type DashboardType = "user_dashboard" | "sponsor_dashboard";
-```
-
-- `user` covers normal users, creators, Pro users, Hosts, and Enterprise users.
-- `sponsor` uses the separate `/sponsor/*` experience and must not render the normal user dashboard.
-- `admin` is a backend/status foundation only in this website phase. Do not create `/admin/*` UI here.
-
-### Normalized Plan IDs
-
-User plans:
-
-```ts
-type UserProductPlanId = "free" | "creator" | "pro" | "host" | "enterprise";
-```
-
-Sponsor plans:
-
-```ts
-type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterprise_partner";
-```
-
-Legacy aliases may be accepted internally while data is migrated:
-
-| Legacy ID | Normalized ID |
-| --- | --- |
-| `observer` | `free` |
-| `premium` | `pro` |
-| `competitor` | `pro` |
-| `creator_pro` | `creator` |
-| `verified_host` | `host` |
-| `executive_host` | `host` |
-| `chief_producer` | `enterprise` |
-| `enterprise_sponsor` | `enterprise_partner` |
-
-UI should display only blueprint names: Free, Creator, Pro, Host, Enterprise, Sponsor Starter, Brand Partner, and Enterprise Partner.
-
-### Sponsor Profile Foundation
-
-Sponsor accounts store account status on `users/{uid}` and `profiles/{uid}`, and brand details in `sponsorProfiles/{uid}`.
-
-Required sponsor status fields:
-
-```json
-{
-  "accountType": "sponsor",
-  "dashboardType": "sponsor_dashboard",
-  "planId": "brand_partner",
-  "legacyPlanId": "premium",
-  "sponsorOnboardingStatus": "complete",
-  "hasSponsorProfile": true,
-  "sponsorVerificationStatus": "pending_review",
-  "brandName": "Goldline Labs",
-  "brandSlug": "goldline-labs",
-  "brandProfileCompletedAt": "2026-06-25T10:00:00.000Z",
-  "updatedAt": "2026-06-25T10:00:00.000Z"
-}
-```
-
-`sponsorProfiles/{uid}` should include `brandName`, `industry`, `website`, `countryLocation`, `brandDescription`, `socialLinks`, `contactPerson`, `businessEmail`, `logoUrl`, `bannerUrl`, `ctaButtonText`, `ctaDestinationLink`, `sponsorshipGoals`, `preferredChallengeCategories`, `sponsorOnboardingStatus`, `hasSponsorProfile`, `sponsorVerificationStatus`, `brandProfileCompletedAt`, `createdAt`, and `updatedAt`.
-
-Sponsor onboarding statuses:
-
-```ts
-type SponsorOnboardingStatus = "not_started" | "in_progress" | "complete";
-type SponsorVerificationStatus = "not_submitted" | "pending_review" | "verified" | "rejected";
-```
-
-### Admin-Review Status Foundations
-
-Admin review is represented through status fields and immutable audit logs only. The public website must not include an admin UI in this phase.
-
-Foundation statuses that may exist before admin UI is built:
-
-```ts
-type ReviewStatus = "not_submitted" | "pending_review" | "approved" | "rejected" | "needs_more_info";
-type PayoutStatus = "not_applicable" | "pending_review" | "approved" | "rejected" | "paid" | "failed";
-type RefundStatus = "not_applicable" | "pending_review" | "approved" | "rejected" | "processed" | "failed";
-type DisputeStatus = "open" | "reviewing" | "resolved" | "dismissed";
-type KycStatus = "not_started" | "pending_review" | "verified" | "rejected" | "expired";
-```
-
-### Audit Log Shape
-
-Sensitive backend actions should use `lib/server/audit.ts` and append immutable documents to `auditLogs`.
-
-```json
-{
-  "id": "audit_log_id",
-  "actorId": "firebase_uid_or_system",
-  "actorType": "creator",
-  "action": "challenge.updated",
-  "targetType": "challenge",
-  "targetId": "challenge_id",
-  "before": { "status": "draft" },
-  "after": { "status": "pending_review" },
-  "reason": "Creator submitted challenge for review",
-  "metadata": { "source": "api" },
-  "createdAt": "2026-06-25T10:00:00.000Z"
-}
-```
-
-Audit-worthy events include account updates, plan changes, sponsor onboarding updates, challenge creation/update, submission approval/rejection, vote activity, leaderboard locking, winner selection/review, prize pool status changes, payout status changes, refund status changes, dispute/report status changes, and verification/KYC status changes.
-
-### Money Systems Locked For Now
-
-The following systems are intentionally status-only foundations in this website phase:
-
-- real cash payouts
-- automatic refunds
-- sponsor money release
-- paid-entry prize pools
-- KYC document processing
-- full sponsor marketplace/campaign logic
-
-Challenges must not require paid entry. Sponsor-funded prize pool and product-prize structures may be represented by statuses and metadata, but no automatic release or payout behavior is active.
-
 ## Status Enums
 
 ```ts
 type AppRole = "user" | "creator" | "sponsor";
-type AccountType = "user" | "sponsor" | "admin";
-type DashboardType = "user_dashboard" | "sponsor_dashboard";
-type UserProductPlanId = "free" | "creator" | "pro" | "host" | "enterprise";
-type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterprise_partner";
 type VerificationStatus = "unverified" | "pending" | "verified" | "rejected";
-type ChallengeStatus = "draft" | "pending_review" | "published" | "registration_open" | "active" | "voting" | "completed" | "cancelled" | "rejected";
+type ChallengeStatus = "draft" | "pending_review" | "scheduled" | "active" | "submission_open" | "voting_open" | "voting_closed" | "under_review" | "winners_announced" | "completed" | "cancelled" | "paused";
 type RoundStatus = "scheduled" | "active" | "completed" | "cancelled";
-type SubmissionStatus = "draft" | "pending_approval" | "approved" | "rejected" | "withdrawn" | "winner";
+type SubmissionStatus = "draft" | "submitted" | "pending_review" | "approved" | "rejected" | "flagged" | "active" | "eliminated" | "winner" | "disqualified" | "withdrawn";
 type VoteMode = "free" | "dorocoin";
-type WalletTransactionType = "purchase" | "admin_grant" | "vote_spend" | "boost_spend" | "reward" | "refund" | "adjustment";
+type WalletTransactionType = "purchase" | "admin_grant" | "vote_spend" | "boost_spend" | "reward" | "adjustment";
 type SponsorshipStatus = "pending_review" | "approved" | "rejected" | "active" | "completed" | "cancelled";
 type LiveEventStatus = "draft" | "scheduled" | "live" | "ended" | "cancelled";
 type NotificationType = "challenge_created" | "challenge_joined" | "submission_uploaded" | "vote_received" | "winner_selected" | "wallet_updated" | "sponsorship_submitted" | "event_registration" | "system";
 type ConsentStatus = "accepted" | "revoked" | "superseded";
-type WinnerClaimStatus = "pending_review" | "needs_more_info" | "approved" | "rejected" | "paid";
+type WinnerClaimStatus = "pending_review" | "needs_more_info" | "approved" | "rejected" | "payout_pending" | "payout_processing" | "paid" | "failed_payout";
+type CashWalletStatus = "inactive" | "review_only" | "locked";
+type CashTransactionType = "prize_placeholder_created" | "sponsor_contribution_requested" | "payout_review_created" | "refund_review_created" | "dispute_opened" | "manual_adjustment_placeholder" | "voided_placeholder";
+type CashTransactionStatus = "pending_review" | "recorded" | "voided" | "blocked";
+type PrizePoolStatus = "disabled" | "pending_review" | "sponsor_funded_pending" | "locked" | "cancelled";
+type PayoutStatus = "pending_review" | "needs_info" | "approved_placeholder" | "blocked" | "cancelled";
+type RefundStatus = "requested" | "pending_review" | "approved_placeholder" | "rejected" | "cancelled";
+type DisputeStatus = "open" | "reviewing" | "resolved" | "dismissed";
 type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
 type AdminActionStatus = "queued" | "completed" | "failed";
 type AuditSeverity = "info" | "warning" | "critical";
 ```
+
+Legacy read aliases only: older Firestore/demo records may still contain challenge statuses `published`, `registration_open`, or `voting`; submission status `pending_approval`; participant status `joined`; or winner compatibility fields such as `isWinner`/`confirmed`. New application writes should use the canonical statuses above and map legacy values through `lib/challenge-status.ts`.
+
+Money-sensitive systems are intentionally locked for the current production foundation: paid-entry prize pools, prize pool release, real cash payouts, automatic refunds, sponsor money release, and KYC document processing are not active. Store review/status foundations only until those systems are intentionally enabled.
 
 ## Collections
 
@@ -259,13 +139,17 @@ Example:
   "type": "public",
   "competitionFormat": "Entry Competition",
   "bestOf": "1 Rounder",
-  "status": "published",
+  "status": "pending_review",
   "acceptedSubmissionTypes": ["image", "video"],
   "promoImageUrl": "https://...",
   "trailerVideoUrl": "https://...",
   "entryFeeCents": 0,
+  "paidEntryEnabled": false,
   "prizeType": "Bragging Rights (Leaderboard Ranking)",
   "prizePoolCents": 0,
+  "prizePoolEnabled": false,
+  "cashPayoutsEnabled": false,
+  "payoutStatus": "not_applicable",
   "registrationDeadline": "2026-07-01T00:00:00.000Z",
   "startsAt": "2026-07-02T00:00:00.000Z",
   "endsAt": "2026-07-10T00:00:00.000Z",
@@ -280,7 +164,7 @@ Example:
   "weightedVoteCount": 0,
   "createdAt": "2026-06-18T10:00:00.000Z",
   "updatedAt": "2026-06-18T10:00:00.000Z",
-  "publishedAt": "2026-06-18T10:05:00.000Z"
+  "submittedForReviewAt": "2026-06-18T10:05:00.000Z"
 }
 ```
 
@@ -290,7 +174,7 @@ Status fields: `status`.
 
 Owner/user relationship: `creatorId` references `users/{uid}`.
 
-Role access rules: public read for published/active challenges; creator reads own drafts; creator/sponsor may create depending role policy; admin approves, rejects, cancels, or force-updates.
+Role access rules: public read for public scheduled/active/submission_open/voting_open/completed challenges; creator reads own drafts; sponsor accounts use sponsor routes rather than normal challenge creation; admin-review foundations approve, reject, cancel, or force-update later.
 
 Indexes needed: `status ASC, createdAt DESC`; `creatorId ASC, createdAt DESC`; `category ASC, status ASC, createdAt DESC`; `status ASC, startsAt ASC`; `status ASC, endsAt ASC`.
 
@@ -353,11 +237,11 @@ Example:
   "mediaUrl": "https://...",
   "mediaPath": "submissions/firebase_uid/submission_id/video.mp4",
   "mediaType": "video",
-  "status": "pending_approval",
+  "status": "pending_review",
   "rejectionReason": null,
   "voteCount": 0,
   "weightedVoteCount": 0,
-  "isWinner": false,
+  "winnerStatus": null,
   "createdAt": "2026-06-18T10:00:00.000Z",
   "updatedAt": "2026-06-18T10:00:00.000Z",
   "approvedAt": null
@@ -366,7 +250,7 @@ Example:
 
 Required fields: `id`, `challengeId`, `userId`, `title`, `mediaUrl`, `mediaType`, `status`, `voteCount`, `weightedVoteCount`, `createdAt`, `updatedAt`.
 
-Status fields: `status`, `isWinner`.
+Status fields: `status`, `winnerStatus`. `isWinner` remains legacy read compatibility only.
 
 Owner/user relationship: `userId` references entrant.
 
@@ -413,7 +297,7 @@ API routes: `POST /api/votes`, fraud detection APIs.
 
 ### `wallets/{userId}`
 
-Purpose: Canonical DoroCoin wallet state.
+Purpose: Canonical DoroCoin wallet state. DoroCoin is an internal platform credit for votes, boosts, and future promotional features. DoroCoin is not cash, is not withdrawable, and cannot be converted into payout balance.
 
 Document ID: Firebase Auth UID.
 
@@ -444,7 +328,7 @@ API routes: `GET/POST /api/dorocoin/transactions`, `POST /api/votes`, `POST /api
 
 ### `walletTransactions/{transactionId}`
 
-Purpose: Immutable DoroCoin ledger. Every wallet balance change must have one transaction.
+Purpose: Immutable DoroCoin ledger. Every DoroCoin wallet balance change must have one transaction. This ledger must never record real cash payouts, withdrawals, or sponsor money release.
 
 Document ID: generated Firestore ID.
 
@@ -476,6 +360,119 @@ Role access rules: owner read; admin read; server-only writes.
 Indexes needed: `userId ASC, createdAt DESC`; `type ASC, createdAt DESC`; `sourceId ASC`.
 
 API routes: `GET/POST /api/dorocoin/transactions`, `POST /api/votes`, Stripe webhook, admin grant APIs.
+### `cashWallets/{userId}`
+
+Purpose: Read-only cash/payout foundation for future prize winnings, creator/host earnings, refunds, and payout review states. This is separate from DoroCoin and is not withdrawable in the current product phase.
+
+Example:
+
+```json
+{
+  "userId": "firebase_uid",
+  "status": "review_only",
+  "availableBalanceCents": 0,
+  "pendingBalanceCents": 0,
+  "lockedBalanceCents": 0,
+  "currency": "USD",
+  "withdrawalsEnabled": false,
+  "payoutProviderConnected": false,
+  "updatedAt": "2026-06-18T10:00:00.000Z"
+}
+```
+
+Required fields: `userId`, `status`, `availableBalanceCents`, `pendingBalanceCents`, `lockedBalanceCents`, `currency`, `withdrawalsEnabled`, `payoutProviderConnected`, `updatedAt`.
+
+Status fields: `status`.
+
+Owner/user relationship: `userId` references wallet owner.
+
+Role access rules: owner reads own foundation; server/admin-review writes only. No client-side cash balance mutation.
+
+Indexes needed: none for direct document reads; future `cashTransactions` queries need `userId ASC, createdAt DESC`.
+
+API routes: `GET /api/wallet` returns foundation state only.
+
+### `cashTransactions/{transactionId}`
+
+Purpose: Immutable cash ledger foundation for review-only financial events. These records document placeholder events for prize foundations, sponsor contribution requests, payout reviews, refund reviews, disputes, and manual review adjustments. They do not represent settled cash, do not increase wallet balances, do not increase withdrawable balances, do not trigger payouts, do not trigger refunds, and do not release sponsor funds.
+
+Example:
+
+```json
+{
+  "id": "cash_txn_id",
+  "userId": "firebase_uid",
+  "walletId": "firebase_uid",
+  "type": "payout_review_created",
+  "status": "pending_review",
+  "amountCents": 0,
+  "currency": "USD",
+  "direction": "none",
+  "sourceType": "winner_claim",
+  "sourceId": "claim_id",
+  "challengeId": "challenge_id",
+  "submissionId": "submission_id",
+  "winnerClaimId": "claim_id",
+  "payoutId": "payout_id",
+  "refundId": null,
+  "disputeId": null,
+  "description": "Payout review placeholder created.",
+  "balanceImpact": "none",
+  "withdrawableImpact": "none",
+  "providerConnected": false,
+  "transferEnabled": false,
+  "createdAt": "2026-06-18T10:00:00.000Z",
+  "updatedAt": "2026-06-18T10:00:00.000Z"
+}
+```
+
+Required fields: `id`, `userId`, `walletId`, `type`, `status`, `amountCents`, `currency`, `direction`, `sourceType`, `sourceId`, `description`, `balanceImpact`, `withdrawableImpact`, `providerConnected`, `transferEnabled`, `createdAt`, `updatedAt`.
+
+Optional link fields: `challengeId`, `submissionId`, `winnerClaimId`, `payoutId`, `refundId`, `disputeId`.
+
+Status fields: `status` (`pending_review`, `recorded`, `voided`, `blocked`).
+
+Allowed types: `prize_placeholder_created`, `sponsor_contribution_requested`, `payout_review_created`, `refund_review_created`, `dispute_opened`, `manual_adjustment_placeholder`, `voided_placeholder`.
+
+Safety requirements: every record must force `balanceImpact: "none"`, `withdrawableImpact: "none"`, `providerConnected: false`, and `transferEnabled: false`.
+
+Role access rules: owner reads own in future owner views; server/admin-review writes only. Do not create payout transfers, refund transfers, sponsor releases, cash withdrawals, or balance mutations from these records in this phase.
+
+Indexes needed: none in the current batch because no route queries this collection. Future owner/admin views may need `userId ASC, createdAt DESC` and `status ASC, createdAt DESC`.
+
+### `prizePools/{challengeId}`
+
+Purpose: Prize pool foundation for challenge-level review states. Paid-entry prize pools, sponsor funding release, and prize release are disabled.
+
+Required fields: `challengeId`, `status`, `releaseStatus`, `fundingStatus`, `paidEntryEnabled`, `cashPayoutsEnabled`, `transferEnabled`, `sponsorFundingReleaseEnabled`, `prizeReleaseEnabled`, `amountCents`, `totalCommittedCents`, `totalReleasedCents`, `currency`, `sourceType`, `sourceId`, `createdAt`, `updatedAt`.
+
+Status fields: `status` (`disabled`, `pending_review`, `sponsor_funded_pending`, `locked`, `cancelled`).
+
+Role access rules: public may read safe display fields for public challenges; server/admin-review writes only.
+
+Indexes needed: `status ASC, updatedAt DESC` if review queues are introduced later.
+
+### `payouts/{payoutId}`
+
+Purpose: Payout review/status foundation. Payout provider integration and transfers are not connected.
+
+Required fields: `id`, `userId`, `challengeId`, `submissionId`, `winnerClaimId`, `sourceType`, `sourceId`, `status`, `reviewStatus`, `releaseStatus`, `amountCents`, `currency`, `payoutProviderConnected`, `transferEnabled`, `createdAt`, `updatedAt`.
+
+Status fields: `status` (`pending_review`, `needs_info`, `approved_placeholder`, `blocked`, `cancelled`).
+
+Role access rules: owner reads own; server/admin-review writes only. No payout execution route should exist in this phase.
+
+Indexes needed: `userId ASC, createdAt DESC`; `status ASC, createdAt DESC`.
+
+### `refunds/{refundId}` and `disputes/{disputeId}`
+
+Purpose: Status foundations for future refund and dispute review. Automatic refunds are not active.
+
+Refund statuses: `requested`, `pending_review`, `approved_placeholder`, `rejected`, `cancelled`.
+
+Dispute statuses: `open`, `reviewing`, `resolved`, `dismissed`.
+
+Role access rules: owner reads own; server/admin-review writes only. No automatic refund or money release behavior is active.
 
 ### `doroCoinPackages/{packageId}`
 
@@ -699,7 +696,7 @@ API routes: consent APIs, admin legal document APIs.
 
 ### `winnerClaims/{claimId}`
 
-Purpose: Prize claim, identity verification, and payout workflow for winners.
+Purpose: Prize claim and review foundation for winners. Identity verification and payout processing are not active yet.
 
 Document ID: generated Firestore ID.
 
@@ -714,7 +711,7 @@ Example:
   "status": "pending_review",
   "identityDocumentName": "passport.pdf",
   "identityDocumentPath": "identity/winner_uid/claim_id/passport.pdf",
-  "payoutMethod": "stripe",
+  "payoutStatus": "pending_review",
   "taxAcknowledged": true,
   "createdAt": "2026-06-18T10:00:00.000Z",
   "updatedAt": "2026-06-18T10:00:00.000Z",
@@ -723,7 +720,7 @@ Example:
 }
 ```
 
-Required fields: `id`, `userId`, `submissionId`, `status`, `identityDocumentName`, `createdAt`, `updatedAt`.
+Required fields: `id`, `userId`, `submissionId`, `challengeId`, `status`, `reviewStatus`, `payoutId`, `payoutStatus`, `payoutProviderConnected`, `transferEnabled`, `identityDocumentName`, `identityDocumentStorageStatus`, `kycProcessingStatus`, `createdAt`, `updatedAt`.
 
 Status fields: `status`.
 
@@ -788,7 +785,7 @@ Example:
   "targetId": "submission_id",
   "status": "completed",
   "reason": "Meets rules",
-  "metadata": { "previousStatus": "pending_approval", "nextStatus": "approved" },
+  "metadata": { "previousStatus": "pending_review", "nextStatus": "approved" },
   "createdAt": "2026-06-18T10:00:00.000Z",
   "updatedAt": "2026-06-18T10:00:00.000Z"
 }
@@ -860,9 +857,9 @@ The current routes are a good start, but several fields and collection names are
 
 `POST /api/challenges`
 
-- Writes `entryFee` and `prizePool` as numbers; contract expects `entryFeeCents` and `prizePoolCents`.
+- Paid-entry and prize-pool release are locked. New challenge writes force `entryFee`, `entryFeeCents`, `prizePool`, and `prizePoolCents` to zero and create a disabled `prizePools/{challengeId}` foundation record.
 - Does not persist `competitionFormat`, `bestOf`, `customCategory`, `promoImageUrl`, `trailerVideoUrl`, `ageRestriction`, `timeLimitedUploads`, `sponsorshipAllocation`, or `publishedAt`.
-- Uses status `published` or `draft`; no `pending_review` path yet.
+- New writes should use `draft` or `pending_review`; `published` remains a legacy read alias only.
 - Does not create initial `challengeRounds`.
 
 `GET /api/challenges`
@@ -886,7 +883,7 @@ The current routes are a good start, but several fields and collection names are
 
 - Correctly creates `votes` and updates counters.
 - Uses `doroCoinWallets` and `doroCoinTransactions` instead of canonical `wallets` and `walletTransactions`.
-- Does not store `walletTransactionId` on paid vote records.
+- Does not store `walletTransactionId` on DoroCoin vote records yet.
 - Does not store fraud metadata such as IP hash or device fingerprint.
 - Error handling for transaction business-rule failures should return structured `400/409` responses instead of generic server errors.
 
@@ -903,9 +900,9 @@ The current routes are a good start, but several fields and collection names are
 
 `POST /api/stripe/webhook`
 
-- Credits wallets and records subscription events.
-- Should use canonical wallet collections.
-- Should write idempotency records keyed by Stripe event/session ID.
+- Credits DoroCoin wallets and records subscription events.
+- DoroCoin credits use `doroCoinWallets`/`doroCoinTransactions`; cash wallet foundations remain separate in `cashWallets`/`cashTransactions`.
+- Writes idempotency records in `stripeWebhookEvents` keyed by Stripe event ID before processing DoroCoin credits.
 - Should create `auditLogs` for wallet credits and subscription changes.
 
 `POST /api/challenges/[id]/boost`
@@ -916,7 +913,7 @@ The current routes are a good start, but several fields and collection names are
 
 `POST /api/challenges/[id]/sponsorships`
 
-- Writes `amount` and `prizePoolContribution` as numbers; contract expects cents fields.
+- Writes sponsor proposal amounts for review only, including cents-compatible fields. Sponsor funding/release is not active yet. If a sponsor contribution intent is present, a `prizePools/{challengeId}` placeholder is merged as review-only.
 - Does not set `updatedAt`.
 - Does not enforce sponsor role.
 - Does not write sponsor consent checks, `adminActions`, or `auditLogs`.
@@ -947,8 +944,8 @@ The current routes are a good start, but several fields and collection names are
 
 `POST /api/winner-claims`
 
-- Writes `winnerClaims`, but does not store generated `id`.
-- Does not store `challengeId`, `updatedAt`, `identityDocumentPath`, payout/tax acknowledgement fields, or review fields.
+- Writes generated `id`, `challengeId`, `reviewStatus`, `payoutId`, `payoutStatus`, `updatedAt`, and review-only identity metadata. Also writes a matching `payouts/{payoutId}` placeholder with transfers disabled.
+- KYC document processing and real payout workflow remain inactive.
 - Does not upload the identity document to Firebase Storage yet.
 - Does not verify the claimant is the actual winner.
 
@@ -979,6 +976,8 @@ Current indexes cover free-vote enforcement, notifications by user, and old Doro
   { "collectionGroup": "submissions", "fields": ["challengeId ASC", "weightedVoteCount DESC"] },
   { "collectionGroup": "votes", "fields": ["userId ASC", "challengeId ASC", "voteDate ASC", "voteMode ASC"] },
   { "collectionGroup": "walletTransactions", "fields": ["userId ASC", "createdAt DESC"] },
+  { "collectionGroup": "cashTransactions", "fields": ["userId ASC", "createdAt DESC"] },
+  { "collectionGroup": "payouts", "fields": ["status ASC", "createdAt DESC"] },
   { "collectionGroup": "sponsorships", "fields": ["challengeId ASC", "status ASC"] },
   { "collectionGroup": "liveEvents", "fields": ["status ASC", "startsAt ASC"] },
   { "collectionGroup": "consents", "fields": ["userId ASC", "agreementType ASC", "agreementVersion ASC"] },
@@ -991,7 +990,7 @@ Current indexes cover free-vote enforcement, notifications by user, and old Doro
 
 ## Security Expectations Summary
 
-- Public read: published challenges, approved submissions, active DoroCoin packages, active legal versions, public profiles, public live events.
+- Public read: public scheduled/active/submission_open/voting_open/completed challenges, approved/active/winner submissions, active DoroCoin packages, active legal versions, public profiles, public live events. Legacy `published` challenge records are readable through compatibility helpers only.
 - Owner read: users, wallets, wallet transactions, consents, winner claims, notifications, reports, private submissions.
 - Creator read: own challenges and child moderation queues.
 - Sponsor read: own sponsorships and approved challenge sponsorship visibility.
@@ -1007,3 +1006,26 @@ Current indexes cover free-vote enforcement, notifications by user, and old Doro
 5. Add missing APIs for rounds, packages, legal versions, reports, audit logs, live events, moderation, and notification read state.
 
 
+
+
+
+## Phase 3.2 Prize/Payout Review Foundations
+
+Batch 3.2 adds foundation-only writes for money-adjacent review records. These records are intentionally not money movement records.
+
+- `POST /api/challenges` creates `prizePools/{challengeId}` with `status: "disabled"`, `releaseStatus: "not_active"`, `fundingStatus: "not_active"`, `amountCents: 0`, all release/transfer flags false, and `sourceType: "challenge"`. It also writes a `cashTransactions` record with `type: "prize_placeholder_created"`, `amountCents: 0`, and no balance/withdrawable impact.
+- `POST /api/challenges/[id]/sponsorships` keeps sponsorships `pending_review`, `fundingReleaseStatus: "not_active"`, and `sponsorMoneyCaptureStatus: "not_active"`. It stores both compatibility number fields and cents fields. If contribution intent is greater than zero, it merges a review-only `prizePools/{challengeId}` placeholder. It also writes a `cashTransactions` record with `type: "sponsor_contribution_requested"` and no capture, hold, release, payout, balance, or withdrawable impact.
+- `POST /api/winner-claims` creates a matching `payouts/{payoutId}` placeholder and stores `payoutId` on the claim. The payout placeholder uses `status: "pending_review"`, `reviewStatus: "pending_review"`, `releaseStatus: "not_active"`, `transferEnabled: false`, and `payoutProviderConnected: false`. It also writes a `cashTransactions` record with `type: "payout_review_created"` and no payout approval, payment, balance, or withdrawable impact.
+- `refunds` and `disputes` currently have helper/data contracts only. No routes, UI, automatic refunds, dispute resolution UI, or admin review UI are active.
+- `GET /api/winners` must normalize prize/payout values with `prizeDisplayStatus: "foundation_only"`, `fundingReleaseStatus: "not_active"`, and `cashPayoutsEnabled: false` so old seeded prize fields are not presented as payable funds.
+
+Operational warnings:
+
+- Real cash payouts are inactive.
+- Automatic refunds are inactive.
+- Sponsor money capture/release is inactive.
+- Paid-entry prize pools are inactive.
+- KYC document processing is inactive.
+- Payout providers are not connected.
+- DoroCoin cannot be converted to cash.
+- No withdraw button or payout execution route should be exposed.

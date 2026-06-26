@@ -80,7 +80,7 @@ export default function ChallengeDetailPage() {
   const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
   const sponsorships = details?.sponsorships ?? [];
   const sponsored = sponsorships.length > 0;
-  const prizeValue = challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : `$${challenge.prizePool.toLocaleString()}`;
+  const prizeValue = challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : "Pending review";
 
   return (
     <AppShell>
@@ -99,7 +99,7 @@ export default function ChallengeDetailPage() {
           <p className="mt-4 text-xl text-slate-200">{challenge.description}</p>
           <div className="mt-8 grid gap-5 md:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" />
-            <Metric value={prizeValue} label="Prize Pool" />
+            <Metric value={prizeValue} label="Prize Details" />
             <Metric value={displayStatus} label="Status" />
             <Metric value={totalVotes.toLocaleString()} label="Votes" />
           </div>
@@ -112,10 +112,10 @@ export default function ChallengeDetailPage() {
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
-              <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can be purchased with DoroCoins." : "Voting is closed for this challenge."} />
+              <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : "Voting is closed for this challenge."} />
               <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
-              <Info title="Sponsor information" body={sponsored ? `${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.` : "Sponsors may contribute to prize pool funding and receive pending-review status before activation."} />
+              <Info title="Sponsor information" body={sponsored ? `${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.` : "Sponsors may submit contribution requests. Funding and release are not active yet."} />
             </div>
           </Card>
 
@@ -155,7 +155,7 @@ export default function ChallengeDetailPage() {
 
           <Card className="border-yellow-500/30 bg-yellow-950/10 p-8 text-center">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
-            <p className="mt-3">Fund the prize pool and earn ROI. Allocation always totals 15%.</p>
+            <p className="mt-3">Submit a sponsor contribution request. Funding/release is not active yet, and ROI reporting remains under review.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5">Propose Sponsorship</LinkButton>
           </Card>
 
@@ -165,7 +165,7 @@ export default function ChallengeDetailPage() {
             <div className="mt-5">
               {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`}><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button disabled><Vote size={17} /> Voting Closed</Button>}
             </div>
-            <p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional votes require paid voting acknowledgement.</p>
+            <p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
           </Card>
         </aside>
       </div>

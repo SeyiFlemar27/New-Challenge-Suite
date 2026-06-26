@@ -1,4 +1,5 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { isChallengeEligibleForBoost } from "@/lib/challenge-status";
 import { requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { createNotification } from "@/lib/server/notifications";
@@ -20,8 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
   const challenge = challengeSnap.data() ?? {};
-  const eligibleStatuses = ["published", "registration_open", "active", "voting"];
-  if (!eligibleStatuses.includes(String(challenge.status ?? ""))) return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");
+  if (!isChallengeEligibleForBoost(challenge.status)) return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");
   if (!packageSnap.exists || packageSnap.data()?.active !== true) return validationError({ packageId: "Select an active boost package." });
   const boostPackage = packageSnap.data()!;
   const coins = Number(boostPackage.coins);
@@ -48,3 +48,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await createNotification(db, { userId: user.uid, type: "challenge_boosted", title: "Boost active", body: `${boostPackage.name ?? "Boost"} is now active.`, targetId: id });
   return ok({ boost }, "Challenge boost is active.");
 }
+
+

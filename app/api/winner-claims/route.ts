@@ -1,6 +1,8 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable, validationError } from "@/lib/server/responses";
+import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
+import { createPayoutPlaceholder } from "@/lib/server/payouts";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -11,7 +13,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const identityDocument = formData.get("identityDocument");
   if (!(identityDocument instanceof File)) {
-    return validationError({ identityDocument: "Identity document upload is required." });
+    return validationError({ identityDocument: "Identity document upload is required for review. Document storage and KYC processing are not active yet." });
   }
   const submissionId = String(formData.get("submissionId") ?? "");
   if (!submissionId) return validationError({ submissionId: "Submission ID is required." });
@@ -33,15 +35,23 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
+  const challengeId = String(winner?.challengeId ?? submission?.challengeId ?? "");
   const ref = db.collection("winnerClaims").doc();
+  const payoutRef = db.collection("payouts").doc();
   const claim = {
     id: ref.id,
     userId: user.uid,
-    challengeId: String(winner?.challengeId ?? submission?.challengeId ?? ""),
+    challengeId,
     submissionId,
     winnerId: winner?.id ?? null,
     status: "pending_review",
+    reviewStatus: "pending_review",
     payoutStatus: "pending_review",
+    payoutId: payoutRef.id,
+    payoutProviderConnected: false,
+    transferEnabled: false,
+    identityDocumentStorageStatus: "not_processed",
+    kycProcessingStatus: "not_active",
     identityDocumentName: identityDocument.name,
     identityDocumentPath: null,
     payoutMethod: null,
@@ -51,7 +61,35 @@ export async function POST(request: Request) {
     reviewedBy: null,
     reviewedAt: null
   };
-  await ref.set(claim);
-  return ok({ claim }, "Winner claim submitted for review.");
+  const payout = createPayoutPlaceholder({
+    id: payoutRef.id,
+    userId: user.uid,
+    challengeId,
+    submissionId,
+    winnerClaimId: ref.id,
+    amountCents: 0,
+    now
+  });
+  await Promise.all([
+    ref.set(claim),
+    payoutRef.set(payout),
+    writeCashTransactionPlaceholder(db, {
+      id: `winner-claim-${ref.id}-payout-review`,
+      userId: user.uid,
+      type: "payout_review_created",
+      status: "pending_review",
+      amountCents: 0,
+      currency: "USD",
+      sourceType: "winner_claim",
+      sourceId: ref.id,
+      challengeId,
+      submissionId,
+      winnerClaimId: ref.id,
+      payoutId: payoutRef.id,
+      description: "Winner claim payout review placeholder. No cash payout, transfer, or KYC processing is active yet.",
+      now
+    })
+  ]);
+  return ok({ claim, payout }, "Winner claim submitted for review. Payout processing is not active yet.");
 }
 

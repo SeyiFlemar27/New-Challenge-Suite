@@ -195,8 +195,8 @@ export default function JoinChallengePage() {
           <p className="mt-5 text-slate-300">{currentChallenge.description}</p>
           <div className="mt-6 space-y-3 text-slate-200">
             <p><b>Deadline:</b> {currentChallenge.registrationDeadline}</p>
-            <p><b>Prize pool:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : `$${currentChallenge.prizePool.toLocaleString()}`}</p>
-            <p><b>Entry fee:</b> {currentChallenge.entryFee ? `$${currentChallenge.entryFee}` : "Free"}</p>
+            <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review. Prize pool release is not active yet."}</p>
+            <p><b>Entry fee:</b> Paid-entry prize pools are not active yet.</p>
           </div>
           <h2 className="mt-8 text-xl font-black">Rules</h2>
           {currentChallenge.rules.length ? currentChallenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-sm text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-sm text-slate-300">Rules have not been published for this challenge yet.</p>}
@@ -211,7 +211,7 @@ export default function JoinChallengePage() {
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
             <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={inputClass} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required /></Field>
-            <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I accept the challenge rules, voting policy, prize terms, and fee acknowledgement where applicable.</label>
+            <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I accept the challenge rules, voting policy, and prize foundation terms. Paid-entry prize pools and payouts are not active yet.</label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? "Unavailable" : "Submit Entry"}</Button>
           </form>
