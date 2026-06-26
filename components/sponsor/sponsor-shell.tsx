@@ -21,6 +21,8 @@ const sponsorNav = [
   { label: "Settings", icon: Settings }
 ];
 
+const sponsorMobileNav = sponsorNav.filter((item) => ["Overview", "Campaigns", "Sponsor Challenges", "Budget & Billing", "Brand Profile"].includes(item.label));
+
 export interface SponsorShellProfile {
   brandName?: string | null;
   businessEmail?: string | null;
@@ -33,9 +35,9 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
   const verificationStatus = profile?.sponsorVerificationStatus || "pending_review";
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen overflow-x-hidden bg-black text-white">
       <div className="grid min-h-screen lg:grid-cols-[292px_1fr]">
-        <aside className="border-b border-white/10 bg-[#0b0b0b] px-5 py-6 lg:border-b-0 lg:border-r">
+        <aside className="hidden border-b border-white/10 bg-[#0b0b0b] px-5 py-6 lg:block lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-4">
             <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
             <div>
@@ -72,7 +74,43 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             Back to main site
           </Link>
         </aside>
-        <section className="min-w-0 px-5 py-6 md:px-8 lg:px-10">
+        <section className="min-w-0 px-4 pb-10 pt-5 sm:px-5 md:px-8 lg:px-10">
+          <div className="mb-6 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsor</p>
+                  <h1 className="truncate text-lg font-black leading-tight">{brandName}</h1>
+                </div>
+              </div>
+              <Link href="/dashboard" className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-xs font-bold text-slate-300">Main site</Link>
+            </div>
+            <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Review Status</p>
+              <p className="mt-1 text-sm font-bold capitalize text-white">{verificationStatus.replaceAll("_", " ")}</p>
+            </Card>
+            <nav className="scrollbar-dark mt-4 flex gap-2 overflow-x-auto pb-1">
+              {sponsorMobileNav.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    disabled={!item.active}
+                    className={cn(
+                      "flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-black transition",
+                      item.active ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "cursor-not-allowed border-white/10 bg-[#151515] text-slate-500"
+                    )}
+                    title={item.active ? item.label : `${item.label} is planned for a later sponsor phase`}
+                  >
+                    <Icon size={15} />
+                    {item.label.replace("Sponsor ", "")}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
           {children}
         </section>
       </div>

@@ -26,6 +26,14 @@ const nav = [
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
+const mobileNav = [
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/feed", label: "Explore", icon: LayoutGrid },
+  { href: "/challenges/create", label: "Create", icon: PlusSquare },
+  { href: "/leaderboards", label: "Rank", icon: BarChart3 },
+  { href: "/wallet", label: "Wallet", icon: Coins }
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const [notificationStatus, setNotificationStatus] = useState("");
@@ -45,60 +53,97 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sticky top-0 z-20 flex max-h-screen flex-col border-b border-yellow-500/30 bg-[#121212] lg:fixed lg:left-5 lg:top-5 lg:h-[calc(100vh-40px)] lg:w-[280px] lg:rounded-[16px] lg:border">
-      <div className="flex h-20 items-center justify-center lg:h-40 xl:h-48">
-        <BrandLogo imageClassName="h-16 w-16 border-2 border-[var(--gold)] gold-glow lg:h-28 lg:w-28 xl:h-32 xl:w-32" />
-      </div>
-      <nav className="scrollbar-dark flex gap-2 overflow-x-auto border-b border-yellow-500/20 px-4 py-3 lg:block lg:flex-1 lg:overflow-y-auto lg:px-5 lg:py-4">
-        {nav.map((item) => {
-          const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn("flex h-11 shrink-0 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-200 lg:mb-2 lg:h-12 lg:px-4", active && "bg-[var(--gold)] text-black gold-glow")}
-            >
-              <Icon size={21} />
-              {item.label}
+    <>
+      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+            <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)] gold-glow" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
+              <p className="truncate text-sm font-black text-white">{loading ? "Loading" : signedOut ? "Welcome" : user?.displayName || "Dashboard"}</p>
+            </div>
+          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]">
+              <Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}
             </Link>
-          );
-        })}
-      </nav>
-      <div className="hidden space-y-3 p-5 lg:block">
-        <Link href="/wallet" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 text-sm font-black text-[var(--gold)]">
-          <Coins size={16} /> {loading ? "Loading DoroCoins" : `${user?.doroBalance ?? 0} DoroCoins`}
-        </Link>
-        <button onClick={enableNotifications} className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-indigo-500/40 bg-indigo-950/40 text-sm font-bold text-indigo-300">
-          <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
-        </button>
-        <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-          <Diamond size={16} className="text-sky-400" /> {loading ? "Plan" : `${planLabel} Plan`}
-        </Link>
-        <div className="flex items-center gap-3 pt-3">
-          <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
-          <div>
-            {loading ? (
-              <div className="font-bold text-slate-300">Loading profile</div>
-            ) : signedOut ? (
-              <>
-                <div className="font-bold text-slate-300">Signed out</div>
-                <Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link>
-              </>
-            ) : error ? (
-              <>
-                <div className="font-bold text-slate-300">Profile unavailable</div>
-                <Link className="text-sm text-[var(--gold)]" href="/profile">Retry from profile</Link>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 font-bold">{user?.displayName}<PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div>
-                <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
-              </>
-            )}
+            <Link href="/profile" className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500 text-sm font-black", avatarRingClass ?? "border-white/10")}>
+              {loading ? "" : user?.initials || "?"}
+            </Link>
           </div>
         </div>
-      </div>
-    </aside>
+      </header>
+
+      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[16px] border border-yellow-500/30 bg-[#121212] lg:flex">
+        <div className="flex h-40 items-center justify-center xl:h-48">
+          <BrandLogo imageClassName="h-28 w-28 border-2 border-[var(--gold)] gold-glow xl:h-32 xl:w-32" />
+        </div>
+        <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-yellow-500/20 px-5 py-4">
+          {nav.map((item) => {
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn("mb-2 flex h-12 items-center gap-3 rounded-[8px] px-4 text-sm font-bold text-slate-200", active && "bg-[var(--gold)] text-black gold-glow")}
+              >
+                <Icon size={21} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="space-y-3 p-5">
+          <Link href="/wallet" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 text-sm font-black text-[var(--gold)]">
+            <Coins size={16} /> {loading ? "Loading DoroCoins" : `${user?.doroBalance ?? 0} DoroCoins`}
+          </Link>
+          <button onClick={enableNotifications} className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-indigo-500/40 bg-indigo-950/40 text-sm font-bold text-indigo-300">
+            <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
+          </button>
+          <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
+            <Diamond size={16} className="text-sky-400" /> {loading ? "Plan" : `${planLabel} Plan`}
+          </Link>
+          <div className="flex items-center gap-3 pt-3">
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
+            <div className="min-w-0">
+              {loading ? (
+                <div className="font-bold text-slate-300">Loading profile</div>
+              ) : signedOut ? (
+                <>
+                  <div className="font-bold text-slate-300">Signed out</div>
+                  <Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link>
+                </>
+              ) : error ? (
+                <>
+                  <div className="font-bold text-slate-300">Profile unavailable</div>
+                  <Link className="text-sm text-[var(--gold)]" href="/profile">Retry from profile</Link>
+                </>
+              ) : (
+                <>
+                  <div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div>
+                  <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-[18px] border border-white/10 bg-[#121212] p-1.5">
+          {mobileNav.map((item) => {
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-[14px] px-1 text-[11px] font-black text-slate-400 transition", active && "bg-[var(--gold)] text-black")}>
+                <Icon size={18} />
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
