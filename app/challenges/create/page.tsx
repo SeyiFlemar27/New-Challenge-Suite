@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +11,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { createChallenge } from "@/lib/api/services";
 
-const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize & Monetization", "Media", "Preview & Publish"];
+const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
 
 function dateInput(daysFromNow: number) {
   const date = new Date();
@@ -71,7 +71,7 @@ function CreateChallengeWizard() {
     minimumSponsorshipAmount: "0",
     sponsorPlacementOptions: ["Challenge page logo", "CTA button"]
   });  const [allocations, setAllocations] = useState([
-    { bucket: "Platform ROI", percent: 12, enabled: true },
+    { bucket: "Platform Operations", percent: 12, enabled: true },
     { bucket: "Creator Share", percent: 3, enabled: true },
     { bucket: "Community Pool", percent: 0, enabled: false }
   ]);
@@ -320,13 +320,13 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
   const sponsorEnabled = form.sponsorEnabled === "true";
   return (
     <section>
-      <h2 className="text-2xl font-black">Step 4: Prize & Monetization</h2>
+      <h2 className="text-2xl font-black">Step 4: Prize Foundation</h2>
       <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Paid-entry prize pools, cash payouts, automatic refunds, and sponsor money release are locked. Challenges are created as non-monetized or sponsor-ready metadata only.</Card>
       {!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]">Free users can publish basic public non-monetized challenges. Creator plan or higher is required for sponsor-enabled or advanced challenge settings.</Card> : null}
-      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option>Bragging Rights (Leaderboard Ranking)</option><option>Product Prize</option><option>DoroCoin</option><option>Cash Jackpot</option></select></Field><Card className="p-4 text-slate-300">Entry fee and cash payout fields are locked for this phase. Server will force entry fee and prize pool to 0.</Card></div>
+      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option>Bragging Rights (Leaderboard Ranking)</option><option>Product Prize</option><option>DoroCoin</option></select></Field><Card className="p-4 text-slate-300">Entry fee, cash payout, and prize release fields are locked for this phase. Server will keep paid-entry prize pools and cash payouts inactive.</Card></div>
       <div className="mt-6 rounded-[8px] border border-blue-500/30 bg-blue-950/20 p-5">
         <label className="font-bold"><input className="mr-3" type="checkbox" checked={sponsorEnabled} disabled={!planAccess.canCreateSponsoredChallenges} onChange={(event) => update("sponsorEnabled", event.target.checked ? "true" : "false")} /> Enable Sponsorship Collaboration {!planAccess.canCreateSponsoredChallenges ? "(Creator plan+)" : ""}</label>
-        {sponsorEnabled ? <div className="mt-5 grid gap-4 md:grid-cols-2"><Field label="Sponsor Slots"><input className={inputClass} type="number" min="0" value={form.sponsorSlots} onChange={(event) => update("sponsorSlots", event.target.value)} /></Field><Field label="Minimum Sponsorship Amount"><input className={inputClass} type="number" min="0" value={form.minimumSponsorshipAmount} onChange={(event) => update("minimumSponsorshipAmount", event.target.value)} /></Field></div> : null}
+        {sponsorEnabled ? <div className="mt-5 grid gap-4 md:grid-cols-2"><Field label="Sponsor Slots"><input className={inputClass} type="number" min="0" value={form.sponsorSlots} onChange={(event) => update("sponsorSlots", event.target.value)} /></Field><Field label="Minimum Sponsor Proposal Amount"><input className={inputClass} type="number" min="0" value={form.minimumSponsorshipAmount} onChange={(event) => update("minimumSponsorshipAmount", event.target.value)} /></Field></div> : null}
         <div className="mt-5 grid gap-4 md:grid-cols-3">{normalized.map((bucket, index) => <label key={bucket.bucket} className="rounded-[8px] bg-black/40 p-4 text-sm"><input className="mr-2" type="checkbox" checked={bucket.enabled} disabled={!planAccess.canCreateSponsoredChallenges} onChange={() => setAllocations((items: any[]) => items.map((item: any, i: number) => i === index ? { ...item, enabled: !item.enabled } : item))} /> {bucket.bucket}: <b>{bucket.percent}%</b></label>)}</div>
       </div>
     </section>

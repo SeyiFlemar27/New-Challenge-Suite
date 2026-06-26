@@ -138,20 +138,20 @@ export default function SponsorChallengePage() {
             <Field label="Brand / Company Name"><input name="brandName" className={inputClass} required /></Field>
             <Field label="Contact Email"><input name="contactEmail" className={inputClass} type="email" required /></Field>
             <div className="grid gap-5 md:grid-cols-2">
-              <Field label="Sponsorship Amount ($)"><input name="amount" className={inputClass} type="number" min="1" required /></Field>
+              <Field label="Sponsor Proposal Amount ($)"><input name="amount" className={inputClass} type="number" min="1" required /></Field>
               <Field label="Sponsor Contribution Request ($)"><input name="prizePoolContribution" className={inputClass} type="number" min="0" required /></Field>
             </div>
             <Field label="Branding Preference"><select name="brandingPreference" className={inputClass}><option>Logo on challenge page</option><option>Featured sponsor badge</option><option>Custom CTA placement</option></select></Field>
             <Field label="Sponsorship Message"><textarea name="message" className={textareaClass} required /></Field>
-            <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" required /> I accept sponsorship funding, branding, and non-refundable review terms.</label>
+            <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" required /> I accept review-only sponsor terms. Money capture/release is not active yet, and no ROI is promised.</label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || !eligible}>Review Proposal</Button>
           </form>
         ) : (
           <div className="mt-8">
             <h2 className="text-2xl font-black">Review Sponsorship</h2>
-            <p className="mt-3 text-slate-300">Confirm the sponsorship proposal for review. Sponsor contribution requests and branding placement remain pending review. Funding and release are not active yet.</p>
-            {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsorship with ${proposal.prizePoolContribution.toLocaleString()} sponsor contribution request. Funding/release is not active yet.</p></div> : null}
+            <p className="mt-3 text-slate-300">Confirm the sponsorship proposal for review. Sponsor contribution requests and branding placement remain pending review. Money capture/release is not active yet, and no ROI is promised.</p>
+            {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsor proposal with ${proposal.prizePoolContribution.toLocaleString()} contribution request. Money capture/release is not active yet.</p></div> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setReview(false)}>Back</Button>

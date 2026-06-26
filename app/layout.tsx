@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Challenge Suite",
-  description: "Creative challenges, competitions, tournaments, voting, and prizes."
+  description: "Creative challenges, competitions, tournaments, voting, reviewed rewards, and prize foundations."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

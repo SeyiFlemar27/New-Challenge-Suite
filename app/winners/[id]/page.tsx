@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
@@ -63,7 +63,7 @@ export default function WinnerDetailPage() {
                 </div>
               </div>
               <p className="mt-5 text-slate-300">{profile?.customization?.profileTagline ?? "Champion entry recognized by Challenge Suite voters."}</p>
-              <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300"><b className="text-white">Payout status:</b> {String(payoutStatus ?? "not_applicable").replaceAll("_", " ")}<p className="mt-2 text-xs text-slate-400">Payout processing is not active in this version.</p></div>
+              <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300"><b className="text-white">Payout review:</b> {String(payoutStatus ?? "not_applicable").replaceAll("_", " ")}<p className="mt-2 text-xs text-slate-400">Winner claim review is foundation-only. No payout provider is connected, payout review does not mean payment will be sent, and KYC processing is not active yet.</p></div>
               <div className="mt-6 grid gap-3">
                 {challenge ? <LinkButton href={`/challenges/${challenge.id}`}>View Challenge</LinkButton> : null}
                 <Button variant="secondary"><Share2 size={16} /> Share Winner</Button>

@@ -9,7 +9,7 @@ const features = [
   { icon: Camera, title: "Daily Challenges", body: "New creative challenges every day across photography, art, fitness, and more" },
   { icon: Award, title: "Earn Badges", body: "Unlock achievements and showcase your skills with exclusive badges" },
   { icon: BarChart3, title: "Leaderboards", body: "Compete globally and climb the ranks to become a top creator" },
-  { icon: Trophy, title: "Win Prizes", body: "Participate in premium challenges with cash prizes and rewards" },
+  { icon: Trophy, title: "Prize Foundations", body: "Participate in premium challenges with reviewed prize details and platform rewards" },
   { icon: BadgeCheck, title: "Get Discovered", body: "Showcase your work to thousands of community members" },
   { icon: Users, title: "Community", body: "Connect with like-minded creators and grow together" }
 ];
@@ -33,7 +33,7 @@ export default function LandingPage() {
         <BrandLogo className="mb-8" imageClassName="h-28 w-28 border-2 border-[var(--gold)] gold-glow" />
         <FloatingCard className="left-[10%] top-[12%]" icon={<Camera size={48} />} label="Creative Challenges" />
         <FloatingCard className="left-[15%] top-[38%]" icon={<Globe size={48} />} label="Global Community" />
-        <FloatingCard className="right-[15%] top-[37%]" icon={<Trophy size={48} />} label="Win Prizes" />
+        <FloatingCard className="right-[15%] top-[37%]" icon={<Trophy size={48} />} label="Prize Foundations" />
         <h1 className="text-6xl font-black tracking-normal">Welcome to <span className="text-[var(--gold)]">ChallengeSuite</span></h1>
         <p className="mt-10 max-w-3xl text-2xl leading-10 text-[#9cb5d8]">Join creative challenges, showcase your talent, and compete with a global community</p>
         <div className="mt-12 flex flex-wrap justify-center gap-6">
@@ -54,7 +54,7 @@ export default function LandingPage() {
 
       <section className="border-y border-white/10 bg-[#211a3b] py-20">
         <div className="mx-auto grid max-w-6xl gap-10 px-6 text-center md:grid-cols-4">
-          {[["24", "Active Users"], ["19", "Challenges"], ["$6,900+", "Prizes Won"], ["12", "Submissions"]].map(([value, label]) => <div key={label}><div className="text-6xl font-black text-[#765cf6]">{value}</div><div className="mt-4 text-xl font-bold text-[#9cb5d8]">{label}</div></div>)}
+          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label}><div className="text-6xl font-black text-[#765cf6]">{value}</div><div className="mt-4 text-xl font-bold text-[#9cb5d8]">{label}</div></div>)}
         </div>
 
         <Card className="mx-auto mt-20 max-w-3xl p-8">

@@ -129,7 +129,7 @@ export default function PurchaseVotesPage() {
     return (
       <AppShell>
         <Card className="mx-auto max-w-4xl p-8">
-          <PageTitle title="Purchase Additional Votes" subtitle="Challenge unavailable" icon={<Vote className="text-[var(--gold)]" />} />
+          <PageTitle title="Record Additional DoroCoin Votes" subtitle="Challenge unavailable" icon={<Vote className="text-[var(--gold)]" />} />
           <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">{detailsQuery.data.message}</p>
           <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
         </Card>
@@ -141,7 +141,7 @@ export default function PurchaseVotesPage() {
     return (
       <AppShell>
         <Card className="mx-auto max-w-4xl p-8">
-          <PageTitle title="Purchase Additional Votes" subtitle="Challenge not found" icon={<Vote className="text-[var(--gold)]" />} />
+          <PageTitle title="Record Additional DoroCoin Votes" subtitle="Challenge not found" icon={<Vote className="text-[var(--gold)]" />} />
           <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
         </Card>
       </AppShell>
@@ -151,11 +151,11 @@ export default function PurchaseVotesPage() {
   return (
     <AppShell>
       <Card className="mx-auto max-w-4xl p-8">
-        <PageTitle title="Purchase Additional Votes" subtitle={challenge.title} icon={<Vote className="text-[var(--gold)]" />} />
+        <PageTitle title="Record Additional DoroCoin Votes" subtitle={challenge.title} icon={<Vote className="text-[var(--gold)]" />} />
         {success ? (
           <div className="mt-8 text-center">
             <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
-            <h2 className="mt-5 text-3xl font-black">Vote Purchase Complete</h2>
+            <h2 className="mt-5 text-3xl font-black">DoroCoin Votes Recorded</h2>
             <p className="mt-3 text-slate-300">{successMessage}</p>
             <LinkButton href={`/challenges/${challenge.id}`} className="mt-8">Return to Challenge</LinkButton>
           </div>
@@ -179,12 +179,12 @@ export default function PurchaseVotesPage() {
             </div>
             <Card className="mt-6 bg-black/30 p-5">
               <p><b>Wallet:</b> {walletBalance} DoroCoins</p>
-              <p className="mt-2"><b>Purchase:</b> {votes || 0} votes for {coins || 0} DoroCoins</p>
+              <p className="mt-2"><b>DoroCoin vote request:</b> {votes || 0} votes for {coins || 0} DoroCoins</p>
             </Card>
-            <label className="mt-6 flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I acknowledge paid votes are final sale, non-refundable, and subject to voting policy.</label>
+            <label className="mt-6 flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I acknowledge DoroCoin votes are final once recorded and are subject to the voting policy. DoroCoin is an internal platform credit, not cash.</label>
             {packagesQuery.data && !packagesQuery.data.ok ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{packagesQuery.data.message}</p> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm Purchase"}</Button>
+            <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm DoroCoin Votes"}</Button>
           </>
         )}
       </Card>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -51,7 +51,7 @@ export default function WinnersPage() {
 
   return (
     <AppShell>
-      <PageTitle title="Winners" subtitle="Winners of recently completed challenges" />
+      <PageTitle title="Winners" subtitle="Winner results and prize review status for completed challenges" />
       <div className="mt-9 flex flex-col gap-4 md:flex-row md:items-center">
         <Button variant="secondary">All Challenges</Button>
         <Card className="flex h-14 w-full max-w-[520px] items-center gap-4 bg-[#11151d] px-6 text-slate-400"><Search size={20} /> <input className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-400" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search challenges..." /> <Button className="ml-auto h-9">Search</Button></Card>
@@ -66,7 +66,7 @@ export default function WinnersPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : visibleWinners.length ? (
-        <div className="mt-8 grid gap-7 md:grid-cols-2 xl:grid-cols-4">{visibleWinners.map((winner) => <div key={winner.id} className="space-y-3"><WinnerCard submission={winner} /><div className="rounded-[8px] border border-white/10 bg-black/30 p-3 text-sm text-slate-300"><b className="text-[var(--gold)]">#{winner.position ?? "-"}</b> · {String(winner.winnerStatus ?? "announced").replaceAll("_", " ")}{winner.payoutStatus && winner.payoutStatus !== "not_applicable" ? ` · payout ${String(winner.payoutStatus).replaceAll("_", " ")}` : ""}</div></div>)}</div>
+        <div className="mt-8 grid gap-7 md:grid-cols-2 xl:grid-cols-4">{visibleWinners.map((winner) => <div key={winner.id} className="space-y-3"><WinnerCard submission={winner} /><div className="rounded-[8px] border border-white/10 bg-black/30 p-3 text-sm text-slate-300"><b className="text-[var(--gold)]">#{winner.position ?? "-"}</b> - {String(winner.winnerStatus ?? "announced").replaceAll("_", " ")}{winner.payoutStatus && winner.payoutStatus !== "not_applicable" ? ` - Payout review: not active yet (${String(winner.payoutStatus).replaceAll("_", " ")})` : ""}</div></div>)}</div>
       ) : (
         <Card className="mt-8 p-8 text-slate-300">No winners have been recorded yet.</Card>
       )}
