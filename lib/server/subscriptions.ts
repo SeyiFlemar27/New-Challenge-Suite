@@ -110,8 +110,27 @@ export function getSubscriptionPlansForUser(currentPlanId: unknown) {
     current: plan.id === normalizedPlanId
   }));
 }
+const stripePlanPriceAliases: Record<string, string[]> = {
+  creator: ["STRIPE_CREATOR_PRICE_ID"],
+  competitor: ["STRIPE_PRO_PRICE_ID"],
+  pro: ["STRIPE_PRO_PRICE_ID"],
+  executive_host: ["STRIPE_HOST_PRICE_ID"],
+  host: ["STRIPE_HOST_PRICE_ID"],
+  chief_producer: ["STRIPE_ENTERPRISE_PRICE_ID"],
+  enterprise: ["STRIPE_ENTERPRISE_PRICE_ID"],
+  brand_partner: ["STRIPE_BRAND_PARTNER_PRICE_ID"],
+  enterprise_sponsor: ["STRIPE_ENTERPRISE_PARTNER_PRICE_ID"],
+  enterprise_partner: ["STRIPE_ENTERPRISE_PARTNER_PRICE_ID"],
+  sponsor_starter: ["STRIPE_SPONSOR_STARTER_PRICE_ID"]
+};
+
 export function resolveStripePriceEnv(plan: { id: string; stripePriceEnv?: string }) {
-  const candidates = [plan.stripePriceEnv, `STRIPE_PRICE_${String(plan.id).toUpperCase()}`].filter(Boolean) as string[];
+  const normalizedId = String(plan.id).toLowerCase();
+  const candidates = [
+    plan.stripePriceEnv,
+    `STRIPE_PRICE_${String(plan.id).toUpperCase()}`,
+    ...(stripePlanPriceAliases[normalizedId] ?? [])
+  ].filter(Boolean) as string[];
   const envName = candidates.find((name) => Boolean(process.env[name])) ?? candidates[0] ?? "";
   return { envName, priceId: envName ? process.env[envName] : undefined, candidates };
 }

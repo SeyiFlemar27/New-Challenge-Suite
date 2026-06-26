@@ -2,6 +2,19 @@ import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { isStripeDevMockEnabled, stripeDevMockCheckout } from "@/lib/server/stripe-dev";
+function resolveDoroCoinStripePriceId(pack: Record<string, unknown>, packageId: string, coins: number) {
+  const envCandidates = [
+    typeof pack.stripePriceEnv === "string" ? pack.stripePriceEnv : null,
+    packageId ? `STRIPE_${packageId.toUpperCase()}_PRICE_ID` : null,
+    coins === 50 ? "STRIPE_DOROCOIN_SMALL_PRICE_ID" : null,
+    coins === 100 ? "STRIPE_DOROCOIN_MEDIUM_PRICE_ID" : null,
+    coins === 500 ? "STRIPE_DOROCOIN_LARGE_PRICE_ID" : null,
+    coins ? `STRIPE_PRICE_DOROCOIN_${coins}` : null
+  ].filter(Boolean) as string[];
+  const configuredEnv = envCandidates.find((name) => Boolean(process.env[name]));
+  return typeof pack.stripePriceId === "string" && pack.stripePriceId ? pack.stripePriceId : configuredEnv ? process.env[configuredEnv] ?? null : null;
+}
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -22,13 +35,13 @@ export async function POST(request: Request) {
   if (!Number.isFinite(coins) || coins <= 0) return validationError({ packageId: "DoroCoin package is missing a valid coin amount." });
   const amountUsd = customCoins ? Number((coins * 0.02).toFixed(2)) : Number(pack.price ?? 0);
   const stripe = getStripe();
-  const stripePriceId = !customCoins && typeof pack.stripePriceId === "string" ? pack.stripePriceId : !customCoins && typeof pack.stripePriceEnv === "string" ? process.env[pack.stripePriceEnv] : null;
+  const stripePriceId = !customCoins ? resolveDoroCoinStripePriceId(pack, packageId, coins) : null;
   if (!stripe || (!customCoins && !stripePriceId)) {
-    const ref = db.collection("doroCoinPurchaseRequests").doc();
-    const now = new Date().toISOString();
-    const purchaseRequest = { id: ref.id, userId: user.uid, packageId: packageId || null, coins, amountUsd, status: "pending_payment_configuration", createdAt: now, updatedAt: now };
-    await ref.set(purchaseRequest);
-    return ok({ purchaseRequest, paymentPending: true }, "Payment is pending. Stripe checkout is not fully configured yet.");
+    if (isStripeDevMockEnabled()) {
+      const payload = stripeDevMockCheckout({ kind: "dorocoin", targetUrl: `/wallet?checkout=mock-success&coins=${encodeURIComponent(String(coins))}`, label: `${coins} DoroCoins` });
+      return ok({ ...payload, packageId: packageId || null, coins, amountUsd, missing: !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID" }, payload.message);
+    }
+    return fail("Stripe DoroCoin checkout is not configured.", 503, { missing: !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID" }, "PAYMENT_CONFIGURATION_ERROR");
   }
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({

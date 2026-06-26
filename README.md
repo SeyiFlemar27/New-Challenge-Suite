@@ -22,7 +22,7 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
 - Challenge creation validation: image/video submission policies, Entry Competition, 1 Rounder, OK date confirmation UI, Bragging Rights payout removal, entry-fee validation, custom categories, age restriction, time-limited uploads, editable rules, promo image upload, trailer video upload.
 - Sponsorship allocation: buckets always normalize to 15%, proportionally redistributed across enabled buckets.
 - Voting: backend endpoint enforces one free vote per challenge per day when Firebase Admin is configured.
-- Stripe: real checkout route and webhook skeleton. Set Stripe price environment variables for each plan.
+- Stripe: real checkout route and webhook skeleton. In local development only, missing Stripe config returns a clearly marked mock checkout URL that processes no payment, credits no DoroCoins, and activates no plan. Set Stripe price environment variables for real test/live checkout.
 - Live events: host CTA is subscription gated by plan capabilities.
 - Winner experience: winners are clearly labeled and open winner-context submission pages.
 - Tournament formats: 2, 4, and 6 division tabs render distinct bracket structures.
@@ -52,13 +52,20 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    Server API routes intentionally fail with `503` until Firebase Admin is configured. They should not silently return demo data for production reads or writes.
 
    For Storage health checks, prefer `FIREBASE_STORAGE_BUCKET` for the Admin SDK. Use the bucket shown in Firebase Storage, without `gs://`. In some newer projects the web config value can look like `project-id.firebasestorage.app`, while the Admin SDK bucket may be the bucket name shown directly in Storage settings.
-4. Fill Stripe secret, webhook secret, publishable key, and plan price IDs:
+4. Fill Stripe secret, webhook secret, publishable key, and plan price IDs when you are ready for real Stripe testing. Leave these blank for local mock checkout only; production never silently mocks Stripe:
    - `STRIPE_PRICE_CREATOR`
    - `STRIPE_PRICE_COMPETITOR`
    - `STRIPE_PRICE_EXECUTIVE_HOST`
    - `STRIPE_PRICE_CHIEF_PRODUCER`
    - `STRIPE_PRICE_BRAND_PARTNER`
    - `STRIPE_PRICE_ENTERPRISE_SPONSOR`
+   - `STRIPE_CREATOR_PRICE_ID`
+   - `STRIPE_PRO_PRICE_ID`
+   - `STRIPE_HOST_PRICE_ID`
+   - `STRIPE_ENTERPRISE_PRICE_ID`
+   - `STRIPE_DOROCOIN_SMALL_PRICE_ID`
+   - `STRIPE_DOROCOIN_MEDIUM_PRICE_ID`
+   - `STRIPE_DOROCOIN_LARGE_PRICE_ID`
 5. Install dependencies.
 6. Run `pnpm dev`.
 7. Verify the backend foundation:

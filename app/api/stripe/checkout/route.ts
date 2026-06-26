@@ -1,7 +1,8 @@
-﻿import { getStripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, validationError } from "@/lib/server/responses";
 import { getSubscriptionPlan, resolveStripePriceEnv } from "@/lib/server/subscriptions";
+import { isStripeDevMockEnabled, stripeDevMockCheckout } from "@/lib/server/stripe-dev";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -14,6 +15,10 @@ export async function POST(request: Request) {
   const stripe = getStripe();
   const { envName, priceId, candidates } = resolveStripePriceEnv(plan);
   if (!stripe || !priceId) {
+    if (isStripeDevMockEnabled()) {
+      const payload = stripeDevMockCheckout({ kind: "subscription", targetUrl: `/subscriptions?checkout=mock-success&plan=${encodeURIComponent(String(plan.id))}`, label: `subscription plan ${plan.id}` });
+      return ok({ ...payload, missing: !stripe ? "STRIPE_SECRET_KEY" : envName, acceptedPriceEnvs: candidates }, payload.message);
+    }
     return fail("Stripe subscription checkout is not configured.", 503, { missing: !stripe ? "STRIPE_SECRET_KEY" : envName, acceptedPriceEnvs: candidates }, "PAYMENT_CONFIGURATION_ERROR");
   }
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
