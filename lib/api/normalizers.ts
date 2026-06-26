@@ -33,9 +33,9 @@ export function normalizeChallenge(record: ChallengeApiRecord): Challenge {
     prizePool: record.prizePool ?? 0,
     startsAt: toDateInput(record.startsAt),
     endsAt: toDateInput(record.endsAt),
-    registrationDeadline: toDateInput(record.registrationDeadline),
+    registrationDeadline: toDateInput(record.registrationDeadline ?? (record as Record<string, unknown>).submissionDeadline),
     participants: record.participants ?? record.participantCount ?? 0,
-    status: record.status === "completed" || record.status === "active" ? record.status : "upcoming",
+    status: (record.status ?? "upcoming") as Challenge["status"],
     rules: record.rules ?? [],
     ageRestriction: record.ageRestriction,
     timeLimitedUploads: record.timeLimitedUploads,
@@ -47,6 +47,9 @@ export type SubmissionApiRecord = Omit<Partial<Submission>, "mediaType"> & {
   voteCount?: number;
   weightedVoteCount?: number;
   createdAt?: string;
+  submittedAt?: string;
+  status?: string;
+  mediaUploadPending?: boolean;
   userDisplayName?: string;
   userPlanId?: UserPlanId;
   mediaType?: SubmissionType | string;
@@ -66,8 +69,10 @@ export function normalizeSubmission(record: SubmissionApiRecord, challenge?: Cha
     challengeTitle: record.challengeTitle ?? challenge?.title ?? "",
     challengeCategory: record.challengeCategory ?? challenge?.category ?? "",
     likes: Number(record.likes ?? record.voteCount ?? record.weightedVoteCount ?? 0),
-    isWinner: record.isWinner,
-    createdAt: record.createdAt ?? "",
+    isWinner: record.isWinner ?? record.status === "winner",
+    createdAt: record.submittedAt ?? record.createdAt ?? "",
     userPlanId: record.userPlanId
   };
 }
+
+

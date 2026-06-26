@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { BrandLogo, PremiumBadge } from "./brand";
+import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 
 const nav = [
@@ -31,6 +31,7 @@ export function Sidebar() {
   const [notificationStatus, setNotificationStatus] = useState("");
   const { user, loading, signedOut, error } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
+  const planLabel = planBadgeLabel(user?.planId);
 
   async function enableNotifications() {
     if (!("Notification" in window)) {
@@ -72,7 +73,7 @@ export function Sidebar() {
           <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
         </button>
         <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-          <Diamond size={16} className="text-sky-400" /> Premium
+          <Diamond size={16} className="text-sky-400" /> {loading ? "Plan" : `${planLabel} Plan`}
         </Link>
         <div className="flex items-center gap-3 pt-3">
           <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>

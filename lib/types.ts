@@ -1,4 +1,4 @@
-export type RegionCode = "US" | "NG";
+﻿export type RegionCode = "US" | "NG";
 export type SubmissionType = "image" | "video";
 export type PrizeType = "Cash Jackpot" | "Product Prize" | "Bragging Rights (Leaderboard Ranking)" | "DoroCoin";
 export type AgreementType =
@@ -12,8 +12,11 @@ export type AgreementType =
   | "winner_claim"
   | "anti_fraud";
 
-export type ProductPlanId = "free" | "premium" | "creator_pro" | "verified_host";
-export type LegacyPlanId = "observer" | "creator" | "competitor" | "executive_host" | "chief_producer" | "brand_partner" | "enterprise_sponsor";
+export type AccountType = "user" | "sponsor" | "admin";
+export type UserProductPlanId = "free" | "creator" | "pro" | "host" | "enterprise";
+export type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterprise_partner";
+export type ProductPlanId = UserProductPlanId | SponsorProductPlanId;
+export type LegacyPlanId = "observer" | "premium" | "creator_pro" | "verified_host" | "competitor" | "executive_host" | "chief_producer" | "enterprise_sponsor";
 export type UserPlanId = ProductPlanId | LegacyPlanId;
 export type AppRole = "user" | "creator" | "sponsor";
 
@@ -23,6 +26,7 @@ export interface UserProfile {
   email: string;
   initials: string;
   role?: AppRole;
+  accountType?: AccountType;
   planId: UserPlanId;
   selfDeclaredRegion?: RegionCode;
   doroBalance: number;
@@ -40,6 +44,7 @@ export interface SubscriptionPlan {
   subtitle: string;
   priceMonthly: number;
   stripePriceEnv: string;
+  legacyStripePriceEnvs?: string[];
   features: string[];
   canHostLiveEvents: boolean;
   liveEventCapacity: number;

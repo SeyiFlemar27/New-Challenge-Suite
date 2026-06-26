@@ -1,4 +1,4 @@
-import nextEnv from "@next/env";
+﻿import nextEnv from "@next/env";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 const { loadEnvConfig } = nextEnv;
@@ -40,29 +40,66 @@ function initializeAdmin() {
 type SeedDoc = { id: string } & Record<string, unknown>;
 
 const planSeedFields = {
-  free: { planId: "free", planName: "Free Member", isPremium: false, isCreatorPro: false, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 1, dailyFreeVoteLimit: 5, canCreatePaidChallenges: false, canCreatePrivateChallenges: false, canCreatePrizeChallenges: false, canCreateSponsoredChallenges: false, canHostLiveEvents: false, canAccessPremiumChallenges: false, canUseAdvancedAnalytics: false },
-  premium: { planId: "premium", planName: "Premium Member", isPremium: true, isCreatorPro: false, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 5, dailyFreeVoteLimit: 20, canCreatePaidChallenges: false, canCreatePrivateChallenges: false, canCreatePrizeChallenges: false, canCreateSponsoredChallenges: false, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: false },
-  creator_pro: { planId: "creator_pro", planName: "Creator Pro", isPremium: true, isCreatorPro: true, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 25, dailyFreeVoteLimit: 50, canCreatePaidChallenges: true, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true },
-  verified_host: { planId: "verified_host", planName: "Verified Host", isPremium: true, isCreatorPro: true, isVerifiedHost: true, planStatus: "active", activeChallengeLimit: 50, dailyFreeVoteLimit: 50, canCreatePaidChallenges: true, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: true, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true }
+  free: { accountType: "user", dashboardType: "user_dashboard", planId: "free", legacyPlanId: "free", planName: "Free", isPremium: false, isCreator: false, isPro: false, isHost: false, isEnterprise: false, isSponsor: false, isCreatorPro: false, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 1, dailyFreeVoteLimit: 1, canCreatePaidChallenges: false, canCreatePrivateChallenges: false, canCreatePrizeChallenges: false, canCreateSponsoredChallenges: false, canHostLiveEvents: false, canAccessPremiumChallenges: false, canUseAdvancedAnalytics: false, canUseSponsorDashboard: false },
+  creator: { accountType: "user", dashboardType: "user_dashboard", planId: "creator", legacyPlanId: "creator_pro", planName: "Creator", isPremium: true, isCreator: true, isPro: false, isHost: false, isEnterprise: false, isSponsor: false, isCreatorPro: true, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 3, dailyFreeVoteLimit: 5, canCreatePaidChallenges: false, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true, canUseSponsorDashboard: false },
+  pro: { accountType: "user", dashboardType: "user_dashboard", planId: "pro", legacyPlanId: "premium", planName: "Pro", isPremium: true, isCreator: true, isPro: true, isHost: false, isEnterprise: false, isSponsor: false, isCreatorPro: true, isVerifiedHost: false, planStatus: "active", activeChallengeLimit: 25, dailyFreeVoteLimit: 20, canCreatePaidChallenges: false, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: false, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true, canUseSponsorDashboard: false },
+  host: { accountType: "user", dashboardType: "user_dashboard", planId: "host", legacyPlanId: "verified_host", planName: "Host", isPremium: true, isCreator: true, isPro: true, isHost: true, isEnterprise: false, isSponsor: false, isCreatorPro: true, isVerifiedHost: true, planStatus: "active", activeChallengeLimit: 50, dailyFreeVoteLimit: 50, canCreatePaidChallenges: false, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: true, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true, canUseSponsorDashboard: false },
+  enterprise: { accountType: "user", dashboardType: "user_dashboard", planId: "enterprise", legacyPlanId: "verified_host", planName: "Enterprise", isPremium: true, isCreator: true, isPro: true, isHost: true, isEnterprise: true, isSponsor: false, isCreatorPro: true, isVerifiedHost: true, planStatus: "active", activeChallengeLimit: 500, dailyFreeVoteLimit: 100, canCreatePaidChallenges: false, canCreatePrivateChallenges: true, canCreatePrizeChallenges: true, canCreateSponsoredChallenges: true, canHostLiveEvents: true, canAccessPremiumChallenges: true, canUseAdvancedAnalytics: true, canUseSponsorDashboard: false },
+  sponsor_starter: { accountType: "sponsor", dashboardType: "sponsor_dashboard", planId: "sponsor_starter", legacyPlanId: "premium", planName: "Sponsor Starter", isPremium: true, isSponsor: true, isSponsorStarter: true, isBrandPartner: false, isEnterprisePartner: false, planStatus: "active", canUseSponsorDashboard: true, canCreateSponsorCampaigns: true, canSponsorChallenges: true, sponsorCampaignLimit: 2 },
+  brand_partner: { accountType: "sponsor", dashboardType: "sponsor_dashboard", planId: "brand_partner", legacyPlanId: "premium", planName: "Brand Partner", isPremium: true, isSponsor: true, isSponsorStarter: true, isBrandPartner: true, isEnterprisePartner: false, planStatus: "active", canUseSponsorDashboard: true, canCreateSponsorCampaigns: true, canSponsorChallenges: true, sponsorCampaignLimit: 10 },
+  enterprise_partner: { accountType: "sponsor", dashboardType: "sponsor_dashboard", planId: "enterprise_partner", legacyPlanId: "verified_host", planName: "Enterprise Partner", isPremium: true, isSponsor: true, isSponsorStarter: true, isBrandPartner: true, isEnterprisePartner: true, planStatus: "active", canUseSponsorDashboard: true, canCreateSponsorCampaigns: true, canSponsorChallenges: true, sponsorCampaignLimit: 100 }
 };
-
 const customizationSeedFields = {
   free: { customization: { appThemeId: "default_black_gold", accentColorId: "gold", profileBadgeId: "free_member", profileFrameId: "default", avatarRingId: "none", dashboardStyleId: "classic_dark", cardStyleId: "classic_dark", celebrationEffectId: "none", voteEffectId: "default_vote", profileTagline: "" }, customizationUnlockedByPlan: "free" },
-  premium: { customization: { appThemeId: "royal_purple_gold", accentColorId: "purple", profileBadgeId: "premium_diamond", profileFrameId: "premium_glow", avatarRingId: "purple_glow", dashboardStyleId: "glass_arena", cardStyleId: "gold_accent", celebrationEffectId: "gold_spark", voteEffectId: "diamond_vote", profileTagline: "Premium competitor with arena style." }, customizationUnlockedByPlan: "premium" },
-  creator_pro: { customization: { appThemeId: "creator_studio", accentColorId: "crimson", profileBadgeId: "creator_pro", profileFrameId: "creator_studio_frame", avatarRingId: "creator_ring", dashboardStyleId: "creator_studio", cardStyleId: "creator_studio", celebrationEffectId: "champion_glow", voteEffectId: "crown_vote", profileTagline: "Building premium challenge experiences.", publicProfileThemeId: "creator_studio", creatorBrandColorId: "crimson" }, customizationUnlockedByPlan: "creator_pro" },
-  verified_host: { customization: { appThemeId: "verified_host_elite", accentColorId: "platinum", profileBadgeId: "verified_host", profileFrameId: "verified_host_frame", avatarRingId: "verified_host_ring", dashboardStyleId: "host_elite", cardStyleId: "host_elite", celebrationEffectId: "champion_glow", voteEffectId: "champion_vote", profileTagline: "Verified host for live Challenge Suite events.", publicProfileThemeId: "verified_host_elite", creatorBrandColorId: "platinum", hostBadgeStyleId: "elite_host" }, customizationUnlockedByPlan: "verified_host" }
+  creator: { customization: { appThemeId: "creator_studio", accentColorId: "crimson", profileBadgeId: "creator_pro", profileFrameId: "creator_studio_frame", avatarRingId: "creator_ring", dashboardStyleId: "creator_studio", cardStyleId: "creator_studio", celebrationEffectId: "champion_glow", voteEffectId: "crown_vote", profileTagline: "Building premium challenge experiences.", publicProfileThemeId: "creator_studio", creatorBrandColorId: "crimson" }, customizationUnlockedByPlan: "creator_pro" },
+  pro: { customization: { appThemeId: "royal_purple_gold", accentColorId: "purple", profileBadgeId: "premium_diamond", profileFrameId: "premium_glow", avatarRingId: "purple_glow", dashboardStyleId: "glass_arena", cardStyleId: "gold_accent", celebrationEffectId: "gold_spark", voteEffectId: "diamond_vote", profileTagline: "Pro competitor with arena style." }, customizationUnlockedByPlan: "premium" },
+  host: { customization: { appThemeId: "verified_host_elite", accentColorId: "platinum", profileBadgeId: "verified_host", profileFrameId: "verified_host_frame", avatarRingId: "verified_host_ring", dashboardStyleId: "host_elite", cardStyleId: "host_elite", celebrationEffectId: "champion_glow", voteEffectId: "champion_vote", profileTagline: "Host for live Challenge Suite events.", publicProfileThemeId: "verified_host_elite", creatorBrandColorId: "platinum", hostBadgeStyleId: "elite_host" }, customizationUnlockedByPlan: "verified_host" },
+  enterprise: { customization: { appThemeId: "verified_host_elite", accentColorId: "platinum", profileBadgeId: "verified_host", profileFrameId: "verified_host_frame", avatarRingId: "verified_host_ring", dashboardStyleId: "host_elite", cardStyleId: "host_elite", celebrationEffectId: "champion_glow", voteEffectId: "champion_vote", profileTagline: "Enterprise Challenge Suite program.", publicProfileThemeId: "verified_host_elite", creatorBrandColorId: "platinum", hostBadgeStyleId: "elite_host" }, customizationUnlockedByPlan: "verified_host" },
+  sponsor: { customization: { appThemeId: "default_black_gold", accentColorId: "gold", profileBadgeId: "premium_gold", profileFrameId: "premium_glow", avatarRingId: "gold_ring", dashboardStyleId: "classic_dark", cardStyleId: "gold_accent", celebrationEffectId: "none", voteEffectId: "default_vote", profileTagline: "Sponsor partner on Challenge Suite." }, customizationUnlockedByPlan: "premium" }
 };
-
 const demoProfiles: SeedDoc[] = [
   { id: "demo-user-free-member", displayName: "Free Member Demo", initials: "FM", role: "user", ...planSeedFields.free, ...customizationSeedFields.free, premium: false, totalPoints: 420, email: "free@example.com" },
-  { id: "demo-user-premium-member", displayName: "Premium Member Demo", initials: "PM", role: "user", ...planSeedFields.premium, ...customizationSeedFields.premium, premium: true, totalPoints: 6420, email: "premium@example.com" },
-  { id: "demo-creator-move-district", displayName: "Move District", initials: "MD", role: "creator", ...planSeedFields.creator_pro, ...customizationSeedFields.creator_pro, premium: true, totalPoints: 16900, email: "move@example.com" },
-  { id: "demo-creator-lens-league", displayName: "Lens League", initials: "LL", role: "creator", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 18420, email: "lens@example.com" },
-  { id: "demo-user-nia-stone", displayName: "Nia Stone", initials: "NS", role: "user", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 18420, email: "nia@example.com" },
-  { id: "demo-user-theo-grant", displayName: "Theo Grant", initials: "TG", role: "user", ...planSeedFields.creator_pro, ...customizationSeedFields.creator_pro, premium: true, totalPoints: 16900, email: "theo@example.com" },
-  { id: demoUserId, displayName: "Demo Member", initials: "DM", role: "creator", ...planSeedFields.verified_host, ...customizationSeedFields.verified_host, premium: true, totalPoints: 12840, email: "demo-member@example.com" }
+  { id: "demo-user-pro-member", displayName: "Pro Member Demo", initials: "PM", role: "user", ...planSeedFields.pro, ...customizationSeedFields.pro, premium: true, totalPoints: 6420, email: "pro@example.com" },
+  { id: "demo-creator-move-district", displayName: "Move District", initials: "MD", role: "creator", ...planSeedFields.creator, ...customizationSeedFields.creator, premium: true, totalPoints: 16900, email: "move@example.com" },
+  { id: "demo-creator-lens-league", displayName: "Lens League", initials: "LL", role: "creator", ...planSeedFields.host, ...customizationSeedFields.host, premium: true, totalPoints: 18420, email: "lens@example.com" },
+  { id: "demo-user-nia-stone", displayName: "Nia Stone", initials: "NS", role: "user", ...planSeedFields.enterprise, ...customizationSeedFields.enterprise, premium: true, totalPoints: 18420, email: "nia@example.com" },
+  { id: "demo-user-theo-grant", displayName: "Theo Grant", initials: "TG", role: "user", ...planSeedFields.creator, ...customizationSeedFields.creator, premium: true, totalPoints: 16900, email: "theo@example.com" },
+  { id: "demo-sponsor-goldline", displayName: "Goldline Labs", initials: "GL", role: "sponsor", ...planSeedFields.brand_partner, ...customizationSeedFields.sponsor, premium: true, totalPoints: 0, email: "sponsor@example.com", sponsorOnboardingStatus: "complete", hasSponsorProfile: true, sponsorVerificationStatus: "pending_review", brandName: "Goldline Labs", brandSlug: "goldline-labs", brandProfileCompletedAt: iso(-3) },
+  { id: demoUserId, displayName: "Demo Member", initials: "DM", role: "creator", ...planSeedFields.host, ...customizationSeedFields.host, premium: true, totalPoints: 12840, email: "demo-member@example.com" }
 ];
 
+const sponsorProfiles: SeedDoc[] = [
+  {
+    id: "demo-sponsor-goldline",
+    userId: "demo-sponsor-goldline",
+    accountType: "sponsor",
+    dashboardType: "sponsor_dashboard",
+    planId: "brand_partner",
+    legacyPlanId: "premium",
+    planName: "Brand Partner",
+    sponsorOnboardingStatus: "complete",
+    hasSponsorProfile: true,
+    sponsorVerificationStatus: "pending_review",
+    brandName: "Goldline Labs",
+    brandSlug: "goldline-labs",
+    industry: "Creator tools",
+    website: "https://example.com/goldline",
+    countryLocation: "United States",
+    brandDescription: "A demo sponsor profile for Challenge Suite brand command center testing.",
+    socialLinks: ["https://example.com/goldline/social"],
+    contactPerson: "Avery Brand",
+    businessEmail: "sponsor@example.com",
+    logoUrl: null,
+    bannerUrl: null,
+    ctaButtonText: "Explore Goldline",
+    ctaDestinationLink: "https://example.com/goldline",
+    sponsorshipGoals: ["Brand awareness", "Creator partnerships"],
+    preferredChallengeCategories: ["Photography", "Dance", "Business"],
+    brandProfileCompletedAt: iso(-3),
+    createdAt: iso(-3),
+    updatedAt: iso(-1)
+  }
+];
 const challenges: SeedDoc[] = [
   {
     id: "demo-neon-city-photo",
@@ -81,9 +118,9 @@ const challenges: SeedDoc[] = [
     competitionFormat: "Entry Competition",
     bestOf: "1 Rounder",
     acceptedSubmissionTypes: ["image"],
-    prizeType: "Cash Prize",
-    entryFee: 10,
-    prizePool: 2500,
+    prizeType: "Product Prize",
+    entryFee: 0,
+    prizePool: 0,
     participantCount: 248,
     participants: 248,
     submissionCount: 3,
@@ -113,9 +150,9 @@ const challenges: SeedDoc[] = [
     competitionFormat: "Entry Competition",
     bestOf: "1 Rounder",
     acceptedSubmissionTypes: ["video"],
-    prizeType: "Cash Prize",
-    entryFee: 25,
-    prizePool: 5000,
+    prizeType: "Product Prize",
+    entryFee: 0,
+    prizePool: 0,
     participantCount: 96,
     participants: 96,
     submissionCount: 1,
@@ -164,9 +201,9 @@ const challenges: SeedDoc[] = [
 ];
 
 const submissions: SeedDoc[] = [
-  { id: "demo-sub-rainline-reflections", challengeId: "demo-neon-city-photo", challengeTitle: "Neon City Photo Battle", challengeCategory: "Photography", userId: "demo-user-nia-stone", userName: "Nia Stone", userInitials: "NS", userPlanId: "chief_producer", title: "Rainline Reflections", description: "A cinematic city moment after midnight rain.", mediaUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "winner", visibility: "public", voteCount: 4382, weightedVoteCount: 4382, likes: 4382, isWinner: true, submittedAt: iso(-4), createdAt: iso(-4), updatedAt: iso(-1) },
-  { id: "demo-sub-midnight-crosswalk", challengeId: "demo-neon-city-photo", challengeTitle: "Neon City Photo Battle", challengeCategory: "Photography", userId: "demo-user-theo-grant", userName: "Theo Grant", userInitials: "TG", userPlanId: "pro_creator", title: "Midnight Crosswalk", description: "Crosswalk light, movement, and deep city contrast.", mediaUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "approved", visibility: "public", voteCount: 3910, weightedVoteCount: 3910, likes: 3910, isWinner: false, submittedAt: iso(-3), createdAt: iso(-3), updatedAt: iso(-1) },
-  { id: "demo-sub-gold-hour-spin", challengeId: "demo-street-dance-finals", challengeTitle: "Street Dance Finals", challengeCategory: "Dance", userId: "demo-user-nia-stone", userName: "Kemi Vale", userInitials: "KV", userPlanId: "chief_producer", title: "Gold Hour Spin", description: "A compact routine with sharp musicality and footwork.", mediaUrl: "https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "approved", visibility: "public", voteCount: 2877, weightedVoteCount: 2877, likes: 2877, isWinner: false, submittedAt: iso(-2), createdAt: iso(-2), updatedAt: iso(-1) }
+  { id: "demo-sub-rainline-reflections", challengeId: "demo-neon-city-photo", challengeTitle: "Neon City Photo Battle", challengeCategory: "Photography", userId: "demo-user-nia-stone", userName: "Nia Stone", userInitials: "NS", userPlanId: "enterprise", title: "Rainline Reflections", description: "A cinematic city moment after midnight rain.", mediaUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "winner", visibility: "public", voteCount: 4382, weightedVoteCount: 4382, likes: 4382, isWinner: true, submittedAt: iso(-4), createdAt: iso(-4), updatedAt: iso(-1) },
+  { id: "demo-sub-midnight-crosswalk", challengeId: "demo-neon-city-photo", challengeTitle: "Neon City Photo Battle", challengeCategory: "Photography", userId: "demo-user-theo-grant", userName: "Theo Grant", userInitials: "TG", userPlanId: "creator", title: "Midnight Crosswalk", description: "Crosswalk light, movement, and deep city contrast.", mediaUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "approved", visibility: "public", voteCount: 3910, weightedVoteCount: 3910, likes: 3910, isWinner: false, submittedAt: iso(-3), createdAt: iso(-3), updatedAt: iso(-1) },
+  { id: "demo-sub-gold-hour-spin", challengeId: "demo-street-dance-finals", challengeTitle: "Street Dance Finals", challengeCategory: "Dance", userId: "demo-user-nia-stone", userName: "Kemi Vale", userInitials: "KV", userPlanId: "enterprise", title: "Gold Hour Spin", description: "A compact routine with sharp musicality and footwork.", mediaUrl: "https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=1400&q=80", mediaType: "image", status: "approved", visibility: "public", voteCount: 2877, weightedVoteCount: 2877, likes: 2877, isWinner: false, submittedAt: iso(-2), createdAt: iso(-2), updatedAt: iso(-1) }
 ];
 
 const doroPackages: SeedDoc[] = [
@@ -239,7 +276,7 @@ const liveEvents: SeedDoc[] = [
     registrationDeadline: iso(24),
     price: 15,
     ticketPrice: 15,
-    requiredPlanId: "chief_producer",
+    requiredPlanId: "host",
     createdAt: iso(-2),
     updatedAt: iso(-1)
   },
@@ -317,12 +354,13 @@ async function main() {
     await writeDoc(db, "profiles", profile.id, { ...profile, verified: true, emailVerified: true, updatedAt: iso(-1), createdAt: iso(-30) });
     await writeDoc(db, "users", profile.id, { ...profile, emailVerified: true, verificationStatus: "verified", updatedAt: iso(-1), createdAt: iso(-30) });
   }
+  for (const sponsorProfile of sponsorProfiles) await writeDoc(db, "sponsorProfiles", sponsorProfile.id, sponsorProfile);
   for (const category of categories) await writeDoc(db, "challengeCategories", category.id, category);
   for (const challenge of challenges) await writeDoc(db, "challenges", challenge.id, challenge);
   for (const submission of submissions) await writeDoc(db, "submissions", submission.id, submission);
   for (const event of liveEvents) await writeDoc(db, "liveEvents", event.id, event);
   await writeDoc(db, "leaderboards", "global", { id: "global", entries: leaderboardEntries, updatedAt: iso(-1), createdAt: iso(-10) });
-  await writeDoc(db, "winners", "demo-winner-rainline-reflections", { id: "demo-winner-rainline-reflections", challengeId: "demo-neon-city-photo", submissionId: "demo-sub-rainline-reflections", userId: "demo-user-nia-stone", rank: 1, status: "confirmed", createdAt: iso(-1), updatedAt: iso(-1) });
+  await writeDoc(db, "winners", "demo-winner-rainline-reflections", { id: "demo-winner-rainline-reflections", challengeId: "demo-neon-city-photo", submissionId: "demo-sub-rainline-reflections", userId: "demo-user-nia-stone", position: 1, rank: 1, status: "announced", payoutStatus: "not_applicable", prizeAmount: null, currency: null, verifiedAt: iso(-1), announcedAt: iso(-1), createdAt: iso(-1), updatedAt: iso(-1) });
   for (const badge of badges) await writeDoc(db, "badges", badge.id, badge);
   for (const notification of notifications) await writeDoc(db, "notifications", notification.id, notification);
   for (const pack of doroPackages) await writeDoc(db, "doroCoinPackages", pack.id, pack);
@@ -335,3 +373,10 @@ main().catch((error) => {
   console.error("Seed failed:", error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
+
+
+
+
+
+

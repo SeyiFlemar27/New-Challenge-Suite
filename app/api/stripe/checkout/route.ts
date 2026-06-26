@@ -1,7 +1,7 @@
-import { getStripe } from "@/lib/stripe";
+﻿import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, validationError } from "@/lib/server/responses";
-import { getSubscriptionPlan } from "@/lib/server/subscriptions";
+import { getSubscriptionPlan, resolveStripePriceEnv } from "@/lib/server/subscriptions";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -12,17 +12,17 @@ export async function POST(request: Request) {
   const plan = getSubscriptionPlan(planId);
   if (!plan) return validationError({ planId: "Select a valid paid subscription plan." });
   const stripe = getStripe();
-  const price = process.env[plan.stripePriceEnv];
-  if (!stripe || !price) {
-    return fail("Stripe subscription checkout is not configured.", 503, { missing: !stripe ? "STRIPE_SECRET_KEY" : plan.stripePriceEnv }, "PAYMENT_CONFIGURATION_ERROR");
+  const { envName, priceId, candidates } = resolveStripePriceEnv(plan);
+  if (!stripe || !priceId) {
+    return fail("Stripe subscription checkout is not configured.", 503, { missing: !stripe ? "STRIPE_SECRET_KEY" : envName, acceptedPriceEnvs: candidates }, "PAYMENT_CONFIGURATION_ERROR");
   }
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel`,
-    metadata: { planId, userId: user.uid }
+    metadata: { planId: plan.id, requestedPlanId: String(planId ?? ""), userId: user.uid }
   });
   return ok({ url: session.url }, "Stripe checkout session created.");
 }

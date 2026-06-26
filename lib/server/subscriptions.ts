@@ -1,14 +1,15 @@
-import type { SubscriptionPlan, UserPlanId } from "@/lib/types";
+﻿import type { ProductPlanId, SubscriptionPlan } from "@/lib/types";
+import { normalizePlanId } from "@/lib/plan-access";
 
 export const subscriptionPlans: SubscriptionPlan[] = [
   {
-    id: "observer",
-    name: "Observer",
+    id: "free",
+    name: "Free",
     audience: "creator",
-    subtitle: "Free Tier",
+    subtitle: "Explore, vote, and create one simple challenge",
     priceMonthly: 0,
     stripePriceEnv: "",
-    features: ["View public challenges", "1 free vote per challenge/day", "Comment on public challenges", "Create 1 free group challenge/month", "Participate in group challenges"],
+    features: ["View and join public challenges", "1 free vote per challenge/day", "Create 1 basic public challenge", "Submit entries", "Basic profile"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
@@ -18,76 +19,95 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     id: "creator",
     name: "Creator",
     audience: "creator",
-    subtitle: "For active users",
+    subtitle: "Creator Studio for challenge builders",
     priceMonthly: 24.99,
     stripePriceEnv: "STRIPE_PRICE_CREATOR",
-    features: ["60 votes/month + 1 Multiplier", "Create up to 3 group challenges/mo", "Prize Pools up to $500", "1 Challenge Boost/month", "Comment & pin 1 comment"],
+    legacyStripePriceEnvs: ["STRIPE_PRICE_CREATOR_PRO"],
+    features: ["Create up to 3 challenges", "1 private challenge", "Sponsor-ready challenges", "Basic creator analytics", "Receive sponsor requests"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
     canCreatePrizeChallenges: true
   },
   {
-    id: "competitor",
-    name: "Competitor",
+    id: "pro",
+    name: "Pro",
     audience: "creator",
-    subtitle: "Serious creators",
+    subtitle: "Performance Hub for serious competitors",
     priceMonthly: 59.99,
-    stripePriceEnv: "STRIPE_PRICE_COMPETITOR",
-    features: ["200 votes + 3 Multipliers", "Unlimited free group challenges", "Prize Pools up to $2,500 + Host 1v1", "Access to Ranked Challenges", "Host Small Live Events (10 pax)"],
-    canHostLiveEvents: true,
-    liveEventCapacity: 10,
+    stripePriceEnv: "STRIPE_PRICE_PRO",
+    legacyStripePriceEnvs: ["STRIPE_PRICE_COMPETITOR", "STRIPE_PRICE_PREMIUM"],
+    features: ["More challenge creation capacity", "Ranked challenge access", "Advanced profile", "Performance analytics", "More boosts and vote multipliers"],
+    canHostLiveEvents: false,
+    liveEventCapacity: 0,
     canManageTournaments: false,
     canCreatePrizeChallenges: true,
     recommended: true
   },
   {
-    id: "executive_host",
-    name: "Executive Host",
+    id: "host",
+    name: "Host",
     audience: "creator",
-    subtitle: "Event organizers",
+    subtitle: "Competition and live event control",
     priceMonthly: 119,
-    stripePriceEnv: "STRIPE_PRICE_EXECUTIVE_HOST",
-    features: ["500 votes + 5 Multipliers", "Prize Pools up to $10,000", "Create Tournament Brackets & 1v1", "Unlimited Challenge Boosts", "Host Mid-Scale Live Events (15 pax)"],
+    stripePriceEnv: "STRIPE_PRICE_HOST",
+    legacyStripePriceEnvs: ["STRIPE_PRICE_EXECUTIVE_HOST", "STRIPE_PRICE_VERIFIED_HOST"],
+    features: ["Host live events", "Manage tournaments", "Sponsor-ready competitions", "Advanced revenue reports", "Participant and submission controls"],
     canHostLiveEvents: true,
-    liveEventCapacity: 15,
+    liveEventCapacity: 100,
     canManageTournaments: true,
     canCreatePrizeChallenges: true
   },
   {
-    id: "chief_producer",
-    name: "Chief Producer",
+    id: "enterprise",
+    name: "Enterprise",
     audience: "creator",
-    subtitle: "Culture architect",
-    priceMonthly: 249,
-    stripePriceEnv: "STRIPE_PRICE_CHIEF_PRODUCER",
-    features: ["1,500 votes + Unlimited Multipliers", "Unlimited prize pools & events", "Sponsor-integrated challenges", "Tier-Restricted Special Events", "Host Large Live Events (25 pax)"],
+    subtitle: "Programs for organizations and teams",
+    priceMonthly: 0,
+    stripePriceEnv: "",
+    legacyStripePriceEnvs: ["STRIPE_PRICE_CHIEF_PRODUCER"],
+    features: ["Custom challenge programs", "Large live events", "Team workflows", "Custom reports", "Dedicated support"],
     canHostLiveEvents: true,
-    liveEventCapacity: 25,
+    liveEventCapacity: 1000,
     canManageTournaments: true,
     canCreatePrizeChallenges: true
   },
   {
-    id: "brand_partner",
-    name: "Brand Partner",
+    id: "sponsor_starter",
+    name: "Sponsor Starter",
     audience: "sponsor",
-    subtitle: "Sponsor growth",
-    priceMonthly: 499,
-    stripePriceEnv: "STRIPE_PRICE_BRAND_PARTNER",
-    features: ["Sponsor up to 5 challenges", "Brand badge on listings", "Custom CTA button", "Engagement dashboard", "Access to sponsor-only placements"],
+    subtitle: "For small brands testing sponsorships",
+    priceMonthly: 199,
+    stripePriceEnv: "STRIPE_PRICE_SPONSOR_STARTER",
+    features: ["Brand Command Center", "Sponsor challenge requests", "Basic placements", "Campaign activity summary", "Brand profile"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
     canCreatePrizeChallenges: false
   },
   {
-    id: "enterprise_sponsor",
-    name: "Enterprise Sponsor",
+    id: "brand_partner",
+    name: "Brand Partner",
     audience: "sponsor",
-    subtitle: "Enterprise campaigns",
+    subtitle: "For active sponsors and growing brands",
+    priceMonthly: 499,
+    stripePriceEnv: "STRIPE_PRICE_BRAND_PARTNER",
+    features: ["Multiple campaigns", "Sponsor marketplace access", "CTA placements", "Audience insights", "Sponsor reports"],
+    canHostLiveEvents: false,
+    liveEventCapacity: 0,
+    canManageTournaments: false,
+    canCreatePrizeChallenges: false,
+    recommended: true
+  },
+  {
+    id: "enterprise_partner",
+    name: "Enterprise Partner",
+    audience: "sponsor",
+    subtitle: "For large brand and agency programs",
     priceMonthly: 1250,
-    stripePriceEnv: "STRIPE_PRICE_ENTERPRISE_SPONSOR",
-    features: ["Unlimited sponsored challenges", "Logo on challenge feed", "Weekly Featured Sponsor banner", "Direct ROI analytics", "Co-branded live event integration"],
+    stripePriceEnv: "STRIPE_PRICE_ENTERPRISE_PARTNER",
+    legacyStripePriceEnvs: ["STRIPE_PRICE_ENTERPRISE_SPONSOR"],
+    features: ["Enterprise campaign support", "Large sponsor placements", "Advanced reports", "Team workflows", "Custom activation planning"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
@@ -95,18 +115,28 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   }
 ];
 
-export type PaidSubscriptionPlanId = Exclude<UserPlanId, "observer">;
+export type PaidSubscriptionPlanId = Exclude<ProductPlanId, "free" | "enterprise">;
 
 export function getSubscriptionPlan(planId: unknown) {
-  if (typeof planId !== "string") return null;
-  const plan = subscriptionPlans.find((item) => item.id === planId);
+  const normalizedPlanId = normalizePlanId(planId);
+  const plan = subscriptionPlans.find((item) => item.id === normalizedPlanId);
   return plan && plan.priceMonthly > 0 ? plan : null;
 }
 
 export function getSubscriptionPlansForUser(currentPlanId: unknown) {
-  const normalizedPlanId = typeof currentPlanId === "string" ? currentPlanId : "observer";
+  const normalizedPlanId = normalizePlanId(currentPlanId);
   return subscriptionPlans.map((plan) => ({
     ...plan,
     current: plan.id === normalizedPlanId
   }));
+}
+
+export function resolveStripePriceEnv(plan: SubscriptionPlan) {
+  const candidates = [plan.stripePriceEnv, ...(plan.legacyStripePriceEnvs ?? [])].filter(Boolean);
+  const envName = candidates.find((candidate) => Boolean(process.env[candidate]));
+  return {
+    envName: envName ?? candidates[0] ?? "STRIPE_PRICE_ID",
+    priceId: envName ? process.env[envName] : undefined,
+    candidates
+  };
 }

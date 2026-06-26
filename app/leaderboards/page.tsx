@@ -47,6 +47,7 @@ export default function LeaderboardsPage() {
     staleTime: 60_000
   });
   const rows = useMemo(() => ((data?.ok ? data.data?.entries : []) ?? []) as LeaderboardRow[], [data]);
+  const leaderboardMessage = data?.ok ? data.data?.message : null;
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3);
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
@@ -70,6 +71,8 @@ export default function LeaderboardsPage() {
         </div>
       ) : errorMessage ? (
         <Card className="mt-8"><EmptyState icon={<Trophy />} title="Leaderboard unavailable" body={errorMessage} action={<Button onClick={() => window.location.reload()}>Retry</Button>} /></Card>
+      ) : leaderboardMessage && !rows.length ? (
+        <Card className="mt-8"><EmptyState icon={<Trophy />} title="Leaderboard not public yet" body={leaderboardMessage} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
       ) : rows.length ? (
         <>
           <div className="mt-8 grid items-end gap-5 lg:grid-cols-[.85fr_1.15fr_.85fr]">
@@ -113,3 +116,4 @@ export default function LeaderboardsPage() {
     </AppShell>
   );
 }
+

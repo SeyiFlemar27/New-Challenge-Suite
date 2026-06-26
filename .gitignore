@@ -9,3 +9,4 @@ coverage
 .vercel
 firebase-admin-key.json
 challenge-suite-firebase-adminsdk-fbsvc-feb653e504.json
+.env*

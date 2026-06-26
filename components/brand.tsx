@@ -1,4 +1,4 @@
-import { Award, BadgeCheck, Crown, Diamond, Flame, ShieldCheck, Sparkles, Star } from "lucide-react";
+﻿import { Award, BadgeCheck, BriefcaseBusiness, Crown, Diamond, Flame, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserPlanId } from "@/lib/types";
 import { findCustomizationOption } from "@/lib/customization/options";
@@ -13,25 +13,48 @@ export function BrandLogo({ className, imageClassName }: { className?: string; i
   );
 }
 
-function planBadgeLabel(planId?: UserPlanId) {
-  if (planId === "verified_host" || planId === "executive_host" || planId === "chief_producer") return "Verified Host";
-  if (planId === "creator_pro") return "Creator Pro";
-  if (planId === "premium" || planId === "creator" || planId === "competitor") return "Premium";
-  return "Free Member";
+export function planBadgeLabel(planId?: UserPlanId | string | null) {
+  switch (planId) {
+    case "creator":
+    case "creator_pro":
+      return "Creator";
+    case "pro":
+    case "premium":
+    case "competitor":
+      return "Pro";
+    case "host":
+    case "verified_host":
+    case "executive_host":
+      return "Host";
+    case "enterprise":
+    case "chief_producer":
+      return "Enterprise";
+    case "sponsor_starter":
+      return "Sponsor Starter";
+    case "brand_partner":
+      return "Brand Partner";
+    case "enterprise_partner":
+    case "enterprise_sponsor":
+      return "Enterprise Partner";
+    default:
+      return "Free";
+  }
 }
 
 export function PremiumBadge({ planId, compact = false, badgeStyleId }: { planId?: UserPlanId; compact?: boolean; badgeStyleId?: string }) {
   const label = planBadgeLabel(planId);
-  const premium = label !== "Free Member";
+  const premium = label !== "Free";
+  const sponsor = label.includes("Sponsor") || label.includes("Partner");
   const badgeStyle = badgeStyleId ? findCustomizationOption(badgeStyleId, "badge") : null;
-  const BadgeIcon = badgeStyleId === "premium_gold" ? Star
-    : badgeStyleId === "premium_diamond" ? Diamond
-      : badgeStyleId === "creator_pro" ? Crown
-        : badgeStyleId === "top_voter" ? Flame
-          : badgeStyleId === "rising_star" ? Sparkles
-            : badgeStyleId === "verified_host" ? ShieldCheck
-              : badgeStyleId === "elite_host" ? Award
-                : BadgeCheck;
+  const BadgeIcon = sponsor ? BriefcaseBusiness
+    : badgeStyleId === "premium_gold" ? Star
+      : badgeStyleId === "premium_diamond" ? Diamond
+        : badgeStyleId === "creator_pro" ? Crown
+          : badgeStyleId === "top_voter" ? Flame
+            : badgeStyleId === "rising_star" ? Sparkles
+              : badgeStyleId === "verified_host" ? ShieldCheck
+                : badgeStyleId === "elite_host" ? Award
+                  : BadgeCheck;
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full border font-black", badgeStyle?.previewClass ?? (premium ? "border-sky-400/40 bg-sky-500/15 text-sky-300" : "border-white/10 bg-white/5 text-slate-300"), compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
       <BadgeIcon size={compact ? 14 : 16} className={premium ? "text-current" : "text-slate-400"} />

@@ -21,7 +21,7 @@ export default function JoinChallengePage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean } | null>(null);
+  const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean; status?: string } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -104,7 +104,7 @@ export default function JoinChallengePage() {
         pendingMedia = true;
       }
 
-      const joinResult = await joinChallenge(currentChallenge.id);
+      const joinResult = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true });
       if (!joinResult.ok) throw new Error(joinResult.message);
 
       const submissionResult = await submitEntry({
@@ -116,12 +116,14 @@ export default function JoinChallengePage() {
         mediaType,
         mediaUploadPending: pendingMedia,
         originalFileName: file.name,
-        fileSize: file.size
+        fileSize: file.size,
+        entryAgreementAccepted: true,
+        rulesAccepted: true
       });
       if (!submissionResult.ok) throw new Error(submissionResult.message);
 
-      const submission = submissionResult.data?.submission as { id?: string } | undefined;
-      setSuccessSubmission({ id: submission?.id, title, pendingMedia });
+      const submission = submissionResult.data?.submission as { id?: string; status?: string } | undefined;
+      setSuccessSubmission({ id: submission?.id, title, pendingMedia, status: submission?.status });
       setSubmitted(true);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Entry could not be submitted.";
@@ -174,7 +176,7 @@ export default function JoinChallengePage() {
           <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
           <h1 className="mt-6 text-4xl font-black">Submission received</h1>
           <p className="mt-3 text-slate-300"><b>{successSubmission?.title}</b> was recorded for {currentChallenge.title}.</p>
-          <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Media upload is pending storage configuration. Your submission metadata is saved and ready to be completed." : "Your media was uploaded and the submission is pending approval."}</p>
+          <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Media upload is pending storage configuration. Your submission metadata is saved and ready to be completed." : successSubmission?.status === "active" || successSubmission?.status === "approved" ? "Your media was uploaded and the submission is live." : "Your media was uploaded and the submission is pending review."}</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <LinkButton href={`/challenges/${currentChallenge.id}`}>View Challenge</LinkButton>
             <LinkButton href="/my-challenges" variant="secondary">View My Submissions</LinkButton>
@@ -218,3 +220,4 @@ export default function JoinChallengePage() {
     </AppShell>
   );
 }
+

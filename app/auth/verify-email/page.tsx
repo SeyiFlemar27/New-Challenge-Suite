@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,15 +8,24 @@ import { CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
-import { requestEmailVerificationCode, verifyEmailCode } from "@/lib/api/services";
+import { fetchBootstrapProfile, requestEmailVerificationCode, verifyEmailCode } from "@/lib/api/services";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { auth } from "@/lib/firebase/client";
 
 const RESEND_SECONDS = 60;
 
-function getReturnUrl() {
-  if (typeof window === "undefined") return "/dashboard";
+function getSafeReturnUrl() {
+  if (typeof window === "undefined") return null;
   const value = new URLSearchParams(window.location.search).get("returnUrl");
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : null;
+}
+
+async function getVerifiedDestination() {
+  const explicitReturnUrl = getSafeReturnUrl();
+  if (explicitReturnUrl) return explicitReturnUrl;
+  const profile = await fetchBootstrapProfile();
+  if (!profile.ok || !profile.data?.user) return "/dashboard";
+  return getDefaultRouteForAccount(profile.data.user);
 }
 
 export default function VerifyEmailPage() {
@@ -44,7 +53,9 @@ export default function VerifyEmailPage() {
     if (authState.verified) {
       setVerified(true);
       setRedirecting(true);
-      const timer = window.setTimeout(() => router.replace(getReturnUrl()), 900);
+      const timer = window.setTimeout(() => {
+        void getVerifiedDestination().then((destination) => router.replace(destination));
+      }, 900);
       return () => window.clearTimeout(timer);
     }
     if (!authState.user || requestedInitialCode.current) return;
@@ -108,12 +119,13 @@ export default function VerifyEmailPage() {
     await auth?.currentUser?.getIdToken(true).catch(() => undefined);
     window.dispatchEvent(new Event("challenge-suite-profile-updated"));
     await authState.refreshProfile().catch(() => null);
+    const destination = await getVerifiedDestination();
     localStorage.removeItem("challenge_suite_signup_email");
     setVerified(true);
     setRedirecting(true);
     setVerifying(false);
     setNotice("Email verified successfully. Redirecting...");
-    window.setTimeout(() => router.replace(getReturnUrl()), 900);
+    window.setTimeout(() => router.replace(destination), 900);
   }
 
   return (
@@ -126,8 +138,8 @@ export default function VerifyEmailPage() {
               <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
             </motion.div>
             <h1 className="mt-6 text-4xl font-black">Email verified successfully</h1>
-            <p className="mt-3 text-slate-300">Redirecting you to your dashboard...</p>
-            <Button className="mt-8 w-full" onClick={() => router.replace(getReturnUrl())}>Continue to Dashboard</Button>
+            <p className="mt-3 text-slate-300">Redirecting you to your account...</p>
+            <Button className="mt-8 w-full" onClick={() => void getVerifiedDestination().then((destination) => router.replace(destination))}>Continue</Button>
           </div>
         ) : (
           <>

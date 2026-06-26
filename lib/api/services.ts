@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { apiRequest } from "./client";
-import type { SubscriptionPlan } from "@/lib/types";
+import type { AccountType, SubscriptionPlan } from "@/lib/types";
 import type { ProfileCustomization } from "@/lib/customization/options";
 
 export interface DashboardResponse {
@@ -11,7 +11,12 @@ export interface DashboardResponse {
     displayName: string;
     initials: string;
     role: string | null;
+    accountType?: AccountType;
+    dashboardType?: string;
     planId: string;
+    legacyPlanId?: string | null;
+    planName?: string;
+    planStatus?: string;
     premium: boolean;
     verified: boolean;
     totalPoints: number;
@@ -32,7 +37,6 @@ export interface DashboardResponse {
   notifications: unknown[];
 }
 
-
 export function requestEmailVerificationCode() {
   return apiRequest<{ email: string; expiresAt: string; resendCooldownSeconds: number }>("/api/auth/email-otp/request", { method: "POST", body: JSON.stringify({}) });
 }
@@ -50,14 +54,24 @@ export function fetchBootstrapProfile() {
       displayName: string;
       email: string;
       role?: string;
+      accountType?: AccountType;
+      dashboardType?: string;
       planId?: string;
+      legacyPlanId?: string | null;
+      planName?: string;
+      planStatus?: string;
       doroBalance?: number;
       initials?: string;
       premium: boolean;
+      isPremium?: boolean;
+      isSponsor?: boolean;
       verified: boolean;
       emailVerified?: boolean;
       emailVerifiedAt?: string | null;
       isAdmin: boolean;
+      sponsorOnboardingStatus?: string | null;
+      sponsorOnboardingComplete?: boolean;
+      hasSponsorProfile?: boolean;
       customization?: ProfileCustomization;
     };
   }>("/api/auth/profile/bootstrap");
@@ -124,7 +138,11 @@ export function fetchMyProfile() {
       initials: string;
       avatarUrl?: string | null;
       role?: string | null;
+      accountType?: AccountType;
+      dashboardType?: string;
       planId?: string | null;
+      legacyPlanId?: string | null;
+      planName?: string | null;
       selfDeclaredRegion?: "US" | "NG" | null;
       verified: boolean;
       premium: boolean;
@@ -209,8 +227,8 @@ export function createChallenge(payload: unknown) {
   return apiRequest<{ challenge: unknown }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export function joinChallenge(challengeId: string) {
-  return apiRequest(`/api/challenges/${challengeId}/join`, { method: "POST", body: JSON.stringify({}) });
+export function joinChallenge(challengeId: string, payload: { entryAgreementAccepted?: boolean } = {}) {
+  return apiRequest(`/api/challenges/${challengeId}/join`, { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function submitEntry(payload: unknown) {
@@ -223,24 +241,29 @@ export function fetchSubmissionDetails(submissionId: string) {
     challenge: unknown | null;
     creator: unknown | null;
     rank: number | null;
+    participant?: unknown | null;
     comments: unknown[];
   }>(`/api/submissions/${submissionId}`);
 }
 
 export function fetchWinners() {
-  return apiRequest<{ winners: unknown[] }>("/api/winners");
+  return apiRequest<{ winners: unknown[]; source?: string; message?: string | null }>("/api/winners");
 }
 
 export function fetchWinnerDetails(winnerId: string) {
-  return apiRequest<{ winner: unknown; challenge: unknown | null; profile: unknown | null; leaderboard: unknown[] }>(`/api/winners/${winnerId}`);
+  return apiRequest<{ winner: unknown; challenge: unknown | null; profile: unknown | null; leaderboard: unknown[]; resultStatus?: string; resultMessage?: string | null; payoutStatus?: string; payoutActive?: boolean }>(`/api/winners/${winnerId}`);
 }
 
-export function fetchLeaderboards(board = "global") {
-  return apiRequest<{ board: string; entries: unknown[]; source: string; updatedAt: string | null }>(`/api/leaderboards?board=${encodeURIComponent(board)}`);
+export function fetchLeaderboards(board = "global", options: { type?: "global" | "challenge"; challengeId?: string; limit?: number } = {}) {
+  const params = new URLSearchParams({ board });
+  if (options.type) params.set("type", options.type);
+  if (options.challengeId) params.set("challengeId", options.challengeId);
+  if (options.limit) params.set("limit", String(options.limit));
+  return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; visibilityMode?: string; visible?: boolean; message?: string | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
-export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin" }) {
-  return apiRequest<{ vote: unknown }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
+export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number }) {
+  return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; walletTransactionId?: string | null }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function purchaseDoroCoins(packageId: string) {
@@ -270,3 +293,8 @@ export function registerForEvent(eventId: string, payload: unknown) {
 export function fetchNotifications() {
   return apiRequest<{ notifications: unknown[] }>("/api/notifications");
 }
+
+
+
+
+

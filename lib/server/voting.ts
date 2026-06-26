@@ -1,104 +1,163 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { todayKey } from "@/lib/utils";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
-import { normalizePlanId } from "@/lib/plan-access";
+import { getVoteWeight } from "@/lib/plan-access";
+import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { writeAuditLog } from "@/lib/server/audit";
 
-const weightByPlan: Record<string, number> = {
-  free: 1,
-  premium: 1.15,
-  creator_pro: 1.5,
-  verified_host: 2,
-  observer: 1,
-  creator: 1.1,
-  competitor: 1.25,
-  executive_host: 1.5,
-  chief_producer: 2,
-  brand_partner: 1,
-  enterprise_sponsor: 1
-};
+export type VoteMode = "free" | "dorocoin";
 
-export async function castVote(db: Firestore, input: { userId: string; challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; planId?: string; dailyFreeVoteLimit?: number }) {
+export interface CastVoteInput {
+  userId: string;
+  challengeId: string;
+  submissionId: string;
+  voteMode: VoteMode;
+  quantity: number;
+  planId?: string;
+  dailyFreeVoteLimit?: number;
+  profile?: Record<string, unknown>;
+  ipHash?: string | null;
+  userAgentHash?: string | null;
+  suspiciousSignals?: string[];
+}
+
+function votingSettings(challenge: Record<string, unknown>) {
+  const settings = typeof challenge.votingSettings === "object" && challenge.votingSettings !== null
+    ? challenge.votingSettings as Record<string, unknown>
+    : {};
+  return {
+    allowFreeVotes: settings.allowFreeVotes !== false,
+    allowDoroCoinVotes: settings.allowDoroCoinVotes !== false,
+    weightedVotes: settings.weightedVotes !== false
+  };
+}
+
+function voteReject(message: string, code: string) {
+  const error = new Error(message) as Error & { code?: string };
+  error.code = code;
+  return error;
+}
+
+export async function castVote(db: Firestore, input: CastVoteInput) {
+  const quantity = Math.max(1, Math.trunc(input.quantity || 1));
   const now = new Date().toISOString();
-  const voteDate = todayKey();
-  const normalizedPlanId = normalizePlanId(input.planId);
-  const weight = weightByPlan[normalizedPlanId] ?? weightByPlan[input.planId || "free"] ?? 1;
+  const voteDateKey = todayKey();
+  const profile = { ...(input.profile ?? {}), planId: input.planId ?? input.profile?.planId ?? "free" };
 
-  return db.runTransaction(async (transaction) => {
+  if (isSponsorProfile(profile)) {
+    throw voteReject("Sponsor accounts cannot vote in normal user challenges yet.", "SPONSOR_ACCOUNT_BLOCKED");
+  }
+  if (input.voteMode === "free" && quantity !== 1) {
+    throw voteReject("Free votes must be submitted one at a time.", "INVALID_FREE_VOTE_QUANTITY");
+  }
+
+  const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(input.challengeId);
-    const challengeSnap = await transaction.get(challengeRef);
-    if (!challengeSnap.exists) throw new Error("Challenge not found.");
-    const challenge = challengeSnap.data()!;
-    if (!canVoteOnChallenge(challenge as any)) throw new Error("Voting is closed for this challenge.");
-
     const submissionRef = db.collection("submissions").doc(input.submissionId);
-    const submissionSnap = await transaction.get(submissionRef);
-    if (!submissionSnap.exists) throw new Error("Submission not found.");
-    if (submissionSnap.data()?.challengeId !== input.challengeId) throw new Error("Submission does not belong to this challenge.");
+    const [challengeSnap, submissionSnap] = await Promise.all([
+      transaction.get(challengeRef),
+      transaction.get(submissionRef)
+    ]);
+
+    if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
+    const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (!canVoteOnChallenge(challenge)) throw voteReject("Voting is closed for this challenge.", "VOTING_CLOSED");
+
+    const settings = votingSettings(challenge);
+    if (input.voteMode === "free" && !settings.allowFreeVotes) throw voteReject("Free voting is not enabled for this challenge.", "FREE_VOTING_DISABLED");
+    if (input.voteMode === "dorocoin" && !settings.allowDoroCoinVotes) throw voteReject("DoroCoin voting is not enabled for this challenge.", "DOROCOIN_VOTING_DISABLED");
+
+    if (!submissionSnap.exists) throw voteReject("Submission not found.", "NOT_FOUND");
+    const submission = { id: submissionSnap.id, ...submissionSnap.data() } as Record<string, unknown>;
+    if (submission.challengeId !== input.challengeId) throw voteReject("Submission does not belong to this challenge.", "SUBMISSION_CHALLENGE_MISMATCH");
+    if (!canSubmissionReceiveVotes(submission.status)) {
+      throw voteReject("This submission is not eligible for voting.", "SUBMISSION_NOT_VOTABLE");
+    }
 
     if (input.voteMode === "free") {
       const dailyVoteLimit = Number(input.dailyFreeVoteLimit ?? 1);
       const dailyFreeVoteQuery = db.collection("votes")
         .where("userId", "==", input.userId)
-        .where("voteDate", "==", voteDate)
+        .where("voteDate", "==", voteDateKey)
         .where("voteMode", "==", "free")
         .limit(Math.max(dailyVoteLimit, 1));
       const todayVotes = await transaction.get(dailyFreeVoteQuery);
-      if (todayVotes.size >= dailyVoteLimit) throw new Error(`Daily free vote limit reached. Your plan includes ${dailyVoteLimit} free votes per day.`);
+      if (todayVotes.size >= dailyVoteLimit) throw voteReject(`Daily free vote limit reached. Your plan includes ${dailyVoteLimit} free votes per day.`, "DAILY_FREE_LIMIT_REACHED");
 
       const freeVoteQuery = db.collection("votes")
         .where("userId", "==", input.userId)
         .where("challengeId", "==", input.challengeId)
-        .where("voteDate", "==", voteDate)
+        .where("voteDate", "==", voteDateKey)
         .where("voteMode", "==", "free")
         .limit(1);
       const existing = await transaction.get(freeVoteQuery);
-      if (!existing.empty) throw new Error("Free users get 1 vote per challenge/day.");
+      if (!existing.empty) throw voteReject("Free users get 1 vote per challenge/day.", "FREE_CHALLENGE_DAILY_LIMIT_REACHED");
     }
 
+    let walletTransactionId: string | null = null;
+    let coinCost = 0;
     if (input.voteMode === "dorocoin") {
+      coinCost = quantity;
       const walletRef = db.collection("doroCoinWallets").doc(input.userId);
       const walletSnap = await transaction.get(walletRef);
       const balance = Number(walletSnap.data()?.balance ?? 0);
-      if (balance < 1) throw new Error("Insufficient DoroCoins. 1 DoroCoin equals 1 vote.");
-      transaction.set(walletRef, { userId: input.userId, balance: balance - 1, updatedAt: now }, { merge: true });
+      if (balance < coinCost) throw voteReject("Insufficient DoroCoins. 1 DoroCoin equals 1 vote.", "INSUFFICIENT_DOROCOINS");
+      transaction.set(walletRef, { userId: input.userId, balance: balance - coinCost, lockedBalance: Number(walletSnap.data()?.lockedBalance ?? 0), updatedAt: now }, { merge: true });
       const txnRef = db.collection("doroCoinTransactions").doc();
+      walletTransactionId = txnRef.id;
       transaction.set(txnRef, {
         id: txnRef.id,
         userId: input.userId,
-        amount: -1,
-        balanceAfter: balance - 1,
+        amount: -coinCost,
+        balanceAfter: balance - coinCost,
         type: "vote_spend",
-        description: `Vote on submission ${input.submissionId}`,
+        description: `${quantity} vote${quantity === 1 ? "" : "s"} on submission ${input.submissionId}`,
         sourceId: input.submissionId,
+        challengeId: input.challengeId,
         createdBy: input.userId,
         createdAt: now
       });
     }
 
-    const voteRef = db.collection("votes").doc();
-    const vote = {
-      id: voteRef.id,
-      userId: input.userId,
-      challengeId: input.challengeId,
-      submissionId: input.submissionId,
-      voteMode: input.voteMode,
-      voteDate,
-      weight,
-      createdAt: now
-    };
-    transaction.set(voteRef, vote);
+    const voteWeight = getVoteWeight(profile, settings.weightedVotes);
+    const voteRecords: Record<string, unknown>[] = [];
+    for (let index = 0; index < quantity; index += 1) {
+      const voteRef = db.collection("votes").doc();
+      const vote = {
+        id: voteRef.id,
+        challengeId: input.challengeId,
+        submissionId: input.submissionId,
+        voterId: input.userId,
+        userId: input.userId,
+        submissionOwnerId: submission.userId ?? null,
+        voteType: input.voteMode,
+        voteMode: input.voteMode,
+        voteWeight,
+        weight: voteWeight,
+        coinCost: input.voteMode === "dorocoin" ? 1 : 0,
+        planId: profile.planId ?? input.planId ?? "free",
+        voteDateKey,
+        voteDate: voteDateKey,
+        status: "counted",
+        walletTransactionId,
+        ipHash: input.ipHash ?? null,
+        userAgentHash: input.userAgentHash ?? null,
+        createdAt: now
+      };
+      transaction.set(voteRef, vote);
+      voteRecords.push(vote);
+    }
 
-    const currentVotes = Number(submissionSnap.data()?.voteCount ?? 0);
-    const currentWeighted = Number(submissionSnap.data()?.weightedVoteCount ?? 0);
+    const weightedIncrement = voteWeight * quantity;
     transaction.set(submissionRef, {
-      voteCount: currentVotes + 1,
-      weightedVoteCount: currentWeighted + weight,
+      voteCount: Number(submission.voteCount ?? 0) + quantity,
+      weightedVoteCount: Number(submission.weightedVoteCount ?? 0) + weightedIncrement,
       updatedAt: now
     }, { merge: true });
 
     transaction.set(challengeRef, {
-      voteCount: Number(challengeSnap.data()?.voteCount ?? 0) + 1,
-      weightedVoteCount: Number(challengeSnap.data()?.weightedVoteCount ?? 0) + weight,
+      voteCount: Number(challenge.voteCount ?? 0) + quantity,
+      weightedVoteCount: Number(challenge.weightedVoteCount ?? 0) + weightedIncrement,
       updatedAt: now
     }, { merge: true });
 
@@ -107,12 +166,47 @@ export async function castVote(db: Firestore, input: { userId: string; challenge
     transaction.set(leaderboardRef, {
       id: input.challengeId,
       challengeId: input.challengeId,
-      totalVotes: Number(leaderboardSnap.data()?.totalVotes ?? 0) + 1,
-      weightedVoteCount: Number(leaderboardSnap.data()?.weightedVoteCount ?? 0) + weight,
+      totalVotes: Number(leaderboardSnap.data()?.totalVotes ?? 0) + quantity,
+      weightedVoteCount: Number(leaderboardSnap.data()?.weightedVoteCount ?? 0) + weightedIncrement,
       lastVoteAt: now,
       updatedAt: now
     }, { merge: true });
 
-    return vote;
+    return {
+      votes: voteRecords,
+      vote: voteRecords[0],
+      quantity,
+      voteWeight,
+      weightedVoteCount: weightedIncrement,
+      coinCost,
+      walletTransactionId,
+      suspiciousSignals: input.suspiciousSignals ?? []
+    };
   });
+
+  void writeAuditLog({
+    actorId: input.userId,
+    actorType: "user",
+    action: input.suspiciousSignals?.length ? "vote.suspicious_activity" : "vote.recorded",
+    targetType: "vote",
+    targetId: String(result.vote?.id ?? input.submissionId),
+    after: {
+      challengeId: input.challengeId,
+      submissionId: input.submissionId,
+      voteMode: input.voteMode,
+      quantity,
+      coinCost: result.coinCost,
+      voteWeight: result.voteWeight,
+      suspiciousSignals: input.suspiciousSignals ?? []
+    },
+    metadata: {
+      challengeId: input.challengeId,
+      submissionId: input.submissionId,
+      quantity,
+      ipHash: input.ipHash ?? null,
+      userAgentHash: input.userAgentHash ?? null
+    }
+  }, db).catch((error) => console.warn("[audit] vote audit failed", { challengeId: input.challengeId, submissionId: input.submissionId, error: error instanceof Error ? error.message : "unknown" }));
+
+  return result;
 }

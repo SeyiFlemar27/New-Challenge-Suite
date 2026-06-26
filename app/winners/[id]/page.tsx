@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
@@ -29,6 +29,9 @@ export default function WinnerDetailPage() {
   const leaderboard = (data?.ok ? data.data?.leaderboard : []) as Record<string, any>[];
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const winnerMeta = (data?.ok ? data.data?.winner : null) as Record<string, any> | null;
+  const resultMessage = data?.ok ? data.data?.resultMessage : null;
+  const payoutStatus = data?.ok ? data.data?.payoutStatus : null;
+  const sponsored = Boolean((challenge as any)?.sponsorEnabled || (challenge as any)?.sponsored || (challenge as any)?.sponsorshipEnabled || winnerMeta?.sponsored);
 
   return (
     <AppShell>
@@ -43,9 +46,11 @@ export default function WinnerDetailPage() {
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 <Stat label="Votes" value={winner.likes.toLocaleString()} />
                 <Stat label="Rank" value={`#${Number(winnerMeta?.rank ?? 1)}`} />
-                <Stat label="Prize" value={challenge?.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : `$${Number(challenge?.prizePool ?? 0).toLocaleString()}`} />
+                <Stat label="Result" value={String(winnerMeta?.status ?? "announced").replaceAll("_", " ")} />
                 <Stat label="Category" value={challenge?.category ?? "Challenge"} />
               </div>
+              {resultMessage ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">{resultMessage}</Card> : null}
+              {sponsored ? <Card className="mt-4 border-indigo-400/20 bg-indigo-950/20 p-4 text-indigo-200">Sponsored challenge results may require review before final announcement.</Card> : null}
             </div>
           </Card>
           <div className="space-y-6">
@@ -58,6 +63,7 @@ export default function WinnerDetailPage() {
                 </div>
               </div>
               <p className="mt-5 text-slate-300">{profile?.customization?.profileTagline ?? "Champion entry recognized by Challenge Suite voters."}</p>
+              <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300"><b className="text-white">Payout status:</b> {String(payoutStatus ?? "not_applicable").replaceAll("_", " ")}<p className="mt-2 text-xs text-slate-400">Payout processing is not active in this version.</p></div>
               <div className="mt-6 grid gap-3">
                 {challenge ? <LinkButton href={`/challenges/${challenge.id}`}>View Challenge</LinkButton> : null}
                 <Button variant="secondary"><Share2 size={16} /> Share Winner</Button>
@@ -80,3 +86,5 @@ export default function WinnerDetailPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><div className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">{label}</div><div className="mt-2 text-xl font-black text-white">{value}</div></div>;
 }
+
+

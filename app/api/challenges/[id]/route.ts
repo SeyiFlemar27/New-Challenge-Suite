@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
+import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,21 +25,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Creator Pro is required to view this private or exclusive challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
     }
   }
-  const [submissionsSnap, sponsorshipsSnap, votesSnap, participantSnap] = await Promise.all([
-    db.collection("submissions").where("challengeId", "==", id).orderBy("weightedVoteCount", "desc").limit(50).get(),
+
+  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap] = await Promise.all([
+    buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
     user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
   ]);
 
-  const submissions: Array<Record<string, unknown>> = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const sponsorships: Array<Record<string, unknown>> = sponsorshipsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const userVotes = user ? votes.filter((vote) => vote.userId === user.uid) : [];
+  const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
+  const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
 
   return ok({
     challenge: { id: challengeSnap.id, ...challengeSnap.data() },
-    submissions,
+    submissions: leaderboard.entries,
+    leaderboard: leaderboardPayload,
     sponsorships,
     voteCount: votes.length,
     userState: user ? {

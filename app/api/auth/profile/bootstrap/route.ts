@@ -1,8 +1,8 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
+import { getUserPlanAccess, normalizeAccountType, planFieldsFor } from "@/lib/plan-access";
 import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
 
@@ -26,9 +26,21 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
+function initialPlanForRole(role: z.infer<typeof roleSchema>) {
+  if (role === "sponsor") return "sponsor_starter";
+  if (role === "creator") return "creator";
+  return "free";
+}
+
 function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>) {
   const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
-  const planAccess = getUserPlanAccess({ ...profile, ...account });
+  const merged = { ...profile, ...account };
+  const isAdmin = Boolean(account.isAdmin || profile.isAdmin);
+  const planAccess = getUserPlanAccess(merged);
+  const accountType = isAdmin ? "admin" : normalizeAccountType(merged);
+  const sponsorOnboardingStatus = typeof merged.sponsorOnboardingStatus === "string" ? merged.sponsorOnboardingStatus : accountType === "sponsor" ? "not_started" : null;
+  const hasSponsorProfile = Boolean(merged.hasSponsorProfile || merged.brandProfileComplete || merged.sponsorOnboardingComplete);
+
   return {
     uid: user.uid,
     firstName: String(profile.firstName ?? account.firstName ?? ""),
@@ -37,6 +49,10 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     email: String(user.email ?? profile.email ?? account.email ?? ""),
     role: typeof account.role === "string" ? account.role : typeof profile.role === "string" ? profile.role : "user",
     ...planAccess,
+    accountType,
+    dashboardType: accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard",
+    planId: planAccess.normalizedPlanId,
+    legacyPlanId: planAccess.planId,
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
     customization: sanitizeCustomization((profile.customization ?? account.customization) as any),
     initials: String(profile.initials ?? initialsFromName(displayName || String(user.email ?? ""))),
@@ -44,7 +60,11 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerifiedAt: profile.emailVerifiedAt ?? account.emailVerifiedAt ?? null,
-    isAdmin: Boolean(account.isAdmin || profile.isAdmin)
+    isAdmin,
+    sponsorOnboardingStatus,
+    sponsorOnboardingComplete: Boolean(merged.sponsorOnboardingComplete || merged.brandProfileComplete),
+    hasSponsorProfile,
+    sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null
   };
 }
 
@@ -106,7 +126,19 @@ export async function POST(request: Request) {
       .filter(Boolean);
     const isAdmin = Boolean(email && adminEmails.includes(email.toLowerCase()));
 
-    const planFields = planFieldsFor("free");
+    const initialPlanId = initialPlanForRole(parsed.data.role);
+    const planFields = planFieldsFor(initialPlanId);
+    const accountType = isAdmin ? "admin" : planFields.accountType;
+    const dashboardType = accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard";
+    const sponsorFields = accountType === "sponsor"
+      ? {
+          sponsorOnboardingStatus: "not_started",
+          sponsorVerificationStatus: "not_submitted",
+          hasSponsorProfile: false,
+          brandProfileComplete: false,
+          sponsorOnboardingComplete: false
+        }
+      : {};
 
     await Promise.all([
       db.collection("users").doc(user.uid).set({
@@ -117,6 +149,9 @@ export async function POST(request: Request) {
         displayName,
         role: parsed.data.role,
         ...planFields,
+        accountType,
+        dashboardType,
+        ...sponsorFields,
         isAdmin,
         emailVerified: Boolean(user.emailVerified),
         verificationStatus: user.emailVerified ? "verified" : "pending",
@@ -132,13 +167,16 @@ export async function POST(request: Request) {
         email,
         role: parsed.data.role,
         ...planFields,
+        accountType,
+        dashboardType,
+        ...sponsorFields,
         premium: planFields.isPremium,
         verified: Boolean(user.emailVerified),
         emailVerified: Boolean(user.emailVerified),
         verificationStatus: user.emailVerified ? "verified" : "pending",
         isAdmin,
         customization: sanitizeCustomization(null),
-        customizationUnlockedByPlan: "free",
+        customizationUnlockedByPlan: planFields.legacyPlanId,
         createdAt: now,
         updatedAt: now
       }, { merge: true }),
@@ -160,3 +198,6 @@ export async function POST(request: Request) {
     return serverError("Profile could not be created.", error instanceof Error ? error.message : error);
   }
 }
+
+
+

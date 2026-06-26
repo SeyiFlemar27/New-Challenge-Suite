@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { fetchBootstrapProfile } from "@/lib/api/services";
-import type { AppRole, UserPlanId } from "@/lib/types";
+import type { AccountType, AppRole, UserPlanId } from "@/lib/types";
 import type { ProfileCustomization } from "@/lib/customization/options";
 
 export interface CurrentUserProfile {
@@ -12,11 +12,20 @@ export interface CurrentUserProfile {
   displayName: string;
   initials: string;
   role?: AppRole;
+  accountType: AccountType;
+  dashboardType?: string;
   planId?: UserPlanId;
+  legacyPlanId?: string | null;
+  planName?: string;
+  planStatus?: string;
   doroBalance: number | null;
   verified: boolean;
   premium: boolean;
+  isSponsor: boolean;
   isAdmin: boolean;
+  sponsorOnboardingStatus?: string | null;
+  sponsorOnboardingComplete?: boolean;
+  hasSponsorProfile?: boolean;
   customization?: ProfileCustomization;
 }
 
@@ -28,6 +37,12 @@ function initialsFromName(name: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+function accountTypeFromProfile(profile: Record<string, unknown>) {
+  if (profile.isAdmin || profile.accountType === "admin") return "admin" as const;
+  if (profile.accountType === "sponsor" || profile.role === "sponsor" || profile.dashboardType === "sponsor_dashboard") return "sponsor" as const;
+  return "user" as const;
 }
 
 export function useCurrentUser() {
@@ -59,8 +74,10 @@ export function useCurrentUser() {
         }
 
         const profile = result.data.user;
+        const profileRecord = profile as Record<string, unknown>;
         const displayName = String(profile.displayName || auth.user.displayName || auth.user.email || "");
         const planId = typeof profile.planId === "string" ? profile.planId as UserPlanId : undefined;
+        const accountType = accountTypeFromProfile(profileRecord);
 
         setCurrentUser({
           uid: auth.user.uid,
@@ -68,11 +85,20 @@ export function useCurrentUser() {
           displayName,
           initials: profile.initials || initialsFromName(displayName || auth.user.email || ""),
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
+          accountType,
+          dashboardType: typeof profile.dashboardType === "string" ? profile.dashboardType : undefined,
           planId,
+          legacyPlanId: typeof profile.legacyPlanId === "string" ? profile.legacyPlanId : null,
+          planName: typeof profile.planName === "string" ? profile.planName : undefined,
+          planStatus: typeof profile.planStatus === "string" ? profile.planStatus : undefined,
           doroBalance: typeof profile.doroBalance === "number" ? profile.doroBalance : null,
-          verified: Boolean(profile.verified || profile.emailVerified || auth.user.emailVerified),
-          premium: Boolean(profile.premium || (planId && planId !== "observer")),
-          isAdmin: Boolean(profile.isAdmin),
+          verified: Boolean(profile.verified || profile.emailVerified),
+          premium: Boolean(profile.premium || profile.isPremium || (planId && planId !== "free" && planId !== "observer")),
+          isSponsor: Boolean(profile.isSponsor || accountType === "sponsor"),
+          isAdmin: Boolean(profile.isAdmin || accountType === "admin"),
+          sponsorOnboardingStatus: typeof profile.sponsorOnboardingStatus === "string" ? profile.sponsorOnboardingStatus : null,
+          sponsorOnboardingComplete: Boolean(profile.sponsorOnboardingComplete),
+          hasSponsorProfile: Boolean(profile.hasSponsorProfile),
           customization: profile.customization as ProfileCustomization | undefined
         });
       } catch (caught) {

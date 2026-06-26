@@ -50,7 +50,11 @@ export default function PurchaseVotesPage() {
   const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
   const submissions = useMemo(() => {
     if (!challenge) return [];
-    return (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id);
+    const voteEligibleStatuses = new Set(["active", "approved", "winner"]);
+    return (details?.submissions ?? [])
+      .filter((item) => voteEligibleStatuses.has(String((item as Record<string, unknown>).status ?? "")))
+      .map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge))
+      .filter((item) => item.id);
   }, [challenge, details?.submissions]);
   const votePackages = useMemo(() => {
     const records = packagesQuery.data?.ok ? packagesQuery.data.data?.packages ?? [] : [];
@@ -66,13 +70,14 @@ export default function PurchaseVotesPage() {
   const voteMutation = useMutation({
     mutationFn: async () => {
       if (!submissionId) throw new Error("Select a submission to vote for.");
-      for (let index = 0; index < votes; index += 1) {
-        const result = await voteForSubmission({ challengeId, submissionId, voteMode: "dorocoin" });
-        if (!result.ok) throw new Error(result.message);
-      }
+      const result = await voteForSubmission({ challengeId, submissionId, voteMode: "dorocoin", quantity: votes });
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
     },
-    onSuccess: async () => {
-      setSuccessMessage(`${votes} vote${votes === 1 ? "" : "s"} were recorded. ${coins} DoroCoin${coins === 1 ? "" : "s"} spent.`);
+    onSuccess: async (result) => {
+      const recorded = Number(result?.quantity ?? votes);
+      const spent = Number(result?.coinCost ?? coins);
+      setSuccessMessage(`${recorded} vote${recorded === 1 ? "" : "s"} were recorded. ${spent} DoroCoin${spent === 1 ? "" : "s"} spent.`);
       setSuccess(true);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["challenge-details", challengeId] }),
@@ -158,7 +163,7 @@ export default function PurchaseVotesPage() {
           <>
             {!auth.user ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Sign in before voting.</p> : null}
             {!votingOpen ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Voting is closed for this challenge.</p> : null}
-            {!submissions.length ? <p className="mt-6 rounded-[8px] bg-[#151515] p-3 text-slate-300">No submissions are available for voting yet.</p> : null}
+            {!submissions.length ? <p className="mt-6 rounded-[8px] bg-[#151515] p-3 text-slate-300">No active or approved submissions are available for voting yet.</p> : null}
             <div className="mt-8 grid gap-5 md:grid-cols-4">
               {votePackages.map((item) => <button key={item.id} onClick={() => setSelected(item.id)} className={`rounded-[8px] border p-5 text-left ${selectedId === item.id ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="text-xl font-black">{item.label ?? item.name ?? `${item.votes} votes`}</h3><p className="mt-3 text-[var(--gold)]">{item.coins} DoroCoins</p></button>)}
               <button onClick={() => setSelected("custom")} className={`rounded-[8px] border p-5 text-left ${selectedId === "custom" ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="text-xl font-black">Custom</h3><p className="mt-3 text-slate-300">Choose amount</p></button>
@@ -186,3 +191,4 @@ export default function PurchaseVotesPage() {
     </AppShell>
   );
 }
+

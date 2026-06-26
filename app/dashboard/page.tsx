@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
@@ -25,7 +26,17 @@ type BadgeRecord = {
   name?: string;
 };
 
+type DashboardRedirectData = {
+  redirectTo?: string;
+  user?: {
+    accountType?: string;
+    sponsorOnboardingComplete?: boolean;
+    hasSponsorProfile?: boolean;
+  };
+};
+
 export default function DashboardPage() {
+  const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
@@ -33,6 +44,13 @@ export default function DashboardPage() {
   });
 
   const dashboard = data?.ok ? data.data : null;
+  const redirectTo = (dashboard as DashboardRedirectData | null)?.redirectTo;
+  const sponsorAccount = (dashboard as DashboardRedirectData | null)?.user?.accountType === "sponsor";
+
+  useEffect(() => {
+    if (redirectTo) router.replace(redirectTo);
+  }, [redirectTo, router]);
+
   const challenges = useMemo(() => {
     return (dashboard?.challenges ?? []).map((item) => normalizeChallenge(item as ChallengeApiRecord)).filter((item) => item.id);
   }, [dashboard?.challenges]);
@@ -42,6 +60,18 @@ export default function DashboardPage() {
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
   const dashboardStyle = findCustomizationOption(dashboard?.user.customization?.dashboardStyleId, "dashboardStyle")?.previewClass;
+
+  if (redirectTo || sponsorAccount) {
+    return (
+      <AppShell>
+        <Card className="mt-12 p-8 text-center">
+          <h1 className="text-3xl font-black text-[var(--gold-2)]">Opening Brand Command Center</h1>
+          <p className="mt-3 text-slate-300">Sponsor accounts use the dedicated sponsor experience.</p>
+          <LinkButton href={redirectTo || "/sponsor/onboarding"} className="mt-6">Continue</LinkButton>
+        </Card>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

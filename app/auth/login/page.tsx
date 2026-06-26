@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
+import { fetchBootstrapProfile } from "@/lib/api/services";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { loginWithEmail } from "@/lib/firebase/auth-service";
 
 export default function LoginPage() {
@@ -14,6 +16,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  async function routeAfterLogin() {
+    const profile = await fetchBootstrapProfile();
+    if (!profile.ok || !profile.data?.user) {
+      throw new Error(profile.message || "Profile could not be loaded.");
+    }
+    router.push(getDefaultRouteForAccount(profile.data.user));
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,7 +44,7 @@ export default function LoginPage() {
         router.push("/auth/verify-email");
         return;
       }
-      router.push("/dashboard");
+      await routeAfterLogin();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not sign in.");
       setLoading(false);

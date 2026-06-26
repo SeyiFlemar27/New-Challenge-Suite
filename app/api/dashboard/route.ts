@@ -2,6 +2,9 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { sanitizeCustomization } from "@/lib/customization/access";
+import { getUserPlanAccess } from "@/lib/plan-access";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
+import { buildGlobalLeaderboard } from "@/lib/server/leaderboard";
 
 type DashboardQueryName =
   | "user"
@@ -10,8 +13,7 @@ type DashboardQueryName =
   | "challenges"
   | "submissions"
   | "notifications"
-  | "badges"
-  | "leaderboard";
+  | "badges";
 
 type DashboardQueryError = Error & {
   queryName?: DashboardQueryName;
@@ -37,8 +39,7 @@ const DASHBOARD_QUERY_DESCRIPTIONS: Record<DashboardQueryName, string> = {
   challenges: "challenges orderBy createdAt desc limit 24",
   submissions: "submissions where userId == uid limit 50",
   notifications: "notifications where userId == uid orderBy createdAt desc limit 8",
-  badges: "badges where userId == uid limit 12",
-  leaderboard: "leaderboards/global"
+  badges: "badges where userId == uid limit 12"
 };
 
 async function runDashboardQuery<T>(queryName: DashboardQueryName, query: Promise<T>) {
@@ -83,6 +84,50 @@ function dashboardErrorDetails(error: unknown) {
   };
 }
 
+function emptyDashboardPayload(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, any>, profile: Record<string, any>, redirectTo?: string) {
+  const planAccess = getUserPlanAccess({ ...profile, ...account });
+  const customization = sanitizeCustomization((profile?.customization ?? account?.customization) as any);
+  return {
+    redirectTo,
+    user: {
+      uid: user.uid,
+      email: user.email ?? account?.email ?? profile?.email ?? "",
+      displayName: profile?.displayName ?? account?.displayName ?? user.email ?? "",
+      initials: profile?.initials ?? "",
+      role: account?.role ?? profile?.role ?? null,
+      accountType: account?.accountType ?? profile?.accountType ?? planAccess.accountType,
+      dashboardType: account?.dashboardType ?? profile?.dashboardType ?? `${planAccess.accountType}_dashboard`,
+      planId: planAccess.normalizedPlanId,
+      legacyPlanId: planAccess.planId,
+      planName: planAccess.planName,
+      planStatus: planAccess.planStatus,
+      premium: planAccess.isPremium,
+      isPremium: planAccess.isPremium,
+      isSponsor: planAccess.isSponsor,
+      sponsorOnboardingStatus: account?.sponsorOnboardingStatus ?? profile?.sponsorOnboardingStatus ?? null,
+      sponsorOnboardingComplete: Boolean(account?.sponsorOnboardingComplete || profile?.sponsorOnboardingComplete || account?.brandProfileComplete || profile?.brandProfileComplete),
+      hasSponsorProfile: Boolean(account?.hasSponsorProfile || profile?.hasSponsorProfile),
+      sponsorVerificationStatus: account?.sponsorVerificationStatus ?? profile?.sponsorVerificationStatus ?? null,
+      verified: Boolean(profile?.verified ?? user.emailVerified),
+      totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
+      doroBalance: 0,
+      customization
+    },
+    stats: {
+      activeChallenges: 0,
+      totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
+      badgeCount: 0,
+      submissionCount: 0
+    },
+    challenges: [],
+    submissions: [],
+    wallet: null,
+    badges: [],
+    leaderboard: [],
+    notifications: []
+  };
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -90,26 +135,35 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Dashboard");
 
   try {
-    const [userSnap, profileSnap, walletSnap, challengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap] = await Promise.all([
+    const [userSnap, profileSnap] = await Promise.all([
       runDashboardQuery("user", db.collection("users").doc(user.uid).get()),
-      runDashboardQuery("profile", db.collection("profiles").doc(user.uid).get()),
+      runDashboardQuery("profile", db.collection("profiles").doc(user.uid).get())
+    ]);
+
+    const account = userSnap.exists ? userSnap.data() ?? {} : {};
+    const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
+    const planAccess = getUserPlanAccess({ ...profile, ...account });
+
+    if (planAccess.accountType === "sponsor") {
+      const redirectTo = getDefaultRouteForAccount({ ...profile, ...account, accountType: "sponsor" });
+      return ok(emptyDashboardPayload(user, account, profile, redirectTo), "Sponsor accounts use the Brand Command Center.");
+    }
+
+    const [walletSnap, challengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardResult] = await Promise.all([
       runDashboardQuery("wallet", db.collection("doroCoinWallets").doc(user.uid).get()),
       runDashboardQuery("challenges", db.collection("challenges").orderBy("createdAt", "desc").limit(24).get()),
       runDashboardQuery("submissions", db.collection("submissions").where("userId", "==", user.uid).limit(50).get()),
       runDashboardQuery("notifications", db.collection("notifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(8).get()),
       runDashboardQuery("badges", db.collection("badges").where("userId", "==", user.uid).limit(12).get()),
-      runDashboardQuery("leaderboard", db.collection("leaderboards").doc("global").get())
+      buildGlobalLeaderboard(db, 10)
     ]);
 
-    const account = userSnap.exists ? userSnap.data() : {};
-    const profile = profileSnap.exists ? profileSnap.data() : {};
     const wallet = walletSnap.exists ? walletSnap.data() : {};
     const challenges: Array<Record<string, unknown>> = challengesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const submissions = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const notifications = notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const leaderboardData = leaderboardSnap.exists ? leaderboardSnap.data() : {};
-    const leaderboardEntries = Array.isArray(leaderboardData?.entries) ? leaderboardData.entries : [];
+    const leaderboardEntries = leaderboardResult.entries;
     const customization = sanitizeCustomization((profile?.customization ?? account?.customization) as any);
 
     return ok({
@@ -119,8 +173,15 @@ export async function GET(request: Request) {
         displayName: profile?.displayName ?? account?.displayName ?? user.email ?? "",
         initials: profile?.initials ?? "",
         role: account?.role ?? profile?.role ?? null,
-        planId: account?.planId ?? "observer",
-        premium: Boolean(profile?.premium || (account?.planId && account.planId !== "observer")),
+        accountType: account?.accountType ?? profile?.accountType ?? planAccess.accountType,
+        dashboardType: account?.dashboardType ?? profile?.dashboardType ?? "user_dashboard",
+        planId: planAccess.normalizedPlanId,
+        legacyPlanId: planAccess.planId,
+        planName: planAccess.planName,
+        planStatus: planAccess.planStatus,
+        premium: planAccess.isPremium,
+        isPremium: planAccess.isPremium,
+        isSponsor: planAccess.isSponsor,
         verified: Boolean(profile?.verified ?? user.emailVerified),
         totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
         doroBalance: Number(wallet?.balance ?? 0),

@@ -1,59 +1,199 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { canAccessChallenge } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
+import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
-import { ok, serverUnavailable, fail, readJson, validationError } from "@/lib/server/responses";
+import { ok, serverUnavailable, fail, readJson, validationError, conflict, serverError } from "@/lib/server/responses";
+import {
+  isChallengeSubmittable,
+  isSponsorProfile,
+  resolveParticipantStatus,
+  resolveSubmissionStatus
+} from "@/lib/server/submission-lifecycle";
+import { submissionCreateSchema, zodFieldErrors } from "@/lib/server/submission-validation";
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "?");
+}
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Submission creation");
+
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const body = parsed.body;
-  const fieldErrors: Record<string, string> = {};
-  if (!body?.challengeId) fieldErrors.challengeId = "Challenge ID is required.";
-  if (!body?.title) fieldErrors.title = "Title is required.";
-  const mediaUploadPending = body?.mediaUploadPending === true;
-  if (!body?.mediaUrl && !mediaUploadPending) fieldErrors.mediaUrl = "Media URL is required.";
-  if (body?.mediaType && !["image", "video"].includes(body.mediaType)) fieldErrors.mediaType = "Media type must be image or video.";
-  if (Object.keys(fieldErrors).length) return validationError(fieldErrors);
+  const parsedSubmission = submissionCreateSchema.safeParse(parsed.body ?? {});
+  if (!parsedSubmission.success) return validationError(zodFieldErrors(parsedSubmission.error));
+  const body = parsedSubmission.data;
+
+  const [accountSnap, profileSnap] = await Promise.all([
+    db.collection("users").doc(user.uid).get(),
+    db.collection("profiles").doc(user.uid).get()
+  ]);
+  const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) } as Record<string, unknown>;
+  if (isSponsorProfile(profile)) {
+    return fail("Sponsor accounts use sponsor tools and cannot submit entries into normal user challenges.", 403, undefined, "SPONSOR_ACCOUNT_BLOCKED");
+  }
 
   const challengeSnap = await db.collection("challenges").doc(body.challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
-  const challenge = challengeSnap.data() ?? {};
-  const mediaType = body.mediaType ?? "image";
-  const acceptedTypes = Array.isArray(challenge.acceptedSubmissionTypes) ? challenge.acceptedSubmissionTypes : ["image"];
-  if (!acceptedTypes.includes(mediaType)) {
+  const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  const access = canAccessChallenge(profile, challenge);
+  if (!access.allowed) {
+    return fail("Your current plan does not allow access to this challenge.", 403, undefined, access.code ?? "CHALLENGE_ACCESS_DENIED");
+  }
+  const submittable = isChallengeSubmittable(challenge);
+  if (!submittable.allowed) {
+    return fail(submittable.reason ?? "Challenge is not accepting submissions.", 409, undefined, "CHALLENGE_NOT_SUBMITTABLE");
+  }
+
+  const acceptedTypes = Array.isArray(challenge.acceptedSubmissionTypes) ? challenge.acceptedSubmissionTypes.map(String) : ["image"];
+  if (!acceptedTypes.includes(body.mediaType)) {
     return validationError({ mediaType: `This challenge accepts: ${acceptedTypes.join(", ")}.` });
   }
 
   const now = new Date().toISOString();
-  const ref = db.collection("submissions").doc();
-  const submission = {
-    id: ref.id,
-    challengeId: body.challengeId,
+  const allowMultipleEntries = challenge.allowMultipleEntries === true;
+  const submissionRef = allowMultipleEntries ? db.collection("submissions").doc() : db.collection("submissions").doc(`${body.challengeId}_${user.uid}`);
+  const participantRef = db.collection("challengeParticipants").doc(`${body.challengeId}_${user.uid}`);
+  const displayName = String(profile.displayName ?? profile.fullName ?? user.email ?? "Participant");
+  const userInitials = String(profile.initials ?? initialsFromName(displayName)).slice(0, 2).toUpperCase();
+  const status = resolveSubmissionStatus(challenge, body.mediaUploadPending);
+  const participantStatus = resolveParticipantStatus(challenge);
+  const duplicateBlockingStatuses = new Set(["draft", "submitted", "pending_review", "approved", "flagged", "active", "eliminated", "winner"]);
+
+  let submission: Record<string, unknown> = {};
+  let submissionCreated = false;
+  let participantWasCreated = false;
+  try {
+    await db.runTransaction(async (transaction) => {
+      const userSubmissionsQuery = db.collection("submissions").where("userId", "==", user.uid).limit(100);
+      const [freshChallengeSnap, participantSnap, directSubmissionSnap, userSubmissionsSnap] = await Promise.all([
+        transaction.get(db.collection("challenges").doc(body.challengeId)),
+        transaction.get(participantRef),
+        transaction.get(submissionRef),
+        transaction.get(userSubmissionsQuery)
+      ]);
+      if (!freshChallengeSnap.exists) throw new Error("Challenge not found.");
+      const freshChallenge = { id: freshChallengeSnap.id, ...freshChallengeSnap.data() } as Record<string, unknown>;
+      const freshSubmittable = isChallengeSubmittable(freshChallenge);
+      if (!freshSubmittable.allowed) throw new Error(freshSubmittable.reason ?? "Challenge is not accepting submissions.");
+
+      if (!allowMultipleEntries) {
+        if (directSubmissionSnap.exists) throw new Error("You have already submitted an entry for this challenge.");
+        const existing = userSubmissionsSnap.docs.find((doc) => {
+          const entry = doc.data();
+          return entry.challengeId === body.challengeId && duplicateBlockingStatuses.has(String(entry.status ?? ""));
+        });
+        if (existing) throw new Error("You have already submitted an entry for this challenge.");
+      }
+
+      const participantData = participantSnap.exists ? participantSnap.data() ?? {} : null;
+      participantWasCreated = !participantData;
+      if (!participantData) {
+        transaction.set(participantRef, {
+          id: participantRef.id,
+          challengeId: body.challengeId,
+          userId: user.uid,
+          status: participantStatus,
+          registeredAt: now,
+          joinedAt: now,
+          entryAgreementAccepted: true,
+          entryAgreementAcceptedAt: now,
+          paidEntryEnabled: false,
+          entryFeeCents: 0,
+          planId: profile.planId ?? "free",
+          accountType: profile.accountType ?? "user",
+          createdAt: now,
+          updatedAt: now
+        });
+      } else {
+        transaction.set(participantRef, {
+          entryAgreementAccepted: true,
+          entryAgreementAcceptedAt: participantData.entryAgreementAcceptedAt ?? now,
+          updatedAt: now
+        }, { merge: true });
+      }
+
+      submission = {
+        id: submissionRef.id,
+        challengeId: body.challengeId,
+        participantId: participantRef.id,
+        userId: user.uid,
+        title: body.title,
+        description: body.description || body.caption || "",
+        caption: body.caption || body.description || "",
+        mediaUrl: body.mediaUrl ?? "",
+        mediaType: body.mediaType,
+        status,
+        mediaUploadPending: body.mediaUploadPending,
+        originalFileName: body.originalFileName ?? "",
+        fileSize: Number(body.fileSize ?? 0),
+        voteCount: 0,
+        weightedVoteCount: 0,
+        challengeTitle: String(freshChallenge.title ?? "Untitled Challenge"),
+        challengeCategory: String(freshChallenge.category ?? "General"),
+        userDisplayName: displayName,
+        userName: displayName,
+        userInitials,
+        userPlanId: profile.planId ?? "free",
+        entryAgreementAccepted: true,
+        entryAgreementAcceptedAt: now,
+        rulesAccepted: true,
+        paidEntryEnabled: false,
+        entryFeeCents: 0,
+        visibility: "public",
+        submittedAt: now,
+        reviewedAt: null,
+        reviewedBy: null,
+        rejectionReason: null,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      submissionCreated = true;
+      transaction.set(submissionRef, submission);
+      transaction.set(participantRef, {
+        submissionId: submissionRef.id,
+        lastSubmissionId: submissionRef.id,
+        status: participantData?.status ?? participantStatus,
+        updatedAt: now
+      }, { merge: true });
+      transaction.set(db.collection("challenges").doc(body.challengeId), {
+        submissionCount: Number(freshChallenge.submissionCount ?? 0) + 1,
+        participantCount: Number(freshChallenge.participantCount ?? 0) + (participantWasCreated ? 1 : 0),
+        updatedAt: now
+      }, { merge: true });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Submission could not be created.";
+    if (message.includes("already submitted")) return conflict(message);
+    return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "SUBMISSION_REJECTED");
+  }
+
+  if (!submissionCreated) return serverError("Submission could not be created.");
+
+  void writeAuditLog({
+    actorId: user.uid,
+    actorType: "user",
+    action: "submission.created",
+    targetType: "submission",
+    targetId: String(submission.id),
+    after: submission,
+    metadata: { challengeId: body.challengeId, status, participantWasCreated }
+  }, db).catch((error) => console.warn("[audit] submission create audit failed", { challengeId: body.challengeId, userId: user.uid, error: error instanceof Error ? error.message : "unknown" }));
+
+  await createNotification(db, {
     userId: user.uid,
-    title: body.title,
-    description: body.description ?? "",
-    caption: body.caption ?? "",
-    mediaUrl: body.mediaUrl ?? "",
-    mediaType,
-    status: mediaUploadPending ? "media_upload_pending" : "pending_approval",
-    mediaUploadPending,
-    originalFileName: body.originalFileName ?? "",
-    fileSize: Number(body.fileSize ?? 0),
-    voteCount: 0,
-    weightedVoteCount: 0,
-    createdAt: now,
-    updatedAt: now
-  };
-  await db.runTransaction(async (transaction) => {
-    transaction.set(ref, submission);
-    const challengeRef = db.collection("challenges").doc(body.challengeId);
-    const freshChallengeSnap = await transaction.get(challengeRef);
-    transaction.set(challengeRef, { submissionCount: Number(freshChallengeSnap.data()?.submissionCount ?? 0) + 1, updatedAt: now }, { merge: true });
+    type: "submission_uploaded",
+    title: body.mediaUploadPending ? "Submission received" : "Submission uploaded",
+    body: status === "pending_review" ? "Your submission is pending review." : status === "submitted" ? "Your submission metadata was saved and media upload is pending." : "Your submission is live.",
+    targetId: String(submission.id)
   });
-  await createNotification(db, { userId: user.uid, type: "submission_uploaded", title: mediaUploadPending ? "Submission received" : "Submission uploaded", body: mediaUploadPending ? "Your submission metadata was saved and media upload is pending." : "Your submission is pending approval.", targetId: ref.id });
-  return ok({ submission }, mediaUploadPending ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded and pending approval.");
+  return ok({ submission }, status === "pending_review" ? "Submission uploaded and pending review." : status === "submitted" ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded successfully.");
 }
+
+

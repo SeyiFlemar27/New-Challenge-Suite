@@ -76,6 +76,7 @@ export default function ChallengeDetailPage() {
   const joinOpen = canJoinChallenge(challenge);
   const votingOpen = canVoteOnChallenge(challenge);
   const userState = details?.userState;
+  const leaderboard = (details as { leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; entries?: unknown[] } } | null)?.leaderboard;
   const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
   const sponsorships = details?.sponsorships ?? [];
   const sponsored = sponsorships.length > 0;
@@ -120,12 +121,13 @@ export default function ChallengeDetailPage() {
 
           <section className="mt-12">
             <h2 className="text-2xl font-black">Community Submissions</h2>
+            {leaderboard?.message ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-5 text-[var(--gold)]">{leaderboard.message}</Card> : null}
             {challengeSubmissions.length ? (
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 {challengeSubmissions.map((entry, index) => <SubmissionVoteCard key={entry.id} rank={index + 1} submission={entry} votingOpen={votingOpen} />)}
               </div>
             ) : (
-              <p className="mt-6 text-slate-400">No submissions yet. Join and upload an accepted media file to become the first entry.</p>
+              <p className="mt-6 text-slate-400">{leaderboard?.message ? "Rankings are not public right now." : "No eligible submissions yet. Join and upload an accepted media file to become the first entry."}</p>
             )}
           </section>
 
@@ -199,3 +201,4 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+

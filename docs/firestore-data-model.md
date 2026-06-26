@@ -1,4 +1,4 @@
-# Challenge Suite Firestore Data Model Contract
+﻿# Challenge Suite Firestore Data Model Contract
 
 This document is the production backend contract for Challenge Suite. The app keeps the current backend architecture: Next.js App Router API routes, Firebase Auth, Firestore, Firebase Storage, and Stripe. No ORM is used.
 
@@ -11,10 +11,141 @@ This document is the production backend contract for Challenge Suite. The app ke
 - Status fields must use the enums below. Do not invent new statuses in routes without updating this contract.
 - Monetary values should be stored in integer cents where possible. DoroCoin values are integer coin counts.
 
+
+## Phase 1 Account, Plan, Sponsor, and Review Foundations
+
+Phase 1 keeps the current Next.js/Firebase/Stripe backend architecture and adds normalized account routing foundations without building admin UI.
+
+### Account Types
+
+Canonical account types:
+
+```ts
+type AccountType = "user" | "sponsor" | "admin";
+type DashboardType = "user_dashboard" | "sponsor_dashboard";
+```
+
+- `user` covers normal users, creators, Pro users, Hosts, and Enterprise users.
+- `sponsor` uses the separate `/sponsor/*` experience and must not render the normal user dashboard.
+- `admin` is a backend/status foundation only in this website phase. Do not create `/admin/*` UI here.
+
+### Normalized Plan IDs
+
+User plans:
+
+```ts
+type UserProductPlanId = "free" | "creator" | "pro" | "host" | "enterprise";
+```
+
+Sponsor plans:
+
+```ts
+type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterprise_partner";
+```
+
+Legacy aliases may be accepted internally while data is migrated:
+
+| Legacy ID | Normalized ID |
+| --- | --- |
+| `observer` | `free` |
+| `premium` | `pro` |
+| `competitor` | `pro` |
+| `creator_pro` | `creator` |
+| `verified_host` | `host` |
+| `executive_host` | `host` |
+| `chief_producer` | `enterprise` |
+| `enterprise_sponsor` | `enterprise_partner` |
+
+UI should display only blueprint names: Free, Creator, Pro, Host, Enterprise, Sponsor Starter, Brand Partner, and Enterprise Partner.
+
+### Sponsor Profile Foundation
+
+Sponsor accounts store account status on `users/{uid}` and `profiles/{uid}`, and brand details in `sponsorProfiles/{uid}`.
+
+Required sponsor status fields:
+
+```json
+{
+  "accountType": "sponsor",
+  "dashboardType": "sponsor_dashboard",
+  "planId": "brand_partner",
+  "legacyPlanId": "premium",
+  "sponsorOnboardingStatus": "complete",
+  "hasSponsorProfile": true,
+  "sponsorVerificationStatus": "pending_review",
+  "brandName": "Goldline Labs",
+  "brandSlug": "goldline-labs",
+  "brandProfileCompletedAt": "2026-06-25T10:00:00.000Z",
+  "updatedAt": "2026-06-25T10:00:00.000Z"
+}
+```
+
+`sponsorProfiles/{uid}` should include `brandName`, `industry`, `website`, `countryLocation`, `brandDescription`, `socialLinks`, `contactPerson`, `businessEmail`, `logoUrl`, `bannerUrl`, `ctaButtonText`, `ctaDestinationLink`, `sponsorshipGoals`, `preferredChallengeCategories`, `sponsorOnboardingStatus`, `hasSponsorProfile`, `sponsorVerificationStatus`, `brandProfileCompletedAt`, `createdAt`, and `updatedAt`.
+
+Sponsor onboarding statuses:
+
+```ts
+type SponsorOnboardingStatus = "not_started" | "in_progress" | "complete";
+type SponsorVerificationStatus = "not_submitted" | "pending_review" | "verified" | "rejected";
+```
+
+### Admin-Review Status Foundations
+
+Admin review is represented through status fields and immutable audit logs only. The public website must not include an admin UI in this phase.
+
+Foundation statuses that may exist before admin UI is built:
+
+```ts
+type ReviewStatus = "not_submitted" | "pending_review" | "approved" | "rejected" | "needs_more_info";
+type PayoutStatus = "not_applicable" | "pending_review" | "approved" | "rejected" | "paid" | "failed";
+type RefundStatus = "not_applicable" | "pending_review" | "approved" | "rejected" | "processed" | "failed";
+type DisputeStatus = "open" | "reviewing" | "resolved" | "dismissed";
+type KycStatus = "not_started" | "pending_review" | "verified" | "rejected" | "expired";
+```
+
+### Audit Log Shape
+
+Sensitive backend actions should use `lib/server/audit.ts` and append immutable documents to `auditLogs`.
+
+```json
+{
+  "id": "audit_log_id",
+  "actorId": "firebase_uid_or_system",
+  "actorType": "creator",
+  "action": "challenge.updated",
+  "targetType": "challenge",
+  "targetId": "challenge_id",
+  "before": { "status": "draft" },
+  "after": { "status": "pending_review" },
+  "reason": "Creator submitted challenge for review",
+  "metadata": { "source": "api" },
+  "createdAt": "2026-06-25T10:00:00.000Z"
+}
+```
+
+Audit-worthy events include account updates, plan changes, sponsor onboarding updates, challenge creation/update, submission approval/rejection, vote activity, leaderboard locking, winner selection/review, prize pool status changes, payout status changes, refund status changes, dispute/report status changes, and verification/KYC status changes.
+
+### Money Systems Locked For Now
+
+The following systems are intentionally status-only foundations in this website phase:
+
+- real cash payouts
+- automatic refunds
+- sponsor money release
+- paid-entry prize pools
+- KYC document processing
+- full sponsor marketplace/campaign logic
+
+Challenges must not require paid entry. Sponsor-funded prize pool and product-prize structures may be represented by statuses and metadata, but no automatic release or payout behavior is active.
+
 ## Status Enums
 
 ```ts
 type AppRole = "user" | "creator" | "sponsor";
+type AccountType = "user" | "sponsor" | "admin";
+type DashboardType = "user_dashboard" | "sponsor_dashboard";
+type UserProductPlanId = "free" | "creator" | "pro" | "host" | "enterprise";
+type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterprise_partner";
 type VerificationStatus = "unverified" | "pending" | "verified" | "rejected";
 type ChallengeStatus = "draft" | "pending_review" | "published" | "registration_open" | "active" | "voting" | "completed" | "cancelled" | "rejected";
 type RoundStatus = "scheduled" | "active" | "completed" | "cancelled";
@@ -874,3 +1005,5 @@ Current indexes cover free-vote enforcement, notifications by user, and old Doro
 3. Add shared TypeScript document types and Zod validators for each write route.
 4. Update existing APIs to write required fields and reject missing/inconsistent data.
 5. Add missing APIs for rounds, packages, legal versions, reports, audit logs, live events, moderation, and notification read state.
+
+

@@ -93,7 +93,9 @@ export default function SubmissionPage() {
   }
 
   const status = String((details?.submission as Record<string, unknown> | undefined)?.status ?? "approved");
-  const unavailableStatus = ["pending_approval", "rejected", "removed", "private", "withdrawn"].includes(status);
+  const votableSubmissionStatuses = ["active", "approved", "winner"];
+  const unavailableStatus = ["draft", "submitted", "pending_review", "pending_approval", "rejected", "flagged", "removed", "private", "eliminated", "disqualified", "withdrawn"].includes(status);
+  const canReceiveVotes = votableSubmissionStatuses.includes(status);
   const creatorName = creator.displayName ?? submission.userName;
   const creatorInitials = creator.initials ?? submission.userInitials;
   const creatorPlan = creator.planId ?? submission.userPlanId;
@@ -107,7 +109,7 @@ export default function SubmissionPage() {
         </div>
         <aside>
           <h1 className="text-4xl font-black md:text-5xl">{submission.title}</h1>
-          {unavailableStatus ? <p className="mt-4 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 p-4 text-lg font-bold text-[var(--gold)]">Status: {status.replace("_", " ")}</p> : null}
+          {unavailableStatus ? <p className="mt-4 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 p-4 text-lg font-bold text-[var(--gold)]">Status: {status.replaceAll("_", " ")}. This entry is not available for voting yet.</p> : null}
           {submission.isWinner ? <p className="mt-4 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 p-4 text-lg font-bold text-[var(--gold)]">Winner of {submission.challengeTitle}</p> : null}
           <div className="mt-6 inline-flex rounded-full bg-indigo-950/70 px-5 py-3 font-bold text-indigo-200">{submission.challengeTitle} - {submission.challengeCategory}</div>
           <div className="mt-4 rounded-[8px] border border-white/10 bg-black/30 p-4">
@@ -117,7 +119,7 @@ export default function SubmissionPage() {
           <p className="mt-10 text-xl">{submission.description}</p>
           <Card className="mt-8 p-7"><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600">{creatorInitials}</div><div><div className="flex items-center gap-2 text-xl font-black">@{creatorName}<PremiumBadge planId={creatorPlan} /></div><div className="text-slate-400">{submission.createdAt}</div></div></div></Card>
           <div className="mt-8 grid grid-cols-2 gap-5">
-            {votingOpen && !unavailableStatus ? <ConsentDialog agreementType="paid_voting" targetId={submission.id} actionLabel={`Vote ${submission.likes}`} onAccepted={() => voteMutation.mutate()} /> : <Button disabled>Voting Closed</Button>}
+            {votingOpen && canReceiveVotes ? <ConsentDialog agreementType="paid_voting" targetId={submission.id} actionLabel={`Vote ${submission.likes}`} onAccepted={() => voteMutation.mutate()} /> : <Button disabled>{canReceiveVotes ? "Voting Closed" : "Voting Unavailable"}</Button>}
             <Button variant="ghost" onClick={() => setSaved((value) => !value)}><Star size={18} /> {saved ? "Saved" : "Save"}</Button>
           </div>
           {voteMessage ? <p className="mt-4 rounded-[8px] bg-black/30 p-3 text-slate-300">{voteMessage}</p> : null}
@@ -133,3 +135,4 @@ export default function SubmissionPage() {
     </AppShell>
   );
 }
+
