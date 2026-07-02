@@ -39,6 +39,7 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
    - `NEXT_PUBLIC_FIREBASE_APP_ID`
 3. Create a Firebase Admin service account key from Firebase Console > Project settings > Service accounts > Generate new private key. Add these values from the downloaded JSON:
+   - `FIREBASE_PROJECT_ID` from `project_id`
    - `FIREBASE_CLIENT_EMAIL` from `client_email`
    - `FIREBASE_PRIVATE_KEY` from `private_key`
    - `FIREBASE_STORAGE_BUCKET` from Firebase Console > Storage, using the exact bucket name without `gs://`

@@ -51,6 +51,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 3. Add these values to `.env.local`:
 
 ```bash
+FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```

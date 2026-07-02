@@ -27,6 +27,7 @@ export async function GET(request: Request) {
       details: {
         missing: config.missing,
         projectId: config.projectId ?? null,
+        projectIdSource: config.projectIdSource,
         storageBucket: config.storageBucket ?? null,
         publicStorageBucket: config.publicStorageBucket ?? null,
         storageBucketSource: config.storageBucketSource
