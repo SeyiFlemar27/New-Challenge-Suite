@@ -19,7 +19,7 @@ export const plans: SubscriptionPlan[] = [
   {
     id: "observer",
     name: "Observer",
-    audience: "creator",
+    audience: "user",
     subtitle: "Free Tier",
     priceMonthly: 0,
     stripePriceEnv: "",
@@ -33,7 +33,7 @@ export const plans: SubscriptionPlan[] = [
   {
     id: "creator",
     name: "Creator",
-    audience: "creator",
+    audience: "user",
     subtitle: "For active users",
     priceMonthly: 24.99,
     stripePriceEnv: "STRIPE_PRICE_CREATOR",
@@ -46,7 +46,7 @@ export const plans: SubscriptionPlan[] = [
   {
     id: "competitor",
     name: "Competitor",
-    audience: "creator",
+    audience: "user",
     subtitle: "Serious creators",
     priceMonthly: 59.99,
     stripePriceEnv: "STRIPE_PRICE_COMPETITOR",
@@ -60,7 +60,7 @@ export const plans: SubscriptionPlan[] = [
   {
     id: "executive_host",
     name: "Executive Host",
-    audience: "creator",
+    audience: "user",
     subtitle: "Event organizers",
     priceMonthly: 119,
     stripePriceEnv: "STRIPE_PRICE_EXECUTIVE_HOST",
@@ -73,7 +73,7 @@ export const plans: SubscriptionPlan[] = [
   {
     id: "chief_producer",
     name: "Chief Producer",
-    audience: "creator",
+    audience: "user",
     subtitle: "Culture architect",
     priceMonthly: 249,
     stripePriceEnv: "STRIPE_PRICE_CHIEF_PRODUCER",

@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { getSubscriptionPlansForUser } from "@/lib/server/subscriptions";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { normalizeAccountType, normalizePlanId } from "@/lib/plan-access";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,14 @@ export async function GET(request: Request) {
     ]);
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
-    const currentPlanId = account.planId ?? profile.planId ?? "observer";
+    const currentPlanId = normalizePlanId(account.planId ?? profile.planId ?? "free");
+    const accountType = normalizeAccountType({ ...profile, ...account, planId: currentPlanId });
 
     return ok({
       currentPlanId,
+      accountType,
       subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free",
-      plans: getSubscriptionPlansForUser(currentPlanId)
+      plans: getSubscriptionPlansForUser(currentPlanId, accountType)
     }, "Subscription plans loaded.");
   } catch (error) {
     return serverError("Subscription plans could not be loaded.", error instanceof Error ? error.message : error);

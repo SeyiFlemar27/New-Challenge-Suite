@@ -10,7 +10,7 @@ import { createSubscriptionCheckout, fetchSubscriptionPlans } from "@/lib/api/se
 import type { SubscriptionPlan } from "@/lib/types";
 
 export default function SubscriptionsPage() {
-  const [audience, setAudience] = useState<"creator" | "sponsor">("creator");
+  const [audience, setAudience] = useState<"user" | "sponsor">("user");
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,7 @@ export default function SubscriptionsPage() {
       return;
     }
     setPlans(result.data.plans);
+    setAudience(result.data.accountType === "sponsor" ? "sponsor" : "user");
     setLoading(false);
   }
 
@@ -68,7 +69,7 @@ export default function SubscriptionsPage() {
         <PageTitle title="Choose Your Plan" subtitle="Blueprint-aligned access for competitors, creators, hosts, enterprises, and sponsors." />
       </div>
       <div className="mx-auto mt-8 flex w-full max-w-[620px] rounded-full bg-[#111] p-2">
-        <Button variant={audience === "creator" ? "purple" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("creator")}>Users, Creators & Hosts</Button>
+        <Button variant={audience === "user" ? "purple" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("user")}>Users, Creators & Hosts</Button>
         <Button variant={audience === "sponsor" ? "purple" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("sponsor")}>Sponsors & Brands</Button>
       </div>
       <Card className="mx-auto mt-6 max-w-4xl border-yellow-500/20 bg-yellow-500/5 p-4 text-center text-sm leading-6 text-slate-300">
@@ -98,14 +99,14 @@ export default function SubscriptionsPage() {
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-purple-950 text-purple-200">{plan.audience === "sponsor" ? <Handshake size={34} /> : plan.id === "free" ? <Eye size={34} /> : plan.id === "host" || plan.id === "enterprise" ? <Radio size={34} /> : <Swords size={34} />}</div>
             <h2 className="mt-8 text-center text-3xl font-black">{plan.name}</h2>
             <p className="mt-4 text-center text-slate-300">{plan.subtitle}</p>
-            <div className="mt-6 text-center text-4xl font-black">{plan.priceMonthly > 0 ? money(plan.priceMonthly) : plan.id === "enterprise" ? "Custom" : money(0)}{plan.priceMonthly > 0 ? <span className="text-base font-normal">/month</span> : null}</div>
+            <div className="mt-6 text-center text-4xl font-black">{plan.priceMonthlyLabel ?? (plan.priceMonthly !== null ? money(plan.priceMonthly) : "Pricing pending")}</div>
             {plan.audience === "sponsor" ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-center text-xs font-bold text-slate-300">Sponsor tools only. Campaign budget is separate.</p> : null}
             {plan.id === "free" ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-center text-xs font-bold text-slate-300">1 free vote per challenge/day.</p> : null}
             <div className="my-8 border-t border-white/10" />
             <ul className="space-y-4">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm"><Check size={16} className="shrink-0 text-emerald-400" /> {feature}</li>)}</ul>
             {plan.canCreatePrizeChallenges ? <p className="mt-5 flex gap-2 rounded-[8px] bg-yellow-500/5 p-3 text-xs text-slate-300"><ShieldCheck size={15} className="shrink-0 text-[var(--gold)]" /> Sponsor-funded prize tooling only. Paid-entry prize pools are disabled.</p> : null}
             <div className="mt-8">
-              {plan.current ? <Button variant="ghost" className="w-full" disabled>Current Plan</Button> : plan.priceMonthly <= 0 ? <Button variant="ghost" className="w-full" disabled>{plan.id === "enterprise" ? "Contact Sales Later" : "Free Plan"}</Button> : plan.audience === "sponsor" ? <ConsentDialog agreementType="sponsor" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Sponsor Plan"} onAccepted={() => checkout(plan.id)} /> : <ConsentDialog agreementType="dorocoin" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Plan"} onAccepted={() => checkout(plan.id)} />}
+              {plan.current ? <Button variant="ghost" className="w-full" disabled>Current Plan</Button> : plan.id === "free" ? <Button variant="ghost" className="w-full" disabled>Free Plan</Button> : !plan.purchaseAllowed ? <Button variant="ghost" className="w-full" disabled>Not Available for This Account</Button> : !plan.checkoutAvailable ? <Button variant="ghost" className="w-full" disabled>Stripe Price Not Configured</Button> : plan.audience === "sponsor" ? <ConsentDialog agreementType="sponsor" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Sponsor Plan"} onAccepted={() => checkout(plan.id)} /> : <ConsentDialog agreementType="dorocoin" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Plan"} onAccepted={() => checkout(plan.id)} />}
             </div>
           </Card>
         ))}

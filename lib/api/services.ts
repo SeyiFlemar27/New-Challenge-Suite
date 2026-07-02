@@ -167,6 +167,7 @@ export function fetchMyProfile() {
 export function fetchSubscriptionPlans() {
   return apiRequest<{
     currentPlanId: string;
+    accountType: "user" | "sponsor";
     subscriptionStatus: string;
     plans: SubscriptionPlan[];
   }>("/api/subscriptions");

@@ -40,11 +40,16 @@ export interface UserProfile {
 export interface SubscriptionPlan {
   id: UserPlanId;
   name: string;
-  audience: "creator" | "sponsor";
+  audience: "user" | "sponsor";
   subtitle: string;
-  priceMonthly: number;
+  priceMonthly: number | null;
+  priceMonthlyLabel?: string;
+  priceYearlyLabel?: string | null;
   stripePriceEnv: string;
   legacyStripePriceEnvs?: string[];
+  stripeConfigured?: boolean;
+  checkoutAvailable?: boolean;
+  purchaseAllowed?: boolean;
   features: string[];
   canHostLiveEvents: boolean;
   liveEventCapacity: number;

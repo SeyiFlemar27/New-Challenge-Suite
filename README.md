@@ -63,14 +63,24 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
-   Subscription price IDs can use the legacy names or blueprint aliases:
+   Prefer canonical subscription price variables:
 
    ```env
    STRIPE_PRICE_CREATOR=
+   STRIPE_PRICE_PRO=
+   STRIPE_PRICE_HOST=
+   STRIPE_PRICE_ENTERPRISE=
+   STRIPE_PRICE_SPONSOR_STARTER=
+   STRIPE_PRICE_BRAND_PARTNER=
+   STRIPE_PRICE_ENTERPRISE_PARTNER=
+   ```
+
+   Older deployments may temporarily use these legacy aliases:
+
+   ```env
    STRIPE_PRICE_COMPETITOR=
    STRIPE_PRICE_EXECUTIVE_HOST=
    STRIPE_PRICE_CHIEF_PRODUCER=
-   STRIPE_PRICE_BRAND_PARTNER=
    STRIPE_PRICE_ENTERPRISE_SPONSOR=
    STRIPE_CREATOR_PRICE_ID=
    STRIPE_PRO_PRICE_ID=

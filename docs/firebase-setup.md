@@ -93,3 +93,17 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
 Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout success pages do not activate plans or credit DoroCoins directly; those updates happen only after the verified Stripe webhook is processed.
+
+Create recurring monthly Stripe test prices for the canonical subscription plans and configure:
+
+```bash
+STRIPE_PRICE_CREATOR=
+STRIPE_PRICE_PRO=
+STRIPE_PRICE_HOST=
+STRIPE_PRICE_ENTERPRISE=
+STRIPE_PRICE_SPONSOR_STARTER=
+STRIPE_PRICE_BRAND_PARTNER=
+STRIPE_PRICE_ENTERPRISE_PARTNER=
+```
+
+Legacy price variable names remain read-compatible for older deployments, but new environments should use the canonical names. Sponsor Starter pricing is controlled by its Stripe Price ID and must be configured before checkout becomes available. Never commit Stripe keys or Price IDs containing private account data.
