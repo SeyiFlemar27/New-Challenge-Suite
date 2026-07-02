@@ -1063,3 +1063,14 @@ Blocking financial-review write groups:
 - Winner claim submission blocks on the claim, payout review placeholder, and review-only cash ledger placeholder.
 
 Locked systems remain inactive: real cash payouts, cash withdrawals, automatic refunds, sponsor money release, paid-entry prize pools, KYC processing, payout provider integrations, DoroCoin-to-cash conversion, and admin financial review UI.
+
+## Entitlement And Client Security
+
+- Signup role selection expresses account intent only. New accounts always begin with the canonical `free` plan.
+- A Creator selection stores creator role intent while paid `creator` access still requires a verified Stripe webhook.
+- A Sponsor selection creates sponsor routing and onboarding state while paid sponsor plans still require a verified Stripe webhook.
+- `accountType`, `role`, and `dashboardType` do not grant paid plan entitlement.
+- Firebase Admin API routes own profile, entitlement, subscription, wallet, and financial writes. Firestore client rules deny direct writes to `users` and `profiles`, so profile editing must use the validated profile API.
+- Raw `profiles` documents are owner-readable only. Public APIs must use the server public-profile projection and must not expose email, phone, Stripe identifiers, wallet/cash balances, billing data, KYC data, admin notes, or internal flags.
+- Stripe subscriptions, webhook events, DoroCoin ledgers, cash foundations, prize pools, payouts, refunds, disputes, claims, and audit logs are server-owned and unavailable through the client Firestore SDK.
+- Identity-document Storage uploads remain disabled while KYC processing is inactive.

@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
+import { toPublicProfile } from "@/lib/server/public-profile";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     ]);
 
     const challenge = challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : null;
-    const creator = profileSnap?.exists ? { id: profileSnap.id, ...profileSnap.data() } : null;
+    const creator = profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null;
     const participant = participantSnap?.exists ? { id: participantSnap.id, ...participantSnap.data() } : null;
     const rank = leaderboard?.entries.find((item) => item.submissionId === id || item.id === id)?.rank ?? null;
 

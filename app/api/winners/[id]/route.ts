@@ -2,6 +2,7 @@
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 import { deriveSafePreviewWinners, enrichWinnerRecord, normalizeWinnerRecord } from "@/lib/server/winners";
+import { toPublicProfile } from "@/lib/server/public-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ async function findWinnerResult(db: NonNullable<ReturnType<typeof getAdminDb>>, 
       },
       submission,
       challenge: challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : null,
-      profile: profileSnap?.exists ? { id: profileSnap.id, ...profileSnap.data() } : null,
+      profile: profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null,
       row,
       source: "submission_flag"
     });
@@ -62,7 +63,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       winner.challengeId ? buildChallengeLeaderboard(db, winner.challengeId, { limit: 5 }) : Promise.resolve(null)
     ]);
     const challenge = challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : winner.challenge ?? null;
-    const profile = profileSnap?.exists ? { id: profileSnap.id, ...profileSnap.data() } : null;
+    const profile = profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null;
     const leaderboard = leaderboardResult?.visible ? leaderboardResult.entries : [];
 
     return ok({

@@ -26,12 +26,6 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-function initialPlanForRole(role: z.infer<typeof roleSchema>) {
-  if (role === "sponsor") return "sponsor_starter";
-  if (role === "creator") return "creator";
-  return "free";
-}
-
 function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>) {
   const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
   const merged = { ...profile, ...account };
@@ -126,9 +120,10 @@ export async function POST(request: Request) {
       .filter(Boolean);
     const isAdmin = Boolean(email && adminEmails.includes(email.toLowerCase()));
 
-    const initialPlanId = initialPlanForRole(parsed.data.role);
-    const planFields = planFieldsFor(initialPlanId);
-    const accountType = isAdmin ? "admin" : planFields.accountType;
+    // Signup role expresses account intent only. Paid entitlement is granted
+    // later by verified Stripe webhook processing.
+    const planFields = planFieldsFor("free");
+    const accountType = isAdmin ? "admin" : parsed.data.role === "sponsor" ? "sponsor" : "user";
     const dashboardType = accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard";
     const sponsorFields = accountType === "sponsor"
       ? {
@@ -148,6 +143,7 @@ export async function POST(request: Request) {
         lastName: parsed.data.lastName,
         displayName,
         role: parsed.data.role,
+        roleIntent: parsed.data.role,
         ...planFields,
         accountType,
         dashboardType,
@@ -166,6 +162,7 @@ export async function POST(request: Request) {
         initials: initialsFromName(displayName || email),
         email,
         role: parsed.data.role,
+        roleIntent: parsed.data.role,
         ...planFields,
         accountType,
         dashboardType,

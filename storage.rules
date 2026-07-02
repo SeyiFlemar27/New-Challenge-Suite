@@ -13,10 +13,6 @@ service firebase.storage {
       return request.resource.contentType.matches('video/.*');
     }
 
-    function isPdfOrImage() {
-      return request.resource.contentType.matches('application/pdf') || isImage();
-    }
-
     match /users/{userId}/submissions/{fileName} {
       allow read: if true;
       allow write: if signedIn()
@@ -34,11 +30,8 @@ service firebase.storage {
     }
 
     match /users/{userId}/identity-documents/{fileName} {
-      allow read: if signedIn() && request.auth.uid == userId;
-      allow write: if signedIn()
-        && request.auth.uid == userId
-        && isPdfOrImage()
-        && request.resource.size < 15 * 1024 * 1024;
+      // KYC document processing is intentionally inactive.
+      allow read, write: if false;
     }
 
     match /{allPaths=**} {

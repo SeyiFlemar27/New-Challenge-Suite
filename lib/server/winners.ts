@@ -1,5 +1,6 @@
 ﻿import type { Firestore } from "firebase-admin/firestore";
 import { buildChallengeLeaderboard, type LeaderboardRow } from "@/lib/server/leaderboard";
+import { toPublicProfile } from "@/lib/server/public-profile";
 
 export const winnerStatuses = [
   "pending_review",
@@ -177,7 +178,7 @@ export async function enrichWinnerRecord(db: Firestore, winner: Record<string, u
     winner,
     submission,
     challenge: challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : null,
-    profile: profileSnap?.exists ? { id: profileSnap.id, ...profileSnap.data() } : null,
+    profile: profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null,
     source
   });
 }
@@ -211,7 +212,7 @@ export async function deriveSafePreviewWinners(db: Firestore, limitChallenges = 
         },
         submission,
         challenge,
-        profile: profileSnap?.exists ? { id: profileSnap.id, ...profileSnap.data() } : null,
+        profile: profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null,
         row,
         position: index + 1,
         source: "derived_preview"
