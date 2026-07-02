@@ -126,8 +126,21 @@ export const subscriptionPlans: SubscriptionPlan[] = [
 
 export type PaidSubscriptionPlanId = Exclude<ProductPlanId, "free">;
 
+const legacyCheckoutPlanIds = new Set([
+  "observer",
+  "premium",
+  "creator_pro",
+  "verified_host",
+  "competitor",
+  "executive_host",
+  "chief_producer",
+  "enterprise_sponsor"
+]);
+
 export function getSubscriptionPlan(planId: unknown) {
   if (typeof planId !== "string") return null;
+  const knownPlan = subscriptionPlans.some((item) => item.id === planId) || legacyCheckoutPlanIds.has(planId);
+  if (!knownPlan) return null;
   const normalizedPlanId = normalizePlanId(planId);
   return subscriptionPlans.find((item) => item.id === normalizedPlanId) ?? null;
 }

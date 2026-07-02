@@ -108,7 +108,15 @@ Full-stack reconstruction of the Challenge Suite application from the supplied s
    stripe listen --forward-to localhost:3000/api/stripe/webhook
    ```
 
-   Checkout success pages only show receipt state. Plans and DoroCoins update only after the verified Stripe webhook is received. Local mock checkout returns an internal URL and processes no payment, credits no DoroCoins, and activates no subscription.
+   Configure the Stripe webhook endpoint to send:
+
+   - `checkout.session.completed`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+
+   On Vercel, the endpoint is `https://www.challengesuite.com/api/stripe/webhook`. Checkout success pages only show receipt state. Plans and DoroCoins update only after the verified Stripe webhook is received. Local mock checkout returns an internal URL and processes no payment, credits no DoroCoins, and activates no subscription.
 5. Install dependencies.
 6. Run `pnpm dev`.
 7. Verify the backend foundation:

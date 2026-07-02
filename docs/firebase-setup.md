@@ -94,6 +94,14 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout success pages do not activate plans or credit DoroCoins directly; those updates happen only after the verified Stripe webhook is processed.
 
+Enable these events for the local Stripe CLI or the Vercel webhook endpoint at `https://www.challengesuite.com/api/stripe/webhook`:
+
+- `checkout.session.completed`
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
 Create recurring monthly Stripe test prices for the canonical subscription plans and configure:
 
 ```bash

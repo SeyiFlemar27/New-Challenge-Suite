@@ -169,6 +169,12 @@ export function fetchSubscriptionPlans() {
     currentPlanId: string;
     accountType: "user" | "sponsor";
     subscriptionStatus: string;
+    subscription: {
+      stripeStatus: string | null;
+      currentPeriodEnd: string | null;
+      cancelAtPeriodEnd: boolean;
+      planId: string | null;
+    };
     plans: SubscriptionPlan[];
   }>("/api/subscriptions");
 }

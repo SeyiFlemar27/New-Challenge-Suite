@@ -39,18 +39,20 @@ export async function POST(request: Request) {
   }
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   try {
+    const metadata = {
+      userId: user.uid,
+      planId: plan.id,
+      planAudience: plan.audience,
+      accountType,
+      billingCycle: "monthly"
+    };
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout/cancel`,
-      metadata: {
-        userId: user.uid,
-        planId: plan.id,
-        planAudience: plan.audience,
-        accountType,
-        billingCycle: "monthly"
-      }
+      metadata,
+      subscription_data: { metadata }
     });
     if (!session.url) return fail("Stripe checkout did not return a redirect URL.", 502, undefined, "PAYMENT_PROVIDER_ERROR");
     return ok({ url: session.url }, "Stripe checkout session created.");

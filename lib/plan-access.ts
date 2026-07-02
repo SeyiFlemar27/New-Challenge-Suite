@@ -1,7 +1,7 @@
 ﻿import type { AccountType, ProductPlanId as BlueprintPlanId, SponsorProductPlanId, UserProductPlanId } from "@/lib/types";
 
 export type ProductPlanId = "free" | "premium" | "creator_pro" | "verified_host";
-export type PlanStatus = "active" | "inactive" | "trial" | "trialing" | "expired" | "cancelled" | "past_due" | "paused";
+export type PlanStatus = "active" | "inactive" | "trial" | "trialing" | "expired" | "cancelled" | "canceled" | "past_due" | "incomplete" | "paused";
 
 export interface PlanAccess {
   planId: ProductPlanId;

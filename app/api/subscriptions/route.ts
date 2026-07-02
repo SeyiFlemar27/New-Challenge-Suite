@@ -27,6 +27,12 @@ export async function GET(request: Request) {
       currentPlanId,
       accountType,
       subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free",
+      subscription: {
+        stripeStatus: account.stripeStatus ?? profile.stripeStatus ?? null,
+        currentPeriodEnd: account.subscriptionCurrentPeriodEnd ?? profile.subscriptionCurrentPeriodEnd ?? null,
+        cancelAtPeriodEnd: Boolean(account.subscriptionCancelAtPeriodEnd ?? profile.subscriptionCancelAtPeriodEnd),
+        planId: account.subscriptionPlanId ?? profile.subscriptionPlanId ?? null
+      },
       plans: getSubscriptionPlansForUser(currentPlanId, accountType)
     }, "Subscription plans loaded.");
   } catch (error) {
