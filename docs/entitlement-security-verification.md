@@ -30,3 +30,5 @@ Phase 5.2 keeps account intent separate from paid entitlement. Run these checks 
 - Confirm payouts, withdrawals, automatic refunds, sponsor fund release, paid-entry prize pools, and DoroCoin-to-cash conversion remain unavailable.
 
 There is no Firebase Rules unit-test harness in this repository yet. Add `@firebase/rules-unit-testing` and emulator-backed tests before broadening client Firestore access.
+
+Existing accounts created before Phase 5.2 should be reviewed with the read-only process in `docs/entitlement-migration-plan.md`. Do not infer paid entitlement from role or account type, and do not automatically downgrade accounts without reconciling trusted Stripe subscription records.

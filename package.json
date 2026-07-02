@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "audit:entitlements": "node --experimental-strip-types scripts/audit-entitlements.ts",
     "seed:firestore": "node --experimental-strip-types scripts/seed-firestore.ts"
   },
   "dependencies": {
