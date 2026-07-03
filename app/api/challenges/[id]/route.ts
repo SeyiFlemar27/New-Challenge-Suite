@@ -4,6 +4,7 @@ import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { publicPrizePoolFields } from "@/lib/server/prize-pools";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,12 +28,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
-  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap, engagementSnap] = await Promise.all([
+  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap, engagementSnap, prizePoolSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
     user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
-    user ? db.collection("challengeEngagements").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
+    user ? db.collection("challengeEngagements").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
+    db.collection("prizePools").doc(id).get()
   ]);
 
   const sponsorships = sponsorshipsSnap.docs
@@ -57,6 +59,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     submissions: leaderboard.entries,
     leaderboard: leaderboardPayload,
     sponsorships,
+    prizePool: publicPrizePoolFields(prizePoolSnap.exists ? prizePoolSnap.data() : null),
     voteCount: votes.length,
     userState: user ? {
       authenticated: true,

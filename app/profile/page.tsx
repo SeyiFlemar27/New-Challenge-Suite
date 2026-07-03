@@ -120,24 +120,24 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
-      <Card className={cn("bg-yellow-500/5 p-10", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
-        <div className="flex items-start justify-between">
-          <div className="flex gap-8">
-            <div className={cn("flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-yellow-500/30 bg-indigo-500 text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
+      <Card className={cn("bg-yellow-500/5 p-5 sm:p-8 lg:p-10", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:gap-8">
+            <div className={cn("flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-yellow-500/30 bg-[var(--gold)] text-3xl text-black sm:h-32 sm:w-32 sm:text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
               {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
             </div>
             <div>
-              <h1 className="flex items-center gap-3 text-4xl font-black">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} /></h1>
+              <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} /></h1>
               {profile.user.customization?.profileTagline ? <p className="mt-3 text-lg font-bold text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : null}
               <p className="mt-3 font-bold">{profile.user.username ? `@${profile.user.username} · ` : ""}{profile.user.email}</p>
               <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.role ?? "Role unavailable"} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
-              <LinkButton href="/profile/edit" className="mt-8 w-36">Edit Profile</LinkButton>
+              <div className="mt-8 flex flex-wrap gap-3"><LinkButton href="/profile/edit">Edit Profile</LinkButton>{profile.user.username ? <LinkButton href={`/profile/${profile.user.username}`} variant="secondary">View Public Profile</LinkButton> : <LinkButton href="/settings" variant="secondary">Choose Username</LinkButton>}</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-[var(--gold)] px-8 py-4 text-lg font-black text-black gold-glow">{planLabel(profile.user.planId)}</span>
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--gold)] px-5 py-3 text-base font-black text-black gold-glow">{planLabel(profile.user.planId)}</span>
         </div>
-        <div className="mt-10 grid grid-cols-5 gap-6 border-t border-white/10 pt-8">
-          {[["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Total Likes", profile.stats.totalLikes], ["Followers", profile.stats.followers], ["Following", profile.stats.following]].map(([label, value]) => <Card key={label} className="p-7 text-center"><div className="font-bold">{label}</div><div className="mt-4 text-4xl font-black">{value}</div></Card>)}
+        <div className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
+          {[["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Total Likes", profile.stats.totalLikes], ["Followers", profile.stats.followers], ["Following", profile.stats.following]].map(([label, value]) => <Card key={label} className="p-4 text-center sm:p-6"><div className="text-sm font-bold">{label}</div><div className="mt-3 text-3xl font-black sm:text-4xl">{value}</div></Card>)}
         </div>
       </Card>
       <h2 className="mt-12 text-3xl font-black">My Collection <span className="rounded-full border border-white/10 px-4 py-1 text-sm text-slate-300">{profile.badges.length} Badges</span></h2>

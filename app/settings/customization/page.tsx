@@ -176,7 +176,7 @@ export default function CustomizationSettingsPage() {
       <div className="max-w-7xl pb-24 lg:pb-0">
         <div className="overflow-hidden rounded-[8px] border border-[var(--gold)]/25 bg-[radial-gradient(circle_at_top_left,rgba(245,217,10,.16),transparent_30%),#090909] p-5 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <PageTitle title="Customize Your Experience" subtitle="Build a premium identity across profile, badges, dashboard, and creator presence." icon={<Palette className="text-[var(--gold)]" />} />
+            <PageTitle title="Profile Appearance" subtitle="Choose approved visual options for your public profile and creator presence." icon={<Palette className="text-[var(--gold)]" />} />
             <div className="flex flex-wrap gap-3">
               <LinkButton href="/settings" variant="ghost">Back to Settings</LinkButton>
               <LinkButton href="/subscriptions" variant="secondary">View Plans</LinkButton>

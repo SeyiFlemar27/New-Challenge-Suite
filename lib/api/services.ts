@@ -105,6 +105,15 @@ export function fetchChallengeDetails(challengeId: string) {
     challenge: unknown;
     submissions: unknown[];
     sponsorships: unknown[];
+    prizePool?: {
+      status: string;
+      visibleJackpotCents: number;
+      currency: string;
+      payoutReviewStatus: string;
+      winnerSplits: Array<{ position: number; percent: number; expectedAmountCents: number }>;
+      transferEnabled: false;
+      prizeReleaseEnabled: false;
+    };
     voteCount: number;
     userState: {
       authenticated: boolean;
@@ -125,8 +134,22 @@ export function fetchVotePackages() {
 
 export function fetchWallet() {
   return apiRequest<{
-    user: unknown;
+    user: { planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean };
     wallet: { balance: number; lockedBalance: number; updatedAt?: string | null };
+    cashWallet?: { status: string; availableBalanceCents: number; pendingBalanceCents: number; lockedBalanceCents: number; withdrawalsEnabled: false };
+    financialSummary?: {
+      status: string;
+      pendingEarningsCents: number;
+      sponsorEarningsCents: number;
+      prizeWinningsCents: number;
+      campaignBudgetCents: number;
+      sponsorshipSpendCents: number;
+      prizePoolContributionsCents: number;
+      payoutStatus: string;
+      withdrawalsEnabled: false;
+      moneyMovementEnabled: false;
+    };
+    cashTransactions?: unknown[];
     transactions: unknown[];
   }>("/api/wallet");
 }

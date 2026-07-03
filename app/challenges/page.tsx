@@ -8,6 +8,7 @@ import { ChallengeCard } from "@/components/domain-cards";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchChallenges } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
+import { TrendingStories } from "@/components/stories/trending-stories";
 
 export default function ChallengesPage() {
   const { data, isLoading } = useQuery({
@@ -18,7 +19,7 @@ export default function ChallengesPage() {
 
   const challenges = useMemo(() => {
     if (!data?.ok || !data.data?.challenges) return [];
-    return data.data.challenges.map((item) => normalizeChallenge(item as ChallengeApiRecord)).filter((item) => item.id);
+    return data.data.challenges.map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
   }, [data]);
 
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
@@ -29,9 +30,10 @@ export default function ChallengesPage() {
         <PageTitle title="Challenges" subtitle="Browse active, upcoming, and completed competitions" />
         <LinkButton href="/challenges/create">+ Create Challenge</LinkButton>
       </div>
+      <TrendingStories challenges={challenges} />
 
       {isLoading ? (
-        <div className="mt-10 grid max-w-6xl grid-cols-2 gap-8">
+        <div className="mt-10 grid max-w-6xl gap-6 sm:grid-cols-2 lg:gap-8">
           {[0, 1, 2, 3].map((item) => <Card key={item} className="h-[430px] animate-pulse bg-[#171717]" />)}
         </div>
       ) : errorMessage ? (
@@ -40,7 +42,7 @@ export default function ChallengesPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : challenges.length ? (
-        <div className="mt-10 grid max-w-6xl grid-cols-2 gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
+        <div className="mt-10 grid max-w-6xl gap-6 sm:grid-cols-2 lg:gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge as any} />)}</div>
       ) : (
         <EmptyState icon={<Trophy />} title="No challenges yet" body="Published challenges will appear here once they are created." action={<LinkButton href="/challenges/create">Create Challenge</LinkButton>} />
       )}

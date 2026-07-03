@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { BarChart3, Building2, CreditCard, LayoutDashboard, Megaphone, MessageSquare, PieChart, PlusCircle, Settings, Store, Target, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { BarChart3, Building2, CreditCard, LayoutDashboard, Megaphone, MessageSquare, PieChart, PlusCircle, Settings, Store, Target, Users, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { Card } from "@/components/ui";
 import { getPlanExperience } from "@/lib/plan-access";
@@ -21,8 +23,6 @@ const sponsorNav = [
   { label: "Settings", icon: Settings }
 ];
 
-const sponsorMobileNav = sponsorNav.filter((item) => ["Overview", "Campaigns", "Sponsor Challenges", "Budget & Billing", "Brand Profile"].includes(item.label));
-
 export interface SponsorShellProfile {
   brandName?: string | null;
   businessEmail?: string | null;
@@ -33,9 +33,17 @@ export interface SponsorShellProfile {
 }
 
 export function SponsorShell({ children, profile }: { children: React.ReactNode; profile?: SponsorShellProfile | null }) {
+  const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const brandName = profile?.brandName || "Brand Command Center";
   const verificationStatus = profile?.sponsorVerificationStatus || "pending_review";
   const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
+  useEffect(() => setDrawerOpen(false), [pathname]);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
@@ -74,19 +82,14 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
                   <h1 className="truncate text-lg font-black leading-tight">{brandName}</h1>
                 </div>
               </div>
-              <Link href="/landing" className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-xs font-bold text-slate-300">Public site</Link>
+              <button onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open sponsor navigation"><Menu /></button>
             </div>
             <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3">
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Review Status</p>
               <p className="mt-1 text-sm font-bold capitalize text-white">{verificationStatus.replaceAll("_", " ")}</p>
             </Card>
-            <nav className="scrollbar-dark mt-4 flex gap-2 overflow-x-auto pb-1">
-              {sponsorMobileNav.map((item) => {
-                const Icon = item.icon;
-                return item.href ? <Link key={item.label} href={item.href} className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-[#151515] px-4 text-xs font-black text-slate-200"><Icon size={15} />{item.label.replace("Sponsor ", "")}</Link> : <button key={item.label} type="button" disabled className="flex min-h-11 shrink-0 cursor-not-allowed items-center gap-2 rounded-full border border-white/10 bg-[#151515] px-4 text-xs font-black text-slate-500"><Icon size={15} />{item.label.replace("Sponsor ", "")}</button>;
-              })}
-            </nav>
           </div>
+          {drawerOpen ? <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div><nav className="mt-6 space-y-2">{sponsorNav.map((item) => { const Icon = item.icon; return item.href ? <Link key={item.label} href={item.href} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200 hover:bg-[var(--gold)] hover:text-black"><Icon size={18} />{item.label}</Link> : <div key={item.label} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 text-slate-500"><Icon size={18} />{item.label}<span className="ml-auto text-[10px]">Soon</span></div>; })}</nav><Link href="/landing" className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public Site</Link></aside></div> : null}
           {children}
         </section>
       </div>

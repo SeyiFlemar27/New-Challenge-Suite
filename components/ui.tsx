@@ -28,10 +28,11 @@ export function Button({
   );
 }
 
-export function LinkButton({ href, children, className, variant = "primary" }: { href: string; children: React.ReactNode; className?: string; variant?: "primary" | "secondary" | "purple" | "ghost" }) {
+export function LinkButton({ href, children, className, variant = "primary", onClick }: { href: string; children: React.ReactNode; className?: string; variant?: "primary" | "secondary" | "purple" | "ghost"; onClick?: React.MouseEventHandler<HTMLAnchorElement> }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         "inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] px-5 py-2 text-center text-sm font-bold leading-tight transition",
         variant === "primary" && "bg-[var(--gold)] text-black hover:bg-yellow-300 gold-glow",

@@ -45,6 +45,8 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [customCoins, setCustomCoins] = useState("250");
+  const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
+  const [financialSummary, setFinancialSummary] = useState<any>(null);
 
   async function loadWallet() {
     setLoading(true);
@@ -61,6 +63,8 @@ export default function WalletPage() {
     }
 
     setBalance(Number(walletResult.data.wallet.balance ?? 0));
+    setAccount(walletResult.data.user ?? {});
+    setFinancialSummary(walletResult.data.financialSummary ?? null);
     setTransactions(walletResult.data.transactions.map((txn) => {
       const record = txn as Partial<DoroTransaction>;
       return {
@@ -178,6 +182,28 @@ export default function WalletPage() {
         ].map((item) => <Card key={item.title} className="p-5"><div className="text-[var(--gold)]">{item.icon}</div><h2 className="mt-3 text-xl font-black">{item.title}</h2><p className="mt-2 text-sm text-slate-300">{item.body}</p></Card>)}
       </div> : null}
 
+      {!loading && !unauthenticated && !error && (account.accountType === "sponsor" || account.isAdmin || ["creator", "pro", "host", "enterprise"].includes(String(account.planId))) ? <section className="mt-10">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-black">{account.isAdmin ? "Financial Review Foundation" : account.accountType === "sponsor" ? "Sponsor Budget Overview" : "Earnings & Prize Review"}</h2><p className="mt-2 text-sm text-slate-400">Read-only records. Withdrawals, payout execution, refunds, and sponsor release are not active.</p></div><span className="rounded-full border border-[var(--gold)]/30 px-3 py-2 text-xs font-black capitalize text-[var(--gold)]">{financialSummary?.payoutStatus?.replaceAll("_", " ") || "review only"}</span></div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {account.accountType === "sponsor" ? <>
+            <FinancialCard label="Campaign Budget" cents={financialSummary?.campaignBudgetCents} note="Separate from subscription billing" />
+            <FinancialCard label="Sponsorship Spend" cents={financialSummary?.sponsorshipSpendCents} note="Proposal records only" />
+            <FinancialCard label="Prize Contributions" cents={financialSummary?.prizePoolContributionsCents} note="Funding/release inactive" />
+            <FinancialCard label="Invoices & Reports" cents={0} note="Placeholder" />
+          </> : account.isAdmin ? <>
+            <FinancialCard label="Prize Pool Review" cents={0} note="Use admin review queue" />
+            <FinancialCard label="Payout Review" cents={0} note="No release controls" />
+            <FinancialCard label="Disputes" cents={0} note="Review foundation" />
+            <FinancialCard label="Platform Allocation" cents={0} note="Admin-only ledger" />
+          </> : <>
+            <FinancialCard label="Pending Earnings" cents={financialSummary?.pendingEarningsCents} note="Review-only" />
+            <FinancialCard label="Sponsor Earnings" cents={financialSummary?.sponsorEarningsCents} note="No release active" />
+            <FinancialCard label="Prize Winnings" cents={financialSummary?.prizeWinningsCents} note="Subject to winner review" />
+            <FinancialCard label="Payout Status" cents={0} note="Withdrawals unavailable" />
+          </>}
+        </div>
+      </section> : null}
+
       {!loading && !unauthenticated && !error ? <section className="mt-10">
         <h2 className="text-2xl font-black">Buy DoroCoins</h2>
         <Card className="mt-5 p-6">
@@ -232,4 +258,8 @@ export default function WalletPage() {
       </section> : null}
     </AppShell>
   );
+}
+
+function FinancialCard({ label, cents = 0, note }: { label: string; cents?: number; note: string }) {
+  return <Card className="p-5"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">{money(Number(cents || 0) / 100)}</p><p className="mt-2 text-xs text-slate-400">{note}</p></Card>;
 }

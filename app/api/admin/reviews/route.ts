@@ -11,15 +11,28 @@ export async function GET(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin reviews");
-  const [sponsors, challenges, sponsorships] = await Promise.all([
+  const [sponsors, challenges, sponsorships, prizePools] = await Promise.all([
     db.collection("sponsorProfiles").where("sponsorVerificationStatus", "==", "pending_review").limit(100).get(),
     db.collection("challenges").where("adminReviewRequired", "==", true).limit(100).get(),
-    db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get()
+    db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get(),
+    db.collection("prizePools").limit(100).get()
   ]);
   return ok({
     sponsors: sponsors.docs.map((doc) => ({ id: doc.id, brandName: doc.data().brandName ?? "", status: doc.data().sponsorVerificationStatus })),
     challenges: challenges.docs.map((doc) => ({ id: doc.id, title: doc.data().title ?? "", status: doc.data().status, prizeType: doc.data().prizeType, isLiveEvent: Boolean(doc.data().isLiveEvent), platformFeePercent: doc.data().platformFeePercent ?? 15 })),
-    sponsorships: sponsorships.docs.map((doc) => ({ id: doc.id, challengeId: doc.data().challengeId, brandName: doc.data().brandName ?? "", status: doc.data().status, sponsorApprovedAt: doc.data().sponsorApprovedAt ?? null, creatorApprovedAt: doc.data().creatorApprovedAt ?? null }))
+    sponsorships: sponsorships.docs.map((doc) => ({ id: doc.id, challengeId: doc.data().challengeId, brandName: doc.data().brandName ?? "", status: doc.data().status, sponsorApprovedAt: doc.data().sponsorApprovedAt ?? null, creatorApprovedAt: doc.data().creatorApprovedAt ?? null })),
+    prizePools: prizePools.docs.map((doc) => ({
+      id: doc.id,
+      challengeId: doc.data().challengeId ?? doc.id,
+      status: doc.data().status ?? "draft",
+      grossEntryRevenueCents: Number(doc.data().grossEntryRevenueCents ?? 0),
+      visibleJackpotCents: Number(doc.data().visibleJackpotCents ?? doc.data().amountCents ?? 0),
+      platformFeeCents: Number(doc.data().platformFeeCents ?? 0),
+      paidEntryCount: Number(doc.data().paidEntryCount ?? 0),
+      payoutReviewStatus: doc.data().payoutReviewStatus ?? "not_started",
+      winnerSplits: doc.data().winnerSplits ?? [],
+      transferEnabled: false
+    }))
   }, "Admin review queue loaded.");
 }
 

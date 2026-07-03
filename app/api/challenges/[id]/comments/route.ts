@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { getUserPlanAccess } from "@/lib/plan-access";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     db.collection("profiles").doc(user.uid).get()
   ]);
   const profile = { ...(userSnap.data() ?? {}), ...(profileSnap.data() ?? {}) };
+  const plan = getUserPlanAccess(profile);
   const now = new Date().toISOString();
   const ref = db.collection("challengeComments").doc();
   const comment = {
@@ -38,6 +40,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     challengeId: id,
     userId: user.uid,
     displayName: profile.displayName ?? profile.name ?? "Challenge Suite member",
+    username: profile.username ?? null,
+    avatarUrl: profile.avatarUrl ?? null,
+    planId: plan.normalizedPlanId,
+    verified: Boolean(profile.verified || profile.verificationStatus === "verified"),
     body,
     status: "active",
     moderationStatus: "unreviewed",

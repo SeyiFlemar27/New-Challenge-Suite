@@ -1,6 +1,6 @@
 ﻿export type RegionCode = "US" | "NG";
 export type SubmissionType = "image" | "video";
-export type PrizeType = "Prize Details Pending Review" | "Prize Foundation" | "Prize Review" | "Product Prize" | "Bragging Rights (Leaderboard Ranking)" | "DoroCoin" | "Cash Jackpot"; // Cash Jackpot is legacy/read-only compatibility, not an active payout feature.
+export type PrizeType = "Prize Details Pending Review" | "Prize Foundation" | "Prize Review" | "Product Prize" | "Physical Product" | "Digital Product" | "Money" | "Bragging Rights (Leaderboard Ranking)" | "DoroCoin" | "Cash Jackpot"; // Cash Jackpot is legacy/read-only compatibility, not an active payout feature.
 export type AgreementType =
   | "master_account"
   | "challenge_entry"
@@ -70,7 +70,7 @@ export interface Challenge {
   type: "Normal Challenge" | "Private / Exclusive";
   competitionFormat: string;
   twoStepFormat?: "Entry Competition" | "Semifinal + Final" | "Qualifier + Final";
-  bestOf: "1 Rounder" | "Best of 3" | "Best of 5";
+  bestOf: "1 Rounder" | "Best of 3" | "Best of 5" | "Best of 7";
   acceptedSubmissionTypes: SubmissionType[];
   prizeType: PrizeType;
   entryFee: number | null;

@@ -8,7 +8,7 @@ import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, sho
 import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
-import { writeDisabledPrizePoolFoundation } from "@/lib/server/prize-pools";
+import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET() {
@@ -199,7 +199,13 @@ export async function POST(request: Request) {
 
   await Promise.all([
     ref.set(challenge),
-    writeDisabledPrizePoolFoundation(db, ref.id, now),
+    writeChallengePrizePoolFoundation(db, {
+      challengeId: ref.id,
+      prizeType: body.prizeType,
+      prizeValueCents: Math.round(body.prizeValue * 100),
+      sponsorEnabled,
+      now
+    }),
     writeCashTransactionPlaceholder(db, {
       id: `challenge_${ref.id}_prize_placeholder`,
       userId: user.uid,

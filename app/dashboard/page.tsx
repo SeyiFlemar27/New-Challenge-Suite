@@ -13,6 +13,7 @@ import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalize
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
 import { getPlanExperience } from "@/lib/plan-access";
+import { TrendingStories } from "@/components/stories/trending-stories";
 
 type LeaderboardEntry = {
   displayName?: string;
@@ -53,7 +54,7 @@ export default function DashboardPage() {
   }, [redirectTo, router]);
 
   const challenges = useMemo(() => {
-    return (dashboard?.challenges ?? []).map((item) => normalizeChallenge(item as ChallengeApiRecord)).filter((item) => item.id);
+    return (dashboard?.challenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
   }, [dashboard?.challenges]);
   const trendingChallenges = challenges.slice(0, 10);
   const leaderboard = (dashboard?.leaderboard ?? []) as LeaderboardEntry[];
@@ -174,6 +175,7 @@ export default function DashboardPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : null}
+      <TrendingStories challenges={challenges} source="dashboard" />
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>

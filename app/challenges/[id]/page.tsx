@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
 import { apiRequest } from "@/lib/api/client";
+import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
 import type { Submission } from "@/lib/types";
@@ -21,7 +22,7 @@ export default function ChallengeDetailPage() {
   const [saved, setSaved] = useState(false);
   const [watchLater, setWatchLater] = useState(false);
   const [engagementMessage, setEngagementMessage] = useState("");
-  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; body?: string; createdAt?: string }>>([]);
+  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
   const [shared, setShared] = useState(false);
@@ -47,7 +48,7 @@ export default function ChallengeDetailPage() {
 
   useEffect(() => {
     if (!challengeId) return;
-    void apiRequest<{ comments: Array<{ id: string; displayName?: string; body?: string; createdAt?: string }> }>(`/api/challenges/${challengeId}/comments`)
+    void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
       .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
   }, [challengeId]);
 
@@ -68,7 +69,7 @@ export default function ChallengeDetailPage() {
   }
 
   async function addComment() {
-    const result = await apiRequest<{ comment: { id: string; displayName?: string; body?: string; createdAt?: string } }>(`/api/challenges/${challengeId}/comments`, {
+    const result = await apiRequest<{ comment: { id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean } }>(`/api/challenges/${challengeId}/comments`, {
       method: "POST",
       body: JSON.stringify({ body: commentBody })
     });
@@ -127,7 +128,8 @@ export default function ChallengeDetailPage() {
   const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
   const sponsorships = details?.sponsorships ?? [];
   const sponsored = sponsorships.length > 0;
-  const prizeValue = challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : "Pending review";
+  const prizePool = details?.prizePool;
+  const prizeValue = Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `$${(Number(prizePool?.visibleJackpotCents) / 100).toLocaleString()}` : challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : "Pending review";
 
   return (
     <AppShell>
@@ -191,7 +193,7 @@ export default function ChallengeDetailPage() {
               </div>
               {commentMessage ? <p className="mt-3 text-sm text-slate-300">{commentMessage}</p> : null}
               <div className="mt-6 space-y-3">
-                {comments.length ? comments.map((comment) => <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="font-black text-[var(--gold)]">{comment.displayName || "Challenge Suite member"}</div><p className="mt-2 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
+                {comments.length ? comments.map((comment) => <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]">{comment.username ? <a href={`/profile/${comment.username}`}>{comment.displayName || "Challenge Suite member"}</a> : comment.displayName || "Challenge Suite member"}<PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div><p className="mt-2 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
               </div>
             </Card>
           </section>
@@ -217,6 +219,7 @@ export default function ChallengeDetailPage() {
             <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card>
+          {prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> · Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} · {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
 
           <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>

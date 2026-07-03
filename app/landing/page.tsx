@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Award, BadgeCheck, BarChart3, Camera, Crown, Globe, Trophy, Users } from "lucide-react";
+import { Award, BadgeCheck, BarChart3, Camera, Crown, Globe, Trophy, Users, Menu, X } from "lucide-react";
 import { LinkButton, Card, Button } from "@/components/ui";
 import { BrandLogo, PremiumBadge } from "@/components/brand";
 
@@ -25,10 +25,15 @@ const leaders = [
 
 export default function LandingPage() {
   const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const visibleLeaders = expanded ? leaders : leaders.slice(0, 3);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-black/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between"><a href="/landing" className="flex items-center gap-3"><BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" /><span className="font-black">Challenge Suite</span></a><nav className="hidden items-center gap-3 md:flex"><LinkButton href="/challenges" variant="ghost">Explore</LinkButton><LinkButton href="/leaderboards" variant="ghost">Leaderboards</LinkButton><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/auth/login" variant="secondary">Sign In</LinkButton></nav><button onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)] md:hidden" aria-label="Open public navigation"><Menu /></button></div>
+      </header>
+      {menuOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Public navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setMenuOpen(false)} aria-label="Close navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,340px)] border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><span className="font-black">Menu</span><button onClick={() => setMenuOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10"><X /></button></div><nav className="mt-8 grid gap-3"><LinkButton href="/challenges">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton><LinkButton href="/leaderboards" variant="secondary">Leaderboards</LinkButton><LinkButton href="/winners" variant="secondary">Winners</LinkButton><LinkButton href="/auth/login" variant="ghost">Sign In</LinkButton></nav></aside></div> : null}
       <section className="relative flex min-h-[680px] flex-col items-center justify-center overflow-hidden px-4 py-20 text-center sm:px-6 lg:min-h-[900px] lg:py-28">
         <BrandLogo className="mb-7 lg:mb-8" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24 lg:h-28 lg:w-28" />
         <FloatingCard className="left-[10%] top-[12%]" icon={<Camera size={48} />} label="Creative Challenges" />
