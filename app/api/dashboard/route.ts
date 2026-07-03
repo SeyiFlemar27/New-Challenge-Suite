@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverUnavailable } from "@/lib/server/responses";
 import { getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   const account = userSnap.exists ? userSnap.data() : {};
   const profile = profileSnap.exists ? profileSnap.data() : {};
   const wallet = walletSnap.exists ? walletSnap.data() : {};
-  const challenges: Array<Record<string, unknown>> = challengesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const challenges: Array<Record<string, unknown>> = challengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
   const submissions = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const notifications = notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

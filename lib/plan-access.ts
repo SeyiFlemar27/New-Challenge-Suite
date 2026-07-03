@@ -1,7 +1,7 @@
 ﻿import type { AccountType, ProductPlanId as BlueprintPlanId, SponsorProductPlanId, UserProductPlanId } from "@/lib/types";
 
 export type ProductPlanId = "free" | "premium" | "creator_pro" | "verified_host";
-export type PlanStatus = "active" | "inactive" | "trial" | "trialing" | "expired" | "cancelled" | "canceled" | "past_due" | "incomplete" | "paused";
+export type PlanStatus = "active" | "inactive" | "trial" | "trialing" | "payment_warning_1" | "payment_warning_2" | "expired" | "cancelled" | "canceled" | "past_due" | "incomplete" | "paused";
 
 export interface PlanAccess {
   planId: ProductPlanId;
@@ -635,7 +635,7 @@ export function normalizeAccountType(profile: Record<string, unknown> = {}): Exc
 export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAccess {
   const normalizedPlanId = normalizePlanId(profile.planId);
   const status = typeof profile.planStatus === "string" ? profile.planStatus as PlanStatus : "active";
-  const active = status === "active" || status === "trial" || status === "trialing";
+  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
   const base = active ? accessByPlan[normalizedPlanId] : accessByPlan.free;
   return {
     ...base,
@@ -652,7 +652,7 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
 
 export function getPlanExperience(profile: Record<string, unknown> = {}): PlanExperience {
   const access = getUserPlanAccess(profile);
-  const active = ["active", "trial", "trialing"].includes(access.planStatus);
+  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(access.planStatus);
   if (access.accountType === "sponsor") {
     const sponsorPlan = active && sponsorPlanOrder.includes(access.normalizedPlanId as SponsorProductPlanId)
       ? access.normalizedPlanId
@@ -769,7 +769,7 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   const enterpriseProgram = format.includes("program") || format.includes("campaign");
   const prize = prizePool > 0 || Boolean(challengeInput.prizePoolEnabled || challengeInput.cashPayoutsEnabled) || (prizeType && !prizeType.includes("bragging"));
 
-  if (tournament) return { allowed: false, code: "TOURNAMENTS_LOCKED", message: "Tournament creation is locked until Phase 6." };
+  if (tournament && !access.canManageTournaments) return { allowed: false, code: "HOST_REQUIRED", message: "Tournament and bracket creation require Host or Enterprise access." };
   if (enterpriseProgram && !access.isEnterprise) return { allowed: false, code: "ENTERPRISE_REQUIRED", message: "Program and campaign challenge builders require Enterprise access." };
   if ((oneVsOne || liveEvent) && !access.isHost) return { allowed: false, code: "HOST_REQUIRED", message: "1v1 and live-event challenge tools require Host access." };
   if (ranked && !access.isPro) return { allowed: false, code: "PRO_REQUIRED", message: "Ranked challenge creation requires Pro access." };

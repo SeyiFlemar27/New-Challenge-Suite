@@ -111,6 +111,10 @@ export function fetchChallengeDetails(challengeId: string) {
       joined: boolean;
       votedSubmissionIds: string[];
       voteCount: number;
+      saved?: boolean;
+      watchLater?: boolean;
+      interested?: boolean;
+      reminderStatus?: string | null;
     };
   }>(`/api/challenges/${challengeId}`);
 }

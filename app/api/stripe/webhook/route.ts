@@ -106,6 +106,8 @@ async function processInvoiceEvent(
     eventType: event.type,
     eventCreated: event.created,
     internalStatus: paymentFailed ? "past_due" : undefined,
+    paymentFailed,
+    paymentSucceeded: !paymentFailed,
     latestInvoiceId: invoice.id,
     latestPaymentIntentId: invoicePaymentIntentId(invoice)
   });

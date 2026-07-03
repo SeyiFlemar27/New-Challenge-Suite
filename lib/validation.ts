@@ -9,8 +9,8 @@ export const challengeSchema = z
     customCategory: z.string().optional(),
     acceptedSubmissionTypes: z.array(z.enum(["image", "video"])).min(1),
     competitionFormat: z.string().min(1),
-    bestOf: z.enum(["1 Rounder", "Best of 3", "Best of 5"]),
-    prizeType: z.enum(["Prize Details Pending Review", "Prize Foundation", "Prize Review", "Product Prize", "Bragging Rights (Leaderboard Ranking)", "DoroCoin", "Cash Jackpot"]), // Cash Jackpot remains legacy/read-only compatibility only.
+    bestOf: z.enum(["1 Rounder", "Best of 3", "Best of 5", "Best of 7"]),
+    prizeType: z.enum(["Prize Details Pending Review", "Prize Foundation", "Prize Review", "Product Prize", "Physical Product", "Digital Product", "Money", "Bragging Rights (Leaderboard Ranking)", "DoroCoin", "Cash Jackpot"]), // Cash Jackpot remains legacy/read-only compatibility only.
     entryFee: z.coerce.number().nullable().optional(),
     registrationDeadline: z.string().min(1),
     submissionDeadline: z.string().min(1),

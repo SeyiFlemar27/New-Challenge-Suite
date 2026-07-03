@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails, proposeSponsorship } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
+import { isChallengeEligibleForSponsorship } from "@/lib/challenge-status";
 
 type SponsorForm = {
   sponsorName: string;
@@ -18,6 +19,11 @@ type SponsorForm = {
   prizePoolContribution: number;
   brandingPreference: string;
   message: string;
+  packageId: string;
+  ctaButtonText: string;
+  ctaDestinationLink: string;
+  sponsorReturnPercent: number;
+  creatorPercent: number;
 };
 
 export default function SponsorChallengePage() {
@@ -38,8 +44,8 @@ export default function SponsorChallengePage() {
   const details = detailsQuery.data?.ok ? detailsQuery.data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
   const challenge = useMemo(() => rawChallenge ? normalizeChallenge(rawChallenge) : null, [rawChallenge]);
-  const eligibleStatuses = ["published", "registration_open", "active", "voting"];
-  const eligible = Boolean(rawChallenge && eligibleStatuses.includes(String(rawChallenge.status ?? "")));
+  const eligible = Boolean(rawChallenge?.sponsorEnabled && isChallengeEligibleForSponsorship(rawChallenge.status));
+  const sponsorPackages = Array.isArray(rawChallenge?.sponsorPackages) ? rawChallenge.sponsorPackages as Array<{ id: string; name?: string; price?: number; slotLimit?: number }> : [];
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -64,6 +70,12 @@ export default function SponsorChallengePage() {
       prizePoolContribution: Number(formData.get("prizePoolContribution") ?? 0),
       brandingPreference: String(formData.get("brandingPreference") ?? "Logo on challenge page"),
       message: String(formData.get("message") ?? "").trim()
+      ,
+      packageId: String(formData.get("packageId") ?? "").trim(),
+      ctaButtonText: String(formData.get("ctaButtonText") ?? "Learn More").trim(),
+      ctaDestinationLink: String(formData.get("ctaDestinationLink") ?? "").trim(),
+      sponsorReturnPercent: Number(formData.get("sponsorReturnPercent") ?? 12),
+      creatorPercent: Number(formData.get("creatorPercent") ?? 3)
     };
     if (!auth.user) {
       setError("Sign in with a sponsor account before submitting a sponsorship proposal.");
@@ -118,8 +130,8 @@ export default function SponsorChallengePage() {
         <Card className="mx-auto max-w-2xl p-6 text-center sm:p-8 lg:p-10">
           <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400 sm:h-20 sm:w-20" />
           <h1 className="mt-6 text-3xl font-black sm:text-4xl">Proposal Submitted</h1>
-          <p className="mt-3 text-slate-300">Your sponsorship proposal is pending review.</p>
-          <div className="mt-6 rounded-[8px] bg-yellow-500/10 p-4 font-black text-[var(--gold)]">Status: Pending Review</div>
+          <p className="mt-3 text-slate-300">Your terms were sent to the creator. Both parties must agree before platform review.</p>
+          <div className="mt-6 rounded-[8px] bg-yellow-500/10 p-4 font-black text-[var(--gold)]">Status: Pending Creator Approval</div>
           <LinkButton href={`/challenges/${challenge.id}`} className="mt-8 w-full sm:w-auto">Back to Challenge</LinkButton>
         </Card>
       </AppShell>
@@ -141,16 +153,23 @@ export default function SponsorChallengePage() {
               <Field label="Sponsor Proposal Amount ($)"><input name="amount" className={inputClass} type="number" min="1" required /></Field>
               <Field label="Sponsor Contribution Request ($)"><input name="prizePoolContribution" className={inputClass} type="number" min="0" required /></Field>
             </div>
+            {sponsorPackages.length ? <Field label="Sponsor Package"><select name="packageId" className={inputClass} required>{sponsorPackages.map((item) => <option key={item.id} value={item.id}>{item.name || item.id} · {item.slotLimit ?? 0} slot(s)</option>)}</select></Field> : null}
             <Field label="Branding Preference"><select name="brandingPreference" className={inputClass}><option>Logo on challenge page</option><option>Featured sponsor badge</option><option>Custom CTA placement</option></select></Field>
+            <div className="grid gap-5 md:grid-cols-2">
+              <Field label="CTA Button Text"><select name="ctaButtonText" className={inputClass}><option>Shop Now</option><option>Visit Website</option><option>Register Now</option><option>Follow Brand</option><option>Learn More</option></select></Field>
+              <Field label="CTA Destination Link"><input name="ctaDestinationLink" className={inputClass} type="url" placeholder="https://..." /></Field>
+              <Field label="Sponsor Return Arrangement (%)"><input name="sponsorReturnPercent" className={inputClass} type="number" min="0" max="100" defaultValue="12" /></Field>
+              <Field label="Creator Arrangement (%)"><input name="creatorPercent" className={inputClass} type="number" min="0" max="100" defaultValue="3" /></Field>
+            </div>
             <Field label="Sponsorship Message"><textarea name="message" className={textareaClass} required /></Field>
-            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" required /> <span>I accept review-only sponsor terms. Money capture/release is not active yet, and no ROI is promised.</span></label>
+            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" required /> <span>I accept review-only sponsorship split terms. Both parties must approve. Money capture/release is inactive and no investment return is promised.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || !eligible}>Review Proposal</Button>
           </form>
         ) : (
           <div className="mt-8">
             <h2 className="text-xl font-black sm:text-2xl">Review Sponsorship</h2>
-            <p className="mt-3 text-slate-300">Confirm the sponsorship proposal for review. Sponsor contribution requests and branding placement remain pending review. Money capture/release is not active yet, and no ROI is promised.</p>
+            <p className="mt-3 text-slate-300">Confirm the proposed collaboration terms. The creator must also approve before platform review. Money capture/release is inactive and no investment return is promised.</p>
             {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsor proposal with ${proposal.prizePoolContribution.toLocaleString()} contribution request. Money capture/release is not active yet.</p></div> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <div className="mt-6 grid gap-3 sm:flex sm:justify-end">

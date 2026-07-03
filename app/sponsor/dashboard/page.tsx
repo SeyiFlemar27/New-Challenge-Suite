@@ -38,7 +38,7 @@ const commandSections = [
   { title: "Create Campaign", icon: Target, body: "Campaign creation is intentionally deferred until sponsor payment and review rules are finalized." },
   { title: "Placements", icon: CalendarClock, body: "Placement inventory, CTA slots, and sponsored challenge surfaces will be managed here later." },
   { title: "Audience Insights", icon: BarChart3, body: "Audience and performance insights are placeholder-only in this shell." },
-  { title: "Budget & Billing", icon: CreditCard, body: "No sponsor money release, payouts, or active billing workflows are enabled in this batch." },
+  { title: "Budget & Billing", icon: CreditCard, body: "Your monthly sponsor subscription is separate from any campaign or sponsorship contribution budget. Money capture and release are not active." },
   { title: "Team Members", icon: Users, body: "Team seat management is planned, but no invitations are active yet." },
   { title: "Messages", icon: MessageSquare, body: "Sponsor-to-creator messaging will be connected in a later phase." }
 ];
@@ -80,6 +80,7 @@ export default function SponsorDashboardPage() {
   const goals = useMemo(() => profile?.sponsorshipGoals ?? [], [profile]);
   const categories = useMemo(() => profile?.preferredChallengeCategories ?? [], [profile]);
   const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
+  const sponsorApproved = profile?.sponsorVerificationStatus === "approved";
 
   if (loading) {
     return (
@@ -118,6 +119,7 @@ export default function SponsorDashboardPage() {
       </div>
 
       {error ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-5 text-red-200">{error}</Card> : null}
+      {!sponsorApproved ? <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Sponsor verification pending</h2><p className="mt-2 text-slate-300">Your brand profile is available, but campaign creation, placements, sponsor proposals, audience reports, and billing tools stay locked until platform verification is approved. You may use Messages to contact creators or hosts before sponsoring.</p><LinkButton href="/sponsor/messages" variant="secondary" className="mt-4">Open Messages</LinkButton></Card> : null}
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         <Metric title="Verification" value={(profile?.sponsorVerificationStatus || "pending_review").replaceAll("_", " ")} label="Future admin review status" />
@@ -159,7 +161,7 @@ export default function SponsorDashboardPage() {
       <div className="mt-8 grid gap-6 xl:grid-cols-4">
         {commandSections.map((section) => {
           const Icon = section.icon;
-          return <SponsorPlaceholder key={section.title} title={section.title} body={section.body} />;
+          return <SponsorPlaceholder key={section.title} title={section.title} body={sponsorApproved || section.title === "Messages" ? section.body : `${section.body} Sponsor verification is required before this area can be activated.`} />;
         })}
       </div>
     </SponsorShell>

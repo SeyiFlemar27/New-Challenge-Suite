@@ -28,7 +28,7 @@ export default function LandingPage() {
   const visibleLeaders = expanded ? leaders : leaders.slice(0, 3);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#11111a]">
+    <main className="min-h-screen overflow-x-hidden bg-black">
       <section className="relative flex min-h-[680px] flex-col items-center justify-center overflow-hidden px-4 py-20 text-center sm:px-6 lg:min-h-[900px] lg:py-28">
         <BrandLogo className="mb-7 lg:mb-8" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24 lg:h-28 lg:w-28" />
         <FloatingCard className="left-[10%] top-[12%]" icon={<Camera size={48} />} label="Creative Challenges" />
@@ -37,13 +37,14 @@ export default function LandingPage() {
         <h1 className="max-w-5xl text-4xl font-black leading-tight tracking-normal sm:text-5xl lg:text-6xl">Welcome to <span className="text-[var(--gold)]">ChallengeSuite</span></h1>
         <p className="mt-6 max-w-3xl text-lg leading-8 text-[#9cb5d8] sm:mt-8 sm:text-xl lg:mt-10 lg:text-2xl lg:leading-10">Join creative challenges, showcase your talent, and compete with a global community</p>
         <div className="mt-9 flex w-full max-w-sm flex-col justify-center gap-3 sm:mt-12 sm:max-w-none sm:flex-row sm:flex-wrap sm:gap-6">
-          <LinkButton href="/auth/register" variant="purple" className="min-h-14 w-full text-base sm:h-16 sm:w-72 sm:text-lg">Get Started Free</LinkButton>
+          <LinkButton href="/challenges" className="min-h-14 w-full text-base sm:h-16 sm:w-56 sm:text-lg">Explore Challenges</LinkButton>
+          <LinkButton href="/challenges/create" variant="secondary" className="min-h-14 w-full text-base sm:h-16 sm:w-56 sm:text-lg">Create Challenge</LinkButton>
           <LinkButton href="/auth/login" variant="ghost" className="min-h-14 w-full text-base sm:h-16 sm:w-40 sm:text-lg">Sign In</LinkButton>
         </div>
       </section>
 
       <section className="mx-auto max-w-[1340px] px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-24">
-        <h2 className="text-center text-3xl font-black leading-tight text-[#d5a7ff] sm:text-4xl lg:text-5xl">Why Join ChallengeSuite?</h2>
+        <h2 className="text-center text-3xl font-black leading-tight text-[var(--gold-2)] sm:text-4xl lg:text-5xl">Why Join ChallengeSuite?</h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3 lg:gap-8">
           {features.map((feature) => {
             const Icon = feature.icon;
@@ -52,9 +53,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-[#211a3b] py-14 sm:py-16 lg:py-20">
+      <section className="border-y border-white/10 bg-[#111111] py-14 sm:py-16 lg:py-20">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 text-center sm:px-6 md:grid-cols-4 lg:gap-10">
-          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label} className="min-w-0"><div className="break-words text-4xl font-black text-[#765cf6] sm:text-5xl lg:text-6xl">{value}</div><div className="mt-3 text-sm font-bold leading-6 text-[#9cb5d8] sm:text-base lg:mt-4 lg:text-xl">{label}</div></div>)}
+          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label} className="min-w-0"><div className="break-words text-4xl font-black text-[var(--gold)] sm:text-5xl lg:text-6xl">{value}</div><div className="mt-3 text-sm font-bold leading-6 text-slate-300 sm:text-base lg:mt-4 lg:text-xl">{label}</div></div>)}
         </div>
 
         <Card className="mx-4 mt-12 max-w-3xl p-5 sm:mx-auto sm:mt-16 sm:p-8 lg:mt-20">
@@ -75,7 +76,7 @@ export default function LandingPage() {
         <div className="mx-auto mt-14 max-w-3xl px-4 text-center sm:mt-16 lg:mt-20">
           <h2 className="text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">Ready to Start Your Journey?</h2>
           <p className="mt-5 text-lg leading-8 text-[#9cb5d8] sm:mt-7 sm:text-2xl">Join thousands of creators showcasing their talent</p>
-          <LinkButton href="/auth/register" variant="purple" className="mt-8 min-h-14 w-full max-w-sm text-base sm:mt-10 sm:h-16 sm:w-80 sm:text-lg">Create Free Account</LinkButton>
+          <div className="mt-8 grid gap-3 sm:mt-10 sm:flex sm:justify-center"><LinkButton href="/challenges" className="min-h-14 w-full text-base sm:w-64 sm:text-lg">Find Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary" className="min-h-14 w-full text-base sm:w-64 sm:text-lg">Create Challenge</LinkButton></div>
         </div>
       </section>
       <footer className="py-10 text-center text-[#58719a]">ChallengeSuite. All rights reserved.</footer>

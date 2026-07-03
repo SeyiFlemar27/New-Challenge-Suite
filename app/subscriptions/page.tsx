@@ -7,6 +7,7 @@ import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui
 import { ConsentDialog } from "@/components/consent-dialog";
 import { money } from "@/lib/utils";
 import { createSubscriptionCheckout, fetchSubscriptionPlans } from "@/lib/api/services";
+import { apiRequest } from "@/lib/api/client";
 import type { SubscriptionPlan } from "@/lib/types";
 
 export default function SubscriptionsPage() {
@@ -17,6 +18,7 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [unauthenticated, setUnauthenticated] = useState(false);
+  const [currentSubscription, setCurrentSubscription] = useState<{ status: string; planId: string | null } | null>(null);
   const visiblePlans = plans.filter((plan) => plan.audience === audience);
 
   async function loadPlans() {
@@ -33,6 +35,7 @@ export default function SubscriptionsPage() {
       return;
     }
     setPlans(result.data.plans);
+    setCurrentSubscription({ status: result.data.subscriptionStatus, planId: result.data.subscription.planId });
     setAudience(result.data.accountType === "sponsor" ? "sponsor" : "user");
     setLoading(false);
   }
@@ -63,20 +66,32 @@ export default function SubscriptionsPage() {
     window.location.href = result.data.url;
   }
 
+  async function cancelSubscription() {
+    setCheckoutMessage("");
+    setError("");
+    const result = await apiRequest<{ webhookPending: boolean }>("/api/stripe/subscription", {
+      method: "PATCH",
+      body: JSON.stringify({ action: "cancel" })
+    });
+    if (result.ok) setCheckoutMessage(result.message);
+    else setError(result.message);
+  }
+
   return (
     <AppShell>
       <div className="text-center">
         <PageTitle title="Choose Your Plan" subtitle="Blueprint-aligned access for competitors, creators, hosts, enterprises, and sponsors." />
       </div>
       <div className="mx-auto mt-8 flex w-full max-w-[620px] rounded-full bg-[#111] p-2">
-        <Button variant={audience === "user" ? "purple" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("user")}>Users, Creators & Hosts</Button>
-        <Button variant={audience === "sponsor" ? "purple" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("sponsor")}>Sponsors & Brands</Button>
+        <Button variant={audience === "user" ? "primary" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("user")}>Users, Creators & Hosts</Button>
+        <Button variant={audience === "sponsor" ? "primary" : "ghost"} className="flex-1 rounded-full" onClick={() => setAudience("sponsor")}>Sponsors & Brands</Button>
       </div>
       <Card className="mx-auto mt-6 max-w-4xl border-yellow-500/20 bg-yellow-500/5 p-4 text-center text-sm leading-6 text-slate-300">
         {audience === "sponsor"
           ? "Sponsor subscriptions unlock sponsor tools and the Brand Command Center. Actual campaign budgets, sponsorship funding, money release, and payouts are separate and are not active in this version."
           : "Paid-entry prize pools remain disabled. Creator, Pro, Host, and Enterprise plans unlock platform tools, not automatic cash payouts."}
       </Card>
+      {currentSubscription?.planId ? <Card className="mx-auto mt-4 max-w-4xl p-4 text-center"><p className="text-sm text-slate-300">Current paid plan: <b className="text-white">{currentSubscription.planId.replaceAll("_", " ")}</b> · Status: <b className="text-white">{currentSubscription.status.replaceAll("_", " ")}</b>. You may select another eligible plan to change tiers. Cancellation downgrades access after verified webhook confirmation.</p><Button className="mt-4" variant="secondary" onClick={() => void cancelSubscription()}>Cancel Subscription</Button></Card> : null}
       {error ? <Card className="mx-auto mt-6 max-w-3xl border-red-500/30 bg-red-950/30 p-4 text-red-100">{error}</Card> : null}
       {checkoutMessage ? <Card className="mx-auto mt-6 max-w-3xl border-emerald-500/30 bg-emerald-950/30 p-4 text-emerald-100">{checkoutMessage}</Card> : null}
       {loading ? (
@@ -94,9 +109,9 @@ export default function SubscriptionsPage() {
       ) : (
       <div className="mt-14 grid gap-7 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         {visiblePlans.map((plan) => (
-          <Card key={plan.id} className={`relative p-8 ${plan.recommended ? "border-purple-500 bg-yellow-500/10" : "bg-[#10151e]"}`}>
-            {plan.recommended ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[#765cf6] px-7 py-2 text-sm font-bold">Recommended</span> : null}
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-purple-950 text-purple-200">{plan.audience === "sponsor" ? <Handshake size={34} /> : plan.id === "free" ? <Eye size={34} /> : plan.id === "host" || plan.id === "enterprise" ? <Radio size={34} /> : <Swords size={34} />}</div>
+          <Card key={plan.id} className={`relative p-8 ${plan.recommended ? "border-[var(--gold)] bg-yellow-500/10" : "bg-[#10151e]"}`}>
+            {plan.recommended ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[var(--gold)] px-7 py-2 text-sm font-bold text-black">Recommended</span> : null}
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--gold)]/10 text-[var(--gold)]">{plan.audience === "sponsor" ? <Handshake size={34} /> : plan.id === "free" ? <Eye size={34} /> : plan.id === "host" || plan.id === "enterprise" ? <Radio size={34} /> : <Swords size={34} />}</div>
             <h2 className="mt-8 text-center text-3xl font-black">{plan.name}</h2>
             <p className="mt-4 text-center text-slate-300">{plan.subtitle}</p>
             <div className="mt-6 text-center text-4xl font-black">{plan.priceMonthlyLabel ?? (plan.priceMonthly !== null ? money(plan.priceMonthly) : "Pricing pending")}</div>

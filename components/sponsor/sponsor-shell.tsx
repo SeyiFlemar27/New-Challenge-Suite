@@ -4,21 +4,20 @@ import Link from "next/link";
 import { BarChart3, Building2, CreditCard, LayoutDashboard, Megaphone, MessageSquare, PieChart, PlusCircle, Settings, Store, Target, Users } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { Card } from "@/components/ui";
-import { cn } from "@/lib/utils";
 import { getPlanExperience } from "@/lib/plan-access";
 
 const sponsorNav = [
-  { label: "Overview", icon: LayoutDashboard, active: true },
+  { label: "Overview", icon: LayoutDashboard, href: "/sponsor/dashboard" },
   { label: "Campaigns", icon: Megaphone },
   { label: "Sponsor Challenges", icon: Store },
   { label: "Create Campaign", icon: PlusCircle },
-  { label: "Brand Profile", icon: Building2 },
+  { label: "Brand Profile", icon: Building2, href: "/sponsor/onboarding" },
   { label: "Placements", icon: Target },
   { label: "Audience Insights", icon: PieChart },
   { label: "Reports", icon: BarChart3 },
   { label: "Budget & Billing", icon: CreditCard },
   { label: "Team Members", icon: Users },
-  { label: "Messages", icon: MessageSquare },
+  { label: "Messages", icon: MessageSquare, href: "/sponsor/messages" },
   { label: "Settings", icon: Settings }
 ];
 
@@ -58,21 +57,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
           <nav className="mt-6 grid gap-2">
             {sponsorNav.map((item) => {
               const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  disabled={!item.active}
-                  className={cn(
-                    "flex h-11 items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold transition",
-                    item.active ? "bg-[var(--gold)] text-black" : "cursor-not-allowed text-slate-500 opacity-70"
-                  )}
-                  title={item.active ? item.label : `${item.label} is planned for a later sponsor phase`}
-                >
-                  <Icon size={17} />
-                  {item.label}
-                </button>
-              );
+              return item.href ? <Link key={item.label} href={item.href} className="flex h-11 items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-200 transition hover:bg-[var(--gold)] hover:text-black"><Icon size={17} />{item.label}</Link> : <button key={item.label} type="button" disabled className="flex h-11 cursor-not-allowed items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-500 opacity-70" title={`${item.label} is planned for a later sponsor phase`}><Icon size={17} />{item.label}</button>;
             })}
           </nav>
           <Link href="/landing" className="mt-6 block rounded-[8px] border border-white/10 px-4 py-3 text-center text-sm font-bold text-slate-300 transition hover:border-[var(--gold)] hover:text-white">
@@ -98,21 +83,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             <nav className="scrollbar-dark mt-4 flex gap-2 overflow-x-auto pb-1">
               {sponsorMobileNav.map((item) => {
                 const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    disabled={!item.active}
-                    className={cn(
-                      "flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-black transition",
-                      item.active ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "cursor-not-allowed border-white/10 bg-[#151515] text-slate-500"
-                    )}
-                    title={item.active ? item.label : `${item.label} is planned for a later sponsor phase`}
-                  >
-                    <Icon size={15} />
-                    {item.label.replace("Sponsor ", "")}
-                  </button>
-                );
+                return item.href ? <Link key={item.label} href={item.href} className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-[#151515] px-4 text-xs font-black text-slate-200"><Icon size={15} />{item.label.replace("Sponsor ", "")}</Link> : <button key={item.label} type="button" disabled className="flex min-h-11 shrink-0 cursor-not-allowed items-center gap-2 rounded-full border border-white/10 bg-[#151515] px-4 text-xs font-black text-slate-500"><Icon size={15} />{item.label.replace("Sponsor ", "")}</button>;
               })}
             </nav>
           </div>

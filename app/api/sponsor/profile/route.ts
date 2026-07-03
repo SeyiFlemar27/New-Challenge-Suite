@@ -17,7 +17,7 @@ const sponsorProfileSchema = z.object({
   businessEmail: z.string().trim().email("Enter a valid business email."),
   logoUrl: z.string().trim().url("Logo URL must be valid.").optional().or(z.literal("")),
   bannerUrl: z.string().trim().url("Banner URL must be valid.").optional().or(z.literal("")),
-  ctaButtonText: z.string().trim().min(2, "CTA button text is required.").max(40),
+  ctaButtonText: z.string().trim().min(2, "CTA button text is required.").max(40).transform((value) => value.replace(/[<>]/g, "")),
   ctaDestinationLink: z.string().trim().url("Enter a valid CTA destination link."),
   sponsorshipGoals: z.array(z.string().trim().min(1)).min(1, "Select at least one sponsorship goal.").max(8),
   preferredChallengeCategories: z.array(z.string().trim().min(1)).min(1, "Select at least one preferred category.").max(12)

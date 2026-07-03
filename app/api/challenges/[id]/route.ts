@@ -3,6 +3,7 @@ import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,20 +27,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
-  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap] = await Promise.all([
+  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap, engagementSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
-    user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
+    user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
+    user ? db.collection("challengeEngagements").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
   ]);
 
-  const sponsorships: Array<Record<string, unknown>> = sponsorshipsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const sponsorships = sponsorshipsSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
+    .filter((item) => item.status === "approved")
+    .map((item) => ({
+      id: item.id,
+      brandName: item.brandName ?? item.sponsorName ?? "Sponsor",
+      packageName: item.packageName ?? null,
+      ctaButtonText: item.ctaButtonText ?? null,
+      ctaDestinationLink: item.ctaDestinationLink ?? null,
+      status: item.status
+    }));
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
 
+  const publicChallenge = publicChallengeFields(challengeSnap.data() ?? {});
+
   return ok({
-    challenge: { id: challengeSnap.id, ...challengeSnap.data() },
+    challenge: { id: challengeSnap.id, ...publicChallenge },
     submissions: leaderboard.entries,
     leaderboard: leaderboardPayload,
     sponsorships,
@@ -48,7 +62,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       authenticated: true,
       joined: Boolean(participantSnap?.exists),
       votedSubmissionIds: userVotes.map((vote) => vote.submissionId).filter(Boolean),
-      voteCount: userVotes.length
+      voteCount: userVotes.length,
+      saved: Boolean(engagementSnap?.data()?.saved),
+      watchLater: Boolean(engagementSnap?.data()?.watchLater),
+      interested: Boolean(engagementSnap?.data()?.interested),
+      reminderStatus: engagementSnap?.data()?.reminderStatus ?? null
     } : {
       authenticated: false,
       joined: false,

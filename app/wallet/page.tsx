@@ -210,6 +210,11 @@ export default function WalletPage() {
           ))}
         </div> : <Card className="mt-5"><EmptyState icon={<Coins />} title="No packages available" body="DoroCoin packages have not been configured yet." action={<Button onClick={loadWallet}>Retry</Button>} /></Card>}
         {status ? <p className={`mt-5 rounded-[8px] p-4 font-bold ${status.startsWith("Checkout started") || status.startsWith("Development checkout") ? "bg-emerald-950/40 text-emerald-200" : "bg-red-950/40 text-red-200"}`}>{status}</p> : null}
+        <Card className="mt-6 border-dashed border-[var(--gold)]/30 p-6">
+          <h3 className="text-xl font-black">Watch ads to earn free coins</h3>
+          <p className="mt-2 text-slate-300">Coming soon. No ads are served and no DoroCoins are granted yet. A future ad network integration will require verified completion, rate limits, and fraud protection.</p>
+          <Button className="mt-4" variant="secondary" disabled>Coming Soon</Button>
+        </Card>
       </section> : null}
 
       {!loading && !unauthenticated && !error ? <section className="mt-10">

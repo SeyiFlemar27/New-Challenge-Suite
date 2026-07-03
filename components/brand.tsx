@@ -56,7 +56,7 @@ export function PremiumBadge({ planId, compact = false, badgeStyleId }: { planId
                 : badgeStyleId === "elite_host" ? Award
                   : BadgeCheck;
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border font-black", badgeStyle?.previewClass ?? (premium ? "border-sky-400/40 bg-sky-500/15 text-sky-300" : "border-white/10 bg-white/5 text-slate-300"), compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full border font-black", badgeStyle?.previewClass ?? (premium ? "border-[var(--gold)]/40 bg-[var(--gold)]/10 text-[var(--gold-2)]" : "border-white/10 bg-white/5 text-slate-300"), compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm")}>
       <BadgeIcon size={compact ? 14 : 16} className={premium ? "text-current" : "text-slate-400"} />
       {badgeStyle?.name ?? label}
     </span>

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Share2, Rocket, Trophy, Vote } from "lucide-react";
+import { Bookmark, Clock3, Share2, Rocket, Trophy, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
+import { apiRequest } from "@/lib/api/client";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
 import type { Submission } from "@/lib/types";
@@ -17,6 +18,12 @@ export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
   const [watching, setWatching] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [watchLater, setWatchLater] = useState(false);
+  const [engagementMessage, setEngagementMessage] = useState("");
+  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; body?: string; createdAt?: string }>>([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentMessage, setCommentMessage] = useState("");
   const [shared, setShared] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId],
@@ -31,6 +38,46 @@ export default function ChallengeDetailPage() {
     if (!challenge) return [];
     return (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id);
   }, [challenge, details?.submissions]);
+
+  useEffect(() => {
+    setWatching(Boolean(details?.userState?.interested));
+    setSaved(Boolean(details?.userState?.saved));
+    setWatchLater(Boolean(details?.userState?.watchLater));
+  }, [details?.userState]);
+
+  useEffect(() => {
+    if (!challengeId) return;
+    void apiRequest<{ comments: Array<{ id: string; displayName?: string; body?: string; createdAt?: string }> }>(`/api/challenges/${challengeId}/comments`)
+      .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
+  }, [challengeId]);
+
+  async function updateEngagement(action: "save_challenge" | "watch_later" | "interested", enabled: boolean) {
+    setEngagementMessage("");
+    const result = await apiRequest<{ reminderStatus?: string | null }>(`/api/challenges/${challengeId}/engagement`, {
+      method: "POST",
+      body: JSON.stringify({ action, enabled })
+    });
+    if (!result.ok) {
+      setEngagementMessage(result.message);
+      return;
+    }
+    if (action === "save_challenge") setSaved(enabled);
+    if (action === "watch_later") setWatchLater(enabled);
+    if (action === "interested") setWatching(enabled);
+    setEngagementMessage(result.message);
+  }
+
+  async function addComment() {
+    const result = await apiRequest<{ comment: { id: string; displayName?: string; body?: string; createdAt?: string } }>(`/api/challenges/${challengeId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body: commentBody })
+    });
+    setCommentMessage(result.message);
+    if (result.ok && result.data?.comment) {
+      setComments((current) => [...current, result.data!.comment]);
+      setCommentBody("");
+    }
+  }
 
   if (isLoading) {
     return (
@@ -95,7 +142,10 @@ export default function ChallengeDetailPage() {
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
             <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton>
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setShared(true)}><Share2 size={17} /> {shared ? "Link Copied" : "Share"}</Button>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "In Watch Later" : "Watch Later"}</Button>
           </div>
+          {engagementMessage ? <p className="mt-3 text-sm text-slate-300">{engagementMessage}</p> : null}
           <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" />
@@ -134,7 +184,15 @@ export default function ChallengeDetailPage() {
           <section className="mt-12 border-t border-white/10 pt-10">
             <h2 className="text-2xl font-black">Comments</h2>
             <Card className="mt-6 p-5 sm:p-6">
-              <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">Comments are not available for this challenge yet.</p>
+              <textarea className={textareaClass} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Add to the conversation..." maxLength={1000} />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-400">Comments include moderation status and may be reviewed.</p>
+                <Button onClick={() => void addComment()} disabled={commentBody.trim().length < 2}>Post Comment</Button>
+              </div>
+              {commentMessage ? <p className="mt-3 text-sm text-slate-300">{commentMessage}</p> : null}
+              <div className="mt-6 space-y-3">
+                {comments.length ? comments.map((comment) => <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="font-black text-[var(--gold)]">{comment.displayName || "Challenge Suite member"}</div><p className="mt-2 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
+              </div>
             </Card>
           </section>
         </div>
@@ -150,12 +208,13 @@ export default function ChallengeDetailPage() {
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
             )}
-            <Button variant="secondary" className="mt-4 w-full" onClick={() => setWatching(true)}>{watching ? "Watching Challenge" : "Interested in watching"}</Button>
+            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Reminder Saved" : "Interested in Watching"}</Button>
+            {watching ? <p className="mt-3 text-xs text-slate-400">Preferences saved for 1 hour, 30 minutes, 5 minutes, and start time. Delivery begins when the notification worker is connected.</p> : null}
           </Card>
 
           <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
-            <p className="mt-3">Submit a sponsor contribution request. Funding/release is not active yet, and ROI reporting remains under review.</p>
+            <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card>
 

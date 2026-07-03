@@ -5,7 +5,6 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchLiveEvents } from "@/lib/api/services";
 import { CheckCircle2, LockKeyhole } from "lucide-react";
-import { PlanFeatureGate } from "@/components/plan-feature-gate";
 
 interface LiveEventRecord {
   id: string;
@@ -19,6 +18,8 @@ interface LiveEventRecord {
   registrationStatus: string;
   planRequired: boolean;
   canRegister: boolean;
+  source?: string;
+  challengeId?: string | null;
 }
 
 function formatDate(value: string) {
@@ -29,11 +30,7 @@ function formatDate(value: string) {
 }
 
 export default function LiveEventsPage() {
-  return (
-    <PlanFeatureGate feature="live_event_tools" requiredPlan="Host" title="Live event tools require Host plan">
-      <LiveEventsContent />
-    </PlanFeatureGate>
-  );
+  return <LiveEventsContent />;
 }
 
 function LiveEventsContent() {
@@ -71,6 +68,9 @@ function LiveEventsContent() {
         registrationStatus: String(record.registrationStatus ?? "available"),
         planRequired: Boolean(record.planRequired),
         canRegister: Boolean(record.canRegister)
+        ,
+        source: String((record as any).source ?? "liveEvents"),
+        challengeId: (record as any).challengeId ? String((record as any).challengeId) : null
       };
     }).filter((event) => event.id));
     setLoading(false);
@@ -112,6 +112,7 @@ function LiveEventsContent() {
                 <p className="mt-8 text-slate-200">Date: {formatDate(event.date)} at {event.time || "Time unavailable"}</p>
                 <p className="mt-5 text-slate-200">{event.attending} attending</p>
                 <div className="mt-7">
+                  {event.challengeId ? <LinkButton href={`/challenges/${event.challengeId}`} variant="secondary" className="mb-3 mr-3">Watch Challenge</LinkButton> : null}
                   {isRegistered ? (
                     <p className="flex items-center gap-2 rounded-[8px] bg-emerald-950/40 p-3 font-bold text-emerald-200"><CheckCircle2 size={18} /> Registered to attend</p>
                   ) : event.planRequired ? (

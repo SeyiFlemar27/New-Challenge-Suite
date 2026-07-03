@@ -78,7 +78,7 @@ export default function LeaderboardsPage() {
           <div className="mt-8 grid items-end gap-5 lg:grid-cols-[.85fr_1.15fr_.85fr]">
             {[podium[1], podium[0], podium[2]].filter(Boolean).map((row) => (
               <Card key={row.id ?? row.userId ?? row.rank} className={`p-5 text-center sm:p-6 ${row.rank === 1 ? "border-[var(--gold)]/50 bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111]" : "bg-[#151515]"}`}>
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[var(--gold)]/30 bg-indigo-600 text-xl font-black">{row.initials ?? rowName(row).slice(0, 2).toUpperCase()}</div>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[var(--gold)]/30 bg-[var(--gold)] text-xl font-black text-black">{row.initials ?? rowName(row).slice(0, 2).toUpperCase()}</div>
                 <div className="mt-4 text-sm font-black text-[var(--gold)]">#{row.rank}</div>
                 <h2 className="mt-1 break-words text-xl font-black sm:text-2xl">{rowName(row)}</h2>
                 <div className="mt-3 flex justify-center"><PremiumBadge planId={row.planId} badgeStyleId={row.badgeStyleId} compact /></div>
@@ -93,7 +93,7 @@ export default function LeaderboardsPage() {
               <div key={row.id ?? row.userId ?? row.rank} className="grid gap-4 border-b border-white/10 p-4 sm:p-5 lg:grid-cols-[70px_minmax(0,1fr)_130px_120px_120px_150px] lg:items-center">
                 <div className="text-2xl font-black text-[var(--gold)]">#{row.rank}</div>
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-black">{row.initials ?? rowName(row).slice(0, 2).toUpperCase()}</div>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{row.initials ?? rowName(row).slice(0, 2).toUpperCase()}</div>
                   <div className="min-w-0">
                     <div className="break-words font-black">{rowName(row)}</div>
                     <PremiumBadge planId={row.planId} badgeStyleId={row.badgeStyleId} compact />
@@ -101,7 +101,7 @@ export default function LeaderboardsPage() {
                 </div>
                 <div className="font-black">{Number(row.points ?? 0).toLocaleString()} pts</div>
                 <div className="flex items-center gap-2 text-slate-300"><Medal size={16} className="shrink-0 text-[var(--gold)]" /> {Number(row.wins ?? 0)} wins</div>
-                <div className="flex items-center gap-2 text-slate-300"><Vote size={16} className="shrink-0 text-sky-300" /> {Number(row.votes ?? 0)} votes</div>
+                <div className="flex items-center gap-2 text-slate-300"><Vote size={16} className="shrink-0 text-[var(--gold)]" /> {Number(row.votes ?? 0)} votes</div>
                 <div className="grid gap-2 sm:flex">
                   {row.challengeId ? <LinkButton href={`/challenges/${row.challengeId}`} variant="ghost" className="w-full sm:w-auto">Challenge</LinkButton> : null}
                   {row.userId ? <LinkButton href={`/profile?user=${row.userId}`} variant="secondary" className="w-full sm:w-auto"><UserRound size={15} /> Profile</LinkButton> : <ArrowUpRight size={18} />}

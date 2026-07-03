@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
 
 export const dynamic = "force-dynamic";
@@ -31,22 +31,28 @@ export async function GET(request: Request) {
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 30;
 
   try {
-    const [userSnap, profileSnap, eventsSnap, registrationsSnap] = await Promise.all([
+    const [userSnap, profileSnap, eventsSnap, challengeEventsSnap, registrationsSnap] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
       db.collection("liveEvents").orderBy("startsAt", "asc").limit(limit).get(),
+      db.collection("challenges").where("isLiveEvent", "==", true).limit(limit).get(),
       db.collection("eventRegistrations").where("userId", "==", user.uid).limit(200).get()
     ]);
 
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
-    if (!plan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
     const registeredEventIds = new Set(registrationsSnap.docs.map((doc) => String(doc.data().eventId ?? "")));
 
-    const events = eventsSnap.docs
+    const liveEventRecords = [
+      ...eventsSnap.docs.map((doc) => ({ id: doc.id, data: doc.data(), source: "liveEvents" })),
+      ...challengeEventsSnap.docs
+        .filter((doc) => doc.data().eventApprovalStatus === "approved" && doc.data().eventVisibility !== "hidden")
+        .map((doc) => ({ id: doc.id, data: doc.data(), source: "challenge" }))
+    ];
+    const events = liveEventRecords
       .map((doc) => {
-        const data = doc.data();
+        const data = doc.data;
         const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
         const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
         const planRequired = Boolean(requiredPlan && getPlanRank(plan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId));
@@ -70,6 +76,9 @@ export async function GET(request: Request) {
           planRequired,
           canRegister: !registeredEventIds.has(doc.id) && !planRequired && (!capacity || attending < capacity),
           status: data.status ?? "scheduled"
+          ,
+          source: doc.source,
+          challengeId: doc.source === "challenge" ? doc.id : data.challengeId ?? null
         };
       })
       .filter((event) => !["draft", "deleted", "cancelled"].includes(String(event.status).toLowerCase()));

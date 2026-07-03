@@ -5,6 +5,8 @@ import type { ProductPlanId } from "@/lib/types";
 
 export type InternalSubscriptionStatus =
   | "active"
+  | "payment_warning_1"
+  | "payment_warning_2"
   | "past_due"
   | "canceled"
   | "incomplete"
@@ -18,6 +20,8 @@ type LifecycleOverrides = {
   internalStatus?: InternalSubscriptionStatus;
   latestInvoiceId?: string | null;
   latestPaymentIntentId?: string | null;
+  paymentFailed?: boolean;
+  paymentSucceeded?: boolean;
 };
 
 function objectId(value: unknown): string | null {
@@ -120,11 +124,21 @@ export async function persistStripeSubscriptionLifecycle(
   const storedPlanId = validMetadataPlanId(owner.existing.planId);
   const unchangedStoredPrice = Boolean(storedPlanId && price.stripePriceId && owner.existing.stripePriceId === price.stripePriceId);
   const plan = pricePlan ?? (metadataPlanId ? getSubscriptionPlan(metadataPlanId) : null) ?? (unchangedStoredPrice ? getSubscriptionPlan(storedPlanId) : null);
-  const internalStatus = overrides.internalStatus ?? mapStripeSubscriptionStatus(subscription.status);
+  const baseInternalStatus = overrides.internalStatus ?? mapStripeSubscriptionStatus(subscription.status);
+  const previousFailureCount = Number(owner.existing.paymentFailureCount ?? 0);
+  const paymentFailureCount = overrides.paymentSucceeded ? 0 : overrides.paymentFailed ? previousFailureCount + 1 : previousFailureCount;
+  const immediateCancellation = subscription.cancel_at_period_end || baseInternalStatus === "canceled";
+  const internalStatus: InternalSubscriptionStatus = immediateCancellation
+    ? "canceled"
+    : overrides.paymentFailed && paymentFailureCount <= 2
+      ? paymentFailureCount === 1 ? "payment_warning_1" : "payment_warning_2"
+      : baseInternalStatus === "past_due" && paymentFailureCount > 0 && paymentFailureCount <= 2
+        ? paymentFailureCount === 1 ? "payment_warning_1" : "payment_warning_2"
+      : baseInternalStatus;
   const metadataAccountType = metadata.accountType === "sponsor" ? "sponsor" : metadata.accountType === "user" ? "user" : null;
   const accountType = metadataAccountType ?? (plan?.audience ?? null);
   const planMatchesAccount = Boolean(plan && accountType && plan.audience === accountType);
-  const entitled = internalStatus === "active" && planMatchesAccount;
+  const entitled = ["active", "payment_warning_1", "payment_warning_2"].includes(internalStatus) && planMatchesAccount;
   const canonicalPlanId = plan?.id && plan.id !== "free" ? plan.id as ProductPlanId : storedPlanId;
   const now = new Date().toISOString();
   const customerId = objectId(subscription.customer);
@@ -154,6 +168,9 @@ export async function persistStripeSubscriptionLifecycle(
     planAudience: plan?.audience ?? owner.existing.planAudience ?? null,
     accountType,
     entitlementActive: entitled,
+    paymentFailureCount,
+    paymentWarningState: internalStatus.startsWith("payment_warning_") ? internalStatus : null,
+    accessDowngradeReason: immediateCancellation ? "cancellation_requested" : paymentFailureCount > 2 ? "payment_failure_limit_reached" : null,
     planResolution: pricePlan ? "stripe_price" : metadataPlanId ? "trusted_metadata" : unchangedStoredPrice ? "existing_price_match" : "unresolved",
     lastStripeEventId: overrides.eventId,
     lastStripeEventType: overrides.eventType,

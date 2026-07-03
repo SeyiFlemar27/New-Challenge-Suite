@@ -1,6 +1,7 @@
 ﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { getChallengeDisplayStatus, isPublicChallengeStatus, isSubmissionVotableStatus } from "@/lib/challenge-status";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
       .map((doc) => {
         const data = doc.data();
         return {
-          ...data,
+          ...publicChallengeFields(data),
           id: doc.id,
           createdAt: toIso(data.createdAt),
           updatedAt: toIso(data.updatedAt),

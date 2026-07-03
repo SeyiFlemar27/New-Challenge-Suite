@@ -96,7 +96,7 @@ export function Sidebar() {
             <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]">
               <Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}
             </Link>
-            <Link href="/profile" className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500 text-sm font-black", avatarRingClass ?? "border-white/10")}>
+            <Link href="/profile" className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>
               {loading ? "" : user?.initials || "?"}
             </Link>
           </div>
@@ -127,14 +127,14 @@ export function Sidebar() {
           <Link href="/wallet" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 text-sm font-black text-[var(--gold)]">
             <Coins size={16} /> {loading ? "Loading DoroCoins" : `${user?.doroBalance ?? 0} DoroCoins`}
           </Link>
-          <button onClick={enableNotifications} className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-indigo-500/40 bg-indigo-950/40 text-sm font-bold text-indigo-300">
+          <button onClick={enableNotifications} className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-sm font-bold text-[var(--gold-2)]">
             <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
           </button>
           <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-            <Diamond size={16} className="text-sky-400" /> {loading ? "Plan" : `${planLabel} Plan`}
+            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : `${planLabel} Plan`}
           </Link>
           <div className="flex items-center gap-3 pt-3">
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-indigo-500", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
             <div className="min-w-0">
               {loading ? (
                 <div className="font-bold text-slate-300">Loading profile</div>

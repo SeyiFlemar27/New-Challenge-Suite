@@ -16,7 +16,7 @@ const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize 
 function dateInput(daysFromNow: number) {
   const date = new Date();
   date.setDate(date.getDate() + daysFromNow);
-  return date.toISOString().slice(0, 10);
+  return `${date.toISOString().slice(0, 10)}T12:00`;
 }
 
 export default function CreateChallengePage() {
@@ -59,7 +59,11 @@ function CreateChallengeWizard() {
     competitionFormat: "Entry Competition",
     bestOf: "1 Rounder",
     submissionTypes: ["image"],
-    prizeType: "Bragging Rights (Leaderboard Ranking)",
+    prizeType: "bragging_rights",
+    prizeTitle: "",
+    prizeDescription: "",
+    prizeValue: "0",
+    prizeDeliveryNotes: "",
     entryFee: "0",
     startsAt: dateInput(1),
     submissionDeadline: dateInput(5),
@@ -68,10 +72,36 @@ function CreateChallengeWizard() {
     coverImageUrl: "",
     promoImageUrl: "",
     trailerVideoUrl: "",
+    promoVideoUrl: "",
+    standardRules: "Respect all participants.\nSubmit original work.\nFollow the published voting policy.",
+    policyTerms: "Challenge entries remain subject to platform review and community standards.",
+    challengeGuidelines: "Keep submissions relevant to the challenge brief and accepted media types.",
     sponsorEnabled: "false",
     sponsorSlots: "2",
     minimumSponsorshipAmount: "0",
     sponsorPlacementOptions: ["Challenge page logo", "CTA button"],
+    sponsorPackageName: "Main Sponsor",
+    sponsorPackagePrice: "0",
+    sponsorPackageSlots: "1",
+    sponsorPackageBenefits: "Challenge page logo\nCTA placement\nWinner announcement mention",
+    isLiveEvent: "false",
+    venueName: "",
+    eventAddress: "",
+    eventCity: "",
+    eventState: "",
+    eventCountry: "",
+    eventMapUrl: "",
+    eventCapacity: "50",
+    tournamentType: "none",
+    divisionFormat: "2",
+    maxParticipants: "50",
+    scoringMode: "best_of",
+    bestOfRounds: "3",
+    pointsToWin: "10",
+    timerEnabled: "false",
+    timerDuration: "300",
+    roundDuration: "300",
+    judgeScoringEnabled: "false",
     weightedVotes: "false",
     requiresSubmissionApproval: "false"
   });  const [allocations, setAllocations] = useState([
@@ -80,11 +110,11 @@ function CreateChallengeWizard() {
     { bucket: "Community Pool", percent: 0, enabled: false }
   ]);
   const normalized = useMemo(() => redistributeSponsorship(15, allocations), [allocations]);
-  const braggingRights = form.prizeType === "Bragging Rights (Leaderboard Ranking)";
+  const braggingRights = form.prizeType === "bragging_rights" || form.prizeType === "none";
   const monetizedLocked = !planAccess.canCreatePaidChallenges && !braggingRights && Number(form.entryFee) > 0;
   const prizeLocked = !planAccess.canCreatePrizeChallenges && !braggingRights;
   const privateLocked = !planAccess.canCreatePrivateChallenges && form.type === "Private / Exclusive";
-  const draftOnlyFormat = form.competitionFormat.includes("Draft Foundation");
+  const draftOnlyFormat = form.competitionFormat.includes("Program") || form.competitionFormat.includes("Campaign");
 
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -146,6 +176,10 @@ function CreateChallengeWizard() {
       competitionFormat: form.competitionFormat,
       bestOf: form.bestOf,
       prizeType: form.prizeType,
+      prizeTitle: form.prizeTitle,
+      prizeDescription: form.prizeDescription,
+      prizeValue: Number(form.prizeValue || 0),
+      prizeDeliveryNotes: form.prizeDeliveryNotes,
       paidEntryEnabled: false,
       entryFee: 0,
       prizePoolEnabled: false,
@@ -160,10 +194,45 @@ function CreateChallengeWizard() {
       coverImageUrl: form.coverImageUrl,
       promoImageUrl: form.promoImageUrl,
       trailerVideoUrl: form.trailerVideoUrl,
+      promoVideoUrl: form.promoVideoUrl,
+      standardRules: form.standardRules,
+      policyTerms: form.policyTerms,
+      challengeGuidelines: form.challengeGuidelines,
       sponsorEnabled: form.sponsorEnabled === "true",
       sponsorSlots: Number(form.sponsorSlots || 0),
       minimumSponsorshipAmount: Number(form.minimumSponsorshipAmount || 0),
       sponsorPlacementOptions: form.sponsorPlacementOptions,
+      sponsorPackages: form.sponsorEnabled === "true" ? [{
+        id: "main-sponsor",
+        name: form.sponsorPackageName,
+        price: Number(form.sponsorPackagePrice || 0),
+        slotLimit: Number(form.sponsorPackageSlots || 1),
+        benefits: form.sponsorPackageBenefits.split("\n").map((item) => item.trim()).filter(Boolean),
+        logoPlacement: true,
+        ctaButton: true,
+        leaderboardMention: true,
+        winnerAnnouncementMention: true,
+        feedBannerPlacement: false,
+        campaignReportAvailable: true
+      }] : [],
+      isLiveEvent: form.isLiveEvent === "true",
+      venueName: form.venueName,
+      eventAddress: form.eventAddress,
+      eventCity: form.eventCity,
+      eventState: form.eventState,
+      eventCountry: form.eventCountry,
+      eventMapUrl: form.eventMapUrl,
+      eventCapacity: Number(form.eventCapacity || 0),
+      tournamentType: form.tournamentType,
+      divisionFormat: Number(form.divisionFormat),
+      maxParticipants: Number(form.maxParticipants),
+      scoringMode: form.scoringMode,
+      bestOfRounds: Number(form.bestOfRounds),
+      pointsToWin: Number(form.pointsToWin),
+      timerEnabled: form.timerEnabled === "true",
+      timerDuration: Number(form.timerDuration),
+      roundDuration: Number(form.roundDuration),
+      judgeScoringEnabled: form.judgeScoringEnabled === "true",
       requiresSubmissionApproval: form.requiresSubmissionApproval === "true",
       votingSettings: { allowFreeVotes: true, allowDoroCoinVotes: true, weightedVotes: planExperience.features.performance_analytics && form.weightedVotes === "true" },
       publish
@@ -195,7 +264,7 @@ function CreateChallengeWizard() {
       acceptedSubmissionTypes: form.submissionTypes,
       competitionFormat: form.competitionFormat,
       bestOf: form.bestOf,
-      prizeType: form.prizeType,
+      prizeType: form.prizeType === "physical_product" ? "Physical Product" : form.prizeType === "digital_product" ? "Digital Product" : form.prizeType === "money" ? "Money" : "Bragging Rights (Leaderboard Ranking)",
       entryFee: 0,
       registrationDeadline: form.submissionDeadline,
       submissionDeadline: form.submissionDeadline,
@@ -227,7 +296,7 @@ function CreateChallengeWizard() {
         <Card className="mx-auto max-w-2xl p-6 text-center sm:p-8 lg:p-10">
           <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400 sm:h-20 sm:w-20" />
           <h1 className="mt-6 text-3xl font-black sm:text-4xl">Challenge Published</h1>
-          <p className="mt-3 text-slate-300">Your challenge is now ready for participants, voting, and media submissions.</p>
+          <p className="mt-3 text-slate-300">Your challenge was saved with the appropriate review status. Advanced, physical-event, sponsor, and prize settings remain subject to review.</p>
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:justify-center">
             <LinkButton href={createdChallengeId ? `/challenges/${createdChallengeId}` : "/challenges"} className="w-full sm:w-auto">View Challenge</LinkButton>
             <LinkButton href="/challenges/create" variant="secondary" className="w-full sm:w-auto">Create Another</LinkButton>
@@ -279,7 +348,7 @@ function CreateChallengeWizard() {
                 <LinkButton href="/subscriptions" className="w-full sm:w-auto">Upgrade Plan</LinkButton>
                 <Button className="w-full sm:w-auto" variant="secondary" onClick={() => {
                   update("type", "Public Challenge");
-                  update("prizeType", "Bragging Rights (Leaderboard Ranking)");
+                  update("prizeType", "bragging_rights");
                   update("entryFee", "0");
                 }}>Continue with Free Public Challenge</Button>
               </div>
@@ -322,7 +391,7 @@ function StepBasic({ form, update, planAccess }: { form: any; update: any; planA
 function StepFormat({ form, update, toggleSubmission, experience }: { form: any; update: any; toggleSubmission: (type: string) => void; experience: PlanExperience }) {
   const formats = ["Group Challenge", "Entry Competition"];
   if (experience.features.ranked_challenges) formats.push("Ranked Challenge");
-  if (experience.features.host_control_center) formats.push("1 vs 1 Battle", "Tournament Builder (Draft Foundation)", "Live Event Challenge (Draft Foundation)");
+  if (experience.features.host_control_center) formats.push("1 vs 1 Battle", "Tournament Builder", "Live Event Challenge");
   if (experience.features.programs) formats.push("Program Challenge (Draft Foundation)", "Campaign Challenge (Draft Foundation)");
   const lockedFormats = [
     !experience.features.ranked_challenges ? "Ranked Challenge · Pro" : null,
@@ -342,7 +411,7 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
         <Field label="Best Of"><select className={inputClass} value={form.bestOf} onChange={(event) => update("bestOf", event.target.value)}><option>1 Rounder</option><option>Best of 3</option><option>Best of 5</option></select></Field>
       </div>
       {lockedFormats.length ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> {lockedFormats.join(" · ")}</Card> : null}
-      {form.competitionFormat.includes("Draft Foundation") ? <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">This advanced builder can be saved as a draft. Publishing remains locked until its complete operational workflow is activated.</Card> : null}
+      {form.competitionFormat.includes("Tournament") || form.competitionFormat.includes("Live Event") ? <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Tournament and live-event challenges are submitted for platform review. Prize and payout execution remains inactive.</Card> : null}
       <div className="mt-6">
         <div className="mb-2 font-bold">Submission Type</div>
         <div className="grid gap-3 sm:grid-cols-2">{["image", "video"].map((type) => <label key={type} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-[#181818] px-4 py-4 font-bold"><input className="shrink-0" type="checkbox" checked={form.submissionTypes.includes(type)} onChange={() => toggleSubmission(type)} /> {type === "image" ? "Image uploads" : "Video uploads"}</label>)}</div>
@@ -352,6 +421,23 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
         <label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" checked={form.weightedVotes === "true"} disabled={!experience.features.performance_analytics} onChange={(event) => update("weightedVotes", event.target.checked ? "true" : "false")} /> <span>Weighted vote multipliers {!experience.features.performance_analytics ? "(Pro plan+)" : ""}</span></label>
         <label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" checked={form.requiresSubmissionApproval === "true"} disabled={!experience.features.submission_moderation} onChange={(event) => update("requiresSubmissionApproval", event.target.checked ? "true" : "false")} /> <span>Submission approval control {!experience.features.submission_moderation ? "(Host plan+)" : ""}</span></label>
       </div>
+      <div className="mt-6 grid gap-5 rounded-[8px] border border-white/10 p-4 md:grid-cols-2">
+        <Field label="Standard Rules"><textarea className={textareaClass} value={form.standardRules} onChange={(event) => update("standardRules", event.target.value)} /></Field>
+        <Field label="Policy / Terms"><textarea className={textareaClass} value={form.policyTerms} onChange={(event) => update("policyTerms", event.target.value)} /></Field>
+        <Field label="Challenge Guidelines"><textarea className={textareaClass} value={form.challengeGuidelines} onChange={(event) => update("challengeGuidelines", event.target.value)} /></Field>
+        <Card className="p-4 text-sm text-slate-300">Money-related rules, physical prizes, live events, and non-standard policies require platform review before public activation.</Card>
+      </div>
+      {form.competitionFormat.includes("Tournament") || form.competitionFormat.includes("1 vs 1") ? (
+        <div className="mt-6 grid gap-5 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 md:grid-cols-2">
+          <Field label="Bracket Type"><select className={inputClass} value={form.tournamentType} onChange={(event) => update("tournamentType", event.target.value)}><option value="one_vs_one">1v1</option><option value="group">Group Challenge</option></select></Field>
+          <Field label="Division Format"><select className={inputClass} value={form.divisionFormat} onChange={(event) => update("divisionFormat", event.target.value)}><option value="2">2 Divisions</option><option value="4">4 Divisions</option><option value="6">6 Divisions</option></select></Field>
+          <Field label="Maximum Participants (50 max)"><input className={inputClass} type="number" min="2" max="50" value={form.maxParticipants} onChange={(event) => update("maxParticipants", event.target.value)} /></Field>
+          <Field label="Scoring Mode"><select className={inputClass} value={form.scoringMode} onChange={(event) => update("scoringMode", event.target.value)}><option value="best_of">Best Of</option><option value="points">Points Based</option></select></Field>
+          {form.scoringMode === "best_of" ? <Field label="Best Of"><select className={inputClass} value={form.bestOfRounds} onChange={(event) => update("bestOfRounds", event.target.value)}><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option></select></Field> : <Field label="Points To Win"><input className={inputClass} type="number" min="1" value={form.pointsToWin} onChange={(event) => update("pointsToWin", event.target.value)} /></Field>}
+          <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={form.timerEnabled === "true"} onChange={(event) => update("timerEnabled", event.target.checked ? "true" : "false")} /> Timer enabled</label>
+          {form.timerEnabled === "true" ? <Field label="Timer Duration (seconds)"><input className={inputClass} type="number" min="1" value={form.timerDuration} onChange={(event) => update("timerDuration", event.target.value)} /></Field> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -361,13 +447,14 @@ function StepDates({ form, update }: { form: any; update: any }) {
     <section>
       <h2 className="text-xl font-black sm:text-2xl">Step 3: Dates & Eligibility</h2>
       <div className="mt-6 grid gap-5 md:grid-cols-2">
-        <Field label="Start Date"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><input className={inputClass} type="date" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /><Button type="button" variant="ghost">OK</Button></div></Field>
-        <Field label="Submission Deadline"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><input className={inputClass} type="date" value={form.submissionDeadline} onChange={(event) => update("submissionDeadline", event.target.value)} /><Button type="button" variant="ghost">OK</Button></div></Field>
-        <Field label="Voting Deadline"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><input className={inputClass} type="date" value={form.votingDeadline} onChange={(event) => update("votingDeadline", event.target.value)} /><Button type="button" variant="ghost">OK</Button></div></Field>
-        <Field label="End Date"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><input className={inputClass} type="date" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /><Button type="button" variant="ghost">OK</Button></div></Field>
+        <Field label="Challenge Start"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></Field>
+        <Field label="Entry / Submission Deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(event) => update("submissionDeadline", event.target.value)} /></Field>
+        <Field label="Voting End"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(event) => update("votingDeadline", event.target.value)} /></Field>
+        <Field label="Challenge End"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></Field>
       </div>
       <Card className="mt-6 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Submission deadline must be on or before voting deadline. Voting deadline must be after start date and on or before end date.</Card>
-      <div className="mt-6 grid gap-5 md:grid-cols-2"><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" /> Age restriction</label><Field label="Minimum Age"><input className={inputClass} type="number" placeholder="13" /></Field><Field label="Location Restrictions"><select className={inputClass}><option>No restriction</option><option>United States only</option><option>Nigeria only</option><option>Invite list only</option></select></Field></div>
+      <div className="mt-6 grid gap-5 md:grid-cols-2"><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" /> Age restriction</label><Field label="Minimum Age"><input className={inputClass} type="number" placeholder="13" /></Field><Field label="Location Restrictions"><select className={inputClass}><option>No restriction</option><option>United States only</option><option>Nigeria only</option><option>Invite list only</option></select></Field><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" checked={form.isLiveEvent === "true"} onChange={(event) => update("isLiveEvent", event.target.checked ? "true" : "false")} /> Physical / live event</label></div>
+      {form.isLiveEvent === "true" ? <div className="mt-6 grid gap-5 rounded-[8px] border border-[var(--gold)]/20 p-4 md:grid-cols-2"><Field label="Venue Name"><input className={inputClass} value={form.venueName} onChange={(event) => update("venueName", event.target.value)} /></Field><Field label="Address"><input className={inputClass} value={form.eventAddress} onChange={(event) => update("eventAddress", event.target.value)} /></Field><Field label="City"><input className={inputClass} value={form.eventCity} onChange={(event) => update("eventCity", event.target.value)} /></Field><Field label="State / Region"><input className={inputClass} value={form.eventState} onChange={(event) => update("eventState", event.target.value)} /></Field><Field label="Country"><input className={inputClass} value={form.eventCountry} onChange={(event) => update("eventCountry", event.target.value)} /></Field><Field label="Capacity"><input className={inputClass} type="number" min="1" value={form.eventCapacity} onChange={(event) => update("eventCapacity", event.target.value)} /></Field><Field label="Map Link (optional)"><input className={inputClass} value={form.eventMapUrl} onChange={(event) => update("eventMapUrl", event.target.value)} placeholder="https://..." /></Field><Card className="p-4 text-sm text-slate-300">Live-event sync remains hidden until platform approval. Event reminders are saved for a future notification worker.</Card></div> : null}
     </section>
   );
 }
@@ -379,10 +466,11 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
       <h2 className="text-xl font-black sm:text-2xl">Step 4: Prize Foundation</h2>
       <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Paid-entry prize pools, cash payouts, automatic refunds, and sponsor money release are locked. Challenges are created as non-monetized or sponsor-ready metadata only.</Card>
       {!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]">Free users can publish basic public non-monetized challenges. Creator plan or higher is required for sponsor-enabled or advanced challenge settings.</Card> : null}
-      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option>Bragging Rights (Leaderboard Ranking)</option><option disabled={!planAccess.canCreatePrizeChallenges}>Product Prize {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option disabled={!planAccess.canCreatePrizeChallenges}>DoroCoin {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option></select></Field><Card className="p-4 text-slate-300">Entry fee, cash payout, and prize release fields are locked for this phase. Server will keep paid-entry prize pools and cash payouts inactive.</Card></div>
-      <div className="mt-6 rounded-[8px] border border-blue-500/30 bg-blue-950/20 p-5">
+      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option value="bragging_rights">Bragging Rights</option><option value="physical_product" disabled={!planAccess.canCreatePrizeChallenges}>Physical Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="digital_product" disabled={!planAccess.canCreatePrizeChallenges}>Digital Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="money" disabled={!planAccess.canCreatePrizeChallenges}>Money (Review Only) {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option></select></Field><Card className="p-4 text-slate-300">Money and physical-product prizes require platform review. Entry fees, cash payout execution, and prize release remain inactive.</Card></div>
+      {!braggingRights ? <div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Prize Title"><input className={inputClass} value={form.prizeTitle} onChange={(event) => update("prizeTitle", event.target.value)} /></Field><Field label="Estimated Prize Value"><input className={inputClass} type="number" min="0" value={form.prizeValue} onChange={(event) => update("prizeValue", event.target.value)} /></Field><Field label="Prize Description"><textarea className={textareaClass} value={form.prizeDescription} onChange={(event) => update("prizeDescription", event.target.value)} /></Field><Field label="Delivery Notes"><textarea className={textareaClass} value={form.prizeDeliveryNotes} onChange={(event) => update("prizeDeliveryNotes", event.target.value)} /></Field></div> : null}
+      <div className="mt-6 rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5">
         <label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" checked={sponsorEnabled} disabled={!planAccess.canCreateSponsoredChallenges} onChange={(event) => update("sponsorEnabled", event.target.checked ? "true" : "false")} /> <span>Enable Sponsorship Collaboration {!planAccess.canCreateSponsoredChallenges ? "(Creator plan+)" : ""}</span></label>
-        {sponsorEnabled ? <div className="mt-5 grid gap-4 md:grid-cols-2"><Field label="Sponsor Slots"><input className={inputClass} type="number" min="0" value={form.sponsorSlots} onChange={(event) => update("sponsorSlots", event.target.value)} /></Field><Field label="Minimum Sponsor Proposal Amount"><input className={inputClass} type="number" min="0" value={form.minimumSponsorshipAmount} onChange={(event) => update("minimumSponsorshipAmount", event.target.value)} /></Field></div> : null}
+        {sponsorEnabled ? <div className="mt-5 grid gap-4 md:grid-cols-2"><Field label="Total Sponsor Slots"><input className={inputClass} type="number" min="0" value={form.sponsorSlots} onChange={(event) => update("sponsorSlots", event.target.value)} /></Field><Field label="Minimum Sponsor Proposal Amount"><input className={inputClass} type="number" min="0" value={form.minimumSponsorshipAmount} onChange={(event) => update("minimumSponsorshipAmount", event.target.value)} /></Field><Field label="Package Name"><input className={inputClass} value={form.sponsorPackageName} onChange={(event) => update("sponsorPackageName", event.target.value)} /></Field><Field label="Package Price (proposal only)"><input className={inputClass} type="number" min="0" value={form.sponsorPackagePrice} onChange={(event) => update("sponsorPackagePrice", event.target.value)} /></Field><Field label="Package Slot Limit"><input className={inputClass} type="number" min="1" max="20" value={form.sponsorPackageSlots} onChange={(event) => update("sponsorPackageSlots", event.target.value)} /></Field><Field label="Package Benefits"><textarea className={textareaClass} value={form.sponsorPackageBenefits} onChange={(event) => update("sponsorPackageBenefits", event.target.value)} /></Field></div> : null}
         <div className="mt-5 grid gap-4 md:grid-cols-3">{normalized.map((bucket, index) => <label key={bucket.bucket} className="flex items-start gap-2 rounded-[8px] bg-black/40 p-4 text-sm"><input className="mt-1 shrink-0" type="checkbox" checked={bucket.enabled} disabled={!planAccess.canCreateSponsoredChallenges} onChange={() => setAllocations((items: any[]) => items.map((item: any, i: number) => i === index ? { ...item, enabled: !item.enabled } : item))} /> <span>{bucket.bucket}: <b>{bucket.percent}%</b></span></label>)}</div>
       </div>
     </section>
@@ -393,7 +481,7 @@ function StepMedia({ form, update }: { form: any; update: any }) {
   return (
     <section>
       <h2 className="text-xl font-black sm:text-2xl">Step 5: Media</h2>
-      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Cover Media URL"><input className={inputClass} value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Promo Flyer Image URL"><input className={inputClass} value={form.promoImageUrl} onChange={(event) => update("promoImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Trailer Video URL"><input className={inputClass} value={form.trailerVideoUrl} onChange={(event) => update("trailerVideoUrl", event.target.value)} placeholder="https://..." /></Field></div>
+      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Cover Media URL"><input className={inputClass} value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Promo Flyer Image URL"><input className={inputClass} value={form.promoImageUrl} onChange={(event) => update("promoImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Trailer Video URL"><input className={inputClass} value={form.trailerVideoUrl} onChange={(event) => update("trailerVideoUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Promo Video URL"><input className={inputClass} value={form.promoVideoUrl} onChange={(event) => update("promoVideoUrl", event.target.value)} placeholder="https://..." /></Field></div>
       <Card className="mt-6 p-4 text-slate-300 sm:p-6">Media upload storage will be connected later. For now, preview media fields accept URLs and are validated server-side when provided.</Card>
     </section>
   );

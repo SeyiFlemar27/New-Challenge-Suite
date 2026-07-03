@@ -50,13 +50,13 @@ export default function WinnerDetailPage() {
                 <Stat label="Category" value={challenge?.category ?? "Challenge"} />
               </div>
               {resultMessage ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">{resultMessage}</Card> : null}
-              {sponsored ? <Card className="mt-4 border-indigo-400/20 bg-indigo-950/20 p-4 text-indigo-200">Sponsored challenge results may require review before final announcement.</Card> : null}
+              {sponsored ? <Card className="mt-4 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-[var(--gold-2)]">Sponsored challenge results may require review before final announcement.</Card> : null}
             </div>
           </Card>
           <div className="space-y-6">
             <Card className="p-5 sm:p-6">
               <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-base font-black sm:h-16 sm:w-16 sm:text-lg">{profile?.initials ?? winner.userInitials}</div>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-base font-black text-black sm:h-16 sm:w-16 sm:text-lg">{profile?.initials ?? winner.userInitials}</div>
                 <div className="min-w-0">
                   <h2 className="break-words text-xl font-black sm:text-2xl">{profile?.displayName ?? winner.userName}</h2>
                   <PremiumBadge planId={profile?.planId as UserPlanId | undefined} badgeStyleId={profile?.customization?.profileBadgeId} compact />

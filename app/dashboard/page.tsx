@@ -249,5 +249,5 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
 }
 
 function Stat({ icon, title, value, label, className }: { icon: React.ReactNode; title: string; value: string; label: string; className?: string | null }) {
-  return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-indigo-950 text-purple-300">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black">{value} <span className="text-base text-emerald-400">+0</span></div><div className="text-sm text-slate-300">{label}</div></div></Card>;
+  return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black">{value} <span className="text-base text-emerald-400">+0</span></div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }

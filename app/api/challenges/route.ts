@@ -9,6 +9,7 @@ import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challe
 import { writeAuditLog } from "@/lib/server/audit";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeDisabledPrizePoolFoundation } from "@/lib/server/prize-pools";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET() {
   const db = getAdminDb();
@@ -16,7 +17,7 @@ export async function GET() {
   const snap = await db.collection("challenges").orderBy("createdAt", "desc").limit(100).get();
   const challenges = snap.docs.map((doc) => {
     const data = doc.data();
-    return { ...data, id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) };
+    return { ...publicChallengeFields(data), id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) };
   });
   return ok({ challenges }, "Challenges loaded.");
 }
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   if (body.publish && body.visibility === "private" && planExperience.monthlyPrivateChallengeLimit !== null && privateChallengesThisMonth >= planExperience.monthlyPrivateChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.privateChallengeLimitLabel}.`, 409, undefined, "PRIVATE_CHALLENGE_LIMIT_REACHED");
   }
-  const lifecycleStatus = resolveInitialChallengeStatus({
+  let lifecycleStatus = resolveInitialChallengeStatus({
     publish: body.publish,
     startsAt: body.startsAt,
     endsAt: body.endsAt,
@@ -79,6 +80,12 @@ export async function POST(request: Request) {
     competitionFormat: body.competitionFormat,
     premiumOnly: body.premiumOnly
   });
+  const advancedReviewRequired = body.prizeType === "money"
+    || body.prizeType === "physical_product"
+    || body.isLiveEvent
+    || body.tournamentType !== "none"
+    || body.competitionFormat.toLowerCase().includes("tournament");
+  if (body.publish && advancedReviewRequired) lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const challengeInputForAccess = { ...body, ...moneyLocks, status: lifecycleStatus };
   const creationAccess = canCreateChallenge(planProfile, challengeInputForAccess as Record<string, unknown>, activeChallengeCount);
@@ -111,20 +118,77 @@ export async function POST(request: Request) {
     competitionFormat: body.competitionFormat,
     bestOf: body.bestOf,
     votingSettings: body.votingSettings,
-    rules: [],
-    prizeType: "Bragging Rights (Leaderboard Ranking)",
+    rules: body.standardRules
+      ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
+      : [],
+    standardRules: body.standardRules,
+    policyTerms: body.policyTerms,
+    challengeGuidelines: body.challengeGuidelines,
+    prizeType: body.prizeType,
+    prizeTitle: body.prizeTitle || null,
+    prizeDescription: body.prizeDescription || null,
+    prizeValue: body.prizeValue,
+    prizeDeliveryNotes: body.prizeDeliveryNotes || null,
+    prizeApprovalStatus: ["none", "bragging_rights"].includes(body.prizeType) ? "not_required" : "pending_admin_review",
+    publicPrizeStatus: ["none", "bragging_rights"].includes(body.prizeType) ? "available" : "pending_review",
+    jackpotAllocationPercent: 85,
+    publicJackpotEstimateCents: 0,
+    platformFeePercent: 15,
+    platformFeeVisibility: "admin_only",
     ...moneyLocks,
     sponsorEnabled,
     sponsorSlots: sponsorEnabled ? Number(body.sponsorSlots ?? 0) : 0,
     minimumSponsorshipAmount: sponsorEnabled ? Number(body.minimumSponsorshipAmount ?? 0) : 0,
     sponsorPlacementOptions: sponsorEnabled ? body.sponsorPlacementOptions : [],
+    sponsorPackages: sponsorEnabled ? body.sponsorPackages.map((item) => ({
+      ...item,
+      priceCents: Math.round(item.price * 100),
+      availableSlots: item.slotLimit,
+      moneyCaptureStatus: "not_active",
+      releaseStatus: "not_active"
+    })) : [],
+    sponsorshipSplitDefaults: sponsorEnabled ? {
+      sponsorReturnPercent: 12,
+      creatorPercent: 3,
+      status: "draft",
+      moneyMovementEnabled: false
+    } : null,
     sponsorMoneyCaptureEnabled: false,
     sponsorMoneyReleaseEnabled: false,
     participantCount: 0,
     submissionCount: 0,
     voteCount: 0,
     weightedVoteCount: 0,
-    requiresSubmissionApproval: true,
+    requiresSubmissionApproval: body.requiresSubmissionApproval || body.isLiveEvent || body.tournamentType !== "none",
+    coverImageUrl: body.coverImageUrl || null,
+    promoImageUrl: body.promoImageUrl || null,
+    trailerVideoUrl: body.trailerVideoUrl || null,
+    promoVideoUrl: body.promoVideoUrl || null,
+    mediaStorageStatus: "metadata_only",
+    isLiveEvent: body.isLiveEvent,
+    venueName: body.venueName || null,
+    eventAddress: body.eventAddress || null,
+    eventCity: body.eventCity || null,
+    eventState: body.eventState || null,
+    eventCountry: body.eventCountry || null,
+    eventMapUrl: body.eventMapUrl || null,
+    eventCapacity: body.eventCapacity,
+    eventSyncStatus: body.isLiveEvent ? "pending_review" : "not_applicable",
+    eventVisibility: body.isLiveEvent ? "hidden_until_approved" : "not_applicable",
+    eventApprovalStatus: body.isLiveEvent ? "pending_admin_review" : "not_required",
+    tournamentType: body.tournamentType,
+    divisionFormat: body.divisionFormat,
+    maxParticipants: body.maxParticipants,
+    scoringMode: body.scoringMode,
+    bestOfRounds: body.bestOfRounds,
+    pointsToWin: body.pointsToWin,
+    timerEnabled: body.timerEnabled,
+    timerDuration: body.timerDuration,
+    roundDuration: body.roundDuration,
+    judgeScoringEnabled: body.judgeScoringEnabled,
+    votingStartsAt: body.votingStartsAt || body.submissionDeadline,
+    adminReviewRequired: lifecycleStatus === "pending_review",
+    adminPriceApprovalStatus: body.prizeType === "money" ? "pending_review" : "not_required",
     creatorPlanId: planAccess.normalizedPlanId,
     creatorLegacyPlanId: planAccess.planId,
     createdAt: now,
