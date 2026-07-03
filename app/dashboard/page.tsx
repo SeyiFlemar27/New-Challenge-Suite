@@ -6,12 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Award, Diamond, Flame, Medal, Swords, Trophy, Users } from "lucide-react";
+import { Activity, Award, BarChart3, Crown, Diamond, Flame, LockKeyhole, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
+import { getPlanExperience } from "@/lib/plan-access";
 
 type LeaderboardEntry = {
   displayName?: string;
@@ -60,6 +61,86 @@ export default function DashboardPage() {
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
   const dashboardStyle = findCustomizationOption(dashboard?.user.customization?.dashboardStyleId, "dashboardStyle")?.previewClass;
+  const planExperience = getPlanExperience({
+    planId: dashboard?.user.planId,
+    planStatus: dashboard?.user.planStatus,
+    accountType: dashboard?.user.accountType
+  });
+  const tierFeatures = planExperience.planId === "free"
+    ? [
+        { title: "Explore & Compete", body: "Discover public challenges, submit entries, vote, and build your ranking.", icon: Swords, active: true },
+        { title: "Creator Studio", body: "Private challenges, sponsor collaboration, analytics, and boosts require Creator.", icon: LockKeyhole, active: false },
+        { title: "Host Control Center", body: "Tournament, live-event, participant, and voting controls require Host.", icon: LockKeyhole, active: false }
+      ]
+    : planExperience.planId === "creator"
+      ? [
+          { title: "Creator Analytics", body: "Track submissions, challenge activity, and basic creator performance.", icon: BarChart3, active: true },
+          { title: "Sponsor Ready", body: "Create sponsor-enabled challenges and receive future sponsor requests.", icon: Rocket, active: true },
+          { title: "Creator Earnings", body: "Review-only earnings foundation. Withdrawals and payouts are not active.", icon: ShieldCheck, active: true }
+        ]
+      : planExperience.planId === "pro"
+        ? [
+            { title: "Performance Analytics", body: "Study ranking history, highlighted submissions, votes, and challenge performance.", icon: Activity, active: true },
+            { title: "Ranked Challenges", body: "Create ranked formats and join tournament experiences when available.", icon: Trophy, active: true },
+            { title: "Amplification", body: `${planExperience.monthlyBoostLimit} boosts per month and vote multipliers up to ${planExperience.voteMultiplierLimit}x.`, icon: Rocket, active: true }
+          ]
+        : planExperience.planId === "host"
+          ? [
+              { title: "Competition Operations", body: "Manage participants, submission review, voting controls, tournaments, and live-event foundations.", icon: Radio, active: true, href: "/dashboard/host" },
+              { title: "Host Team", body: `Team foundation for up to ${planExperience.teamMemberLimit} members. Invitations are not active yet.`, icon: UsersRound, active: true, href: "/dashboard/host/team" },
+              { title: "Revenue Overview", body: "Read-only sponsorship and revenue review. Transfers and withdrawals remain inactive.", icon: ShieldCheck, active: true }
+            ]
+          : [
+              { title: "Programs & Campaigns", body: "Coordinate branded programs, campaigns, and large competition foundations.", icon: Crown, active: true },
+              { title: "Reports & Exports", body: "Enterprise reporting and export foundations for program oversight.", icon: BarChart3, active: true },
+              { title: "Teams & Integrations", body: `Multi-admin foundation for up to ${planExperience.teamMemberLimit} members, with integration placeholders.`, icon: UsersRound, active: true, href: "/dashboard/host" }
+            ];
+  const quickActions = planExperience.planId === "free"
+    ? [
+        { href: "/challenges", label: "Explore Challenges", variant: "secondary" as const },
+        { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
+        { href: "/subscriptions", label: "Compare Plans", variant: "ghost" as const }
+      ]
+    : planExperience.planId === "creator"
+      ? [
+          { href: "/challenges/create", label: "Create Challenge", variant: "primary" as const },
+          { href: "/my-challenges", label: "Creator Projects", variant: "secondary" as const },
+          { href: "/wallet", label: "Wallet & Earnings", variant: "ghost" as const }
+        ]
+      : planExperience.planId === "pro"
+        ? [
+            { href: "/challenges/create", label: "Create Ranked Challenge", variant: "primary" as const },
+            { href: "/leaderboards", label: "Performance & Rank", variant: "secondary" as const },
+            { href: "/profile", label: "Highlight Profile", variant: "ghost" as const }
+          ]
+        : [
+            { href: "/dashboard/host", label: planExperience.planId === "enterprise" ? "Open Command Center" : "Open Host Controls", variant: "primary" as const },
+            { href: "/challenges/create", label: "Build Competition", variant: "secondary" as const },
+            { href: "/wallet", label: "Revenue Overview", variant: "ghost" as const }
+          ];
+  const tierStats = planExperience.planId === "free"
+    ? [
+        { icon: <Swords />, title: "Active Challenges", value: dashboard?.stats.activeChallenges ?? 0, label: "Public participation" },
+        { icon: <Diamond />, title: "Points Earned", value: dashboard?.stats.totalPoints ?? 0, label: "Competition score" },
+        { icon: <Medal />, title: "Badges Collected", value: dashboard?.stats.badgeCount ?? 0, label: "Achievements" }
+      ]
+    : planExperience.planId === "creator"
+      ? [
+          { icon: <Swords />, title: "Creator Challenges", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
+          { icon: <Activity />, title: "Submissions", value: dashboard?.stats.submissionCount ?? 0, label: "Creator activity" },
+          { icon: <Rocket />, title: "Monthly Boosts", value: planExperience.monthlyBoostLimit, label: "Creator allowance" }
+        ]
+      : planExperience.planId === "pro"
+        ? [
+            { icon: <Trophy />, title: "Performance Points", value: dashboard?.stats.totalPoints ?? 0, label: "Ranking performance" },
+            { icon: <Activity />, title: "Submissions", value: dashboard?.stats.submissionCount ?? 0, label: "Portfolio activity" },
+            { icon: <Rocket />, title: "Monthly Boosts", value: planExperience.monthlyBoostLimit, label: `${planExperience.voteMultiplierLimit}x vote limit` }
+          ]
+        : [
+            { icon: <Swords />, title: planExperience.planId === "enterprise" ? "Active Programs" : "Active Competitions", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
+            { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit, label: "Foundation seats" },
+            { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational foundation" }
+          ];
 
   if (redirectTo || sponsorAccount) {
     return (
@@ -78,12 +159,13 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-4">
           <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
-          <PageTitle title="Dashboard" subtitle={isLoading ? "Loading your dashboard..." : `Welcome back, ${firstName}. Ready to compete today?`} />
+          <div>
+            <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{planExperience.badgeLabel}</p>
+            <PageTitle title={planExperience.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : `${firstName}, ${planExperience.dashboardSubtitle}`} />
+          </div>
         </div>
         <div className="flex flex-wrap gap-4">
-          <LinkButton href="/challenges" variant="secondary">Find Challenge</LinkButton>
-          <LinkButton href="/challenges/create">Create Challenge</LinkButton>
-          <LinkButton href="/wallet" variant="ghost">View Wallet</LinkButton>
+          {quickActions.map((action) => <LinkButton key={action.href} href={action.href} variant={action.variant}>{action.label}</LinkButton>)}
         </div>
       </div>
       {errorMessage ? (
@@ -93,9 +175,12 @@ export default function DashboardPage() {
         </Card>
       ) : null}
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <Stat className={dashboardStyle} icon={<Swords />} title="Active Challenges" value={isLoading ? "..." : String(dashboard?.stats.activeChallenges ?? 0)} label="In Progress" />
-        <Stat className={dashboardStyle} icon={<Diamond />} title="Points Earned" value={isLoading ? "..." : String(dashboard?.stats.totalPoints ?? 0)} label="Total Points" />
-        <Stat className={dashboardStyle} icon={<Medal />} title="Badges Collected" value={isLoading ? "..." : String(dashboard?.stats.badgeCount ?? 0)} label="Total Earned" />
+        {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
+      </div>
+      <div className="mt-8 grid gap-6 md:grid-cols-3">
+        {tierFeatures.map((feature) => (
+          <TierFeatureCard key={feature.title} {...feature} />
+        ))}
       </div>
       <Card className="mt-8 p-6 md:p-8">
         <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
@@ -147,6 +232,19 @@ export default function DashboardPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: string; body: string; icon: typeof Swords; active: boolean; href?: string }) {
+  return (
+    <Card className={cn("flex min-h-48 flex-col p-6", !active && "border-dashed opacity-80")}>
+      <div className={cn("flex h-11 w-11 items-center justify-center rounded-[8px]", active ? "bg-yellow-500/10 text-[var(--gold)]" : "bg-white/5 text-slate-500")}>
+        <Icon size={21} />
+      </div>
+      <h2 className="mt-4 text-xl font-black">{title}</h2>
+      <p className="mt-2 flex-1 text-sm leading-6 text-slate-300">{body}</p>
+      {href ? <LinkButton href={href} variant="ghost" className="mt-4 w-full">Open</LinkButton> : !active ? <LinkButton href="/subscriptions" variant="ghost" className="mt-4 w-full">View Upgrade</LinkButton> : null}
+    </Card>
   );
 }
 

@@ -1,9 +1,9 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
-import { subscriptionPlans } from "@/lib/server/subscriptions";
 import { conflict, fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { logEmailDeliveryError, sendEmail } from "@/lib/server/email";
+import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,11 +36,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const account = userSnap.exists ? userSnap.data() ?? {} : {};
   const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
-  const currentPlanId = String(account.planId ?? profile.planId ?? "observer");
-  const currentPlan = subscriptionPlans.find((item) => item.id === currentPlanId) ?? subscriptionPlans[0];
+  const currentPlan = getUserPlanAccess({ ...profile, ...account });
+  if (!currentPlan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
   const requiredPlanId = typeof event.requiredPlanId === "string" ? event.requiredPlanId : null;
-  const requiredPlan = requiredPlanId ? subscriptionPlans.find((item) => item.id === requiredPlanId) : null;
-  if (requiredPlan && requiredPlan.canHostLiveEvents && !currentPlan.canHostLiveEvents) {
+  const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
+  if (requiredPlan && getPlanRank(currentPlan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId)) {
     return forbidden("This live event requires an eligible subscription plan.");
   }
 

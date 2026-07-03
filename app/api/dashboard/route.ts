@@ -2,6 +2,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverUnavailable } from "@/lib/server/responses";
+import { getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -29,16 +30,31 @@ export async function GET(request: Request) {
   const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const leaderboardData = leaderboardSnap.exists ? leaderboardSnap.data() : {};
   const leaderboardEntries = Array.isArray(leaderboardData?.entries) ? leaderboardData.entries : [];
+  const planProfile = { ...profile, ...account };
+  const planAccess = getUserPlanAccess(planProfile);
+  const accountType = normalizeAccountType(planProfile);
+  const sponsorOnboardingComplete = Boolean(planProfile.sponsorOnboardingComplete || planProfile.brandProfileComplete);
+  const hasSponsorProfile = Boolean(planProfile.hasSponsorProfile || sponsorOnboardingComplete);
 
   return ok({
+    redirectTo: accountType === "sponsor"
+      ? sponsorOnboardingComplete && hasSponsorProfile ? "/sponsor/dashboard" : "/sponsor/onboarding"
+      : null,
     user: {
       uid: user.uid,
       email: user.email ?? account?.email ?? profile?.email ?? "",
       displayName: profile?.displayName ?? account?.displayName ?? user.email ?? "",
       initials: profile?.initials ?? "",
       role: account?.role ?? profile?.role ?? null,
-      planId: account?.planId ?? "observer",
-      premium: Boolean(profile?.premium || (account?.planId && account.planId !== "observer")),
+      accountType,
+      dashboardType: accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard",
+      planId: planAccess.normalizedPlanId,
+      legacyPlanId: planAccess.planId,
+      planName: planAccess.planName,
+      planStatus: planAccess.planStatus,
+      premium: planAccess.isPremium,
+      sponsorOnboardingComplete,
+      hasSponsorProfile,
       verified: Boolean(profile?.verified ?? user.emailVerified),
       totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
       doroBalance: Number(wallet?.balance ?? 0)

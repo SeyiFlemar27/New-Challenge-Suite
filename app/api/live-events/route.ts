@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
-import { getUserPlanAccess } from "@/lib/plan-access";
+import { forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
+    if (!plan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
     const registeredEventIds = new Set(registrationsSnap.docs.map((doc) => String(doc.data().eventId ?? "")));
 
     const events = eventsSnap.docs
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
         const data = doc.data();
         const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
         const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
-        const planRequired = Boolean(requiredPlan && requiredPlan.canHostLiveEvents && !plan.canHostLiveEvents);
+        const planRequired = Boolean(requiredPlan && getPlanRank(plan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId));
         const capacity = Number(data.capacity ?? data.maxAttendees ?? 0);
         const attending = Number(data.attending ?? data.attendeeCount ?? data.registrationCount ?? 0);
         return {

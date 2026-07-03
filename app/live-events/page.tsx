@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchLiveEvents } from "@/lib/api/services";
 import { CheckCircle2, LockKeyhole } from "lucide-react";
+import { PlanFeatureGate } from "@/components/plan-feature-gate";
 
 interface LiveEventRecord {
   id: string;
@@ -28,6 +29,14 @@ function formatDate(value: string) {
 }
 
 export default function LiveEventsPage() {
+  return (
+    <PlanFeatureGate feature="live_event_tools" requiredPlan="Host" title="Live event tools require Host plan">
+      <LiveEventsContent />
+    </PlanFeatureGate>
+  );
+}
+
+function LiveEventsContent() {
   const [events, setEvents] = useState<LiveEventRecord[]>([]);
   const [canHostLiveEvents, setCanHostLiveEvents] = useState(false);
   const [loading, setLoading] = useState(true);

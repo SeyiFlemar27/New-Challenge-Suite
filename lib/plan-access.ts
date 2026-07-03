@@ -42,6 +42,45 @@ export interface PlanAccess {
   sponsorCampaignLimit: number;
 }
 
+export type PlanFeature =
+  | "private_challenges"
+  | "sponsor_challenges"
+  | "creator_analytics"
+  | "performance_analytics"
+  | "boosts"
+  | "vote_multipliers"
+  | "ranked_challenges"
+  | "join_tournaments"
+  | "host_control_center"
+  | "tournament_builder"
+  | "live_event_tools"
+  | "participant_management"
+  | "submission_moderation"
+  | "voting_control"
+  | "revenue_overview"
+  | "team_management"
+  | "data_export"
+  | "programs"
+  | "custom_branding"
+  | "reports"
+  | "integrations"
+  | "sponsor_command_center";
+
+export interface PlanExperience {
+  planId: BlueprintPlanId;
+  dashboardName: string;
+  dashboardSubtitle: string;
+  badgeLabel: string;
+  challengeLimitLabel: string;
+  privateChallengeLimitLabel: string;
+  monthlyChallengeLimit: number | null;
+  monthlyPrivateChallengeLimit: number | null;
+  teamMemberLimit: number;
+  monthlyBoostLimit: number;
+  voteMultiplierLimit: number;
+  features: Record<PlanFeature, boolean>;
+}
+
 const userPlanOrder: UserProductPlanId[] = ["free", "creator", "pro", "host", "enterprise"];
 const sponsorPlanOrder: SponsorProductPlanId[] = ["sponsor_starter", "brand_partner", "enterprise_partner"];
 
@@ -65,6 +104,215 @@ const customizationPlanByBlueprint: Record<BlueprintPlanId, ProductPlanId> = {
   sponsor_starter: "premium",
   brand_partner: "premium",
   enterprise_partner: "verified_host"
+};
+
+const noFeatures: Record<PlanFeature, boolean> = {
+  private_challenges: false,
+  sponsor_challenges: false,
+  creator_analytics: false,
+  performance_analytics: false,
+  boosts: false,
+  vote_multipliers: false,
+  ranked_challenges: false,
+  join_tournaments: false,
+  host_control_center: false,
+  tournament_builder: false,
+  live_event_tools: false,
+  participant_management: false,
+  submission_moderation: false,
+  voting_control: false,
+  revenue_overview: false,
+  team_management: false,
+  data_export: false,
+  programs: false,
+  custom_branding: false,
+  reports: false,
+  integrations: false,
+  sponsor_command_center: false
+};
+
+const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
+  free: {
+    planId: "free",
+    dashboardName: "User Dashboard",
+    dashboardSubtitle: "Explore challenges, compete, vote, and build your first public challenge.",
+    badgeLabel: "Free Explorer",
+    challengeLimitLabel: "1 basic public challenge / month",
+    privateChallengeLimitLabel: "Private challenges locked",
+    monthlyChallengeLimit: 1,
+    monthlyPrivateChallengeLimit: 0,
+    teamMemberLimit: 0,
+    monthlyBoostLimit: 0,
+    voteMultiplierLimit: 0,
+    features: { ...noFeatures }
+  },
+  creator: {
+    planId: "creator",
+    dashboardName: "Creator Studio",
+    dashboardSubtitle: "Create sponsor-ready challenges, manage your entries, and understand creator performance.",
+    badgeLabel: "Creator",
+    challengeLimitLabel: "3 challenges / month",
+    privateChallengeLimitLabel: "1 private challenge / month",
+    monthlyChallengeLimit: 3,
+    monthlyPrivateChallengeLimit: 1,
+    teamMemberLimit: 0,
+    monthlyBoostLimit: 1,
+    voteMultiplierLimit: 0,
+    features: {
+      ...noFeatures,
+      private_challenges: true,
+      sponsor_challenges: true,
+      creator_analytics: true,
+      boosts: true,
+      revenue_overview: true
+    }
+  },
+  pro: {
+    planId: "pro",
+    dashboardName: "Performance Hub",
+    dashboardSubtitle: "Run ranked challenges, study performance, amplify standout work, and build ranking history.",
+    badgeLabel: "Pro",
+    challengeLimitLabel: "Unlimited basic and group challenges",
+    privateChallengeLimitLabel: "5 private challenges / month",
+    monthlyChallengeLimit: null,
+    monthlyPrivateChallengeLimit: 5,
+    teamMemberLimit: 0,
+    monthlyBoostLimit: 3,
+    voteMultiplierLimit: 3,
+    features: {
+      ...noFeatures,
+      private_challenges: true,
+      sponsor_challenges: true,
+      creator_analytics: true,
+      performance_analytics: true,
+      boosts: true,
+      vote_multipliers: true,
+      ranked_challenges: true,
+      join_tournaments: true,
+      revenue_overview: true
+    }
+  },
+  host: {
+    planId: "host",
+    dashboardName: "Host Control Center",
+    dashboardSubtitle: "Operate competitions, participants, submissions, voting, events, sponsors, and review-safe revenue reporting.",
+    badgeLabel: "Verified Host",
+    challengeLimitLabel: "Unlimited challenges",
+    privateChallengeLimitLabel: "Unlimited private challenges",
+    monthlyChallengeLimit: null,
+    monthlyPrivateChallengeLimit: null,
+    teamMemberLimit: 3,
+    monthlyBoostLimit: 10,
+    voteMultiplierLimit: 5,
+    features: {
+      ...noFeatures,
+      private_challenges: true,
+      sponsor_challenges: true,
+      creator_analytics: true,
+      performance_analytics: true,
+      boosts: true,
+      vote_multipliers: true,
+      ranked_challenges: true,
+      join_tournaments: true,
+      host_control_center: true,
+      tournament_builder: true,
+      live_event_tools: true,
+      participant_management: true,
+      submission_moderation: true,
+      voting_control: true,
+      revenue_overview: true,
+      team_management: true,
+      data_export: true,
+      reports: true
+    }
+  },
+  enterprise: {
+    planId: "enterprise",
+    dashboardName: "Enterprise Command Center",
+    dashboardSubtitle: "Coordinate programs, campaigns, branded experiences, large competitions, teams, reports, and integrations.",
+    badgeLabel: "Enterprise",
+    challengeLimitLabel: "Unlimited program challenges",
+    privateChallengeLimitLabel: "Unlimited private challenges",
+    monthlyChallengeLimit: null,
+    monthlyPrivateChallengeLimit: null,
+    teamMemberLimit: 25,
+    monthlyBoostLimit: 50,
+    voteMultiplierLimit: 20,
+    features: {
+      ...noFeatures,
+      private_challenges: true,
+      sponsor_challenges: true,
+      creator_analytics: true,
+      performance_analytics: true,
+      boosts: true,
+      vote_multipliers: true,
+      ranked_challenges: true,
+      join_tournaments: true,
+      host_control_center: true,
+      tournament_builder: true,
+      live_event_tools: true,
+      participant_management: true,
+      submission_moderation: true,
+      voting_control: true,
+      revenue_overview: true,
+      team_management: true,
+      data_export: true,
+      programs: true,
+      custom_branding: true,
+      reports: true,
+      integrations: true
+    }
+  },
+  sponsor_starter: {
+    planId: "sponsor_starter",
+    dashboardName: "Brand Command Center",
+    dashboardSubtitle: "Discover sponsor-ready challenges and prepare focused brand campaigns.",
+    badgeLabel: "Sponsor Starter",
+    challengeLimitLabel: "2 campaign workspaces",
+    privateChallengeLimitLabel: "Normal challenge creation unavailable",
+    monthlyChallengeLimit: 0,
+    monthlyPrivateChallengeLimit: 0,
+    teamMemberLimit: 1,
+    monthlyBoostLimit: 0,
+    voteMultiplierLimit: 0,
+    features: { ...noFeatures, sponsor_command_center: true, reports: true }
+  },
+  brand_partner: {
+    planId: "brand_partner",
+    dashboardName: "Brand Command Center",
+    dashboardSubtitle: "Manage brand campaigns, placements, audience insights, reports, and sponsor-ready opportunities.",
+    badgeLabel: "Brand Partner",
+    challengeLimitLabel: "10 campaign workspaces",
+    privateChallengeLimitLabel: "Normal challenge creation unavailable",
+    monthlyChallengeLimit: 0,
+    monthlyPrivateChallengeLimit: 0,
+    teamMemberLimit: 5,
+    monthlyBoostLimit: 0,
+    voteMultiplierLimit: 0,
+    features: { ...noFeatures, sponsor_command_center: true, reports: true, team_management: true, data_export: true }
+  },
+  enterprise_partner: {
+    planId: "enterprise_partner",
+    dashboardName: "Brand Command Center",
+    dashboardSubtitle: "Coordinate enterprise campaigns, placements, teams, reporting, exports, and integration foundations.",
+    badgeLabel: "Enterprise Partner",
+    challengeLimitLabel: "Unlimited campaign workspaces",
+    privateChallengeLimitLabel: "Normal challenge creation unavailable",
+    monthlyChallengeLimit: 0,
+    monthlyPrivateChallengeLimit: 0,
+    teamMemberLimit: 25,
+    monthlyBoostLimit: 0,
+    voteMultiplierLimit: 0,
+    features: {
+      ...noFeatures,
+      sponsor_command_center: true,
+      reports: true,
+      team_management: true,
+      data_export: true,
+      custom_branding: true,
+      integrations: true
+    }
+  }
 };
 
 const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
@@ -135,8 +383,8 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,
-    canAccessPremiumChallenges: true,
-    canUseAdvancedAnalytics: true,
+    canAccessPremiumChallenges: false,
+    canUseAdvancedAnalytics: false,
     canUseSponsorDashboard: false,
     canCreateSponsorCampaigns: false,
     canSponsorChallenges: false,
@@ -158,7 +406,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isEnterprisePartner: false,
     isCreatorPro: true,
     isVerifiedHost: false,
-    activeChallengeLimit: 25,
+    activeChallengeLimit: 1000,
     privateChallengeLimit: 5,
     dailyFreeVoteLimit: 20,
     monthlyBoostLimit: 3,
@@ -195,8 +443,8 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isEnterprisePartner: false,
     isCreatorPro: true,
     isVerifiedHost: true,
-    activeChallengeLimit: 50,
-    privateChallengeLimit: 50,
+    activeChallengeLimit: 1000,
+    privateChallengeLimit: 1000,
     dailyFreeVoteLimit: 50,
     monthlyBoostLimit: 10,
     voteMultiplierLimit: 5,
@@ -232,8 +480,8 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isEnterprisePartner: false,
     isCreatorPro: true,
     isVerifiedHost: true,
-    activeChallengeLimit: 500,
-    privateChallengeLimit: 500,
+    activeChallengeLimit: 1000,
+    privateChallengeLimit: 1000,
     dailyFreeVoteLimit: 100,
     monthlyBoostLimit: 50,
     voteMultiplierLimit: 20,
@@ -393,13 +641,37 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
     ...base,
     accountType: normalizeAccountType({ ...profile, planId: normalizedPlanId }),
     planStatus: status,
-    activeChallengeLimit: Number(profile.activeChallengeLimit ?? base.activeChallengeLimit),
-    privateChallengeLimit: Number(profile.privateChallengeLimit ?? base.privateChallengeLimit),
-    dailyFreeVoteLimit: Number(profile.dailyFreeVoteLimit ?? base.dailyFreeVoteLimit),
-    monthlyBoostLimit: Number(profile.monthlyBoostLimit ?? base.monthlyBoostLimit),
-    voteMultiplierLimit: Number(profile.voteMultiplierLimit ?? base.voteMultiplierLimit),
-    sponsorCampaignLimit: Number(profile.sponsorCampaignLimit ?? base.sponsorCampaignLimit)
+    activeChallengeLimit: base.activeChallengeLimit,
+    privateChallengeLimit: base.privateChallengeLimit,
+    dailyFreeVoteLimit: base.dailyFreeVoteLimit,
+    monthlyBoostLimit: base.monthlyBoostLimit,
+    voteMultiplierLimit: base.voteMultiplierLimit,
+    sponsorCampaignLimit: base.sponsorCampaignLimit
   };
+}
+
+export function getPlanExperience(profile: Record<string, unknown> = {}): PlanExperience {
+  const access = getUserPlanAccess(profile);
+  const active = ["active", "trial", "trialing"].includes(access.planStatus);
+  if (access.accountType === "sponsor") {
+    const sponsorPlan = active && sponsorPlanOrder.includes(access.normalizedPlanId as SponsorProductPlanId)
+      ? access.normalizedPlanId
+      : "sponsor_starter";
+    const experience = planExperiences[sponsorPlan];
+    if (active && access.normalizedPlanId !== "free") return experience;
+    return {
+      ...experience,
+      badgeLabel: "Sponsor Account",
+      challengeLimitLabel: "Sponsor tools require an active sponsor plan",
+      teamMemberLimit: 0,
+      features: { ...noFeatures, sponsor_command_center: true }
+    };
+  }
+  return planExperiences[active ? access.normalizedPlanId : "free"];
+}
+
+export function canAccessPlanFeature(profile: Record<string, unknown>, feature: PlanFeature) {
+  return getPlanExperience(profile).features[feature];
 }
 
 export function planFieldsFor(planId: BlueprintPlanId | ProductPlanId | unknown) {
@@ -491,9 +763,16 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   const premiumOnly = type.includes("premium") || Boolean(challengeInput.premiumOnly);
   const paid = entryFee > 0 || Boolean(challengeInput.paidEntryEnabled);
   const tournament = type.includes("tournament") || format.includes("tournament") || format.includes("bracket");
+  const ranked = format.includes("ranked");
+  const oneVsOne = format.includes("1 vs 1") || format.includes("1v1") || format.includes("head-to-head");
+  const liveEvent = format.includes("live event");
+  const enterpriseProgram = format.includes("program") || format.includes("campaign");
   const prize = prizePool > 0 || Boolean(challengeInput.prizePoolEnabled || challengeInput.cashPayoutsEnabled) || (prizeType && !prizeType.includes("bragging"));
 
   if (tournament) return { allowed: false, code: "TOURNAMENTS_LOCKED", message: "Tournament creation is locked until Phase 6." };
+  if (enterpriseProgram && !access.isEnterprise) return { allowed: false, code: "ENTERPRISE_REQUIRED", message: "Program and campaign challenge builders require Enterprise access." };
+  if ((oneVsOne || liveEvent) && !access.isHost) return { allowed: false, code: "HOST_REQUIRED", message: "1v1 and live-event challenge tools require Host access." };
+  if (ranked && !access.isPro) return { allowed: false, code: "PRO_REQUIRED", message: "Ranked challenge creation requires Pro access." };
   if (paid) return { allowed: false, code: "PAID_ENTRY_DISABLED", message: "Paid-entry prize pools are disabled for now. Use sponsor-funded or bragging-rights challenges." };
   if (privateChallenge && !access.canCreatePrivateChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish private or exclusive challenges." };
   if (premiumOnly && !access.canAccessPremiumChallenges) return { allowed: false, code: "PRO_REQUIRED", message: "Pro access is required to publish premium-only challenges." };

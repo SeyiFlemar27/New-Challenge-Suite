@@ -3,7 +3,7 @@ import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
-import { canCreateChallenge, getUserPlanAccess } from "@/lib/plan-access";
+import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -43,12 +43,31 @@ export async function POST(request: Request) {
   ]);
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
   const planAccess = getUserPlanAccess(planProfile);
+  const planExperience = getPlanExperience(planProfile);
 
   if (planAccess.isSponsor) {
     return fail("Sponsors manage campaigns from the Brand Command Center. Use /sponsor instead of normal challenge creation.", 403, { redirectTo: "/sponsor/dashboard" }, "USER_ACCOUNT_REQUIRED");
   }
 
   const activeChallengeCount = ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status)).length;
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const challengesCreatedThisMonth = ownedChallengesSnap.docs.filter((document) => {
+    const data = document.data();
+    const createdAt = Date.parse(String(data.createdAt ?? ""));
+    return Number.isFinite(createdAt) && createdAt >= monthStart.getTime() && !["draft", "cancelled"].includes(String(data.status ?? ""));
+  });
+  const privateChallengesThisMonth = challengesCreatedThisMonth.filter((document) => {
+    const data = document.data();
+    return String(data.visibility ?? data.type ?? "").toLowerCase().includes("private");
+  }).length;
+  if (body.publish && planExperience.monthlyChallengeLimit !== null && challengesCreatedThisMonth.length >= planExperience.monthlyChallengeLimit) {
+    return fail(`Your ${planAccess.planName} plan allows ${planExperience.challengeLimitLabel}.`, 409, undefined, "PLAN_LIMIT_REACHED");
+  }
+  if (body.publish && body.visibility === "private" && planExperience.monthlyPrivateChallengeLimit !== null && privateChallengesThisMonth >= planExperience.monthlyPrivateChallengeLimit) {
+    return fail(`Your ${planAccess.planName} plan allows ${planExperience.privateChallengeLimitLabel}.`, 409, undefined, "PRIVATE_CHALLENGE_LIMIT_REACHED");
+  }
   const lifecycleStatus = resolveInitialChallengeStatus({
     publish: body.publish,
     startsAt: body.startsAt,

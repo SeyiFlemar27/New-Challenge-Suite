@@ -5,6 +5,7 @@ import { BarChart3, Building2, CreditCard, LayoutDashboard, Megaphone, MessageSq
 import { BrandLogo } from "@/components/brand";
 import { Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { getPlanExperience } from "@/lib/plan-access";
 
 const sponsorNav = [
   { label: "Overview", icon: LayoutDashboard, active: true },
@@ -28,11 +29,14 @@ export interface SponsorShellProfile {
   businessEmail?: string | null;
   sponsorVerificationStatus?: string | null;
   sponsorOnboardingStatus?: string | null;
+  planId?: string | null;
+  planStatus?: string | null;
 }
 
 export function SponsorShell({ children, profile }: { children: React.ReactNode; profile?: SponsorShellProfile | null }) {
   const brandName = profile?.brandName || "Brand Command Center";
   const verificationStatus = profile?.sponsorVerificationStatus || "pending_review";
+  const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
@@ -49,6 +53,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-200">Review Status</p>
             <p className="mt-2 text-sm font-bold capitalize text-white">{verificationStatus.replaceAll("_", " ")}</p>
             <p className="mt-2 text-xs text-slate-400">Your sponsor profile is ready for future admin review workflows.</p>
+            <p className="mt-3 border-t border-white/10 pt-3 text-xs font-black text-[var(--gold)]">{experience.badgeLabel} · {experience.teamMemberLimit} team seat{experience.teamMemberLimit === 1 ? "" : "s"}</p>
           </Card>
           <nav className="mt-6 grid gap-2">
             {sponsorNav.map((item) => {
@@ -70,8 +75,8 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
               );
             })}
           </nav>
-          <Link href="/dashboard" className="mt-6 block rounded-[8px] border border-white/10 px-4 py-3 text-center text-sm font-bold text-slate-300 transition hover:border-[var(--gold)] hover:text-white">
-            Back to main site
+          <Link href="/landing" className="mt-6 block rounded-[8px] border border-white/10 px-4 py-3 text-center text-sm font-bold text-slate-300 transition hover:border-[var(--gold)] hover:text-white">
+            View public site
           </Link>
         </aside>
         <section className="min-w-0 px-4 pb-10 pt-5 sm:px-5 md:px-8 lg:px-10">
@@ -84,7 +89,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
                   <h1 className="truncate text-lg font-black leading-tight">{brandName}</h1>
                 </div>
               </div>
-              <Link href="/dashboard" className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-xs font-bold text-slate-300">Main site</Link>
+              <Link href="/landing" className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-xs font-bold text-slate-300">Public site</Link>
             </div>
             <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3">
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Review Status</p>

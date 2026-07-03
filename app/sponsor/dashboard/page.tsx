@@ -6,6 +6,7 @@ import { ArrowRight, BarChart3, Building2, CalendarClock, CreditCard, Megaphone,
 import { Card, LinkButton } from "@/components/ui";
 import { SponsorPlaceholder, SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
+import { getPlanExperience } from "@/lib/plan-access";
 
 interface SponsorProfile {
   brandName?: string | null;
@@ -22,6 +23,8 @@ interface SponsorProfile {
   sponsorVerificationStatus?: string | null;
   hasSponsorProfile?: boolean;
   updatedAt?: string | null;
+  planId?: string | null;
+  planStatus?: string | null;
 }
 
 interface SponsorProfileResponse {
@@ -76,6 +79,7 @@ export default function SponsorDashboardPage() {
 
   const goals = useMemo(() => profile?.sponsorshipGoals ?? [], [profile]);
   const categories = useMemo(() => profile?.preferredChallengeCategories ?? [], [profile]);
+  const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
 
   if (loading) {
     return (
@@ -106,7 +110,7 @@ export default function SponsorDashboardPage() {
     <SponsorShell profile={profile}>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">Brand Command Center</p>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">{experience.badgeLabel} · Brand Command Center</p>
           <h1 className="mt-2 text-4xl font-black md:text-5xl">{profile?.brandName || "Sponsor Dashboard"}</h1>
           <p className="mt-3 max-w-3xl text-slate-300">A dedicated sponsor operating area for campaigns, placements, marketplace activity, audience insights, reports, team access, and billing foundations.</p>
         </div>
@@ -117,8 +121,8 @@ export default function SponsorDashboardPage() {
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         <Metric title="Verification" value={(profile?.sponsorVerificationStatus || "pending_review").replaceAll("_", " ")} label="Future admin review status" />
-        <Metric title="Goals" value={String(goals.length)} label="Sponsor objectives saved" />
-        <Metric title="Categories" value={String(categories.length)} label="Preferred challenge areas" />
+        <Metric title="Campaign Capacity" value={experience.challengeLimitLabel} label="Plan workspace allowance" />
+        <Metric title="Team Seats" value={String(experience.teamMemberLimit)} label={experience.features.team_management ? "Team foundation available" : "Team upgrades available on higher sponsor plans"} />
       </div>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_.9fr]">

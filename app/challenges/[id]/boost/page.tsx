@@ -10,6 +10,7 @@ import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
 import { boostChallenge, fetchBoostPackages, fetchChallengeDetails } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { PlanFeatureGate } from "@/components/plan-feature-gate";
 
 type BoostPackage = {
   id: string;
@@ -21,6 +22,14 @@ type BoostPackage = {
 };
 
 export default function BoostChallengePage() {
+  return (
+    <PlanFeatureGate feature="boosts" requiredPlan="Creator" title="Challenge boosts require Creator plan">
+      <BoostChallengeContent />
+    </PlanFeatureGate>
+  );
+}
+
+function BoostChallengeContent() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
   const auth = useAuth();

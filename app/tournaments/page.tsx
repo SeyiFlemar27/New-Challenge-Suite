@@ -3,12 +3,21 @@
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, PageTitle } from "@/components/ui";
 import { useState } from "react";
+import { PlanFeatureGate } from "@/components/plan-feature-gate";
 
 export default function TournamentsPage() {
+  return (
+    <PlanFeatureGate feature="join_tournaments" requiredPlan="Pro" title="Tournament access requires Pro plan">
+      <TournamentPreview />
+    </PlanFeatureGate>
+  );
+}
+
+function TournamentPreview() {
   const [format, setFormat] = useState<2 | 4 | 6>(2);
   return (
     <AppShell>
-      <div className="text-center"><PageTitle title="Tournament Brackets" subtitle="Manage and view live interactive tournament brackets" /></div>
+      <div className="text-center"><PageTitle title="Tournament Brackets" subtitle="Plan and preview tournament structures. Full tournament execution is not active yet." /></div>
       <div className="mt-6 flex justify-center gap-5"><span className="pt-3 font-bold">Format:</span>{[2, 4, 6].map((item) => <Button key={item} variant={format === item ? "primary" : "ghost"} onClick={() => setFormat(item as 2 | 4 | 6)}>{item} Divisions</Button>)}</div>
       <Card className="bracket-scroll mx-auto mt-12 max-h-[650px] max-w-[1160px] overflow-auto bg-[#0b1019] p-9">
         <h2 className="text-center text-2xl font-black text-[var(--gold-2)]">{format} Divisions {format === 2 ? "(East/West)" : format === 4 ? "(North/South/East/West)" : "(Regional Pools)"}</h2>
@@ -17,7 +26,7 @@ export default function TournamentsPage() {
           <BracketColumn title="Final" matches={1} />
         </div>
       </Card>
-      <p className="mt-12 text-center text-lg text-slate-500">Interactive Bracket Management (Admin/Verified Hosts only)<br />Max 50 participants allowed per tournament.</p>
+      <p className="mt-12 text-center text-lg text-slate-500">Bracket preview foundation. Host plan is required for management controls.<br />No participant or prize action is executed from this preview.</p>
     </AppShell>
   );
 }

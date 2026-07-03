@@ -4,7 +4,8 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { createNotification } from "@/lib/server/notifications";
 import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
-import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { getUserPlanAccess } from "@/lib/plan-access";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,10 +18,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const packageId = parsed.body?.packageId;
   const idempotencyKey = getRequestIdempotencyKey(request, parsed.body);
   if (typeof packageId !== "string") return validationError({ packageId: "Select a valid boost package." });
-  const [challengeSnap, packageSnap] = await Promise.all([
+  const [challengeSnap, packageSnap, accountSnap, profileSnap, boostsSnap] = await Promise.all([
     db.collection("challenges").doc(id).get(),
-    db.collection("boostPackages").doc(packageId).get()
+    db.collection("boostPackages").doc(packageId).get(),
+    db.collection("users").doc(user.uid).get(),
+    db.collection("profiles").doc(user.uid).get(),
+    db.collection("boosts").where("userId", "==", user.uid).limit(250).get()
   ]);
+  const planAccess = getUserPlanAccess({
+    ...(profileSnap.exists ? profileSnap.data() ?? {} : {}),
+    ...(accountSnap.exists ? accountSnap.data() ?? {} : {})
+  });
+  if (planAccess.accountType === "sponsor" || planAccess.monthlyBoostLimit <= 0) {
+    return forbidden("Challenge boosts require the Creator plan or higher.");
+  }
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const boostsThisMonth = boostsSnap.docs.filter((document) => {
+    const startsAt = Date.parse(String(document.data().startsAt ?? ""));
+    return Number.isFinite(startsAt) && startsAt >= monthStart.getTime();
+  }).length;
+  if (boostsThisMonth >= planAccess.monthlyBoostLimit) {
+    return fail(`Your ${planAccess.planName} plan includes ${planAccess.monthlyBoostLimit} challenge boost${planAccess.monthlyBoostLimit === 1 ? "" : "s"} per month.`, 403, undefined, "PLAN_LIMIT_REACHED");
+  }
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
   const challenge = challengeSnap.data() ?? {};
   if (!isChallengeEligibleForBoost(challenge.status)) return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");

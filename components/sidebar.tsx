@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings } from "lucide-react";
+import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
+import { getPlanExperience } from "@/lib/plan-access";
 
 const nav = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -21,6 +22,7 @@ const nav = [
   { href: "/live-events", label: "Live Events", icon: Radio },
   { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
   { href: "/tournaments", label: "Tournaments", icon: Award },
+  { href: "/dashboard/host", label: "Host Control Center", icon: ShieldCheck },
   { href: "/winners", label: "Winners", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings }
@@ -40,6 +42,33 @@ export function Sidebar() {
   const { user, loading, signedOut, error } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
   const planLabel = planBadgeLabel(user?.planId);
+  const planExperience = getPlanExperience({
+    planId: user?.planId,
+    planStatus: user?.planStatus,
+    accountType: user?.accountType
+  });
+  const visibleNav = user?.accountType === "sponsor"
+    ? [
+        { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
+        { href: "/sponsor/onboarding", label: "Brand Profile", icon: User },
+        { href: "/subscriptions", label: "Sponsor Plans", icon: Diamond },
+        { href: "/settings", label: "Settings", icon: Settings }
+      ]
+    : nav.filter((item) => {
+        if (item.href === "/private-exclusive") return planExperience.features.private_challenges;
+        if (item.href === "/live-events") return planExperience.features.live_event_tools;
+        if (item.href === "/tournaments") return planExperience.features.join_tournaments || planExperience.features.tournament_builder;
+        if (item.href === "/dashboard/host") return planExperience.features.host_control_center;
+        return true;
+      });
+  const visibleMobileNav = user?.accountType === "sponsor"
+    ? [
+        { href: "/sponsor/dashboard", label: "Brand", icon: Home },
+        { href: "/sponsor/onboarding", label: "Profile", icon: User },
+        { href: "/subscriptions", label: "Plans", icon: Diamond },
+        { href: "/settings", label: "Settings", icon: Settings }
+      ]
+    : mobileNav;
 
   async function enableNotifications() {
     if (!("Notification" in window)) {
@@ -79,7 +108,7 @@ export function Sidebar() {
           <BrandLogo imageClassName="h-28 w-28 border-2 border-[var(--gold)] gold-glow xl:h-32 xl:w-32" />
         </div>
         <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-yellow-500/20 px-5 py-4">
-          {nav.map((item) => {
+          {visibleNav.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = item.icon;
             return (
@@ -131,8 +160,8 @@ export function Sidebar() {
       </aside>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-[18px] border border-white/10 bg-[#121212] p-1.5">
-          {mobileNav.map((item) => {
+        <div className={cn("mx-auto grid max-w-md gap-1 rounded-[18px] border border-white/10 bg-[#121212] p-1.5", visibleMobileNav.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
+          {visibleMobileNav.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = item.icon;
             return (

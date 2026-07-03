@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { subscriptionPlans } from "@/lib/server/subscriptions";
-import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { fail, forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +42,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const data = eventSnap.data() ?? {};
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
-    const currentPlanId = String(account.planId ?? profile.planId ?? "observer");
-    const plan = subscriptionPlans.find((item) => item.id === currentPlanId) ?? subscriptionPlans[0];
+    const plan = getUserPlanAccess({ ...profile, ...account });
+    if (!plan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
     const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
-    const requiredPlan = requiredPlanId ? subscriptionPlans.find((item) => item.id === requiredPlanId) : null;
-    const planRequired = Boolean(requiredPlan && !plan.canHostLiveEvents && requiredPlan.canHostLiveEvents);
+    const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
+    const planRequired = Boolean(requiredPlan && getPlanRank(plan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId));
     const capacity = Number(data.capacity ?? data.maxAttendees ?? 0);
     const attending = Number(data.attending ?? data.attendeeCount ?? data.registrationCount ?? 0);
     const status = String(data.status ?? "scheduled").toLowerCase();
@@ -59,7 +59,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         uid: user.uid,
         email: user.email ?? account.email ?? profile.email ?? "",
         displayName: profile.displayName ?? account.displayName ?? user.email ?? "",
-        planId: plan.id,
+        planId: plan.normalizedPlanId,
         subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free"
       },
       event: {
