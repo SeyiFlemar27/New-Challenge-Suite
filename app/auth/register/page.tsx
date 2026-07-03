@@ -60,13 +60,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6">
-      <Card className="my-8 w-full max-w-[560px] rounded-[16px] p-8 md:p-10">
-        <BrandLogo className="mb-6" imageClassName="h-24 w-24 border-2 border-[var(--gold)] gold-glow" />
-        <h1 className="text-center text-4xl font-black">Create Account</h1>
-        <p className="mt-3 text-center text-lg text-slate-300">Join the Challenge Suite community today</p>
-        <form className="mt-8 space-y-5" onSubmit={submit}>
-          <div className="grid gap-4 md:grid-cols-2">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+      <Card className="w-full max-w-[600px] rounded-[12px] p-6 sm:p-8 lg:p-10">
+        <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" />
+        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">Create Account</h1>
+        <p className="mx-auto mt-3 max-w-md text-center text-base leading-7 text-slate-300 sm:text-lg">Join the Challenge Suite community today</p>
+        <form className="mt-8 space-y-6" onSubmit={submit}>
+          <div className="grid gap-5 sm:grid-cols-2">
             <Field label="First Name"><input className={inputClass} value={form.firstName} onChange={(event) => update("firstName", event.target.value)} placeholder="First name" /></Field>
             <Field label="Last Name"><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder="Last name" /></Field>
           </div>

@@ -161,9 +161,9 @@ export default function SponsorOnboardingPage() {
   if (loading) {
     return (
       <SponsorShell profile={profile}>
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-6xl">
           <div className="h-10 w-80 animate-pulse rounded bg-white/10" />
-          <Card className="mt-8 p-6">
+          <Card className="mt-8 p-5 sm:p-6 lg:p-8">
             <div className="grid gap-5 md:grid-cols-2">
               {Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-11 animate-pulse rounded-[7px] bg-white/10" />)}
             </div>
@@ -176,7 +176,7 @@ export default function SponsorOnboardingPage() {
   if (unauthorized) {
     return (
       <SponsorShell profile={profile}>
-        <Card className="mx-auto mt-16 max-w-2xl p-8 text-center">
+        <Card className="mx-auto mt-10 max-w-2xl p-6 text-center sm:mt-16 sm:p-8 lg:p-10">
           <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
           <h1 className="mt-5 text-3xl font-black">Sponsor access required</h1>
           <p className="mt-3 text-slate-300">{error ?? "Sign in with a verified sponsor account to continue."}</p>
@@ -189,25 +189,25 @@ export default function SponsorOnboardingPage() {
   return (
     <SponsorShell profile={profile}>
       <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">Sponsor Onboarding</p>
-            <h1 className="mt-2 text-4xl font-black md:text-5xl">{completed ? "Update Brand Profile" : "Build Your Brand Command Center"}</h1>
-            <p className="mt-3 max-w-3xl text-slate-300">Add the sponsor profile details Challenge Suite needs before future campaign, marketplace, placement, and reporting tools are activated.</p>
+            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">{completed ? "Update Brand Profile" : "Build Your Brand Command Center"}</h1>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300 sm:text-lg">Add the sponsor profile details Challenge Suite needs before future campaign, marketplace, placement, and reporting tools are activated.</p>
           </div>
           {completed ? <Button type="button" onClick={() => router.push("/sponsor/dashboard")}>Go to Dashboard <ArrowRight size={18} /></Button> : null}
         </div>
 
         {completed ? (
-          <Card className="mt-8 border-emerald-500/20 bg-emerald-500/5 p-5">
+          <Card className="mt-8 border-emerald-500/20 bg-emerald-500/5 p-5 sm:p-6">
             <p className="flex items-center gap-2 font-bold text-emerald-200"><CheckCircle2 size={18} /> Brand profile is complete.</p>
             <p className="mt-2 text-sm text-slate-300">Verification remains a backend status for a future admin-review workflow. No sponsor payments or money release are active here.</p>
           </Card>
         ) : null}
 
-        <form className="mt-8 grid gap-8 xl:grid-cols-[1.2fr_.8fr]" onSubmit={saveProfile}>
-          <Card className="p-6 md:p-8">
-            <div className="grid gap-5 md:grid-cols-2">
+        <form className="mt-8 grid gap-8 lg:mt-10 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,.75fr)] xl:gap-10" onSubmit={saveProfile}>
+          <Card className="p-5 sm:p-6 lg:p-8">
+            <div className="grid gap-6 lg:grid-cols-2">
               <Field label="Brand Name"><input className={inputClass} value={form.brandName} onChange={(event) => update("brandName", event.target.value)} />{fieldErrors.brandName ? <ErrorText>{fieldErrors.brandName}</ErrorText> : null}</Field>
               <Field label="Industry / Category"><input className={inputClass} value={form.industry} onChange={(event) => update("industry", event.target.value)} placeholder="Food, beauty, fitness..." />{fieldErrors.industry ? <ErrorText>{fieldErrors.industry}</ErrorText> : null}</Field>
               <Field label="Website"><input className={inputClass} value={form.website} onChange={(event) => update("website", event.target.value)} placeholder="https://brand.com" />{fieldErrors.website ? <ErrorText>{fieldErrors.website}</ErrorText> : null}</Field>
@@ -215,38 +215,38 @@ export default function SponsorOnboardingPage() {
               <Field label="Contact Person"><input className={inputClass} value={form.contactPerson} onChange={(event) => update("contactPerson", event.target.value)} />{fieldErrors.contactPerson ? <ErrorText>{fieldErrors.contactPerson}</ErrorText> : null}</Field>
               <Field label="Business Email"><input className={inputClass} type="email" value={form.businessEmail} onChange={(event) => update("businessEmail", event.target.value)} />{fieldErrors.businessEmail ? <ErrorText>{fieldErrors.businessEmail}</ErrorText> : null}</Field>
             </div>
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <Field label="CTA Button Text"><input className={inputClass} value={form.ctaButtonText} onChange={(event) => update("ctaButtonText", event.target.value)} />{fieldErrors.ctaButtonText ? <ErrorText>{fieldErrors.ctaButtonText}</ErrorText> : null}</Field>
               <Field label="CTA Destination Link"><input className={inputClass} value={form.ctaDestinationLink} onChange={(event) => update("ctaDestinationLink", event.target.value)} placeholder="https://brand.com/campaign" />{fieldErrors.ctaDestinationLink ? <ErrorText>{fieldErrors.ctaDestinationLink}</ErrorText> : null}</Field>
             </div>
-            <div className="mt-5">
+            <div className="mt-6">
               <Field label="Brand Description"><textarea className={textareaClass} value={form.brandDescription} onChange={(event) => update("brandDescription", event.target.value)} placeholder="Describe the brand, audience, and what you want creators or participants to know." />{fieldErrors.brandDescription ? <ErrorText>{fieldErrors.brandDescription}</ErrorText> : null}</Field>
             </div>
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <Field label="Logo URL / Placeholder"><input className={inputClass} value={form.logoUrl} onChange={(event) => update("logoUrl", event.target.value)} placeholder="Optional image URL" />{fieldErrors.logoUrl ? <ErrorText>{fieldErrors.logoUrl}</ErrorText> : null}</Field>
               <Field label="Banner URL / Placeholder"><input className={inputClass} value={form.bannerUrl} onChange={(event) => update("bannerUrl", event.target.value)} placeholder="Optional banner URL" />{fieldErrors.bannerUrl ? <ErrorText>{fieldErrors.bannerUrl}</ErrorText> : null}</Field>
             </div>
-            <div className="mt-5">
+            <div className="mt-6">
               <Field label="Social Links"><textarea className={textareaClass} value={form.socialLinksText} onChange={(event) => update("socialLinksText", event.target.value)} placeholder="One URL per line" />{fieldErrors.socialLinks ? <ErrorText>{fieldErrors.socialLinks}</ErrorText> : null}</Field>
             </div>
           </Card>
 
-          <div className="space-y-8">
-            <Card className="p-6">
+          <div className="space-y-6 lg:space-y-8">
+            <Card className="p-5 sm:p-6 lg:p-7">
               <h2 className="flex items-center gap-2 text-xl font-black"><Building2 className="text-[var(--gold)]" /> Sponsor Goals</h2>
               <div className="mt-5 grid gap-3">
                 {goalOptions.map((goal) => <CheckOption key={goal} label={goal} checked={form.sponsorshipGoals.includes(goal)} onChange={() => toggleList("sponsorshipGoals", goal)} />)}
               </div>
               {fieldErrors.sponsorshipGoals ? <ErrorText>{fieldErrors.sponsorshipGoals}</ErrorText> : null}
             </Card>
-            <Card className="p-6">
+            <Card className="p-5 sm:p-6 lg:p-7">
               <h2 className="text-xl font-black">Preferred Challenge Categories</h2>
               <div className="mt-5 flex flex-wrap gap-3">
                 {categoryOptions.map((category) => <ChipOption key={category} label={category} checked={form.preferredChallengeCategories.includes(category)} onClick={() => toggleList("preferredChallengeCategories", category)} />)}
               </div>
               {fieldErrors.preferredChallengeCategories ? <ErrorText>{fieldErrors.preferredChallengeCategories}</ErrorText> : null}
             </Card>
-            <Card className="border-yellow-500/20 bg-yellow-500/5 p-6">
+            <Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:p-6 lg:p-7">
               <Upload className="h-8 w-8 text-[var(--gold)]" />
               <h2 className="mt-4 text-xl font-black">Media upload support</h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">Logo and banner fields are prepared as URL placeholders for now. File upload can connect to Firebase Storage in a later media batch.</p>
@@ -267,9 +267,9 @@ function ErrorText({ children }: { children: React.ReactNode }) {
 }
 
 function CheckOption({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return <label className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-[#1a1a1a] p-3 text-sm font-bold"><input type="checkbox" checked={checked} onChange={onChange} /> {label}</label>;
+  return <label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm font-bold"><input className="shrink-0" type="checkbox" checked={checked} onChange={onChange} /> {label}</label>;
 }
 
 function ChipOption({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={checked ? "rounded-full bg-[var(--gold)] px-4 py-2 text-sm font-black text-black" : "rounded-full border border-white/10 bg-[#1a1a1a] px-4 py-2 text-sm font-bold text-slate-300"}>{label}</button>;
+  return <button type="button" onClick={onClick} className={checked ? "min-h-11 rounded-full bg-[var(--gold)] px-4 py-2 text-sm font-black text-black" : "min-h-11 rounded-full border border-white/10 bg-[#1a1a1a] px-4 py-2 text-sm font-bold text-slate-300"}>{label}</button>;
 }

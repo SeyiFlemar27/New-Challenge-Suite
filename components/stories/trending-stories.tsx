@@ -61,18 +61,18 @@ export function TrendingStories({ challenges, source = "explore" }: { challenges
         <Card className="relative flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-none border-0 bg-[#090909] sm:h-[min(860px,92vh)] sm:rounded-[8px] sm:border">
           <div className="absolute left-3 right-3 top-3 z-20 flex gap-1">{stories.map((story, index) => <div key={story.id} className={`h-1 flex-1 rounded-full ${index <= activeIndex! ? "bg-[var(--gold)]" : "bg-white/20"}`} />)}</div>
           <button onClick={close} className="absolute right-4 top-7 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/70" aria-label="Close story"><X /></button>
-          <div className="relative min-h-0 flex-1 bg-black">
+          <div className="relative min-h-[34dvh] flex-1 bg-black sm:min-h-0">
             {String(active.trailerVideoUrl || active.promoVideoUrl || "").startsWith("http") ? <video src={active.trailerVideoUrl || active.promoVideoUrl} controls autoPlay muted className="h-full w-full object-contain" /> : <img src={active.coverImageUrl || active.imageUrl || active.promoImageUrl || logoUrl} alt={active.title} className="h-full w-full object-contain" />}
             <button onClick={() => move(-1)} className="absolute left-2 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/60" aria-label="Previous story"><ChevronLeft /></button>
             <button onClick={() => move(1)} className="absolute right-2 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/60" aria-label="Next story"><ChevronRight /></button>
           </div>
-          <div className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase text-[var(--gold)]"><span>Trending</span>{active.sponsorEnabled ? <span>· Sponsored</span> : null}</div>
+          <div className="max-h-[56dvh] overflow-y-auto overscroll-contain p-5 sm:max-h-none sm:p-6">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase text-[var(--gold)]"><span>Trending</span>{active.sponsorEnabled ? <span>/ Sponsored</span> : null}</div>
             <h2 className="mt-2 break-words text-2xl font-black sm:text-3xl">{active.title}</h2>
             <p className="mt-2 line-clamp-2 text-sm text-slate-300">{active.description}</p>
             <p className="mt-3 text-sm font-bold text-slate-300">by @{active.creatorUsername || active.creatorName || "challengehost"}</p>
             <div className="mt-4 grid grid-cols-3 gap-2"><Mini icon={<Users size={15} />} value={Number(active.participants ?? active.participantCount ?? 0)} label="Participants" /><Mini icon={<Vote size={15} />} value={Number(active.voteCount ?? 0)} label="Votes" /><Mini value={active.publicJackpotEstimateCents ? `$${(Number(active.publicJackpotEstimateCents) / 100).toLocaleString()}` : "Review"} label="Prize" /></div>
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap">
               <LinkButton href={`/challenges/${active.id}`} onClick={() => track(String(active.id), "view_details")}>View Details</LinkButton>
               <LinkButton href={`/challenges/${active.id}/join`} variant="secondary" onClick={() => track(String(active.id), "join")}>Participate</LinkButton>
               <LinkButton href={`/challenges/${active.id}/votes`} variant="secondary" onClick={() => track(String(active.id), "vote")}>Vote Now</LinkButton>

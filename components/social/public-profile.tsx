@@ -71,10 +71,10 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
                   <div className="mt-3 flex flex-wrap items-center gap-2"><PremiumBadge planId={profile.planId} />{profile.role ? <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-black capitalize">{profile.role}</span> : null}</div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {profile.isOwner ? <LinkButton href="/profile/edit">Edit Profile</LinkButton> : <Button onClick={() => void follow()}><UserPlus size={17} /> {profile.isFollowing ? "Unfollow" : "Follow"}</Button>}
+              <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:flex sm:flex-wrap">
+                {profile.isOwner ? <LinkButton href="/profile/edit" className="col-span-2 sm:col-span-1">Edit Profile</LinkButton> : <Button onClick={() => void follow()}><UserPlus size={17} /> {profile.isFollowing ? "Unfollow" : "Follow"}</Button>}
                 <Button variant="secondary" disabled={!profile.allowMessages}><MessageSquare size={17} /> Message</Button>
-                <Button variant="secondary" onClick={() => navigator.share?.({ title: profile.displayName, url: window.location.href })}><Share2 size={17} /> Share</Button>
+                <Button className="col-span-2 sm:col-span-1" variant="secondary" onClick={() => navigator.share?.({ title: profile.displayName, url: window.location.href })}><Share2 size={17} /> Share</Button>
               </div>
             </div>
             {profile.bio ? <p className="mt-6 max-w-3xl leading-7 text-slate-200">{profile.bio}</p> : null}

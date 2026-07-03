@@ -70,12 +70,12 @@ export default function SettingsPage() {
   if (loading) return <AppShell><Card className="h-[420px] animate-pulse bg-[#171717]" /></AppShell>;
   return (
     <AppShell>
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <PageTitle title="Settings" subtitle="Manage your account, public profile, privacy, notifications, security, billing, and challenge preferences." icon={<SettingsIcon className="text-[var(--gold)]" />} />
-        <Button onClick={() => void save()} disabled={saving}>{saving ? "Saving..." : "Save Settings"}</Button>
+        <Button className="w-full sm:w-auto" onClick={() => void save()} disabled={saving}>{saving ? "Saving..." : "Save Settings"}</Button>
       </div>
       {notice ? <Card className="mt-6 p-4 text-slate-300">{notice}</Card> : null}
-      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+      <div className="mt-8 grid gap-6 lg:gap-8 xl:grid-cols-2">
         <Section icon={<UserRound />} title="Account">
           <Field label="Name"><input className={inputClass} value={settings.account.displayName} onChange={(event) => update("account", "displayName", event.target.value)} /></Field>
           <Field label="Username"><input className={inputClass} value={settings.account.username} onChange={(event) => update("account", "username", event.target.value)} /></Field>
@@ -137,7 +137,7 @@ export default function SettingsPage() {
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return <Card className="p-5 sm:p-7"><h2 className="flex items-center gap-2 text-2xl font-black"><span className="text-[var(--gold)]">{icon}</span>{title}</h2><div className="mt-6 space-y-5">{children}</div></Card>;
+  return <Card className="p-5 sm:p-6 lg:p-8"><h2 className="flex items-center gap-3 text-xl font-black sm:text-2xl"><span className="shrink-0 text-[var(--gold)]">{icon}</span>{title}</h2><div className="mt-6 space-y-6">{children}</div></Card>;
 }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return <label className="flex min-h-12 items-center justify-between gap-4 rounded-[8px] border border-white/10 bg-black/30 px-4 py-3"><span className="font-bold">{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>;

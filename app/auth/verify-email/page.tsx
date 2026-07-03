@@ -129,9 +129,9 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6 py-10">
-      <Card className="w-full max-w-[540px] rounded-[16px] p-8 text-center md:p-10">
-        <BrandLogo className="mb-5" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
+    <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+      <Card className="w-full max-w-[540px] rounded-[12px] p-6 text-center sm:p-8 lg:p-10">
+        <BrandLogo className="mb-6" imageClassName="h-16 w-16 border-2 border-[var(--gold)] gold-glow sm:h-20 sm:w-20" />
         {verified ? (
           <div className="py-6">
             <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 180 }}>
@@ -152,7 +152,7 @@ export default function VerifyEmailPage() {
             <form className="mt-8 space-y-5 text-left" onSubmit={verify}>
               <Field label="Verification Code">
                 <input
-                  className={`${inputClass} h-14 text-center text-2xl font-black tracking-[.45em]`}
+                  className={`${inputClass} h-14 text-center text-xl font-black tracking-[.3em] sm:text-2xl sm:tracking-[.45em]`}
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
                   inputMode="numeric"

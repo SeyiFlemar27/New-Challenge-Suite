@@ -52,12 +52,12 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6">
-      <Card className="w-full max-w-[430px] rounded-[16px] p-8 md:p-12">
-        <BrandLogo className="mb-6" imageClassName="h-24 w-24 border-2 border-[var(--gold)] gold-glow" />
-        <h1 className="text-center text-4xl font-black">Sign In</h1>
-        <p className="mt-3 text-center text-lg text-slate-300">Welcome back to Challenge Suite</p>
-        <form className="mt-10 space-y-6" onSubmit={submit}>
+    <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+      <Card className="w-full max-w-[450px] rounded-[12px] p-6 sm:p-8 lg:p-10">
+        <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" />
+        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">Sign In</h1>
+        <p className="mx-auto mt-3 max-w-sm text-center text-base leading-7 text-slate-300 sm:text-lg">Welcome back to Challenge Suite</p>
+        <form className="mt-8 space-y-6 sm:mt-10" onSubmit={submit}>
           <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" type="email" /></Field>
           <Field label="Password">
             <div className="relative">
@@ -70,7 +70,7 @@ export default function LoginPage() {
           {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
           <Button className="w-full" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
         </form>
-        <div className="mt-8 flex items-center justify-between text-sm">
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center text-sm sm:flex-row sm:justify-between">
           <Link href="/auth/forgot-password" className="text-[var(--gold)]">Forgot password?</Link>
           <Link href="/auth/register" className="font-bold text-[var(--gold)]">Create account</Link>
         </div>

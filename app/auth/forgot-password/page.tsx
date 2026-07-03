@@ -21,12 +21,12 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6">
-      <Card className="w-full max-w-md p-10">
-        <BrandLogo className="mb-6" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
-        <h1 className="text-3xl font-black">Reset Password</h1>
-        <p className="mt-3 text-slate-300">Enter your email to receive a reset link.</p>
-        <form className="mt-8 space-y-5" onSubmit={submit}>
+    <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+      <Card className="w-full max-w-md p-6 sm:p-8 lg:p-10">
+        <BrandLogo className="mb-7" imageClassName="h-16 w-16 border-2 border-[var(--gold)] gold-glow sm:h-20 sm:w-20" />
+        <h1 className="text-3xl font-black leading-tight sm:text-4xl">Reset Password</h1>
+        <p className="mt-3 leading-7 text-slate-300">Enter your email to receive a reset link.</p>
+        <form className="mt-8 space-y-6" onSubmit={submit}>
           <Field label="Email"><input className={inputClass} type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
           {message ? <p className="rounded-[8px] bg-[#181818] p-3 text-sm text-slate-200">{message}</p> : null}
           <Button className="w-full">Send Reset Link</Button>

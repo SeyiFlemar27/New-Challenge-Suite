@@ -47,8 +47,8 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
-      <div className="grid min-h-screen lg:grid-cols-[292px_1fr]">
-        <aside className="hidden border-b border-white/10 bg-[#0b0b0b] px-5 py-6 lg:block lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[292px_minmax(0,1fr)]">
+        <aside className="hidden border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:block md:border-b-0 md:border-r">
           <div className="flex items-center gap-4">
             <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
             <div>
@@ -72,8 +72,8 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             View public site
           </Link>
         </aside>
-        <section className="min-w-0 px-4 pb-10 pt-5 sm:px-5 md:px-8 lg:px-10">
-          <div className="mb-6 lg:hidden">
+        <section className="min-w-0 px-5 pb-12 pt-6 sm:px-6 md:px-8 md:py-8 lg:px-10 xl:px-12">
+          <div className="mb-8 md:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" />
@@ -89,7 +89,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
               <p className="mt-1 text-sm font-bold capitalize text-white">{verificationStatus.replaceAll("_", " ")}</p>
             </Card>
           </div>
-          {drawerOpen ? <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div><nav className="mt-6 space-y-2">{sponsorNav.map((item) => { const Icon = item.icon; return item.href ? <Link key={item.label} href={item.href} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200 hover:bg-[var(--gold)] hover:text-black"><Icon size={18} />{item.label}</Link> : <div key={item.label} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 text-slate-500"><Icon size={18} />{item.label}<span className="ml-auto text-[10px]">Soon</span></div>; })}</nav><Link href="/landing" className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public Site</Link></aside></div> : null}
+          {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div><nav className="mt-6 space-y-2">{sponsorNav.map((item) => { const Icon = item.icon; return item.href ? <Link key={item.label} href={item.href} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200 hover:bg-[var(--gold)] hover:text-black"><Icon size={18} />{item.label}</Link> : <div key={item.label} className="flex min-h-12 items-center gap-3 rounded-[8px] px-4 text-slate-500"><Icon size={18} />{item.label}<span className="ml-auto text-[10px]">Soon</span></div>; })}</nav><Link href="/landing" className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public Site</Link></aside></div> : null}
           {children}
         </section>
       </div>
