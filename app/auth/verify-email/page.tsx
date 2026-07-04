@@ -128,8 +128,9 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
-      <Card className="w-full max-w-[560px] rounded-[8px] border-[var(--gold)]/20 p-6 text-center shadow-2xl sm:p-9 lg:p-12">
+    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(245,217,10,.09),transparent)]" />
+      <Card className="relative w-full max-w-[560px] rounded-[8px] border-[var(--gold)]/20 p-6 text-center shadow-2xl sm:p-9 lg:p-12">
         <BrandLogo className="mb-7" imageClassName="h-14 w-14 border border-[var(--gold)] sm:h-16 sm:w-16" />
         {verified ? (
           <div className="py-6">

@@ -9,6 +9,8 @@
   --gold: #f5d90a;
   --gold-2: #d6b832;
   --purple: #765cf6;
+  --content-max: 100rem;
+  --page-gutter: clamp(1.25rem, 3vw, 3rem);
 }
 
 * {
@@ -21,9 +23,12 @@ html {
 
 body {
   margin: 0;
-  background: #000;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(245, 217, 10, 0.08), transparent 28rem),
+    #000;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -35,7 +40,28 @@ textarea {
 
 .app-shell {
   min-height: 100vh;
-  background: #000;
+  background:
+    linear-gradient(180deg, rgba(245, 217, 10, 0.035), transparent 18rem),
+    #000;
+}
+
+.premium-card {
+  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 55%);
+}
+
+.premium-card:hover {
+  border-color: rgba(245, 217, 10, 0.2);
+}
+
+::selection {
+  background: var(--gold);
+  color: #000;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .premium-card {
+    transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  }
 }
 
 .gold-glow {

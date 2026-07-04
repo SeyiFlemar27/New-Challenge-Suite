@@ -1,43 +1,160 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings, ShieldCheck, Menu, X, UsersRound, ClipboardCheck, Vote } from "lucide-react";
+import {
+  Award,
+  BarChart3,
+  Bell,
+  ClipboardCheck,
+  Coins,
+  Diamond,
+  Home,
+  LayoutGrid,
+  LockKeyhole,
+  Medal,
+  Menu,
+  PlusSquare,
+  Radio,
+  Rocket,
+  Settings,
+  ShieldCheck,
+  Star,
+  Target,
+  Trophy,
+  User,
+  UsersRound,
+  Vote,
+  X
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
-import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
+import { getEffectiveTier } from "@/lib/plan-access";
 
-const nav = [
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/feed", label: "Feed", icon: LayoutGrid },
-  { href: "/favorites", label: "Favorites", icon: Star },
-  { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
-  { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
-  { href: "/challenges", label: "Challenges", icon: Medal },
-  { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
-  { href: "/my-challenges", label: "My Challenges", icon: Target },
-  { href: "/live-events", label: "Live Events", icon: Radio },
-  { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
-  { href: "/tournaments", label: "Tournaments", icon: Award },
-  { href: "/dashboard/host", label: "Host Control Center", icon: ShieldCheck },
-  { href: "/winners", label: "Winners", icon: Trophy },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings }
+type NavIcon = typeof Home;
+type NavItem = { href: string; label: string; icon: NavIcon };
+type NavSection = { label: string; items: NavItem[] };
+
+const competitorSections: NavSection[] = [
+  { label: "Main", items: [
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Favorites / Saved", icon: Star },
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+  ] },
+  { label: "Compete", items: [
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+    { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
+    { href: "/winners", label: "Winners", icon: Trophy }
+  ] },
+  { label: "Account", items: [
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings }
+  ] }
 ];
 
-const mobileNav = [
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/feed", label: "Explore", icon: LayoutGrid },
-  { href: "/challenges/create", label: "Create", icon: PlusSquare },
-  { href: "/leaderboards", label: "Rank", icon: BarChart3 },
-  { href: "/wallet", label: "Wallet", icon: Coins }
+const starterSections: NavSection[] = [
+  { label: "Main", items: [
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Favorites / Saved", icon: Star },
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+  ] },
+  { label: "Competitions", items: [
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
+    { href: "/my-challenges", label: "My Challenges", icon: Target },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
+  ] },
+  { label: "Community", items: [
+    { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
+    { href: "/winners", label: "Winners", icon: Trophy }
+  ] },
+  { label: "Account", items: [
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings }
+  ] }
+];
+
+const creatorSections: NavSection[] = [
+  { label: "Main", items: [
+    { href: "/dashboard", label: "Creator Studio", icon: Home },
+    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Favorites / Saved", icon: Star },
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+  ] },
+  { label: "Competitions", items: [
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
+    { href: "/my-challenges", label: "My Challenges", icon: Target },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
+  ] },
+  { label: "Creator Tools", items: [
+    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck },
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
+    { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket },
+    { href: "/creator/sponsor-ready", label: "Sponsor-Ready", icon: ShieldCheck }
+  ] },
+  { label: "Community", items: [
+    { href: "/leaderboards", label: "Leaderboards", icon: Award },
+    { href: "/winners", label: "Winners", icon: Trophy }
+  ] },
+  { label: "Account", items: [
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings }
+  ] }
+];
+
+const hostSections: NavSection[] = [
+  { label: "Main", items: [
+    { href: "/dashboard/host", label: "Host Control Center", icon: Home },
+    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Favorites / Saved", icon: Star },
+    { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
+    { href: "/wallet", label: "Wallet & Revenue", icon: Coins }
+  ] },
+  { label: "Competitions", items: [
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
+    { href: "/my-challenges", label: "My Challenges", icon: Target },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+    { href: "/live-events", label: "Live Events", icon: Radio },
+    { href: "/host/tournaments", label: "Tournaments", icon: Award }
+  ] },
+  { label: "Host Tools", items: [
+    { href: "/host/participants", label: "Participants", icon: UsersRound },
+    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
+    { href: "/host/voting", label: "Voting Control", icon: Vote },
+    { href: "/host/reports", label: "Reports", icon: BarChart3 },
+    { href: "/host/winners", label: "Winners", icon: Trophy },
+    { href: "/host/notifications", label: "Notifications", icon: Bell },
+    { href: "/host/team", label: "Team Members", icon: UsersRound }
+  ] },
+  { label: "Account", items: [
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings }
+  ] }
+];
+
+const sponsorSections: NavSection[] = [
+  { label: "Brand", items: [
+    { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
+    { href: "/sponsor/onboarding", label: "Brand Profile", icon: User },
+    { href: "/sponsor/plans", label: "Sponsor Plans", icon: Diamond },
+    { href: "/settings", label: "Settings", icon: Settings }
+  ] }
 ];
 
 function activeNavigationHref(pathname: string) {
   if (pathname === "/challenges/create") return "/challenges/create";
+  if (pathname === "/dashboard/host/team" || pathname === "/host/team") return "/host/team";
+  if (pathname === "/dashboard/host") return "/dashboard/host";
+  if (pathname.startsWith("/host/")) return pathname;
+  if (pathname.startsWith("/creator/")) return pathname;
   if (pathname === "/my-entries") return "/my-entries";
   if (pathname === "/my-challenges") return "/my-challenges";
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
@@ -46,17 +163,20 @@ function activeNavigationHref(pathname: string) {
   return pathname;
 }
 
+function sectionsForTier(tierId: string, sponsor: boolean) {
+  if (sponsor) return sponsorSections;
+  if (tierId === "host" || tierId === "enterprise") return hostSections;
+  if (tierId === "creator" || tierId === "pro") return creatorSections;
+  if (tierId === "creator_starter" || tierId === "host_starter") return starterSections;
+  return competitorSections;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [notificationStatus, setNotificationStatus] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, loading, signedOut, error } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
-  const planExperience = getPlanExperience({
-    planId: user?.planId,
-    planStatus: user?.planStatus,
-    accountType: user?.accountType
-  });
   const effectiveTier = getEffectiveTier({
     planId: user?.planId,
     planStatus: user?.planStatus,
@@ -64,66 +184,27 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
-  const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
-  const selectedAccountType = user?.selectedAccountType ?? (user?.role === "creator" || user?.role === "host" ? user.role : user?.accountType);
-  const freePlan = planExperience.planId === "free";
-  const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
-  const canCreateChallenges = !freePlan || selectedAccountType === "creator" || selectedAccountType === "host";
+  const sections = sectionsForTier(effectiveTier.id, user?.accountType === "sponsor");
   const activeHref = activeNavigationHref(pathname);
-  const hostNav = nav.flatMap((item) => item.href === "/dashboard/host"
-    ? [
-        item,
-        { href: "/host/participants", label: "Participants", icon: UsersRound },
-        { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
-        { href: "/host/voting", label: "Voting Control", icon: Vote },
-        { href: "/host/tournaments", label: "Tournaments", icon: Trophy },
-        { href: "/host/reports", label: "Reports", icon: BarChart3 },
-        { href: "/host/winners", label: "Winners", icon: Trophy },
-        { href: "/host/notifications", label: "Notifications", icon: Bell },
-        { href: "/dashboard/host/team", label: "Team Members", icon: UsersRound }
-      ]
-    : [item]);
-  const accountNav = effectiveTier.id === "host" ? hostNav : nav;
-  const upgradeLabel = effectiveTier.id === "free_competitor"
-    ? "Become a Creator"
-    : ["creator_starter", "creator"].includes(effectiveTier.id)
-      ? "Become a Host"
-      : planLabel;
-  const visibleNav = user?.accountType === "sponsor"
-    ? [
-        { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
-        { href: "/sponsor/onboarding", label: "Brand Profile", icon: User },
-        { href: "/subscriptions", label: "Sponsor Plans", icon: Diamond },
-        { href: "/settings", label: "Settings", icon: Settings }
-      ]
-    : accountNav.map((item) => {
-        if (effectiveTier.id === "host" && item.href === "/wallet") return { ...item, label: "Wallet & Revenue" };
-        return freeCompetitor && item.href === "/my-challenges" ? { ...item, href: "/my-entries", label: "My Entries" } : item;
-      }).filter((item) => {
-        if (freeCompetitor) return ["/dashboard", "/feed", "/favorites", "/wallet", "/challenges", "/my-entries", "/leaderboards", "/winners", "/profile", "/settings"].includes(item.href);
-        if (item.href === "/challenges/create") return canCreateChallenges;
-        if (item.href === "/private-exclusive") return planExperience.features.private_challenges;
-        if (item.href === "/live-events") return planExperience.features.live_event_tools;
-        if (item.href === "/tournaments") return planExperience.features.join_tournaments || planExperience.features.tournament_builder;
-        if (item.href === "/dashboard/host") return planExperience.features.host_control_center;
-        return true;
-      });
-  const visibleMobileNav = user?.accountType === "sponsor"
-    ? [
-        { href: "/sponsor/dashboard", label: "Brand", icon: Home },
-        { href: "/sponsor/onboarding", label: "Profile", icon: User },
-        { href: "/subscriptions", label: "Plans", icon: Diamond },
-        { href: "/settings", label: "Settings", icon: Settings }
-      ]
-    : freeCompetitor
+  const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
+  const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;
+  const mobileItems = user?.accountType === "sponsor"
+    ? sponsorSections[0].items
+    : effectiveTier.id === "host" || effectiveTier.id === "enterprise"
       ? [
-          { href: "/dashboard", label: "Home", icon: Home },
-          { href: "/feed", label: "Explore", icon: LayoutGrid },
-          { href: "/favorites", label: "Saved", icon: Star },
-          { href: "/leaderboards", label: "Rank", icon: BarChart3 },
+          { href: "/dashboard/host", label: "Home", icon: Home },
+          { href: "/challenges/create", label: "Create", icon: PlusSquare },
+          { href: "/host/participants", label: "People", icon: UsersRound },
+          { href: "/host/voting", label: "Voting", icon: Vote },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ]
-      : mobileNav.filter((item) => item.href !== "/challenges/create" || canCreateChallenges);
+      : [
+          { href: "/dashboard", label: "Home", icon: Home },
+          { href: "/feed", label: "Explore", icon: LayoutGrid },
+          { href: effectiveTier.id === "free_competitor" ? "/favorites" : "/challenges/create", label: effectiveTier.id === "free_competitor" ? "Saved" : "Create", icon: effectiveTier.id === "free_competitor" ? Star : PlusSquare },
+          { href: "/leaderboards", label: "Rank", icon: BarChart3 },
+          { href: "/wallet", label: "Wallet", icon: Coins }
+        ];
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
@@ -147,101 +228,65 @@ export function Sidebar() {
     <>
       <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)] gold-glow" />
+          <Link href={effectiveTier.id === "host" ? "/dashboard/host" : "/dashboard"} className="flex min-w-0 items-center gap-3">
+            <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" />
             <div className="min-w-0">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
-              <p className="truncate text-sm font-black text-white">{loading ? "Loading" : signedOut ? "Welcome" : user?.displayName || "Dashboard"}</p>
+              <p className="truncate text-sm font-black text-white">{loading ? "Loading" : signedOut ? "Welcome" : effectiveTier.dashboardName}</p>
             </div>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]">
-              <Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}
-            </Link>
-            <button onClick={() => setDrawerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={20} /></button>
+            <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
+            <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={20} /></button>
           </div>
         </div>
       </header>
 
       {drawerOpen ? <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
-        <button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
+        <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
-          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{user?.displayName || "Menu"}</p></div></div><button onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
-          <nav className="mt-6 space-y-2">{visibleNav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cn("flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200", activeHref === item.href && "bg-[var(--gold)] text-black")}><Icon size={19} />{item.label}</Link>; })}</nav>
+          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{effectiveTier.dashboardName}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
+          <NavigationSections sections={sections} activeHref={activeHref} mobile />
           <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link></div>
         </aside>
       </div> : null}
 
-      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[16px] border border-yellow-500/30 bg-[#121212] lg:flex">
-        <div className="flex h-40 items-center justify-center xl:h-48">
-          <BrandLogo imageClassName="h-28 w-28 border-2 border-[var(--gold)] gold-glow xl:h-32 xl:w-32" />
+      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] shadow-2xl lg:flex xl:w-[320px]">
+        <div className="flex h-28 items-center gap-4 border-b border-white/10 px-6">
+          <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
+          <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{effectiveTier.dashboardName}</p></div>
         </div>
-        <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-yellow-500/20 px-5 py-4">
-          {visibleNav.map((item) => {
-            const active = activeHref === item.href;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("mb-2 flex h-12 items-center gap-3 rounded-[8px] px-4 text-sm font-bold text-slate-200", active && "bg-[var(--gold)] text-black gold-glow")}
-              >
-                <Icon size={21} />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-white/10 px-5 py-4" aria-label="Primary navigation">
+          <NavigationSections sections={sections} activeHref={activeHref} />
         </nav>
         <div className="space-y-3 p-5">
-          <Link href="/wallet" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/40 bg-yellow-500/10 text-sm font-black text-[var(--gold)]">
-            <Coins size={16} /> {loading ? "Loading DoroCoins" : `${user?.doroBalance ?? 0} DoroCoins`}
-          </Link>
-          <button onClick={enableNotifications} className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-sm font-bold text-[var(--gold-2)]">
-            <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
-          </button>
-          <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : upgradeLabel}
-          </Link>
-          <div className="flex items-center gap-3 pt-3">
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
-            <div className="min-w-0">
-              {loading ? (
-                <div className="font-bold text-slate-300">Loading profile</div>
-              ) : signedOut ? (
-                <>
-                  <div className="font-bold text-slate-300">Signed out</div>
-                  <Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link>
-                </>
-              ) : error ? (
-                <>
-                  <div className="font-bold text-slate-300">Profile unavailable</div>
-                  <Link className="text-sm text-[var(--gold)]" href="/profile">Retry from profile</Link>
-                </>
-              ) : (
-                <>
-                  <div className="min-w-0"><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} labelOverride={effectiveTier.badgeLabel} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></div>
-                  <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
-                </>
-              )}
+          <div className="grid grid-cols-2 gap-2">
+            <Link href="/wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
+            <button type="button" onClick={enableNotifications} className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.025] px-2 text-xs font-bold text-slate-300" title="Enable notifications"><Bell size={15} /> {notificationStatus || "Alerts"}</button>
+          </div>
+          <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#171717] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
+          <div className="flex items-center gap-3 pt-2">
+            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
+            <div className="min-w-0 flex-1">
+              {loading ? <div className="font-bold text-slate-300">Loading profile</div> : signedOut ? <><div className="font-bold text-slate-300">Signed out</div><Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link></> : error ? <><div className="font-bold text-slate-300">Profile unavailable</div><Link className="text-sm text-[var(--gold)]" href="/profile">Retry</Link></> : <><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} labelOverride={effectiveTier.badgeLabel} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></>}
             </div>
           </div>
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
-        <div className={cn("mx-auto grid max-w-md gap-1 rounded-[18px] border border-white/10 bg-[#121212] p-1.5", visibleMobileNav.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
-          {visibleMobileNav.map((item) => {
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden" aria-label="Mobile navigation">
+        <div className={cn("mx-auto grid max-w-md gap-1 rounded-[8px] border border-white/10 bg-[#121212] p-1.5", mobileItems.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
+          {mobileItems.map((item) => {
             const active = activeHref === item.href;
             const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-[14px] px-1 text-[11px] font-black text-slate-400 transition", active && "bg-[var(--gold)] text-black")}>
-                <Icon size={18} />
-                <span className="leading-none">{item.label}</span>
-              </Link>
-            );
+            return <Link key={item.href} href={item.href} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-[8px] px-1 text-[11px] font-black text-slate-400 transition", active && "bg-[var(--gold)] text-black")}><Icon size={18} /><span className="leading-none">{item.label}</span></Link>;
           })}
         </div>
       </nav>
     </>
   );
+}
+
+function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
+  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href; return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }

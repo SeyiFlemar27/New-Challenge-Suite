@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Activity, Award, BarChart3, Crown, Diamond, Flame, LockKeyhole, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
+import { Activity, Award, BarChart3, Crown, Diamond, Flame, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
@@ -90,15 +90,13 @@ export default function DashboardPage() {
         { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
       ] : [
         { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
-        { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" },
-        { title: "Become a Host", body: "Run tournaments, live events, participant reviews, voting controls, and reports.", icon: LockKeyhole, active: false }
+        { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" }
       ]
     : planExperience.planId === "creator"
       ? [
-          { title: "Creator Analytics", body: "Track submissions, challenge activity, and basic creator performance.", icon: BarChart3, active: true },
-          { title: "Sponsor Ready", body: "Create sponsor-enabled challenges and receive future sponsor requests.", icon: Rocket, active: true },
-          { title: "Creator Earnings", body: "Review-only earnings foundation. Withdrawals and payouts are not active.", icon: ShieldCheck, active: true },
-          { title: "Become a Host", body: "Run tournaments, live events, participant reviews, voting controls, and reports.", icon: Radio, active: false }
+          { title: "Creator Analytics", body: "Track submissions, challenge activity, and basic creator performance.", icon: BarChart3, active: true, href: "/creator/analytics" },
+          { title: "Sponsor Ready", body: "Prepare eligible challenges for future sponsor interest.", icon: Rocket, active: true, href: "/creator/sponsor-ready" },
+          { title: "Creator Earnings", body: "Review-only earnings foundation. Withdrawals and payouts are not active.", icon: ShieldCheck, active: true, href: "/wallet" }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -109,7 +107,7 @@ export default function DashboardPage() {
         : planExperience.planId === "host"
           ? [
               { title: "Competition Operations", body: "Manage participants, submission review, voting controls, tournaments, and live-event foundations.", icon: Radio, active: true, href: "/dashboard/host" },
-              { title: "Host Team", body: `Team foundation for up to ${planExperience.teamMemberLimit} members. Invitations are not active yet.`, icon: UsersRound, active: true, href: "/dashboard/host/team" },
+              { title: "Host Team", body: `Team foundation for up to ${planExperience.teamMemberLimit} members. Invitations are not active yet.`, icon: UsersRound, active: true, href: "/host/team" },
               { title: "Revenue Overview", body: "Read-only sponsorship and revenue review. Transfers and withdrawals remain inactive.", icon: ShieldCheck, active: true }
             ]
           : [
@@ -124,14 +122,13 @@ export default function DashboardPage() {
         { href: "/subscriptions", label: "Upgrade to Creator", variant: "ghost" as const }
       ] : [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
-        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
-        { href: "/subscriptions", label: "Upgrade to Host", variant: "ghost" as const }
+        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const }
       ]
     : planExperience.planId === "creator"
       ? [
           { href: "/challenges/create", label: "Create Challenge", variant: "primary" as const },
           { href: "/my-challenges", label: "Creator Projects", variant: "secondary" as const },
-          { href: "/subscriptions", label: "Upgrade to Host", variant: "ghost" as const }
+          { href: "/my-entries", label: "My Entries", variant: "ghost" as const }
         ]
       : planExperience.planId === "pro"
         ? [

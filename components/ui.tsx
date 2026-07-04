@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export function Card({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) {
-  return <div className={cn("min-w-0 rounded-[8px] border border-white/10 bg-[#121212] shadow-sm", className)} {...props}>{children}</div>;
+  return <div className={cn("premium-card min-w-0 rounded-[8px] border border-white/10 bg-[#121212] shadow-sm", className)} {...props}>{children}</div>;
 }
 
 export function Button({
@@ -14,7 +14,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] px-5 py-3 text-center text-sm font-bold leading-tight transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] px-5 py-3 text-center text-sm font-bold leading-tight transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/70 disabled:cursor-not-allowed disabled:opacity-50",
         variant === "primary" && "bg-[var(--gold)] text-black hover:bg-yellow-300 gold-glow",
         variant === "secondary" && "border border-[var(--gold)] bg-transparent text-white hover:bg-yellow-400/10",
         variant === "purple" && "purple-gradient text-white shadow-[0_0_30px_rgba(118,92,246,.28)]",
@@ -34,7 +34,7 @@ export function LinkButton({ href, children, className, variant = "primary", onC
       href={href}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] px-5 py-3 text-center text-sm font-bold leading-tight transition",
+        "inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] px-5 py-3 text-center text-sm font-bold leading-tight transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/70",
         variant === "primary" && "bg-[var(--gold)] text-black hover:bg-yellow-300 gold-glow",
         variant === "secondary" && "border border-[var(--gold)] text-white hover:bg-yellow-400/10",
         variant === "purple" && "purple-gradient text-white",
@@ -50,8 +50,8 @@ export function LinkButton({ href, children, className, variant = "primary", onC
 export function PageTitle({ title, subtitle, icon }: { title: string; subtitle?: string; icon?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <h1 className="flex min-w-0 items-start gap-3 text-2xl font-black leading-tight text-[var(--gold-2)] sm:text-3xl lg:text-4xl">{icon ? <span className="mt-1 shrink-0">{icon}</span> : null}<span className="min-w-0 break-words">{title}</span></h1>
-      {subtitle ? <p className="mt-3 max-w-4xl text-base font-medium leading-7 text-slate-300 sm:text-lg">{subtitle}</p> : null}
+      <h1 className="flex min-w-0 items-start gap-3 text-3xl font-black leading-[1.08] text-white sm:text-4xl lg:text-5xl">{icon ? <span className="mt-1 shrink-0 text-[var(--gold)]">{icon}</span> : null}<span className="min-w-0 break-words">{title}</span></h1>
+      {subtitle ? <p className="mt-4 max-w-3xl text-base font-medium leading-7 text-slate-400 sm:text-lg">{subtitle}</p> : null}
     </div>
   );
 }
@@ -76,5 +76,5 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
-export const inputClass = "min-h-12 w-full rounded-[8px] border border-white/10 bg-[#1c1c1c] px-4 py-3 text-base text-white outline-none transition focus:border-[var(--gold)]";
-export const textareaClass = "min-h-28 w-full rounded-[8px] border border-white/10 bg-[#1c1c1c] px-4 py-3 text-base leading-6 text-white outline-none transition focus:border-[var(--gold)]";
+export const inputClass = "min-h-12 w-full rounded-[8px] border border-white/10 bg-[#171717] px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-600 focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/10";
+export const textareaClass = "min-h-28 w-full rounded-[8px] border border-white/10 bg-[#171717] px-4 py-3 text-base leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/10";

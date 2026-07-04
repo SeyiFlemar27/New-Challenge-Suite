@@ -16,7 +16,7 @@ const modules = [
   { title: "Tournament Builder", body: "Build draft brackets and competition structures.", icon: Swords, href: "/host/tournaments" },
   { title: "Live Event Tools", body: "Manage approved event and registration foundations.", icon: Radio, href: "/live-events" },
   { title: "Reports & Export", body: "Open operational report and export foundations.", icon: Download, href: "/host/reports" },
-  { title: "Team Members", body: "Review the three-seat Host team foundation.", icon: UsersRound, href: "/dashboard/host/team" },
+  { title: "Team Members", body: "Review the three-seat Host team foundation.", icon: UsersRound, href: "/host/team" },
   { title: "Revenue Overview", body: "Read-only entry, vote, sponsor, and payout review status.", icon: BarChart3, href: "/dashboard/host/revenue" },
   { title: "Sponsor Requests", body: "Review sponsor-interest foundations for sponsor-ready competitions.", icon: ClipboardList, href: "/dashboard/host/sponsors" }
 ];
@@ -70,7 +70,7 @@ export default function HostControlCenterPage() {
             <Checklist label="Set competition preferences" href="/settings/preferences" />
             <Checklist label="Create first competition" done={challenges.length > 0} href="/challenges/create" />
             <Checklist label="Configure voting rules" href="/host/voting" />
-            <Checklist label="Invite team member" href="/dashboard/host/team" />
+            <Checklist label="Invite team member" href="/host/team" />
             <Checklist label="Publish first event" done={events.length > 0} href="/live-events" />
             <Checklist label="Review reports" href="/host/reports" />
           </div>
@@ -78,7 +78,7 @@ export default function HostControlCenterPage() {
 
         <div className="mt-8 grid gap-6 xl:grid-cols-2">
           <Card className="p-6"><h2 className="text-xl font-black">Active Hosted Competitions</h2><div className="mt-4 space-y-3">{challenges.length ? challenges.slice(0, 4).map((item) => { const record = item as Record<string, unknown>; return <div key={String(record.id)} className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] bg-black/30 p-4"><span className="font-bold">{String(record.title ?? "Hosted competition")}</span><LinkButton href={`/challenges/${String(record.id)}`} variant="ghost">Manage Competition</LinkButton></div>; }) : <p className="text-sm text-slate-400">No hosted competitions yet.</p>}</div></Card>
-          <Card className="p-6"><h2 className="text-xl font-black">Upcoming Events</h2><div className="mt-4 space-y-3">{events.length ? events.slice(0, 4).map((item) => { const record = item as Record<string, unknown>; return <div key={String(record.id)} className="rounded-[8px] bg-black/30 p-4"><p className="font-bold">{String(record.title ?? "Live event")}</p><p className="mt-1 text-sm text-slate-400">{String(record.location ?? "Location pending")} · {String(record.status ?? "scheduled").replaceAll("_", " ")}</p></div>; }) : <p className="text-sm text-slate-400">No upcoming events yet.</p>}</div></Card>
+          <Card className="p-6"><h2 className="text-xl font-black">Upcoming Events</h2><div className="mt-4 space-y-3">{events.length ? events.slice(0, 4).map((item) => { const record = item as Record<string, unknown>; return <div key={String(record.id)} className="rounded-[8px] bg-black/30 p-4"><p className="font-bold">{String(record.title ?? "Live event")}</p><p className="mt-1 text-sm text-slate-400">{String(record.location ?? "Location pending")} - {String(record.status ?? "scheduled").replaceAll("_", " ")}</p></div>; }) : <p className="text-sm text-slate-400">No upcoming events yet.</p>}</div></Card>
           <Card className="p-6"><h2 className="text-xl font-black">Pending Reviews</h2><p className="mt-3 text-sm leading-6 text-slate-300">{pendingSubmissions} pending submission{pendingSubmissions === 1 ? "" : "s"}. Participant review, moderation, and manual winner confirmation remain Host-controlled foundations.</p><LinkButton href="/host/submissions" variant="secondary" className="mt-5">Review Submissions</LinkButton></Card>
           <Card className="p-6"><h2 className="text-xl font-black">Recent Host Activity</h2><p className="mt-3 text-sm leading-6 text-slate-300">Voting activity, participant changes, reports, and sponsor requests will appear here as audited Host events are recorded.</p><LinkButton href="/host/reports" variant="secondary" className="mt-5">Reports & Results</LinkButton></Card>
         </div>
