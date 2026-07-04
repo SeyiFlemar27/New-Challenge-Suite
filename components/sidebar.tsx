@@ -73,10 +73,13 @@ export function Sidebar() {
   const hostNav = nav.flatMap((item) => item.href === "/dashboard/host"
     ? [
         item,
-        { href: "/dashboard/host/participants", label: "Participants", icon: UsersRound },
-        { href: "/dashboard/host/submissions", label: "Submissions", icon: ClipboardCheck },
-        { href: "/dashboard/host/voting", label: "Voting Control", icon: Vote },
-        { href: "/dashboard/host/reports", label: "Reports", icon: BarChart3 },
+        { href: "/host/participants", label: "Participants", icon: UsersRound },
+        { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
+        { href: "/host/voting", label: "Voting Control", icon: Vote },
+        { href: "/host/tournaments", label: "Tournaments", icon: Trophy },
+        { href: "/host/reports", label: "Reports", icon: BarChart3 },
+        { href: "/host/winners", label: "Winner Confirmation", icon: Trophy },
+        { href: "/host/notifications", label: "Host Notifications", icon: Bell },
         { href: "/dashboard/host/team", label: "Team Members", icon: UsersRound }
       ]
     : [item]);

@@ -10,6 +10,7 @@ import { challengeSchema } from "@/lib/validation";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience, getUserPlanAccess, type PlanExperience } from "@/lib/plan-access";
 import { createChallenge } from "@/lib/api/services";
+import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
 
 const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
 
@@ -378,6 +379,10 @@ function CreateChallengeWizard() {
         </Card>
       </AppShell>
     );
+  }
+
+  if (planExperience.planId === "host") {
+    return <HostCompetitionWizard />;
   }
 
   return (

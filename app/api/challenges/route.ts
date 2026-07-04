@@ -190,6 +190,13 @@ export async function POST(request: Request) {
     timerDuration: body.timerDuration,
     roundDuration: body.roundDuration,
     judgeScoringEnabled: body.judgeScoringEnabled,
+    hostOperations: body.hostOperations ? {
+      ...body.hostOperations,
+      financialExecutionEnabled: false,
+      moderationActionsEnabled: false,
+      winnerPublishingEnabled: false,
+      exportsEnabled: false
+    } : null,
     votingStartsAt: body.votingStartsAt || body.submissionDeadline,
     adminReviewRequired: lifecycleStatus === "pending_review",
     adminPriceApprovalStatus: body.prizeType === "money" ? "pending_review" : "not_required",
