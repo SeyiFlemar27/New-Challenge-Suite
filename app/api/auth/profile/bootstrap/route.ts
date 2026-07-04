@@ -69,6 +69,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     sponsorOnboardingComplete: Boolean(merged.sponsorOnboardingComplete || merged.brandProfileComplete),
     creatorOnboardingComplete: Boolean(merged.creatorOnboardingComplete),
     hostOnboardingComplete: Boolean(merged.hostOnboardingComplete),
+    walkthroughCompleted: merged.walkthroughCompleted === undefined ? true : Boolean(merged.walkthroughCompleted),
     hasSponsorProfile,
     sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null
   };
@@ -163,6 +164,7 @@ export async function POST(request: Request) {
         dashboardType,
         dashboard_type: dashboardType,
         accountTypeSelectionComplete: false,
+        walkthroughCompleted: false,
         ...sponsorFields,
         isAdmin,
         emailVerified: Boolean(user.emailVerified),
@@ -186,6 +188,7 @@ export async function POST(request: Request) {
         dashboardType,
         dashboard_type: dashboardType,
         accountTypeSelectionComplete: false,
+        walkthroughCompleted: false,
         ...sponsorFields,
         premium: planFields.isPremium,
         verified: Boolean(user.emailVerified),

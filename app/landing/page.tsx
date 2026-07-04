@@ -1,94 +1,136 @@
 "use client";
 
-import { useState } from "react";
-import { Award, BadgeCheck, BarChart3, Camera, Crown, Globe, Trophy, Users, Menu, X } from "lucide-react";
-import { LinkButton, Card, Button } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { ArrowRight, BarChart3, Check, ChevronRight, Menu, Play, ShieldCheck, Sparkles, Trophy, Vote, X } from "lucide-react";
 import { BrandLogo, PremiumBadge } from "@/components/brand";
+import { LinkButton } from "@/components/ui";
 
-const features = [
-  { icon: Camera, title: "Daily Challenges", body: "New creative challenges every day across photography, art, fitness, and more" },
-  { icon: Award, title: "Earn Badges", body: "Unlock achievements and showcase your skills with exclusive badges" },
-  { icon: BarChart3, title: "Leaderboards", body: "Compete globally and climb the ranks to become a top creator" },
-  { icon: Trophy, title: "Prize Foundations", body: "Participate in premium challenges with reviewed prize details and platform rewards" },
-  { icon: BadgeCheck, title: "Get Discovered", body: "Showcase your work to thousands of community members" },
-  { icon: Users, title: "Community", body: "Connect with like-minded creators and grow together" }
+const audience = [
+  { index: "01", title: "Competitors", body: "Discover challenges, submit your best work, vote fairly, and build a public competition identity.", href: "/challenges" },
+  { index: "02", title: "Creators", body: "Launch polished challenges, grow an audience, and manage every entry from one focused studio.", href: "/subscriptions" },
+  { index: "03", title: "Hosts", body: "Run tournaments, live events, participant review, voting controls, and competition reports.", href: "/subscriptions" },
+  { index: "04", title: "Brands", body: "Find sponsor-ready communities and build reviewed campaign collaborations without blurred budgets.", href: "/sponsor/plans" }
 ];
-
+const trust = [
+  { icon: Vote, title: "Structured voting", body: "Clear voting windows, daily limits, DoroCoin ledgers, and review-safe controls." },
+  { icon: ShieldCheck, title: "Moderated competition", body: "Submission approvals, rule enforcement, audit foundations, and winner confirmation." },
+  { icon: Trophy, title: "Prize foundations", body: "Transparent prize metadata and review states without pretending automatic payouts are active." }
+];
 const leaders = [
-  ["Flemar", "4,850 pts", "competitor"],
-  ["Emily Smith", "3,940 pts", "competitor"],
-  ["John Doe", "3,410 pts", ""],
-  ["Maya Lens", "2,980 pts", "creator"],
-  ["Chef Nova", "2,420 pts", ""],
-  ["Studio Blue", "2,110 pts", "executive_host"]
+  ["Flemar", "4,850", "competitor"],
+  ["Emily Smith", "3,940", "creator"],
+  ["Maya Lens", "3,410", "creator"],
+  ["Studio Gold", "2,980", "verified_host"]
 ];
 
 export default function LandingPage() {
-  const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const visibleLeaders = expanded ? leaders : leaders.slice(0, 3);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-black">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-black/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between"><a href="/landing" className="flex items-center gap-3"><BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" /><span className="font-black">Challenge Suite</span></a><nav className="hidden items-center gap-3 md:flex"><LinkButton href="/challenges" variant="ghost">Explore</LinkButton><LinkButton href="/leaderboards" variant="ghost">Leaderboards</LinkButton><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/auth/login" variant="secondary">Sign In</LinkButton></nav><button onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)] md:hidden" aria-label="Open public navigation"><Menu /></button></div>
+    <main className="min-h-screen overflow-x-hidden bg-black text-white">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-black/85 px-5 py-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5">
+          <a href="/landing" className="flex items-center gap-3"><BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" /><span className="text-sm font-black uppercase tracking-[0.16em]">Challenge Suite</span></a>
+          <nav className="hidden items-center gap-1 lg:flex">
+            <LinkButton href="/challenges" variant="ghost">Explore</LinkButton>
+            <LinkButton href="/leaderboards" variant="ghost">Leaderboards</LinkButton>
+            <LinkButton href="/auth/login" variant="ghost">Sign In</LinkButton>
+            <LinkButton href="/auth/register" className="ml-2">Create Account</LinkButton>
+          </nav>
+          <button type="button" onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)] lg:hidden" aria-label="Open public navigation"><Menu /></button>
+        </div>
       </header>
-      {menuOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Public navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setMenuOpen(false)} aria-label="Close navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,340px)] border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><span className="font-black">Menu</span><button onClick={() => setMenuOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10"><X /></button></div><nav className="mt-8 grid gap-3"><LinkButton href="/challenges">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton><LinkButton href="/leaderboards" variant="secondary">Leaderboards</LinkButton><LinkButton href="/winners" variant="secondary">Winners</LinkButton><LinkButton href="/auth/login" variant="ghost">Sign In</LinkButton></nav></aside></div> : null}
-      <section className="relative flex min-h-[680px] flex-col items-center justify-center overflow-hidden px-4 py-20 text-center sm:px-6 lg:min-h-[900px] lg:py-28">
-        <BrandLogo className="mb-7 lg:mb-8" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24 lg:h-28 lg:w-28" />
-        <FloatingCard className="left-[10%] top-[12%]" icon={<Camera size={48} />} label="Creative Challenges" />
-        <FloatingCard className="left-[15%] top-[38%]" icon={<Globe size={48} />} label="Global Community" />
-        <FloatingCard className="right-[15%] top-[37%]" icon={<Trophy size={48} />} label="Prize Foundations" />
-        <h1 className="max-w-5xl text-4xl font-black leading-tight tracking-normal sm:text-5xl lg:text-6xl">Welcome to <span className="text-[var(--gold)]">ChallengeSuite</span></h1>
-        <p className="mt-6 max-w-3xl text-lg leading-8 text-[#9cb5d8] sm:mt-8 sm:text-xl lg:mt-10 lg:text-2xl lg:leading-10">Join creative challenges, showcase your talent, and compete with a global community</p>
-        <div className="mt-9 flex w-full max-w-sm flex-col justify-center gap-3 sm:mt-12 sm:max-w-none sm:flex-row sm:flex-wrap sm:gap-6">
-          <LinkButton href="/challenges" className="min-h-14 w-full text-base sm:h-16 sm:w-56 sm:text-lg">Explore Challenges</LinkButton>
-          <LinkButton href="/challenges/create" variant="secondary" className="min-h-14 w-full text-base sm:h-16 sm:w-56 sm:text-lg">Create Challenge</LinkButton>
-          <LinkButton href="/auth/login" variant="ghost" className="min-h-14 w-full text-base sm:h-16 sm:w-40 sm:text-lg">Sign In</LinkButton>
-        </div>
-      </section>
 
-      <section className="mx-auto max-w-[1340px] px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-24">
-        <h2 className="text-center text-3xl font-black leading-tight text-[var(--gold-2)] sm:text-4xl lg:text-5xl">Why Join ChallengeSuite?</h2>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3 lg:gap-8">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return <Card key={feature.title} className="p-6 text-center sm:min-h-[280px] lg:min-h-[330px] lg:p-10"><Icon className="mx-auto text-white" size={46} /><h3 className="mt-6 text-xl font-black lg:mt-9 lg:text-2xl">{feature.title}</h3><p className="mt-4 text-base leading-7 text-[#9cb5d8] lg:mt-5 lg:text-lg lg:leading-8">{feature.body}</p></Card>;
-          })}
-        </div>
-      </section>
+      {menuOpen ? <div className="fixed inset-0 z-[100] lg:hidden" role="dialog" aria-modal="true" aria-label="Public navigation">
+        <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />
+        <aside className="absolute bottom-0 right-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6">
+          <div className="flex items-center justify-between"><span className="font-black">Challenge Suite</span><button type="button" onClick={() => setMenuOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
+          <nav className="mt-10 grid gap-3"><LinkButton href="/challenges">Explore Challenges</LinkButton><LinkButton href="/auth/register" variant="secondary">Create Account</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton><LinkButton href="/leaderboards" variant="ghost">Leaderboards</LinkButton><LinkButton href="/auth/login" variant="ghost">Sign In</LinkButton></nav>
+        </aside>
+      </div> : null}
 
-      <section className="border-y border-white/10 bg-[#111111] py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 text-center sm:px-6 md:grid-cols-4 lg:gap-10">
-          {[["24", "Active Users"], ["19", "Challenges"], ["Tracked", "Prize Foundations"], ["12", "Submissions"]].map(([value, label]) => <div key={label} className="min-w-0"><div className="break-words text-4xl font-black text-[var(--gold)] sm:text-5xl lg:text-6xl">{value}</div><div className="mt-3 text-sm font-bold leading-6 text-slate-300 sm:text-base lg:mt-4 lg:text-xl">{label}</div></div>)}
-        </div>
-
-        <Card className="mx-4 mt-12 max-w-3xl p-5 sm:mx-auto sm:mt-16 sm:p-8 lg:mt-20">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="flex min-w-0 items-center gap-2 text-2xl font-black sm:text-3xl"><Crown className="shrink-0 text-[var(--gold)]" /> <span className="min-w-0">Homepage Leaderboard</span></h2>
-            {!expanded ? <Button onClick={() => setExpanded(true)} variant="secondary" className="w-full sm:w-auto">View Leaderboards</Button> : <LinkButton href="/leaderboards" className="w-full sm:w-auto">Show More</LinkButton>}
+      <section className="relative min-h-[760px] overflow-hidden border-b border-white/10 pt-24 lg:min-h-[880px]">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,.96)_0%,rgba(0,0,0,.72)_52%,rgba(0,0,0,.24)_100%),url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=2200&q=85')] bg-cover bg-center" />
+        <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-end px-5 pb-16 sm:px-8 lg:min-h-[790px] lg:items-center lg:px-10 lg:pb-10">
+          <div className="max-w-4xl">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">The competition platform for ambitious communities</p>
+            <h1 className="mt-6 max-w-4xl text-5xl font-black leading-[1.02] sm:text-6xl lg:text-7xl xl:text-8xl">Turn participation into <span className="text-[var(--gold)]">momentum.</span></h1>
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">Create, enter, vote, rank, and run serious challenges through one trusted platform built for competitors, creators, hosts, and brands.</p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <LinkButton href="/auth/register" className="min-h-14 px-7 text-base">Create Account <ArrowRight size={18} /></LinkButton>
+              <LinkButton href="/challenges" variant="secondary" className="min-h-14 px-7 text-base">Explore Challenges</LinkButton>
+              <LinkButton href="/challenges/create" variant="ghost" className="min-h-14 px-7 text-base">Start Creating</LinkButton>
+            </div>
+            <div className="mt-12 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/15 pt-6 text-sm font-bold text-slate-300">
+              <span className="flex items-center gap-2"><Check size={16} className="text-[var(--gold)]" /> Public challenges</span>
+              <span className="flex items-center gap-2"><Check size={16} className="text-[var(--gold)]" /> Structured voting</span>
+              <span className="flex items-center gap-2"><Check size={16} className="text-[var(--gold)]" /> Verified Host tools</span>
+            </div>
           </div>
-          <div className="mt-6 space-y-3">
-            {visibleLeaders.map(([name, score, plan], index) => (
-              <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-black/30 p-4">
-                <span className="flex min-w-0 flex-wrap items-center gap-2 font-black">#{index + 1} <span className="truncate">{name}</span><PremiumBadge planId={plan as any} compact /></span>
-                <span className="shrink-0 text-sm font-black text-[var(--gold)] sm:text-base">{score}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <div className="mx-auto mt-14 max-w-3xl px-4 text-center sm:mt-16 lg:mt-20">
-          <h2 className="text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">Ready to Start Your Journey?</h2>
-          <p className="mt-5 text-lg leading-8 text-[#9cb5d8] sm:mt-7 sm:text-2xl">Join thousands of creators showcasing their talent</p>
-          <div className="mt-8 grid gap-3 sm:mt-10 sm:flex sm:justify-center"><LinkButton href="/challenges" className="min-h-14 w-full text-base sm:w-64 sm:text-lg">Find Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary" className="min-h-14 w-full text-base sm:w-64 sm:text-lg">Create Challenge</LinkButton></div>
         </div>
       </section>
-      <footer className="py-10 text-center text-[#58719a]">ChallengeSuite. All rights reserved.</footer>
+
+      <section className="border-b border-white/10 py-20 sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <SectionHeading eyebrow="Live on Challenge Suite" title="Competition, in motion." body="A clear view of the challenges people are watching, entering, and shaping right now." />
+          <div className="mt-12 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+            <article className="group relative min-h-[480px] overflow-hidden rounded-[8px] border border-white/10 bg-[url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1600&q=85')] bg-cover bg-center">
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8"><span className="inline-flex items-center gap-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black uppercase"><Play size={13} /> Live preview</span><h3 className="mt-5 text-3xl font-black sm:text-4xl">The Main Stage Challenge</h3><p className="mt-3 max-w-xl text-slate-200">Creative performance, community votes, and a leaderboard that moves with every entry.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/challenges">Watch Challenges</LinkButton><span className="rounded-[8px] border border-white/20 px-4 py-3 text-sm font-bold">246 participants</span></div></div>
+            </article>
+            <div className="grid gap-5">
+              <PreviewCard icon={<Sparkles />} label="Trending" title="Creator spotlight" body="Discover original entries before they climb the rankings." />
+              <PreviewCard icon={<BarChart3 />} label="Leaderboard" title="Every vote has context" body="Follow position, activity, and verified competition outcomes." />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-white/10 bg-[#0d0d0d] py-20 sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <SectionHeading eyebrow="One platform. Four ways in." title="Built around the role you play." body="Start as a competitor. Grow into a creator. Run full competitions as a Host. Partner with communities as a brand." />
+          <div className="mt-12 divide-y divide-white/10 border-y border-white/10">
+            {audience.map((item) => <a key={item.title} href={item.href} className="group grid gap-4 py-8 transition hover:bg-white/[0.025] sm:grid-cols-[80px_1fr_auto] sm:items-center sm:px-4 lg:py-10"><span className="text-sm font-black text-[var(--gold)]">{item.index}</span><div><h3 className="text-2xl font-black sm:text-3xl">{item.title}</h3><p className="mt-2 max-w-2xl leading-7 text-slate-400">{item.body}</p></div><ChevronRight className="hidden text-[var(--gold)] transition group-hover:translate-x-2 sm:block" /></a>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-white/10 py-20 sm:py-24 lg:py-32">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[1fr_1.2fr] lg:items-center lg:px-10">
+          <div><SectionHeading eyebrow="Trust is a product feature" title="Fairer competition starts with better structure." body="Challenge Suite makes the rules, review states, voting windows, and outcomes easier to understand." /><LinkButton href="/challenges" variant="secondary" className="mt-8">See the competition flow</LinkButton></div>
+          <div className="grid gap-4">{trust.map(({ icon: Icon, title, body }, index) => <article key={title} className="grid grid-cols-[52px_1fr] gap-5 rounded-[8px] border border-white/10 bg-[#111] p-5 transition hover:border-[var(--gold)]/40 sm:p-6"><div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[var(--gold)]/10 text-[var(--gold)]"><Icon size={22} /></div><div><p className="text-xs font-black text-slate-500">0{index + 1}</p><h3 className="mt-1 text-xl font-black">{title}</h3><p className="mt-2 leading-7 text-slate-400">{body}</p></div></article>)}</div>
+        </div>
+      </section>
+
+      <section className="border-b border-white/10 bg-[#0d0d0d] py-20 sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-end"><SectionHeading eyebrow="Leaderboard pulse" title="Progress should feel visible." body="Rankings turn participation into a story people can follow." /><LinkButton href="/leaderboards" className="w-fit lg:justify-self-end">View Full Leaderboard</LinkButton></div>
+          <div className="mt-12 overflow-hidden rounded-[8px] border border-white/10">{leaders.map(([name, points, plan], index) => <div key={name} className="grid grid-cols-[48px_1fr_auto] items-center gap-4 border-b border-white/10 bg-[#111] p-5 last:border-0 sm:grid-cols-[70px_1fr_auto] sm:p-6"><span className="text-2xl font-black text-[var(--gold)]">{String(index + 1).padStart(2, "0")}</span><span className="flex min-w-0 flex-wrap items-center gap-3 font-black"><span className="truncate">{name}</span><PremiumBadge planId={plan as any} compact /></span><span className="font-black">{points} <span className="hidden text-sm text-slate-500 sm:inline">pts</span></span></div>)}</div>
+        </div>
+      </section>
+
+      <section className="relative overflow-hidden border-b border-white/10 py-20 sm:py-24 lg:py-32">
+        <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[linear-gradient(90deg,#0000,#000),url('https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1400&q=80')] bg-cover bg-center opacity-35 lg:block" />
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10"><div className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">For Hosts and Brands</p><h2 className="mt-5 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">Run the room. Back the right community.</h2><p className="mt-6 text-lg leading-8 text-slate-300">Hosts get operational competition tools. Approved brands get a separate command center for reviewed campaign collaboration. Subscription access and campaign budgets stay clearly separated.</p><div className="mt-8 flex flex-wrap gap-3"><LinkButton href="/subscriptions">Compare Plans</LinkButton><LinkButton href="/sponsor/plans" variant="secondary">Explore Brand Access</LinkButton></div></div></div>
+      </section>
+
+      <section className="px-5 py-20 sm:px-8 sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-7xl rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)] p-7 text-black sm:p-10 lg:p-14">
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end"><div><p className="text-xs font-black uppercase tracking-[0.22em]">Your next challenge starts here</p><h2 className="mt-4 max-w-4xl text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">Compete. Create. Host. Partner.</h2><p className="mt-5 max-w-2xl text-lg font-bold text-black/70">Join a platform designed to make serious competition feel clear, social, and worth following.</p></div><div className="flex flex-col gap-3 sm:flex-row lg:flex-col"><LinkButton href="/auth/register" className="min-h-14 border-black bg-black text-white hover:bg-[#171717]">Create Account</LinkButton><LinkButton href="/challenges" variant="secondary" className="min-h-14 border-black/30 bg-transparent text-black hover:bg-black hover:text-white">Explore Challenges</LinkButton></div></div>
+        </div>
+      </section>
+      <footer className="border-t border-white/10 px-5 py-10"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Challenge Suite. Competition, made intentional.</span><div className="flex gap-5"><a href="/auth/login">Sign In</a><a href="/auth/register">Create Account</a><a href="/sponsor/plans">For Brands</a></div></div></footer>
     </main>
   );
 }
 
-function FloatingCard({ icon, label, className }: { icon: React.ReactNode; label: string; className: string }) {
-  return <div className={`absolute hidden rounded-[16px] border border-white/10 bg-white/5 px-10 py-12 lg:block ${className}`}><div>{icon}</div><div className="mt-7 text-lg font-bold text-slate-300">{label}</div></div>;
+function SectionHeading({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+  return <div className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">{eyebrow}</p><h2 className="mt-5 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">{title}</h2><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-400">{body}</p></div>;
+}
+function PreviewCard({ icon, label, title, body }: { icon: React.ReactNode; label: string; title: string; body: string }) {
+  return <article className="group flex min-h-56 flex-col justify-between rounded-[8px] border border-white/10 bg-[#111] p-6 transition hover:-translate-y-1 hover:border-[var(--gold)]/40 sm:p-8"><div className="flex items-center justify-between"><div className="text-[var(--gold)]">{icon}</div><span className="text-xs font-black uppercase text-slate-500">{label}</span></div><div><h3 className="text-2xl font-black">{title}</h3><p className="mt-3 leading-7 text-slate-400">{body}</p></div></article>;
 }

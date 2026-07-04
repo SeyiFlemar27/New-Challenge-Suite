@@ -147,7 +147,7 @@ export function getSubscriptionPlan(planId: unknown) {
 
 export function getSubscriptionPlansForUser(currentPlanId: unknown, accountType: Exclude<AccountType, "admin">) {
   const normalizedPlanId = normalizePlanId(currentPlanId);
-  return subscriptionPlans.map((plan) => ({
+  return subscriptionPlans.filter((plan) => plan.id !== "pro").map((plan) => ({
     ...plan,
     current: plan.id === normalizedPlanId,
     stripeConfigured: Boolean(resolveStripePriceEnv(plan).priceId),

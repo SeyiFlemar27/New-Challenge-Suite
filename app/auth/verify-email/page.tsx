@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
@@ -130,25 +129,21 @@ export default function VerifyEmailPage() {
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
-      <Card className="w-full max-w-[540px] rounded-[12px] p-6 text-center sm:p-8 lg:p-10">
-        <BrandLogo className="mb-6" imageClassName="h-16 w-16 border-2 border-[var(--gold)] gold-glow sm:h-20 sm:w-20" />
+      <Card className="w-full max-w-[560px] rounded-[8px] border-[var(--gold)]/20 p-6 text-center shadow-2xl sm:p-9 lg:p-12">
+        <BrandLogo className="mb-7" imageClassName="h-14 w-14 border border-[var(--gold)] sm:h-16 sm:w-16" />
         {verified ? (
           <div className="py-6">
-            <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 180 }}>
-              <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400" />
-            </motion.div>
-            <h1 className="mt-6 text-4xl font-black">Email verified successfully</h1>
-            <p className="mt-3 text-slate-300">Redirecting you to your account...</p>
+            <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400" />
+            <p className="mt-7 text-xs font-black uppercase text-[var(--gold)]">Identity confirmed</p>
+            <h1 className="mt-3 text-3xl font-black sm:text-4xl">Email verified</h1>
+            <p className="mt-4 text-slate-300">Your Challenge Suite account is ready. We are opening your workspace now.</p>
             <Button className="mt-8 w-full" onClick={() => void getVerifiedDestination().then((destination) => router.replace(destination))}>Continue</Button>
           </div>
         ) : (
           <>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-yellow-500/30 bg-yellow-500/10 text-[var(--gold)]">
-              <MailCheck className="h-8 w-8" />
-            </div>
-            <h1 className="mt-6 text-4xl font-black">We sent a verification code to your email</h1>
-            <p className="mt-4 text-slate-300">We sent a 6-digit code to <b className="text-white">{maskedEmail}</b>.</p>
-            <p className="mt-2 text-sm text-slate-400">Enter the code below to continue. The code expires in 10 minutes.</p>
+            <p className="text-xs font-black uppercase text-[var(--gold)]">Secure account setup</p>
+            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">Verify your email</h1>
+            <p className="mx-auto mt-4 max-w-md leading-7 text-slate-300">Enter the 6-digit code sent to <b className="text-white">{maskedEmail}</b>. The code expires in 10 minutes.</p>
             <form className="mt-8 space-y-5 text-left" onSubmit={verify}>
               <Field label="Verification Code">
                 <input
@@ -171,7 +166,7 @@ export default function VerifyEmailPage() {
               </Button>
               <Link href="/auth/register" className="inline-flex h-11 items-center justify-center rounded-[8px] border border-white/10 bg-[#1d1d1d] px-5 text-sm font-bold text-white transition hover:bg-[#242424]">Change Email</Link>
             </div>
-            <div className="mt-6 flex items-center justify-center gap-2 text-xs font-bold text-slate-500">
+            <div className="mt-7 flex items-center justify-center gap-2 border-t border-white/10 pt-6 text-xs font-bold text-slate-500">
               <ShieldCheck size={14} /> Didn't receive it? Check spam or request a new code.
             </div>
           </>

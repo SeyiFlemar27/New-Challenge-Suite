@@ -19,7 +19,7 @@ export default function SubscriptionsPage() {
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<{ status: string; planId: string | null } | null>(null);
-  const visiblePlans = plans.filter((plan) => plan.audience === audience);
+  const visiblePlans = plans.filter((plan) => plan.audience === audience && plan.id !== "pro");
   const currentTier = getEffectiveTier({ planId: currentSubscription?.planId, planStatus: currentSubscription?.status, accountType: audience === "sponsor" ? "sponsor" : "user" });
 
   async function loadPlans() {
@@ -79,7 +79,7 @@ export default function SubscriptionsPage() {
       <Card className="mx-auto mt-6 max-w-4xl border-yellow-500/20 bg-yellow-500/5 p-4 text-center text-sm leading-6 text-slate-300">
         {audience === "sponsor"
           ? "Sponsor subscriptions unlock sponsor tools and the Brand Command Center. Actual campaign budgets, sponsorship funding, money release, and payouts are separate and are not active in this version."
-          : "Paid-entry prize pools remain disabled. Creator, Pro, Host, and Enterprise plans unlock platform tools, not automatic cash payouts."}
+          : "Paid-entry prize pools remain disabled. Creator, Host, and Enterprise plans unlock platform tools, not automatic cash payouts."}
       </Card>
       {currentSubscription?.planId ? <Card className="mx-auto mt-4 flex max-w-4xl flex-col gap-4 p-5 text-left sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Current Plan</p><p className="mt-2 text-sm text-slate-300"><b className="text-white">{currentTier.displayName}</b> · <span className="capitalize">{currentSubscription.status.replaceAll("_", " ")}</span></p></div><LinkButton href="/settings/billing" variant="secondary">Manage Billing</LinkButton></Card> : null}
       {error ? <Card className="mx-auto mt-6 max-w-3xl border-red-500/30 bg-red-950/30 p-4 text-red-100">{error}</Card> : null}
@@ -97,7 +97,7 @@ export default function SubscriptionsPage() {
           <EmptyState icon={<Swords />} title="No plans available" body="Subscription plans are not available for this audience yet." action={<Button onClick={loadPlans}>Retry</Button>} />
         </Card>
       ) : (
-      <div className="mt-14 grid gap-7 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+      <div className={`mx-auto mt-14 grid max-w-[1500px] gap-7 md:grid-cols-2 ${audience === "user" ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
         {visiblePlans.map((plan) => (
           <Card key={plan.id} className={`relative p-8 ${plan.recommended ? "border-[var(--gold)] bg-yellow-500/10" : "bg-[#10151e]"}`}>
             {plan.recommended ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[var(--gold)] px-7 py-2 text-sm font-bold text-black">Recommended</span> : null}

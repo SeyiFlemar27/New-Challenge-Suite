@@ -13,7 +13,6 @@ import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalize
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
 import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
-import { TrendingStories } from "@/components/stories/trending-stories";
 
 type LeaderboardEntry = {
   displayName?: string;
@@ -88,8 +87,7 @@ export default function DashboardPage() {
     ? freeCompetitor ? [
         { title: "Explore Challenges", body: "Discover active public competitions that match your interests.", icon: Swords, active: true },
         { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible challenges.", icon: Vote, active: true },
-        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" },
-        { title: "Become a Creator", body: "Launch your own challenges, manage submissions, and grow a competition community.", icon: Rocket, active: false }
+        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
       ] : [
         { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" },
@@ -202,7 +200,6 @@ export default function DashboardPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : null}
-      <TrendingStories challenges={challenges} source="dashboard" />
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>

@@ -29,6 +29,7 @@ export interface CurrentUserProfile {
   sponsorOnboardingComplete?: boolean;
   creatorOnboardingComplete?: boolean;
   hostOnboardingComplete?: boolean;
+  walkthroughCompleted?: boolean;
   hasSponsorProfile?: boolean;
   customization?: ProfileCustomization;
 }
@@ -106,6 +107,7 @@ export function useCurrentUser() {
           sponsorOnboardingComplete: Boolean(profile.sponsorOnboardingComplete),
           creatorOnboardingComplete: Boolean(profile.creatorOnboardingComplete),
           hostOnboardingComplete: Boolean(profile.hostOnboardingComplete),
+          walkthroughCompleted: profile.walkthroughCompleted !== false,
           hasSponsorProfile: Boolean(profile.hasSponsorProfile),
           customization: profile.customization as ProfileCustomization | undefined
         });

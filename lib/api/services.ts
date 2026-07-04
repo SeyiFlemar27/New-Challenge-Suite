@@ -90,6 +90,7 @@ export function fetchBootstrapProfile() {
       sponsorOnboardingComplete?: boolean;
       creatorOnboardingComplete?: boolean;
       hostOnboardingComplete?: boolean;
+      walkthroughCompleted?: boolean;
       hasSponsorProfile?: boolean;
       customization?: ProfileCustomization;
     };

@@ -776,7 +776,7 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
     badgeLabel: "Free Competitor",
     memberLabel: "Free Member",
     dashboardName: "Competitor Dashboard",
-    dashboardSubtitle: "Explore, join, vote, compete, and track your entries."
+    dashboardSubtitle: "Compete, vote, and follow your progress."
   };
 }
 

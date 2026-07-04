@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BarChart3, Building2, CreditCard, LayoutDashboard, LockKeyhole, Megaphone, MessageSquare, PieChart, PlusCircle, Settings, Store, Target, Users, Menu, X, BadgeDollarSign } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
+import { ProductWalkthrough } from "@/components/product-walkthrough";
 import { Card } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { getPlanExperience } from "@/lib/plan-access";
@@ -64,6 +65,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
+      <ProductWalkthrough />
       <div className="grid min-h-screen md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[292px_minmax(0,1fr)]">
         <aside className="hidden border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:block md:border-b-0 md:border-r">
           <div className="flex items-center gap-4">
