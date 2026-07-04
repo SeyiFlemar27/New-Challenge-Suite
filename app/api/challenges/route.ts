@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Challenge creation");
-  const permission = requireRole(user, ["user", "creator"]);
+  const permission = requireRole(user, ["user", "creator", "host"]);
   if (permission) return permission;
 
   const parsed = await readJson(request);
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
+  const selectedAccountType = String(planProfile.account_type ?? planProfile.role ?? "user");
 
   if (planAccess.isSponsor) {
     return fail("Sponsors manage campaigns from the Brand Command Center. Use /sponsor instead of normal challenge creation.", 403, { redirectTo: "/sponsor/dashboard" }, "USER_ACCOUNT_REQUIRED");
@@ -65,6 +66,9 @@ export async function POST(request: Request) {
   }).length;
   if (body.publish && planExperience.monthlyChallengeLimit !== null && challengesCreatedThisMonth.length >= planExperience.monthlyChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.challengeLimitLabel}.`, 409, undefined, "PLAN_LIMIT_REACHED");
+  }
+  if (planAccess.normalizedPlanId === "free" && !["creator", "host"].includes(selectedAccountType)) {
+    return fail("Create Challenge is available to Creator and Host accounts. Competitor accounts can join, vote, save, and compete.", 403, { redirectTo: "/subscriptions" }, "CREATOR_ACCOUNT_REQUIRED");
   }
   if (body.publish && body.visibility === "private" && planExperience.monthlyPrivateChallengeLimit !== null && privateChallengesThisMonth >= planExperience.monthlyPrivateChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.privateChallengeLimitLabel}.`, 409, undefined, "PRIVATE_CHALLENGE_LIMIT_REACHED");

@@ -9,8 +9,11 @@ import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchChallenges } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { TrendingStories } from "@/components/stories/trending-stories";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getPlanExperience } from "@/lib/plan-access";
 
 export default function ChallengesPage() {
+  const { user } = useCurrentUser();
   const { data, isLoading } = useQuery({
     queryKey: ["challenges"],
     queryFn: fetchChallenges,
@@ -23,12 +26,14 @@ export default function ChallengesPage() {
   }, [data]);
 
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
+  const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
+  const canCreate = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType }).planId !== "free" || selectedAccountType === "creator" || selectedAccountType === "host";
 
   return (
     <AppShell>
       <div className="flex items-start justify-between">
         <PageTitle title="Challenges" subtitle="Browse active, upcoming, and completed competitions" />
-        <LinkButton href="/challenges/create">+ Create Challenge</LinkButton>
+        {canCreate ? <LinkButton href="/challenges/create">+ Create Challenge</LinkButton> : null}
       </div>
       <TrendingStories challenges={challenges} />
 
@@ -44,7 +49,7 @@ export default function ChallengesPage() {
       ) : challenges.length ? (
         <div className="mt-10 grid max-w-6xl gap-6 sm:grid-cols-2 lg:gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge as any} />)}</div>
       ) : (
-        <EmptyState icon={<Trophy />} title="No challenges yet" body="Published challenges will appear here once they are created." action={<LinkButton href="/challenges/create">Create Challenge</LinkButton>} />
+        <EmptyState icon={<Trophy />} title="No challenges yet" body="Published challenges will appear here once they are created." action={canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : undefined} />
       )}
     </AppShell>
   );

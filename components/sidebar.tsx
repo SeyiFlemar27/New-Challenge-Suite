@@ -36,6 +36,16 @@ const mobileNav = [
   { href: "/wallet", label: "Wallet", icon: Coins }
 ];
 
+function activeNavigationHref(pathname: string) {
+  if (pathname === "/challenges/create") return "/challenges/create";
+  if (pathname === "/my-entries") return "/my-entries";
+  if (pathname === "/my-challenges") return "/my-challenges";
+  if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) return "/settings";
+  return pathname;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [notificationStatus, setNotificationStatus] = useState("");
@@ -48,6 +58,11 @@ export function Sidebar() {
     planStatus: user?.planStatus,
     accountType: user?.accountType
   });
+  const selectedAccountType = user?.selectedAccountType ?? (user?.role === "creator" || user?.role === "host" ? user.role : user?.accountType);
+  const freePlan = planExperience.planId === "free";
+  const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
+  const canCreateChallenges = !freePlan || selectedAccountType === "creator" || selectedAccountType === "host";
+  const activeHref = activeNavigationHref(pathname);
   const visibleNav = user?.accountType === "sponsor"
     ? [
         { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
@@ -55,7 +70,9 @@ export function Sidebar() {
         { href: "/subscriptions", label: "Sponsor Plans", icon: Diamond },
         { href: "/settings", label: "Settings", icon: Settings }
       ]
-    : nav.filter((item) => {
+    : nav.map((item) => freeCompetitor && item.href === "/my-challenges" ? { ...item, href: "/my-entries", label: "My Entries" } : item).filter((item) => {
+        if (freeCompetitor) return ["/dashboard", "/feed", "/favorites", "/wallet", "/challenges", "/my-entries", "/leaderboards", "/winners", "/profile", "/settings"].includes(item.href);
+        if (item.href === "/challenges/create") return canCreateChallenges;
         if (item.href === "/private-exclusive") return planExperience.features.private_challenges;
         if (item.href === "/live-events") return planExperience.features.live_event_tools;
         if (item.href === "/tournaments") return planExperience.features.join_tournaments || planExperience.features.tournament_builder;
@@ -69,7 +86,15 @@ export function Sidebar() {
         { href: "/subscriptions", label: "Plans", icon: Diamond },
         { href: "/settings", label: "Settings", icon: Settings }
       ]
-    : mobileNav;
+    : freeCompetitor
+      ? [
+          { href: "/dashboard", label: "Home", icon: Home },
+          { href: "/feed", label: "Explore", icon: LayoutGrid },
+          { href: "/favorites", label: "Saved", icon: Star },
+          { href: "/leaderboards", label: "Rank", icon: BarChart3 },
+          { href: "/wallet", label: "Wallet", icon: Coins }
+        ]
+      : mobileNav.filter((item) => item.href !== "/challenges/create" || canCreateChallenges);
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
@@ -113,7 +138,7 @@ export function Sidebar() {
         <button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{user?.displayName || "Menu"}</p></div></div><button onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
-          <nav className="mt-6 space-y-2">{visibleNav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cn("flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200", pathname === item.href && "bg-[var(--gold)] text-black")}><Icon size={19} />{item.label}</Link>; })}</nav>
+          <nav className="mt-6 space-y-2">{visibleNav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cn("flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200", activeHref === item.href && "bg-[var(--gold)] text-black")}><Icon size={19} />{item.label}</Link>; })}</nav>
           <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{planLabel} Plan</p></div></Link></div>
         </aside>
       </div> : null}
@@ -124,7 +149,7 @@ export function Sidebar() {
         </div>
         <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-yellow-500/20 px-5 py-4">
           {visibleNav.map((item) => {
-            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const active = activeHref === item.href;
             const Icon = item.icon;
             return (
               <Link
@@ -177,7 +202,7 @@ export function Sidebar() {
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
         <div className={cn("mx-auto grid max-w-md gap-1 rounded-[18px] border border-white/10 bg-[#121212] p-1.5", visibleMobileNav.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
           {visibleMobileNav.map((item) => {
-            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const active = activeHref === item.href;
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-[14px] px-1 text-[11px] font-black text-slate-400 transition", active && "bg-[var(--gold)] text-black")}>

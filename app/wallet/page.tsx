@@ -47,6 +47,7 @@ export default function WalletPage() {
   const [customCoins, setCustomCoins] = useState("250");
   const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
   const [financialSummary, setFinancialSummary] = useState<any>(null);
+  const freeCompetitor = String(account.planId ?? "free") === "free" && !["creator", "host"].includes(String(account.role ?? "user"));
 
   async function loadWallet() {
     setLoading(true);
@@ -173,13 +174,16 @@ export default function WalletPage() {
         </Card>
       ) : null}
 
-      {!loading && !unauthenticated && !error ? <div className="mt-8 grid gap-6 xl:grid-cols-4">
-        {[
+      {!loading && !unauthenticated && !error ? <div className={`mt-8 grid gap-6 ${freeCompetitor ? "md:grid-cols-2" : "xl:grid-cols-4"}`}>
+        {(freeCompetitor ? [
+          { icon: <Vote />, title: "Free & DoroCoin Votes", body: "Use the challenge's free daily vote, then buy DoroCoins for additional eligible votes." },
+          { icon: <Coins />, title: "Internal Platform Credits", body: "DoroCoins are used for platform voting features and cannot be withdrawn or converted to cash." }
+        ] : [
           { icon: <Vote />, title: "Voting", body: "Buy additional votes for eligible submissions." },
-          { icon: <TrendingUp />, title: "Boosting", body: "Increase challenge visibility for a fixed duration." },
+          { icon: <TrendingUp />, title: "Boosting", body: "Increase challenge visibility when your plan allows it." },
           { icon: <LockKeyhole />, title: "Premium Entries", body: "Join locked creator challenges when allowed." },
-          { icon: <Coins />, title: "Rewards", body: "Earn bonuses from wins, promos, and platform campaigns." }
-        ].map((item) => <Card key={item.title} className="p-5"><div className="text-[var(--gold)]">{item.icon}</div><h2 className="mt-3 text-xl font-black">{item.title}</h2><p className="mt-2 text-sm text-slate-300">{item.body}</p></Card>)}
+          { icon: <Coins />, title: "Platform Credits", body: "Use DoroCoins for eligible votes, boosts, and promotional features." }
+        ]).map((item) => <Card key={item.title} className="p-5"><div className="text-[var(--gold)]">{item.icon}</div><h2 className="mt-3 text-xl font-black">{item.title}</h2><p className="mt-2 text-sm text-slate-300">{item.body}</p></Card>)}
       </div> : null}
 
       {!loading && !unauthenticated && !error && (account.accountType === "sponsor" || account.isAdmin || ["creator", "pro", "host", "enterprise"].includes(String(account.planId))) ? <section className="mt-10">

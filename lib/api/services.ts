@@ -13,6 +13,7 @@ export interface DashboardResponse {
     role: string | null;
     accountType?: AccountType;
     dashboardType?: string;
+    selectedAccountType?: string;
     planId: string;
     legacyPlanId?: string | null;
     planName?: string;

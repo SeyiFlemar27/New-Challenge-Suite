@@ -14,6 +14,8 @@ export interface CurrentUserProfile {
   role?: AppRole;
   accountType: AccountType;
   dashboardType?: string;
+  selectedAccountType?: string;
+  roleIntent?: string;
   planId?: UserPlanId;
   legacyPlanId?: string | null;
   planName?: string;
@@ -87,6 +89,8 @@ export function useCurrentUser() {
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           accountType,
           dashboardType: typeof profile.dashboardType === "string" ? profile.dashboardType : undefined,
+          selectedAccountType: typeof profile.selectedAccountType === "string" ? profile.selectedAccountType : undefined,
+          roleIntent: typeof profile.roleIntent === "string" ? profile.roleIntent : undefined,
           planId,
           legacyPlanId: typeof profile.legacyPlanId === "string" ? profile.legacyPlanId : null,
           planName: typeof profile.planName === "string" ? profile.planName : undefined,

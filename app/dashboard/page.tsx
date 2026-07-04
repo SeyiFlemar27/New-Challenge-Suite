@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Activity, Award, BarChart3, Crown, Diamond, Flame, LockKeyhole, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound } from "lucide-react";
+import { Activity, Award, BarChart3, Crown, Diamond, Flame, LockKeyhole, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
@@ -67,11 +67,18 @@ export default function DashboardPage() {
     planStatus: dashboard?.user.planStatus,
     accountType: dashboard?.user.accountType
   });
+  const selectedAccountType = dashboard?.user.selectedAccountType ?? dashboard?.user.role ?? dashboard?.user.accountType;
+  const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
+  const freeCreatorOrHost = planExperience.planId === "free" && (selectedAccountType === "creator" || selectedAccountType === "host");
   const tierFeatures = planExperience.planId === "free"
-    ? [
-        { title: "Explore & Compete", body: "Discover public challenges, submit entries, vote, and build your ranking.", icon: Swords, active: true },
-        { title: "Creator Studio", body: "Private challenges, sponsor collaboration, analytics, and boosts require Creator.", icon: LockKeyhole, active: false },
-        { title: "Host Control Center", body: "Tournament, live-event, participant, and voting controls require Host.", icon: LockKeyhole, active: false }
+    ? freeCompetitor ? [
+        { title: "Explore Challenges", body: "Discover active public competitions that match your interests.", icon: Swords, active: true },
+        { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible challenges.", icon: Vote, active: true },
+        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
+      ] : [
+        { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
+        { title: "Simple Competition Setup", body: "Use basic rules, dates, cover media, and image or video submissions.", icon: Trophy, active: true },
+        { title: "More Creator Tools", body: "Private, sponsor, tournament, live-event, and advanced tools require an eligible plan.", icon: LockKeyhole, active: false }
       ]
     : planExperience.planId === "creator"
       ? [
@@ -97,9 +104,13 @@ export default function DashboardPage() {
               { title: "Teams & Integrations", body: `Multi-admin foundation for up to ${planExperience.teamMemberLimit} members, with integration placeholders.`, icon: UsersRound, active: true, href: "/dashboard/host" }
             ];
   const quickActions = planExperience.planId === "free"
-    ? [
+    ? freeCompetitor ? [
         { href: "/challenges", label: "Explore Challenges", variant: "secondary" as const },
+        { href: "/my-entries", label: "My Entries", variant: "primary" as const },
+        { href: "/wallet", label: "Votes & DoroCoins", variant: "ghost" as const }
+      ] : [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
+        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
         { href: "/subscriptions", label: "Compare Plans", variant: "ghost" as const }
       ]
     : planExperience.planId === "creator"
@@ -121,7 +132,7 @@ export default function DashboardPage() {
           ];
   const tierStats = planExperience.planId === "free"
     ? [
-        { icon: <Swords />, title: "Active Challenges", value: dashboard?.stats.activeChallenges ?? 0, label: "Public participation" },
+        { icon: <Swords />, title: freeCompetitor ? "My Entries" : "Active Challenges", value: freeCompetitor ? dashboard?.stats.submissionCount ?? 0 : dashboard?.stats.activeChallenges ?? 0, label: freeCompetitor ? "Competition submissions" : "Public challenge allowance" },
         { icon: <Diamond />, title: "Points Earned", value: dashboard?.stats.totalPoints ?? 0, label: "Competition score" },
         { icon: <Medal />, title: "Badges Collected", value: dashboard?.stats.badgeCount ?? 0, label: "Achievements" }
       ]
@@ -161,8 +172,8 @@ export default function DashboardPage() {
         <div className="flex items-start gap-4">
           <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
           <div>
-            <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{planExperience.badgeLabel}</p>
-            <PageTitle title={planExperience.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : `${firstName}, ${planExperience.dashboardSubtitle}`} />
+            {!freeCompetitor ? <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{planExperience.badgeLabel}</p> : null}
+            <PageTitle title={freeCompetitor ? "Competitor Dashboard" : freeCreatorOrHost ? `${selectedAccountType === "host" ? "Host" : "Creator"} Starter` : planExperience.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : freeCompetitor ? `${firstName}, explore, join, vote, compete, and track your entries.` : `${firstName}, ${planExperience.dashboardSubtitle}`} />
           </div>
         </div>
         <div className="flex flex-wrap gap-4">

@@ -12,12 +12,15 @@ import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
 import type { Submission } from "@/lib/types";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getPlanExperience } from "@/lib/plan-access";
 
 type DetailSubmission = Submission & { userPlanId?: string };
 
 export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
+  const { user } = useCurrentUser();
   const [watching, setWatching] = useState(false);
   const [saved, setSaved] = useState(false);
   const [watchLater, setWatchLater] = useState(false);
@@ -130,6 +133,11 @@ export default function ChallengeDetailPage() {
   const sponsored = sponsorships.length > 0;
   const prizePool = details?.prizePool;
   const prizeValue = Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `$${(Number(prizePool?.visibleJackpotCents) / 100).toLocaleString()}` : challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : "Pending review";
+  const planExperience = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
+  const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
+  const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
+  const canBoost = planExperience.monthlyBoostLimit > 0 && (selectedAccountType === "creator" || selectedAccountType === "host");
+  const sponsorAccount = user?.accountType === "sponsor";
 
   return (
     <AppShell>
@@ -142,7 +150,7 @@ export default function ChallengeDetailPage() {
           </div>
           <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
-            <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton>
+            {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setShared(true)}><Share2 size={17} /> {shared ? "Link Copied" : "Share"}</Button>
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "In Watch Later" : "Watch Later"}</Button>
@@ -167,7 +175,7 @@ export default function ChallengeDetailPage() {
               <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : "Voting is closed for this challenge."} />
               <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
-              <Info title="Sponsor information" body={sponsored ? `${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.` : "Sponsors may submit contribution requests. Funding and release are not active yet."} />
+              {!freeCompetitor ? <Info title="Sponsor information" body={sponsored ? `${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.` : "Sponsor contribution requests remain subject to account approval and review."} /> : null}
             </div>
           </Card>
 
@@ -214,12 +222,12 @@ export default function ChallengeDetailPage() {
             {watching ? <p className="mt-3 text-xs text-slate-400">Preferences saved for 1 hour, 30 minutes, 5 minutes, and start time. Delivery begins when the notification worker is connected.</p> : null}
           </Card>
 
-          <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
+          {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
-          </Card>
-          {prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> · Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} · {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
+          </Card> : null}
+          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> · Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} · {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
 
           <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>

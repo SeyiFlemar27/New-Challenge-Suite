@@ -9,10 +9,13 @@ import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus } from 
 import { fetchFeed } from "@/lib/api/services";
 import { normalizeChallenge } from "@/lib/api/normalizers";
 import type { Challenge } from "@/lib/types";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getPlanExperience } from "@/lib/plan-access";
 
 const tabs = ["Active", "Trending", "Recommended", "Open", "Premium"];
 
 export default function FeedPage() {
+  const { user } = useCurrentUser();
   const [tab, setTab] = useState("Active");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -21,6 +24,8 @@ export default function FeedPage() {
   const [error, setError] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const categories = ["All", ...Array.from(new Set(challenges.map((challenge) => challenge.category)))];
+  const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
+  const canCreate = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType }).planId !== "free" || selectedAccountType === "creator" || selectedAccountType === "host";
 
   async function loadFeed() {
     setLoading(true);
@@ -61,7 +66,7 @@ export default function FeedPage() {
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <PageTitle title="Explore Feed" subtitle="Find active challenges you can join, vote on, or follow." icon={<Sparkles className="text-[var(--gold)]" />} />
-        <LinkButton href="/challenges/create">Create Challenge</LinkButton>
+        {canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : null}
       </div>
 
       <Card className="mt-8 p-4 md:p-6">

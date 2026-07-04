@@ -39,10 +39,14 @@ function CreateChallengeFallback() {
 
 function CreateChallengeWizard() {
   const searchParams = useSearchParams();
-  const { user } = useCurrentUser();
+  const { user, loading: userLoading } = useCurrentUser();
   const planProfile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
+  const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
+  const freePlan = planExperience.planId === "free";
+  const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
+  const freeCreatorOrHost = freePlan && (selectedAccountType === "creator" || selectedAccountType === "host");
   const defaultType = searchParams.get("mode") === "private" ? "Private / Exclusive" : "Public Challenge";
   const [step, setStep] = useState(0);
   const [stage, setStage] = useState<"wizard" | "success">("wizard");
@@ -290,6 +294,24 @@ function CreateChallengeWizard() {
     setStage("success");
   }
 
+  if (userLoading) return <CreateChallengeFallback />;
+
+  if (freeCompetitor) {
+    return (
+      <AppShell>
+        <Card className="mx-auto mt-10 max-w-2xl border-yellow-500/30 p-6 text-center sm:p-8 lg:p-10">
+          <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
+          <h1 className="mt-5 text-3xl font-black">Create Challenge is for Creators and Hosts</h1>
+          <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">Free competitor accounts are built for joining, voting, saving, and competing in challenges. Switch to a Creator or Host plan to create challenges.</p>
+          <div className="mt-7 grid gap-3 sm:flex sm:justify-center">
+            <LinkButton href="/subscriptions">Compare Plans</LinkButton>
+            <LinkButton href="/challenges" variant="secondary">Go Back to Challenges</LinkButton>
+          </div>
+        </Card>
+      </AppShell>
+    );
+  }
+
   if (stage === "success") {
     return (
       <AppShell>
@@ -316,6 +338,35 @@ function CreateChallengeWizard() {
           <h1 className="mt-5 text-3xl font-black">Use Brand Command Center</h1>
           <p className="mt-3 text-slate-300">Sponsor accounts create and manage campaign foundations from the dedicated sponsor experience.</p>
           <LinkButton href="/sponsor/dashboard" className="mt-6">Open Brand Command Center</LinkButton>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  if (freeCreatorOrHost) {
+    return (
+      <AppShell>
+        <Card className="mx-auto max-w-3xl p-5 sm:p-7 lg:p-9">
+          <PageTitle title="Create a Basic Public Challenge" subtitle="Free creator and host accounts can publish one simple, public, non-monetized challenge per month." />
+          <div className="mt-8 grid gap-6">
+            <Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Field label="Category"><select className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)}>{["Fitness", "Creative", "Photography", "Food", "Gaming", "Other"].map((category) => <option key={category}>{category}</option>)}</select></Field>
+              <Field label="Submission Type"><select className={inputClass} value={form.submissionTypes[0]} onChange={(event) => setForm((current) => ({ ...current, submissionTypes: [event.target.value] }))}><option value="image">Image</option><option value="video">Video</option></select></Field>
+            </div>
+            <Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field>
+            <Field label="Rules"><textarea className={textareaClass} value={form.standardRules} onChange={(event) => update("standardRules", event.target.value)} /></Field>
+            <Field label="Cover Image URL"><input className={inputClass} value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} placeholder="https://..." /></Field>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Field label="Start Date"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></Field>
+              <Field label="Entry Deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(event) => update("submissionDeadline", event.target.value)} /></Field>
+              <Field label="Voting Deadline"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(event) => update("votingDeadline", event.target.value)} /></Field>
+              <Field label="End Date"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></Field>
+            </div>
+            <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, boosts, advanced voting, and promo media are unavailable in this free flow.</Card>
+            {error ? <p className="rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
+            <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:items-center sm:justify-between"><LinkButton href="/subscriptions" variant="secondary">Compare Creator Plans</LinkButton><Button onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button></div>
+          </div>
         </Card>
       </AppShell>
     );
