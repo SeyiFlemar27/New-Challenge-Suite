@@ -41,9 +41,9 @@ export function planBadgeLabel(planId?: UserPlanId | string | null) {
   }
 }
 
-export function PremiumBadge({ planId, compact = false, badgeStyleId }: { planId?: UserPlanId; compact?: boolean; badgeStyleId?: string }) {
-  const label = planBadgeLabel(planId);
-  const premium = label !== "Free";
+export function PremiumBadge({ planId, compact = false, badgeStyleId, labelOverride }: { planId?: UserPlanId; compact?: boolean; badgeStyleId?: string; labelOverride?: string }) {
+  const label = labelOverride || planBadgeLabel(planId);
+  const premium = planBadgeLabel(planId) !== "Free";
   const sponsor = label.includes("Sponsor") || label.includes("Partner");
   const badgeStyle = badgeStyleId ? findCustomizationOption(badgeStyleId, "badge") : null;
   const BadgeIcon = sponsor ? BriefcaseBusiness

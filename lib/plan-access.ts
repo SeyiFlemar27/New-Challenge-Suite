@@ -658,7 +658,7 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
   const normalizedPlanId = normalizePlanId(profile.planId ?? profile.subscriptionPlan);
   const rawStatus = profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus;
   const status = typeof rawStatus === "string" ? rawStatus as PlanStatus : normalizedPlanId === "free" ? "active" : "inactive";
-  const active = ["active", "trial", "trialing"].includes(status);
+  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
   const base = active ? accessByPlan[normalizedPlanId] : accessByPlan.free;
   return {
     ...base,
@@ -675,7 +675,7 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
 
 export function getPlanExperience(profile: Record<string, unknown> = {}): PlanExperience {
   const access = getUserPlanAccess(profile);
-  const active = ["active", "trial", "trialing"].includes(access.planStatus);
+  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(access.planStatus);
   if (access.accountType === "sponsor") {
     const sponsorPlan = active && sponsorPlanOrder.includes(access.normalizedPlanId as SponsorProductPlanId)
       ? access.normalizedPlanId
@@ -697,7 +697,7 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
   const planId = normalizePlanId(profile.planId ?? profile.subscriptionPlan);
   const rawStatus = profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus;
   const status = typeof rawStatus === "string" ? rawStatus.toLowerCase() : planId === "free" ? "active" : "inactive";
-  const paid = planId !== "free" && ["active", "trial", "trialing"].includes(status);
+  const paid = planId !== "free" && ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
   const accountIntent = String(
     profile.selectedAccountType
       ?? profile.account_type

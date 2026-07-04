@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/private", destination: "/private-exclusive", permanent: false },
+      { source: "/live", destination: "/live-events", permanent: false }
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "i.imgur.com" },

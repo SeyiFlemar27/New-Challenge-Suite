@@ -78,8 +78,8 @@ export function Sidebar() {
         { href: "/host/voting", label: "Voting Control", icon: Vote },
         { href: "/host/tournaments", label: "Tournaments", icon: Trophy },
         { href: "/host/reports", label: "Reports", icon: BarChart3 },
-        { href: "/host/winners", label: "Winner Confirmation", icon: Trophy },
-        { href: "/host/notifications", label: "Host Notifications", icon: Bell },
+        { href: "/host/winners", label: "Winners", icon: Trophy },
+        { href: "/host/notifications", label: "Notifications", icon: Bell },
         { href: "/dashboard/host/team", label: "Team Members", icon: UsersRound }
       ]
     : [item]);
@@ -219,7 +219,7 @@ export function Sidebar() {
                 </>
               ) : (
                 <>
-                  <div className="min-w-0"><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></div>
+                  <div className="min-w-0"><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} labelOverride={effectiveTier.badgeLabel} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></div>
                   <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
                 </>
               )}

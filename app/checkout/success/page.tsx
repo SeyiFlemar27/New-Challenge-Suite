@@ -6,7 +6,7 @@ import { CheckCircle2, Clock3, TriangleAlert } from "lucide-react";
 import { Card, LinkButton } from "@/components/ui";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 
-const activeStatuses = new Set(["active", "trial", "trialing"]);
+const activeStatuses = new Set(["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"]);
 
 export default function CheckoutSuccessPage() {
   return <Suspense fallback={<CheckoutPending />}><CheckoutSuccessContent /></Suspense>;

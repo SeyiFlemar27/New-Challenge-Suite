@@ -10,7 +10,7 @@ export const sponsorReviewStatuses = [
 ] as const;
 
 export type SponsorReviewStatus = (typeof sponsorReviewStatuses)[number];
-export type SponsorSubscriptionStatus = "none" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid";
+export type SponsorSubscriptionStatus = "none" | "incomplete" | "trialing" | "active" | "payment_warning_1" | "payment_warning_2" | "past_due" | "canceled" | "unpaid";
 
 export type SponsorFeatureKey =
   | "overview"
@@ -42,13 +42,13 @@ export function normalizeSponsorSubscriptionStatus(value: unknown): SponsorSubsc
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "trial") return "trialing";
   if (normalized === "cancelled") return "canceled";
-  return ["none", "incomplete", "trialing", "active", "past_due", "canceled", "unpaid"].includes(normalized)
+  return ["none", "incomplete", "trialing", "active", "payment_warning_1", "payment_warning_2", "past_due", "canceled", "unpaid"].includes(normalized)
     ? normalized as SponsorSubscriptionStatus
     : "none";
 }
 
 export function hasActiveSponsorSubscription(status: SponsorSubscriptionStatus) {
-  return status === "active" || status === "trialing";
+  return ["active", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
 }
 
 export function canAccessSponsorFeature(status: SponsorReviewStatus, feature: SponsorFeatureKey, subscriptionStatus: SponsorSubscriptionStatus = "none") {

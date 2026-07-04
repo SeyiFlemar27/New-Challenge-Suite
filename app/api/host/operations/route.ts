@@ -9,6 +9,16 @@ function serialize(document: FirebaseFirestore.QueryDocumentSnapshot) {
   return { id: document.id, ...document.data() };
 }
 
+async function readHostedRecords(db: FirebaseFirestore.Firestore, collection: string, challengeIds: string[]) {
+  if (!challengeIds.length) return [];
+  const batches: string[][] = [];
+  for (let index = 0; index < challengeIds.length; index += 30) batches.push(challengeIds.slice(index, index + 30));
+  const snapshots = await Promise.all(batches.map((ids) =>
+    db.collection(collection).where("challengeId", "in", ids).limit(300).get()
+  ));
+  return snapshots.flatMap((snapshot) => snapshot.docs.map(serialize));
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -26,17 +36,13 @@ export async function GET(request: Request) {
 
   const challengeSnap = await db.collection("challenges").where("creatorId", "==", user.uid).limit(100).get();
   const challenges = challengeSnap.docs.map(serialize);
-  const challengeIds = new Set(challenges.map((item) => String(item.id)));
-  const [participantSnap, submissionSnap, winnerSnap, notificationSnap] = await Promise.all([
-    db.collection("participants").where("userId", "==", user.uid).limit(200).get().catch(() => null),
-    db.collection("submissions").where("creatorId", "==", user.uid).limit(200).get().catch(() => null),
-    db.collection("winners").where("creatorId", "==", user.uid).limit(100).get().catch(() => null),
+  const challengeIds = challenges.map((item) => String(item.id));
+  const [participants, submissions, winners, notificationSnap] = await Promise.all([
+    readHostedRecords(db, "participants", challengeIds),
+    readHostedRecords(db, "submissions", challengeIds),
+    readHostedRecords(db, "winners", challengeIds),
     db.collection("notifications").where("userId", "==", user.uid).limit(50).get().catch(() => null)
   ]);
-  const belongsToHostedChallenge = (item: Record<string, unknown>) => challengeIds.has(String(item.challengeId ?? ""));
-  const participants = participantSnap?.docs.map(serialize).filter(belongsToHostedChallenge) ?? [];
-  const submissions = submissionSnap?.docs.map(serialize).filter(belongsToHostedChallenge) ?? [];
-  const winners = winnerSnap?.docs.map(serialize).filter(belongsToHostedChallenge) ?? [];
   const notifications = notificationSnap?.docs.map(serialize) ?? [];
 
   return ok({

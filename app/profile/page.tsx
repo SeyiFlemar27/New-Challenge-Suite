@@ -25,6 +25,7 @@ interface ProfileState {
     planId?: string | null;
     effectiveTier?: {
       displayName: string;
+      badgeLabel: string;
       memberLabel: string;
     };
     joinedAt?: string | null;
@@ -133,7 +134,7 @@ export default function ProfilePage() {
               {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
             </div>
             <div>
-              <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}{profile.user.effectiveTier?.displayName === "Host Plan" ? <span className="rounded-full border border-[var(--gold)]/40 bg-[var(--gold)]/10 px-3 py-1.5 text-sm font-black text-[var(--gold-2)]">Host Plan</span> : <PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} />}</h1>
+              <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} labelOverride={profile.user.effectiveTier?.badgeLabel} /></h1>
               {profile.user.customization?.profileTagline ? <p className="mt-3 text-lg font-bold text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : null}
               <p className="mt-3 font-bold">{profile.user.username ? `@${profile.user.username} · ` : ""}{profile.user.email}</p>
               <p className="mt-2 text-sm font-bold capitalize text-slate-300">{profile.user.selectedAccountType ?? profile.user.role ?? "Role unavailable"} · {profile.user.effectiveTier?.memberLabel ?? planLabel(profile.user.planId)} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
