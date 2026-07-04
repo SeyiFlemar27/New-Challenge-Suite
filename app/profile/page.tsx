@@ -20,7 +20,13 @@ interface ProfileState {
     initials: string;
     avatarUrl?: string | null;
     role?: string | null;
+    accountType?: string | null;
+    selectedAccountType?: string | null;
     planId?: string | null;
+    effectiveTier?: {
+      displayName: string;
+      memberLabel: string;
+    };
     joinedAt?: string | null;
     doroBalance: number;
     customization?: ProfileCustomization;
@@ -130,11 +136,11 @@ export default function ProfilePage() {
               <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} /></h1>
               {profile.user.customization?.profileTagline ? <p className="mt-3 text-lg font-bold text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : null}
               <p className="mt-3 font-bold">{profile.user.username ? `@${profile.user.username} · ` : ""}{profile.user.email}</p>
-              <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.role ?? "Role unavailable"} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
+              <p className="mt-2 text-sm font-bold capitalize text-slate-300">{profile.user.selectedAccountType ?? profile.user.role ?? "Role unavailable"} · {profile.user.effectiveTier?.memberLabel ?? planLabel(profile.user.planId)} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
               <div className="mt-8 flex flex-wrap gap-3"><LinkButton href="/profile/edit">Edit Profile</LinkButton>{profile.user.username ? <LinkButton href={`/profile/${profile.user.username}`} variant="secondary">View Public Profile</LinkButton> : <LinkButton href="/settings" variant="secondary">Choose Username</LinkButton>}</div>
             </div>
           </div>
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--gold)] px-5 py-3 text-base font-black text-black gold-glow">{planLabel(profile.user.planId)}</span>
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--gold)] px-5 py-3 text-base font-black text-black gold-glow">{profile.user.effectiveTier?.displayName ?? planLabel(profile.user.planId)}</span>
         </div>
         <div className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
           {[["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Total Likes", profile.stats.totalLikes], ["Followers", profile.stats.followers], ["Following", profile.stats.following]].map(([label, value]) => <Card key={label} className="p-4 text-center sm:p-6"><div className="text-sm font-bold">{label}</div><div className="mt-3 text-3xl font-black sm:text-4xl">{value}</div></Card>)}

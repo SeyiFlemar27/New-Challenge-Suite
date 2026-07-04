@@ -94,7 +94,7 @@ export function useCurrentUser() {
           planId,
           legacyPlanId: typeof profile.legacyPlanId === "string" ? profile.legacyPlanId : null,
           planName: typeof profile.planName === "string" ? profile.planName : undefined,
-          planStatus: typeof profile.planStatus === "string" ? profile.planStatus : undefined,
+          planStatus: typeof profile.planStatus === "string" ? profile.planStatus : typeof profile.subscriptionStatus === "string" ? profile.subscriptionStatus : undefined,
           doroBalance: typeof profile.doroBalance === "number" ? profile.doroBalance : null,
           verified: Boolean(profile.verified || profile.emailVerified),
           premium: Boolean(profile.premium || profile.isPremium || (planId && planId !== "free" && planId !== "observer")),

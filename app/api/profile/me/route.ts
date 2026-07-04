@@ -2,7 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
+import { getEffectiveTier, getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
 import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
 
@@ -121,7 +121,9 @@ export async function GET(request: Request) {
     ]);
 
     const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
-    const planAccess = getUserPlanAccess({ ...profile, ...account });
+    const planProfile = { ...profile, ...account };
+    const planAccess = getUserPlanAccess(planProfile);
+    const effectiveTier = getEffectiveTier(planProfile);
     const customization = sanitizeCustomization((profile.customization ?? account.customization) as any);
     const submissions: Array<Record<string, unknown>> = submissionsSnap ? submissionsSnap.docs.map((doc) => {
       const data = doc.data();
@@ -152,6 +154,8 @@ export async function GET(request: Request) {
         initials: profile.initials ?? initialsFromName(displayName || String(user.email ?? "")),
         avatarUrl: profile.avatarUrl ?? profile.photoURL ?? account.avatarUrl ?? null,
         role: account.role ?? profile.role ?? null,
+        selectedAccountType: account.account_type ?? profile.account_type ?? account.role ?? profile.role ?? "user",
+        effectiveTier,
         ...planAccess,
         selfDeclaredRegion: profile.selfDeclaredRegion ?? account.selfDeclaredRegion ?? null,
         verified: Boolean(profile.verified ?? user.emailVerified),

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { getUserPlanAccess } from "@/lib/plan-access";
+import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
 const settingsSchema = z.object({
@@ -42,7 +42,8 @@ const settingsSchema = z.object({
     preferredChallengeTypes: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
     locationPreference: z.string().trim().max(120).default(""),
     contentLanguage: z.string().trim().max(40).default("English"),
-    matureContent: z.boolean().default(false)
+    matureContent: z.boolean().default(false),
+    appearance: z.enum(["system", "light", "dark"]).default("system")
   }),
   sponsorDefaults: z.object({
     ctaButtonText: z.string().trim().max(40).default("Visit Website"),
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
   const account = accountSnap.data() ?? {};
   const profile = profileSnap.data() ?? {};
   const plan = getUserPlanAccess({ ...profile, ...account });
+  const effectiveTier = getEffectiveTier({ ...profile, ...account });
   return ok({
     account: {
       displayName: profile.displayName ?? account.displayName ?? "",
@@ -74,7 +76,8 @@ export async function GET(request: Request) {
       phone: profile.phone ?? "",
       accountType: plan.accountType,
       planId: plan.normalizedPlanId,
-      subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free"
+      subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free",
+      effectiveTier
     },
     profile: {
       avatarUrl: profile.avatarUrl ?? "",
@@ -95,7 +98,7 @@ export async function GET(request: Request) {
       followerNotifications: true, sponsorRequestUpdates: true, billingAlerts: true, email: true, push: false, inApp: true
     },
     preferences: preferencesSnap.data() ?? {
-      favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false
+      favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "system"
     },
     sponsorDefaults: sponsorSnap.exists ? {
       ctaButtonText: sponsorSnap.data()?.ctaButtonText ?? "Visit Website",

@@ -310,7 +310,7 @@ export default function CustomizationSettingsPage() {
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-black">{hasChanges ? `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}` : "All customization saved"}</div>
-            <div className="truncate text-xs text-[#8fa6ca]">{selectedBadge?.name ?? "Free Member Basic"} selected</div>
+            <div className="truncate text-xs text-[#8fa6ca]">{selectedBadge?.name ?? "Free Member"} selected</div>
           </div>
           <Button variant="ghost" onClick={resetChanges} disabled={!hasChanges}>Reset</Button>
           <Button onClick={save} disabled={saving || loading || !hasChanges}>{saving ? "Saving" : "Save"}</Button>

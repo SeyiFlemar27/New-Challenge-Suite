@@ -12,7 +12,7 @@ import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
-import { getPlanExperience } from "@/lib/plan-access";
+import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
 import { TrendingStories } from "@/components/stories/trending-stories";
 
 type LeaderboardEntry = {
@@ -68,8 +68,14 @@ export default function DashboardPage() {
     accountType: dashboard?.user.accountType
   });
   const selectedAccountType = dashboard?.user.selectedAccountType ?? dashboard?.user.role ?? dashboard?.user.accountType;
+  const effectiveTier = getEffectiveTier({
+    planId: dashboard?.user.planId,
+    planStatus: dashboard?.user.planStatus,
+    accountType: dashboard?.user.accountType,
+    selectedAccountType,
+    role: dashboard?.user.role
+  });
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
-  const freeCreatorOrHost = planExperience.planId === "free" && (selectedAccountType === "creator" || selectedAccountType === "host");
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
         { title: "Explore Challenges", body: "Discover active public competitions that match your interests.", icon: Swords, active: true },
@@ -77,8 +83,8 @@ export default function DashboardPage() {
         { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
       ] : [
         { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
-        { title: "Simple Competition Setup", body: "Use basic rules, dates, cover media, and image or video submissions.", icon: Trophy, active: true },
-        { title: "More Creator Tools", body: "Private, sponsor, tournament, live-event, and advanced tools require an eligible plan.", icon: LockKeyhole, active: false }
+        { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" },
+        { title: "Upgrade to Creator Plan", body: "Unlock private challenges, sponsor-ready tools, basic analytics, and a monthly boost.", icon: LockKeyhole, active: false }
       ]
     : planExperience.planId === "creator"
       ? [
@@ -172,8 +178,8 @@ export default function DashboardPage() {
         <div className="flex items-start gap-4">
           <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
           <div>
-            {!freeCompetitor ? <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{planExperience.badgeLabel}</p> : null}
-            <PageTitle title={freeCompetitor ? "Competitor Dashboard" : freeCreatorOrHost ? `${selectedAccountType === "host" ? "Host" : "Creator"} Starter` : planExperience.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : freeCompetitor ? `${firstName}, explore, join, vote, compete, and track your entries.` : `${firstName}, ${planExperience.dashboardSubtitle}`} />
+            {!freeCompetitor ? <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{effectiveTier.badgeLabel}</p> : null}
+            <PageTitle title={effectiveTier.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : `${firstName}, ${effectiveTier.dashboardSubtitle}`} />
           </div>
         </div>
         <div className="flex flex-wrap gap-4">

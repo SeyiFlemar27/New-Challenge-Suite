@@ -348,6 +348,7 @@ function CreateChallengeWizard() {
       <AppShell>
         <Card className="mx-auto max-w-3xl p-5 sm:p-7 lg:p-9">
           <PageTitle title="Create a Basic Public Challenge" subtitle="Free creator and host accounts can publish one simple, public, non-monetized challenge per month." />
+          <p className="mt-4 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 px-4 py-3 text-sm font-bold text-[var(--gold-2)]">1 free public challenge is available each month. Published usage is enforced on the server.</p>
           <div className="mt-8 grid gap-6">
             <Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field>
             <div className="grid gap-6 sm:grid-cols-2">
@@ -365,7 +366,14 @@ function CreateChallengeWizard() {
             </div>
             <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, boosts, advanced voting, and promo media are unavailable in this free flow.</Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
-            <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:items-center sm:justify-between"><LinkButton href="/subscriptions" variant="secondary">Compare Creator Plans</LinkButton><Button onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button></div>
+            {draftSaved ? <p className="rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved.</p> : null}
+            <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+              <LinkButton href="/subscriptions" variant="secondary">Upgrade for More Creator Tools</LinkButton>
+              <div className="grid gap-3 sm:flex">
+                <Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>
+                <Button onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button>
+              </div>
+            </div>
           </div>
         </Card>
       </AppShell>

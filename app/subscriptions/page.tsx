@@ -7,7 +7,6 @@ import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui
 import { ConsentDialog } from "@/components/consent-dialog";
 import { money } from "@/lib/utils";
 import { createSubscriptionCheckout, fetchSubscriptionPlans } from "@/lib/api/services";
-import { apiRequest } from "@/lib/api/client";
 import type { SubscriptionPlan } from "@/lib/types";
 
 export default function SubscriptionsPage() {
@@ -66,17 +65,6 @@ export default function SubscriptionsPage() {
     window.location.href = result.data.url;
   }
 
-  async function cancelSubscription() {
-    setCheckoutMessage("");
-    setError("");
-    const result = await apiRequest<{ webhookPending: boolean }>("/api/stripe/subscription", {
-      method: "PATCH",
-      body: JSON.stringify({ action: "cancel" })
-    });
-    if (result.ok) setCheckoutMessage(result.message);
-    else setError(result.message);
-  }
-
   return (
     <AppShell>
       <div className="text-center">
@@ -91,7 +79,7 @@ export default function SubscriptionsPage() {
           ? "Sponsor subscriptions unlock sponsor tools and the Brand Command Center. Actual campaign budgets, sponsorship funding, money release, and payouts are separate and are not active in this version."
           : "Paid-entry prize pools remain disabled. Creator, Pro, Host, and Enterprise plans unlock platform tools, not automatic cash payouts."}
       </Card>
-      {currentSubscription?.planId ? <Card className="mx-auto mt-4 max-w-4xl p-4 text-center"><p className="text-sm text-slate-300">Current paid plan: <b className="text-white">{currentSubscription.planId.replaceAll("_", " ")}</b> · Status: <b className="text-white">{currentSubscription.status.replaceAll("_", " ")}</b>. You may select another eligible plan to change tiers. Cancellation downgrades access after verified webhook confirmation.</p><Button className="mt-4" variant="secondary" onClick={() => void cancelSubscription()}>Cancel Subscription</Button></Card> : null}
+      {currentSubscription?.planId ? <Card className="mx-auto mt-4 flex max-w-4xl flex-col gap-4 p-5 text-left sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Current Plan</p><p className="mt-2 text-sm text-slate-300"><b className="capitalize text-white">{currentSubscription.planId.replaceAll("_", " ")}</b> · <span className="capitalize">{currentSubscription.status.replaceAll("_", " ")}</span></p></div><LinkButton href="/settings/billing" variant="secondary">Manage Billing</LinkButton></Card> : null}
       {error ? <Card className="mx-auto mt-6 max-w-3xl border-red-500/30 bg-red-950/30 p-4 text-red-100">{error}</Card> : null}
       {checkoutMessage ? <Card className="mx-auto mt-6 max-w-3xl border-emerald-500/30 bg-emerald-950/30 p-4 text-emerald-100">{checkoutMessage}</Card> : null}
       {loading ? (

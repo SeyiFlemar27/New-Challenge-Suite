@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { BadgeCheck, MapPin, MessageSquare, Share2, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { PremiumBadge } from "@/components/brand";
 import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
@@ -68,7 +67,7 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
                 <div className="min-w-0 pb-1">
                   <h1 className="flex flex-wrap items-center gap-2 text-3xl font-black sm:text-4xl">{profile.displayName}{profile.verified ? <BadgeCheck className="text-[var(--gold)]" /> : null}</h1>
                   <p className="mt-1 text-slate-300">@{profile.username || username}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2"><PremiumBadge planId={profile.planId} />{profile.role ? <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-black capitalize">{profile.role}</span> : null}</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-xs font-black text-[var(--gold)]">{profile.effectiveTier?.displayName ?? "Free Competitor"}</span>{profile.role ? <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-black capitalize">{profile.role}</span> : null}</div>
                 </div>
               </div>
               <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:flex sm:flex-wrap">

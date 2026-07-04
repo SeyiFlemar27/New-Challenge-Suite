@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
-import { getPlanExperience } from "@/lib/plan-access";
+import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
 
 const nav = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -52,12 +52,19 @@ export function Sidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, loading, signedOut, error } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
-  const planLabel = planBadgeLabel(user?.planId);
   const planExperience = getPlanExperience({
     planId: user?.planId,
     planStatus: user?.planStatus,
     accountType: user?.accountType
   });
+  const effectiveTier = getEffectiveTier({
+    planId: user?.planId,
+    planStatus: user?.planStatus,
+    accountType: user?.accountType,
+    selectedAccountType: user?.selectedAccountType,
+    role: user?.role
+  });
+  const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
   const selectedAccountType = user?.selectedAccountType ?? (user?.role === "creator" || user?.role === "host" ? user.role : user?.accountType);
   const freePlan = planExperience.planId === "free";
   const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
@@ -139,7 +146,7 @@ export function Sidebar() {
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{user?.displayName || "Menu"}</p></div></div><button onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <nav className="mt-6 space-y-2">{visibleNav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cn("flex min-h-12 items-center gap-3 rounded-[8px] px-4 font-bold text-slate-200", activeHref === item.href && "bg-[var(--gold)] text-black")}><Icon size={19} />{item.label}</Link>; })}</nav>
-          <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{planLabel} Plan</p></div></Link></div>
+          <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link></div>
         </aside>
       </div> : null}
 
@@ -171,7 +178,7 @@ export function Sidebar() {
             <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
           </button>
           <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : `${planLabel} Plan`}
+            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planLabel}
           </Link>
           <div className="flex items-center gap-3 pt-3">
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
@@ -190,7 +197,7 @@ export function Sidebar() {
                 </>
               ) : (
                 <>
-                  <div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div>
+                  <div className="min-w-0"><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></div>
                   <Link className="text-sm text-red-500" href="/landing">Sign Out</Link>
                 </>
               )}

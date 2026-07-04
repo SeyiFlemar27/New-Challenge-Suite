@@ -61,7 +61,7 @@ export const customizationOptions = {
     { id: "platinum", name: "Platinum", category: "accentColor", requiredPlan: "verified_host", previewClass: "bg-zinc-200" }
   ],
   badges: [
-    { id: "free_member", name: "Free Member Basic", description: "The default member identity badge.", category: "badge", requiredPlan: "free", previewClass: "border-white/20 bg-white/5 text-slate-300" },
+    { id: "free_member", name: "Free Member", description: "The default competitor identity badge.", category: "badge", requiredPlan: "free", previewClass: "border-white/20 bg-white/5 text-slate-300" },
     { id: "premium_gold", name: "Premium Star", description: "A glowing premium status marker.", category: "badge", requiredPlan: "premium", previewClass: "border-yellow-400/50 bg-yellow-400/15 text-yellow-200 shadow-[0_0_26px_rgba(245,217,10,.18)]" },
     { id: "premium_diamond", name: "Gold Diamond", description: "A collectible diamond badge for premium identity.", category: "badge", requiredPlan: "premium", previewClass: "border-sky-300/50 bg-sky-300/15 text-sky-200 shadow-[0_0_26px_rgba(125,211,252,.18)]" },
     { id: "creator_pro", name: "Creator Crown", description: "Signals advanced creator tools and monetization.", category: "badge", requiredPlan: "creator_pro", previewClass: "border-fuchsia-300/50 bg-fuchsia-400/15 text-fuchsia-200 shadow-[0_0_26px_rgba(217,70,239,.18)]" },

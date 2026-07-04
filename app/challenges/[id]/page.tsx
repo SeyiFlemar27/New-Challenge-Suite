@@ -175,7 +175,7 @@ export default function ChallengeDetailPage() {
               <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : "Voting is closed for this challenge."} />
               <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
-              {!freeCompetitor ? <Info title="Sponsor information" body={sponsored ? `${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.` : "Sponsor contribution requests remain subject to account approval and review."} /> : null}
+              {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
             </div>
           </Card>
 

@@ -81,6 +81,28 @@ export interface PlanExperience {
   features: Record<PlanFeature, boolean>;
 }
 
+export type EffectiveTierId =
+  | "free_competitor"
+  | "creator_starter"
+  | "creator"
+  | "host_starter"
+  | "pro"
+  | "host"
+  | "enterprise"
+  | "sponsor";
+
+export interface EffectiveTier {
+  id: EffectiveTierId;
+  planId: BlueprintPlanId;
+  accountIntent: string;
+  paid: boolean;
+  displayName: string;
+  badgeLabel: string;
+  memberLabel: string;
+  dashboardName: string;
+  dashboardSubtitle: string;
+}
+
 const userPlanOrder: UserProductPlanId[] = ["free", "creator", "pro", "host", "enterprise"];
 const sponsorPlanOrder: SponsorProductPlanId[] = ["sponsor_starter", "brand_partner", "enterprise_partner"];
 
@@ -136,7 +158,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     planId: "free",
     dashboardName: "User Dashboard",
     dashboardSubtitle: "Explore challenges, compete, vote, and build your first public challenge.",
-    badgeLabel: "Free Explorer",
+    badgeLabel: "Free Competitor",
     challengeLimitLabel: "1 basic public challenge / month",
     privateChallengeLimitLabel: "Private challenges locked",
     monthlyChallengeLimit: 1,
@@ -633,9 +655,10 @@ export function normalizeAccountType(profile: Record<string, unknown> = {}): Exc
 }
 
 export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAccess {
-  const normalizedPlanId = normalizePlanId(profile.planId);
-  const status = typeof profile.planStatus === "string" ? profile.planStatus as PlanStatus : "active";
-  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
+  const normalizedPlanId = normalizePlanId(profile.planId ?? profile.subscriptionPlan);
+  const rawStatus = profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus;
+  const status = typeof rawStatus === "string" ? rawStatus as PlanStatus : normalizedPlanId === "free" ? "active" : "inactive";
+  const active = ["active", "trial", "trialing"].includes(status);
   const base = active ? accessByPlan[normalizedPlanId] : accessByPlan.free;
   return {
     ...base,
@@ -652,7 +675,7 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
 
 export function getPlanExperience(profile: Record<string, unknown> = {}): PlanExperience {
   const access = getUserPlanAccess(profile);
-  const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(access.planStatus);
+  const active = ["active", "trial", "trialing"].includes(access.planStatus);
   if (access.accountType === "sponsor") {
     const sponsorPlan = active && sponsorPlanOrder.includes(access.normalizedPlanId as SponsorProductPlanId)
       ? access.normalizedPlanId
@@ -668,6 +691,91 @@ export function getPlanExperience(profile: Record<string, unknown> = {}): PlanEx
     };
   }
   return planExperiences[active ? access.normalizedPlanId : "free"];
+}
+
+export function getEffectiveTier(profile: Record<string, unknown> = {}): EffectiveTier {
+  const planId = normalizePlanId(profile.planId ?? profile.subscriptionPlan);
+  const rawStatus = profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus;
+  const status = typeof rawStatus === "string" ? rawStatus.toLowerCase() : planId === "free" ? "active" : "inactive";
+  const paid = planId !== "free" && ["active", "trial", "trialing"].includes(status);
+  const accountIntent = String(
+    profile.selectedAccountType
+      ?? profile.account_type
+      ?? profile.roleIntent
+      ?? profile.role
+      ?? profile.accountType
+      ?? "user"
+  ).toLowerCase();
+
+  if (accountIntent === "sponsor" || accountIntent === "brand" || sponsorPlanOrder.includes(planId as SponsorProductPlanId)) {
+    return {
+      id: "sponsor",
+      planId: paid ? planId : "free",
+      accountIntent: "sponsor",
+      paid,
+      displayName: paid ? planExperiences[planId].badgeLabel : "Sponsor Account",
+      badgeLabel: paid ? planExperiences[planId].badgeLabel : "Sponsor Account",
+      memberLabel: paid ? `${planExperiences[planId].badgeLabel} Member` : "Sponsor Setup",
+      dashboardName: "Brand Command Center",
+      dashboardSubtitle: "Complete brand approval and subscription setup to unlock sponsor tools."
+    };
+  }
+
+  if (paid) {
+    const experience = planExperiences[planId];
+    const id = planId === "creator" || planId === "pro" || planId === "host" || planId === "enterprise" ? planId : "free_competitor";
+    return {
+      id,
+      planId,
+      accountIntent,
+      paid: true,
+      displayName: `${experience.badgeLabel} Plan`,
+      badgeLabel: `${experience.badgeLabel} Plan`,
+      memberLabel: `${experience.badgeLabel} Member`,
+      dashboardName: experience.dashboardName,
+      dashboardSubtitle: experience.dashboardSubtitle
+    };
+  }
+
+  if (accountIntent === "creator") {
+    return {
+      id: "creator_starter",
+      planId: "free",
+      accountIntent,
+      paid: false,
+      displayName: "Creator Starter",
+      badgeLabel: "Creator Starter",
+      memberLabel: "Free Creator",
+      dashboardName: "Creator Starter",
+      dashboardSubtitle: "Create one basic public challenge, explore competitions, and upgrade when you're ready for full creator tools."
+    };
+  }
+
+  if (accountIntent === "host") {
+    return {
+      id: "host_starter",
+      planId: "free",
+      accountIntent,
+      paid: false,
+      displayName: "Host Starter",
+      badgeLabel: "Host Starter",
+      memberLabel: "Starter Access",
+      dashboardName: "Host Starter",
+      dashboardSubtitle: "Create one basic public challenge while you prepare for full host tools."
+    };
+  }
+
+  return {
+    id: "free_competitor",
+    planId: "free",
+    accountIntent,
+    paid: false,
+    displayName: "Free Competitor",
+    badgeLabel: "Free Competitor",
+    memberLabel: "Free Member",
+    dashboardName: "Competitor Dashboard",
+    dashboardSubtitle: "Explore, join, vote, compete, and track your entries."
+  };
 }
 
 export function canAccessPlanFeature(profile: Record<string, unknown>, feature: PlanFeature) {

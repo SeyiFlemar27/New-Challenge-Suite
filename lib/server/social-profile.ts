@@ -1,5 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { getUserPlanAccess } from "@/lib/plan-access";
+import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { toPublicProfile } from "@/lib/server/public-profile";
 import { publicChallengeFields } from "@/lib/server/public-challenge";
 
@@ -65,6 +65,7 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
       coverImageUrl: typeof merged.coverImageUrl === "string" ? merged.coverImageUrl : null,
       verified: Boolean(merged.verified || merged.verificationStatus === "verified"),
       planId: getUserPlanAccess(merged).normalizedPlanId,
+      effectiveTier: getEffectiveTier(merged),
       joinedAt: merged.createdAt ?? null,
       categories: Array.isArray(merged.categoryInterests) ? merged.categoryInterests : [],
       profileVisibility: merged.profileVisibility ?? "public",

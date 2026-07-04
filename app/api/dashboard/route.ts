@@ -2,7 +2,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverUnavailable } from "@/lib/server/responses";
-import { getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
+import { getEffectiveTier, getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
 import { publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET(request: Request) {
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
   const leaderboardEntries = Array.isArray(leaderboardData?.entries) ? leaderboardData.entries : [];
   const planProfile = { ...profile, ...account };
   const planAccess = getUserPlanAccess(planProfile);
+  const effectiveTier = getEffectiveTier(planProfile);
   const accountType = normalizeAccountType(planProfile);
   const sponsorOnboardingComplete = Boolean(planProfile.sponsorOnboardingComplete || planProfile.brandProfileComplete);
   const hasSponsorProfile = Boolean(planProfile.hasSponsorProfile || sponsorOnboardingComplete);
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
       legacyPlanId: planAccess.planId,
       planName: planAccess.planName,
       planStatus: planAccess.planStatus,
+      effectiveTier,
       premium: planAccess.isPremium,
       sponsorOnboardingComplete,
       hasSponsorProfile,

@@ -18,6 +18,15 @@ export interface DashboardResponse {
     legacyPlanId?: string | null;
     planName?: string;
     planStatus?: string;
+    effectiveTier?: {
+      id: string;
+      displayName: string;
+      badgeLabel: string;
+      memberLabel: string;
+      dashboardName: string;
+      dashboardSubtitle: string;
+      paid: boolean;
+    };
     premium: boolean;
     verified: boolean;
     totalPoints: number;
@@ -64,6 +73,7 @@ export function fetchBootstrapProfile() {
       legacyPlanId?: string | null;
       planName?: string;
       planStatus?: string;
+      subscriptionStatus?: string;
       doroBalance?: number;
       initials?: string;
       premium: boolean;
