@@ -6,6 +6,7 @@ import { ArrowRight, Building2, CheckCircle2, ExternalLink, LockKeyhole, Save, U
 import { Button, Card, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
 import { SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
+import { normalizeSponsorReviewStatus, sponsorStatusLabel } from "@/lib/sponsor-access";
 
 interface SponsorProfile {
   brandName?: string;
@@ -25,6 +26,8 @@ interface SponsorProfile {
   sponsorOnboardingStatus?: string | null;
   hasSponsorProfile?: boolean;
   sponsorVerificationStatus?: string | null;
+  sponsorSubmittedAt?: string | null;
+  sponsorReviewFeedback?: string | null;
 }
 
 interface SponsorProfileResponse {
@@ -58,12 +61,14 @@ export default function SponsorOnboardingPage() {
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [savingAction, setSavingAction] = useState<"save" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [unauthorized, setUnauthorized] = useState(false);
 
   const completed = Boolean(profile?.hasSponsorProfile || profile?.sponsorOnboardingStatus === "complete");
+  const verificationStatus = normalizeSponsorReviewStatus(profile?.sponsorVerificationStatus);
 
   async function loadProfile() {
     setLoading(true);
@@ -106,7 +111,7 @@ export default function SponsorOnboardingPage() {
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
     setFieldErrors((current) => ({ ...current, [field]: "" }));
-    setSaved(false);
+    setSaved(null);
   }
 
   function toggleList(field: "sponsorshipGoals" | "preferredChallengeCategories", value: string) {
@@ -115,15 +120,15 @@ export default function SponsorOnboardingPage() {
       return { ...current, [field]: active ? current[field].filter((item) => item !== value) : [...current[field], value] };
     });
     setFieldErrors((current) => ({ ...current, [field]: "" }));
-    setSaved(false);
+    setSaved(null);
   }
 
   const socialLinks = useMemo(() => form.socialLinksText.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean), [form.socialLinksText]);
 
-  async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function persistProfile(reviewAction: "save" | "submit") {
     setSaving(true);
-    setSaved(false);
+    setSavingAction(reviewAction);
+    setSaved(null);
     setError(null);
     setFieldErrors({});
 
@@ -143,11 +148,13 @@ export default function SponsorOnboardingPage() {
         ctaButtonText: form.ctaButtonText,
         ctaDestinationLink: form.ctaDestinationLink,
         sponsorshipGoals: form.sponsorshipGoals,
-        preferredChallengeCategories: form.preferredChallengeCategories
+        preferredChallengeCategories: form.preferredChallengeCategories,
+        reviewAction
       })
     });
 
     setSaving(false);
+    setSavingAction(null);
     if (!result.ok || !result.data) {
       setFieldErrors(((result as any).details?.fieldErrors ?? {}) as Record<string, string>);
       setError(result.message || "Sponsor profile could not be saved.");
@@ -155,7 +162,12 @@ export default function SponsorOnboardingPage() {
     }
 
     setProfile(result.data.sponsorProfile);
-    setSaved(true);
+    setSaved(result.message);
+  }
+
+  async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await persistProfile("save");
   }
 
   if (loading) {
@@ -186,6 +198,19 @@ export default function SponsorOnboardingPage() {
     );
   }
 
+  if (verificationStatus === "suspended") {
+    return (
+      <SponsorShell profile={profile}>
+        <Card className="mx-auto mt-10 max-w-2xl border-red-500/20 bg-red-950/20 p-8 text-center">
+          <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
+          <h1 className="mt-5 text-3xl font-black">Sponsor access suspended</h1>
+          <p className="mt-3 leading-7 text-slate-300">Your brand profile cannot be changed while sponsor access is suspended. Contact support for the next step.</p>
+          <LinkButton href="/sponsor/messages" className="mt-6">Contact Support</LinkButton>
+        </Card>
+      </SponsorShell>
+    );
+  }
+
   return (
     <SponsorShell profile={profile}>
       <div className="mx-auto max-w-6xl">
@@ -198,12 +223,16 @@ export default function SponsorOnboardingPage() {
           {completed ? <Button type="button" onClick={() => router.push("/sponsor/dashboard")}>Go to Dashboard <ArrowRight size={18} /></Button> : null}
         </div>
 
-        {completed ? (
-          <Card className="mt-8 border-emerald-500/20 bg-emerald-500/5 p-5 sm:p-6">
-            <p className="flex items-center gap-2 font-bold text-emerald-200"><CheckCircle2 size={18} /> Brand profile is complete.</p>
-            <p className="mt-2 text-sm text-slate-300">Verification remains a backend status for a future admin-review workflow. No sponsor payments or money release are active here.</p>
-          </Card>
-        ) : null}
+        <Card className={`mt-8 p-5 sm:p-6 ${verificationStatus === "approved" ? "border-emerald-500/20 bg-emerald-500/5" : "border-yellow-500/20 bg-yellow-500/5"}`}>
+          <p className="flex items-center gap-2 font-bold"><CheckCircle2 size={18} className="text-[var(--gold)]" /> Review status: {sponsorStatusLabel(verificationStatus)}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            {verificationStatus === "approved" ? "Your sponsor profile is approved. Sponsor tools are available according to your plan." :
+              verificationStatus === "pending_review" || verificationStatus === "submitted" ? "Your profile is under review. You can keep viewing or updating the brand profile while approval is pending." :
+              verificationStatus === "rejected" || verificationStatus === "needs_changes" ? "Your sponsor profile needs changes before approval. Update it and submit it again." :
+              "Save your complete profile, then submit it for platform review."}
+          </p>
+          {profile?.sponsorReviewFeedback ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-sm text-slate-200">Review feedback: {profile.sponsorReviewFeedback}</p> : null}
+        </Card>
 
         <form className="mt-8 grid gap-8 lg:mt-10 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,.75fr)] xl:gap-10" onSubmit={saveProfile}>
           <Card className="p-5 sm:p-6 lg:p-8">
@@ -252,8 +281,11 @@ export default function SponsorOnboardingPage() {
               <p className="mt-2 text-sm leading-6 text-slate-300">Logo and banner fields are prepared as URL placeholders for now. File upload can connect to Firebase Storage in a later media batch.</p>
             </Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm font-bold text-red-200">{error}</p> : null}
-            {saved ? <p className="rounded-[8px] bg-emerald-950/40 p-3 text-sm font-bold text-emerald-200">Sponsor profile saved.</p> : null}
-            <Button className="w-full" disabled={saving}>{saving ? "Saving Brand Profile..." : <><Save size={18} /> Save Brand Profile</>}</Button>
+            {saved ? <p className="rounded-[8px] bg-emerald-950/40 p-3 text-sm font-bold text-emerald-200">{saved}</p> : null}
+            <Button className="w-full" disabled={saving}>{savingAction === "save" ? "Saving Brand Profile..." : <><Save size={18} /> Save Brand Profile</>}</Button>
+            {verificationStatus === "approved" ? <p className="rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100">This sponsor profile is approved. Saving updates does not start any payment or funding action.</p> :
+              verificationStatus === "pending_review" || verificationStatus === "submitted" ? <Button type="button" variant="secondary" className="w-full" disabled>Submitted for Review</Button> :
+              <Button type="button" variant="secondary" className="w-full" disabled={saving} onClick={() => void persistProfile("submit")}>{savingAction === "submit" ? "Submitting..." : "Submit for Review"}</Button>}
             {completed ? <LinkButton href="/sponsor/dashboard" variant="secondary" className="w-full">Open Brand Command Center <ExternalLink size={16} /></LinkButton> : null}
           </div>
         </form>

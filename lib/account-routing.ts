@@ -1,10 +1,10 @@
 import { normalizeAccountType } from "@/lib/plan-access";
 
 export function getDefaultRouteForAccount(profile: Record<string, unknown> = {}) {
+  if (profile.accountTypeSelectionComplete === false) return "/onboarding/account-type";
   const accountType = normalizeAccountType(profile);
   if (accountType === "sponsor") {
-    const onboardingComplete = Boolean(profile.sponsorOnboardingComplete || profile.brandProfileComplete);
-    return onboardingComplete ? "/sponsor/dashboard" : "/sponsor/onboarding";
+    return "/sponsor/dashboard";
   }
   return "/dashboard";
 }

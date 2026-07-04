@@ -2,6 +2,7 @@
 import { normalizeAccountType } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { forbidden, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { normalizeSponsorReviewStatus } from "@/lib/sponsor-access";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,8 @@ const sponsorProfileSchema = z.object({
   ctaButtonText: z.string().trim().min(2, "CTA button text is required.").max(40).transform((value) => value.replace(/[<>]/g, "")),
   ctaDestinationLink: z.string().trim().url("Enter a valid CTA destination link."),
   sponsorshipGoals: z.array(z.string().trim().min(1)).min(1, "Select at least one sponsorship goal.").max(8),
-  preferredChallengeCategories: z.array(z.string().trim().min(1)).min(1, "Select at least one preferred category.").max(12)
+  preferredChallengeCategories: z.array(z.string().trim().min(1)).min(1, "Select at least one preferred category.").max(12),
+  reviewAction: z.enum(["save", "submit"]).default("save")
 });
 
 type SponsorProfileInput = z.infer<typeof sponsorProfileSchema>;
@@ -105,7 +107,7 @@ function toSponsorProfile(uid: string, email: string | undefined, userData: Reco
     dashboardType: "sponsor_dashboard",
     hasSponsorProfile: Boolean(merged.hasSponsorProfile || merged.sponsorOnboardingComplete || merged.brandProfileCompletedAt),
     sponsorOnboardingStatus: String(merged.sponsorOnboardingStatus || "not_started"),
-    sponsorVerificationStatus: String(merged.sponsorVerificationStatus || "not_submitted"),
+    sponsorVerificationStatus: normalizeSponsorReviewStatus(merged.sponsorVerificationStatus),
     businessEmail: String(merged.businessEmail || email || "")
   };
 }
@@ -153,13 +155,25 @@ export async function PATCH(request: Request) {
     const input: SponsorProfileInput = parsed.data;
     const now = new Date().toISOString();
     const brandSlug = slugify(input.brandName);
+    const currentVerificationStatus = normalizeSponsorReviewStatus({
+      ...context.profileData,
+      ...context.userData,
+      ...context.sponsorData
+    }.sponsorVerificationStatus);
+    if (currentVerificationStatus === "suspended") {
+      return forbidden("Suspended sponsor profiles cannot be changed. Contact support.");
+    }
+    const sponsorVerificationStatus = input.reviewAction === "submit"
+      ? currentVerificationStatus === "approved" ? "approved" : "pending_review"
+      : currentVerificationStatus === "not_submitted" ? "draft" : currentVerificationStatus;
     const sponsorProfile = {
       userId: user.uid,
       accountType: "sponsor",
       dashboardType: "sponsor_dashboard",
       sponsorOnboardingStatus: "complete",
       hasSponsorProfile: true,
-      sponsorVerificationStatus: String(context.sponsorData.sponsorVerificationStatus || "pending_review"),
+      sponsorVerificationStatus,
+      sponsorSubmittedAt: input.reviewAction === "submit" && currentVerificationStatus !== "approved" ? now : context.sponsorData.sponsorSubmittedAt ?? null,
       brandName: input.brandName,
       brandSlug,
       industry: input.industry,
@@ -197,7 +211,12 @@ export async function PATCH(request: Request) {
       db.collection("profiles").doc(user.uid).set(accountStatusFields, { merge: true })
     ]);
 
-    return ok({ sponsorProfile }, "Sponsor profile saved.");
+    return ok(
+      { sponsorProfile },
+      input.reviewAction === "submit"
+        ? currentVerificationStatus === "approved" ? "Approved sponsor profile updated." : "Sponsor profile submitted for review."
+        : "Sponsor profile saved. Submit it when you are ready for review."
+    );
   } catch (error) {
     console.error("[sponsor-profile:patch]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor profile could not be saved.", { stage: "sponsor-profile:patch" });

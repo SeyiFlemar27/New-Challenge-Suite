@@ -38,9 +38,9 @@ export async function GET(request: Request) {
   const hasSponsorProfile = Boolean(planProfile.hasSponsorProfile || sponsorOnboardingComplete);
 
   return ok({
-    redirectTo: accountType === "sponsor"
-      ? sponsorOnboardingComplete && hasSponsorProfile ? "/sponsor/dashboard" : "/sponsor/onboarding"
-      : null,
+    redirectTo: planProfile.accountTypeSelectionComplete === false
+      ? "/onboarding/account-type"
+      : accountType === "sponsor" ? "/sponsor/dashboard" : null,
     user: {
       uid: user.uid,
       email: user.email ?? account?.email ?? profile?.email ?? "",
@@ -48,7 +48,8 @@ export async function GET(request: Request) {
       initials: profile?.initials ?? "",
       role: account?.role ?? profile?.role ?? null,
       accountType,
-      dashboardType: accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard",
+      dashboardType: String(planProfile.dashboard_type ?? planProfile.dashboardType ?? (accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard")),
+      selectedAccountType: String(planProfile.account_type ?? (accountType === "sponsor" ? "sponsor" : "user")),
       planId: planAccess.normalizedPlanId,
       legacyPlanId: planAccess.planId,
       planName: planAccess.planName,

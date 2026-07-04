@@ -18,7 +18,7 @@ export type SponsorProductPlanId = "sponsor_starter" | "brand_partner" | "enterp
 export type ProductPlanId = UserProductPlanId | SponsorProductPlanId;
 export type LegacyPlanId = "observer" | "premium" | "creator_pro" | "verified_host" | "competitor" | "executive_host" | "chief_producer" | "enterprise_sponsor";
 export type UserPlanId = ProductPlanId | LegacyPlanId;
-export type AppRole = "user" | "creator" | "sponsor";
+export type AppRole = "user" | "creator" | "host" | "sponsor";
 
 export interface UserProfile {
   id: string;

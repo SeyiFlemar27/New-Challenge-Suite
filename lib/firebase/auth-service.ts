@@ -26,6 +26,9 @@ export interface AuthProfile {
   displayName: string;
   email: string;
   role: AppRole;
+  accountTypeSelectionComplete?: boolean;
+  selectedAccountType?: string;
+  dashboardType?: string;
   planId?: UserPlanId;
   doroBalance?: number;
   premium: boolean;

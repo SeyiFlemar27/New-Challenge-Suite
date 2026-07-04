@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, BarChart3, Building2, CalendarClock, CreditCard, Megaphone, MessageSquare, ShieldCheck, Store, Target, Users } from "lucide-react";
 import { Card, LinkButton } from "@/components/ui";
 import { SponsorPlaceholder, SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
 import { getPlanExperience } from "@/lib/plan-access";
+import { hasActiveSponsorSubscription, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorStatusLabel, type SponsorReviewStatus, type SponsorSubscriptionStatus } from "@/lib/sponsor-access";
 
 interface SponsorProfile {
   brandName?: string | null;
@@ -25,6 +25,8 @@ interface SponsorProfile {
   updatedAt?: string | null;
   planId?: string | null;
   planStatus?: string | null;
+  subscriptionStatus?: string | null;
+  stripeStatus?: string | null;
 }
 
 interface SponsorProfileResponse {
@@ -44,7 +46,6 @@ const commandSections = [
 ];
 
 export default function SponsorDashboardPage() {
-  const router = useRouter();
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +65,6 @@ export default function SponsorDashboardPage() {
     }
 
     const sponsorProfile = result.data.sponsorProfile;
-    if (!sponsorProfile.hasSponsorProfile || sponsorProfile.sponsorOnboardingStatus !== "complete") {
-      router.replace("/sponsor/onboarding");
-      return;
-    }
-
     setProfile(sponsorProfile);
     setLoading(false);
   }
@@ -77,10 +73,13 @@ export default function SponsorDashboardPage() {
     void loadProfile();
   }, []);
 
-  const goals = useMemo(() => profile?.sponsorshipGoals ?? [], [profile]);
   const categories = useMemo(() => profile?.preferredChallengeCategories ?? [], [profile]);
   const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
-  const sponsorApproved = profile?.sponsorVerificationStatus === "approved";
+  const verificationStatus = normalizeSponsorReviewStatus(profile?.sponsorVerificationStatus);
+  const sponsorApproved = verificationStatus === "approved";
+  const subscriptionStatus = normalizeSponsorSubscriptionStatus(profile?.subscriptionStatus ?? profile?.planStatus ?? profile?.stripeStatus);
+  const subscriptionActive = hasActiveSponsorSubscription(subscriptionStatus);
+  const sponsorToolsUnlocked = sponsorApproved && subscriptionActive;
 
   if (loading) {
     return (
@@ -115,16 +114,16 @@ export default function SponsorDashboardPage() {
           <h1 className="mt-2 text-4xl font-black md:text-5xl">{profile?.brandName || "Sponsor Dashboard"}</h1>
           <p className="mt-3 max-w-3xl text-slate-300">A dedicated sponsor operating area for campaigns, placements, marketplace activity, audience insights, reports, team access, and billing foundations.</p>
         </div>
-        <LinkButton href="/sponsor/onboarding" variant="secondary">Edit Brand Profile <ArrowRight size={17} /></LinkButton>
+        <LinkButton href="/sponsor/onboarding" variant="secondary">{profile?.hasSponsorProfile ? "Edit Brand Profile" : "Complete Brand Profile"} <ArrowRight size={17} /></LinkButton>
       </div>
 
       {error ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-5 text-red-200">{error}</Card> : null}
-      {!sponsorApproved ? <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Sponsor verification pending</h2><p className="mt-2 text-slate-300">Your brand profile is available, but campaign creation, placements, sponsor proposals, audience reports, and billing tools stay locked until platform verification is approved. You may use Messages to contact creators or hosts before sponsoring.</p><LinkButton href="/sponsor/messages" variant="secondary" className="mt-4">Open Messages</LinkButton></Card> : null}
+      {!sponsorToolsUnlocked ? <SponsorAccessNotice verificationStatus={verificationStatus} subscriptionStatus={subscriptionStatus} /> : null}
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <Metric title="Verification" value={(profile?.sponsorVerificationStatus || "pending_review").replaceAll("_", " ")} label="Future admin review status" />
+        <Metric title="Verification" value={sponsorStatusLabel(verificationStatus)} label={sponsorApproved ? "Sponsor tools approved" : "Approval required for locked tools"} />
+        <Metric title="Subscription" value={subscriptionStatus.replaceAll("_", " ")} label={subscriptionActive ? "Subscription entitlement active" : "Sponsor plan required"} />
         <Metric title="Campaign Capacity" value={experience.challengeLimitLabel} label="Plan workspace allowance" />
-        <Metric title="Team Seats" value={String(experience.teamMemberLimit)} label={experience.features.team_management ? "Team foundation available" : "Team upgrades available on higher sponsor plans"} />
       </div>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_.9fr]">
@@ -147,25 +146,36 @@ export default function SponsorDashboardPage() {
         </Card>
 
         <Card className="p-6 md:p-8">
-          <h2 className="text-2xl font-black">Sponsor Readiness</h2>
+          <h2 className="text-2xl font-black">Sponsor Onboarding Checklist</h2>
           <div className="mt-5 space-y-4">
-            <Readiness label="Brand profile completed" done={Boolean(profile?.hasSponsorProfile)} />
-            <Readiness label="Admin review status prepared" done={Boolean(profile?.sponsorVerificationStatus)} />
-            <Readiness label="Sponsor goals captured" done={goals.length > 0} />
-            <Readiness label="Preferred categories captured" done={categories.length > 0} />
+            <Readiness label="1. Choose sponsor account type" done />
+            <Readiness label="2. Complete brand profile" done={Boolean(profile?.hasSponsorProfile && profile?.ctaButtonText && profile?.ctaDestinationLink && categories.length)} />
+            <Readiness label="3. Submit for platform review" done={!["not_submitted", "draft"].includes(verificationStatus)} />
+            <Readiness label="4. Get brand approval" done={sponsorApproved} />
+            <Readiness label="5. Choose sponsor plan" done={Boolean(profile?.planId && profile.planId !== "free")} />
+            <Readiness label="6. Activate subscription" done={subscriptionActive} />
+            <Readiness label="7. Sponsor challenges or create campaigns" done={sponsorToolsUnlocked} />
           </div>
-          <p className="mt-6 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-slate-300">Payments, sponsor money release, reports, campaign creation, and marketplace workflows are intentionally not active in this shell.</p>
+          <p className="mt-6 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-slate-300">Approval grants access to sponsor workspaces only. Payments, sponsor money release, and campaign funding remain inactive.</p>
         </Card>
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-4">
         {commandSections.map((section) => {
           const Icon = section.icon;
-          return <SponsorPlaceholder key={section.title} title={section.title} body={sponsorApproved || section.title === "Messages" ? section.body : `${section.body} Sponsor verification is required before this area can be activated.`} />;
+          return <SponsorPlaceholder key={section.title} title={section.title} body={sponsorToolsUnlocked ? section.body : `${section.body} Brand approval and an active sponsor subscription are required.`} />;
         })}
       </div>
     </SponsorShell>
   );
+}
+
+function SponsorAccessNotice({ verificationStatus, subscriptionStatus }: { verificationStatus: SponsorReviewStatus; subscriptionStatus: SponsorSubscriptionStatus }) {
+  const approved = verificationStatus === "approved";
+  const paid = hasActiveSponsorSubscription(subscriptionStatus);
+  const title = approved && !paid ? "Choose a sponsor plan" : paid && !approved ? "Brand approval still required" : verificationStatus === "suspended" ? "Sponsor access suspended" : verificationStatus === "rejected" || verificationStatus === "needs_changes" ? "Brand profile changes required" : verificationStatus === "not_submitted" || verificationStatus === "draft" ? "Complete sponsor onboarding" : "Sponsor verification pending";
+  const body = approved && !paid ? "Your brand is approved. Activate a sponsor subscription to unlock full sponsor tools." : paid && !approved ? "Your sponsor plan is active, but full sponsor tools remain locked until the brand is approved." : verificationStatus === "suspended" ? "Sponsor tools are locked. Contact support for the next step." : verificationStatus === "rejected" || verificationStatus === "needs_changes" ? "Update your brand profile and submit it again before sponsor tools can be approved." : verificationStatus === "not_submitted" || verificationStatus === "draft" ? "Complete your brand profile and submit it for review before sponsor tools can unlock." : "Your brand profile is under platform review. Full sponsor tools require approval and an active sponsor subscription.";
+  return <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{sponsorStatusLabel(verificationStatus)} / Subscription {subscriptionStatus.replaceAll("_", " ")}</p><h2 className="mt-2 text-xl font-black">{title}</h2><p className="mt-2 leading-7 text-slate-300">{body}</p><div className="mt-5 flex flex-wrap gap-3"><LinkButton href={approved && !paid ? "/sponsor/plans" : "/sponsor/onboarding"}>{approved && !paid ? "Choose Sponsor Plan" : verificationStatus === "not_submitted" || verificationStatus === "draft" ? "Complete Brand Profile" : "View Review Status"}</LinkButton><LinkButton href="/sponsor/plans" variant="secondary">View Sponsor Plans</LinkButton></div></Card>;
 }
 
 function Metric({ title, value, label }: { title: string; value: string; label: string }) {

@@ -56,6 +56,9 @@ export function fetchBootstrapProfile() {
       role?: string;
       accountType?: AccountType;
       dashboardType?: string;
+      selectedAccountType?: string;
+      accountTypeSelectionComplete?: boolean;
+      roleIntent?: string;
       planId?: string;
       legacyPlanId?: string | null;
       planName?: string;

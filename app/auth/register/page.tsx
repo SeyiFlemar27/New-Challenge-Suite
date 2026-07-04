@@ -8,18 +8,17 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
 import { signUpWithProfile } from "@/lib/firebase/auth-service";
-import type { AppRole } from "@/lib/types";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [accepted, setAccepted] = useState({ terms: false, privacy: false, community: false });
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "", role: "user" as AppRole });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function update(field: keyof typeof form, value: string | AppRole) {
+  function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
   }
@@ -48,7 +47,7 @@ export default function RegisterPage() {
         lastName: form.lastName,
         email: form.email,
         password: form.password,
-        role: form.role
+        role: "user"
       });
       localStorage.setItem("challenge_suite_signup_email", form.email);
       localStorage.setItem("challenge_suite_auth_mode", result.mode);
@@ -71,13 +70,7 @@ export default function RegisterPage() {
             <Field label="Last Name"><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder="Last name" /></Field>
           </div>
           <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
-          <Field label="Account Role">
-            <select className={inputClass} value={form.role} onChange={(event) => update("role", event.target.value as AppRole)}>
-              <option value="user">User</option>
-              <option value="creator">Creator</option>
-              <option value="sponsor">Sponsor</option>
-            </select>
-          </Field>
+          <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.</Card>
           <PasswordField label="Password" shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
           <PasswordField label="Confirm Password" shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />
           {Object.values(errors).filter(Boolean).map((error) => <p key={error} className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p>)}
