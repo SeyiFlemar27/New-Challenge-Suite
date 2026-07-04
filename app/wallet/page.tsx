@@ -48,6 +48,7 @@ export default function WalletPage() {
   const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const freeCompetitor = String(account.planId ?? "free") === "free" && !["creator", "host"].includes(String(account.role ?? "user"));
+  const hostMode = String(account.planId) === "host";
 
   async function loadWallet() {
     setLoading(true);
@@ -153,7 +154,7 @@ export default function WalletPage() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title="Wallet / DoroCoin" subtitle="DoroCoins are internal platform credits for votes, boosts, and future promotional features. They cannot be withdrawn or converted to cash." icon={<Coins className="text-[var(--gold)]" />} />
+        <PageTitle title={hostMode ? "Wallet & Revenue" : "Wallet / DoroCoin"} subtitle={hostMode ? "Review DoroCoin activity, entry activity, sponsor-interest records, and revenue foundations without moving money." : "DoroCoins are internal platform credits for votes, boosts, and future promotional features. They cannot be withdrawn or converted to cash."} icon={<Coins className="text-[var(--gold)]" />} />
         <Card className="px-7 py-5 text-right">
           <div className="text-sm font-bold text-slate-400">DoroCoin Balance</div>
           <div className="text-4xl font-black text-[var(--gold)]">{balance}</div>
@@ -187,7 +188,7 @@ export default function WalletPage() {
       </div> : null}
 
       {!loading && !unauthenticated && !error && (account.accountType === "sponsor" || account.isAdmin || ["creator", "pro", "host", "enterprise"].includes(String(account.planId))) ? <section className="mt-10">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-black">{account.isAdmin ? "Financial Review Foundation" : account.accountType === "sponsor" ? "Sponsor Budget Overview" : "Earnings & Prize Review"}</h2><p className="mt-2 text-sm text-slate-400">Read-only records. Withdrawals, payout execution, refunds, and sponsor release are not active.</p></div><span className="rounded-full border border-[var(--gold)]/30 px-3 py-2 text-xs font-black capitalize text-[var(--gold)]">{financialSummary?.payoutStatus?.replaceAll("_", " ") || "review only"}</span></div>
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-black">{account.isAdmin ? "Financial Review Foundation" : account.accountType === "sponsor" ? "Sponsor Budget Overview" : hostMode ? "Host Revenue Review" : "Earnings & Prize Review"}</h2><p className="mt-2 text-sm text-slate-400">{hostMode ? "Entry activity, vote purchases, sponsor payment review, and payout status remain read-only. Withdrawals, automatic payouts, refunds, sponsor releases, and paid-entry prize-pool releases are not active yet." : "Read-only records. Withdrawals, payout execution, refunds, and sponsor release are not active."}</p></div><span className="rounded-full border border-[var(--gold)]/30 px-3 py-2 text-xs font-black capitalize text-[var(--gold)]">{financialSummary?.payoutStatus?.replaceAll("_", " ") || "review only"}</span></div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {account.accountType === "sponsor" ? <>
             <FinancialCard label="Campaign Budget" cents={financialSummary?.campaignBudgetCents} note="Separate from subscription billing" />

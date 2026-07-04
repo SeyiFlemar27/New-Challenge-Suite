@@ -724,14 +724,16 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
   if (paid) {
     const experience = planExperiences[planId];
     const id = planId === "creator" || planId === "pro" || planId === "host" || planId === "enterprise" ? planId : "free_competitor";
+    const paidDisplayName = planId === "host" ? "Host Plan" : `${experience.badgeLabel} Plan`;
+    const paidMemberLabel = planId === "host" ? "Verified Host" : `${experience.badgeLabel} Member`;
     return {
       id,
       planId,
       accountIntent,
       paid: true,
-      displayName: `${experience.badgeLabel} Plan`,
-      badgeLabel: `${experience.badgeLabel} Plan`,
-      memberLabel: `${experience.badgeLabel} Member`,
+      displayName: paidDisplayName,
+      badgeLabel: paidDisplayName,
+      memberLabel: paidMemberLabel,
       dashboardName: experience.dashboardName,
       dashboardSubtitle: experience.dashboardSubtitle
     };

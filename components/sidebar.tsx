@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings, ShieldCheck, Menu, X } from "lucide-react";
+import { Bell, Coins, Diamond, Home, LayoutGrid, Star, Medal, PlusSquare, Target, Radio, BarChart3, Trophy, User, Award, LockKeyhole, Settings, ShieldCheck, Menu, X, UsersRound, ClipboardCheck, Vote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
@@ -70,6 +70,22 @@ export function Sidebar() {
   const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const canCreateChallenges = !freePlan || selectedAccountType === "creator" || selectedAccountType === "host";
   const activeHref = activeNavigationHref(pathname);
+  const hostNav = nav.flatMap((item) => item.href === "/dashboard/host"
+    ? [
+        item,
+        { href: "/dashboard/host/participants", label: "Participants", icon: UsersRound },
+        { href: "/dashboard/host/submissions", label: "Submissions", icon: ClipboardCheck },
+        { href: "/dashboard/host/voting", label: "Voting Control", icon: Vote },
+        { href: "/dashboard/host/reports", label: "Reports", icon: BarChart3 },
+        { href: "/dashboard/host/team", label: "Team Members", icon: UsersRound }
+      ]
+    : [item]);
+  const accountNav = effectiveTier.id === "host" ? hostNav : nav;
+  const upgradeLabel = effectiveTier.id === "free_competitor"
+    ? "Become a Creator"
+    : ["creator_starter", "creator"].includes(effectiveTier.id)
+      ? "Become a Host"
+      : planLabel;
   const visibleNav = user?.accountType === "sponsor"
     ? [
         { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
@@ -77,7 +93,10 @@ export function Sidebar() {
         { href: "/subscriptions", label: "Sponsor Plans", icon: Diamond },
         { href: "/settings", label: "Settings", icon: Settings }
       ]
-    : nav.map((item) => freeCompetitor && item.href === "/my-challenges" ? { ...item, href: "/my-entries", label: "My Entries" } : item).filter((item) => {
+    : accountNav.map((item) => {
+        if (effectiveTier.id === "host" && item.href === "/wallet") return { ...item, label: "Wallet & Revenue" };
+        return freeCompetitor && item.href === "/my-challenges" ? { ...item, href: "/my-entries", label: "My Entries" } : item;
+      }).filter((item) => {
         if (freeCompetitor) return ["/dashboard", "/feed", "/favorites", "/wallet", "/challenges", "/my-entries", "/leaderboards", "/winners", "/profile", "/settings"].includes(item.href);
         if (item.href === "/challenges/create") return canCreateChallenges;
         if (item.href === "/private-exclusive") return planExperience.features.private_challenges;
@@ -178,7 +197,7 @@ export function Sidebar() {
             <Bell size={16} /> {notificationStatus ? `Notifications: ${notificationStatus}` : "Enable Notifications"}
           </button>
           <Link href="/subscriptions" className="flex h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#1c1c1c] text-base font-black">
-            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planLabel}
+            <Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : upgradeLabel}
           </Link>
           <div className="flex items-center gap-3 pt-3">
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>

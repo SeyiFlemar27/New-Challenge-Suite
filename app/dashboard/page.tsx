@@ -75,22 +75,32 @@ export default function DashboardPage() {
     selectedAccountType,
     role: dashboard?.user.role
   });
+  useEffect(() => {
+    if (isLoading || redirectTo) return;
+    if (effectiveTier.id === "host") {
+      router.replace(dashboard?.user.hostOnboardingComplete ? "/dashboard/host" : "/onboarding/host");
+    } else if (effectiveTier.id === "creator" && !dashboard?.user.creatorOnboardingComplete) {
+      router.replace("/onboarding/creator");
+    }
+  }, [dashboard?.user.creatorOnboardingComplete, dashboard?.user.hostOnboardingComplete, effectiveTier.id, isLoading, redirectTo, router]);
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
         { title: "Explore Challenges", body: "Discover active public competitions that match your interests.", icon: Swords, active: true },
         { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible challenges.", icon: Vote, active: true },
-        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
+        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" },
+        { title: "Become a Creator", body: "Launch your own challenges, manage submissions, and grow a competition community.", icon: Rocket, active: false }
       ] : [
         { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" },
-        { title: "Upgrade to Creator Plan", body: "Unlock private challenges, sponsor-ready tools, basic analytics, and a monthly boost.", icon: LockKeyhole, active: false }
+        { title: "Become a Host", body: "Run tournaments, live events, participant reviews, voting controls, and reports.", icon: LockKeyhole, active: false }
       ]
     : planExperience.planId === "creator"
       ? [
           { title: "Creator Analytics", body: "Track submissions, challenge activity, and basic creator performance.", icon: BarChart3, active: true },
           { title: "Sponsor Ready", body: "Create sponsor-enabled challenges and receive future sponsor requests.", icon: Rocket, active: true },
-          { title: "Creator Earnings", body: "Review-only earnings foundation. Withdrawals and payouts are not active.", icon: ShieldCheck, active: true }
+          { title: "Creator Earnings", body: "Review-only earnings foundation. Withdrawals and payouts are not active.", icon: ShieldCheck, active: true },
+          { title: "Become a Host", body: "Run tournaments, live events, participant reviews, voting controls, and reports.", icon: Radio, active: false }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -113,17 +123,17 @@ export default function DashboardPage() {
     ? freeCompetitor ? [
         { href: "/challenges", label: "Explore Challenges", variant: "secondary" as const },
         { href: "/my-entries", label: "My Entries", variant: "primary" as const },
-        { href: "/wallet", label: "Votes & DoroCoins", variant: "ghost" as const }
+        { href: "/subscriptions", label: "Upgrade to Creator", variant: "ghost" as const }
       ] : [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
         { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
-        { href: "/subscriptions", label: "Compare Plans", variant: "ghost" as const }
+        { href: "/subscriptions", label: "Upgrade to Host", variant: "ghost" as const }
       ]
     : planExperience.planId === "creator"
       ? [
           { href: "/challenges/create", label: "Create Challenge", variant: "primary" as const },
           { href: "/my-challenges", label: "Creator Projects", variant: "secondary" as const },
-          { href: "/wallet", label: "Wallet & Earnings", variant: "ghost" as const }
+          { href: "/subscriptions", label: "Upgrade to Host", variant: "ghost" as const }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -262,7 +272,7 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
       </div>
       <h2 className="mt-4 text-xl font-black">{title}</h2>
       <p className="mt-2 flex-1 text-sm leading-6 text-slate-300">{body}</p>
-      {href ? <LinkButton href={href} variant="ghost" className="mt-4 w-full">Open</LinkButton> : !active ? <LinkButton href="/subscriptions" variant="ghost" className="mt-4 w-full">View Upgrade</LinkButton> : null}
+      {href ? <LinkButton href={href} variant="ghost" className="mt-4 w-full">Open</LinkButton> : !active ? <LinkButton href="/subscriptions" variant="ghost" className="mt-4 w-full">{title === "Become a Host" ? "Upgrade to Host" : title === "Become a Creator" ? "Upgrade to Creator" : "View Upgrade"}</LinkButton> : null}
     </Card>
   );
 }

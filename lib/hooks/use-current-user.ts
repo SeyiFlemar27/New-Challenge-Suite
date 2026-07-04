@@ -27,6 +27,8 @@ export interface CurrentUserProfile {
   isAdmin: boolean;
   sponsorOnboardingStatus?: string | null;
   sponsorOnboardingComplete?: boolean;
+  creatorOnboardingComplete?: boolean;
+  hostOnboardingComplete?: boolean;
   hasSponsorProfile?: boolean;
   customization?: ProfileCustomization;
 }
@@ -102,6 +104,8 @@ export function useCurrentUser() {
           isAdmin: Boolean(profile.isAdmin || accountType === "admin"),
           sponsorOnboardingStatus: typeof profile.sponsorOnboardingStatus === "string" ? profile.sponsorOnboardingStatus : null,
           sponsorOnboardingComplete: Boolean(profile.sponsorOnboardingComplete),
+          creatorOnboardingComplete: Boolean(profile.creatorOnboardingComplete),
+          hostOnboardingComplete: Boolean(profile.hostOnboardingComplete),
           hasSponsorProfile: Boolean(profile.hasSponsorProfile),
           customization: profile.customization as ProfileCustomization | undefined
         });

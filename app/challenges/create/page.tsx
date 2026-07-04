@@ -304,7 +304,7 @@ function CreateChallengeWizard() {
           <h1 className="mt-5 text-3xl font-black">Create Challenge is for Creators and Hosts</h1>
           <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">Free competitor accounts are built for joining, voting, saving, and competing in challenges. Switch to a Creator or Host plan to create challenges.</p>
           <div className="mt-7 grid gap-3 sm:flex sm:justify-center">
-            <LinkButton href="/subscriptions">Compare Plans</LinkButton>
+            <LinkButton href="/subscriptions">Upgrade to Creator</LinkButton>
             <LinkButton href="/challenges" variant="secondary">Go Back to Challenges</LinkButton>
           </div>
         </Card>

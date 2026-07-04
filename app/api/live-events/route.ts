@@ -68,6 +68,7 @@ export async function GET(request: Request) {
           time: data.time ?? data.startTime ?? "",
           description: data.description ?? "",
           attending,
+          checkInCount: Number(data.checkInCount ?? data.checkedInCount ?? 0),
           capacity,
           price: Number(data.price ?? data.ticketPrice ?? 0),
           eventType: data.eventType ?? data.type ?? null,
@@ -75,13 +76,18 @@ export async function GET(request: Request) {
           registrationStatus: registeredEventIds.has(doc.id) ? "registered" : "available",
           planRequired,
           canRegister: !registeredEventIds.has(doc.id) && !planRequired && (!capacity || attending < capacity),
-          status: data.status ?? "scheduled"
+          status: data.status ?? "scheduled",
+          isOwned: [data.userId, data.creatorId, data.hostId].some((value) => value === user.uid)
           ,
           source: doc.source,
           challengeId: doc.source === "challenge" ? doc.id : data.challengeId ?? null
         };
       })
-      .filter((event) => !["draft", "deleted", "cancelled"].includes(String(event.status).toLowerCase()));
+      .filter((event) => {
+        const status = String(event.status).toLowerCase();
+        if (["deleted", "cancelled"].includes(status)) return false;
+        return status !== "draft" || (plan.canHostLiveEvents && event.isOwned);
+      });
 
     return ok({
       user: {

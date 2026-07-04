@@ -11,11 +11,12 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Dashboard");
 
-  const [userSnap, profileSnap, walletSnap, challengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap] = await Promise.all([
+  const [userSnap, profileSnap, walletSnap, challengesSnap, ownedChallengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap] = await Promise.all([
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
     db.collection("doroCoinWallets").doc(user.uid).get(),
     db.collection("challenges").orderBy("createdAt", "desc").limit(24).get(),
+    db.collection("challenges").where("creatorId", "==", user.uid).limit(50).get(),
     db.collection("submissions").where("userId", "==", user.uid).limit(50).get(),
     db.collection("notifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(8).get(),
     db.collection("badges").where("userId", "==", user.uid).limit(12).get(),
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
   const profile = profileSnap.exists ? profileSnap.data() : {};
   const wallet = walletSnap.exists ? walletSnap.data() : {};
   const challenges: Array<Record<string, unknown>> = challengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
+  const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
   const submissions = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const notifications = notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -59,6 +61,8 @@ export async function GET(request: Request) {
       premium: planAccess.isPremium,
       sponsorOnboardingComplete,
       hasSponsorProfile,
+      creatorOnboardingComplete: Boolean(planProfile.creatorOnboardingComplete),
+      hostOnboardingComplete: Boolean(planProfile.hostOnboardingComplete),
       verified: Boolean(profile?.verified ?? user.emailVerified),
       totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
       doroBalance: Number(wallet?.balance ?? 0)
@@ -70,6 +74,7 @@ export async function GET(request: Request) {
       submissionCount: submissions.length
     },
     challenges,
+    hostedChallenges,
     submissions,
     wallet: walletSnap.exists ? { userId: user.uid, ...wallet } : null,
     badges,

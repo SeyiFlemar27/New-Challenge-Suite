@@ -32,6 +32,8 @@ export interface DashboardResponse {
     totalPoints: number;
     doroBalance: number;
     customization?: ProfileCustomization;
+    creatorOnboardingComplete?: boolean;
+    hostOnboardingComplete?: boolean;
   };
   stats: {
     activeChallenges: number;
@@ -40,6 +42,7 @@ export interface DashboardResponse {
     submissionCount: number;
   };
   challenges: unknown[];
+  hostedChallenges?: unknown[];
   submissions: unknown[];
   wallet: unknown | null;
   badges: unknown[];
@@ -85,6 +88,8 @@ export function fetchBootstrapProfile() {
       isAdmin: boolean;
       sponsorOnboardingStatus?: string | null;
       sponsorOnboardingComplete?: boolean;
+      creatorOnboardingComplete?: boolean;
+      hostOnboardingComplete?: boolean;
       hasSponsorProfile?: boolean;
       customization?: ProfileCustomization;
     };

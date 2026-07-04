@@ -67,6 +67,8 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     isAdmin,
     sponsorOnboardingStatus,
     sponsorOnboardingComplete: Boolean(merged.sponsorOnboardingComplete || merged.brandProfileComplete),
+    creatorOnboardingComplete: Boolean(merged.creatorOnboardingComplete),
+    hostOnboardingComplete: Boolean(merged.hostOnboardingComplete),
     hasSponsorProfile,
     sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null
   };

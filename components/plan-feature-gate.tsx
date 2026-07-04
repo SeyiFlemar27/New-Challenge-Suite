@@ -4,7 +4,7 @@ import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton } from "@/components/ui";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { canAccessPlanFeature, getPlanExperience, type PlanFeature } from "@/lib/plan-access";
+import { canAccessPlanFeature, getEffectiveTier, getPlanExperience, type PlanFeature } from "@/lib/plan-access";
 
 export function PlanFeatureGate({
   feature,
@@ -18,8 +18,9 @@ export function PlanFeatureGate({
   children: React.ReactNode;
 }) {
   const { user, loading, signedOut, error } = useCurrentUser();
-  const profile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
+  const profile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role };
   const experience = getPlanExperience(profile);
+  const tier = getEffectiveTier(profile);
 
   if (loading) {
     return <AppShell><Card className="mx-auto mt-14 h-72 max-w-3xl animate-pulse bg-[#151515]" /></AppShell>;
@@ -55,9 +56,9 @@ export function PlanFeatureGate({
           <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
           <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{experience.dashboardName}</p>
           <h1 className="mt-2 text-3xl font-black">{title}</h1>
-          <p className="mt-3 text-slate-300">{title} requires the {requiredPlan} plan. Your current {experience.badgeLabel} access remains active everywhere else.</p>
+          <p className="mt-3 text-slate-300">{requiredPlan === "Host" ? "Run tournaments, live events, participant reviews, voting controls, and reports." : `${title} requires the ${requiredPlan} plan.`} Your current {tier.displayName} access remains active everywhere else.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <LinkButton href="/subscriptions">View Plans</LinkButton>
+            <LinkButton href="/subscriptions">{requiredPlan === "Host" ? "Upgrade to Host" : tier.id === "free_competitor" ? "Upgrade to Creator" : "View Plans"}</LinkButton>
             <LinkButton href="/dashboard" variant="secondary">Back to Dashboard</LinkButton>
           </div>
         </Card>
