@@ -224,6 +224,8 @@ export function Sidebar() {
     if (permission === "granted") new Notification("Challenge Suite", { body: "Notifications enabled." });
   }
 
+  if (loading) return <WorkspaceNavigationLoading />;
+
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
@@ -283,6 +285,24 @@ export function Sidebar() {
           })}
         </div>
       </nav>
+    </>
+  );
+}
+
+function WorkspaceNavigationLoading() {
+  return (
+    <>
+      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center gap-3">
+          <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" />
+          <div><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="text-sm font-black">Loading your workspace...</p></div>
+        </div>
+      </header>
+      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] p-6 lg:flex xl:w-[320px]">
+        <div className="flex items-center gap-4"><BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" /><div className="h-5 w-36 animate-pulse rounded bg-white/10" /></div>
+        <div className="mt-10 space-y-3">{[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="h-11 animate-pulse rounded-[8px] bg-white/5" />)}</div>
+        <p className="mt-auto text-sm font-bold text-slate-400">Loading your workspace...</p>
+      </aside>
     </>
   );
 }

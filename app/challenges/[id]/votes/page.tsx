@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Vote } from "lucide-react";
+import { CheckCircle2, PlayCircle, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
@@ -33,6 +33,7 @@ export default function PurchaseVotesPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [submissionId, setSubmissionId] = useState("");
+  const [freeVoteUsed, setFreeVoteUsed] = useState(false);
 
   const detailsQuery = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
@@ -68,24 +69,36 @@ export default function PurchaseVotesPage() {
   const walletBalance = currentUser.user?.doroBalance ?? 0;
 
   const voteMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: "free" | "dorocoin") => {
       if (!submissionId) throw new Error("Select a submission to vote for.");
-      const result = await voteForSubmission({ challengeId, submissionId, voteMode: "dorocoin", quantity: votes });
+      const quantity = mode === "free" ? 1 : votes;
+      const result = await voteForSubmission({
+        challengeId,
+        submissionId,
+        voteMode: mode,
+        quantity,
+        idempotencyKey: crypto.randomUUID()
+      });
       if (!result.ok) throw new Error(result.message);
-      return result.data;
+      return { ...result.data, mode };
     },
     onSuccess: async (result) => {
-      const recorded = Number(result?.quantity ?? votes);
-      const spent = Number(result?.coinCost ?? coins);
-      setSuccessMessage(`${recorded} vote${recorded === 1 ? "" : "s"} were recorded. ${spent} DoroCoin${spent === 1 ? "" : "s"} spent.`);
+      const recorded = Number(result?.quantity ?? (result?.mode === "free" ? 1 : votes));
+      const spent = Number(result?.coinCost ?? 0);
+      setSuccessMessage(result?.mode === "free"
+        ? "Your free daily vote was recorded."
+        : `${recorded} vote${recorded === 1 ? "" : "s"} were recorded. ${spent} DoroCoin${spent === 1 ? "" : "s"} spent.`);
       setSuccess(true);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["challenge-details", challengeId] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["current-user"] })
       ]);
     },
     onError: (caught) => {
-      setError(caught instanceof Error ? caught.message : "Votes could not be recorded.");
+      const message = caught instanceof Error ? caught.message : "Votes could not be recorded.";
+      if (message.toLowerCase().includes("1 vote per challenge/day")) setFreeVoteUsed(true);
+      setError(message);
     }
   });
 
@@ -111,7 +124,15 @@ export default function PurchaseVotesPage() {
       setError("Insufficient DoroCoin balance.");
       return;
     }
-    voteMutation.mutate();
+    voteMutation.mutate("dorocoin");
+  }
+
+  function useFreeVote() {
+    setError("");
+    if (!auth.user) return setError("Sign in before voting.");
+    if (!submissionId) return setError("Select a submission to vote for.");
+    if (!votingOpen) return setError("Voting is closed for this challenge.");
+    voteMutation.mutate("free");
   }
 
   if (auth.loading || detailsQuery.isLoading || packagesQuery.isLoading || currentUser.loading) {
@@ -177,6 +198,14 @@ export default function PurchaseVotesPage() {
                 </select>
               </Field>
             </div>
+            <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5">
+              <h2 className="text-xl font-black">Your daily vote</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Every user receives one free vote per challenge each day. The server enforces the daily limit.</p>
+              {freeVoteUsed ? <p className="mt-4 rounded-[8px] bg-amber-950/40 p-3 text-sm font-bold text-amber-200">You&apos;ve used your free vote for today. Use DoroCoins, buy DoroCoins, or return when the daily limit resets.</p> : null}
+              <Button className="mt-4 w-full sm:w-auto" variant="secondary" onClick={useFreeVote} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>
+                {voteMutation.isPending ? "Recording Vote..." : "Use Free Daily Vote"}
+              </Button>
+            </Card>
             <Card className="mt-6 bg-black/30 p-4 sm:p-5">
               <p><b>Wallet:</b> {walletBalance} DoroCoins</p>
               <p className="mt-2"><b>DoroCoin vote request:</b> {votes || 0} votes for {coins || 0} DoroCoins</p>
@@ -185,6 +214,11 @@ export default function PurchaseVotesPage() {
             {packagesQuery.data && !packagesQuery.data.ok ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{packagesQuery.data.message}</p> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm DoroCoin Votes"}</Button>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <LinkButton href="/wallet" variant="secondary" className="w-full">Buy DoroCoins</LinkButton>
+              <Button variant="secondary" className="w-full" disabled title="A verified ad provider is required before bonus votes can be granted"><PlayCircle size={18} /> Watch Ad for Bonus Vote</Button>
+            </div>
+            <p className="mt-3 text-sm text-slate-400">Ad rewards are being prepared. This will unlock one bonus vote only after verified ad completion. No vote is granted by this placeholder.</p>
           </>
         )}
       </Card>

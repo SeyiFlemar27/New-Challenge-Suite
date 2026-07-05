@@ -25,27 +25,36 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Wallet");
 
   try {
-    const [walletRef, cashWalletRef] = await Promise.all([ensureWallet(db, user.uid), ensureCashWalletFoundation(db, user.uid)]);
-    const [walletSnap, cashWalletSnap, profileSnap, userSnap, transactionSnap, cashTransactionsSnap, sponsorshipsSnap, winnerClaimsSnap] = await Promise.all([
+    const walletRef = await ensureWallet(db, user.uid);
+    const [walletSnap, profileSnap, userSnap, transactionSnap] = await Promise.all([
       walletRef.get(),
-      cashWalletRef.get(),
       db.collection("profiles").doc(user.uid).get(),
       db.collection("users").doc(user.uid).get(),
-      db.collection("doroCoinTransactions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get(),
+      db.collection("doroCoinTransactions").where("userId", "==", user.uid).limit(100).get()
+    ]);
+    const optionalResults = await Promise.allSettled([
+      ensureCashWalletFoundation(db, user.uid).then((ref) => ref.get()),
       db.collection("cashTransactions").where("userId", "==", user.uid).limit(100).get(),
       db.collection("sponsorships").where("userId", "==", user.uid).limit(100).get(),
       db.collection("winnerClaims").where("userId", "==", user.uid).limit(100).get()
     ]);
+    const cashWalletSnap = optionalResults[0].status === "fulfilled" ? optionalResults[0].value : null;
+    const cashTransactionsSnap = optionalResults[1].status === "fulfilled" ? optionalResults[1].value : null;
+    const sponsorshipsSnap = optionalResults[2].status === "fulfilled" ? optionalResults[2].value : null;
+    const winnerClaimsSnap = optionalResults[3].status === "fulfilled" ? optionalResults[3].value : null;
+    const warnings = optionalResults
+      .map((result, index) => result.status === "rejected" ? ["cash wallet review", "cash transactions", "sponsorship review", "winner claims"][index] : null)
+      .filter(Boolean);
 
     const wallet = walletSnap.data() ?? {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
-    const cashTransactions = cashTransactionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+    const cashTransactions = cashTransactionsSnap?.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)) ?? [];
     const sumByType = (types: string[]) => cashTransactions
       .filter((item) => types.includes(String(item.type ?? "")) && item.status !== "voided")
       .reduce((sum, item) => sum + Number(item.amountCents ?? 0), 0);
-    const sponsorshipSpendCents = sponsorshipsSnap.docs.reduce((sum, doc) => sum + Number(doc.data().amountCents ?? 0), 0);
+    const sponsorshipSpendCents = sponsorshipsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().amountCents ?? 0), 0) ?? 0;
 
     return ok({
       user: {
@@ -66,15 +75,16 @@ export async function GET(request: Request) {
         cashConvertible: false,
         updatedAt: toIso(wallet.updatedAt)
       },
-      cashWallet: normalizeCashWallet(user.uid, cashWalletSnap.data()),
+      cashWallet: normalizeCashWallet(user.uid, cashWalletSnap?.data()),
+      warnings,
       financialSummary: {
         status: "review_only",
         pendingEarningsCents: sumByType(["prize_placeholder_created", "payout_review_created"]),
         sponsorEarningsCents: sumByType(["sponsor_contribution_requested"]),
-        prizeWinningsCents: winnerClaimsSnap.docs.reduce((sum, doc) => sum + Number(doc.data().prizeAmountCents ?? 0), 0),
+        prizeWinningsCents: winnerClaimsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizeAmountCents ?? 0), 0) ?? 0,
         campaignBudgetCents: 0,
         sponsorshipSpendCents,
-        prizePoolContributionsCents: sponsorshipsSnap.docs.reduce((sum, doc) => sum + Number(doc.data().prizePoolContributionCents ?? 0), 0),
+        prizePoolContributionsCents: sponsorshipsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizePoolContributionCents ?? 0), 0) ?? 0,
         payoutStatus: "review_only",
         withdrawalsEnabled: false,
         moneyMovementEnabled: false
@@ -96,7 +106,7 @@ export async function GET(request: Request) {
           id: doc.id,
           createdAt: toIso(data.createdAt)
         };
-      })
+      }).sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? ""))).slice(0, 50)
     }, "Wallet loaded.");
   } catch (error) {
     return serverError("Wallet could not be loaded.", error instanceof Error ? error.message : error);

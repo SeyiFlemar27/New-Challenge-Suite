@@ -47,6 +47,7 @@ export default function WalletPage() {
   const [customCoins, setCustomCoins] = useState("250");
   const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
   const [financialSummary, setFinancialSummary] = useState<any>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const freeCompetitor = String(account.planId ?? "free") === "free" && !["creator", "host"].includes(String(account.role ?? "user"));
   const hostMode = String(account.planId) === "host";
 
@@ -67,6 +68,7 @@ export default function WalletPage() {
     setBalance(Number(walletResult.data.wallet.balance ?? 0));
     setAccount(walletResult.data.user ?? {});
     setFinancialSummary(walletResult.data.financialSummary ?? null);
+    setWarnings(walletResult.data.warnings ?? []);
     setTransactions(walletResult.data.transactions.map((txn) => {
       const record = txn as Partial<DoroTransaction>;
       return {
@@ -186,6 +188,7 @@ export default function WalletPage() {
           { icon: <Coins />, title: "Platform Credits", body: "Use DoroCoins for eligible votes, boosts, and promotional features." }
         ]).map((item) => <Card key={item.title} className="p-5"><div className="text-[var(--gold)]">{item.icon}</div><h2 className="mt-3 text-xl font-black">{item.title}</h2><p className="mt-2 text-sm text-slate-300">{item.body}</p></Card>)}
       </div> : null}
+      {!loading && !error && warnings.length ? <p className="mt-5 rounded-[8px] border border-amber-400/20 bg-amber-950/20 p-4 text-sm text-amber-100">Your DoroCoin wallet is available. Some review-only financial summaries could not be loaded and will refresh when their indexes are ready.</p> : null}
 
       {!loading && !unauthenticated && !error && (account.accountType === "sponsor" || account.isAdmin || ["creator", "pro", "host", "enterprise"].includes(String(account.planId))) ? <section className="mt-10">
         <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-black">{account.isAdmin ? "Financial Review Foundation" : account.accountType === "sponsor" ? "Sponsor Budget Overview" : hostMode ? "Host Revenue Review" : "Earnings & Prize Review"}</h2><p className="mt-2 text-sm text-slate-400">{hostMode ? "Entry activity, vote purchases, sponsor payment review, and payout status remain read-only. Withdrawals, automatic payouts, refunds, sponsor releases, and paid-entry prize-pool releases are not active yet." : "Read-only records. Withdrawals, payout execution, refunds, and sponsor release are not active."}</p></div><span className="rounded-full border border-[var(--gold)]/30 px-3 py-2 text-xs font-black capitalize text-[var(--gold)]">{financialSummary?.payoutStatus?.replaceAll("_", " ") || "review only"}</span></div>
@@ -242,8 +245,8 @@ export default function WalletPage() {
         </div> : <Card className="mt-5"><EmptyState icon={<Coins />} title="No packages available" body="DoroCoin packages have not been configured yet." action={<Button onClick={loadWallet}>Retry</Button>} /></Card>}
         {status ? <p className={`mt-5 rounded-[8px] p-4 font-bold ${status.startsWith("Checkout started") || status.startsWith("Development checkout") ? "bg-emerald-950/40 text-emerald-200" : "bg-red-950/40 text-red-200"}`}>{status}</p> : null}
         <Card className="mt-6 border-dashed border-[var(--gold)]/30 p-6">
-          <h3 className="text-xl font-black">Watch ads to earn free coins</h3>
-          <p className="mt-2 text-slate-300">Coming soon. No ads are served and no DoroCoins are granted yet. A future ad network integration will require verified completion, rate limits, and fraud protection.</p>
+          <h3 className="text-xl font-black">Watch an ad for a bonus vote</h3>
+          <p className="mt-2 text-slate-300">Ad rewards are being prepared. A future verified provider callback may grant one limited bonus vote for an eligible challenge. No ads are served and no votes or DoroCoins are granted yet.</p>
           <Button className="mt-4" variant="secondary" disabled>Coming Soon</Button>
         </Card>
       </section> : null}

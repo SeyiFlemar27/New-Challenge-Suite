@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, Clock3, Share2, Rocket, Trophy, Vote } from "lucide-react";
+import { Bookmark, Clock3, Rocket, Trophy, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
@@ -14,6 +14,7 @@ import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus, status
 import type { Submission } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
+import { ChallengeShare } from "@/components/challenge-share";
 
 type DetailSubmission = Submission & { userPlanId?: string };
 
@@ -28,7 +29,6 @@ export default function ChallengeDetailPage() {
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
-  const [shared, setShared] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -151,7 +151,7 @@ export default function ChallengeDetailPage() {
           <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
             {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setShared(true)}><Share2 size={17} /> {shared ? "Link Copied" : "Share"}</Button>
+            <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "In Watch Later" : "Watch Later"}</Button>
           </div>
@@ -218,8 +218,8 @@ export default function ChallengeDetailPage() {
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
             )}
-            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Reminder Saved" : "Interested in Watching"}</Button>
-            {watching ? <p className="mt-3 text-xs text-slate-400">Preferences saved for 1 hour, 30 minutes, 5 minutes, and start time. Delivery begins when the notification worker is connected.</p> : null}
+            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Watching Interest Saved" : "Interested in Watching"}</Button>
+            {watching ? <><p className="mt-3 text-xs text-slate-400">In-app reminders are saved for 1 hour, 30 minutes, 5 minutes, and start time. Push/email delivery begins when notification delivery is connected.</p><LinkButton href={`/challenges/${challenge.id}/watch`} variant="ghost" className="mt-4 w-full">View Watch Details</LinkButton></> : null}
           </Card>
 
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">

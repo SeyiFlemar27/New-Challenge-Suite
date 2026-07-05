@@ -171,6 +171,7 @@ export function fetchWallet() {
     };
     cashTransactions?: unknown[];
     transactions: unknown[];
+    warnings?: string[];
   }>("/api/wallet");
 }
 
@@ -329,7 +330,7 @@ export function fetchLeaderboards(board = "global", options: { type?: "global" |
   return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; visibilityMode?: string; visible?: boolean; message?: string | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
-export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number }) {
+export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number; idempotencyKey?: string }) {
   return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; walletTransactionId?: string | null }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 

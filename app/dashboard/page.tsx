@@ -165,6 +165,19 @@ export default function DashboardPage() {
             { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational foundation" }
           ];
 
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
+          <h1 className="mt-3 text-3xl font-black sm:text-4xl">Loading your workspace...</h1>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-32 animate-pulse bg-[#151515]" />)}</div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-64 animate-pulse bg-[#151515]" />)}</div>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (redirectTo || sponsorAccount) {
     return (
       <AppShell>
@@ -205,6 +218,36 @@ export default function DashboardPage() {
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
       </div>
+      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Build, review, and grow</h2><p className="mt-2 text-slate-300">Your challenge work comes first. Discovery and community activity follow below.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
+      <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
+        <Card className="p-6 md:p-8">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-2xl font-black">{planExperience.planId === "creator" ? "My Challenges" : "Current Challenges"}</h2>
+            <LinkButton href={planExperience.planId === "creator" ? "/my-challenges" : "/challenges"} variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
+          </div>
+          {challenges.length ? (
+            <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
+          ) : (
+            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? "Your published challenges and drafts will appear here." : "No current challenges are available yet."}</Card>
+          )}
+        </Card>
+        <div className="space-y-8">
+          <Card className="p-6">
+            <h2 className="flex gap-2 text-2xl font-black"><Trophy className="text-[var(--gold)]" /> {planExperience.planId === "creator" ? "Challenge Performance" : "Top Performers"}</h2>
+            {leaderboard.length ? leaderboard.slice(0, 3).map((row, i) => {
+              const name = row.displayName ?? row.name ?? "Unnamed performer";
+              const points = Number(row.points ?? row.score ?? 0).toLocaleString();
+              return <div key={`${name}-${i}`} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{i + 1}. {name} - {points} pts</div>;
+            }) : <div className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold text-slate-300">Performance data will appear as challenges receive activity.</div>}
+            <LinkButton href={planExperience.planId === "creator" ? "/creator/analytics" : "/leaderboards"} variant="ghost" className="mt-5 w-full text-[var(--gold)]">{planExperience.planId === "creator" ? "Open Creator Analytics" : "View Full Leaderboard"}</LinkButton>
+          </Card>
+          <Card className="p-6">
+            <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
+            {badges.length ? badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>) : <p className="mt-8 text-xl font-bold">No badges yet. Start participating!</p>}
+            <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
+          </Card>
+        </div>
+      </div>
       <Card className="mt-8 p-6 md:p-8">
         <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
         <p className="text-slate-300">Join the most popular challenges happening right now</p>
@@ -223,37 +266,6 @@ export default function DashboardPage() {
           )) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
         </div>
       </Card>
-      <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
-        <Card className="p-6 md:p-8">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-black">Current Challenges</h2>
-            <LinkButton href="/challenges" variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
-          </div>
-          {isLoading ? (
-            <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{[0, 1].map((item) => <Card key={item} className="h-[430px] animate-pulse bg-[#171717]" />)}</div>
-          ) : challenges.length ? (
-            <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
-          ) : (
-            <Card className="p-6 text-slate-300">No current challenges are available yet.</Card>
-          )}
-        </Card>
-        <div className="space-y-8">
-          <Card className="p-6">
-            <h2 className="flex gap-2 text-2xl font-black"><Trophy className="text-[var(--gold)]" /> Top Performers</h2>
-            {isLoading ? [0, 1, 2].map((item) => <div key={item} className="mt-5 h-16 animate-pulse rounded-[8px] bg-[#1a1a1a]" />) : leaderboard.length ? leaderboard.slice(0, 3).map((row, i) => {
-              const name = row.displayName ?? row.name ?? "Unnamed performer";
-              const points = Number(row.points ?? row.score ?? 0).toLocaleString();
-              return <div key={`${name}-${i}`} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{i + 1}. {name} - {points} pts</div>;
-            }) : <div className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold text-slate-300">No leaderboard entries yet.</div>}
-            <LinkButton href="/leaderboards" variant="ghost" className="mt-5 w-full text-[var(--gold)]">View Full Leaderboard</LinkButton>
-          </Card>
-          <Card className="p-6">
-            <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
-            {isLoading ? <div className="mt-8 h-7 w-64 animate-pulse rounded bg-[#1a1a1a]" /> : badges.length ? badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>) : <p className="mt-8 text-xl font-bold">No badges yet. Start participating!</p>}
-            <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
-          </Card>
-        </div>
-      </div>
     </AppShell>
   );
 }
