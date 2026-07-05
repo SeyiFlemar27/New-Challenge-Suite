@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity, BarChart3, Bell, BookOpenCheck, Boxes, BriefcaseBusiness, ClipboardCheck,
-  Coins, FileClock, Flag, FolderCog, Home, Landmark, LifeBuoy, ListChecks, Menu,
+  Coins, Database, FileClock, Flag, FolderCog, Home, Landmark, LifeBuoy, ListChecks, Menu,
   Megaphone, Radio, RefreshCw, Search, Settings, ShieldCheck, SlidersHorizontal,
   Trophy, UserCog, UsersRound, WalletCards, X
 } from "lucide-react";
@@ -53,6 +53,8 @@ const groups: NavGroup[] = [
     { href: "/admin/revenue-rules", label: "Prize & Revenue Rules", icon: BookOpenCheck },
     { href: "/admin/feature-flags", label: "Feature Flags", icon: SlidersHorizontal },
     { href: "/admin/roles", label: "Admin Roles", icon: Boxes },
+    { href: "/admin/qa-data", label: "QA Seed Data", icon: Database },
+    { href: "/admin/settings/qa", label: "Production QA", icon: ClipboardCheck },
     { href: "/admin/settings", label: "Settings", icon: Settings }
   ] }
 ];

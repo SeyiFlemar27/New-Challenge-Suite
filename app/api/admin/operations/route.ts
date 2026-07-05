@@ -366,6 +366,10 @@ export async function PATCH(request: Request) {
             ledgerId: `${id}_rejected`, userId: record.userId, type: "withdrawal_reversed", sourceType: "withdrawal", sourceId: id,
             amountCents: amount, currency: record.currency ?? "USD", direction: "credit_release", balanceBeforeCents: available,
             balanceAfterCents: available + amount, status: "recorded", providerConnected: false, transferEnabled: false,
+            isQaSeed: record.isQaSeed === true,
+            qaSeedBatchId: record.isQaSeed === true ? record.qaSeedBatchId : null,
+            createdFor: record.isQaSeed === true ? "admin_qa" : null,
+            createdByAdminId: record.isQaSeed === true ? record.createdByAdminId : null,
             metadata: { reason, reviewOnly: true }, createdAt: now
           });
         }
