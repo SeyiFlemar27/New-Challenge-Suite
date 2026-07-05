@@ -1,52 +1,70 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, BarChart3, ClipboardCheck, FileClock, Landmark, ShieldAlert, ShieldCheck, Trophy, UserCog, UsersRound } from "lucide-react";
-import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import {
+  Activity, ArrowRight, BarChart3, Bell, ClipboardCheck, Coins, FileClock, Flag,
+  FolderCog, Landmark, LifeBuoy, Megaphone, Radio, Search, ShieldAlert,
+  ShieldCheck, SlidersHorizontal, Trophy, UserCog, UsersRound, WalletCards, X
+} from "lucide-react";
+import { Button, Card, EmptyState, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
+type AdminRecord = Record<string, unknown> & { id: string; status?: string };
 type AdminData = {
   overview: Record<string, unknown> & { recentAuditEvents?: AdminRecord[]; safety?: Record<string, unknown> };
-  sponsors: AdminRecord[];
-  hosts: AdminRecord[];
-  challenges: AdminRecord[];
-  submissions: AdminRecord[];
-  participants: AdminRecord[];
-  winners: AdminRecord[];
-  withdrawals: AdminRecord[];
-  reports: Record<string, unknown>;
-  users: AdminRecord[];
-  auditLogs: AdminRecord[];
-  settings: Record<string, unknown>;
+  sponsors: AdminRecord[]; hosts: AdminRecord[]; challenges: AdminRecord[]; submissions: AdminRecord[];
+  participants: AdminRecord[]; winners: AdminRecord[]; withdrawals: AdminRecord[]; disputes: AdminRecord[];
+  users: AdminRecord[]; creators: AdminRecord[]; hostWorkspaces: AdminRecord[]; sponsorBrands: AdminRecord[];
+  events: AdminRecord[]; tournaments: AdminRecord[]; cashLedger: AdminRecord[]; adminNotifications: AdminRecord[];
+  support: AdminRecord[]; announcements: AdminRecord[]; auditLogs: AdminRecord[];
+  doroCoin: { wallets: AdminRecord[]; transactions: AdminRecord[]; conversionEnabled: false; adjustmentsEnabled: false };
+  reports: Record<string, unknown>; settings: Record<string, unknown>;
 };
-type AdminRecord = Record<string, unknown> & { id: string; status?: string };
 
 const sectionMeta: Record<string, { title: string; description: string }> = {
-  overview: { title: "Admin Command Center", description: "Operational review queues, platform safety, and recent administrative activity." },
-  sponsors: { title: "Sponsor Approvals", description: "Review brand applications without unlocking paid tools unless subscription requirements are also met." },
-  hosts: { title: "Host Verification", description: "Review Host workspaces. Verification never replaces an active Host subscription." },
-  challenges: { title: "Challenge Moderation", description: "Review challenge rules, visibility, dates, sponsor readiness, and prize foundations." },
-  submissions: { title: "Submission Moderation", description: "Review pending and flagged entries without deleting source media." },
-  participants: { title: "Participant Oversight", description: "Review registration, check-in, disqualification, and reinstatement states." },
-  winners: { title: "Winner Confirmation", description: "Approve announcements or hold results. No payout or prize release occurs here." },
-  withdrawals: { title: "Withdrawal Review", description: "Review reserved eligible balances. No automatic payout provider is connected." },
-  reports: { title: "Operational Reports", description: "Live record counts and review foundations. Exports are not active." },
-  users: { title: "User Oversight", description: "Review account type, effective tier, subscriptions, verification, and activity." },
-  "audit-logs": { title: "Admin Audit Logs", description: "Append-only history of sensitive administrative and financial-review actions." },
-  settings: { title: "Admin Settings", description: "Review rules and safety configuration foundations." }
+  overview: { title: "Admin Command Center", description: "Operational queues, platform safety, and the work that needs attention now." },
+  sponsors: { title: "Sponsor Approvals", description: "Review brand applications without bypassing paid Sponsor plan requirements." },
+  hosts: { title: "Host Verification", description: "Verify Host workspaces without bypassing active Host subscription requirements." },
+  challenges: { title: "Challenge Moderation", description: "Review competition rules, visibility, deadlines, voting, sponsors, and prize foundations." },
+  submissions: { title: "Submission Moderation", description: "Review pending and flagged entries without permanently deleting source media." },
+  participants: { title: "Participant Oversight", description: "Review registrations, check-ins, flags, disqualifications, and reinstatements." },
+  winners: { title: "Winner Confirmation", description: "Approve announcements or hold results. Prize release and payouts remain inactive." },
+  withdrawals: { title: "Withdrawal Review", description: "Review reserved eligible balances. KYC and payout providers are not connected." },
+  disputes: { title: "Disputes", description: "Review challenge, submission, vote, winner, withdrawal, and Sponsor disputes." },
+  users: { title: "User Oversight", description: "Inspect account type, effective tier, balances, subscriptions, safety, and activity." },
+  creators: { title: "Creator Operations", description: "Review Creator accounts, challenge volume, boosts, Sponsor readiness, and earnings foundations." },
+  "host-workspaces": { title: "Host Workspaces", description: "Review verified workspaces, competitions, events, teams, and operational risk." },
+  "sponsor-brands": { title: "Sponsor Brands", description: "Review brand profiles, subscriptions, CTA foundations, campaigns, and risk." },
+  events: { title: "Events", description: "Review live-event records, registration foundations, status, and safety." },
+  tournaments: { title: "Tournaments", description: "Review tournament plans and bracket foundations without simulating execution." },
+  dorocoin: { title: "DoroCoin Ledger", description: "Inspect internal-credit balances and transactions. Cash conversion is disabled." },
+  "cash-ledger": { title: "Cash Ledger", description: "Read-only immutable real-money balance events. No payout execution is available." },
+  reports: { title: "Operational Reports", description: "Current platform counts and review foundations. Exports remain unavailable." },
+  "audit-logs": { title: "Admin Audit Logs", description: "Append-only history for sensitive administrative and financial-review actions." },
+  notifications: { title: "Admin Notifications", description: "In-app operational notification records. Email and push delivery are not implied." },
+  support: { title: "Support Inbox", description: "Support ticket foundation for account, payment, challenge, voting, and safety issues." },
+  announcements: { title: "Announcements", description: "Draft platform, maintenance, policy, and feature announcements. Delivery is inactive." },
+  categories: { title: "Categories", description: "Challenge, submission, event, Sponsor, and risk category foundations." },
+  "voting-rules": { title: "Voting Rules", description: "Review daily free votes, DoroCoin voting, multipliers, and suspicious-vote thresholds." },
+  "revenue-rules": { title: "Prize & Revenue Rules", description: "Review platform fees, winner splits, and withdrawal requirements without moving money." },
+  "feature-flags": { title: "Feature Flags", description: "Read-only safety state for sensitive and incomplete platform systems." },
+  roles: { title: "Admin Roles", description: "Role and permission foundation. Self-promotion and owner grants are unavailable." },
+  settings: { title: "Admin Settings", description: "Platform identity, review policy, safety, access, system status, and legal foundations." },
+  search: { title: "Admin Search", description: "Search the currently loaded operational index across users, brands, challenges, submissions, and withdrawals." }
 };
 
-const actions: Record<string, Array<{ action: string; label: string; dangerous?: boolean }>> = {
-  sponsors: [{ action: "approve", label: "Approve Sponsor" }, { action: "request_changes", label: "Request Changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }],
-  hosts: [{ action: "verify", label: "Verify Host" }, { action: "request_changes", label: "Request Changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }],
-  challenges: [{ action: "approve", label: "Approve Challenge" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "archive", label: "Archive" }, { action: "suspend", label: "Suspend", dangerous: true }],
-  submissions: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request Changes" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }],
-  participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }],
-  winners: [{ action: "approve", label: "Approve Announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request Review" }, { action: "flag", label: "Flag" }],
-  withdrawals: [{ action: "approve", label: "Approve After KYC" }, { action: "request_info", label: "Request Information" }, { action: "reject", label: "Reject", dangerous: true }]
+const queueActions: Record<string, Array<{ action: string; label: string; dangerous?: boolean }>> = {
+  sponsors: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
+  hosts: [{ action: "verify", label: "Verify" }, { action: "request_changes", label: "Request changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
+  challenges: [{ action: "approve", label: "Publish" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "archive", label: "Archive" }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
+  submissions: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request resubmission" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
+  participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }, { action: "add_note", label: "Add note" }],
+  winners: [{ action: "approve", label: "Approve announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request review" }, { action: "flag", label: "Flag" }, { action: "add_note", label: "Add note" }],
+  withdrawals: [{ action: "approve", label: "Approve foundation" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }]
 };
-
 const typeBySection: Record<string, string> = { sponsors: "sponsor", hosts: "host", challenges: "challenge", submissions: "submission", participants: "participant", winners: "winner", withdrawals: "withdrawal" };
+const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
 
 export function AdminControlCenter({ section = "overview" }: { section?: string }) {
   const normalizedSection = sectionMeta[section] ? section : "overview";
@@ -55,6 +73,12 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selected, setSelected] = useState<AdminRecord | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ record: AdminRecord; action: string } | null>(null);
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -62,24 +86,44 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
     setLoading(false);
     if (!result.ok || !result.data) return setNotice(result.message);
     setData(result.data);
+    setNotice("");
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFilter(params.get("status") ?? "all");
+    setSearchQuery(params.get("q") ?? "");
+    void load();
+    const refresh = () => void load();
+    window.addEventListener("admin:refresh", refresh);
+    return () => window.removeEventListener("admin:refresh", refresh);
+  }, []);
 
-  const records = useMemo(() => {
-    if (!data || !Array.isArray(data[normalizedSection as keyof AdminData])) return [];
-    const list = data[normalizedSection as keyof AdminData] as AdminRecord[];
-    return filter === "all" ? list : list.filter((item) => String(item.status ?? item.sponsorStatus ?? item.hostStatus) === filter);
-  }, [data, filter, normalizedSection]);
-  const statuses = useMemo(() => [...new Set(records.map((item) => String(item.status ?? item.sponsorStatus ?? item.hostStatus ?? "unknown")))], [records]);
+  const sourceRecords = useMemo(() => {
+    if (!data) return [];
+    const value = data[normalizedSection as keyof AdminData];
+    return Array.isArray(value) ? value as AdminRecord[] : [];
+  }, [data, normalizedSection]);
+  const statuses = useMemo(() => [...new Set(sourceRecords.map(recordStatus))], [sourceRecords]);
+  const filteredRecords = useMemo(() => filter === "all" ? sourceRecords : sourceRecords.filter((item) => recordStatus(item) === filter), [filter, sourceRecords]);
 
-  async function decide(record: AdminRecord, action: string) {
-    const needsReason = ["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"].includes(action);
-    const reason = needsReason ? window.prompt(`Reason required for ${action.replaceAll("_", " ")}:`)?.trim() : "";
-    if (needsReason && !reason) return;
-    if (!window.confirm(`Confirm ${action.replaceAll("_", " ")} for this ${typeBySection[normalizedSection]}?`)) return;
-    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: record.id, action, reason }) });
+  function openAction(record: AdminRecord, action: string) {
+    setPendingAction({ record, action });
+    setReason("");
+    setNote("");
+  }
+  async function confirmAction() {
+    if (!pendingAction) return;
+    if (reasonRequired.has(pendingAction.action) && !reason.trim()) return setNotice("A reason is required for this action.");
+    if (pendingAction.action === "add_note" && !note.trim()) return setNotice("Enter an internal note.");
+    setSubmitting(true);
+    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note }) });
+    setSubmitting(false);
     setNotice(result.message);
-    if (result.ok) await load();
+    if (result.ok) {
+      setPendingAction(null);
+      setSelected(null);
+      await load();
+    }
   }
 
   return (
@@ -88,58 +132,158 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
       {notice ? <Card className="mt-6 border-yellow-500/20 p-4 text-sm text-slate-200">{notice}</Card> : null}
       {loading ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : null}
       {!loading && data && normalizedSection === "overview" ? <Overview data={data} /> : null}
-      {!loading && data && actions[normalizedSection] ? <>
-        <div className="mt-8 flex flex-wrap gap-2"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All</Button>{statuses.map((status) => <Button key={status} variant={filter === status ? "primary" : "secondary"} onClick={() => setFilter(status)}>{status.replaceAll("_", " ")}</Button>)}</div>
-        <div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record) => <RecordCard key={record.id} record={record} section={normalizedSection} onAction={decide} />) : <Card className="xl:col-span-2"><EmptyState icon={<ClipboardCheck />} title={`No ${normalizedSection} records`} body="The live Firestore queue is currently empty for this filter." /></Card>}</div>
-      </> : null}
+      {!loading && data && queueActions[normalizedSection] ? <Queue records={filteredRecords} allRecords={sourceRecords} statuses={statuses} filter={filter} setFilter={setFilter} section={normalizedSection} onSelect={setSelected} onAction={openAction} /> : null}
       {!loading && data && normalizedSection === "reports" ? <Reports records={data.reports} /> : null}
-      {!loading && data && normalizedSection === "users" ? <Users records={data.users} /> : null}
       {!loading && data && normalizedSection === "audit-logs" ? <AuditLogs records={data.auditLogs} /> : null}
-      {!loading && data && normalizedSection === "settings" ? <Settings records={data.settings} /> : null}
+      {!loading && data && normalizedSection === "search" ? <SearchResults data={data} query={searchQuery} /> : null}
+      {!loading && data && ["categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) ? <Configuration section={normalizedSection} records={data.settings} /> : null}
+      {!loading && data && !["overview", "reports", "audit-logs", "search", "categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) && !queueActions[normalizedSection] ? <FoundationData section={normalizedSection} data={data} onSelect={setSelected} /> : null}
+      {selected ? <DetailDrawer record={selected} section={normalizedSection} onClose={() => setSelected(null)} onAction={queueActions[normalizedSection] ? openAction : undefined} /> : null}
+      {pendingAction ? <ActionDialog action={pendingAction.action} reason={reason} note={note} setReason={setReason} setNote={setNote} submitting={submitting} onCancel={() => setPendingAction(null)} onConfirm={confirmAction} /> : null}
     </>
   );
 }
 
 function Overview({ data }: { data: AdminData }) {
   const cards = [
-    ["Pending sponsor reviews", data.overview.pendingSponsorReviews, ShieldCheck],
-    ["Pending host verifications", data.overview.pendingHostVerifications, UserCog],
-    ["Pending challenge reviews", data.overview.pendingChallengeReviews, Trophy],
-    ["Pending submissions", data.overview.pendingSubmissions, ClipboardCheck],
-    ["Flagged submissions", data.overview.flaggedSubmissions, ShieldAlert],
-    ["Participant approvals", data.overview.participantApprovals, UsersRound],
-    ["Winner confirmations", data.overview.winnerConfirmations, Trophy],
-    ["Open disputes", data.overview.openDisputes, Activity],
-    ["Revenue review items", data.overview.revenueReviewItems, Landmark]
+    ["Pending sponsor reviews", data.overview.pendingSponsorReviews, "/admin/sponsors?status=pending_review", ShieldCheck],
+    ["Pending host verifications", data.overview.pendingHostVerifications, "/admin/hosts?status=pending_review", UserCog],
+    ["Pending challenge reviews", data.overview.pendingChallengeReviews, "/admin/challenges?status=pending_review", Trophy],
+    ["Pending submissions", data.overview.pendingSubmissions, "/admin/submissions?status=pending_review", ClipboardCheck],
+    ["Flagged submissions", data.overview.flaggedSubmissions, "/admin/submissions?status=flagged", ShieldAlert],
+    ["Participant approvals", data.overview.participantApprovals, "/admin/participants?status=pending", UsersRound],
+    ["Winner confirmations", data.overview.winnerConfirmations, "/admin/winners?status=pending_admin_review", Trophy],
+    ["Withdrawal reviews", data.overview.pendingWithdrawalReviews, "/admin/withdrawals?status=pending_review", Landmark],
+    ["Open disputes", data.overview.openDisputes, "/admin/disputes?status=open", Flag],
+    ["Revenue review items", data.overview.revenueReviewItems, "/admin/reports?type=revenue_review", BarChart3]
   ] as const;
-  return <><div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards.map(([label, value, Icon]) => <Card key={label} className="p-5"><Icon className="text-[var(--gold)]" /><p className="mt-4 text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black">{String(value ?? 0)}</p></Card>)}</div><Card className="mt-8 border-emerald-500/20 p-6"><h2 className="text-xl font-black">System safety status</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{Object.entries(data.overview.safety ?? {}).map(([key, value]) => <div key={key} className="rounded-[8px] bg-white/[0.03] p-4"><p className="text-xs font-bold capitalize text-slate-500">{key.replaceAll(/([A-Z])/g, " $1")}</p><p className="mt-2 font-black capitalize text-emerald-300">{String(value).replaceAll("_", " ")}</p></div>)}</div></Card><Card className="mt-8 p-6"><h2 className="text-xl font-black">Recent audit events</h2><div className="mt-4 space-y-3">{(data.overview.recentAuditEvents ?? []).length ? (data.overview.recentAuditEvents ?? []).map((item) => <AuditRow key={item.id} record={item} />) : <p className="text-slate-400">No recent administrative events.</p>}</div></Card></>;
+  const urgent = [
+    [Number(data.overview.pendingSponsorReviews ?? 0), "sponsor application", "/admin/sponsors?status=pending_review", "Review Sponsors"],
+    [Number(data.overview.pendingSubmissions ?? 0), "submission", "/admin/submissions?status=pending_review", "Review Submissions"],
+    [Number(data.overview.pendingWithdrawalReviews ?? 0), "withdrawal request", "/admin/withdrawals?status=pending_review", "Review Withdrawals"],
+    [Number(data.overview.winnerConfirmations ?? 0), "winner announcement", "/admin/winners?status=pending_admin_review", "Review Winners"]
+  ] as const;
+  const activeUrgent = urgent.filter(([count]) => count > 0);
+  return <>
+    <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, href, Icon]) => <Link key={label} href={href} className="group"><Card className="h-full p-5 transition duration-200 group-hover:-translate-y-1 group-hover:border-[var(--gold)]/50 group-hover:bg-[var(--gold)]/[0.04]"><div className="flex items-start justify-between"><Icon className="text-[var(--gold)]" /><ArrowRight size={17} className="text-slate-600 transition group-hover:translate-x-1 group-hover:text-[var(--gold)]" /></div><p className="mt-4 text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black">{String(value ?? 0)}</p></Card></Link>)}</div>
+    <Card className="mt-8 border-[var(--gold)]/20 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Action Required</p><h2 className="mt-2 text-2xl font-black">Urgent operational queues</h2>{activeUrgent.length ? <div className="mt-6 grid gap-3 lg:grid-cols-2">{activeUrgent.map(([count, label, href, cta]) => <div key={label} className="flex flex-col gap-4 rounded-[8px] border border-white/10 bg-white/[0.025] p-5 sm:flex-row sm:items-center sm:justify-between"><p className="font-bold"><span className="text-[var(--gold)]">{count}</span> {label}{count === 1 ? "" : "s"} need review</p><LinkButton href={href} variant="secondary">{cta}</LinkButton></div>)}</div> : <div className="mt-6 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-6"><ShieldCheck className="text-emerald-300" /><p className="mt-3 text-lg font-black">All queues are clear.</p><p className="mt-1 text-sm text-slate-400">No urgent reviews are waiting right now.</p></div>}</Card>
+    <Card className="mt-8 border-emerald-500/20 p-6"><h2 className="text-xl font-black">System Safety</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(data.overview.safety ?? {}).map(([key, value]) => <div key={key} className="rounded-[8px] bg-white/[0.03] p-4"><p className="text-xs font-bold text-slate-500">{friendlyLabel(key)}</p><p className="mt-2 font-black text-emerald-300">{String(value)}</p></div>)}</div></Card>
+    <Card className="mt-8 p-6"><h2 className="text-xl font-black">Recent Audit Events</h2><div className="mt-4 space-y-3">{(data.overview.recentAuditEvents ?? []).length ? (data.overview.recentAuditEvents ?? []).map((item) => <AuditRow key={item.id} record={item} />) : <p className="rounded-[8px] bg-white/[0.025] p-5 text-slate-400">No recent administrative events.</p>}</div></Card>
+  </>;
 }
 
-function RecordCard({ record, section, onAction }: { record: AdminRecord; section: string; onAction: (record: AdminRecord, action: string) => void }) {
-  const title = String(record.brandName ?? record.title ?? record.displayName ?? record.challengeTitle ?? record.payoutMethodLabel ?? record.id);
-  const status = String(record.status ?? record.sponsorStatus ?? record.hostStatus ?? "unknown");
-  const hidden = new Set(["id", "brandName", "title", "displayName", "status", "sponsorStatus", "hostStatus", "mediaUrl", "adminNote", "internalNote"]);
-  const details = Object.entries(record).filter(([key, value]) => !hidden.has(key) && value !== null && value !== "" && typeof value !== "object").slice(0, 8);
-  return <Card className="flex flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{section.replaceAll("-", " ")}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><span className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-black capitalize text-slate-300">{status.replaceAll("_", " ")}</span></div>{section === "submissions" && record.mediaUrl ? <a href={String(record.mediaUrl)} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-[8px] border border-white/10 px-4 text-sm font-black text-[var(--gold)]">View Media</a> : null}<dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <div key={key} className="rounded-[8px] bg-white/[0.025] p-3"><dt className="text-xs font-bold capitalize text-slate-500">{key.replaceAll(/([A-Z])/g, " $1")}</dt><dd className="mt-1 break-words text-sm font-bold capitalize">{typeof value === "boolean" ? value ? "Yes" : "No" : String(value).replaceAll("_", " ")}</dd></div>)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">Approval is blocked until KYC is genuinely verified. No payout or paid-state action exists.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6">{actions[section].map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
+function Queue({ records, allRecords, statuses, filter, setFilter, section, onSelect, onAction }: { records: AdminRecord[]; allRecords: AdminRecord[]; statuses: string[]; filter: string; setFilter: (value: string) => void; section: string; onSelect: (record: AdminRecord) => void; onAction: (record: AdminRecord, action: string) => void }) {
+  return <><div className="scrollbar-dark mt-8 flex gap-2 overflow-x-auto pb-2"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All <span className="ml-1 opacity-70">{allRecords.length}</span></Button>{statuses.map((status) => <Button key={status} variant={filter === status ? "primary" : "secondary"} onClick={() => setFilter(status)}>{friendlyLabel(status)} <span className="ml-1 opacity-70">{allRecords.filter((item) => recordStatus(item) === status).length}</span></Button>)}</div><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record) => <RecordCard key={record.id} record={record} section={section} onSelect={onSelect} onAction={onAction} />) : <Card className="xl:col-span-2"><EmptyState icon={<ClipboardCheck />} title={`No ${friendlyLabel(filter === "all" ? section : filter).toLowerCase()} records`} body="The live Firestore queue is currently empty for this filter." /></Card>}</div></>;
+}
+
+function RecordCard({ record, section, onSelect, onAction }: { record: AdminRecord; section: string; onSelect: (record: AdminRecord) => void; onAction: (record: AdminRecord, action: string) => void }) {
+  const title = recordTitle(record);
+  const status = recordStatus(record);
+  const details = displayEntries(record).slice(0, 8);
+  return <Card className="flex min-w-0 flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><Status value={status} /></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">Approval remains blocked without genuine KYC. Processing, paid status, and payout execution are unavailable.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6"><Button variant="secondary" onClick={() => onSelect(record)}>View details</Button>{queueActions[section].slice(0, 3).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
+}
+
+function DetailDrawer({ record, section, onClose, onAction }: { record: AdminRecord; section: string; onClose: () => void; onAction?: (record: AdminRecord, action: string) => void }) {
+  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`${recordTitle(record)} details`}><button className="absolute inset-0 bg-black/80" onClick={onClose} aria-label="Close details" /><aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 text-2xl font-black">{recordTitle(record)}</h2><div className="mt-3"><Status value={recordStatus(record)} /></div></div><button onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close details"><X /></button></div><div className="mt-8 grid gap-3 sm:grid-cols-2">{displayEntries(record, true).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</div><Card className="mt-8 p-5"><h3 className="font-black">Related operations</h3><div className="mt-4 flex flex-wrap gap-2">{relatedLinks(record, section).map((item) => <LinkButton key={item.href} href={item.href} variant="secondary">{item.label}</LinkButton>)}{!relatedLinks(record, section).length ? <p className="text-sm text-slate-400">Related records will appear as their data becomes available.</p> : null}</div></Card>{onAction ? <div className="mt-8 flex flex-wrap gap-2">{queueActions[section].map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div> : null}</aside></div>;
+}
+
+function ActionDialog({ action, reason, note, setReason, setNote, submitting, onCancel, onConfirm }: { action: string; reason: string; note: string; setReason: (value: string) => void; setNote: (value: string) => void; submitting: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const needsReason = reasonRequired.has(action);
+  const noteOnly = action === "add_note";
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="Confirm admin action"><button className="absolute inset-0 bg-black/85" onClick={onCancel} aria-label="Cancel admin action" /><Card className="relative z-10 w-full max-w-xl border-[var(--gold)]/25 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Confirm administrative action</p><h2 className="mt-3 text-2xl font-black">{friendlyLabel(action)}</h2><p className="mt-3 leading-7 text-slate-300">This action is server-authorized and will create an audit event. It does not execute money movement.</p>{needsReason ? <label className="mt-6 block"><span className="mb-2 block text-sm font-bold">Reason required</span><textarea className={textareaClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this action is required." /></label> : null}<label className="mt-5 block"><span className="mb-2 block text-sm font-bold">{noteOnly ? "Internal note required" : "Internal note (optional)"}</span><textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Visible only to authorized administrators." /></label><div className="mt-6 grid gap-3 sm:grid-cols-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button onClick={onConfirm} disabled={submitting}>{submitting ? "Saving..." : `Confirm ${friendlyLabel(action)}`}</Button></div></Card></div>;
+}
+
+function FoundationData({ section, data, onSelect }: { section: string; data: AdminData; onSelect: (record: AdminRecord) => void }) {
+  let records: AdminRecord[] = [];
+  if (section === "dorocoin") records = [...data.doroCoin.wallets, ...data.doroCoin.transactions];
+  else if (section === "host-workspaces") records = data.hostWorkspaces;
+  else if (section === "sponsor-brands") records = data.sponsorBrands;
+  else if (section === "cash-ledger") records = data.cashLedger;
+  else if (section === "notifications") records = data.adminNotifications;
+  else {
+    const value = data[section as keyof AdminData];
+    if (Array.isArray(value)) records = value as AdminRecord[];
+  }
+  const emptyCopy: Record<string, string> = {
+    disputes: "No disputes have been opened.", creators: "No Creator accounts are available.", "host-workspaces": "No Host workspaces are available.",
+    "sponsor-brands": "No Sponsor brands are available.", events: "No event records are available.", tournaments: "No tournament plans are available.",
+    dorocoin: "No DoroCoin wallet or transaction records are available.", "cash-ledger": "No cash ledger entries are available.",
+    notifications: "No admin notifications are waiting.", support: "No support tickets are open.", announcements: "No announcements have been drafted."
+  };
+  return <><Card className="mt-8 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300"><strong className="text-white">Foundation state:</strong> this surface shows real stored records when available. Actions requiring unfinished delivery, payout, streaming, bracket, support reply, or notification providers remain unavailable.</Card><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record, index) => <button key={`${section}_${record.id}_${String(record.type ?? index)}`} onClick={() => onSelect(record)} className="text-left"><Card className="h-full p-5 transition hover:border-[var(--gold)]/40"><div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-black">{recordTitle(record)}</h2><Status value={recordStatus(record)} /></div><dl className="mt-4 grid gap-3 sm:grid-cols-2">{displayEntries(record).slice(0, 6).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl><p className="mt-5 text-sm font-black text-[var(--gold)]">View details</p></Card></button>) : <Card className="xl:col-span-2"><EmptyState icon={sectionIcon(section)} title={emptyCopy[section] ?? "No records yet"} body="This operational foundation is ready for real Firestore data." /></Card>}</div></>;
+}
+
+function SearchResults({ data, query }: { data: AdminData; query: string }) {
+  const q = query.trim().toLowerCase();
+  const groups = [
+    ["Users", data.users], ["Sponsors", data.sponsors], ["Hosts", data.hosts], ["Challenges", data.challenges],
+    ["Submissions", data.submissions], ["Withdrawals", data.withdrawals]
+  ] as const;
+  const results = groups.map(([label, records]) => [label, q ? records.filter((record) => JSON.stringify(record).toLowerCase().includes(q)).slice(0, 25) : []] as const);
+  return <>{!q ? <Card className="mt-8"><EmptyState icon={<Search />} title="Enter a search term" body="Use the global admin search to find users, emails, brands, challenges, submissions, and withdrawal references." /></Card> : <div className="mt-8 space-y-7">{results.map(([label, records]) => <section key={label}><h2 className="text-xl font-black">{label} <span className="text-sm text-slate-500">{records.length}</span></h2><div className="mt-3 grid gap-3 md:grid-cols-2">{records.length ? records.map((record) => <Card key={record.id} className="p-4"><p className="font-black">{recordTitle(record)}</p><p className="mt-2 break-all text-xs text-slate-500">{record.id}</p></Card>) : <p className="text-sm text-slate-500">No matching {label.toLowerCase()}.</p>}</div></section>)}</div>}</>;
 }
 
 function Reports({ records }: { records: Record<string, unknown> }) {
-  return <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{Object.entries(records).filter(([key]) => key !== "exportsEnabled").map(([key, value]) => <Card key={key} className="p-6"><BarChart3 className="text-[var(--gold)]" /><p className="mt-4 text-sm font-bold capitalize text-slate-400">{key.replaceAll(/([A-Z])/g, " $1")}</p><p className="mt-2 text-3xl font-black">{String(value)}</p><Button className="mt-5" variant="secondary" disabled>Export coming soon</Button></Card>)}</div>;
-}
-
-function Users({ records }: { records: AdminRecord[] }) {
-  return <Card className="mt-8 overflow-hidden">{records.length ? records.map((record) => <div key={record.id} className="grid gap-3 border-b border-white/10 p-5 md:grid-cols-[1.2fr_1.3fr_1fr_1fr]"><div><p className="font-black">{String(record.displayName || "Unnamed user")}</p><p className="text-xs text-slate-500">{String(record.email || "")}</p></div><span className="capitalize">{String(record.accountType ?? "user")}</span><span>{String(record.effectiveTier ?? "Free Competitor")}</span><span className="capitalize text-slate-400">{String(record.subscriptionStatus ?? "none").replaceAll("_", " ")}</span></div>) : <EmptyState icon={<UsersRound />} title="No users found" body="User records will appear here when Firestore contains accounts." />}</Card>;
+  const reports = ["Challenge report", "Submission report", "Participant report", "Voting report", "Winner report", "Revenue review report", "Sponsor interest report", "Withdrawal report", "Safety report"];
+  return <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{reports.map((label) => { const key = label.split(" ")[0].toLowerCase() + "Count"; return <Card key={label} className="p-6"><BarChart3 className="text-[var(--gold)]" /><h2 className="mt-4 text-xl font-black">{label}</h2><p className="mt-3 text-3xl font-black">{String(records[key] ?? "—")}</p><p className="mt-2 text-sm text-slate-400">Current stored records where available.</p><Button className="mt-5" variant="secondary" disabled>Export coming soon</Button></Card>; })}</div>;
 }
 
 function AuditLogs({ records }: { records: AdminRecord[] }) {
-  return <Card className="mt-8 p-5">{records.length ? records.map((record) => <AuditRow key={record.id} record={record} />) : <EmptyState icon={<FileClock />} title="No audit events" body="Sensitive admin actions will appear here." />}</Card>;
+  return <Card className="mt-8 p-5 sm:p-7">{records.length ? records.map((record) => <AuditRow key={record.id} record={record} />) : <EmptyState icon={<FileClock />} title="No audit events yet" body="Sensitive administrative actions will appear here." />}</Card>;
 }
 
 function AuditRow({ record }: { record: AdminRecord }) {
-  return <div className="grid gap-2 border-b border-white/10 py-4 md:grid-cols-[180px_1fr_1fr]"><span className="text-sm text-slate-500">{record.createdAt ? new Date(String(record.createdAt)).toLocaleString() : "Pending"}</span><span className="font-black">{String(record.action ?? "admin action")}</span><span className="text-sm text-slate-300">{String(record.targetType ?? "record")} · {String(record.targetId ?? "")}</span></div>;
+  return <div className="grid gap-3 border-b border-white/10 py-5 lg:grid-cols-[170px_1fr_1fr]"><span className="text-sm text-slate-500">{relativeTime(record.createdAt)}</span><div><p className="font-black">{String(record.actorName ?? "Administrator")} <span className="font-normal text-slate-400">{friendlyLabel(String(record.action ?? "admin action"))}</span></p><p className="mt-1 text-xs text-slate-500">{String(record.actorEmail ?? "")}</p></div><div className="text-sm text-slate-300"><p>{friendlyLabel(String(record.targetType ?? "record"))}: {String(record.targetId ?? "")}</p>{record.reason ? <p className="mt-1">Reason: {String(record.reason)}</p> : null}{record.previousStatus || record.newStatus ? <p className="mt-1 text-xs text-slate-500">{friendlyLabel(String(record.previousStatus ?? "unknown"))} → {friendlyLabel(String(record.newStatus ?? "unknown"))}</p> : null}</div></div>;
 }
 
-function Settings({ records }: { records: Record<string, unknown> }) {
-  const foundations = ["Admin roles", "Review rules", "Challenge categories", "Safety rules", "Sponsor review checklist", "Host verification checklist", "Voting risk thresholds", "System notices"];
-  return <><div className="mt-8 grid gap-5 md:grid-cols-2">{foundations.map((item) => <Card key={item} className="p-6"><h2 className="text-xl font-black">{item}</h2><p className="mt-3 text-sm leading-6 text-slate-400">Configuration foundation ready. Changes require a reviewed server-side implementation.</p><Button className="mt-5" variant="secondary" disabled>Foundation ready</Button></Card>)}</div><Card className="mt-8 p-6"><pre className="overflow-x-auto whitespace-pre-wrap text-sm text-slate-300">{JSON.stringify(records, null, 2)}</pre></Card></>;
+function Configuration({ section, records }: { section: string; records: Record<string, unknown> }) {
+  const content: unknown = section === "categories" ? records.categories : section === "voting-rules" ? records.votingRules : section === "revenue-rules" ? records.revenueRules : section === "feature-flags" ? records.featureFlags : section === "roles" ? records.roles : records;
+  const entries = Array.isArray(content) ? content.map((value) => [String(value), "Foundation"] as const) : Object.entries((content ?? {}) as Record<string, unknown>);
+  return <><Card className="mt-8 border-yellow-500/20 p-6"><h2 className="text-xl font-black">Protected configuration</h2><p className="mt-3 leading-7 text-slate-300">These values are informational foundations. Sensitive features cannot be activated from this page.</p></Card><div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{entries.map(([key, value]) => <Card key={key} className="p-5"><p className="text-sm font-bold text-slate-500">{friendlyLabel(key)}</p><p className="mt-3 break-words text-lg font-black">{typeof value === "object" ? JSON.stringify(value) : friendlyLabel(String(value))}</p><Button className="mt-5" variant="secondary" disabled>Read-only foundation</Button></Card>)}</div></>;
+}
+
+function DataPoint({ label, value }: { label: string; value: unknown }) {
+  return <div className="min-w-0 rounded-[8px] bg-white/[0.025] p-3"><dt className="text-xs font-bold text-slate-500">{friendlyLabel(label)}</dt><dd className="mt-1 break-words text-sm font-bold">{formatValue(value)}</dd></div>;
+}
+function Status({ value }: { value: string }) {
+  return <span className="inline-flex rounded-full border border-white/10 px-3 py-1.5 text-xs font-black text-slate-300">{friendlyLabel(value)}</span>;
+}
+function recordStatus(record: AdminRecord) {
+  return String(record.status ?? record.sponsorStatus ?? record.hostStatus ?? record.verificationStatus ?? "recorded");
+}
+function recordTitle(record: AdminRecord) {
+  return String(record.brandName ?? record.workspaceName ?? record.organizationName ?? record.title ?? record.subject ?? record.userName ?? record.displayName ?? record.challengeTitle ?? record.payoutMethodLabel ?? record.type ?? record.id);
+}
+function displayEntries(record: AdminRecord, all = false) {
+  const hidden = new Set(["id", "brandName", "workspaceName", "organizationName", "title", "subject", "userName", "displayName", "challengeTitle", "payoutMethodLabel", "status", "sponsorStatus", "hostStatus", "verificationStatus", "mediaUrl", "adminNote", "internalNote"]);
+  return Object.entries(record).filter(([key, value]) => !hidden.has(key) && value !== null && value !== "" && typeof value !== "object").slice(0, all ? 30 : 10);
+}
+function formatValue(value: unknown) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return value.toLocaleString();
+  return friendlyLabel(String(value ?? "Not available"));
+}
+function friendlyLabel(value: string) {
+  return value.replaceAll("_", " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function relativeTime(value: unknown) {
+  const time = Date.parse(String(value ?? ""));
+  if (!Number.isFinite(time)) return "Time unavailable";
+  const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+function relatedLinks(record: AdminRecord, section: string) {
+  const links: Array<{ href: string; label: string }> = [];
+  if (record.challengeId) links.push({ href: `/challenges/${record.challengeId}`, label: "View Challenge" });
+  if (section === "challenges") links.push({ href: `/challenges/${record.id}`, label: "View Challenge" });
+  if (record.userId) links.push({ href: `/admin/search?q=${encodeURIComponent(String(record.userId))}`, label: "Find User" });
+  if (section === "withdrawals") links.push({ href: "/admin/cash-ledger", label: "View Cash Ledger" });
+  return links;
+}
+function sectionIcon(section: string) {
+  const icons: Record<string, React.ReactNode> = { disputes: <Flag />, creators: <UserCog />, "host-workspaces": <UsersRound />, "sponsor-brands": <ShieldCheck />, events: <Radio />, tournaments: <Trophy />, dorocoin: <Coins />, "cash-ledger": <WalletCards />, notifications: <Bell />, support: <LifeBuoy />, announcements: <Megaphone /> };
+  return icons[section] ?? <Activity />;
 }

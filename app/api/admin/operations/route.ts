@@ -12,7 +12,7 @@ function records(snapshot: FirebaseFirestore.QuerySnapshot) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as RecordData));
 }
 
-function safeUser(record: RecordData) {
+function safeUser(record: RecordData, doroBalance = 0, cashBalanceCents = 0) {
   const tier = getEffectiveTier(record);
   return {
     id: record.id,
@@ -24,6 +24,10 @@ function safeUser(record: RecordData) {
     subscriptionStatus: record.subscriptionStatus ?? record.planStatus ?? "none",
     sponsorStatus: record.sponsorVerificationStatus ?? "not_submitted",
     hostStatus: record.hostVerificationStatus ?? "not_submitted",
+    doroCoinBalance: doroBalance,
+    cashBalanceCents,
+    riskStatus: record.riskStatus ?? "clear",
+    isAdmin: Boolean(record.isAdmin || record.role === "admin"),
     suspended: Boolean(record.suspended),
     createdAt: record.createdAt ?? null,
     lastActivityAt: record.lastActivityAt ?? record.updatedAt ?? null
@@ -47,11 +51,25 @@ export async function GET(request: Request) {
       db.collection("auditLogs").limit(200).get(),
       db.collection("disputes").limit(100).get(),
       db.collection("prizePools").limit(150).get(),
-      db.collection("adminNotes").limit(250).get()
+      db.collection("adminNotes").limit(250).get(),
+      db.collection("doroCoinWallets").limit(250).get(),
+      db.collection("doroCoinTransactions").limit(300).get(),
+      db.collection("cashWallets").limit(250).get(),
+      db.collection("cashLedger").limit(300).get(),
+      db.collection("liveEvents").limit(200).get(),
+      db.collection("tournaments").limit(200).get(),
+      db.collection("notifications").limit(200).get(),
+      db.collection("supportTickets").limit(200).get(),
+      db.collection("announcements").limit(100).get()
     ]);
-    const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap] = snapshots;
+    const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap, doroWalletSnap, doroTransactionSnap, cashWalletSnap, cashLedgerSnap, liveEventSnap, tournamentSnap, notificationSnap, supportSnap, announcementSnap] = snapshots;
     const notes = new Map(records(adminNoteSnap).map((item) => [`${item.targetType}_${item.targetId}`, item]));
     const users = records(userSnap);
+    const userMap = new Map(users.map((item) => [item.id, item]));
+    const doroWallets = records(doroWalletSnap);
+    const cashWallets = records(cashWalletSnap);
+    const doroMap = new Map(doroWallets.map((item) => [String(item.userId ?? item.id), Number(item.balance ?? 0)]));
+    const cashMap = new Map(cashWallets.map((item) => [String(item.userId ?? item.id), item]));
     const hosts = users.filter((item) => item.accountType === "host" || item.role === "host" || item.planId === "host");
     const sponsors = records(sponsorSnap).map((item) => ({
       id: item.id,
@@ -59,8 +77,12 @@ export async function GET(request: Request) {
       industry: item.industry ?? "",
       website: item.website ?? "",
       contactEmail: item.contactEmail ?? "",
+      contactPerson: item.contactPerson ?? item.contactName ?? "",
       status: item.sponsorVerificationStatus ?? "not_submitted",
       subscriptionStatus: item.subscriptionStatus ?? "none",
+      createdAt: item.createdAt ?? null,
+      riskFlags: item.riskFlags ?? [],
+      adminNotesCount: notes.has(`sponsor_${item.id}`) ? 1 : 0,
       adminNote: notes.get(`sponsor_${item.id}`)?.note ?? null,
       updatedAt: item.updatedAt ?? null
     }));
@@ -78,6 +100,8 @@ export async function GET(request: Request) {
       votingEndsAt: item.votingEndsAt ?? null,
       entryDeadline: item.entryDeadline ?? null,
       riskFlags: item.riskFlags ?? [],
+      submissionCount: Number(item.submissionCount ?? 0),
+      voteCount: Number(item.voteCount ?? item.totalVotes ?? 0),
       adminNote: notes.get(`challenge_${item.id}`)?.note ?? null
     }));
     const submissions = records(submissionSnap).map((item) => ({
@@ -85,6 +109,11 @@ export async function GET(request: Request) {
       challengeId: item.challengeId ?? null,
       userId: item.userId ?? null,
       title: item.title ?? "Submission",
+      participantName: item.participantName ?? item.creatorName ?? "",
+      challengeTitle: item.challengeTitle ?? "",
+      creatorName: item.hostName ?? item.challengeCreatorName ?? "",
+      format: item.submissionType ?? item.mediaType ?? "unknown",
+      riskFlags: item.riskFlags ?? [],
       mediaUrl: item.mediaUrl ?? item.imageUrl ?? null,
       status: item.status ?? "pending_review",
       internalNote: notes.get(`submission_${item.id}`)?.note ?? null,
@@ -95,9 +124,12 @@ export async function GET(request: Request) {
       challengeId: item.challengeId ?? null,
       userId: item.userId ?? null,
       displayName: item.displayName ?? item.username ?? "Participant",
+      email: item.email ?? "",
       status: item.status ?? "pending",
       submissionStatus: item.submissionStatus ?? "not_submitted",
       joinedAt: item.joinedAt ?? item.createdAt ?? null,
+      votes: Number(item.votes ?? item.voteCount ?? 0),
+      riskFlags: item.riskFlags ?? [],
       adminNote: notes.get(`participant_${item.id}`)?.note ?? null
     }));
     const winners = records(winnerSnap).map((item) => ({
@@ -112,9 +144,14 @@ export async function GET(request: Request) {
       flagWarnings: item.flagWarnings ?? [],
       disqualificationNotes: item.disqualificationNotes ?? null
     }));
-    const withdrawals = records(withdrawalSnap).map((item) => ({
+    const withdrawals = records(withdrawalSnap).map((item) => {
+      const account = userMap.get(String(item.userId ?? ""));
+      const wallet = cashMap.get(String(item.userId ?? ""));
+      return {
       id: item.id,
       userId: item.userId ?? null,
+      userName: account?.displayName ?? account?.name ?? "User",
+      accountType: account?.accountType ?? account?.role ?? "user",
       amountCents: Number(item.amountCents ?? 0),
       currency: item.currency ?? "USD",
       sourceType: item.sourceType ?? "eligible_earnings",
@@ -122,13 +159,31 @@ export async function GET(request: Request) {
       status: item.status ?? "pending_review",
       kycStatus: item.kycStatus ?? "not_started",
       riskStatus: item.riskStatus ?? "pending_review",
+      availableBalanceCents: Number(wallet?.availableBalanceCents ?? 0),
+      underReviewBalanceCents: Number(wallet?.underReviewBalanceCents ?? wallet?.lockedBalanceCents ?? 0),
       createdAt: item.createdAt ?? null,
       transferEnabled: false,
       payoutExecuted: false
-    }));
+    }; });
     const auditLogs = records(auditSnap)
-      .map((item) => ({ id: item.id, actorId: item.actorId ?? "", action: item.action ?? "", targetType: item.targetType ?? "", targetId: item.targetId ?? "", reason: item.reason ?? null, createdAt: item.createdAt ?? null }))
+      .map((item) => {
+        const actor = userMap.get(String(item.actorId ?? ""));
+        return { id: item.id, actorId: item.actorId ?? "", actorName: actor?.displayName ?? actor?.name ?? "Administrator", actorEmail: actor?.email ?? "", action: item.action ?? "", targetType: item.targetType ?? "", targetId: item.targetId ?? "", reason: item.reason ?? null, note: (item.metadata as Record<string, unknown> | undefined)?.note ?? null, previousStatus: (item.before as Record<string, unknown> | undefined)?.status ?? null, newStatus: (item.after as Record<string, unknown> | undefined)?.status ?? null, createdAt: item.createdAt ?? null };
+      })
       .sort((a, b) => Date.parse(String(b.createdAt ?? "")) - Date.parse(String(a.createdAt ?? "")));
+    const disputes = records(disputeSnap).map((item) => ({ id: item.id, type: item.type ?? item.targetType ?? "other", userId: item.userId ?? null, targetId: item.targetId ?? null, status: item.status ?? "open", reason: item.reason ?? "", createdAt: item.createdAt ?? null }));
+    const doroCoin = {
+      wallets: doroWallets.map((item) => ({ id: item.id, userId: item.userId ?? item.id, balance: Number(item.balance ?? 0), lockedBalance: Number(item.lockedBalance ?? 0), updatedAt: item.updatedAt ?? null })),
+      transactions: records(doroTransactionSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, type: item.type ?? "unknown", amount: Number(item.amount ?? 0), status: item.status ?? "recorded", createdAt: item.createdAt ?? null })),
+      conversionEnabled: false,
+      adjustmentsEnabled: false
+    };
+    const cashLedger = records(cashLedgerSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, type: item.type ?? "unknown", sourceType: item.sourceType ?? "", sourceId: item.sourceId ?? "", amountCents: Number(item.amountCents ?? 0), currency: item.currency ?? "USD", direction: item.direction ?? "", status: item.status ?? "recorded", createdAt: item.createdAt ?? null, transferEnabled: false }));
+    const events = records(liveEventSnap).map((item) => ({ id: item.id, title: item.title ?? "Live event", hostId: item.hostId ?? item.creatorId ?? null, startsAt: item.startsAt ?? null, status: item.status ?? "draft", registrationCount: Number(item.registrationCount ?? 0), riskFlags: item.riskFlags ?? [] }));
+    const tournaments = records(tournamentSnap).map((item) => ({ id: item.id, title: item.title ?? "Tournament", hostId: item.hostId ?? null, format: item.format ?? "foundation", participantCount: Number(item.participantCount ?? 0), status: item.status ?? "draft", bracketExecutionEnabled: false }));
+    const adminNotifications = records(notificationSnap).filter((item) => item.audience === "admin" || item.adminOnly === true || ["sponsor_application", "host_verification", "flagged_submission", "withdrawal_request", "winner_review", "support_ticket"].includes(String(item.type)));
+    const support = records(supportSnap).map((item) => ({ id: item.id, category: item.category ?? "other", subject: item.subject ?? "Support request", userId: item.userId ?? null, status: item.status ?? "open", createdAt: item.createdAt ?? null }));
+    const announcements = records(announcementSnap).map((item) => ({ id: item.id, type: item.type ?? "platform_announcement", title: item.title ?? "Announcement", status: item.status ?? "draft", createdAt: item.createdAt ?? null, deliveryActive: false }));
     const pending = (list: Array<{ status?: unknown }>, statuses: string[]) => list.filter((item) => statuses.includes(String(item.status))).length;
     return ok({
       overview: {
@@ -141,31 +196,64 @@ export async function GET(request: Request) {
         winnerConfirmations: pending(winners, ["pending_admin_review", "pending_host_confirmation"]),
         openDisputes: disputeSnap.docs.filter((doc) => !["resolved", "closed"].includes(String(doc.data().status))).length,
         revenueReviewItems: prizePoolSnap.docs.filter((doc) => ["pending_review", "under_review", "payout_review"].includes(String(doc.data().payoutReviewStatus ?? doc.data().status))).length,
+        pendingWithdrawalReviews: withdrawals.filter((item) => ["pending_review", "needs_kyc"].includes(String(item.status))).length,
         recentAuditEvents: auditLogs.slice(0, 8),
-        safety: { automaticPayouts: false, withdrawals: "review_only", sponsorRelease: false, prizePoolRelease: false, kycProcessing: false }
+        safety: { automaticPayouts: "Disabled", withdrawals: "Review only", sponsorRelease: "Disabled", prizePoolRelease: "Disabled", kycProcessing: "Not active", doroCoinConversion: "Disabled", adRewards: "Verification required" }
       },
       sponsors,
-      hosts: hosts.map(safeUser),
+      hosts: hosts.map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), organizationName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "", ownerName: item.displayName ?? item.name ?? "", location: item.location ?? item.country ?? "", eventType: item.hostType ?? "", competitionSize: item.competitionSize ?? "", riskFlags: item.riskFlags ?? [] })),
       challenges,
       submissions,
       participants,
       winners,
       withdrawals,
+      disputes,
       reports: {
         challengeCount: challenges.length,
         submissionCount: submissions.length,
         participantCount: participants.length,
         sponsorInterestCount: sponsors.length,
         winnerCount: winners.length,
+        withdrawalCount: withdrawals.length,
+        disputeCount: disputes.length,
+        eventCount: events.length,
+        tournamentCount: tournaments.length,
         exportsEnabled: false
       },
-      users: users.map(safeUser),
+      users: users.map((item) => safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0))),
+      creators: users.filter((item) => item.accountType === "creator" || item.role === "creator" || item.planId === "creator").map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), createdChallengeCount: Number(item.createdChallengeCount ?? 0), submissionVolume: Number(item.submissionCount ?? 0), boostsUsed: Number(item.boostsUsed ?? 0), sponsorReadyCount: Number(item.sponsorReadyCount ?? 0), riskFlags: item.riskFlags ?? [] })),
+      hostWorkspaces: hosts.map((item) => ({ id: item.id, workspaceName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "Host workspace", ownerName: item.displayName ?? item.name ?? "", verificationStatus: item.hostVerificationStatus ?? "not_submitted", planStatus: item.subscriptionStatus ?? item.planStatus ?? "none", events: Number(item.eventCount ?? 0), tournaments: Number(item.tournamentCount ?? 0), participants: Number(item.participantCount ?? 0), teamSeats: Number(item.teamSeats ?? 1), reports: Number(item.reportCount ?? 0), riskFlags: item.riskFlags ?? [] })),
+      sponsorBrands: sponsors,
+      events,
+      tournaments,
+      doroCoin,
+      cashLedger,
+      adminNotifications,
+      support,
+      announcements,
       auditLogs,
       settings: {
         adminRoles: "Firebase custom claim, users.isAdmin, or server-only allowlist",
         reviewRulesConfigured: true,
         payoutProvider: "manual_review",
-        automaticMoneyMovement: false
+        automaticMoneyMovement: false,
+        categories: ["challenge", "submission", "event", "sponsor", "risk"],
+        votingRules: { freeVotesPerDay: 1, doroCoinCostConfigurable: true, suspiciousVoteReview: "foundation" },
+        revenueRules: { platformFeePercent: 15, winnerSplits: [60, 25, 15], minimumWithdrawalCents: 2500, moneyMovementEnabled: false },
+        featureFlags: {
+          adRewards: "disabled",
+          withdrawals: "review_only",
+          automaticPayouts: "disabled",
+          sponsorReleases: "disabled",
+          prizePoolRelease: "disabled",
+          kycVerification: "not_connected",
+          liveStreaming: "disabled",
+          realExports: "disabled",
+          teamInvitations: "foundation",
+          emailNotifications: "foundation",
+          pushNotifications: "foundation"
+        },
+        roles: ["Owner", "Admin", "Reviewer", "Finance Reviewer", "Support", "Moderator", "Read-only Auditor"]
       }
     }, "Admin command data loaded.");
   } catch (error) {
@@ -174,13 +262,13 @@ export async function GET(request: Request) {
 }
 
 const allowedActions: Record<string, Set<string>> = {
-  sponsor: new Set(["approve", "reject", "request_changes", "suspend"]),
-  host: new Set(["verify", "reject", "request_changes", "suspend"]),
-  challenge: new Set(["approve", "reject", "flag", "archive", "suspend"]),
-  submission: new Set(["approve", "reject", "request_changes", "flag"]),
-  participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag"]),
-  winner: new Set(["approve", "hold", "request_review", "flag"]),
-  withdrawal: new Set(["approve", "reject", "request_info"])
+  sponsor: new Set(["approve", "reject", "request_changes", "suspend", "add_note"]),
+  host: new Set(["verify", "reject", "request_changes", "suspend", "add_note"]),
+  challenge: new Set(["approve", "reject", "flag", "archive", "suspend", "add_note"]),
+  submission: new Set(["approve", "reject", "request_changes", "flag", "add_note"]),
+  participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag", "add_note"]),
+  winner: new Set(["approve", "hold", "request_review", "flag", "add_note"]),
+  withdrawal: new Set(["approve", "reject", "request_info", "add_note"])
 };
 
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
@@ -213,10 +301,32 @@ export async function PATCH(request: Request) {
   if (!allowedActions[type]?.has(action)) return validationError({ action: "Select a valid admin action." });
   if (!id) return validationError({ id: "Target ID is required." });
   if (reasonRequired.has(action) && !reason) return validationError({ reason: "A reason is required for this action." });
+  if (action === "add_note" && !note) return validationError({ note: "Enter an internal admin note." });
   const status = nextStatus(type, action);
   const now = new Date().toISOString();
 
   try {
+    if (action === "add_note") {
+      await db.collection("adminNotes").doc(`${type}_${id}`).set({
+        id: `${type}_${id}`,
+        targetType: type,
+        targetId: id,
+        note,
+        updatedBy: user.uid,
+        updatedAt: now,
+        createdAt: now
+      }, { merge: true });
+      await writeAuditLog({
+        actorId: user.uid,
+        actorType: "admin",
+        action: `${type}.note_added`,
+        targetType: type,
+        targetId: id,
+        reason: "Internal admin note added.",
+        metadata: { note }
+      }, db);
+      return ok({ type, id, action }, "Internal admin note saved.");
+    }
     let previousStatus = "unknown";
     if (type === "host") {
       const userRef = db.collection("users").doc(id);
