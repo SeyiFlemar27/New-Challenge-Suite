@@ -24,11 +24,18 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
     }
     const profileSnap = db ? await db.collection("users").doc(decoded.uid).get() : null;
     const profile = profileSnap?.exists ? profileSnap.data() : {};
+    const adminAllowlist = new Set(
+      String(process.env.ADMIN_EMAIL_ALLOWLIST ?? "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const email = String(decoded.email ?? "").toLowerCase();
     return {
       uid: decoded.uid,
       email: decoded.email,
-      role: profile?.role,
-      isAdmin: Boolean(profile?.isAdmin),
+      role: decoded.admin === true ? "admin" : profile?.role,
+      isAdmin: Boolean(decoded.admin === true || profile?.isAdmin || (email && adminAllowlist.has(email))),
       emailVerified: Boolean(decoded.email_verified || profile?.emailVerified || profile?.verificationStatus === "verified")
     };
   }

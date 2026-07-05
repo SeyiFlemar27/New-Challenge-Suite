@@ -119,6 +119,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /cashLedger/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /withdrawalRequests/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /payoutMethods/{document=**} {
+      allow read, write: if false;
+    }
+
     match /payouts/{document=**} {
       allow read, write: if false;
     }
@@ -140,6 +152,14 @@ service cloud.firestore {
     }
 
     match /adminActions/{actionId} {
+      allow read, write: if false;
+    }
+
+    match /adminNotes/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorProfiles/{document=**} {
       allow read, write: if false;
     }
 

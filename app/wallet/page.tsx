@@ -212,6 +212,11 @@ export default function WalletPage() {
         </div>
       </section> : null}
 
+      {!loading && !unauthenticated && !error && account.accountType !== "sponsor" ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-xl font-black">Eligible earnings withdrawal</h2><p className="mt-2 text-sm text-slate-300">Verified winnings and approved earnings can be submitted for manual review. DoroCoins are never withdrawable.</p></div>
+        <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">Review Withdrawal Eligibility</LinkButton>
+      </Card> : null}
+
       {!loading && !unauthenticated && !error ? <section className="mt-10">
         <h2 className="text-2xl font-black">Buy DoroCoins</h2>
         <Card className="mt-5 p-6">

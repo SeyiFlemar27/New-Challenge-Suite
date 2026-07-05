@@ -1062,7 +1062,23 @@ Blocking financial-review write groups:
 - Sponsorship proposal submission blocks on the proposal, review-only cash ledger placeholder, and sponsor prize-pool placeholder when applicable.
 - Winner claim submission blocks on the claim, payout review placeholder, and review-only cash ledger placeholder.
 
-Locked systems remain inactive: real cash payouts, cash withdrawals, automatic refunds, sponsor money release, paid-entry prize pools, KYC processing, payout provider integrations, DoroCoin-to-cash conversion, and admin financial review UI.
+Locked systems remain inactive: real cash payouts, automatic withdrawals, automatic refunds, sponsor money release, paid-entry prize pools, KYC processing, payout provider integrations, and DoroCoin-to-cash conversion. Phase 7 adds review-only withdrawal requests and admin financial review; neither can execute or mark a payout paid.
+
+### `withdrawalRequests/{withdrawalId}`
+
+Purpose: Review-only requests against an existing eligible cash balance. Creation atomically reserves the requested amount from `availableBalanceCents` into `underReviewBalanceCents`. It never calls a payout provider.
+
+Required fields: `id`, `userId`, `amountCents`, `currency`, `sourceType`, `sourceIds`, `payoutMethodType`, `payoutMethodLabel`, `payoutMethodLast4`, `status`, `adminReviewStatus`, `riskStatus`, `kycStatus`, `payoutProvider`, `transferEnabled`, `payoutExecuted`, `createdAt`, `updatedAt`.
+
+Client access: denied. Owner reads and writes use authenticated server routes. Admin reviews use admin-authorized server routes.
+
+### `cashLedger/{ledgerId}`
+
+Purpose: Immutable real-money balance ledger. Withdrawal request and reversal records include before/after balance values and always keep provider execution disabled until a future reviewed payout integration exists.
+
+Required fields: `ledgerId`, `userId`, `type`, `sourceType`, `sourceId`, `amountCents`, `currency`, `direction`, `balanceBeforeCents`, `balanceAfterCents`, `status`, `providerConnected`, `transferEnabled`, `createdAt`.
+
+Client access: denied. Ledger writes are server-only and append-only by convention.
 
 ## Entitlement And Client Security
 

@@ -10,6 +10,9 @@ export type CashWalletSnapshot = {
   availableBalanceCents: number;
   pendingBalanceCents: number;
   lockedBalanceCents: number;
+  underReviewBalanceCents: number;
+  withdrawnBalanceCents: number;
+  failedWithdrawalBalanceCents: number;
   currency: string;
   withdrawalsEnabled: false;
   payoutProviderConnected: false;
@@ -23,6 +26,9 @@ export function createCashWalletDefaults(userId: string, now = new Date().toISOS
     availableBalanceCents: 0,
     pendingBalanceCents: 0,
     lockedBalanceCents: 0,
+    underReviewBalanceCents: 0,
+    withdrawnBalanceCents: 0,
+    failedWithdrawalBalanceCents: 0,
     currency: "USD",
     withdrawalsEnabled: false,
     payoutProviderConnected: false,
@@ -49,6 +55,9 @@ export function normalizeCashWallet(userId: string, data: FirebaseFirestore.Docu
     availableBalanceCents: Number(data?.availableBalanceCents ?? 0),
     pendingBalanceCents: Number(data?.pendingBalanceCents ?? 0),
     lockedBalanceCents: Number(data?.lockedBalanceCents ?? 0),
+    underReviewBalanceCents: Number(data?.underReviewBalanceCents ?? data?.lockedBalanceCents ?? 0),
+    withdrawnBalanceCents: Number(data?.withdrawnBalanceCents ?? 0),
+    failedWithdrawalBalanceCents: Number(data?.failedWithdrawalBalanceCents ?? 0),
     currency: String(data?.currency ?? defaults.currency),
     withdrawalsEnabled: false,
     payoutProviderConnected: false,
