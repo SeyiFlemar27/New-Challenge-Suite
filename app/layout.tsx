@@ -3,8 +3,22 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Challenge Suite",
-  description: "Creative challenges, competitions, tournaments, voting, reviewed rewards, and prize foundations."
+  metadataBase: new URL("https://www.challengesuite.com"),
+  title: { default: "Challenge Suite", template: "%s | Challenge Suite" },
+  description: "Create, enter, vote, and run structured challenges for competitors, creators, Hosts, and brands.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "https://www.challengesuite.com",
+    siteName: "Challenge Suite",
+    title: "Challenge Suite",
+    description: "Competition, made intentional."
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Challenge Suite",
+    description: "Competition, made intentional."
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

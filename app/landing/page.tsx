@@ -17,10 +17,10 @@ const trust = [
   { icon: Trophy, title: "Prize foundations", body: "Transparent prize metadata and review states without pretending automatic payouts are active." }
 ];
 const leaders = [
-  ["Flemar", "4,850", "competitor"],
-  ["Emily Smith", "3,940", "creator"],
-  ["Maya Lens", "3,410", "creator"],
-  ["Studio Gold", "2,980", "verified_host"]
+  ["Competitor profile", "4,850", "competitor"],
+  ["Creator profile", "3,940", "creator"],
+  ["Rising creator", "3,410", "creator"],
+  ["Verified Host", "2,980", "verified_host"]
 ];
 
 export default function LandingPage() {
@@ -76,11 +76,11 @@ export default function LandingPage() {
 
       <section className="border-b border-white/10 py-20 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-          <SectionHeading eyebrow="Live on Challenge Suite" title="Competition, in motion." body="A clear view of the challenges people are watching, entering, and shaping right now." />
+          <SectionHeading eyebrow="Product experience preview" title="Competition, in motion." body="An illustrative view of how live challenges, entries, and rankings come together." />
           <div className="mt-12 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
             <article className="group relative min-h-[480px] overflow-hidden rounded-[8px] border border-white/10 bg-[url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1600&q=85')] bg-cover bg-center">
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8"><span className="inline-flex items-center gap-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black uppercase"><Play size={13} /> Live preview</span><h3 className="mt-5 text-3xl font-black sm:text-4xl">The Main Stage Challenge</h3><p className="mt-3 max-w-xl text-slate-200">Creative performance, community votes, and a leaderboard that moves with every entry.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/challenges">Watch Challenges</LinkButton><span className="rounded-[8px] border border-white/20 px-4 py-3 text-sm font-bold">246 participants</span></div></div>
+              <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8"><span className="inline-flex items-center gap-2 rounded-full bg-[var(--gold)] px-3 py-1.5 text-xs font-black uppercase text-black"><Play size={13} /> Interface preview</span><h3 className="mt-5 text-3xl font-black sm:text-4xl">A Challenge Suite stage</h3><p className="mt-3 max-w-xl text-slate-200">Illustrative preview of creative performance, community votes, and a leaderboard that moves with every approved entry.</p><div className="mt-6"><LinkButton href="/challenges">Explore Published Challenges</LinkButton></div></div>
             </article>
             <div className="grid gap-5">
               <PreviewCard icon={<Sparkles />} label="Trending" title="Creator spotlight" body="Discover original entries before they climb the rankings." />
@@ -109,7 +109,7 @@ export default function LandingPage() {
       <section className="border-b border-white/10 bg-[#0d0d0d] py-20 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
           <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-end"><SectionHeading eyebrow="Leaderboard pulse" title="Progress should feel visible." body="Rankings turn participation into a story people can follow." /><LinkButton href="/leaderboards" className="w-fit lg:justify-self-end">View Full Leaderboard</LinkButton></div>
-          <div className="mt-12 overflow-hidden rounded-[8px] border border-white/10">{leaders.map(([name, points, plan], index) => <div key={name} className="grid grid-cols-[48px_1fr_auto] items-center gap-4 border-b border-white/10 bg-[#111] p-5 last:border-0 sm:grid-cols-[70px_1fr_auto] sm:p-6"><span className="text-2xl font-black text-[var(--gold)]">{String(index + 1).padStart(2, "0")}</span><span className="flex min-w-0 flex-wrap items-center gap-3 font-black"><span className="truncate">{name}</span><PremiumBadge planId={plan as any} compact /></span><span className="font-black">{points} <span className="hidden text-sm text-slate-500 sm:inline">pts</span></span></div>)}</div>
+          <p className="mt-10 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Illustrative leaderboard layout</p><div className="mt-4 overflow-hidden rounded-[8px] border border-white/10">{leaders.map(([name, points, plan], index) => <div key={name} className="grid grid-cols-[48px_1fr_auto] items-center gap-4 border-b border-white/10 bg-[#111] p-5 last:border-0 sm:grid-cols-[70px_1fr_auto] sm:p-6"><span className="text-2xl font-black text-[var(--gold)]">{String(index + 1).padStart(2, "0")}</span><span className="flex min-w-0 flex-wrap items-center gap-3 font-black"><span className="truncate">{name}</span><PremiumBadge planId={plan as any} compact /></span><span className="font-black">{points} <span className="hidden text-sm text-slate-500 sm:inline">pts</span></span></div>)}</div>
         </div>
       </section>
 
@@ -123,7 +123,7 @@ export default function LandingPage() {
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end"><div><p className="text-xs font-black uppercase tracking-[0.22em]">Your next challenge starts here</p><h2 className="mt-4 max-w-4xl text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">Compete. Create. Host. Partner.</h2><p className="mt-5 max-w-2xl text-lg font-bold text-black/70">Join a platform designed to make serious competition feel clear, social, and worth following.</p></div><div className="flex flex-col gap-3 sm:flex-row lg:flex-col"><LinkButton href="/auth/register" className="min-h-14 border-black bg-black text-white hover:bg-[#171717]">Create Account</LinkButton><LinkButton href="/challenges" variant="secondary" className="min-h-14 border-black/30 bg-transparent text-black hover:bg-black hover:text-white">Explore Challenges</LinkButton></div></div>
         </div>
       </section>
-      <footer className="border-t border-white/10 px-5 py-10"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Challenge Suite. Competition, made intentional.</span><div className="flex gap-5"><a href="/auth/login">Sign In</a><a href="/auth/register">Create Account</a><a href="/sponsor/plans">For Brands</a></div></div></footer>
+      <footer className="border-t border-white/10 px-5 py-10"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm text-slate-500"><span>Challenge Suite. Competition, made intentional.</span><div className="flex flex-wrap gap-x-5 gap-y-3"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/community-guidelines">Community Guidelines</a><a href="/refund-policy">Refund Policy</a><a href="/cookie-policy">Cookie Policy</a><a href="/auth/login">Sign In</a><a href="/auth/register">Create Account</a></div></div></footer>
     </main>
   );
 }

@@ -5,12 +5,32 @@ import { Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 
-const publicPrefixes = ["/landing", "/auth", "/mobile-preview"];
+const publicPrefixes = ["/auth", "/mobile-preview"];
+const publicRoutes = new Set([
+  "/",
+  "/landing",
+  "/subscriptions",
+  "/challenges",
+  "/leaderboards",
+  "/privacy",
+  "/terms",
+  "/community-guidelines",
+  "/refund-policy",
+  "/cookie-policy",
+  "/contact",
+  "/about"
+]);
+
+function isPublicRoute(pathname: string) {
+  if (publicRoutes.has(pathname)) return true;
+  if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
+  return /^\/challenges\/[^/]+$/.test(pathname);
+}
 
 export function VerificationGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { loading, firebaseConfigured, user, verified } = useAuth();
-  const publicPage = publicPrefixes.some((prefix) => pathname.startsWith(prefix)) || pathname === "/";
+  const publicPage = isPublicRoute(pathname);
 
   if (publicPage || !firebaseConfigured) return <>{children}</>;
   if (loading) return <LoadingGate />;

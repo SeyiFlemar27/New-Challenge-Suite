@@ -127,7 +127,13 @@ export default function JoinChallengePage() {
       setSubmitted(true);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Entry could not be submitted.";
-      setError(message === "STORAGE_UPLOAD_TIMEOUT" ? "STORAGE_NOT_CONFIGURED: Media upload timed out. Try again or contact support." : message);
+      const storageUnavailable = message === "STORAGE_UPLOAD_TIMEOUT"
+        || message.includes("storage/unauthorized")
+        || message.includes("storage/object-not-found")
+        || message.includes("bucket");
+      setError(storageUnavailable
+        ? "Media uploads are temporarily unavailable while secure storage is being verified. Your entry was not submitted."
+        : message);
     } finally {
       setSubmitting(false);
     }

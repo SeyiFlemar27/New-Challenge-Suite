@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { buildChallengeLeaderboard, buildGlobalLeaderboard } from "@/lib/server/leaderboard";
 import { fail, ok, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { isPublicChallenge } from "@/lib/server/public-challenge";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export async function GET(request: Request) {
       if (!challengeId) return validationError({ challengeId: "Challenge ID is required for challenge leaderboards." });
       const result = await buildChallengeLeaderboard(db, challengeId, { limit });
       if (!result.challenge) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+      if (!isPublicChallenge(challengeId, result.challenge)) {
+        return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+      }
       const { challenge: _challenge, ...payload } = result;
       return ok(payload, result.message ?? "Challenge leaderboard loaded.");
     }

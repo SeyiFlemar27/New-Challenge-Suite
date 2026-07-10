@@ -25,12 +25,8 @@ export async function GET(request: Request) {
       ok: config.configured,
       message: config.configured ? "Firebase Admin environment variables are present." : "Firebase Admin environment variables are missing.",
       details: {
-        missing: config.missing,
-        projectId: config.projectId ?? null,
-        projectIdSource: config.projectIdSource,
-        storageBucket: config.storageBucket ?? null,
-        publicStorageBucket: config.publicStorageBucket ?? null,
-        storageBucketSource: config.storageBucketSource
+        missingVariableCount: config.missing.length,
+        storageBucketConfigured: Boolean(config.storageBucket)
       }
     },
     adminInitialization: { ok: false, message: "Firebase Admin has not been initialized." },
@@ -75,10 +71,7 @@ export async function GET(request: Request) {
       checks.authTokenVerification = {
         ok: true,
         message: "Firebase Auth token verification succeeded.",
-        details: {
-          uid: decoded.uid,
-          emailVerified: decoded.email_verified ?? false
-        }
+        details: { emailVerified: decoded.email_verified ?? false }
       };
     }
 
@@ -87,10 +80,7 @@ export async function GET(request: Request) {
     checks.storageConfig = {
       ok: exists,
       message: exists ? "Firebase Storage bucket exists and is reachable." : "Firebase Storage bucket was configured but could not be found.",
-      details: {
-        bucket: bucket.name,
-        source: config.storageBucketSource
-      }
+      details: { configured: true }
     };
 
     const ok = checks.adminInitialization.ok && checks.firestoreReadWrite.ok && checks.storageConfig.ok && (token ? checks.authTokenVerification.ok : true);
@@ -99,7 +89,7 @@ export async function GET(request: Request) {
     return json({
       ok: false,
       checks,
-      error: error instanceof Error ? error.message : "Unknown Firebase Admin health check error."
+      error: "A backend dependency health check failed."
     }, 500);
   }
 }

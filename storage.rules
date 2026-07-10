@@ -14,19 +14,13 @@ service firebase.storage {
     }
 
     match /users/{userId}/submissions/{fileName} {
-      allow read: if true;
-      allow write: if signedIn()
-        && request.auth.uid == userId
-        && (isImage() || isVideo())
-        && request.resource.size < 100 * 1024 * 1024;
+      // Submission media remains private until a server-side approval and signed-delivery flow exists.
+      allow read, write: if false;
     }
 
     match /users/{userId}/challenge-media/{fileName} {
-      allow read: if true;
-      allow write: if signedIn()
-        && request.auth.uid == userId
-        && (isImage() || isVideo())
-        && request.resource.size < 200 * 1024 * 1024;
+      // Challenge media uploads are disabled until the production bucket and moderation flow are verified.
+      allow read, write: if false;
     }
 
     match /users/{userId}/identity-documents/{fileName} {

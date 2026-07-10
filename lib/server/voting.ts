@@ -99,22 +99,19 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (input.voteMode === "free") {
       const dailyVoteLimit = Number(input.dailyFreeVoteLimit ?? 1);
-      const dailyFreeVoteQuery = db.collection("votes")
-        .where("userId", "==", input.userId)
-        .where("voteDate", "==", voteDateKey)
-        .where("voteMode", "==", "free")
-        .limit(Math.max(dailyVoteLimit, 1));
-      const todayVotes = await transaction.get(dailyFreeVoteQuery);
-      if (todayVotes.size >= dailyVoteLimit) throw voteReject(`Daily free vote limit reached. Your plan includes ${dailyVoteLimit} free votes per day.`, "DAILY_FREE_LIMIT_REACHED");
-
       const freeVoteQuery = db.collection("votes")
         .where("userId", "==", input.userId)
         .where("challengeId", "==", input.challengeId)
         .where("voteDate", "==", voteDateKey)
         .where("voteMode", "==", "free")
-        .limit(1);
+        .limit(Math.max(dailyVoteLimit, 1));
       const existing = await transaction.get(freeVoteQuery);
-      if (!existing.empty) throw voteReject("Free users get 1 vote per challenge/day.", "FREE_CHALLENGE_DAILY_LIMIT_REACHED");
+      if (existing.size >= dailyVoteLimit) {
+        throw voteReject(
+          `Free vote limit reached for this challenge today. Your plan includes ${dailyVoteLimit} free vote${dailyVoteLimit === 1 ? "" : "s"} per challenge/day.`,
+          "FREE_CHALLENGE_DAILY_LIMIT_REACHED"
+        );
+      }
     }
 
     let walletTransactionId: string | null = null;

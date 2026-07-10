@@ -3,7 +3,7 @@ import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { publicPrizePoolFields } from "@/lib/server/prize-pools";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -16,13 +16,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return fail("Challenge not found.", 404, { fieldErrors: { id: "Challenge does not exist." } }, "NOT_FOUND");
   }
 
+  const challengeData = challengeSnap.data() ?? {};
+  const publiclyVisible = isPublicChallenge(challengeSnap.id, challengeData);
   const user = await getOptionalRequestUser(request);
+  if (!user && !publiclyVisible) {
+    return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+  }
   if (user) {
     const [accountSnap, profileSnap] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get()
     ]);
-    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, challengeSnap.data() ?? {});
+    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, challengeData);
     if (!access.allowed) {
       return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Creator Pro is required to view this private or exclusive challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
     }
@@ -52,7 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
 
-  const publicChallenge = publicChallengeFields(challengeSnap.data() ?? {});
+  const publicChallenge = publicChallengeFields(challengeData);
 
   return ok({
     challenge: { id: challengeSnap.id, ...publicChallenge },

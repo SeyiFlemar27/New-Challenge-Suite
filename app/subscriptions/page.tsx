@@ -18,6 +18,7 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [unauthenticated, setUnauthenticated] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<{ status: string; planId: string | null } | null>(null);
   const visiblePlans = plans.filter((plan) => plan.audience === audience && plan.id !== "pro");
   const currentTier = getEffectiveTier({ planId: currentSubscription?.planId, planStatus: currentSubscription?.status, accountType: audience === "sponsor" ? "sponsor" : "user" });
@@ -36,6 +37,7 @@ export default function SubscriptionsPage() {
       return;
     }
     setPlans(result.data.plans);
+    setSignedOut((result.data as any).authenticated === false);
     setCurrentSubscription({ status: result.data.subscriptionStatus, planId: result.data.subscription.planId });
     setAudience(result.data.accountType === "sponsor" ? "sponsor" : "user");
     setLoading(false);
@@ -111,7 +113,7 @@ export default function SubscriptionsPage() {
             <ul className="space-y-4">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm"><Check size={16} className="shrink-0 text-emerald-400" /> {feature}</li>)}</ul>
             {plan.canCreatePrizeChallenges ? <p className="mt-5 flex gap-2 rounded-[8px] bg-yellow-500/5 p-3 text-xs text-slate-300"><ShieldCheck size={15} className="shrink-0 text-[var(--gold)]" /> Sponsor-funded prize tooling only. Paid-entry prize pools are disabled.</p> : null}
             <div className="mt-8">
-              {plan.current ? <Button variant="ghost" className="w-full" disabled>Current Plan</Button> : plan.id === "free" ? <Button variant="ghost" className="w-full" disabled>Free Plan</Button> : !plan.purchaseAllowed ? <Button variant="ghost" className="w-full" disabled>Not Available for This Account</Button> : !plan.checkoutAvailable ? <Button variant="ghost" className="w-full" disabled>Stripe Price Not Configured</Button> : plan.audience === "sponsor" ? <ConsentDialog agreementType="sponsor" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Sponsor Plan"} onAccepted={() => checkout(plan.id)} /> : <ConsentDialog agreementType="dorocoin" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Plan"} onAccepted={() => checkout(plan.id)} />}
+              {signedOut && plan.id !== "free" ? <LinkButton href="/auth/login" className="w-full">Sign In to Choose Plan</LinkButton> : plan.current ? <Button variant="ghost" className="w-full" disabled>Current Plan</Button> : plan.id === "free" ? <Button variant="ghost" className="w-full" disabled>Free Plan</Button> : !plan.purchaseAllowed ? <Button variant="ghost" className="w-full" disabled>Not Available for This Account</Button> : !plan.checkoutAvailable ? <Button variant="ghost" className="w-full" disabled>Stripe Price Not Configured</Button> : plan.audience === "sponsor" ? <ConsentDialog agreementType="sponsor" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Sponsor Plan"} onAccepted={() => checkout(plan.id)} /> : <ConsentDialog agreementType="dorocoin" actionLabel={loadingPlan === plan.id ? "Starting Checkout..." : "Select Plan"} onAccepted={() => checkout(plan.id)} />}
             </div>
           </Card>
         ))}

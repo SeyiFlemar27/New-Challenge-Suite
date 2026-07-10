@@ -35,13 +35,12 @@ service cloud.firestore {
     }
 
     match /votes/{voteId} {
-      allow read: if signedIn();
-      allow write: if false;
+      allow read, write: if false;
     }
 
     match /challenges/{challengeId} {
-      allow read: if true;
-      allow write: if false;
+      // Public challenge data is served through a server API that applies a field allowlist.
+      allow read, write: if false;
     }
 
     match /challengeParticipants/{participantId} {
@@ -50,8 +49,8 @@ service cloud.firestore {
     }
 
     match /submissions/{submissionId} {
-      allow read: if true;
-      allow write: if false;
+      // Public approved submissions are served through a server API after challenge checks.
+      allow read, write: if false;
     }
 
     match /boosts/{boostId} {
@@ -178,13 +177,35 @@ service cloud.firestore {
     }
 
     match /leaderboards/{leaderboardId} {
-      allow read: if true;
-      allow write: if false;
+      allow read, write: if false;
     }
 
     match /winners/{winnerId} {
-      allow read: if true;
-      allow write: if false;
+      allow read, write: if false;
+    }
+
+    match /adminAuditLogs/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /challengeEngagements/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /savedChallenges/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /hostWorkspaces/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /supportTickets/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /voteRequests/{document=**} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

@@ -2,8 +2,10 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 import { toPublicProfile } from "@/lib/server/public-profile";
+import { getOptionalRequestUser } from "@/lib/server/auth";
+import { isPublicChallenge, isPublicSubmission, publicChallengeFields, publicSubmissionFields } from "@/lib/server/public-challenge";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Submission details");
@@ -17,24 +19,36 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const submission = { id: submissionSnap.id, ...submissionSnap.data() } as Record<string, unknown>;
     const challengeId = String(submission.challengeId ?? "");
     const userId = String(submission.userId ?? "");
-    const participantId = String(submission.participantId ?? (challengeId && userId ? `${challengeId}_${userId}` : ""));
-    const [challengeSnap, profileSnap, participantSnap, leaderboard] = await Promise.all([
+    const [challengeSnap, profileSnap, leaderboard] = await Promise.all([
       challengeId ? db.collection("challenges").doc(challengeId).get() : Promise.resolve(null),
       userId ? db.collection("profiles").doc(userId).get() : Promise.resolve(null),
-      participantId ? db.collection("challengeParticipants").doc(participantId).get() : Promise.resolve(null),
       challengeId ? buildChallengeLeaderboard(db, challengeId, { limit: 200 }) : Promise.resolve(null)
     ]);
 
-    const challenge = challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : null;
+    const challengeData = challengeSnap?.exists ? challengeSnap.data() ?? {} : null;
+    const user = await getOptionalRequestUser(request);
+    const publicAccess = Boolean(
+      challengeSnap?.exists
+      && challengeData
+      && isPublicChallenge(challengeSnap.id, challengeData)
+      && isPublicSubmission(submissionSnap.id, submission)
+    );
+    const ownerAccess = Boolean(user && (user.uid === userId || user.uid === String(challengeData?.creatorId ?? "")));
+    if (!publicAccess && !ownerAccess) {
+      return fail("Submission not found.", 404, undefined, "NOT_FOUND");
+    }
+
+    const challenge = challengeSnap?.exists && challengeData
+      ? { id: challengeSnap.id, ...publicChallengeFields(challengeData) }
+      : null;
     const creator = profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null;
-    const participant = participantSnap?.exists ? { id: participantSnap.id, ...participantSnap.data() } : null;
     const rank = leaderboard?.entries.find((item) => item.submissionId === id || item.id === id)?.rank ?? null;
 
     return ok({
-      submission,
+      submission: { id: submissionSnap.id, ...publicSubmissionFields(submission) },
       challenge,
       creator,
-      participant,
+      participant: null,
       rank,
       leaderboard: leaderboard ? { status: leaderboard.status, visibilityMode: leaderboard.visibilityMode, visible: leaderboard.visible, message: leaderboard.message } : null,
       comments: []

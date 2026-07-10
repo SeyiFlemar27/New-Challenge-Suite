@@ -1,6 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { canSubmissionReceiveVotes } from "@/lib/server/submission-lifecycle";
+import { isPublicSubmission, isQaOrDemoRecord } from "@/lib/server/public-challenge";
 
 export type LeaderboardType = "challenge" | "global" | "tournament";
 export type ChallengeLeaderboardStatus = "live" | "hidden" | "locked" | "under_review" | "final" | "disputed" | "archived";
@@ -128,7 +129,6 @@ export function rankSubmissions(submissions: Record<string, unknown>[], limit?: 
         id: String(submission.id ?? submission.submissionId ?? ""),
         submissionId: String(submission.id ?? submission.submissionId ?? ""),
         challengeId: String(submission.challengeId ?? ""),
-        userId: String(submission.userId ?? ""),
         displayName,
         name: displayName,
         initials: String(submission.userInitials ?? displayName.slice(0, 2).toUpperCase()),
@@ -179,7 +179,10 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     .orderBy("weightedVoteCount", "desc")
     .limit(250)
     .get();
-  const rawSubmissions = submissionSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, unknown>);
+  const rawSubmissions = submissionSnap.docs.flatMap((doc) => {
+    const data = doc.data();
+    return isPublicSubmission(doc.id, data) ? [{ id: doc.id, ...data } as Record<string, unknown>] : [];
+  });
   const topLimit = visibilityMode === "top_10_only" ? 10 : options.limit;
   const entries = visible ? rankSubmissions(rawSubmissions, topLimit) : [];
   return {
@@ -200,12 +203,12 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
 export async function buildGlobalLeaderboard(db: Firestore, limit = 50): Promise<LeaderboardResult> {
   const profileSnap = await db.collection("profiles").limit(Math.max(limit * 4, 100)).get();
   const entries = profileSnap.docs
-    .map((doc) => {
+    .flatMap((doc) => {
       const profile = doc.data();
+      if (isQaOrDemoRecord(doc.id, profile) || profile.publicProfile === false || profile.status === "suspended") return [];
       const displayName = String(profile.displayName ?? profile.name ?? "Challenge Suite Member");
-      return {
+      return [{
         id: doc.id,
-        userId: doc.id,
         displayName,
         name: displayName,
         initials: String(profile.initials ?? displayName.slice(0, 2).toUpperCase()),
@@ -220,7 +223,7 @@ export async function buildGlobalLeaderboard(db: Firestore, limit = 50): Promise
         previousRank: getPreviousRank(profile),
         rankChange: 0,
         rank: 0
-      } satisfies LeaderboardRow;
+      } satisfies LeaderboardRow];
     })
     .filter((row) => row.points > 0 || Number(row.wins ?? 0) > 0 || Number(row.votes ?? 0) > 0 || Number(row.submissions ?? 0) > 0)
     .sort((a, b) => Number(b.points ?? 0) - Number(a.points ?? 0) || Number(b.wins ?? 0) - Number(a.wins ?? 0) || Number(b.votes ?? 0) - Number(a.votes ?? 0))

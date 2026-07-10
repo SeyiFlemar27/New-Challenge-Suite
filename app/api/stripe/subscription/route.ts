@@ -20,8 +20,8 @@ export async function PATCH(request: Request) {
     return fail("No active Stripe subscription was found for this account.", 404, undefined, "NOT_FOUND");
   }
   try {
-    await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
-    return ok({ webhookPending: true }, "Cancellation requested. Access downgrades after the verified Stripe webhook is received.");
+    await stripe.subscriptions.cancel(subscriptionId);
+    return ok({ webhookPending: true }, "Cancellation confirmed. The verified Stripe webhook immediately returns the account to Free access.");
   } catch (error) {
     console.error("[stripe-subscription:cancel]", {
       userId: user.uid,

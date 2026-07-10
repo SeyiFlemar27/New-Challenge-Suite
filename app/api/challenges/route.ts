@@ -9,15 +9,16 @@ import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challe
 import { writeAuditLog } from "@/lib/server/audit";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 
 export async function GET() {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Challenge listing");
   const snap = await db.collection("challenges").orderBy("createdAt", "desc").limit(100).get();
-  const challenges = snap.docs.map((doc) => {
+  const challenges = snap.docs.flatMap((doc) => {
     const data = doc.data();
-    return { ...publicChallengeFields(data), id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) };
+    if (!isPublicChallenge(doc.id, data)) return [];
+    return [{ ...publicChallengeFields(data), id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) }];
   });
   return ok({ challenges }, "Challenges loaded.");
 }

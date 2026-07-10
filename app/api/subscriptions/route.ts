@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireRequestUser } from "@/lib/server/auth";
+import { getOptionalRequestUser } from "@/lib/server/auth";
 import { getSubscriptionPlansForUser } from "@/lib/server/subscriptions";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { normalizeAccountType, normalizePlanId } from "@/lib/plan-access";
@@ -7,8 +7,17 @@ import { normalizeAccountType, normalizePlanId } from "@/lib/plan-access";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
+  const user = await getOptionalRequestUser(request);
+  if (!user) {
+    return ok({
+      authenticated: false,
+      currentPlanId: "free",
+      accountType: "user",
+      subscriptionStatus: "free",
+      subscription: { stripeStatus: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, planId: null },
+      plans: getSubscriptionPlansForUser("free", "user")
+    }, "Public subscription plans loaded.");
+  }
 
   const db = getAdminDb();
   if (!db) return serverUnavailable("Subscriptions");
@@ -24,6 +33,7 @@ export async function GET(request: Request) {
     const accountType = normalizeAccountType({ ...profile, ...account, planId: currentPlanId });
 
     return ok({
+      authenticated: true,
       currentPlanId,
       accountType,
       subscriptionStatus: account.subscriptionStatus ?? profile.subscriptionStatus ?? "free",

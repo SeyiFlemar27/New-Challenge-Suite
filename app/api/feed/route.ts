@@ -1,7 +1,7 @@
 ﻿import { getAdminDb } from "@/lib/firebase/admin";
-import { getChallengeDisplayStatus, isPublicChallengeStatus, isSubmissionVotableStatus } from "@/lib/challenge-status";
+import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, isPublicSubmission, publicChallengeFields, publicSubmissionFields } from "@/lib/server/public-challenge";
 
 export const dynamic = "force-dynamic";
 
@@ -13,19 +13,6 @@ function toIso(value: unknown): string | null {
     return value.toDate().toISOString();
   }
   return null;
-}
-
-function isPublicChallenge(data: FirebaseFirestore.DocumentData) {
-  const status = String(data.status ?? "").toLowerCase();
-  const type = String(data.type ?? "public").toLowerCase();
-  const visibility = String(data.visibility ?? "public").toLowerCase();
-  return isPublicChallengeStatus(status) && status !== "deleted" && status !== "removed" && type !== "private" && visibility !== "private";
-}
-
-function isPublicSubmission(data: FirebaseFirestore.DocumentData) {
-  const status = String(data.status ?? "").toLowerCase();
-  const visibility = String(data.visibility ?? "public").toLowerCase();
-  return isSubmissionVotableStatus(status) && visibility !== "private" && Boolean(data.mediaUrl);
 }
 
 export async function GET(request: Request) {
@@ -43,9 +30,10 @@ export async function GET(request: Request) {
     ]);
 
     const challenges = challengeSnap.docs
-      .map((doc) => {
+      .flatMap((doc) => {
         const data = doc.data();
-        return {
+        if (!isPublicChallenge(doc.id, data)) return [];
+        return [{
           ...publicChallengeFields(data),
           id: doc.id,
           createdAt: toIso(data.createdAt),
@@ -54,23 +42,22 @@ export async function GET(request: Request) {
           endsAt: toIso(data.endsAt) ?? data.endsAt,
           registrationDeadline: toIso(data.registrationDeadline) ?? data.registrationDeadline,
           computedStatus: getChallengeDisplayStatus(data as any)
-        };
+        }];
       })
-      .filter(isPublicChallenge)
       .slice(0, limit);
 
     const submissions = submissionSnap.docs
-      .map((doc) => {
+      .flatMap((doc) => {
         const data = doc.data();
-        return {
-          ...data,
+        if (!isPublicSubmission(doc.id, data) || !data.mediaUrl) return [];
+        return [{
+          ...publicSubmissionFields(data),
           id: doc.id,
           createdAt: toIso(data.createdAt),
           submittedAt: toIso(data.submittedAt),
           updatedAt: toIso(data.updatedAt)
-        };
+        }];
       })
-      .filter(isPublicSubmission)
       .slice(0, limit);
 
     return ok({ challenges, submissions, nextCursor: null }, "Feed loaded.");
