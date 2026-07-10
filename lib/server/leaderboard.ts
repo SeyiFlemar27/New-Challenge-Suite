@@ -1,7 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { canSubmissionReceiveVotes } from "@/lib/server/submission-lifecycle";
-import { isPublicSubmission, isQaOrDemoRecord } from "@/lib/server/public-challenge";
+import { isPublicSubmission, isQaDemoOrPlaceholderProfile } from "@/lib/server/public-challenge";
 
 export type LeaderboardType = "challenge" | "global" | "tournament";
 export type ChallengeLeaderboardStatus = "live" | "hidden" | "locked" | "under_review" | "final" | "disputed" | "archived";
@@ -205,7 +205,7 @@ export async function buildGlobalLeaderboard(db: Firestore, limit = 50): Promise
   const entries = profileSnap.docs
     .flatMap((doc) => {
       const profile = doc.data();
-      if (isQaOrDemoRecord(doc.id, profile) || profile.publicProfile === false || profile.status === "suspended") return [];
+      if (isQaDemoOrPlaceholderProfile(doc.id, profile) || profile.publicProfile === false || profile.status === "suspended") return [];
       const displayName = String(profile.displayName ?? profile.name ?? "Challenge Suite Member");
       return [{
         id: doc.id,

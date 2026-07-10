@@ -47,6 +47,8 @@ const competitorSections: NavSection[] = [
   ] },
   { label: "Compete", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
+    { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
     { href: "/winners", label: "Winners", icon: Trophy }
@@ -201,7 +203,7 @@ export function Sidebar() {
       : [
           { href: "/dashboard", label: "Home", icon: Home },
           { href: "/feed", label: "Explore", icon: LayoutGrid },
-          { href: effectiveTier.id === "free_competitor" ? "/favorites" : "/challenges/create", label: effectiveTier.id === "free_competitor" ? "Saved" : "Create", icon: effectiveTier.id === "free_competitor" ? Star : PlusSquare },
+          { href: "/challenges/create", label: "Create", icon: PlusSquare },
           { href: "/leaderboards", label: "Rank", icon: BarChart3 },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ];

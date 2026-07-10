@@ -356,7 +356,7 @@ function CreateChallengeWizard() {
       <AppShell>
         <Card className="mx-auto max-w-3xl p-5 sm:p-7 lg:p-9">
           <PageTitle title="Create a Basic Public Challenge" subtitle="Free accounts can publish up to three lifetime public, non-monetized challenges before upgrading." />
-          <p className="mt-4 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 px-4 py-3 text-sm font-bold text-[var(--gold-2)]">Free Basic Challenges Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}. This lifetime limit is enforced on the server.</p>
+          <p className="mt-4 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 px-4 py-3 text-sm font-bold text-[var(--gold-2)]">Free Basic Challenges Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}. Basic Challenges Remaining: {freeUsage.loaded ? freeUsage.remaining : "..."}. This lifetime limit is enforced on the server.</p>
           {usedAllFreeChallenges ? <Card className="mt-6 border-yellow-500/30 bg-yellow-500/5 p-5 text-center"><LockKeyhole className="mx-auto text-[var(--gold)]" /><h2 className="mt-3 text-2xl font-black">Upgrade to keep creating</h2><p className="mt-2 text-sm leading-6 text-slate-300">You have used all three lifetime Free Basic Challenges. Creator and Host plans unlock more creation tools.</p><LinkButton href="/subscriptions" className="mt-5">Upgrade to Creator</LinkButton></Card> : null}
           <div className="mt-8 grid gap-6">
             <Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field>
@@ -373,7 +373,7 @@ function CreateChallengeWizard() {
               <Field label="Voting Deadline"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(event) => update("votingDeadline", event.target.value)} /></Field>
               <Field label="End Date"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></Field>
             </div>
-            <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, revenue sharing, prediction arena, boosts, advanced voting, and premium analytics are unavailable in this free flow.</Card>
+            <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, revenue sharing, Prediction Arena, boosts, advanced voting, and premium analytics are unavailable in this free flow.</Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
             {draftSaved ? <p className="rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved.</p> : null}
             <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
@@ -562,4 +562,3 @@ function StepMedia({ form, update }: { form: any; update: any }) {
 function StepPreview({ form }: { form: any }) {
   return <section><h2 className="text-xl font-black sm:text-2xl">Step 6: Preview & Publish</h2><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title, Type: form.type, Category: form.category === "Other" ? form.customCategory : form.category, Format: form.competitionFormat, "Best Of": form.bestOf, "Prize Type": form.prizeType, "Submission Types": form.submissionTypes.join(", "), "Start Date": form.startsAt, "Submission Deadline": form.submissionDeadline, "Voting Deadline": form.votingDeadline, "End Date": form.endsAt, "Sponsor Enabled": form.sponsorEnabled === "true" ? "Yes" : "No" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black sm:text-lg">{String(value)}</div></Card>)}</div></section>;
 }
-

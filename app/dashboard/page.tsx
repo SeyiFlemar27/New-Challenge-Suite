@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -85,9 +85,9 @@ export default function DashboardPage() {
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { title: "Explore Challenges", body: "Discover active public competitions that match your interests.", icon: Swords, active: true },
-        { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible challenges.", icon: Vote, active: true },
-        { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
+        { title: "Create Basic Challenge", body: "Create up to three lifetime public, non-monetized challenges before upgrading.", icon: Swords, active: true, href: "/challenges/create" },
+        { title: "My Challenges", body: "Draft, publish, and track your Free Basic Challenge activity.", icon: Trophy, active: true, href: "/my-challenges" },
+        { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible public challenges.", icon: Vote, active: true, href: "/challenges" }
       ] : [
         { title: "Basic Public Challenge", body: "Create up to three lifetime public, non-monetized challenges.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" }
@@ -117,9 +117,9 @@ export default function DashboardPage() {
             ];
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { href: "/challenges", label: "Explore Challenges", variant: "secondary" as const },
-        { href: "/my-entries", label: "My Entries", variant: "primary" as const },
-        { href: "/subscriptions", label: "Upgrade to Creator", variant: "ghost" as const }
+        { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
+        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
+        { href: "/challenges", label: "Explore Challenges", variant: "ghost" as const }
       ] : [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
         { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const }

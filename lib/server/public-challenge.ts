@@ -24,7 +24,33 @@ export function isQaOrDemoRecord(id: string, data: Record<string, unknown>) {
     || data.isQaSeed === true
     || data.isDemo === true
     || data.demo === true
+    || data.isTest === true
+    || data.test === true
+    || data.isMock === true
+    || data.mock === true
+    || data.isPlaceholder === true
+    || data.placeholder === true
     || data.createdFor === "admin_qa";
+}
+
+export function isQaDemoOrPlaceholderProfile(id: string, data: Record<string, unknown>) {
+  if (isQaOrDemoRecord(id, data)) return true;
+  const fields = [
+    data.displayName,
+    data.name,
+    data.username,
+    data.email,
+    data.userName,
+    data.userDisplayName
+  ];
+  return fields.some((value) => {
+    if (typeof value !== "string") return false;
+    const normalized = value.trim().toLowerCase();
+    return /(^|[\s._-])(demo|sample|placeholder|mock|test|qa)([\s._-]|$)/.test(normalized)
+      || normalized.endsWith("@example.com")
+      || normalized.endsWith("@test.com")
+      || normalized.endsWith(".test");
+  });
 }
 
 export function isPublicChallenge(id: string, data: Record<string, unknown>) {
