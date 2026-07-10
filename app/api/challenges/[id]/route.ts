@@ -41,10 +41,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
-  const [leaderboard, sponsorshipsSnap, votesSnap, participantSnap, engagementSnap, prizePoolSnap] = await Promise.all([
+  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
+    db.collection("challengeParticipants").where("challengeId", "==", id).limit(250).get(),
     user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
     user ? db.collection("challengeEngagements").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
     db.collection("prizePools").doc(id).get()
@@ -61,6 +62,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       ctaDestinationLink: item.ctaDestinationLink ?? null,
       status: item.status
     }));
+  const publicParticipantStatuses = new Set(["approved", "active", "joined", "checked_in", "submitted"]);
+  const participants = publicParticipantsSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
+    .filter((item) => publicParticipantStatuses.has(String(item.status ?? "joined")))
+    .map((item) => ({
+      id: String(item.id),
+      displayName: String(item.displayName ?? item.name ?? item.userName ?? item.username ?? "Challenge Suite member"),
+      username: typeof item.username === "string" ? item.username : typeof item.userName === "string" ? item.userName : null,
+      avatarUrl: typeof item.avatarUrl === "string" ? item.avatarUrl : typeof item.photoURL === "string" ? item.photoURL : null,
+      participantStatus: String(item.status ?? "joined"),
+      entryStatus: typeof item.submissionStatus === "string" ? item.submissionStatus : null,
+      profilePath: typeof item.username === "string" ? `/profile/${item.username}` : typeof item.userName === "string" ? `/profile/${item.userName}` : "/profile"
+    }));
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
@@ -72,6 +86,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     submissions: leaderboard.entries,
     leaderboard: leaderboardPayload,
     sponsorships,
+    participants,
     prizePool: publicPrizePoolFields(prizePoolSnap.exists ? prizePoolSnap.data() : null),
     voteCount: votes.length,
     userState: user ? {
@@ -91,3 +106,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }, "Challenge details loaded.");
 }
+
+

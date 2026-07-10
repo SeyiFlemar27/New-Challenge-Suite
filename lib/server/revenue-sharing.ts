@@ -70,9 +70,8 @@ export function predictionFee(stakeAmountDorocoin: number) {
 }
 
 export const VOTER_REWARD_TIERS = [
-  { id: "bronze", label: "Bronze", pointsRequired: 250, spinCredits: 1, spinTier: "basic" },
-  { id: "silver", label: "Silver", pointsRequired: 750, spinCredits: 1, spinTier: "standard" },
-  { id: "gold", label: "Gold", pointsRequired: 1500, spinCredits: 2, spinTier: "standard" },
-  { id: "platinum", label: "Platinum", pointsRequired: 3000, spinCredits: 1, spinTier: "premium" },
-  { id: "diamond", label: "Diamond", pointsRequired: 7500, spinCredits: 2, spinTier: "premium" }
+  { id: "basic", label: "Basic", pointsRequired: 100, spinCredits: 1, spinTier: "basic" },
+  { id: "standard", label: "Standard", pointsRequired: 250, spinCredits: 1, spinTier: "standard" },
+  { id: "premium", label: "Premium", pointsRequired: 500, spinCredits: 1, spinTier: "premium" }
 ];
+

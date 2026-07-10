@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server/responses";
 import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
+import { normalizeSpinCredits, type RewardSpinTier } from "@/lib/server/rewards";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
   return ok({
     points: Number(profile.voterPoints ?? 0),
     spinCredits: Number(profile.rewardSpinCredits ?? 0),
+    spinCreditsByTier: normalizeSpinCredits(profile.rewardSpinCreditsByTier ?? profile.rewardSpinCredits),
     tiers: VOTER_REWARD_TIERS,
     prizes: prizeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data(), cashOutEnabled: false })),
     history: spinSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
@@ -32,19 +34,23 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Rewards");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
+  const tier = String(parsed.body?.tier ?? "basic") as RewardSpinTier;
+  if (!["basic", "standard", "premium"].includes(tier)) return fail("Select a valid reward wheel tier.", 400, undefined, "INVALID_REWARD_TIER");
   const now = new Date().toISOString();
   const userRef = db.collection("users").doc(user.uid);
   const spinRef = db.collection("rewardSpinHistory").doc();
   try {
     await db.runTransaction(async (transaction) => {
       const userSnap = await transaction.get(userRef);
-      const credits = Number(userSnap.data()?.rewardSpinCredits ?? 0);
-      if (credits <= 0) throw new Error("NO_SPIN_CREDITS");
-      transaction.set(userRef, { rewardSpinCredits: credits - 1, updatedAt: now }, { merge: true });
+      const creditsByTier = normalizeSpinCredits(userSnap.data()?.rewardSpinCreditsByTier ?? userSnap.data()?.rewardSpinCredits);
+      if (creditsByTier[tier] <= 0) throw new Error("NO_SPIN_CREDITS");
+      creditsByTier[tier] -= 1;
+      transaction.set(userRef, { rewardSpinCredits: creditsByTier.basic + creditsByTier.standard + creditsByTier.premium, rewardSpinCreditsByTier: creditsByTier, updatedAt: now }, { merge: true });
       transaction.set(spinRef, {
         id: spinRef.id,
         userId: user.uid,
-        prizeName: "Manual prize review",
+        wheelTier: tier,
+        prizeName: `${tier[0].toUpperCase()}${tier.slice(1)} wheel manual prize review`,
         prizeType: "manual_foundation",
         status: "pending_admin_fulfillment",
         cashOutEnabled: false,
@@ -59,3 +65,5 @@ export async function POST(request: Request) {
     return serverError("Reward spin could not be recorded.", error instanceof Error ? error.message : error);
   }
 }
+
+

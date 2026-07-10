@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience, getUserPlanAccess, type PlanExperience } from "@/lib/plan-access";
 import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
 import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
+import { MediaUploadField } from "@/components/media-upload-field";
 
 const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
 
@@ -366,7 +367,7 @@ function CreateChallengeWizard() {
             </div>
             <Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field>
             <Field label="Rules"><textarea className={textareaClass} value={form.standardRules} onChange={(event) => update("standardRules", event.target.value)} /></Field>
-            <Field label="Cover Image URL"><input className={inputClass} value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} placeholder="https://..." /></Field>
+            <MediaUploadField label="Cover Image" value={form.coverImageUrl} onChange={(url) => update("coverImageUrl", url)} storagePath={`challengeMedia/drafts/${user?.uid ?? "anonymous"}`} kind="image" buttonLabel="Upload Cover Image" helperText="Free basic challenges use uploaded public cover art only after secure Storage rules are published." />
             <div className="grid gap-6 sm:grid-cols-2">
               <Field label="Start Date"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></Field>
               <Field label="Entry Deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(event) => update("submissionDeadline", event.target.value)} /></Field>
@@ -436,7 +437,7 @@ function CreateChallengeWizard() {
           {step === 1 ? <StepFormat form={form} update={update} toggleSubmission={toggleSubmission} experience={planExperience} /> : null}
           {step === 2 ? <StepDates form={form} update={update} /> : null}
           {step === 3 ? <StepPrize form={form} update={update} braggingRights={braggingRights} normalized={normalized} setAllocations={setAllocations} planAccess={planAccess} /> : null}
-          {step === 4 ? <StepMedia form={form} update={update} /> : null}
+          {step === 4 ? <StepMedia form={form} update={update} userId={user?.uid ?? "anonymous"} /> : null}
           {step === 5 ? <StepPreview form={form} /> : null}
         </div>
 
@@ -549,12 +550,18 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
   );
 }
 
-function StepMedia({ form, update }: { form: any; update: any }) {
+function StepMedia({ form, update, userId }: { form: any; update: any; userId: string }) {
+  const basePath = `challengeMedia/drafts/${userId}`;
   return (
     <section>
       <h2 className="text-xl font-black sm:text-2xl">Step 5: Media</h2>
-      <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Cover Media URL"><input className={inputClass} value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Promo Flyer Image URL"><input className={inputClass} value={form.promoImageUrl} onChange={(event) => update("promoImageUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Trailer Video URL"><input className={inputClass} value={form.trailerVideoUrl} onChange={(event) => update("trailerVideoUrl", event.target.value)} placeholder="https://..." /></Field><Field label="Promo Video URL"><input className={inputClass} value={form.promoVideoUrl} onChange={(event) => update("promoVideoUrl", event.target.value)} placeholder="https://..." /></Field></div>
-      <Card className="mt-6 p-4 text-slate-300 sm:p-6">Media upload storage will be connected later. For now, preview media fields accept URLs and are validated server-side when provided.</Card>
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <MediaUploadField label="Cover Media" value={form.coverImageUrl} onChange={(url) => update("coverImageUrl", url)} storagePath={`${basePath}/cover`} kind="image" buttonLabel="Upload Cover Image" />
+        <MediaUploadField label="Promo Flyer" value={form.promoImageUrl} onChange={(url) => update("promoImageUrl", url)} storagePath={`${basePath}/promo-flyer`} kind="image" buttonLabel="Upload Promo Image" />
+        <MediaUploadField label="Trailer Video" value={form.trailerVideoUrl} onChange={(url) => update("trailerVideoUrl", url)} storagePath={`${basePath}/trailer`} kind="video" buttonLabel="Upload Trailer Video" />
+        <MediaUploadField label="Promo Video" value={form.promoVideoUrl} onChange={(url) => update("promoVideoUrl", url)} storagePath={`${basePath}/promo-video`} kind="video" buttonLabel="Upload Promo Video" />
+      </div>
+      <Card className="mt-6 p-4 text-slate-300 sm:p-6">Uploaded media is stored as secure Firebase Storage metadata. If Storage rules are not published yet, uploads fail closed and the challenge can still be saved without broken media.</Card>
     </section>
   );
 }
@@ -562,3 +569,5 @@ function StepMedia({ form, update }: { form: any; update: any }) {
 function StepPreview({ form }: { form: any }) {
   return <section><h2 className="text-xl font-black sm:text-2xl">Step 6: Preview & Publish</h2><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title, Type: form.type, Category: form.category === "Other" ? form.customCategory : form.category, Format: form.competitionFormat, "Best Of": form.bestOf, "Prize Type": form.prizeType, "Submission Types": form.submissionTypes.join(", "), "Start Date": form.startsAt, "Submission Deadline": form.submissionDeadline, "Voting Deadline": form.votingDeadline, "End Date": form.endsAt, "Sponsor Enabled": form.sponsorEnabled === "true" ? "Yes" : "No" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black sm:text-lg">{String(value)}</div></Card>)}</div></section>;
 }
+
+

@@ -1,10 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, CheckCircle2, ExternalLink, LockKeyhole, Save, Upload } from "lucide-react";
 import { Button, Card, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
 import { SponsorShell } from "@/components/sponsor/sponsor-shell";
+import { useAuth } from "@/components/auth-provider";
+import { MediaUploadField } from "@/components/media-upload-field";
 import { apiRequest } from "@/lib/api/client";
 import { normalizeSponsorReviewStatus, sponsorStatusLabel } from "@/lib/sponsor-access";
 
@@ -57,6 +59,7 @@ const emptyForm = {
 
 export default function SponsorOnboardingPage() {
   const router = useRouter();
+  const auth = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -254,8 +257,8 @@ export default function SponsorOnboardingPage() {
               <Field label="Brand Description"><textarea className={textareaClass} value={form.brandDescription} onChange={(event) => update("brandDescription", event.target.value)} placeholder="Describe the brand, audience, and what you want creators or participants to know." />{fieldErrors.brandDescription ? <ErrorText>{fieldErrors.brandDescription}</ErrorText> : null}</Field>
             </div>
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
-              <Field label="Logo URL / Placeholder"><input className={inputClass} value={form.logoUrl} onChange={(event) => update("logoUrl", event.target.value)} placeholder="Optional image URL" />{fieldErrors.logoUrl ? <ErrorText>{fieldErrors.logoUrl}</ErrorText> : null}</Field>
-              <Field label="Banner URL / Placeholder"><input className={inputClass} value={form.bannerUrl} onChange={(event) => update("bannerUrl", event.target.value)} placeholder="Optional banner URL" />{fieldErrors.bannerUrl ? <ErrorText>{fieldErrors.bannerUrl}</ErrorText> : null}</Field>
+              <div><MediaUploadField label="Sponsor Logo" value={form.logoUrl} onChange={(url) => update("logoUrl", url)} storagePath={`sponsorMedia/profile/${auth.user?.uid ?? "anonymous"}/logo`} kind="image" buttonLabel="Upload Logo" helperText="Logos are uploaded to secure sponsor media storage. Pasted image links are no longer used for sponsor profiles." />{fieldErrors.logoUrl ? <ErrorText>{fieldErrors.logoUrl}</ErrorText> : null}</div>
+              <div><MediaUploadField label="Sponsor Banner" value={form.bannerUrl} onChange={(url) => update("bannerUrl", url)} storagePath={`sponsorMedia/profile/${auth.user?.uid ?? "anonymous"}/banner`} kind="image" buttonLabel="Upload Banner" helperText="Banner uploads can be replaced or removed before saving the brand profile." />{fieldErrors.bannerUrl ? <ErrorText>{fieldErrors.bannerUrl}</ErrorText> : null}</div>
             </div>
             <div className="mt-6 grid gap-5 lg:grid-cols-[180px_1fr]">
               <MediaPreview label="Logo preview" url={form.logoUrl} failed={imageErrors.logoUrl} onError={() => setImageErrors((current) => ({ ...current, logoUrl: true }))} />
@@ -284,7 +287,7 @@ export default function SponsorOnboardingPage() {
             <Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:p-6 lg:p-7">
               <Upload className="h-8 w-8 text-[var(--gold)]" />
               <h2 className="mt-4 text-xl font-black">Media upload support</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Logo and banner fields are prepared as URL placeholders for now. File upload can connect to Firebase Storage in a later media batch.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Logo and banner uploads use secure Firebase Storage paths. If Storage rules are not published yet, uploads fail closed and show a clear error without saving broken media.</p>
             </Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm font-bold text-red-200">{error}</p> : null}
             {saved ? <p className="rounded-[8px] bg-emerald-950/40 p-3 text-sm font-bold text-emerald-200">{saved}</p> : null}
@@ -317,7 +320,9 @@ function MediaPreview({ label, url, wide, failed, onError }: { label: string; ur
   return (
     <div className={`rounded-[8px] border border-white/10 bg-black/30 p-3 ${wide ? "" : "max-w-[220px]"}`}>
       <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      {normalized && !failed ? <img src={normalized} alt={label} onError={onError} className={`w-full rounded-[6px] object-cover ${wide ? "h-32" : "h-28"}`} /> : <div className={`flex w-full items-center justify-center rounded-[6px] border border-dashed border-white/10 text-center text-xs font-bold text-slate-500 ${wide ? "h-32" : "h-28"}`}>{failed ? "Image could not be loaded. Replace the URL." : "Add a URL to preview media."}</div>}
+      {normalized && !failed ? <img src={normalized} alt={label} onError={onError} className={`w-full rounded-[6px] object-cover ${wide ? "h-32" : "h-28"}`} /> : <div className={`flex w-full items-center justify-center rounded-[6px] border border-dashed border-white/10 text-center text-xs font-bold text-slate-500 ${wide ? "h-32" : "h-28"}`}>{failed ? "Image could not be loaded. Replace the upload." : "Upload media to preview it here."}</div>}
     </div>
   );
 }
+
+

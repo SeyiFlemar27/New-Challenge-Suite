@@ -216,13 +216,14 @@ export default function PurchaseVotesPage() {
             <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm DoroCoin Votes"}</Button>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <LinkButton href="/wallet" variant="secondary" className="w-full">Buy DoroCoins</LinkButton>
-              <Button variant="secondary" className="w-full" disabled title="A verified ad provider is required before bonus votes can be granted"><PlayCircle size={18} /> Watch Ad for Bonus Vote</Button>
+              <Button variant="secondary" className="w-full" disabled title="A verified ad provider is required before bonus votes can be granted"><PlayCircle size={18} /> Watch Ad for Vote</Button>
             </div>
-            <p className="mt-3 text-sm text-slate-400">Ad rewards are being prepared. This will unlock one bonus vote only after verified ad completion. No vote is granted by this placeholder.</p>
+            <p className="mt-3 text-sm text-slate-400">Ads for votes are not available yet. A future verified provider callback may grant one limited vote credit after completed ad verification; this page does not grant votes from a client-only button.</p>
           </>
         )}
       </Card>
     </AppShell>
   );
 }
+
 

@@ -244,6 +244,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /adVoteRewardLogs/{document=**} {
+      allow read, write: if false;
+    }
+
     match /tournamentPlans/{document=**} {
       allow read, write: if false;
     }
@@ -253,3 +257,4 @@ service cloud.firestore {
     }
   }
 }
+

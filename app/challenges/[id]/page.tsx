@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, Clock3, Rocket, Trophy, Vote } from "lucide-react";
+import { Bookmark, Clock3, Coins, Rocket, Trophy, Users, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
@@ -29,6 +29,8 @@ export default function ChallengeDetailPage() {
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [participantLimit, setParticipantLimit] = useState(12);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -138,6 +140,9 @@ export default function ChallengeDetailPage() {
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const canBoost = planExperience.monthlyBoostLimit > 0 && (selectedAccountType === "creator" || selectedAccountType === "host");
   const sponsorAccount = user?.accountType === "sponsor";
+  const participants = ((details as { participants?: Array<{ id: string; displayName: string; username?: string | null; avatarUrl?: string | null; participantStatus?: string; entryStatus?: string | null; profilePath?: string }> } | null)?.participants ?? []);
+  const filteredParticipants = participants.filter((participant) => `${participant.displayName} ${participant.username ?? ""}`.toLowerCase().includes(participantSearch.toLowerCase()));
+  const visibleParticipants = filteredParticipants.slice(0, participantLimit);
 
   return (
     <AppShell>
@@ -178,6 +183,21 @@ export default function ChallengeDetailPage() {
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
             </div>
           </Card>
+          <section className="mt-12">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-black">Participants</h2>
+                <p className="mt-2 text-sm text-slate-400">{participants.length.toLocaleString()} participating. Public views only show approved or active participant profile details.</p>
+              </div>
+              <input className="min-h-11 rounded-[8px] border border-white/10 bg-[#151515] px-4 text-sm font-bold text-white outline-none focus:border-[var(--gold)] sm:w-72" value={participantSearch} onChange={(event) => { setParticipantSearch(event.target.value); setParticipantLimit(12); }} placeholder="Search participants" />
+            </div>
+            {visibleParticipants.length ? (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleParticipants.map((participant) => <a key={participant.id} href={participant.profilePath || "/profile"} className="rounded-[8px] border border-white/10 bg-[#151515] p-4 transition hover:border-[var(--gold)]/50"><div className="flex items-center gap-3"><div className="h-12 w-12 overflow-hidden rounded-full bg-black/50">{participant.avatarUrl ? <img src={participant.avatarUrl} alt={participant.displayName} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-[var(--gold)]"><Users size={18} /></div>}</div><div className="min-w-0"><p className="truncate font-black">{participant.displayName}</p>{participant.username ? <p className="truncate text-xs text-slate-400">@{participant.username}</p> : null}</div></div><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em]"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{String(participant.participantStatus ?? "active").replaceAll("_", " ")}</span>{participant.entryStatus ? <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">{participant.entryStatus.replaceAll("_", " ")}</span> : null}</div></a>)}
+              </div>
+            ) : <Card className="mt-6 border-dashed p-6 text-center text-slate-400">No public participants match this view yet.</Card>}
+            {filteredParticipants.length > visibleParticipants.length ? <Button variant="secondary" className="mt-5" onClick={() => setParticipantLimit((value) => value + 24)}>Load More Participants</Button> : null}
+          </section>
 
           <section className="mt-12">
             <h2 className="text-2xl font-black">Community Submissions</h2>
@@ -229,6 +249,17 @@ export default function ChallengeDetailPage() {
           </Card> : null}
           {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> · Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} · {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
 
+
+          <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
+            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Use DoroCoins to predict the winner before the challenge begins. Platform fee is 7%, rewards are DoroCoin-only, and settlement waits for final result lock and admin review.</p></div></div>
+            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton>
+          </Card>
+
+          <Card className="border-emerald-500/20 bg-emerald-500/5 p-5 sm:p-7">
+            <h3 className="text-xl font-black">Revenue Share Review</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-300">Generated revenue uses the 65% winners, 15% host, 10% sponsor, 10% platform foundation. Initial prize money remains separate and 100% winner-directed after review. Challenger vote-revenue bonuses remain pending admin review.</p>
+            <LinkButton href="/revenue-share" variant="secondary" className="mt-5 w-full">View Revenue Flow</LinkButton>
+          </Card>
           <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
@@ -273,4 +304,9 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
+
+
+
 

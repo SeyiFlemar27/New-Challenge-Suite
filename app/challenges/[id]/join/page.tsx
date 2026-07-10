@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { CheckCircle2, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -22,6 +22,9 @@ export default function JoinChallengePage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean; status?: string } | null>(null);
+  const [selectedMediaPreview, setSelectedMediaPreview] = useState("");
+  const [selectedMediaType, setSelectedMediaType] = useState<"image" | "video" | "">("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -93,13 +96,21 @@ export default function JoinChallengePage() {
       let pendingMedia = false;
       if (storage) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `users/${auth.user.uid}/submissions/${currentChallenge.id}-${Date.now()}-${safeName}`;
+        const path = `submissions/${currentChallenge.id}/${auth.user.uid}/${Date.now()}-${safeName}`;
         const uploadRef = ref(storage, path);
-        await Promise.race([
-          uploadBytes(uploadRef, file, { contentType: file.type }),
-          new Promise((_, reject) => window.setTimeout(() => reject(new Error("STORAGE_UPLOAD_TIMEOUT")), 45_000))
-        ]);
-        mediaUrl = await getDownloadURL(uploadRef);
+        const uploadTask = uploadBytesResumable(uploadRef, file, { contentType: file.type, customMetadata: { originalName: file.name } });
+        mediaUrl = await new Promise<string>((resolve, reject) => {
+          const timer = window.setTimeout(() => reject(new Error("STORAGE_UPLOAD_TIMEOUT")), 90_000);
+          uploadTask.on("state_changed", (snapshot) => {
+            setUploadProgress(Math.round((snapshot.bytesTransferred / Math.max(snapshot.totalBytes, 1)) * 100));
+          }, (caught) => {
+            window.clearTimeout(timer);
+            reject(caught);
+          }, async () => {
+            window.clearTimeout(timer);
+            resolve(await getDownloadURL(uploadTask.snapshot.ref));
+          });
+        });
       } else {
         pendingMedia = true;
       }
@@ -216,7 +227,7 @@ export default function JoinChallengePage() {
           <form className="mt-6 space-y-5" onSubmit={submit}>
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
-            <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={`${inputClass} file:mr-3 file:rounded-[6px] file:border-0 file:bg-[var(--gold)] file:px-3 file:py-2 file:text-sm file:font-black file:text-black`} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required /></Field>
+            <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={`${inputClass} file:mr-3 file:rounded-[6px] file:border-0 file:bg-[var(--gold)] file:px-3 file:py-2 file:text-sm file:font-black file:text-black`} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required onChange={(event) => { const file = event.target.files?.[0]; if (selectedMediaPreview) URL.revokeObjectURL(selectedMediaPreview); setSelectedMediaPreview(file ? URL.createObjectURL(file) : ""); setSelectedMediaType(file?.type.startsWith("video/") ? "video" : file ? "image" : ""); setUploadProgress(0); }} /></Field>{selectedMediaPreview ? <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">{selectedMediaType === "video" ? <video src={selectedMediaPreview} controls className="max-h-72 w-full object-cover" /> : <img src={selectedMediaPreview} alt="Submission preview" className="max-h-72 w-full object-cover" />}</div> : null}{submitting && uploadProgress > 0 ? <div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)] transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-2 text-xs font-bold text-slate-400">Uploading media {uploadProgress}%</p></div> : null}
             <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize foundation terms. Paid-entry prize pools and payouts are not active yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? "Unavailable" : "Submit Entry"}</Button>
@@ -226,4 +237,6 @@ export default function JoinChallengePage() {
     </AppShell>
   );
 }
+
+
 

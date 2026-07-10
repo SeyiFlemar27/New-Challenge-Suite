@@ -143,34 +143,6 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         createdBy: input.userId,
         createdAt: now
       });
-      const currentPoints = Number(userSnap.data()?.voterPoints ?? 0);
-      const nextPoints = currentPoints + coinCost;
-      const achieved = userSnap.data()?.rewardTierMilestones as Record<string, boolean> | undefined ?? {};
-      const rewardTierMilestones = { ...achieved };
-      let spinCreditsAwarded = 0;
-      for (const tier of VOTER_REWARD_TIERS) {
-        if (!rewardTierMilestones[tier.id] && currentPoints < tier.pointsRequired && nextPoints >= tier.pointsRequired) {
-          rewardTierMilestones[tier.id] = true;
-          spinCreditsAwarded += tier.spinCredits;
-        }
-      }
-      transaction.set(userRef, {
-        voterPoints: nextPoints,
-        rewardSpinCredits: Number(userSnap.data()?.rewardSpinCredits ?? 0) + spinCreditsAwarded,
-        rewardTierMilestones,
-        updatedAt: now
-      }, { merge: true });
-      transaction.create(db.collection("voterRewardEvents").doc(deterministicId("vote_reward", voteRequestId ?? txnRef.id, input.userId)), {
-        userId: input.userId,
-        challengeId: input.challengeId,
-        submissionId: input.submissionId,
-        sourceType: "dorocoin_vote_purchase",
-        pointsAwarded: coinCost,
-        spinCreditsAwarded,
-        status: "recorded",
-        cashOutEnabled: false,
-        createdAt: now
-      });
     }
 
     const voteWeight = getVoteWeight(profile, settings.weightedVotes);
@@ -285,3 +257,5 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
   return result;
 }
+
+

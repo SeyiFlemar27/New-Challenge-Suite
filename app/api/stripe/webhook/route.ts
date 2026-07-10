@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
+import { awardDoroCoinPurchaseRewards } from "@/lib/server/rewards";
 import {
   invoicePaymentIntentId,
   invoiceSubscriptionId,
@@ -156,7 +157,8 @@ export async function POST(request: Request) {
             idempotencyKey: event.id,
             createdBy: "stripe"
           });
-          outcome = { handled: true, kind: "dorocoin_purchase", transactionId: transaction.id };
+          const reward = await awardDoroCoinPurchaseRewards(db, { userId: session.metadata.userId, coins: Number(session.metadata.coins), sourceId: session.id, eventId: event.id });
+          outcome = { handled: true, kind: "dorocoin_purchase", transactionId: transaction.id, rewardPointsAwarded: reward.pointsAwarded, rewardSpinCreditsAwarded: reward.spinCreditsAwarded };
         } else if (session.mode === "subscription") {
           outcome = await processSubscriptionCheckout(stripe, db, event, session);
         }
@@ -210,3 +212,4 @@ export async function POST(request: Request) {
     return serverError("Stripe webhook could not be processed.", error instanceof Error ? error.message : error);
   }
 }
+

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, CreditCard, LockKeyhole, Palette, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
+import { MediaUploadField } from "@/components/media-upload-field";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
@@ -32,6 +34,7 @@ const sections = new Set(["account", "profile", "appearance", "notifications", "
 
 export default function SettingsSectionPage() {
   const params = useParams<{ section: string }>();
+  const auth = useAuth();
   const section = sections.has(params.section) ? params.section : "account";
   const [settings, setSettings] = useState<SettingsData>(defaults);
   const [loading, setLoading] = useState(true);
@@ -119,7 +122,7 @@ export default function SettingsSectionPage() {
         {notice ? <Card className="mt-5 p-4 text-sm text-slate-300">{notice}</Card> : null}
         <Card className={`mt-7 p-5 sm:p-7 ${section === "danger" ? "border-red-500/30" : ""}`}>
           {section === "account" ? <Account settings={settings} update={update} /> : null}
-          {section === "profile" ? <Profile settings={settings} update={update} list={list} /> : null}
+          {section === "profile" ? <Profile settings={settings} update={update} list={list} userId={auth.user?.uid ?? "anonymous"} /> : null}
           {section === "appearance" ? <Appearance value={settings.preferences.appearance} choose={chooseAppearance} /> : null}
           {section === "notifications" ? <ToggleList values={settings.notifications} onChange={(key, value) => update("notifications", key, value)} /> : null}
           {section === "privacy" ? <Privacy settings={settings} update={update} setSettings={setSettings} /> : null}
@@ -138,8 +141,8 @@ function Account({ settings, update }: { settings: SettingsData; update: Update 
   return <div className="space-y-6"><Field label="Name"><input className={inputClass} value={settings.account.displayName} onChange={(event) => update("account", "displayName", event.target.value)} /></Field><Field label="Username"><input className={inputClass} value={settings.account.username} onChange={(event) => update("account", "username", event.target.value)} /></Field><Field label="Email"><input className={inputClass} value={settings.account.email} disabled /></Field><Field label="Phone"><input className={inputClass} value={settings.account.phone} onChange={(event) => update("account", "phone", event.target.value)} /></Field><p className="rounded-[8px] bg-black/30 p-4 text-sm capitalize text-slate-300">Account type: <b>{settings.account.accountType}</b> - Access: <b>{settings.account.effectiveTier?.displayName ?? settings.account.planId}</b></p></div>;
 }
 
-function Profile({ settings, update, list }: { settings: SettingsData; update: Update; list: (value: string) => string[] }) {
-  return <div className="space-y-6"><Field label="Avatar URL"><input className={inputClass} value={settings.profile.avatarUrl} onChange={(event) => update("profile", "avatarUrl", event.target.value)} /></Field><Field label="Cover Image URL"><input className={inputClass} value={settings.profile.coverImageUrl} onChange={(event) => update("profile", "coverImageUrl", event.target.value)} /></Field><Field label="Bio"><textarea className={textareaClass} value={settings.profile.bio} onChange={(event) => update("profile", "bio", event.target.value)} /></Field><Field label="Location"><input className={inputClass} value={settings.profile.location} onChange={(event) => update("profile", "location", event.target.value)} /></Field><Field label="Website"><input className={inputClass} value={settings.profile.website} onChange={(event) => update("profile", "website", event.target.value)} /></Field><Field label="Social Links"><input className={inputClass} value={settings.profile.socialLinks.join(", ")} onChange={(event) => update("profile", "socialLinks", list(event.target.value))} /></Field><Field label="Category Interests"><input className={inputClass} value={settings.profile.categoryInterests.join(", ")} onChange={(event) => update("profile", "categoryInterests", list(event.target.value))} /></Field></div>;
+function Profile({ settings, update, list, userId }: { settings: SettingsData; update: Update; list: (value: string) => string[]; userId: string }) {
+  return <div className="space-y-6"><MediaUploadField label="Profile Avatar" value={settings.profile.avatarUrl} onChange={(url) => update("profile", "avatarUrl", url)} storagePath={`profileMedia/${userId}/avatar`} kind="image" buttonLabel="Upload Avatar" /><MediaUploadField label="Profile Cover Image" value={settings.profile.coverImageUrl} onChange={(url) => update("profile", "coverImageUrl", url)} storagePath={`profileMedia/${userId}/cover`} kind="image" buttonLabel="Upload Cover Image" /><Field label="Bio"><textarea className={textareaClass} value={settings.profile.bio} onChange={(event) => update("profile", "bio", event.target.value)} /></Field><Field label="Location"><input className={inputClass} value={settings.profile.location} onChange={(event) => update("profile", "location", event.target.value)} /></Field><Field label="Website"><input className={inputClass} value={settings.profile.website} onChange={(event) => update("profile", "website", event.target.value)} /></Field><Field label="Social Links"><input className={inputClass} value={settings.profile.socialLinks.join(", ")} onChange={(event) => update("profile", "socialLinks", list(event.target.value))} /></Field><Field label="Category Interests"><input className={inputClass} value={settings.profile.categoryInterests.join(", ")} onChange={(event) => update("profile", "categoryInterests", list(event.target.value))} /></Field></div>;
 }
 
 function Appearance({ value, choose }: { value: string; choose: (value: "system" | "light" | "dark") => void }) {
@@ -192,3 +195,4 @@ function title(section: string) {
 function description(section: string) {
   return ({ account: "Manage your identity and contact details.", profile: "Shape your public competition profile.", appearance: "Choose how Challenge Suite should look.", notifications: "Control the alerts you receive.", privacy: "Choose what other people can see and do.", security: "Protect access to your account.", billing: "Review plan access and manage subscription actions.", wallet: "Review internal platform credits and purchase history.", preferences: "Personalize challenge discovery and content.", danger: "Protected account lifecycle controls." } as Record<string, string>)[section];
 }
+

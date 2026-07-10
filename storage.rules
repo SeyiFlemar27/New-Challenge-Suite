@@ -5,26 +5,83 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
     function isImage() {
-      return request.resource.contentType.matches('image/.*');
+      return request.resource != null
+        && request.resource.size <= 15 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
     }
 
     function isVideo() {
-      return request.resource.contentType.matches('video/.*');
+      return request.resource != null
+        && request.resource.size <= 250 * 1024 * 1024
+        && request.resource.contentType in ['video/mp4', 'video/webm', 'video/quicktime'];
     }
 
-    match /users/{userId}/submissions/{fileName} {
-      // Submission media remains private until a server-side approval and signed-delivery flow exists.
-      allow read, write: if false;
+    function isMedia() {
+      return isImage() || isVideo();
     }
 
-    match /users/{userId}/challenge-media/{fileName} {
-      // Challenge media uploads are disabled until the production bucket and moderation flow are verified.
-      allow read, write: if false;
+    match /challengeMedia/{challengeId}/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /challengeMedia/drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /challengeMedia/host-drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /submissions/{challengeId}/{userId}/{fileName} {
+      // Submission media is authenticated-only until the server marks the submission approved and serves public-safe URLs.
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /sponsorMedia/profile/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isImage();
+    }
+
+    match /sponsorMedia/{sponsorId}/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isImage();
+    }
+
+    match /profileMedia/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImage();
+    }
+
+    match /rewardPrizeMedia/{prizeId}/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if isAdmin() && isImage();
+    }
+
+    match /eventMedia/{eventId}/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /eventMedia/host-drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
     }
 
     match /users/{userId}/identity-documents/{fileName} {
-      // KYC document processing is intentionally inactive.
+      // KYC document processing is intentionally inactive; raw ID and face media must not be stored here.
       allow read, write: if false;
     }
 
