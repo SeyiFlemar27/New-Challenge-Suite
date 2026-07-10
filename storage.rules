@@ -34,6 +34,11 @@ service firebase.storage {
       allow write: if isOwner(userId) && isMedia();
     }
 
+    match /challengeMedia/drafts/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
     match /challengeMedia/drafts/{userId}/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isOwner(userId) && isMedia();
@@ -65,6 +70,11 @@ service firebase.storage {
       allow write: if isOwner(userId) && isImage();
     }
 
+    match /profileMedia/{userId}/{folder}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImage();
+    }
+
     match /rewardPrizeMedia/{prizeId}/{userId}/{fileName} {
       allow read: if signedIn();
       allow write: if isAdmin() && isImage();
@@ -90,3 +100,4 @@ service firebase.storage {
     }
   }
 }
+
