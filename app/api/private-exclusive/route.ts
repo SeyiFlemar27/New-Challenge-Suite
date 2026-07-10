@@ -1,6 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { inviteExpired } from "@/lib/server/private-invites";
+import { writeAuditLog } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ function isPrivateChallenge(data: FirebaseFirestore.DocumentData) {
 }
 
 export async function GET(request: Request) {
-  const { response } = await requireRequestUser(request);
+  const { user, response } = await requireRequestUser(request);
   if (response) return response;
 
   const db = getAdminDb();
@@ -33,7 +35,11 @@ export async function GET(request: Request) {
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 30;
 
   try {
-    const snap = await db.collection("challenges").orderBy("createdAt", "desc").limit(limit * 3).get();
+    const [snap, accessSnap] = await Promise.all([
+      db.collection("challenges").orderBy("createdAt", "desc").limit(limit * 4).get(),
+      db.collection("privateChallengeAccess").where("userId", "==", user.uid).where("status", "==", "approved").limit(200).get()
+    ]);
+    const unlockedIds = new Set(accessSnap.docs.map((doc) => String(doc.data().challengeId ?? "")));
     const challenges = snap.docs
       .map((doc) => {
         const data = doc.data();
@@ -47,7 +53,10 @@ export async function GET(request: Request) {
           registrationDeadline: toIso(data.registrationDeadline) ?? data.registrationDeadline
         };
       })
-      .filter(isPrivateChallenge)
+      .filter((challenge) => {
+        const record = challenge as Record<string, unknown>;
+        return isPrivateChallenge(record) && (record.creatorId === user.uid || record.hostId === user.uid || unlockedIds.has(String(record.id)));
+      })
       .slice(0, limit);
 
     return ok({ challenges }, "Private exclusive challenges loaded.");
@@ -80,6 +89,14 @@ export async function POST(request: Request) {
 
     const inviteDoc = inviteSnap.docs[0];
     const invite = inviteDoc.data();
+    if (invite.enabled === false || inviteExpired(invite)) {
+      return fail("Invite code has expired or is disabled.", 410, { fieldErrors: { inviteCode: "Invite code is no longer active." } }, "INVITE_INACTIVE");
+    }
+    const currentUses = Number(invite.currentUses ?? 0);
+    const maxUses = Number(invite.maxUses ?? 0);
+    if (maxUses > 0 && currentUses >= maxUses) {
+      return fail("Invite code has reached its maximum uses.", 409, { fieldErrors: { inviteCode: "Invite code can no longer be used." } }, "INVITE_LIMIT_REACHED");
+    }
     const challengeId = String(invite.challengeId ?? "");
     if (!challengeId) {
       return fail("Invite code is not connected to a challenge.", 400, { fieldErrors: { inviteCode: "Invite configuration is incomplete." } }, "VALIDATION_ERROR");
@@ -90,16 +107,35 @@ export async function POST(request: Request) {
       return fail("Private challenge is unavailable.", 404, { fieldErrors: { challengeId: "Private challenge does not exist or is unavailable." } }, "NOT_FOUND");
     }
 
-    await db.collection("privateChallengeAccess").doc(`${challengeId}_${user.uid}`).set({
-      id: `${challengeId}_${user.uid}`,
-      challengeId,
-      userId: user.uid,
-      inviteId: inviteDoc.id,
-      status: "approved",
-      source: "invite_code",
-      createdAt: now,
-      updatedAt: now
-    }, { merge: true });
+    await db.runTransaction(async (transaction) => {
+      transaction.set(db.collection("privateChallengeAccess").doc(`${challengeId}_${user.uid}`), {
+        id: `${challengeId}_${user.uid}`,
+        challengeId,
+        userId: user.uid,
+        inviteId: inviteDoc.id,
+        status: "approved",
+        source: "invite_code",
+        createdAt: now,
+        updatedAt: now
+      }, { merge: true });
+      transaction.set(inviteDoc.ref, { currentUses: currentUses + 1, lastUsedAt: now, updatedAt: now }, { merge: true });
+      transaction.create(db.collection("privateInviteAuditEvents").doc(), {
+        challengeId,
+        inviteId: inviteDoc.id,
+        userId: user.uid,
+        action: "invite_code_used",
+        createdAt: now
+      });
+    });
+    await writeAuditLog({
+      actorId: user.uid,
+      actorType: "user",
+      action: "private_invite.used",
+      targetType: "challenge",
+      targetId: challengeId,
+      reason: "User unlocked private challenge with invite code.",
+      metadata: { inviteId: inviteDoc.id }
+    }, db).catch(() => undefined);
 
     return ok({ challengeId, challenge: { id: challengeSnap.id, ...challengeSnap.data() } }, "Access granted. Private challenge unlocked.");
   }

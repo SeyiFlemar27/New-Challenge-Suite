@@ -5,6 +5,7 @@ import { getVoteWeight } from "@/lib/plan-access";
 import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { writeAuditLog } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
+import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
 
 export type VoteMode = "free" | "dorocoin";
 
@@ -119,7 +120,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     if (input.voteMode === "dorocoin") {
       coinCost = quantity;
       const walletRef = db.collection("doroCoinWallets").doc(input.userId);
+      const userRef = db.collection("users").doc(input.userId);
       const walletSnap = await transaction.get(walletRef);
+      const userSnap = await transaction.get(userRef);
       const balance = Number(walletSnap.data()?.balance ?? 0);
       if (balance < coinCost) throw voteReject("Insufficient DoroCoins. 1 DoroCoin equals 1 vote.", "INSUFFICIENT_DOROCOINS");
       transaction.set(walletRef, { userId: input.userId, balance: balance - coinCost, lockedBalance: Number(walletSnap.data()?.lockedBalance ?? 0), updatedAt: now }, { merge: true });
@@ -138,6 +141,34 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         challengeId: input.challengeId,
         idempotencyKey: voteRequestId,
         createdBy: input.userId,
+        createdAt: now
+      });
+      const currentPoints = Number(userSnap.data()?.voterPoints ?? 0);
+      const nextPoints = currentPoints + coinCost;
+      const achieved = userSnap.data()?.rewardTierMilestones as Record<string, boolean> | undefined ?? {};
+      const rewardTierMilestones = { ...achieved };
+      let spinCreditsAwarded = 0;
+      for (const tier of VOTER_REWARD_TIERS) {
+        if (!rewardTierMilestones[tier.id] && currentPoints < tier.pointsRequired && nextPoints >= tier.pointsRequired) {
+          rewardTierMilestones[tier.id] = true;
+          spinCreditsAwarded += tier.spinCredits;
+        }
+      }
+      transaction.set(userRef, {
+        voterPoints: nextPoints,
+        rewardSpinCredits: Number(userSnap.data()?.rewardSpinCredits ?? 0) + spinCreditsAwarded,
+        rewardTierMilestones,
+        updatedAt: now
+      }, { merge: true });
+      transaction.create(db.collection("voterRewardEvents").doc(deterministicId("vote_reward", voteRequestId ?? txnRef.id, input.userId)), {
+        userId: input.userId,
+        challengeId: input.challengeId,
+        submissionId: input.submissionId,
+        sourceType: "dorocoin_vote_purchase",
+        pointsAwarded: coinCost,
+        spinCreditsAwarded,
+        status: "recorded",
+        cashOutEnabled: false,
         createdAt: now
       });
     }

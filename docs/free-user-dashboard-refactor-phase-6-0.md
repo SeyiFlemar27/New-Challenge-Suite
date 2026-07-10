@@ -38,7 +38,7 @@ Accounts with Creator or Host intent and the Free plan can access a compact basi
 - Image or video submission type
 - Start, entry, voting, and end dates
 
-The server enforces one basic public challenge per month through existing plan limits. Private, paid-entry, prize-pool, sponsor, tournament, live-event, boost, advanced voting, and promo-media settings are absent from the free form and remain disabled server-side.
+The server now enforces 3 lifetime Free Basic Challenges for non-premium users. Private, paid-entry, prize-pool, sponsor, tournament, live-event, boost, advanced voting, and promo-media settings are absent from the free form and remain disabled server-side.
 
 ## Create Route Protection
 
@@ -79,7 +79,7 @@ Creator earnings, sponsor payments, prize-pool management, withdrawal, and payou
 7. Confirm manual create navigation shows the competitor access gate.
 8. Confirm a direct Free competitor API creation request is rejected.
 9. Confirm Free Creator/Host sees the basic-only challenge form.
-10. Confirm the existing monthly free challenge limit still applies.
+10. Confirm the lifetime 3 Free Basic Challenge limit still applies.
 11. Confirm sponsor proposal and boost actions are hidden on Free competitor challenge details.
 12. Confirm the Free wallet has no earnings or payout section.
 13. Confirm Stripe, webhook, and DoroCoin fulfillment behavior is unchanged.

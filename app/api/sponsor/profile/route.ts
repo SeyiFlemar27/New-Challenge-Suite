@@ -7,19 +7,26 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
+function normalizeUrl(value: unknown) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 const sponsorProfileSchema = z.object({
   brandName: z.string().trim().min(2, "Brand name is required.").max(120),
   industry: z.string().trim().min(2, "Industry/category is required.").max(100),
-  website: z.string().trim().url("Enter a valid website URL.").optional().or(z.literal("")),
+  website: z.preprocess(normalizeUrl, z.string().trim().url("Enter a valid website URL.").optional().or(z.literal(""))),
   countryLocation: z.string().trim().min(2, "Country/location is required.").max(120),
   brandDescription: z.string().trim().min(20, "Brand description should be at least 20 characters.").max(1200),
-  socialLinks: z.array(z.string().trim().url("Each social link must be a valid URL.")).max(8).default([]),
+  socialLinks: z.array(z.preprocess(normalizeUrl, z.string().trim().url("Each social link must be a valid URL."))).max(8).default([]),
   contactPerson: z.string().trim().min(2, "Contact person is required.").max(120),
   businessEmail: z.string().trim().email("Enter a valid business email."),
-  logoUrl: z.string().trim().url("Logo URL must be valid.").optional().or(z.literal("")),
-  bannerUrl: z.string().trim().url("Banner URL must be valid.").optional().or(z.literal("")),
+  logoUrl: z.preprocess(normalizeUrl, z.string().trim().url("Logo URL must be valid.").optional().or(z.literal(""))),
+  bannerUrl: z.preprocess(normalizeUrl, z.string().trim().url("Banner URL must be valid.").optional().or(z.literal(""))),
   ctaButtonText: z.string().trim().min(2, "CTA button text is required.").max(40).transform((value) => value.replace(/[<>]/g, "")),
-  ctaDestinationLink: z.string().trim().url("Enter a valid CTA destination link."),
+  ctaDestinationLink: z.preprocess(normalizeUrl, z.string().trim().url("Enter a valid CTA destination link.")),
   sponsorshipGoals: z.array(z.string().trim().min(1)).min(1, "Select at least one sponsorship goal.").max(8),
   preferredChallengeCategories: z.array(z.string().trim().min(1)).min(1, "Select at least one preferred category.").max(12),
   reviewAction: z.enum(["save", "submit"]).default("save")

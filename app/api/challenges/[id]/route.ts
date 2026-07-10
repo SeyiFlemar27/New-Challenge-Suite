@@ -5,6 +5,7 @@ import { canAccessChallenge } from "@/lib/plan-access";
 import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { publicPrizePoolFields } from "@/lib/server/prize-pools";
+import { hasPrivateChallengeAccess } from "@/lib/server/private-invites";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,9 +28,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get()
     ]);
-    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, challengeData);
+    const visibility = String(challengeData.visibility ?? challengeData.type ?? "public").toLowerCase();
+    const privateOnly = visibility.includes("private") || visibility.includes("exclusive");
+    const isOwner = String(challengeData.creatorId ?? challengeData.hostId ?? "") === user.uid;
+    const hasInviteAccess = privateOnly ? await hasPrivateChallengeAccess(db, challengeSnap.id, user.uid) : false;
+    if (privateOnly && !isOwner && !hasInviteAccess) {
+      return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
+    }
+    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, { ...challengeData, visibility: privateOnly && hasInviteAccess ? "public" : challengeData.visibility });
     if (!access.allowed) {
-      return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Creator Pro is required to view this private or exclusive challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
+      return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Plan access is required for this challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
     }
   }
 

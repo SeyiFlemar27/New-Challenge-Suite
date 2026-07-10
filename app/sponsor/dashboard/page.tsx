@@ -41,6 +41,7 @@ const commandSections = [
   { title: "Placements", icon: CalendarClock, body: "Placement inventory, CTA slots, and sponsored challenge surfaces will be managed here later." },
   { title: "Audience Insights", icon: BarChart3, body: "Audience and performance insights are placeholder-only in this shell." },
   { title: "Budget & Billing", icon: CreditCard, body: "Your monthly sponsor subscription is separate from any campaign or sponsorship contribution budget. Money capture and release are not active." },
+  { title: "Revenue Share Ledger", icon: BarChart3, body: "Generated-revenue share foundations are review-only. Initial prize money remains separate and goes 100% to winners after review." },
   { title: "Team Members", icon: Users, body: "Team seat management is planned, but no invitations are active yet." },
   { title: "Messages", icon: MessageSquare, body: "Sponsor-to-creator messaging will be connected in a later phase." }
 ];

@@ -5,6 +5,7 @@ const sections = new Set([
   "users", "creators", "host-workspaces", "sponsor-brands", "events", "tournaments", "dorocoin", "cash-ledger",
   "reports", "audit-logs", "notifications", "support", "announcements", "categories", "voting-rules",
   "revenue-rules", "feature-flags", "roles", "settings", "search"
+  , "predictions", "rewards", "prize-wheel", "kyc"
 ]);
 
 export default async function AdminSectionPage({ params }: { params: Promise<{ section: string }> }) {

@@ -104,6 +104,10 @@ export function fetchChallenges() {
   return apiRequest<{ challenges: unknown[] }>("/api/challenges");
 }
 
+export function fetchChallengeUsage() {
+  return apiRequest<{ freeBasic: { used: number; limit: number; remaining: number; rule: "lifetime" } }>("/api/challenges/usage");
+}
+
 export function fetchFeed(limit = 30) {
   return apiRequest<{ challenges: unknown[]; submissions: unknown[]; nextCursor: string | null }>(`/api/feed?limit=${limit}`);
 }

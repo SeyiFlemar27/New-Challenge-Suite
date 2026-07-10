@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, LockKeyhole, Save } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -9,7 +9,7 @@ import { redistributeSponsorship } from "@/lib/legal";
 import { challengeSchema } from "@/lib/validation";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience, getUserPlanAccess, type PlanExperience } from "@/lib/plan-access";
-import { createChallenge } from "@/lib/api/services";
+import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
 import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
 
 const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
@@ -46,8 +46,8 @@ function CreateChallengeWizard() {
   const planExperience = getPlanExperience(planProfile);
   const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
   const freePlan = planExperience.planId === "free";
-  const freeCompetitor = freePlan && selectedAccountType !== "creator" && selectedAccountType !== "host";
-  const freeCreatorOrHost = freePlan && (selectedAccountType === "creator" || selectedAccountType === "host");
+  const freeBasicUser = freePlan && selectedAccountType !== "sponsor";
+  const [freeUsage, setFreeUsage] = useState({ used: 0, limit: 3, remaining: 3, loaded: false });
   const defaultType = searchParams.get("mode") === "private" ? "Private / Exclusive" : "Public Challenge";
   const [step, setStep] = useState(0);
   const [stage, setStage] = useState<"wizard" | "success">("wizard");
@@ -97,6 +97,11 @@ function CreateChallengeWizard() {
     eventCountry: "",
     eventMapUrl: "",
     eventCapacity: "50",
+    externalLiveUrl: "",
+    externalLiveProvider: "",
+    externalLiveStatus: "not_ready",
+    externalLiveOpensAt: "",
+    externalLiveCtaLabel: "Watch live on partner site",
     tournamentType: "none",
     divisionFormat: "2",
     maxParticipants: "50",
@@ -120,6 +125,18 @@ function CreateChallengeWizard() {
   const prizeLocked = !planAccess.canCreatePrizeChallenges && !braggingRights;
   const privateLocked = !planAccess.canCreatePrivateChallenges && form.type === "Private / Exclusive";
   const draftOnlyFormat = form.competitionFormat.includes("Program") || form.competitionFormat.includes("Campaign");
+
+  useEffect(() => {
+    if (!userLoading && freeBasicUser) {
+      fetchChallengeUsage().then((result) => {
+        if (result.ok && result.data) {
+          setFreeUsage({ ...result.data.freeBasic, loaded: true });
+        } else {
+          setFreeUsage((current) => ({ ...current, loaded: true }));
+        }
+      });
+    }
+  }, [freeBasicUser, userLoading]);
 
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -228,6 +245,11 @@ function CreateChallengeWizard() {
       eventCountry: form.eventCountry,
       eventMapUrl: form.eventMapUrl,
       eventCapacity: Number(form.eventCapacity || 0),
+      externalLiveUrl: form.externalLiveUrl,
+      externalLiveProvider: form.externalLiveProvider,
+      externalLiveStatus: form.externalLiveStatus,
+      externalLiveOpensAt: form.externalLiveOpensAt,
+      externalLiveCtaLabel: form.externalLiveCtaLabel,
       tournamentType: form.tournamentType,
       divisionFormat: Number(form.divisionFormat),
       maxParticipants: Number(form.maxParticipants),
@@ -297,22 +319,6 @@ function CreateChallengeWizard() {
 
   if (userLoading) return <CreateChallengeFallback />;
 
-  if (freeCompetitor) {
-    return (
-      <AppShell>
-        <Card className="mx-auto mt-10 max-w-2xl border-yellow-500/30 p-6 text-center sm:p-8 lg:p-10">
-          <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
-          <h1 className="mt-5 text-3xl font-black">Create Challenge is for Creators and Hosts</h1>
-          <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">Free competitor accounts are built for joining, voting, saving, and competing in challenges. Switch to a Creator or Host plan to create challenges.</p>
-          <div className="mt-7 grid gap-3 sm:flex sm:justify-center">
-            <LinkButton href="/subscriptions">Upgrade to Creator</LinkButton>
-            <LinkButton href="/challenges" variant="secondary">Go Back to Challenges</LinkButton>
-          </div>
-        </Card>
-      </AppShell>
-    );
-  }
-
   if (stage === "success") {
     return (
       <AppShell>
@@ -344,12 +350,14 @@ function CreateChallengeWizard() {
     );
   }
 
-  if (freeCreatorOrHost) {
+  if (freeBasicUser) {
+    const usedAllFreeChallenges = freeUsage.loaded && freeUsage.remaining <= 0;
     return (
       <AppShell>
         <Card className="mx-auto max-w-3xl p-5 sm:p-7 lg:p-9">
-          <PageTitle title="Create a Basic Public Challenge" subtitle="Free creator and host accounts can publish one simple, public, non-monetized challenge per month." />
-          <p className="mt-4 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 px-4 py-3 text-sm font-bold text-[var(--gold-2)]">1 free public challenge is available each month. Published usage is enforced on the server.</p>
+          <PageTitle title="Create a Basic Public Challenge" subtitle="Free accounts can publish up to three lifetime public, non-monetized challenges before upgrading." />
+          <p className="mt-4 rounded-[8px] border border-[var(--gold)]/20 bg-[var(--gold)]/5 px-4 py-3 text-sm font-bold text-[var(--gold-2)]">Free Basic Challenges Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}. This lifetime limit is enforced on the server.</p>
+          {usedAllFreeChallenges ? <Card className="mt-6 border-yellow-500/30 bg-yellow-500/5 p-5 text-center"><LockKeyhole className="mx-auto text-[var(--gold)]" /><h2 className="mt-3 text-2xl font-black">Upgrade to keep creating</h2><p className="mt-2 text-sm leading-6 text-slate-300">You have used all three lifetime Free Basic Challenges. Creator and Host plans unlock more creation tools.</p><LinkButton href="/subscriptions" className="mt-5">Upgrade to Creator</LinkButton></Card> : null}
           <div className="mt-8 grid gap-6">
             <Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field>
             <div className="grid gap-6 sm:grid-cols-2">
@@ -365,14 +373,14 @@ function CreateChallengeWizard() {
               <Field label="Voting Deadline"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(event) => update("votingDeadline", event.target.value)} /></Field>
               <Field label="End Date"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></Field>
             </div>
-            <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, boosts, advanced voting, and promo media are unavailable in this free flow.</Card>
+            <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, revenue sharing, prediction arena, boosts, advanced voting, and premium analytics are unavailable in this free flow.</Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
             {draftSaved ? <p className="rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved.</p> : null}
             <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
               <LinkButton href="/subscriptions" variant="secondary">Upgrade for More Creator Tools</LinkButton>
               <div className="grid gap-3 sm:flex">
                 <Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>
-                <Button onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button>
+                <Button onClick={publish} disabled={saving || usedAllFreeChallenges}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button>
               </div>
             </div>
           </div>
@@ -529,7 +537,7 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
     <section>
       <h2 className="text-xl font-black sm:text-2xl">Step 4: Prize Foundation</h2>
       <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Paid-entry prize pools, cash payouts, automatic refunds, and sponsor money release are locked. Challenges are created as non-monetized or sponsor-ready metadata only.</Card>
-      {!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]">Free Creator accounts can publish one basic public non-monetized challenge per month. Free Competitor accounts must become a Creator before creating challenges. Creator Plan or higher is required for sponsor-enabled or advanced settings.</Card> : null}
+      {!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]">Free accounts can publish up to three lifetime basic public non-monetized challenges. Creator Plan or higher is required for sponsor-enabled, private, prize, or advanced settings.</Card> : null}
       <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option value="bragging_rights">Bragging Rights</option><option value="physical_product" disabled={!planAccess.canCreatePrizeChallenges}>Physical Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="digital_product" disabled={!planAccess.canCreatePrizeChallenges}>Digital Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="money" disabled={!planAccess.canCreatePrizeChallenges}>Money (Review Only) {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option></select></Field><Card className="p-4 text-slate-300">Money and physical-product prizes require platform review. Entry fees, cash payout execution, and prize release remain inactive.</Card></div>
       {!braggingRights ? <div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Prize Title"><input className={inputClass} value={form.prizeTitle} onChange={(event) => update("prizeTitle", event.target.value)} /></Field><Field label="Estimated Prize Value"><input className={inputClass} type="number" min="0" value={form.prizeValue} onChange={(event) => update("prizeValue", event.target.value)} /></Field><Field label="Prize Description"><textarea className={textareaClass} value={form.prizeDescription} onChange={(event) => update("prizeDescription", event.target.value)} /></Field><Field label="Delivery Notes"><textarea className={textareaClass} value={form.prizeDeliveryNotes} onChange={(event) => update("prizeDeliveryNotes", event.target.value)} /></Field></div> : null}
       <div className="mt-6 rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5">

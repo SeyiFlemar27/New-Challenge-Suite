@@ -208,6 +208,46 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /kycMetadata/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /revenueShareLedgers/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /privateChallengeInvites/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /privateChallengeAccess/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /privateInviteAuditEvents/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /predictionRecords/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardWheelPrizes/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardSpinHistory/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /voterRewardEvents/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /tournamentPlans/{document=**} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

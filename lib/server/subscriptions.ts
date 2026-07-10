@@ -10,7 +10,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     priceMonthly: 0,
     priceMonthlyLabel: "$0/month",
     stripePriceEnv: "",
-    features: ["Explore and join public challenges", "1 basic public challenge/month", "Public voting and leaderboard access", "Private, sponsor, boost, and analytics tools locked"],
+    features: ["Explore and join public challenges", "3 lifetime Free Basic Challenges", "Public voting and leaderboard access", "Private, sponsor, boost, and analytics tools locked"],
     canHostLiveEvents: false,
     liveEventCapacity: 0,
     canManageTournaments: false,

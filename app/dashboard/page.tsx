@@ -89,7 +89,7 @@ export default function DashboardPage() {
         { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible challenges.", icon: Vote, active: true },
         { title: "Track Your Entries", body: "Follow submission status, votes, rankings, and wins in one place.", icon: Medal, active: true, href: "/my-entries" }
       ] : [
-        { title: "Basic Public Challenge", body: "Create one public, non-monetized challenge per month.", icon: Swords, active: true, href: "/challenges/create" },
+        { title: "Basic Public Challenge", body: "Create up to three lifetime public, non-monetized challenges.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" }
       ]
     : planExperience.planId === "creator"

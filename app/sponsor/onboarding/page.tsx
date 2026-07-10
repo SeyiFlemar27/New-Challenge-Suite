@@ -66,6 +66,7 @@ export default function SponsorOnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [unauthorized, setUnauthorized] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Record<"logoUrl" | "bannerUrl", boolean>>({ logoUrl: false, bannerUrl: false });
 
   const completed = Boolean(profile?.hasSponsorProfile || profile?.sponsorOnboardingStatus === "complete");
   const verificationStatus = normalizeSponsorReviewStatus(profile?.sponsorVerificationStatus);
@@ -111,6 +112,7 @@ export default function SponsorOnboardingPage() {
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
     setFieldErrors((current) => ({ ...current, [field]: "" }));
+    if (field === "logoUrl" || field === "bannerUrl") setImageErrors((current) => ({ ...current, [field]: false }));
     setSaved(null);
   }
 
@@ -255,6 +257,10 @@ export default function SponsorOnboardingPage() {
               <Field label="Logo URL / Placeholder"><input className={inputClass} value={form.logoUrl} onChange={(event) => update("logoUrl", event.target.value)} placeholder="Optional image URL" />{fieldErrors.logoUrl ? <ErrorText>{fieldErrors.logoUrl}</ErrorText> : null}</Field>
               <Field label="Banner URL / Placeholder"><input className={inputClass} value={form.bannerUrl} onChange={(event) => update("bannerUrl", event.target.value)} placeholder="Optional banner URL" />{fieldErrors.bannerUrl ? <ErrorText>{fieldErrors.bannerUrl}</ErrorText> : null}</Field>
             </div>
+            <div className="mt-6 grid gap-5 lg:grid-cols-[180px_1fr]">
+              <MediaPreview label="Logo preview" url={form.logoUrl} failed={imageErrors.logoUrl} onError={() => setImageErrors((current) => ({ ...current, logoUrl: true }))} />
+              <MediaPreview label="Banner preview" wide url={form.bannerUrl} failed={imageErrors.bannerUrl} onError={() => setImageErrors((current) => ({ ...current, bannerUrl: true }))} />
+            </div>
             <div className="mt-6">
               <Field label="Social Links"><textarea className={textareaClass} value={form.socialLinksText} onChange={(event) => update("socialLinksText", event.target.value)} placeholder="One URL per line" />{fieldErrors.socialLinks ? <ErrorText>{fieldErrors.socialLinks}</ErrorText> : null}</Field>
             </div>
@@ -304,4 +310,14 @@ function CheckOption({ label, checked, onChange }: { label: string; checked: boo
 
 function ChipOption({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={checked ? "min-h-11 rounded-full bg-[var(--gold)] px-4 py-2 text-sm font-black text-black" : "min-h-11 rounded-full border border-white/10 bg-[#1a1a1a] px-4 py-2 text-sm font-bold text-slate-300"}>{label}</button>;
+}
+
+function MediaPreview({ label, url, wide, failed, onError }: { label: string; url: string; wide?: boolean; failed: boolean; onError: () => void }) {
+  const normalized = url.trim() ? (/^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`) : "";
+  return (
+    <div className={`rounded-[8px] border border-white/10 bg-black/30 p-3 ${wide ? "" : "max-w-[220px]"}`}>
+      <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      {normalized && !failed ? <img src={normalized} alt={label} onError={onError} className={`w-full rounded-[6px] object-cover ${wide ? "h-32" : "h-28"}`} /> : <div className={`flex w-full items-center justify-center rounded-[6px] border border-dashed border-white/10 text-center text-xs font-bold text-slate-500 ${wide ? "h-32" : "h-28"}`}>{failed ? "Image could not be loaded. Replace the URL." : "Add a URL to preview media."}</div>}
+    </div>
+  );
 }

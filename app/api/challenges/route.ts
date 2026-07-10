@@ -10,6 +10,9 @@ import { writeAuditLog } from "@/lib/server/audit";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
+import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
+import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
+import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 
 export async function GET() {
   const db = getAdminDb();
@@ -46,7 +49,8 @@ export async function POST(request: Request) {
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
-  const selectedAccountType = String(planProfile.account_type ?? planProfile.role ?? "user");
+  const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs);
+  const freePlan = planAccess.normalizedPlanId === "free";
 
   if (planAccess.isSponsor) {
     return fail("Sponsors manage campaigns from the Brand Command Center. Use /sponsor instead of normal challenge creation.", 403, { redirectTo: "/sponsor/dashboard" }, "USER_ACCOUNT_REQUIRED");
@@ -65,11 +69,17 @@ export async function POST(request: Request) {
     const data = document.data();
     return String(data.visibility ?? data.type ?? "").toLowerCase().includes("private");
   }).length;
-  if (body.publish && planExperience.monthlyChallengeLimit !== null && challengesCreatedThisMonth.length >= planExperience.monthlyChallengeLimit) {
+  if (!freePlan && body.publish && planExperience.monthlyChallengeLimit !== null && challengesCreatedThisMonth.length >= planExperience.monthlyChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.challengeLimitLabel}.`, 409, undefined, "PLAN_LIMIT_REACHED");
   }
-  if (planAccess.normalizedPlanId === "free" && !["creator", "host"].includes(selectedAccountType)) {
-    return fail("Create Challenge is available to Creator and Host accounts. Competitor accounts can join, vote, save, and compete.", 403, { redirectTo: "/subscriptions" }, "CREATOR_ACCOUNT_REQUIRED");
+  if (freePlan && body.publish && freeBasicChallengeCount >= FREE_BASIC_CHALLENGE_LIFETIME_LIMIT) {
+    return fail("You have used all 3 lifetime Free Basic Challenges. Upgrade to Creator or Host to keep creating.", 409, { used: freeBasicChallengeCount, limit: FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, redirectTo: "/subscriptions" }, "FREE_BASIC_LIMIT_REACHED");
+  }
+  if (freePlan && body.visibility !== "public") {
+    return fail("Free Basic Challenges must be public. Upgrade to Creator or Host for private invite-only challenges.", 403, undefined, "PRIVATE_CHALLENGE_LOCKED");
+  }
+  if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
+    return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
   }
   if (body.publish && body.visibility === "private" && planExperience.monthlyPrivateChallengeLimit !== null && privateChallengesThisMonth >= planExperience.monthlyPrivateChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.privateChallengeLimitLabel}.`, 409, undefined, "PRIVATE_CHALLENGE_LIMIT_REACHED");
@@ -160,6 +170,11 @@ export async function POST(request: Request) {
     } : null,
     sponsorMoneyCaptureEnabled: false,
     sponsorMoneyReleaseEnabled: false,
+    freeBasicChallenge: freePlan,
+    freeBasicChallengeLimit: freePlan ? FREE_BASIC_CHALLENGE_LIFETIME_LIMIT : null,
+    freeBasicChallengesUsedAtCreation: freePlan ? freeBasicChallengeCount + (body.publish ? 1 : 0) : null,
+    freeBasicChallengeLimitLabel: freePlan ? freeBasicLimitMessage(freeBasicChallengeCount + (body.publish ? 1 : 0)) : null,
+    freeBasicChallengesRemainingAfterPublish: freePlan && body.publish ? freeBasicRemaining(freeBasicChallengeCount + 1) : null,
     participantCount: 0,
     submissionCount: 0,
     voteCount: 0,
@@ -178,10 +193,25 @@ export async function POST(request: Request) {
     eventCountry: body.eventCountry || null,
     eventMapUrl: body.eventMapUrl || null,
     eventCapacity: body.eventCapacity,
+    eventMode: body.isLiveEvent ? "physical_first_external_livestream" : "online",
+    externalLiveUrl: body.externalLiveUrl || null,
+    externalLiveProvider: body.externalLiveProvider || null,
+    externalLiveStatus: body.externalLiveStatus,
+    externalLiveOpensAt: body.externalLiveOpensAt || null,
+    externalLiveCtaLabel: body.externalLiveCtaLabel || "Watch live on partner site",
+    nativeLiveStreamingEnabled: false,
     eventSyncStatus: body.isLiveEvent ? "pending_review" : "not_applicable",
     eventVisibility: body.isLiveEvent ? "hidden_until_approved" : "not_applicable",
     eventApprovalStatus: body.isLiveEvent ? "pending_admin_review" : "not_required",
     tournamentType: body.tournamentType,
+    tournamentModel: body.tournamentType !== "none" ? "multi_stage_competition" : "not_applicable",
+    tournamentStages: body.tournamentStages.length ? body.tournamentStages : body.tournamentType !== "none" ? [
+      { id: "registration", name: "Registration", order: 1, status: "draft", advancementRule: "Participants register or request approval." },
+      { id: "round_1", name: "Round 1", order: 2, status: "draft", advancementRule: "Submissions and/or voting determine advancement." },
+      { id: "final", name: "Final", order: 3, status: "draft", advancementRule: "Final winner requires host and admin review." }
+    ] : [],
+    tournamentCurrentStage: body.tournamentType !== "none" ? "registration" : null,
+    tournamentExecutionEnabled: false,
     divisionFormat: body.divisionFormat,
     maxParticipants: body.maxParticipants,
     scoringMode: body.scoringMode,
@@ -208,9 +238,14 @@ export async function POST(request: Request) {
     submittedForReviewAt: lifecycleStatus === "pending_review" ? now : null,
     publishedAt: body.publish && lifecycleStatus !== "pending_review" ? now : null
   };
+  const privateInvitePromise = challenge.visibility === "private" || challenge.visibility === "exclusive"
+    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now })
+    : Promise.resolve(null);
 
   await Promise.all([
     ref.set(challenge),
+    db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`).set(revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
+    privateInvitePromise,
     writeChallengePrizePoolFoundation(db, {
       challengeId: ref.id,
       prizeType: body.prizeType,

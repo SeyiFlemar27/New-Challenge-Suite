@@ -25,6 +25,13 @@ interface LiveEventRecord {
   isOwned?: boolean;
   source?: string;
   challengeId?: string | null;
+  venueName?: string;
+  venueAddress?: string;
+  externalLiveUrl?: string | null;
+  externalLiveStatus?: string;
+  externalLiveProvider?: string | null;
+  externalLiveCtaLabel?: string;
+  nativeLiveStreamingEnabled?: boolean;
 }
 
 function formatDate(value: string) {
@@ -82,6 +89,14 @@ function LiveEventsContent() {
         isOwned: Boolean(record.isOwned),
         source: String((record as any).source ?? "liveEvents"),
         challengeId: (record as any).challengeId ? String((record as any).challengeId) : null
+        ,
+        venueName: String((record as any).venueName ?? ""),
+        venueAddress: String((record as any).venueAddress ?? ""),
+        externalLiveUrl: (record as any).externalLiveUrl ? String((record as any).externalLiveUrl) : null,
+        externalLiveStatus: String((record as any).externalLiveStatus ?? "not_ready"),
+        externalLiveProvider: (record as any).externalLiveProvider ? String((record as any).externalLiveProvider) : null,
+        externalLiveCtaLabel: String((record as any).externalLiveCtaLabel ?? "Watch live on partner site"),
+        nativeLiveStreamingEnabled: false
       };
     }).filter((event) => event.id));
     setLoading(false);
@@ -120,9 +135,15 @@ function LiveEventsContent() {
               <div className="p-7">
                 <div className="font-bold">Hosted by: {event.host} <span className="text-emerald-400">Verified</span></div>
                 <h2 className="mt-5 text-2xl font-black">{event.title}</h2>
-                <p className="mt-3 text-slate-200">{event.location}</p>
+                <p className="mt-3 text-slate-200">Physical Event · Venue: {event.venueName || event.location || "Venue pending"}</p>
+                {event.venueAddress ? <p className="mt-1 text-sm text-slate-400">{event.venueAddress}</p> : null}
                 <p className="mt-8 text-slate-200">Date: {formatDate(event.date)} at {event.time || "Time unavailable"}</p>
                 <p className="mt-5 text-slate-200">{event.attending} attending</p>
+                <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300">
+                  <p className="font-black text-white">External livestream</p>
+                  <p className="mt-1 capitalize">Status: {event.externalLiveStatus?.replaceAll("_", " ") || "not ready"}</p>
+                  {event.externalLiveUrl && event.externalLiveStatus === "live" ? <a className="mt-3 inline-flex font-black text-[var(--gold)]" href={event.externalLiveUrl} target="_blank" rel="noreferrer">{event.externalLiveCtaLabel || "Watch live on partner site"}</a> : <p className="mt-2">External livestream not ready yet. Challenge Suite does not host native livestream video.</p>}
+                </div>
                 {hostMode ? <p className="mt-2 text-sm text-slate-400">{event.checkInCount ?? 0} checked in · Status: <span className="capitalize">{event.status?.replaceAll("_", " ")}</span></p> : null}
                 <div className="mt-7">
                   {hostMode ? <LinkButton href="/dashboard/host/events">Manage Event</LinkButton> : null}

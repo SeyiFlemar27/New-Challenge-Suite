@@ -1,36 +1,36 @@
 "use client";
 
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, PageTitle } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Trophy } from "lucide-react";
 import { useState } from "react";
 import { PlanFeatureGate } from "@/components/plan-feature-gate";
 
 export default function TournamentsPage() {
   return (
-    <PlanFeatureGate feature="join_tournaments" requiredPlan="Pro" title="Tournament access requires Pro plan">
+    <PlanFeatureGate feature="tournament_builder" requiredPlan="Host" title="Tournament tools require Host Plan">
       <TournamentPreview />
     </PlanFeatureGate>
   );
 }
 
 function TournamentPreview() {
-  const [format, setFormat] = useState<2 | 4 | 6>(2);
+  const [type, setType] = useState("knockout");
+  const stages = ["Registration", "Round 1", type === "league_table" ? "Table Review" : "Advancement", "Final", "Host Confirmation", "Admin Review"];
   return (
     <AppShell>
-      <div className="text-center"><PageTitle title="Tournament Brackets" subtitle="Plan and preview tournament structures. Full tournament execution is not active yet." /></div>
-      <div className="mt-6 flex justify-center gap-5"><span className="pt-3 font-bold">Format:</span>{[2, 4, 6].map((item) => <Button key={item} variant={format === item ? "primary" : "ghost"} onClick={() => setFormat(item as 2 | 4 | 6)}>{item} Divisions</Button>)}</div>
-      <Card className="bracket-scroll mx-auto mt-12 max-h-[650px] max-w-[1160px] overflow-auto bg-[#0b1019] p-9">
-        <h2 className="text-center text-2xl font-black text-[var(--gold-2)]">{format} Divisions {format === 2 ? "(East/West)" : format === 4 ? "(North/South/East/West)" : "(Regional Pools)"}</h2>
-        <div className={`mt-10 grid gap-10 ${format === 2 ? "grid-cols-3" : format === 4 ? "grid-cols-4" : "grid-cols-6"}`}>
-          {Array.from({ length: format }).map((_, division) => <BracketColumn key={division} title={format === 2 ? ["Quarterfinals", "Semifinals"][division] ?? "Final" : `Division ${division + 1}`} matches={format + division} />)}
-          <BracketColumn title="Final" matches={1} />
-        </div>
-      </Card>
-      <p className="mt-12 text-center text-lg text-slate-500">Bracket preview foundation. Host plan is required for management controls.<br />No participant or prize action is executed from this preview.</p>
+      <PageTitle title="Tournament Manager" subtitle="A tournament is a multi-stage competition with rounds, advancement rules, participant review, voting or judging, finals, and admin-reviewed winner confirmation." />
+      <div className="mt-6 flex flex-wrap gap-3">{["knockout", "bracket", "league_table", "audition_to_final", "group_stage_to_final", "custom_rounds"].map((item) => <Button key={item} variant={type === item ? "primary" : "ghost"} onClick={() => setType(item)}>{item.replaceAll("_", " ")}</Button>)}</div>
+      <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_360px]">
+        <Card className="p-6 sm:p-8">
+          <h2 className="text-2xl font-black capitalize">{type.replaceAll("_", " ")} Flow</h2>
+          <div className="mt-7 grid gap-4 md:grid-cols-3">{stages.map((stage, index) => <Card key={stage} className="p-4"><p className="text-xs font-black uppercase text-[var(--gold)]">Stage {index + 1}</p><h3 className="mt-2 font-black">{stage}</h3><p className="mt-2 text-sm text-slate-400">{stage === "Admin Review" ? "Winner announcement and revenue/prize foundations require review. No payout is executed." : "Configure rules, participants, submissions, votes, and advancement before moving forward."}</p></Card>)}</div>
+        </Card>
+        <Card className="p-6">
+          <EmptyState icon={<Trophy />} title="No tournament plans yet" body="Create a Host competition and choose Tournament to start planning rounds, participant approvals, advancement rules, and finals." action={<LinkButton href="/challenges/create?mode=tournament">Create Tournament</LinkButton>} />
+          <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Bracket execution, automatic advancement, prize release, and payout actions remain inactive foundations.</p>
+        </Card>
+      </div>
     </AppShell>
   );
-}
-
-function BracketColumn({ title, matches }: { title: string; matches: number }) {
-  return <div><h3 className="mb-6 text-center text-xl font-black">{title}</h3>{Array.from({ length: matches }).map((_, i) => <div key={i} className="mb-9 overflow-hidden rounded-[7px] border border-white/10"><div className="flex justify-between bg-yellow-500/10 p-4 font-bold"><span>User {String.fromCharCode(65 + i * 2)}</span><span>{i === 0 ? 3 : 0}</span></div><div className="flex justify-between bg-[#111827] p-4"><span>User {String.fromCharCode(66 + i * 2)}</span><span>{i === 0 ? 1 : 0}</span></div></div>)}</div>;
 }

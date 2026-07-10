@@ -3,7 +3,7 @@
 ## Account Creation Rules
 
 - Free Competitors cannot create challenges and receive the Become a Creator gate.
-- Creator Starter accounts can create one basic public, non-monetized challenge each month.
+- Non-premium users can create up to 3 lifetime basic public, non-monetized challenges.
 - Paid Creator accounts use the Creator wizard and its plan limits.
 - Paid Host accounts use the Host competition builder.
 

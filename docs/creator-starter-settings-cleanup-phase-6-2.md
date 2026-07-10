@@ -13,7 +13,7 @@ Account intent does not grant paid entitlement. Paid labels and permissions requ
 
 ## Creator Starter
 
-Creator Starter can create one basic public non-monetized challenge per month. The basic form includes title, category, description, rules, basic cover media, image/video submission type, and dates. Draft saving and publishing use the existing server route.
+Creator Starter can create up to 3 lifetime basic public non-monetized challenges before upgrading. The basic form includes title, category, description, rules, basic cover media, image/video submission type, and dates. Draft saving and publishing use the existing server route.
 
 Private challenges, paid entry, prize pools, sponsorships, boosts, advanced voting, promo media, creator earnings, withdrawals, host tools, tournaments, and live events remain unavailable. Monthly and feature limits remain server-enforced.
 

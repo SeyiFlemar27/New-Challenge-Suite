@@ -159,9 +159,9 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     dashboardName: "User Dashboard",
     dashboardSubtitle: "Explore challenges, compete, vote, and build your first public challenge.",
     badgeLabel: "Free Competitor",
-    challengeLimitLabel: "1 basic public challenge / month",
+    challengeLimitLabel: "3 lifetime basic public challenges",
     privateChallengeLimitLabel: "Private challenges locked",
-    monthlyChallengeLimit: 1,
+    monthlyChallengeLimit: 3,
     monthlyPrivateChallengeLimit: 0,
     teamMemberLimit: 0,
     monthlyBoostLimit: 0,
@@ -354,7 +354,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isEnterprisePartner: false,
     isCreatorPro: false,
     isVerifiedHost: false,
-    activeChallengeLimit: 1,
+    activeChallengeLimit: 3,
     privateChallengeLimit: 0,
     dailyFreeVoteLimit: 1,
     monthlyBoostLimit: 0,
@@ -749,7 +749,7 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
       badgeLabel: "Creator Starter",
       memberLabel: "Free Creator",
       dashboardName: "Creator Starter",
-      dashboardSubtitle: "Create one basic public challenge, explore competitions, and upgrade when you're ready for full creator tools."
+      dashboardSubtitle: "Create up to three lifetime basic public challenges, explore competitions, and upgrade when you're ready for full creator tools."
     };
   }
 
@@ -763,7 +763,7 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
       badgeLabel: "Host Starter",
       memberLabel: "Starter Access",
       dashboardName: "Host Starter",
-      dashboardSubtitle: "Create one basic public challenge while you prepare for full host tools."
+      dashboardSubtitle: "Create up to three lifetime basic public challenges while you prepare for full host tools."
     };
   }
 

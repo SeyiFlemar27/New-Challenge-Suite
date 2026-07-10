@@ -32,7 +32,7 @@ function CheckoutSuccessContent() {
       if (result.ok && planId === expectedPlan && activeStatuses.has(String(planStatus))) {
         completed = true;
         setState("confirmed");
-        setDestination(expectedPlan === "host" ? "/onboarding/host" : expectedPlan === "creator" ? "/onboarding/creator" : "/dashboard");
+        setDestination(expectedPlan === "host" || expectedPlan === "creator" ? "/kyc/status" : "/dashboard");
         return;
       }
       attempts += 1;
@@ -56,7 +56,7 @@ function CheckoutSuccessContent() {
         <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">Secure plan verification</p>
         {state === "pending" ? <Clock3 className="mx-auto mt-5 text-[var(--gold)]" size={42} /> : state === "confirmed" ? <CheckCircle2 className="mx-auto mt-5 text-emerald-400" size={42} /> : <TriangleAlert className="mx-auto mt-5 text-amber-300" size={42} />}
         <h1 className="mt-5 text-3xl font-black text-white sm:text-4xl">{state === "pending" ? "Confirming your subscription..." : state === "confirmed" ? expectedPlan ? "Your plan is ready" : "Checkout received" : "Payment not completed"}</h1>
-        <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">{state === "pending" ? "This usually takes a few seconds. Challenge Suite is waiting for secure webhook verification before unlocking access." : state === "incomplete" ? "Challenge Suite has not received an active subscription confirmation yet. No plan access was granted by this page." : expectedPlan ? `Your verified ${expectedPlan === "host" ? "Host" : expectedPlan === "creator" ? "Creator" : "subscription"} access is ready for setup.` : "Your checkout returned successfully. Account updates still depend on verified webhook processing."}</p>
+        <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">{state === "pending" ? "This usually takes a few seconds. Challenge Suite is waiting for secure webhook verification before unlocking access." : state === "incomplete" ? "Challenge Suite has not received an active subscription confirmation yet. No plan access was granted by this page." : expectedPlan ? `Your verified ${expectedPlan === "host" ? "Host" : expectedPlan === "creator" ? "Creator" : "subscription"} access is ready. Premium accounts may need KYC verification before full tools unlock.` : "Your checkout returned successfully. Account updates still depend on verified webhook processing."}</p>
         <div className="mx-auto mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-4">
           {["Payment confirmed", "Subscription verified", "Plan unlocked", "Start onboarding"].map((label, index) => {
             const reached = state === "confirmed" || (state === "pending" && index === 0);
@@ -65,7 +65,9 @@ function CheckoutSuccessContent() {
         </div>
         <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-slate-400">This page never activates subscriptions or credits by itself. Subscription access is verified securely by the Stripe webhook.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {state === "confirmed" ? <LinkButton href={destination}>{expectedPlan === "host" ? "Start Host Setup" : expectedPlan === "creator" ? "Start Creator Setup" : "Return to Dashboard"}</LinkButton> : null}
+          {state === "confirmed" ? <LinkButton href={destination}>{expectedPlan === "host" || expectedPlan === "creator" ? "Continue to KYC Status" : "Return to Dashboard"}</LinkButton> : null}
+          {state === "confirmed" && expectedPlan === "host" ? <LinkButton href="/onboarding/host" variant="secondary">Open Host Setup</LinkButton> : null}
+          {state === "confirmed" && expectedPlan === "creator" ? <LinkButton href="/onboarding/creator" variant="secondary">Open Creator Setup</LinkButton> : null}
           {state === "incomplete" ? <><LinkButton href="/subscriptions">Try Again</LinkButton><LinkButton href="/subscriptions" variant="secondary">Return to Plans</LinkButton></> : null}
           {state === "pending" ? <LinkButton href="/settings/billing" variant="secondary">View Billing Status</LinkButton> : null}
         </div>

@@ -223,7 +223,7 @@ Required:
 
 ### P1-5: Pricing Copy Conflicts With Free Competitor Rules
 
-The internal Free plan feature list says “1 basic public challenge/month,” while the actual product rule and server logic allow this only for Creator Starter/Host Starter account intents. Free Competitors cannot create challenges.
+This audit captured the old Free creation rule. Phase 7.4B updates the product decision to 3 lifetime Free Basic Challenges for non-premium users, with server-side enforcement and no private/paid/prize/sponsor/host tools.
 
 Required:
 
