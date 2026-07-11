@@ -139,6 +139,7 @@ export async function persistStripeSubscriptionLifecycle(
   const accountType = metadataAccountType ?? (plan?.audience ?? null);
   const planMatchesAccount = Boolean(plan && accountType && plan.audience === accountType);
   const entitled = ["active", "payment_warning_1", "payment_warning_2"].includes(internalStatus) && planMatchesAccount;
+  const requiresKyc = Boolean(entitled && plan && plan.audience === "user" && plan.id !== "free");
   const canonicalPlanId = plan?.id && plan.id !== "free" ? plan.id as ProductPlanId : storedPlanId;
   const now = new Date().toISOString();
   const customerId = objectId(subscription.customer);
@@ -198,6 +199,9 @@ export async function persistStripeSubscriptionLifecycle(
       || currentSubscriptionId === subscription.id
       || Boolean(overrides.trustedMetadataPlan);
     const accessPlanId = entitled && canonicalPlanId ? canonicalPlanId : "free";
+    const existingKycStatus = String(userSnap.data()?.kycStatus ?? "not_started");
+    const kycStatus = requiresKyc ? (existingKycStatus === "verified" ? "verified" : "required") : "not_required";
+    const premiumAccessState = requiresKyc ? (kycStatus === "verified" ? "active" : "pending_kyc") : "free_or_not_required";
     transaction.set(owner.subscriptionRef, record, { merge: true });
     if (!affectsCurrentAccess) {
       return {
@@ -221,12 +225,33 @@ export async function persistStripeSubscriptionLifecycle(
       stripeSubscriptionId: subscription.id,
       subscriptionCurrentPeriodEnd: price.currentPeriodEnd,
       subscriptionCancelAtPeriodEnd: subscription.cancel_at_period_end,
+      kycRequired: requiresKyc,
+      kycStatus,
+      kycProvider: requiresKyc ? "sumsub" : "not_required",
+      premiumAccessState,
       updatedAt: now
     }, { merge: true });
+    if (requiresKyc) {
+      transaction.set(db.collection("kycMetadata").doc(owner.userId), {
+        userId: owner.userId,
+        kycRequired: true,
+        kycStatus,
+        kycProvider: "sumsub",
+        premiumAccessState,
+        rawIdentityStored: false,
+        kycLastCheckedAt: now,
+        updatedAt: now,
+        createdAt: now
+      }, { merge: true });
+    }
     transaction.set(profileRef, {
       planId: accessPlanId,
       subscriptionPlanId: canonicalPlanId ?? null,
       premium: entitled,
+      kycRequired: requiresKyc,
+      kycStatus,
+      kycProvider: requiresKyc ? "sumsub" : "not_required",
+      premiumAccessState,
       subscriptionStatus: internalStatus,
       planStatus: internalStatus,
       stripeStatus: subscription.status,

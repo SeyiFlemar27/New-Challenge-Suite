@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -116,6 +116,9 @@ export default function DashboardPage() {
               { title: "Reports & Exports", body: "Enterprise reporting and export foundations for program oversight.", icon: BarChart3, active: true },
               { title: "Teams & Integrations", body: `Multi-admin foundation for up to ${planExperience.teamMemberLimit} members, with integration placeholders.`, icon: UsersRound, active: true, href: "/dashboard/host" }
             ];
+  const dashboardUserRecord = (dashboard?.user ?? {}) as Record<string, unknown>;
+  const kycStatus = String(dashboardUserRecord.kycStatus ?? "not_required");
+  const showKycBanner = Boolean(dashboardUserRecord.kycRequired && kycStatus !== "verified" && kycStatus !== "not_required");
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
@@ -211,9 +214,11 @@ export default function DashboardPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : null}
+      {showKycBanner ? <Card className="mt-8 border-yellow-500/25 bg-yellow-500/5 p-5"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Premium Pending KYC</p><h2 className="mt-2 text-xl font-black">Identity verification required</h2><p className="mt-2 text-sm leading-6 text-slate-300">Your premium payment is active, but premium-sensitive tools remain locked until Sumsub verification is complete. Free/basic participation tools remain available.</p><LinkButton href="/kyc/start" className="mt-4">Start Verification</LinkButton></Card> : null}
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
+      
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierFeatures.map((feature) => (
           <TierFeatureCard key={feature.title} {...feature} />
@@ -296,3 +301,7 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
 function Stat({ icon, title, value, label, className }: { icon: React.ReactNode; title: string; value: string; label: string; className?: string | null }) {
   return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black">{value} <span className="text-base text-emerald-400">+0</span></div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }
+
+
+
+

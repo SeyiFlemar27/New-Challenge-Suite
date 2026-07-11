@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Bell,
@@ -10,6 +10,7 @@ import {
   Palette,
   Settings as SettingsIcon,
   Shield,
+  ShieldCheck,
   SlidersHorizontal,
   TriangleAlert,
   UserRound
@@ -27,6 +28,7 @@ const categories = [
   { href: "/settings/notifications", title: "Notifications", body: "Challenge, vote, comment, follower, and billing alerts.", icon: Bell },
   { href: "/settings/privacy", title: "Privacy", body: "Profile visibility, activity, messages, and public stats.", icon: Shield },
   { href: "/settings/security", title: "Security", body: "Password, two-factor foundation, and login sessions.", icon: LockKeyhole },
+  { href: "/kyc/status", title: "Identity Verification", body: "Premium KYC status, Sumsub verification, and review state.", icon: ShieldCheck },
   { href: "/settings/billing", title: "Billing & Subscription", body: "Current plan, plan management, invoices, and cancellation.", icon: CreditCard },
   { href: "/settings/wallet", title: "Wallet & DoroCoin", body: "Internal credits and DoroCoin purchase history.", icon: Coins },
   { href: "/settings/preferences", title: "Challenge Preferences", body: "Categories, challenge types, location, and language.", icon: SlidersHorizontal },
@@ -56,3 +58,5 @@ export default function SettingsPage() {
     </AppShell>
   );
 }
+
+

@@ -208,6 +208,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /sumsubWebhookEvents/{document=**} {
+      allow read, write: if false;
+    }
+
     match /kycMetadata/{document=**} {
       allow read, write: if false;
     }
@@ -285,4 +289,3 @@ service cloud.firestore {
     }
   }
 }
-

@@ -32,6 +32,9 @@ export interface CurrentUserProfile {
   walkthroughCompleted?: boolean;
   hasSponsorProfile?: boolean;
   customization?: ProfileCustomization;
+  kycRequired?: boolean;
+  kycStatus?: string;
+  premiumAccessState?: string;
 }
 
 function initialsFromName(name: string) {
@@ -109,7 +112,10 @@ export function useCurrentUser() {
           hostOnboardingComplete: Boolean(profile.hostOnboardingComplete),
           walkthroughCompleted: profile.walkthroughCompleted !== false,
           hasSponsorProfile: Boolean(profile.hasSponsorProfile),
-          customization: profile.customization as ProfileCustomization | undefined
+          customization: profile.customization as ProfileCustomization | undefined,
+          kycRequired: Boolean(profileRecord.kycRequired),
+          kycStatus: typeof profileRecord.kycStatus === "string" ? profileRecord.kycStatus : undefined,
+          premiumAccessState: typeof profileRecord.premiumAccessState === "string" ? profileRecord.premiumAccessState : undefined
         });
       } catch (caught) {
         if (!cancelled) {
@@ -135,3 +141,5 @@ export function useCurrentUser() {
     error
   }), [auth.loading, auth.user, currentUser, error, loadingProfile]);
 }
+
+

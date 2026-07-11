@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, Landmark, ShieldCheck } from "lucide-react";
@@ -112,11 +112,11 @@ export default function WithdrawPage() {
             <Card className="p-6 sm:p-8">
               <ShieldCheck className="text-[var(--gold)]" size={34} />
               <h2 className="mt-5 text-2xl font-black">Review and identity checks</h2>
-              <p className="mt-4 leading-7 text-slate-300">Identity verification will be required before withdrawals can be paid out. Bank verification and payout providers are not connected yet.</p>
+              <p className="mt-4 leading-7 text-slate-300">Sumsub identity verification must be verified before withdrawals can be approved for payout. Bank verification and payout providers are not connected yet.</p>
               <div className="mt-6 space-y-3 text-sm text-slate-400">
                 <p>DoroCoins are platform credits and cannot be withdrawn or converted to cash.</p>
                 <p>Withdrawals require admin review before payout.</p>
-                <p>No automatic or instant payout is available.</p>
+                <p>No automatic or instant payout is available.</p><p><a className="font-bold text-[var(--gold)]" href="/kyc/status">Review KYC status</a></p>
               </div>
             </Card>
           </div>
@@ -140,3 +140,4 @@ export default function WithdrawPage() {
 function Balance({ label, value }: { label: string; value: number }) {
   return <Card className="p-5"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">${(Number(value || 0) / 100).toFixed(2)}</p></Card>;
 }
+

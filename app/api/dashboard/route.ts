@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Dashboard");
 
-  const [userSnap, profileSnap, walletSnap, challengesSnap, ownedChallengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap] = await Promise.all([
+  const [userSnap, profileSnap, walletSnap, challengesSnap, ownedChallengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap, kycSnap] = await Promise.all([
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
     db.collection("doroCoinWallets").doc(user.uid).get(),
@@ -20,12 +20,14 @@ export async function GET(request: Request) {
     db.collection("submissions").where("userId", "==", user.uid).limit(50).get(),
     db.collection("notifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(8).get(),
     db.collection("badges").where("userId", "==", user.uid).limit(12).get(),
-    db.collection("leaderboards").doc("global").get()
+    db.collection("leaderboards").doc("global").get(),
+    db.collection("kycMetadata").doc(user.uid).get()
   ]);
 
   const account = userSnap.exists ? userSnap.data() : {};
   const profile = profileSnap.exists ? profileSnap.data() : {};
   const wallet = walletSnap.exists ? walletSnap.data() : {};
+  const kyc = kycSnap.exists ? kycSnap.data() ?? {} : {};
   const challenges: Array<Record<string, unknown>> = challengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
   const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
   const submissions = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -65,7 +67,10 @@ export async function GET(request: Request) {
       hostOnboardingComplete: Boolean(planProfile.hostOnboardingComplete),
       verified: Boolean(profile?.verified ?? user.emailVerified),
       totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
-      doroBalance: Number(wallet?.balance ?? 0)
+      doroBalance: Number(wallet?.balance ?? 0),
+      kycRequired: Boolean(kyc.kycRequired ?? planProfile.kycRequired),
+      kycStatus: String(kyc.kycStatus ?? planProfile.kycStatus ?? "not_required"),
+      premiumAccessState: String(kyc.premiumAccessState ?? planProfile.premiumAccessState ?? "free_or_not_required")
     },
     stats: {
       activeChallenges: challenges.filter((challenge) => isChallengeActiveForDashboard(challenge.status)).length,
@@ -82,4 +87,5 @@ export async function GET(request: Request) {
     notifications
   }, "Dashboard loaded.");
 }
+
 
