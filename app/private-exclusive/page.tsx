@@ -9,11 +9,18 @@ import { checkPrivateInviteCode, fetchPrivateExclusiveChallenges, requestPrivate
 import { normalizeChallenge } from "@/lib/api/normalizers";
 import type { Challenge } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { getEffectiveTier } from "@/lib/plan-access";
+import { getEffectiveTier, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 
 export default function PrivateExclusivePage() {
   const { user } = useCurrentUser();
-  const hostMode = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType }).id === "host";
+  const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType });
+  const experience = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
+  const planAccess = getUserPlanAccess({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
+  const hostMode = tier.id === "host" || tier.id === "enterprise";
+  const privateLimit = experience.monthlyPrivateChallengeLimit;
+  const privateLimitLabel = privateLimit === null ? "unlimited" : String(privateLimit);
+  const privateUsed = 0;
+  const privateLocked = !planAccess.canCreatePrivateChallenges;
   const [inviteCode, setInviteCode] = useState("");
   const [status, setStatus] = useState("");
   const [privateChallenges, setPrivateChallenges] = useState<Challenge[]>([]);
@@ -81,7 +88,7 @@ export default function PrivateExclusivePage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-yellow-500/10 text-[var(--gold)]"><ShieldCheck /></div>
             <div>
               <h2 className="text-2xl font-black">Access Status</h2>
-              <p className="mt-2 text-slate-300">Your current account can request invites and join with valid invite codes. Premium locked events may require an upgraded plan.</p>
+              <p className="mt-2 text-slate-300">Your current account can request invites and join with valid invite codes. Private creation follows your plan allowance.</p>
             </div>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">

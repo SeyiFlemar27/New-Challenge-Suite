@@ -37,7 +37,10 @@ const groups: NavGroup[] = [
     { href: "/admin/sponsor-brands", label: "Sponsor Brands", icon: ShieldCheck },
     { href: "/admin/events", label: "Events", icon: Radio },
     { href: "/admin/tournaments", label: "Tournaments", icon: Trophy },
+    { href: "/admin/risk-safety", label: "Risk & Safety", icon: ShieldCheck },
+    { href: "/admin/media-moderation", label: "Media Moderation", icon: ClipboardCheck },
     { href: "/admin/predictions", label: "Predictions", icon: Coins },
+    { href: "/admin/prediction-settlements", label: "Prediction Settlements", icon: Landmark },
     { href: "/admin/dorocoin", label: "DoroCoin Ledger", icon: Coins },
     { href: "/admin/cash-ledger", label: "Cash Ledger", icon: WalletCards }
   ] },
@@ -48,7 +51,9 @@ const groups: NavGroup[] = [
     { href: "/admin/support", label: "Support Inbox", icon: LifeBuoy },
     { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
     { href: "/admin/kyc", label: "KYC Status", icon: ShieldCheck },
-    { href: "/admin/rewards", label: "Reward Fulfillment", icon: Trophy }
+    { href: "/admin/rewards", label: "Reward Fulfillment", icon: Trophy },
+    { href: "/admin/ad-rewards", label: "Ad Reward Logs", icon: Bell },
+    { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: BriefcaseBusiness }
   ] },
   { label: "Configuration", items: [
     { href: "/admin/categories", label: "Categories", icon: FolderCog },

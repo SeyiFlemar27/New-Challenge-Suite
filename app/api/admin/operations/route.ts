@@ -64,9 +64,13 @@ export async function GET(request: Request) {
       db.collection("predictionRecords").limit(200).get(),
       db.collection("rewardSpinHistory").limit(200).get(),
       db.collection("rewardWheelPrizes").limit(200).get(),
-      db.collection("kycMetadata").limit(200).get()
+      db.collection("kycMetadata").limit(200).get(),
+      db.collection("predictionSettlementReviews").limit(200).get(),
+      db.collection("adVoteRewardLogs").limit(200).get(),
+      db.collection("enterpriseInquiries").limit(200).get(),
+      db.collection("mediaUploads").limit(200).get()
     ]);
-    const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap, doroWalletSnap, doroTransactionSnap, cashWalletSnap, cashLedgerSnap, liveEventSnap, tournamentSnap, notificationSnap, supportSnap, announcementSnap, predictionSnap, rewardSpinSnap, prizeWheelSnap, kycSnap] = snapshots;
+    const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap, doroWalletSnap, doroTransactionSnap, cashWalletSnap, cashLedgerSnap, liveEventSnap, tournamentSnap, notificationSnap, supportSnap, announcementSnap, predictionSnap, rewardSpinSnap, prizeWheelSnap, kycSnap, predictionSettlementSnap, adRewardSnap, enterpriseLeadSnap, mediaUploadSnap] = snapshots;
     const notes = new Map(records(adminNoteSnap).map((item) => [`${item.targetType}_${item.targetId}`, item]));
     const users = records(userSnap);
     const userMap = new Map(users.map((item) => [item.id, item]));
@@ -188,10 +192,15 @@ export async function GET(request: Request) {
     const adminNotifications = records(notificationSnap).filter((item) => item.audience === "admin" || item.adminOnly === true || ["sponsor_application", "host_verification", "flagged_submission", "withdrawal_request", "winner_review", "support_ticket"].includes(String(item.type)));
     const support = records(supportSnap).map((item) => ({ id: item.id, category: item.category ?? "other", subject: item.subject ?? "Support request", userId: item.userId ?? null, status: item.status ?? "open", createdAt: item.createdAt ?? null }));
     const announcements = records(announcementSnap).map((item) => ({ id: item.id, type: item.type ?? "platform_announcement", title: item.title ?? "Announcement", status: item.status ?? "draft", createdAt: item.createdAt ?? null, deliveryActive: false }));
-    const predictions = records(predictionSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, predictedParticipantId: item.predictedParticipantId ?? null, stakeAmountDorocoin: Number(item.stakeAmountDorocoin ?? 0), platformFeeDorocoin: Number(item.platformFeeDorocoin ?? 0), netPoolDorocoin: Number(item.netPoolDorocoin ?? 0), status: item.status ?? "settlement_pending", settlementRequiresAdminReview: true, cashPayoutEnabled: false }));
+    const predictions = records(predictionSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, predictedParticipantId: item.predictedParticipantId ?? null, stakeAmountUsd: Number(item.stakeAmountUsd ?? 0), platformFeeUsd: Number(item.platformFeeUsd ?? 0), netStakeUsd: Number(item.netStakeUsd ?? 0), predictionStatus: item.predictionStatus ?? item.status ?? "pending_payment", paymentStatus: item.paymentStatus ?? "provider_approval_required", settlementStatus: item.settlementStatus ?? "admin_review_required", eligibilityStatus: item.eligibilityStatus ?? "not_available", status: item.settlementStatus ?? item.predictionStatus ?? item.status ?? "pending_payment", settlementRequiresAdminReview: true, automaticPayoutsEnabled: false, automaticSettlementEnabled: false }));
     const rewards = records(rewardSpinSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, prizeName: item.prizeName ?? "Reward", prizeType: item.prizeType ?? "manual_foundation", status: item.status ?? "pending_admin_fulfillment", manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, createdAt: item.createdAt ?? null }));
     const prizeWheel = records(prizeWheelSnap).map((item) => ({ id: item.id, prizeName: item.prizeName ?? item.name ?? "Prize", prizeType: item.prizeType ?? "manual_prize", tier: item.tier ?? "standard", enabled: item.enabled !== false, quantity: Number(item.quantity ?? 0), probabilityWeight: Number(item.probabilityWeight ?? item.weight ?? 0), manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, status: item.status ?? "foundation" }));
     const kyc = records(kycSnap).map((item) => ({ id: item.id, userId: item.userId ?? item.id, kycRequired: item.kycRequired === true, kycStatus: item.kycStatus ?? "not_started", kycProvider: item.kycProvider ?? "not_configured", kycSessionId: item.kycSessionId ?? null, rawIdentityStored: false, status: item.kycStatus ?? "not_started", updatedAt: item.updatedAt ?? item.kycLastCheckedAt ?? null }));
+    const predictionSettlements = records(predictionSettlementSnap).map((item) => ({ id: item.id, predictionId: item.predictionId ?? item.id, challengeId: item.challengeId ?? null, userId: item.userId ?? null, status: item.settlementStatus ?? item.refundStatus ?? item.status ?? "admin_review_required", refundStatus: item.refundStatus ?? "not_applicable", automaticPayoutsEnabled: false, automaticRefundsEnabled: false, createdAt: item.createdAt ?? null }));
+    const adRewards = records(adRewardSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, adProvider: item.adProvider ?? "disabled", status: item.adRewardStatus ?? "not_available", voteGranted: item.voteGranted === true, providerVerificationRequired: true, clientGrantBlocked: item.clientGrantBlocked !== false, createdAt: item.createdAt ?? null }));
+    const enterpriseLeads = records(enterpriseLeadSnap).map((item) => ({ id: item.id, company: item.company ?? "Enterprise lead", fullName: item.fullName ?? "", workEmail: item.workEmail ?? "", expectedMonthlyChallengeVolume: item.expectedMonthlyChallengeVolume ?? "", status: item.status ?? "new", emailSent: item.emailSent === true, createdAt: item.createdAt ?? null }));
+    const mediaModeration = records(mediaUploadSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, path: item.path ?? item.storagePath ?? "", contentType: item.contentType ?? "unknown", status: item.status ?? item.moderationStatus ?? "recorded", publicReadApproved: item.publicReadApproved === true, privateMedia: item.privateMedia === true, createdAt: item.createdAt ?? null }));
+    const riskSafety = [...submissions.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...participants.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...predictions.filter((item) => ["disputed", "suspended"].includes(String(item.status)))].map((item) => ({ ...item, status: item.status ?? "review_required" }));
     const pending = (list: Array<{ status?: unknown }>, statuses: string[]) => list.filter((item) => statuses.includes(String(item.status))).length;
     return ok({
       overview: {
@@ -206,7 +215,7 @@ export async function GET(request: Request) {
         revenueReviewItems: prizePoolSnap.docs.filter((doc) => ["pending_review", "under_review", "payout_review"].includes(String(doc.data().payoutReviewStatus ?? doc.data().status))).length,
         pendingWithdrawalReviews: withdrawals.filter((item) => ["pending_review", "needs_kyc"].includes(String(item.status))).length,
         pendingKycReviews: kyc.filter((item) => ["pending_review", "needs_resubmission"].includes(String(item.status))).length,
-        predictionReviews: predictions.filter((item) => ["settlement_pending", "locked", "disputed"].includes(String(item.status))).length,
+        predictionReviews: predictions.filter((item) => ["pending_payment", "admin_review_required", "settlement_pending", "locked", "disputed"].includes(String(item.status))).length,
         rewardFulfillments: rewards.filter((item) => ["pending_admin_fulfillment", "pending_review"].includes(String(item.status))).length,
         recentAuditEvents: auditLogs.slice(0, 8),
         safety: { automaticPayouts: "Disabled", withdrawals: "Review only", sponsorRelease: "Disabled", prizePoolRelease: "Disabled", kycProcessing: "Not active", doroCoinConversion: "Disabled", adRewards: "Verification required" }
@@ -243,9 +252,14 @@ export async function GET(request: Request) {
       support,
       announcements,
       predictions,
+      predictionSettlements,
       rewards,
       prizeWheel,
       kyc,
+      adRewards,
+      enterpriseLeads,
+      mediaModeration,
+      riskSafety,
       auditLogs,
       settings: {
         adminRoles: "Firebase custom claim, users.isAdmin, or server-only allowlist",
@@ -267,8 +281,15 @@ export async function GET(request: Request) {
           teamInvitations: "foundation",
           emailNotifications: "foundation",
           pushNotifications: "foundation",
-          predictionArena: "foundation_admin_review",
-          voterRewardsWheel: "foundation_admin_fulfillment"
+          realMoneyPredictionArenaEnabled: false,
+          predictionPaymentsProvider: "disabled_or_pending_approval",
+          adVotesEnabled: false,
+          rewardsWheelEnabled: true,
+          uploadsEnabled: "rules_pending_publication",
+          privateChallengesEnabled: true,
+          revenueShareVisible: true,
+          predictionArena: "compliance_gated_foundation",
+          voterRewardsWheel: "server_selected_foundation"
         },
         roles: ["Owner", "Admin", "Reviewer", "Finance Reviewer", "Support", "Moderator", "Read-only Auditor"]
       }

@@ -232,6 +232,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /predictionSettlementReviews/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /predictionRefundReviews/{document=**} {
+      allow read, write: if false;
+    }
+
     match /rewardWheelPrizes/{document=**} {
       allow read, write: if false;
     }
@@ -240,11 +248,31 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /rewardFulfillments/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /spinCredits/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardPointEvents/{document=**} {
+      allow read, write: if false;
+    }
+
     match /voterRewardEvents/{document=**} {
       allow read, write: if false;
     }
 
     match /adVoteRewardLogs/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /enterpriseInquiries/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /featureFlags/{document=**} {
       allow read, write: if false;
     }
 

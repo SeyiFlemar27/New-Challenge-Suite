@@ -14,6 +14,8 @@ interface SponsorProfile {
   website?: string | null;
   countryLocation?: string | null;
   brandDescription?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
   businessEmail?: string | null;
   ctaButtonText?: string | null;
   ctaDestinationLink?: string | null;
@@ -51,6 +53,7 @@ export default function SponsorDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
+  const [approvalNoticeVisible, setApprovalNoticeVisible] = useState(false);
 
   async function loadProfile() {
     setLoading(true);
@@ -81,6 +84,15 @@ export default function SponsorDashboardPage() {
   const subscriptionStatus = normalizeSponsorSubscriptionStatus(profile?.subscriptionStatus ?? profile?.planStatus ?? profile?.stripeStatus);
   const subscriptionActive = hasActiveSponsorSubscription(subscriptionStatus);
   const sponsorToolsUnlocked = sponsorApproved && subscriptionActive;
+
+  useEffect(() => {
+    if (!profile || !sponsorApproved) return;
+    const noticeKey = `sponsor_approval_seen_${profile.brandName ?? "brand"}_${profile.updatedAt ?? "latest"}`;
+    if (localStorage.getItem(noticeKey)) return;
+    setApprovalNoticeVisible(true);
+    const timer = window.setTimeout(() => { localStorage.setItem(noticeKey, "true"); setApprovalNoticeVisible(false); }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [profile, sponsorApproved]);
 
   if (loading) {
     return (
@@ -119,12 +131,24 @@ export default function SponsorDashboardPage() {
       </div>
 
       {error ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-5 text-red-200">{error}</Card> : null}
+      {approvalNoticeVisible ? <Card className="mt-8 border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-100"><ShieldCheck className="text-emerald-300" /><h2 className="mt-3 text-xl font-black">Sponsor profile approved</h2><p className="mt-2 text-sm leading-6">Your brand review is approved. This notice will close automatically and remain available through notification history.</p></Card> : null}
       {!sponsorToolsUnlocked ? <SponsorAccessNotice verificationStatus={verificationStatus} subscriptionStatus={subscriptionStatus} /> : null}
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         <Metric title="Verification" value={sponsorStatusLabel(verificationStatus)} label={sponsorApproved ? "Sponsor tools approved" : "Approval required for locked tools"} />
         <Metric title="Subscription" value={subscriptionStatus.replaceAll("_", " ")} label={subscriptionActive ? "Subscription entitlement active" : "Sponsor plan required"} />
         <Metric title="Campaign Capacity" value={experience.challengeLimitLabel} label="Plan workspace allowance" />
+      </div>
+
+      <div className="mt-8 overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">
+        <div className="h-44 bg-cover bg-center" style={{ backgroundImage: profile?.bannerUrl ? `url(${profile.bannerUrl})` : "linear-gradient(135deg, rgba(245,197,66,.18), rgba(255,255,255,.04))" }} />
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+          <div className="flex items-end gap-4">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-[var(--gold)]/40 bg-black text-2xl font-black text-[var(--gold)]">{profile?.logoUrl ? <img src={profile.logoUrl} alt={profile?.brandName || "Sponsor logo"} className="h-full w-full object-cover" /> : (profile?.brandName || "S").slice(0, 1)}</div>
+            <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Brand identity</p><h2 className="mt-1 text-2xl font-black">{profile?.brandName || "Sponsor Brand"}</h2><p className="mt-1 text-sm text-slate-400">{profile?.industry || "Industry pending"} ? {profile?.website || "Website pending"}</p></div>
+          </div>
+          <LinkButton href="/sponsor/messages" variant="secondary">Messages & Support</LinkButton>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_.9fr]">
@@ -163,7 +187,6 @@ export default function SponsorDashboardPage() {
 
       <div className="mt-8 grid gap-6 xl:grid-cols-4">
         {commandSections.map((section) => {
-          const Icon = section.icon;
           return <SponsorPlaceholder key={section.title} title={section.title} body={sponsorToolsUnlocked ? section.body : `${section.body} Brand approval and an active sponsor subscription are required.`} />;
         })}
       </div>

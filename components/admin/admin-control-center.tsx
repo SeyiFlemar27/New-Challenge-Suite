@@ -18,7 +18,7 @@ type AdminData = {
   users: AdminRecord[]; creators: AdminRecord[]; hostWorkspaces: AdminRecord[]; sponsorBrands: AdminRecord[];
   events: AdminRecord[]; tournaments: AdminRecord[]; cashLedger: AdminRecord[]; adminNotifications: AdminRecord[];
   support: AdminRecord[]; announcements: AdminRecord[]; auditLogs: AdminRecord[];
-  predictions: AdminRecord[]; rewards: AdminRecord[]; prizeWheel: AdminRecord[]; kyc: AdminRecord[];
+  predictions: AdminRecord[]; predictionSettlements: AdminRecord[]; rewards: AdminRecord[]; prizeWheel: AdminRecord[]; kyc: AdminRecord[]; adRewards: AdminRecord[]; enterpriseLeads: AdminRecord[]; mediaModeration: AdminRecord[]; riskSafety: AdminRecord[];
   doroCoin: { wallets: AdminRecord[]; transactions: AdminRecord[]; conversionEnabled: false; adjustmentsEnabled: false };
   reports: Record<string, unknown>; settings: Record<string, unknown>;
 };
@@ -54,7 +54,12 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   settings: { title: "Admin Settings", description: "Platform identity, review policy, safety, access, system status, and legal foundations." },
   search: { title: "Admin Search", description: "Search the currently loaded operational index across users, brands, challenges, submissions, and withdrawals." }
   ,
-  predictions: { title: "Prediction Arena Review", description: "Review DoroCoin-only prediction records. Settlement remains locked until winner result and admin review." },
+  predictions: { title: "Prediction Arena Market Review", description: "Review compliance-gated Prediction Arena records. Payment provider approval, KYC, age, region, and admin market approval are required." },
+  "prediction-settlements": { title: "Prediction Settlement & Refund Review", description: "Review settlement, cancellation, dispute, and refund foundations. No automatic payout or refund execution is available." },
+  "risk-safety": { title: "Risk & Safety Dashboard", description: "Review suspicious votes, suspicious predictions, media risk, account risk, and safety queues." },
+  "media-moderation": { title: "Upload & Media Moderation", description: "Review uploaded media metadata and moderation status without exposing private files publicly." },
+  "ad-rewards": { title: "Ad Reward Verification Logs", description: "Review ad vote reward attempts. Provider verification is required and fake client grants are blocked." },
+  "enterprise-leads": { title: "Enterprise Leads", description: "Review Contact Sales inquiries and handoff status." },
   rewards: { title: "Reward Fulfillment", description: "Review voter points, spin history, and manual reward fulfillment foundations." },
   "prize-wheel": { title: "Prize Wheel Manager", description: "Manage prize wheel foundations. High-value/manual prizes require admin fulfillment." },
   kyc: { title: "KYC Status Overview", description: "View metadata-only premium KYC status. No raw ID or face media is stored in Firebase." }
@@ -207,6 +212,11 @@ function FoundationData({ section, data, onSelect }: { section: string; data: Ad
   else if (section === "cash-ledger") records = data.cashLedger;
   else if (section === "notifications") records = data.adminNotifications;
   else if (section === "prize-wheel") records = data.prizeWheel;
+  else if (section === "prediction-settlements") records = data.predictionSettlements;
+  else if (section === "ad-rewards") records = data.adRewards;
+  else if (section === "enterprise-leads") records = data.enterpriseLeads;
+  else if (section === "media-moderation") records = data.mediaModeration;
+  else if (section === "risk-safety") records = data.riskSafety;
   else {
     const value = data[section as keyof AdminData];
     if (Array.isArray(value)) records = value as AdminRecord[];
@@ -216,7 +226,7 @@ function FoundationData({ section, data, onSelect }: { section: string; data: Ad
     "sponsor-brands": "No Sponsor brands are available.", events: "No event records are available.", tournaments: "No tournament plans are available.",
     dorocoin: "No DoroCoin wallet or transaction records are available.", "cash-ledger": "No cash ledger entries are available.",
     notifications: "No admin notifications are waiting.", support: "No support tickets are open.", announcements: "No announcements have been drafted.",
-    predictions: "No Prediction Arena records are waiting.", rewards: "No reward fulfillment records are waiting.", "prize-wheel": "No prize wheel prizes have been configured.", kyc: "No KYC metadata records are available."
+    predictions: "No Prediction Arena records are waiting.", "prediction-settlements": "No prediction settlement or refund reviews are waiting.", rewards: "No reward fulfillment records are waiting.", "prize-wheel": "No prize wheel prizes have been configured.", kyc: "No KYC metadata records are available.", "ad-rewards": "No ad reward logs are available.", "enterprise-leads": "No enterprise leads have been submitted.", "media-moderation": "No media uploads are queued for moderation.", "risk-safety": "No risk or safety records are queued."
   };
   return <><Card className="mt-8 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300"><strong className="text-white">Foundation state:</strong> this surface shows real stored records when available. Actions requiring unfinished delivery, payout, streaming, bracket, support reply, or notification providers remain unavailable.</Card><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record, index) => <button key={`${section}_${record.id}_${String(record.type ?? index)}`} onClick={() => onSelect(record)} className="text-left"><Card className="h-full p-5 transition hover:border-[var(--gold)]/40"><div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-black">{recordTitle(record)}</h2><Status value={recordStatus(record)} /></div><dl className="mt-4 grid gap-3 sm:grid-cols-2">{displayEntries(record).slice(0, 6).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl><p className="mt-5 text-sm font-black text-[var(--gold)]">View details</p></Card></button>) : <Card className="xl:col-span-2"><EmptyState icon={sectionIcon(section)} title={emptyCopy[section] ?? "No records yet"} body="This operational foundation is ready for real Firestore data." /></Card>}</div></>;
 }
@@ -292,6 +302,6 @@ function relatedLinks(record: AdminRecord, section: string) {
   return links;
 }
 function sectionIcon(section: string) {
-  const icons: Record<string, React.ReactNode> = { disputes: <Flag />, creators: <UserCog />, "host-workspaces": <UsersRound />, "sponsor-brands": <ShieldCheck />, events: <Radio />, tournaments: <Trophy />, dorocoin: <Coins />, "cash-ledger": <WalletCards />, notifications: <Bell />, support: <LifeBuoy />, announcements: <Megaphone />, predictions: <Coins />, rewards: <Trophy />, "prize-wheel": <Trophy />, kyc: <ShieldCheck /> };
+  const icons: Record<string, React.ReactNode> = { disputes: <Flag />, creators: <UserCog />, "host-workspaces": <UsersRound />, "sponsor-brands": <ShieldCheck />, events: <Radio />, tournaments: <Trophy />, dorocoin: <Coins />, "cash-ledger": <WalletCards />, notifications: <Bell />, support: <LifeBuoy />, announcements: <Megaphone />, predictions: <Coins />, "prediction-settlements": <Landmark />, rewards: <Trophy />, "prize-wheel": <Trophy />, kyc: <ShieldCheck />, "ad-rewards": <Bell />, "enterprise-leads": <FolderCog />, "media-moderation": <ClipboardCheck />, "risk-safety": <ShieldAlert /> };
   return icons[section] ?? <Activity />;
 }

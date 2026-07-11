@@ -6,6 +6,7 @@ export const GENERATED_REVENUE_SPLIT = {
 };
 
 export const CHALLENGER_VOTE_REVENUE_BONUS_PERCENT = 10;
+export const PREDICTION_PLATFORM_FEE_PERCENT = 7;
 
 export function calculateGeneratedRevenueSplit(generatedRevenueCents: number) {
   const safeRevenue = Math.max(0, Math.round(generatedRevenueCents));
@@ -69,9 +70,19 @@ export function predictionFee(stakeAmountDorocoin: number) {
   };
 }
 
+export function predictionStakeFoundation(stakeAmountUsd: number) {
+  const safeStake = Math.max(0, Math.round(stakeAmountUsd * 100) / 100);
+  const platformFeeUsd = Math.round(safeStake * PREDICTION_PLATFORM_FEE_PERCENT) / 100;
+  return {
+    stakeAmountUsd: safeStake,
+    platformFeePercent: PREDICTION_PLATFORM_FEE_PERCENT,
+    platformFeeUsd,
+    netStakeUsd: Math.max(0, Math.round((safeStake - platformFeeUsd) * 100) / 100)
+  };
+}
+
 export const VOTER_REWARD_TIERS = [
   { id: "basic", label: "Basic", pointsRequired: 100, spinCredits: 1, spinTier: "basic" },
   { id: "standard", label: "Standard", pointsRequired: 250, spinCredits: 1, spinTier: "standard" },
   { id: "premium", label: "Premium", pointsRequired: 500, spinCredits: 1, spinTier: "premium" }
 ];
-

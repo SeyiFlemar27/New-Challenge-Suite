@@ -33,9 +33,9 @@ const initial = {
 };
 type Form = typeof initial;
 
-export function HostCompetitionWizard() {
+export function HostCompetitionWizard({ initialCompetitionType }: { initialCompetitionType?: string } = {}) {
   const auth = useAuth();
-  const [step, setStep] = useState(0), [form, setForm] = useState(initial), [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(0), [form, setForm] = useState(() => ({ ...initial, competitionType: initialCompetitionType ?? initial.competitionType })), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [createdId, setCreatedId] = useState("");
   const update = <K extends keyof Form>(key: K, value: Form[K]) => { setForm((current) => ({ ...current, [key]: value })); setError(""); };
   const validate = () => {

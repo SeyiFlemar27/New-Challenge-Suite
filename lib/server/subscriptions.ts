@@ -71,7 +71,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     priceMonthlyLabel: "$249/month",
     stripePriceEnv: "STRIPE_PRICE_ENTERPRISE",
     legacyStripePriceEnvs: ["STRIPE_PRICE_CHIEF_PRODUCER", "STRIPE_ENTERPRISE_PRICE_ID"],
-    features: ["Enterprise Command Center", "Programs, campaigns, and large-tournament foundations", "Multi-admin team foundation", "Custom branded page foundations", "Reports, exports, and integration placeholders", "Dedicated support placeholder"],
+    features: ["Enterprise Command Center", "Unlimited challenge campaigns", "Large-scale tournament foundations", "Multi-host/team workspace", "Private/exclusive campaign tools", "Custom sponsor/partner activations", "Branded challenge hub", "Advanced reporting and exports", "Revenue-share reporting", "Live event operations", "Custom voting/judging rules", "API/integration foundation", "Compliance/KYC workflow support", "Priority support", "Onboarding and launch support", "Custom contract/invoicing"],
     canHostLiveEvents: true,
     liveEventCapacity: 25,
     canManageTournaments: true,
@@ -151,7 +151,7 @@ export function getSubscriptionPlansForUser(currentPlanId: unknown, accountType:
     ...plan,
     current: plan.id === normalizedPlanId,
     stripeConfigured: Boolean(resolveStripePriceEnv(plan).priceId),
-    checkoutAvailable: plan.id !== "free" && Boolean(resolveStripePriceEnv(plan).priceId),
+    checkoutAvailable: plan.id !== "free" && plan.id !== "enterprise" && Boolean(resolveStripePriceEnv(plan).priceId),
     purchaseAllowed: plan.audience === accountType
   }));
 }

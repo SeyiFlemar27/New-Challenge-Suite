@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
@@ -218,7 +219,16 @@ export default function DashboardPage() {
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
       </div>
-      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Build, review, and grow</h2><p className="mt-2 text-slate-300">Your challenge work comes first. Discovery and community activity follow below.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
+      {planExperience.planId === "creator" ? <Card className="mt-8 p-6 md:p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div><h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2><p className="mt-1 text-slate-300">A quick IG-story style pulse of active challenges before your operations queue.</p></div>
+          <LinkButton href="/challenges" variant="secondary">View All Trending</LinkButton>
+        </div>
+        <div className="scrollbar-dark mt-6 flex gap-5 overflow-x-auto pb-2">
+          {trendingChallenges.length ? trendingChallenges.map((challenge) => <Link key={challenge.id} href={`/challenges/${challenge.id}`} className="w-28 shrink-0 text-center"><div className="mx-auto h-20 w-20 rounded-full border-4 border-[var(--gold)] bg-cover bg-center transition hover:scale-105" style={{ backgroundImage: `url(${challenge.imageUrl})` }} /><div className="mt-2 truncate text-sm font-black">{challenge.title}</div><div className="text-xs text-slate-400"><Users size={12} className="inline text-[var(--gold)]" /> {challenge.participants}</div></Link>) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
+        </div>
+      </Card> : null}
+      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Build, review, and grow</h2><p className="mt-2 text-slate-300">Operational tools for your challenges, submissions, and performance.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
         <Card className="p-6 md:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
@@ -248,7 +258,7 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-      <Card className="mt-8 p-6 md:p-8">
+      <Card className={`mt-8 p-6 md:p-8 ${planExperience.planId === "creator" ? "hidden" : ""}`}>
         <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
         <p className="text-slate-300">Join the most popular challenges happening right now</p>
         <div className="scrollbar-dark mt-8 flex gap-6 overflow-x-auto pb-2">

@@ -251,8 +251,8 @@ export default function ChallengeDetailPage() {
 
 
           <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
-            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Use DoroCoins to predict the winner before the challenge begins. Platform fee is 7%, rewards are DoroCoin-only, and settlement waits for final result lock and admin review.</p></div></div>
-            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton>
+            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Review the eligible participants, choose a winner prediction, and continue only if compliance, KYC, age, U.S. state eligibility, admin market approval, and payment-provider approval are satisfied. Platform fee is 7% and settlement/refunds remain admin-review only.</p></div></div>
+            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Real-money Prediction Arena is disabled until provider approval and compliance gates are verified.</p>
           </Card>
 
           <Card className="border-emerald-500/20 bg-emerald-500/5 p-5 sm:p-7">
@@ -266,7 +266,7 @@ export default function ChallengeDetailPage() {
             <div className="mt-5">
               {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> Voting Closed</Button>}
             </div>
-            <p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
+            <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Watch Ad for Bonus Vote</p><p className="mt-2 text-xs leading-5 text-slate-400">Ads for votes live here near challenge voting. Google Ad Manager Rewarded Ads is the recommended provider foundation, but no bonus vote is granted without a verified provider callback. After 3 consecutive verified ad watches, a 1-hour cooldown applies.</p><Button className="mt-3 w-full" variant="secondary" disabled title="A verified ad provider callback is required before bonus votes can be granted">Ads for votes are not available yet</Button></div><p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
           </Card>
         </aside>
       </div>
@@ -304,6 +304,7 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
 
 
 

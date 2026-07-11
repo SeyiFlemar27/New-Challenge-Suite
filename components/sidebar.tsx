@@ -18,6 +18,7 @@ import {
   PlusSquare,
   Radio,
   Rocket,
+  Shuffle,
   Settings,
   ShieldCheck,
   Star,
@@ -125,7 +126,8 @@ const hostSections: NavSection[] = [
     { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/live-events", label: "Live Events", icon: Radio },
-    { href: "/host/tournaments", label: "Tournaments", icon: Award }
+    { href: "/host/tournaments", label: "Tournaments", icon: Award },
+    { href: "/host/hybrid", label: "Hybrid Competition", icon: Shuffle }
   ] },
   { label: "Host Tools", items: [
     { href: "/host/participants", label: "Participants", icon: UsersRound },
