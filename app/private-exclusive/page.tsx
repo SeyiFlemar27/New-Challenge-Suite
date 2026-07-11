@@ -78,7 +78,7 @@ export default function PrivateExclusivePage() {
         <PageTitle title="Private / Exclusive" subtitle="Invite-only competitions, premium creator drops, and locked challenge access." icon={<LockKeyhole className="text-[var(--gold)]" />} />
         <div className="flex flex-wrap gap-3">
           <LinkButton href="/subscriptions" variant="secondary">Check Access</LinkButton>
-          <LinkButton href="/challenges/create?mode=private">{hostMode ? "Create Private Competition" : "Create Private Challenge"}</LinkButton>
+          <LinkButton href="/private/create">{hostMode ? "Create Private Competition" : "Create Private Challenge"}</LinkButton>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export default function PrivateExclusivePage() {
           {privateChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}
         </div>
       ) : (
-        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title={hostMode ? "No private competitions yet" : "No private challenges available"} body={hostMode ? "Create a private competition, then manage invite codes, access requests, approved participants, and pending approvals from this workspace." : "Request an invite or check back when exclusive creator challenges open."} action={hostMode ? <LinkButton href="/challenges/create?mode=private">Create Private Competition</LinkButton> : <Button onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>} /></Card>
+        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title={hostMode ? "No private competitions yet" : "No private challenges available"} body={hostMode ? "Create a private competition, then manage invite codes, access requests, approved participants, and pending approvals from this workspace." : "Request an invite or check back when exclusive creator challenges open."} action={hostMode ? <LinkButton href="/private/create">Create Private Competition</LinkButton> : <Button onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>} /></Card>
       )}
       {requestOpen ? (
         <div className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur sm:items-center sm:justify-center">
@@ -144,3 +144,4 @@ export default function PrivateExclusivePage() {
     </AppShell>
   );
 }
+

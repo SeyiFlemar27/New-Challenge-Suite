@@ -42,8 +42,8 @@ export default function HostControlCenterPage() {
         <div className="mt-2 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <PageTitle title="Host Control Center" subtitle="Run competitions, manage participants, control voting, review submissions, and monitor event performance." />
           <div className="flex flex-wrap gap-3">
-            <LinkButton href="/challenges/create">Build Competition</LinkButton>
-            <LinkButton href="/live-events" variant="secondary">Create Live Event</LinkButton>
+            <LinkButton href="/host/challenges/create">Create Challenge</LinkButton>
+            <LinkButton href="/host/live/create" variant="secondary">Create Live Event</LinkButton>
             <LinkButton href="/host/submissions" variant="secondary">Review Submissions</LinkButton>
             <LinkButton href="/host/voting" variant="secondary">Voting Control</LinkButton>
             <LinkButton href="/host/reports" variant="secondary">Reports</LinkButton>
@@ -68,7 +68,7 @@ export default function HostControlCenterPage() {
             <Checklist label="Host plan activated" done={tier.id === "host"} href="/settings/billing" />
             <Checklist label="Complete host workspace" done={Boolean(user?.hostOnboardingComplete)} href="/onboarding/host" />
             <Checklist label="Set competition preferences" href="/settings/preferences" />
-            <Checklist label="Create first competition" done={challenges.length > 0} href="/challenges/create" />
+            <Checklist label="Create first competition" done={challenges.length > 0} href="/host/challenges/create" />
             <Checklist label="Configure voting rules" href="/host/voting" />
             <Checklist label="Invite team member" href="/host/team" />
             <Checklist label="Publish first event" done={events.length > 0} href="/live-events" />
@@ -106,3 +106,4 @@ function Metric({ title, value, note }: { title: string; value: string | number;
 function Checklist({ label, done = false, href }: { label: string; done?: boolean; href: string }) {
   return <LinkButton href={href} variant="ghost" className="min-h-14 justify-start border border-white/10"><CheckCircle2 className={done ? "text-emerald-400" : "text-slate-500"} size={18} /> {label}</LinkButton>;
 }
+

@@ -27,10 +27,11 @@ function TournamentPreview() {
           <div className="mt-7 grid gap-4 md:grid-cols-3">{stages.map((stage, index) => <Card key={stage} className="p-4"><p className="text-xs font-black uppercase text-[var(--gold)]">Stage {index + 1}</p><h3 className="mt-2 font-black">{stage}</h3><p className="mt-2 text-sm text-slate-400">{stage === "Admin Review" ? "Winner announcement and revenue/prize foundations require review. No payout is executed." : "Configure rules, participants, submissions, votes, and advancement before moving forward."}</p></Card>)}</div>
         </Card>
         <Card className="p-6">
-          <EmptyState icon={<Trophy />} title="No tournament plans yet" body="Create a Host competition and choose Tournament to start planning rounds, participant approvals, advancement rules, and finals." action={<LinkButton href="/challenges/create?mode=tournament">Create Tournament</LinkButton>} />
+          <EmptyState icon={<Trophy />} title="No tournament plans yet" body="Create a Host competition and choose Tournament to start planning rounds, participant approvals, advancement rules, and finals." action={<LinkButton href="/tournaments/create">Create Tournament</LinkButton>} />
           <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Bracket execution, automatic advancement, prize release, and payout actions remain inactive foundations.</p>
         </Card>
       </div>
     </AppShell>
   );
 }
+

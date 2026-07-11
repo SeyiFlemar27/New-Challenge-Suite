@@ -1,5 +1,5 @@
-﻿import { redirect } from "next/navigation";
+import { KycOverviewPageContent } from "@/components/kyc/kyc-experience";
 
 export default function KycIndexPage() {
-  redirect("/kyc/status");
+  return <KycOverviewPageContent />;
 }

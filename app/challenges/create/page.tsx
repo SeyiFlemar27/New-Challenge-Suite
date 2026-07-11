@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { CheckCircle2, LockKeyhole, Save } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
@@ -40,7 +39,6 @@ function CreateChallengeFallback() {
 }
 
 function CreateChallengeWizard() {
-  const searchParams = useSearchParams();
   const { user, loading: userLoading } = useCurrentUser();
   const planProfile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
   const planAccess = getUserPlanAccess(planProfile);
@@ -49,7 +47,7 @@ function CreateChallengeWizard() {
   const freePlan = planExperience.planId === "free";
   const freeBasicUser = freePlan && selectedAccountType !== "sponsor";
   const [freeUsage, setFreeUsage] = useState({ used: 0, limit: 3, remaining: 3, loaded: false });
-  const defaultType = searchParams.get("mode") === "private" ? "Private / Exclusive" : "Public Challenge";
+  const defaultType = "Public Challenge";
   const [step, setStep] = useState(0);
   const [stage, setStage] = useState<"wizard" | "success">("wizard");
   const [draftSaved, setDraftSaved] = useState(false);
@@ -124,7 +122,7 @@ function CreateChallengeWizard() {
   const braggingRights = form.prizeType === "bragging_rights" || form.prizeType === "none";
   const monetizedLocked = !planAccess.canCreatePaidChallenges && !braggingRights && Number(form.entryFee) > 0;
   const prizeLocked = !planAccess.canCreatePrizeChallenges && !braggingRights;
-  const privateLocked = !planAccess.canCreatePrivateChallenges && form.type === "Private / Exclusive";
+  const privateLocked = false;
   const draftOnlyFormat = form.competitionFormat.includes("Program") || form.competitionFormat.includes("Campaign");
 
   useEffect(() => {
@@ -194,7 +192,7 @@ function CreateChallengeWizard() {
       category: form.category,
       customCategory: form.category === "Other" ? form.customCategory : undefined,
       type: form.type,
-      visibility: form.type === "Private / Exclusive" ? "private" : "public",
+      visibility: "public",
       acceptedSubmissionTypes: form.submissionTypes,
       competitionFormat: form.competitionFormat,
       bestOf: form.bestOf,
@@ -391,17 +389,17 @@ function CreateChallengeWizard() {
   }
 
   if (planExperience.planId === "host") {
-    return <HostCompetitionWizard />;
+    return <HostCompetitionWizard initialCompetitionType="Online Challenge" />;
   }
 
   return (
     <AppShell>
       <Card className="mx-auto max-w-[960px] border-yellow-500/50 p-4 gold-glow sm:p-6 lg:p-10">
-        <PageTitle title="Create New Challenge" subtitle="Build a public or private challenge through a guided setup." />
+        <PageTitle title="Create Challenge" subtitle="Build a normal online challenge. Private, live, tournament, and hybrid builders now live in their own workspace sections." />
         <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 sm:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
-              <div className="text-sm font-bold text-[var(--gold-2)]">{planExperience.dashboardName} · {planExperience.badgeLabel}</div>
+              <div className="text-sm font-bold text-[var(--gold-2)]">{planExperience.dashboardName} Ã‚· {planExperience.badgeLabel}</div>
               <p className="mt-1 text-sm text-slate-300">{planExperience.challengeLimitLabel}. {planExperience.privateChallengeLimitLabel}. Paid-entry prize pools remain disabled.</p>
             </div>
             {!planAccess.isCreatorPro ? <LinkButton href="/subscriptions" variant="secondary" className="w-full shrink-0 md:w-auto">Upgrade Plan</LinkButton> : null}
@@ -448,7 +446,7 @@ function CreateChallengeWizard() {
           <Button className="w-full sm:w-auto" variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> {saving ? "Saving..." : "Save Draft"}</Button>
           <div className="grid grid-cols-2 gap-3 sm:flex">
             <Button className="w-full sm:w-auto" variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button>
-            {step < steps.length - 1 ? <Button className="w-full sm:w-auto" onClick={next}>Next</Button> : <Button className="w-full sm:w-auto" onClick={publish} disabled={saving}>{saving ? "Publishing..." : form.type === "Private / Exclusive" ? "Publish Privately" : "Publish Publicly"}</Button>}
+            {step < steps.length - 1 ? <Button className="w-full sm:w-auto" onClick={next}>Next</Button> : <Button className="w-full sm:w-auto" onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Publicly"}</Button>}
           </div>
         </div>
       </Card>
@@ -457,19 +455,19 @@ function CreateChallengeWizard() {
 }
 
 function StepBasic({ form, update, planAccess }: { form: any; update: any; planAccess: ReturnType<typeof getUserPlanAccess> }) {
-  const categories = form.type === "Private / Exclusive" ? ["Invite-only", "Premium Creator", "Sponsor-Only", "VIP Community", "Other"] : ["Fitness", "Creative", "Photography", "Food", "Gaming", "Other"];
-  return <section><h2 className="text-xl font-black sm:text-2xl">Step 1: Basic Details</h2><div className="mt-5 grid gap-3 rounded-[8px] bg-black p-2 sm:grid-cols-2"><Button className="w-full" onClick={() => update("type", "Public Challenge")} variant={form.type === "Public Challenge" ? "primary" : "ghost"}>Public Challenge</Button><Button className="w-full" onClick={() => update("type", "Private / Exclusive")} variant={form.type === "Private / Exclusive" ? "primary" : "ghost"}>Private / Exclusive {!planAccess.canCreatePrivateChallenges ? "Locked" : ""}</Button></div>{!planAccess.canCreatePrivateChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Private and exclusive challenges require the Creator plan or higher. You can still preview the fields, but publishing is blocked until you upgrade.</Card> : null}<div className="mt-6 grid gap-5 md:grid-cols-[1fr_260px]"><Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label={form.type === "Private / Exclusive" ? "Private / Exclusive Category" : "Public Category"}><select className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field></div>{form.category === "Other" ? <div className="mt-5"><Field label="Custom Category"><input className={inputClass} value={form.customCategory} onChange={(event) => update("customCategory", event.target.value)} /></Field></div> : null}<div className="mt-5"><Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field></div>{form.type === "Private / Exclusive" ? <Card className="mt-5 grid gap-4 p-4 sm:p-5 md:grid-cols-2"><Field label="Invite Code Generation"><input className={inputClass} defaultValue="VAULT2026" /></Field><Field label="Approved Participant List"><textarea className={textareaClass} placeholder="Add approved emails, one per line" /></Field><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" defaultChecked /> Require access request approval</label><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" defaultChecked /> Invite-only access</label></Card> : null}</section>;
+  const categories = ["Fitness", "Creative", "Photography", "Food", "Gaming", "Other"];
+  return <section><h2 className="text-xl font-black sm:text-2xl">Step 1: Basic Details</h2><Card className="mt-4 border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">This builder creates a normal public online challenge. Use Private / Exclusive, Live Events, Tournaments, or Hybrid Competition from their dedicated workspace sections.</Card><div className="mt-6 grid gap-5 md:grid-cols-[1fr_260px]"><Field label="Challenge Title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Public Category"><select className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field></div>{form.category === "Other" ? <div className="mt-5"><Field label="Custom Category"><input className={inputClass} value={form.customCategory} onChange={(event) => update("customCategory", event.target.value)} /></Field></div> : null}<div className="mt-5"><Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field></div>{!planAccess.canCreatePrivateChallenges ? <Card className="mt-5 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Private Challenges are a Creator feature. Upgrade to Creator to create invite-only challenges with access approval.</Card> : null}</section>;
 }
 
 function StepFormat({ form, update, toggleSubmission, experience }: { form: any; update: any; toggleSubmission: (type: string) => void; experience: PlanExperience }) {
   const formats = ["Group Challenge", "Entry Competition"];
   if (experience.features.ranked_challenges) formats.push("Ranked Challenge");
-  if (experience.features.host_control_center) formats.push("1 vs 1 Battle", "Tournament Builder", "Live Event Challenge");
+  if (experience.features.host_control_center) formats.push("1 vs 1 Battle");
   if (experience.features.programs) formats.push("Program Challenge (Draft Foundation)", "Campaign Challenge (Draft Foundation)");
   const lockedFormats = [
-    !experience.features.ranked_challenges ? "Ranked Challenge · Pro" : null,
-    !experience.features.host_control_center ? "1 vs 1 / Tournament / Live Event · Host" : null,
-    !experience.features.programs ? "Programs / Campaigns · Enterprise" : null
+    !experience.features.ranked_challenges ? "Ranked Challenge Ã‚· Pro" : null,
+    !experience.features.host_control_center ? "1 vs 1 Battle Ã‚· Host" : null,
+    !experience.features.programs ? "Programs / Campaigns Ã‚· Enterprise" : null
   ].filter(Boolean);
 
   return (
@@ -483,8 +481,8 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
         </Field>
         <Field label="Best Of"><select className={inputClass} value={form.bestOf} onChange={(event) => update("bestOf", event.target.value)}><option>1 Rounder</option><option>Best of 3</option><option>Best of 5</option></select></Field>
       </div>
-      {lockedFormats.length ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> {lockedFormats.join(" · ")}</Card> : null}
-      {form.competitionFormat.includes("Tournament") || form.competitionFormat.includes("Live Event") ? <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Tournament and live-event challenges are submitted for platform review. Prize and payout execution remains inactive.</Card> : null}
+      {lockedFormats.length ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> {lockedFormats.join(" Ã‚· ")}</Card> : null}
+
       <div className="mt-6">
         <div className="mb-2 font-bold">Submission Type</div>
         <div className="grid gap-3 sm:grid-cols-2">{["image", "video"].map((type) => <label key={type} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-[#181818] px-4 py-4 font-bold"><input className="shrink-0" type="checkbox" checked={form.submissionTypes.includes(type)} onChange={() => toggleSubmission(type)} /> {type === "image" ? "Image uploads" : "Video uploads"}</label>)}</div>
@@ -569,5 +567,7 @@ function StepMedia({ form, update, userId }: { form: any; update: any; userId: s
 function StepPreview({ form }: { form: any }) {
   return <section><h2 className="text-xl font-black sm:text-2xl">Step 6: Preview & Publish</h2><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title, Type: form.type, Category: form.category === "Other" ? form.customCategory : form.category, Format: form.competitionFormat, "Best Of": form.bestOf, "Prize Type": form.prizeType, "Submission Types": form.submissionTypes.join(", "), "Start Date": form.startsAt, "Submission Deadline": form.submissionDeadline, "Voting Deadline": form.votingDeadline, "End Date": form.endsAt, "Sponsor Enabled": form.sponsorEnabled === "true" ? "Yes" : "No" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black sm:text-lg">{String(value)}</div></Card>)}</div></section>;
 }
+
+
 
 

@@ -110,7 +110,7 @@ function LiveEventsContent() {
     <AppShell>
       <div className="flex max-w-6xl flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <PageTitle title={hostMode ? "My Live Events" : "Live In-Person Events"} subtitle={hostMode ? "Create and manage event foundations, registrations, check-ins, and event status." : "Discover offline competitions and physical gatherings."} />
-        {hostMode ? <LinkButton href="/challenges/create?mode=live-event">Create Live Event</LinkButton> : canHostLiveEvents ? <LinkButton href="/dashboard/host">Open Host Controls</LinkButton> : <LinkButton href="/subscriptions" variant="secondary">{["creator_starter", "creator"].includes(tier.id) ? "Become a Host" : "Become a Creator"}</LinkButton>}
+        {hostMode ? <LinkButton href="/host/live/create">Create Live Event</LinkButton> : canHostLiveEvents ? <LinkButton href="/dashboard/host">Open Host Controls</LinkButton> : <LinkButton href="/subscriptions" variant="secondary">{["creator_starter", "creator"].includes(tier.id) ? "Become a Host" : "Become a Creator"}</LinkButton>}
       </div>
       {hostMode ? <div className="mt-6 flex flex-wrap gap-2">{["Upcoming", "Live Now", "Completed", "Drafts"].map((label) => <span key={label} className="rounded-[8px] border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">{label}</span>)}</div> : null}
       {loading ? (
@@ -167,9 +167,10 @@ function LiveEventsContent() {
         </div>
       ) : (
         <Card className="mt-12 max-w-5xl">
-          <EmptyState icon={<LockKeyhole />} title={hostMode ? "No hosted events yet" : "No live events available"} body={hostMode ? "Create your first live-event challenge to begin the event-management workflow." : "There are no scheduled live events right now."} action={hostMode ? <LinkButton href="/challenges/create?mode=live-event">Create Live Event</LinkButton> : <Button onClick={loadEvents}>Retry</Button>} />
+          <EmptyState icon={<LockKeyhole />} title={hostMode ? "No hosted events yet" : "No live events available"} body={hostMode ? "Create your first live-event challenge to begin the event-management workflow." : "There are no scheduled live events right now."} action={hostMode ? <LinkButton href="/host/live/create">Create Live Event</LinkButton> : <Button onClick={loadEvents}>Retry</Button>} />
         </Card>
       )}
     </AppShell>
   );
 }
+
