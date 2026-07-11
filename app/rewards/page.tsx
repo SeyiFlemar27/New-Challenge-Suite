@@ -1,49 +1,26 @@
-"use client";
-
+﻿"use client";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
-import { Gift, Sparkles } from "lucide-react";
+import { Gift, History, ShoppingCart, Sparkles, Trophy } from "lucide-react";
 
+type Summary = any;
 export default function RewardsPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Summary | null>(null);
   const [message, setMessage] = useState("");
-  useEffect(() => {
-    apiRequest("/api/rewards").then((result) => result.ok ? setData(result.data) : setMessage(result.message));
-  }, []);
-  const points = Number(data?.points ?? 0);
+  useEffect(() => { apiRequest<Summary>("/api/rewards/summary").then((r) => r.ok ? setData(r.data ?? null) : setMessage(r.message)); }, []);
+  const points = Number(data?.availableRewardPoints ?? data?.points ?? 0);
+  const lifetime = Number(data?.lifetimeRewardPoints ?? points);
   const credits = data?.spinCreditsByTier ?? { basic: 0, standard: 0, premium: 0 };
   const tiers = data?.tiers ?? [];
-  const nextTier = useMemo(() => tiers.find((tier: any) => points < Number(tier.pointsRequired)), [tiers, points]);
-  const recent = data?.history?.slice?.(0, 4) ?? [];
-  return (
-    <AppShell>
-      <PageTitle title="Voter Rewards" subtitle="Earn Voter Points from server-confirmed DoroCoin purchases, unlock spin credits, and track reward fulfillment." icon={<Gift />} />
-      {message ? <Card className="mt-6 border-yellow-500/20 p-4 text-yellow-100">{message}</Card> : null}
-      <div className="mt-8 grid gap-6 lg:grid-cols-4">
-        <Metric label="Total Points" value={points.toLocaleString()} />
-        <Metric label="Basic Spins" value={String(credits.basic ?? 0)} />
-        <Metric label="Standard Spins" value={String(credits.standard ?? 0)} />
-        <Metric label="Premium Spins" value={String(credits.premium ?? 0)} />
-      </div>
-      <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_380px]">
-        <Card className="p-6 sm:p-8">
-          <h2 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="text-[var(--gold)]" /> Tier Progress</h2>
-          {nextTier ? <div className="mt-6"><div className="flex items-center justify-between gap-4 text-sm font-bold"><span>{points.toLocaleString()} points</span><span>{nextTier.pointsRequired.toLocaleString()} for {nextTier.label}</span></div><div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--gold)]" style={{ width: `${Math.min(100, Math.round(points / Number(nextTier.pointsRequired) * 100))}%` }} /></div><p className="mt-4 rounded-[8px] bg-[var(--gold)]/10 p-4 text-sm font-bold text-[var(--gold)]">You need {(Number(nextTier.pointsRequired) - points).toLocaleString()} points to unlock your next {nextTier.label} spin.</p></div> : <p className="mt-5 rounded-[8px] bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">All current tiers reached. Future DoroCoin purchases continue adding lifetime points.</p>}
-          <div className="mt-7 grid gap-4 sm:grid-cols-3">{tiers.map((tier: any) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">{tier.pointsRequired} points = {tier.spinCredits} {tier.spinTier} spin</p></Card>)}</div>
-          <LinkButton href="/rewards/wheel" className="mt-7">Open Spin Wheel</LinkButton>
-        </Card>
-        <Card className="p-6 sm:p-8">
-          <h2 className="text-2xl font-black">Recent Rewards</h2>
-          {recent.length ? <div className="mt-5 space-y-3">{recent.map((item: any) => <div key={item.id} className="rounded-[8px] bg-white/[0.04] p-4"><p className="font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs text-slate-400">{String(item.status ?? item.fulfillmentStatus ?? "recorded").replaceAll("_", " ")}</p></div>)}</div> : <EmptyState icon={<Gift />} title="No rewards yet" body="Buy DoroCoins to start earning Voter Points and unlock your first Basic Spin." action={<LinkButton href="/wallet">Buy DoroCoins</LinkButton>} />}
-          <LinkButton href="/rewards/history" variant="secondary" className="mt-5 w-full">Reward History</LinkButton>
-        </Card>
-      </div>
-    </AppShell>
-  );
+  const next = data?.progress?.nextTier ?? tiers.find((t: any) => points < Number(t.pointsRequired));
+  const needed = next ? Math.max(0, Number(next.pointsRequired) - points) : 0;
+  const recent = data?.recentRewards ?? data?.history?.slice?.(0, 5) ?? [];
+  return <AppShell><PageTitle title="Voter Rewards" subtitle="Earn reward points from server-confirmed DoroCoin purchases, unlock tier-specific spin credits, and claim prizes through reviewed reward flows." icon={<Gift />} />
+    {message ? <Card className="mt-6 border-yellow-500/20 p-4 text-yellow-100">{message}</Card> : null}
+    {!data && !message ? <div className="mt-8 grid gap-5 md:grid-cols-4">{[0,1,2,3].map((i) => <Card key={i} className="h-32 animate-pulse" />)}</div> : null}
+    {data ? <><div className="mt-8 grid gap-5 md:grid-cols-4"><Metric label="Available Points" value={points.toLocaleString()} /><Metric label="Lifetime Points" value={lifetime.toLocaleString()} /><Metric label="Basic Spins" value={String(credits.basic ?? 0)} /><Metric label="Standard / Premium" value={`${credits.standard ?? 0} / ${credits.premium ?? 0}`} /></div>
+    <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_380px]"><Card className="p-6 sm:p-8"><h2 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="text-[var(--gold)]" /> Tier progress</h2>{next ? <div className="mt-6"><div className="flex justify-between gap-4 text-sm font-bold"><span>{points.toLocaleString()} points</span><span>{needed.toLocaleString()} more for {next.label}</span></div><div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--gold)]" style={{ width: `${Math.min(100, Math.round(points / Number(next.pointsRequired) * 100))}%` }} /></div><p className="mt-4 rounded-[8px] bg-[var(--gold)]/10 p-4 text-sm font-bold text-[var(--gold)]">{needed.toLocaleString()} more points to unlock your next {next.label} spin.</p></div> : <p className="mt-5 rounded-[8px] bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">All current reward tiers reached. Future DoroCoin purchases continue adding lifetime points and configured spin credits.</p>}<div className="mt-7 grid gap-4 md:grid-cols-3">{tiers.map((tier: any) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">{Number(tier.pointsRequired).toLocaleString()} points unlock 1 {tier.id} spin.</p><p className="mt-3 text-xs font-bold text-[var(--gold)]">{tier.enabled ? "Enabled" : "Disabled by admin"}</p></Card>)}</div><div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/wallet" variant="secondary"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div><p className="mt-5 text-sm text-slate-400">{data.settings?.publicWheelRules}</p></Card><Card className="p-6 sm:p-8"><h2 className="flex items-center gap-2 text-2xl font-black"><History className="text-[var(--gold)]" /> Recent rewards</h2>{recent.length ? <div className="mt-5 space-y-3">{recent.map((item: any) => <div key={item.id} className="rounded-[8px] bg-white/[0.04] p-4"><p className="font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs capitalize text-slate-400">{String(item.fulfillmentStatus ?? item.status ?? "recorded").replaceAll("_", " ")}</p></div>)}</div> : <EmptyState icon={<Gift />} title="No rewards yet" body="Buy DoroCoins to start earning Voter Points and unlock your first Basic Spin." action={<LinkButton href="/wallet">Buy DoroCoins</LinkButton>} />}<LinkButton href="/rewards/history" variant="secondary" className="mt-5 w-full">Reward History</LinkButton></Card></div></> : null}</AppShell>;
 }
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{label}</p><p className="mt-3 text-3xl font-black text-[var(--gold-2)]">{value}</p></Card>;
-}
+function Metric({ label, value }: { label: string; value: string }) { return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{label}</p><p className="mt-3 text-3xl font-black text-[var(--gold-2)]">{value}</p></Card>; }

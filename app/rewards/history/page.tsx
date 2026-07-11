@@ -1,26 +1,7 @@
-"use client";
-
+﻿"use client";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Button, Card, Field, inputClass, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
-import { Gift } from "lucide-react";
-
-export default function RewardsHistoryPage() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [message, setMessage] = useState("");
-  useEffect(() => {
-    apiRequest<any>("/api/rewards").then((result) => result.ok ? setHistory(result.data?.history ?? []) : setMessage(result.message));
-  }, []);
-  return (
-    <AppShell>
-      <PageTitle title="Reward History" subtitle="Spin results, prize status, and manual fulfillment updates." icon={<Gift />} />
-      {message ? <Card className="mt-6 border-yellow-500/20 p-4 text-yellow-100">{message}</Card> : null}
-      {history.length ? <div className="mt-8 grid gap-4">{history.map((item) => <Card key={item.id} className="p-5"><div className="grid gap-4 md:grid-cols-[1fr_180px_180px]"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{String(item.wheelTier ?? "wheel")} wheel</p><h2 className="mt-2 text-xl font-black">{item.prizeName ?? "Reward"}</h2><p className="mt-2 text-sm text-slate-400">{item.prizeDescription ?? item.fulfillmentInstructions ?? "Reward details will appear as fulfillment progresses."}</p></div><Status label="Fulfillment" value={item.fulfillmentStatus ?? item.status ?? "recorded"} /><Status label="Manual" value={item.manualFulfillmentRequired ? "Pending team" : "Server controlled"} /></div></Card>)}</div> : <Card className="mt-8"><EmptyState icon={<Gift />} title="No spins yet" body="Reward wheel spin history will appear here after you earn and use spin credits." action={<LinkButton href="/rewards/wheel">Open Spin Wheel</LinkButton>} /></Card>}
-    </AppShell>
-  );
-}
-
-function Status({ label, value }: { label: string; value: unknown }) {
-  return <div className="rounded-[8px] bg-white/[0.04] p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p><p className="mt-2 font-black capitalize">{String(value).replaceAll("_", " ")}</p></div>;
-}
+import { Gift, PackageCheck } from "lucide-react";
+export default function RewardsHistoryPage(){ const [data,setData]=useState<any>({history:[],claims:[]}); const [selected,setSelected]=useState<any>(null); const [form,setForm]=useState({legalName:"",email:"",phone:"",deliveryAddress:"",termsAccepted:false}); const [message,setMessage]=useState(""); function load(){ apiRequest<any>("/api/rewards/history").then(r=>r.ok?setData(r.data):setMessage(r.message)); } useEffect(load,[]); async function claim(){ const r=await apiRequest("/api/rewards/claim",{method:"POST",body:JSON.stringify({claimId:selected.id,...form})}); setMessage(r.message); if(r.ok){setSelected(null);load();} } return <AppShell><PageTitle title="Reward History" subtitle="Track spin results, digital rewards, manual prize claims, and fulfillment status." icon={<Gift/>}/>{message?<Card className="mt-6 p-4 text-yellow-100">{message}</Card>:null}<div className="mt-8 grid gap-5">{data.history?.length?data.history.map((item:any)=><Card key={item.id} className="p-5"><div className="grid gap-4 md:grid-cols-[1fr_auto]"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{item.wheelTier} wheel</p><h2 className="mt-2 text-2xl font-black">{item.prizeName}</h2><p className="mt-2 text-sm text-slate-400">{String(item.fulfillmentStatus??item.status).replaceAll("_"," ")} · {item.createdAt??"Recorded"}</p><p className="mt-3 text-sm text-slate-300">{item.prizeDescription}</p></div><div className="flex flex-col gap-2 md:min-w-48"><Button variant="secondary" onClick={()=>setSelected(item)}>View details</Button>{item.manualFulfillmentRequired?<Button onClick={()=>setSelected(item)}>Claim prize</Button>:null}</div></div></Card>):<Card className="p-8 text-center"><PackageCheck className="mx-auto text-[var(--gold)]" size={42}/><h2 className="mt-4 text-2xl font-black">No reward history yet</h2><p className="mt-2 text-slate-400">Spin results will appear here after the server confirms them.</p></Card>}</div>{selected?<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5"><Card className="max-h-[92vh] w-full max-w-xl overflow-y-auto p-6"><h2 className="text-2xl font-black">{selected.prizeName}</h2><p className="mt-2 text-sm text-slate-400">Reference: {selected.id}</p><p className="mt-4 text-slate-300">{selected.prizeDescription}</p>{selected.manualFulfillmentRequired?<div className="mt-6 space-y-4"><Field label="Legal name"><input className={inputClass} value={form.legalName} onChange={e=>setForm({...form,legalName:e.target.value})}/></Field><Field label="Email"><input className={inputClass} value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></Field><Field label="Phone"><input className={inputClass} value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label="Delivery address"><textarea className={textareaClass} value={form.deliveryAddress} onChange={e=>setForm({...form,deliveryAddress:e.target.value})}/></Field><label className="flex gap-3 text-sm text-slate-300"><input type="checkbox" checked={form.termsAccepted} onChange={e=>setForm({...form,termsAccepted:e.target.checked})}/> I accept the prize terms and understand fulfillment is reviewed by Challenge Suite.</label><Button onClick={claim} className="w-full">Submit claim</Button></div>:<p className="mt-5 rounded-[8px] bg-emerald-500/10 p-4 text-emerald-100">Digital reward recorded by the server. Rewards cannot be withdrawn as cash.</p>}<Button variant="secondary" onClick={()=>setSelected(null)} className="mt-4 w-full">Close</Button></Card></div>:null}</AppShell> }

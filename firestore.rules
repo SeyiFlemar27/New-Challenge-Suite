@@ -1,4 +1,4 @@
-rules_version = '2';
+﻿rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -264,6 +264,46 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /rewardSettings/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardCampaigns/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardPrizes/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /userRewards/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /spinResults/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardClaims/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardFulfilments/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardAuditLogs/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardDailySpinUsage/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewardUserSpinUsage/{document=**} {
+      allow read, write: if false;
+    }
+
     match /voterRewardEvents/{document=**} {
       allow read, write: if false;
     }
@@ -289,3 +329,4 @@ service cloud.firestore {
     }
   }
 }
+

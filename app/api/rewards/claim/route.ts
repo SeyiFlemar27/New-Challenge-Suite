@@ -1,0 +1,6 @@
+﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { requireRequestUser } from "@/lib/server/auth";
+import { createRewardClaim } from "@/lib/server/rewards";
+import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server/responses";
+export const dynamic = "force-dynamic";
+export async function POST(request: Request) { const { user, response } = await requireRequestUser(request); if (response) return response; const db = getAdminDb(); if (!db) return serverUnavailable("Rewards"); const parsed = await readJson(request); if (parsed.response) return parsed.response; try { const body = parsed.body ?? {}; return ok(await createRewardClaim(db, { userId: user.uid, claimId: String(body.claimId ?? ""), legalName: String(body.legalName ?? ""), email: String(body.email ?? ""), phone: body.phone ? String(body.phone) : undefined, deliveryAddress: body.deliveryAddress ? String(body.deliveryAddress) : undefined, termsAccepted: body.termsAccepted === true }), "Prize claim submitted for admin review."); } catch (error) { const code = error instanceof Error ? error.message : "CLAIM_FAILED"; return ["TERMS_REQUIRED", "CLAIM_NOT_FOUND", "CLAIM_FORBIDDEN", "CLAIM_ALREADY_SUBMITTED"].includes(code) ? fail(code.replaceAll("_", " ").toLowerCase(), 409, undefined, code) : serverError("Reward claim could not be submitted.", code); } }

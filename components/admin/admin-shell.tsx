@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -51,7 +51,9 @@ const groups: NavGroup[] = [
     { href: "/admin/support", label: "Support Inbox", icon: LifeBuoy },
     { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
     { href: "/admin/kyc", label: "KYC Status", icon: ShieldCheck },
-    { href: "/admin/rewards", label: "Reward Fulfillment", icon: Trophy },
+    { href: "/admin/rewards", label: "Reward Overview", icon: Trophy },
+    { href: "/admin/rewards/spins", label: "Spin History", icon: RefreshCw },
+    { href: "/admin/rewards/fulfilment", label: "Reward Fulfilment", icon: ClipboardCheck },
     { href: "/admin/ad-rewards", label: "Ad Reward Logs", icon: Bell },
     { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: BriefcaseBusiness }
   ] },
@@ -61,6 +63,8 @@ const groups: NavGroup[] = [
     { href: "/admin/revenue-rules", label: "Prize & Revenue Rules", icon: BookOpenCheck },
     { href: "/admin/feature-flags", label: "Feature Flags", icon: SlidersHorizontal },
     { href: "/admin/rewards/prize-wheel", label: "Prize Wheel", icon: Trophy },
+    { href: "/admin/rewards/campaigns", label: "Reward Campaigns", icon: Megaphone },
+    { href: "/admin/rewards/settings", label: "Reward Settings", icon: Settings },
     { href: "/admin/roles", label: "Admin Roles", icon: Boxes },
     { href: "/admin/qa-data", label: "QA Seed Data", icon: Database },
     { href: "/admin/settings/qa", label: "Production QA", icon: ClipboardCheck },
@@ -138,3 +142,5 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+
