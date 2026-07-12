@@ -18,14 +18,19 @@ const rawArgs = process.argv.slice(2);
 const apply = rawArgs.includes("--apply");
 const cleanup = rawArgs.includes("--cleanup");
 const userUid = rawArgs.find((arg) => arg.startsWith("--userUid="))?.split("=").slice(1).join("=").trim();
+const projectArg = rawArgs.find((arg) => arg.startsWith("--project="))?.split("=").slice(1).join("=").trim();
+const confirmedProjectId = projectArg || process.env.REWARDS_QA_FIREBASE_PROJECT?.trim() || null;
+const confirmProductionQa = rawArgs.includes("--confirm-production-qa");
+const writesRequested = apply || cleanup;
 
 if ((apply && cleanup) || rawArgs.includes("--help")) {
   console.log([
     "Usage:",
     "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts",
-    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply",
-    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup",
-    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --userUid=<uid>",
+    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<firebaseProjectId>",
+    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup --project=<firebaseProjectId>",
+    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<firebaseProjectId> --userUid=<uid>",
+    "  node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<productionProjectId> --confirm-production-qa",
     "",
     "--apply and --cleanup cannot be used together."
   ].join("\n"));
@@ -35,8 +40,29 @@ if ((apply && cleanup) || rawArgs.includes("--help")) {
 const now = new Date();
 const iso = (offsetDays = 0) => new Date(now.getTime() + offsetDays * 24 * 60 * 60 * 1000).toISOString();
 
+function projectEnvironment(projectId: string | null) {
+  if (!projectId) return null;
+  return projectLooksProduction(projectId) ? "production" : "controlled_qa";
+}
+
+function projectLooksProduction(projectId: string | null) {
+  if (!projectId) return false;
+  const normalized = projectId.toLowerCase();
+  return normalized === "challenge-suite" || normalized.includes("production") || normalized === "prod" || normalized.endsWith("-prod") || normalized.includes("-prod-");
+}
+
+function assertWriteProjectGuard() {
+  if (!writesRequested) return;
+  if (!confirmedProjectId) {
+    throw new Error("Refusing to write: Firebase project target is not explicitly confirmed. Pass --project=<projectId> or set REWARDS_QA_FIREBASE_PROJECT.");
+  }
+  if (projectLooksProduction(confirmedProjectId) && !confirmProductionQa) {
+    throw new Error("Refusing production QA write without --confirm-production-qa.");
+  }
+}
+
 function qaFields(extra: Record<string, unknown> = {}) {
-  return { isQaSeed: true, qaSeedBatchId: BATCH_ID, createdFor: CREATED_FOR, createdBy: CREATED_BY, createdAt: iso(0), updatedAt: iso(0), ...extra };
+  return { isQaSeed: true, qaSeedBatchId: BATCH_ID, createdFor: CREATED_FOR, createdBy: CREATED_BY, qaSeedEnvironment: projectEnvironment(confirmedProjectId), qaSeedProjectId: confirmedProjectId, createdAt: iso(0), updatedAt: iso(0), ...extra };
 }
 
 function doc(collection: string, id: string, data: Record<string, unknown>, subcollections?: SeedDoc[]): SeedDoc {
@@ -191,12 +217,13 @@ function requiredEnv(name: string) {
 }
 
 async function getDbForWrites() {
+  assertWriteProjectGuard();
   loadEnvConfig(process.cwd());
   if (!getApps().length) {
     initializeApp({
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID || requiredEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+        projectId: confirmedProjectId ?? process.env.FIREBASE_PROJECT_ID ?? requiredEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
         clientEmail: requiredEnv("FIREBASE_CLIENT_EMAIL"),
         privateKey: requiredEnv("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n")
       })
@@ -283,7 +310,7 @@ async function main() {
   if (process.exitCode) return;
   const docs = buildSeedDocs();
   const flattened = flattenDocs(docs);
-  const summary = { batchId: BATCH_ID, dryRun: !apply && !cleanup, apply, cleanup, userUid: userUid ? "provided" : "not_provided", recordCount: flattened.length, byCollection: summarizeByCollection(docs), records: flattened.map((item) => item.path), commands: { dryRun: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts", apply: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply", cleanup: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup", optionalUserCredits: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --userUid=<uid>" } };
+  const summary = { batchId: BATCH_ID, dryRun: !apply && !cleanup, apply, cleanup, userUid: userUid ? "provided" : "not_provided", confirmedProject: confirmedProjectId ?? "not_provided", qaSeedEnvironment: projectEnvironment(confirmedProjectId) ?? "not_provided", productionConfirmation: confirmProductionQa, recordCount: flattened.length, byCollection: summarizeByCollection(docs), records: flattened.map((item) => item.path), commands: { dryRun: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts", apply: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<firebaseProjectId>", cleanup: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup --project=<firebaseProjectId>", optionalUserCredits: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<firebaseProjectId> --userUid=<uid>", productionApply: "node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<productionProjectId> --confirm-production-qa" } };
   if (!apply && !cleanup) {
     console.log(JSON.stringify({ mode: "dry-run", ...summary, writesPerformed: false }, null, 2));
     return;
@@ -302,3 +329,4 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : "Seed script failed.");
   process.exit(1);
 });
+

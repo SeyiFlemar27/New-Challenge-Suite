@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Phase 7.5I adds a controlled QA seed system for the production Rewards Spin Wheel. It does not create live production prize behavior by default. The script is dry-run by default, and no records are written unless `--apply` is explicitly passed.
+Phase 7.5I adds a controlled QA seed system for the production Rewards Spin Wheel. It does not create live production prize behavior by default. The script is dry-run by default, and no records are written unless `--apply` is explicitly passed with a confirmed Firebase project target.
 
 ## Existing Rewards Data Requirements
 
@@ -24,20 +24,55 @@ Path:
 scripts/seed-phase-7-5i-rewards-qa.ts
 ```
 
-Commands:
-
-```bash
-node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts
-node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply
-node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup
-node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --userUid=<uid>
-```
-
-The current project uses the existing Node strip-types script style:
+Dry run:
 
 ```bash
 node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts
 ```
+
+Apply to staging:
+
+```bash
+node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<stagingProjectId>
+```
+
+Apply to staging with a test user:
+
+```bash
+node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<stagingProjectId> --userUid=<testUserUid>
+```
+
+Cleanup staging:
+
+```bash
+node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup --project=<stagingProjectId>
+```
+
+Production QA apply, only if explicitly approved:
+
+```bash
+node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --apply --project=<productionProjectId> --confirm-production-qa
+```
+
+Do not use `pnpm.cmd tsx` for this script. `tsx` is not installed in this repo, and the working command is the Node strip-types command above.
+
+## Project Guard
+
+`.firebaserc` is absent, so there is no safe local Firebase alias for the script to infer. Dry-run can run without a project. Writes are blocked unless a project is explicitly confirmed with `--project=<firebaseProjectId>` or `REWARDS_QA_FIREBASE_PROJECT=<firebaseProjectId>`.
+
+If `--apply` or `--cleanup` is run without a confirmed project, the script refuses to continue:
+
+```text
+Refusing to write: Firebase project target is not explicitly confirmed. Pass --project=<projectId> or set REWARDS_QA_FIREBASE_PROJECT.
+```
+
+If the confirmed project appears to be production, `--confirm-production-qa` is also required:
+
+```text
+Refusing production QA write without --confirm-production-qa.
+```
+
+Future writes include `qaSeedEnvironment` and `qaSeedProjectId` on QA records.
 
 ## Dry-Run Behavior
 
@@ -45,7 +80,7 @@ Dry run is the default. It prints the planned documents and collections without 
 
 ## Apply Behavior
 
-`--apply` writes only the planned QA records. It requires Firebase Admin environment variables but does not print their values. Before writing, the script checks each planned document and refuses to overwrite an existing document unless that document is already tagged with this same QA seed batch.
+`--apply` writes only the planned QA records and only after the Firebase project guard passes. It requires Firebase Admin environment variables but does not print their values. Before writing, the script checks each planned document and refuses to overwrite an existing document unless that document is already tagged with this same QA seed batch.
 
 Every written record includes:
 
@@ -53,12 +88,14 @@ Every written record includes:
 - `qaSeedBatchId: phase_7_5i_rewards_qa`
 - `createdFor: phase_7_5i_rewards_qa`
 - `createdBy: system_qa_seed`
+- `qaSeedEnvironment`
+- `qaSeedProjectId`
 - `createdAt`
 - `updatedAt`
 
 ## Cleanup Behavior
 
-`--cleanup` deletes only records tagged with `isQaSeed: true` and `qaSeedBatchId: phase_7_5i_rewards_qa`.
+`--cleanup` deletes only records tagged with `isQaSeed: true` and `qaSeedBatchId: phase_7_5i_rewards_qa`, and only after the Firebase project guard passes.
 
 For `rewardSettings/default`, cleanup deletes the document only if the default settings document itself is tagged as this QA seed batch. It does not delete untagged or non-QA production settings.
 
@@ -148,7 +185,7 @@ The script does not create Firebase Auth users and does not seed credits for ran
 
 ## Admin Setup Guidance
 
-The admin Prize Wheel page already shows the setup prompt when no active prize records exist:
+The admin Prize Wheel page shows the setup prompt when no active prize records exist:
 
 > No active prize records found. Add prizes to activate the wheel.
 
@@ -156,23 +193,34 @@ Admins should replace QA seed prizes with real campaign prizes before launch.
 
 ## Risks
 
-- Applying to production would intentionally modify `rewardSettings/default` and activate QA prize records. Use only in a controlled QA environment unless explicitly approved.
+- Applying to production would intentionally modify `rewardSettings/default` and activate QA prize records. Use staging whenever possible.
+- Production QA writes require explicit user approval, `--project=<productionProjectId>`, and `--confirm-production-qa`.
 - Optional user credits are fake QA credits and must only be seeded for a known test user UID.
 - Cleanup cannot safely remove optional user reward subcollections unless the test UID is supplied.
 
 ## Verification
 
-Admin verification:
+Admin verification after controlled apply:
 
 - Visit `/admin/rewards/settings` and confirm thresholds and primary campaign.
 - Visit `/admin/rewards/campaigns` and confirm the QA campaign.
 - Visit `/admin/rewards/prize-wheel` and confirm the nine QA prizes.
 
-User verification:
+User verification after controlled apply:
 
 - Visit `/rewards` and confirm the active campaign and backend-loaded settings.
 - Visit `/rewards/wheel` and confirm configured prizes appear by tier.
 - Use a controlled test user with seeded spin credits to verify a server-confirmed spin.
+
+## Cleanup
+
+Cleanup command for staging:
+
+```bash
+node --experimental-strip-types scripts/seed-phase-7-5i-rewards-qa.ts --cleanup --project=<stagingProjectId>
+```
+
+Cleanup removes only records tagged with `isQaSeed: true` and `qaSeedBatchId: phase_7_5i_rewards_qa`.
 
 ## Firestore Rules
 
@@ -180,4 +228,4 @@ Firestore rules should not be broadly published yet. Run controlled staging QA f
 
 ## Next QA Phase
 
-Recommended next phase: Phase 7.5J controlled rewards seed apply in staging, admin prize verification, optional test-user spin execution, manual claim flow QA, cleanup verification, and Firestore rule publication readiness review.
+Recommended next phase: controlled staging apply with explicit Firebase project confirmation, optional test-user spin execution, manual claim flow QA, cleanup verification, and Firestore rule publication readiness review.
