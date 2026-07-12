@@ -1,4 +1,4 @@
-rules_version = '2';
+﻿rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -197,6 +197,42 @@ service cloud.firestore {
     match /sponsorAuditLogs/{document=**} {
       allow read, write: if false;
     }
+
+    match /sponsorCampaignBriefs/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCampaignDeliverables/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCampaignBudgets/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorSavedCreators/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorSavedChallenges/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCreatorComparisons/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorDiscoveryPreferences/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorshipOpportunities/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCampaignActivity/{document=**} {
+      allow read, write: if false;
+    }
     match /fraudFlags/{flagId} {
       allow read, write: if false;
     }
@@ -364,4 +400,5 @@ service cloud.firestore {
     }
   }
 }
+
 

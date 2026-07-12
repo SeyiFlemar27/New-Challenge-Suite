@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -165,7 +165,7 @@ const hostSections: NavSection[] = [
 const sponsorSections: NavSection[] = [
   { label: "Brand", items: [
     { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
-    { href: "/sponsor/campaigns/create", label: "Create Campaign", icon: PlusSquare },
+    { href: "/sponsor/campaigns/new", label: "Create Campaign", icon: PlusSquare },
     { href: "/sponsor/onboarding", label: "Brand Profile", icon: User },
     { href: "/sponsor/plans", label: "Sponsor Plans", icon: Diamond },
     { href: "/settings", label: "Settings", icon: Settings }
@@ -334,5 +334,6 @@ function WorkspaceNavigationLoading() {
 function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
   return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }
+
 
 

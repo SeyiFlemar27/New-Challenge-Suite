@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -21,7 +21,7 @@ const features: Record<string, FeatureDefinition> = {
   campaigns: { title: "Campaigns", feature: "campaigns", icon: Megaphone, description: "Organize sponsor campaign drafts and approved challenge collaborations." },
   challenges: { title: "Sponsor Challenges", feature: "challenges", icon: Store, description: "Browse sponsor-ready challenge opportunities after sponsor approval." },
   "create-campaign": { title: "Create Campaign", feature: "create_campaign", icon: PlusCircle, description: "Campaign creation remains a structured placeholder until its later implementation phase." },
-  "discover-creators": { title: "Discover Creators", feature: "discover", icon: Users, description: "Creator discovery and filtering foundations will appear here after marketplace phases." },
+  "discover-creators": { title: "Discover Creators", feature: "discover", icon: Users, description: "Creator discovery has moved to /sponsor/discover/creators." },
   events: { title: "Discover Events", feature: "discover", icon: Store, description: "Event sponsorship discovery remains a foundation route." },
   tournaments: { title: "Discover Tournaments", feature: "discover", icon: Target, description: "Tournament sponsorship discovery remains a foundation route." },
   proposals: { title: "Proposals", feature: "proposals", icon: Megaphone, description: "Sponsorship proposal intake and negotiation foundations will appear here." },
@@ -95,3 +95,4 @@ function BillingFoundation({ profile }: { profile: SponsorShellProfile | null })
     <Card className="p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Campaign Budget</p><h2 className="mt-3 text-2xl font-black">Separate review-only budget</h2><div className="mt-5 grid gap-3 text-sm text-slate-300">{["Sponsorship payments", "Prize pool contributions", "Boost budget", "Pending payments", "Disputes and refund reviews"].map((item) => <div key={item} className="rounded-[8px] bg-black/30 p-4">{item}: <b>Not active</b></div>)}</div><p className="mt-5 text-sm leading-6 text-slate-400">No sponsor money capture, release, refund, payout, or withdrawal action is available.</p></Card>
   </div>;
 }
+

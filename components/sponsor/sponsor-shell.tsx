@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -20,8 +20,9 @@ const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; ico
     { label: "Deliverables", icon: CalendarCheck, href: "/sponsor/deliverables", feature: "deliverables" }
   ] },
   { label: "Discover", items: [
-    { label: "Creators", icon: Users, href: "/sponsor/discover-creators", feature: "discover" },
-    { label: "Challenges", icon: Store, href: "/sponsor/challenges", feature: "challenges" },
+    { label: "Creators", icon: Users, href: "/sponsor/discover/creators", feature: "discover" },
+    { label: "Challenges", icon: Store, href: "/sponsor/discover/challenges", feature: "challenges" },
+    { label: "Saved", icon: FolderKanban, href: "/sponsor/saved", feature: "discover" },
     { label: "Events", icon: BriefcaseBusiness, href: "/sponsor/events", feature: "discover" },
     { label: "Tournaments", icon: Target, href: "/sponsor/tournaments", feature: "discover" }
   ] },
@@ -132,3 +133,4 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 export function SponsorPlaceholder({ title, body }: { title: string; body: string }) {
   return <Card className="p-5"><p className="text-sm font-black text-[var(--gold)]">{title}</p><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></Card>;
 }
+
