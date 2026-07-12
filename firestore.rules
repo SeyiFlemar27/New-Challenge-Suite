@@ -233,6 +233,49 @@ service cloud.firestore {
     match /sponsorCampaignActivity/{document=**} {
       allow read, write: if false;
     }
+    match /sponsorProposals/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorProposalRevisions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorProposalActivity/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorConversations/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorMessages/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorInternalNotes/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorDeliverables/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorDeliverableRevisions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorApprovals/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorApprovalComments/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorApprovalActivity/{document=**} {
+      allow read, write: if false;
+    }
     match /fraudFlags/{flagId} {
       allow read, write: if false;
     }
@@ -400,5 +443,6 @@ service cloud.firestore {
     }
   }
 }
+
 
 

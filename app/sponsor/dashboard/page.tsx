@@ -78,9 +78,9 @@ export default function SponsorDashboardPage() {
 }
 
 const commandSections = [
-  { title: "Campaigns", body: "Campaign briefs, active campaign status, and next milestones will appear here." },
+  { title: "Campaigns", body: "Campaign briefs, proposals, deliverables, and safe next milestones are connected as foundation workflows." },
   { title: "Discover", body: "Creator, challenge, event, and tournament discovery foundations are ready for later phases." },
-  { title: "Approvals", body: "Contracts, assets, invoices, and deliverables requiring review will be centralized here." },
+  { title: "Approvals", body: "Assets, proposal decisions, deliverables, and requested changes now route through the approvals workspace." },
   { title: "Reports", body: "CSV/PDF exports and advanced analytics remain foundation-only." }
 ];
 
@@ -89,6 +89,7 @@ function SponsorAccessNotice({ verificationStatus, subscriptionStatus, completio
   const title = approved && !paid ? "Choose a sponsor plan" : paid && !approved ? "Brand approval still required" : verificationStatus === "suspended" || verificationStatus === "flagged" ? "Sponsor access restricted" : verificationStatus === "rejected" || verificationStatus === "needs_changes" || verificationStatus === "additional_information_required" ? "Brand profile changes required" : completion < 80 ? "Complete sponsor onboarding" : "Sponsor verification pending";
   return <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{sponsorStatusLabel(verificationStatus)} / Subscription {subscriptionStatus.replaceAll("_", " ")}</p><h2 className="mt-2 text-xl font-black">{title}</h2><p className="mt-2 leading-7 text-slate-300">Sponsors can explore the dashboard while pending. Funding campaigns, verified badges, high-value sponsorship tools, payment release actions, and enterprise tools remain restricted until review, plan, and safety checks pass.</p><div className="mt-5 flex flex-wrap gap-3"><LinkButton href={approved && !paid ? "/sponsor/plans" : "/sponsor/onboarding"}>{approved && !paid ? "Choose Sponsor Plan" : "Continue Onboarding"}</LinkButton><LinkButton href="/sponsor/plans" variant="secondary">View Sponsor Plans</LinkButton></div></Card>;
 }
-function actionItems(status: SponsorReviewStatus, subscription: SponsorSubscriptionStatus, completion: number) { const items = []; if (completion < 100) items.push("Complete remaining onboarding fields."); if (!sponsorIsApproved(status)) items.push("Business verification is not fully approved yet."); if (!hasActiveSponsorSubscription(subscription)) items.push("Choose or activate a sponsor plan."); items.push("Campaign briefs and funding stay foundation-only until later phases."); return items; }
+function actionItems(status: SponsorReviewStatus, subscription: SponsorSubscriptionStatus, completion: number) { const items = []; if (completion < 100) items.push("Complete remaining onboarding fields."); if (!sponsorIsApproved(status)) items.push("Business verification is not fully approved yet."); if (!hasActiveSponsorSubscription(subscription)) items.push("Choose or activate a sponsor plan."); items.push("Review proposals, messages, deliverables, and approval queues from the sponsor collaboration workspace."); items.push("Campaign briefs and funding stay foundation-only until later phases."); return items; }
 function Metric({ title, value, label }: { title: string; value: string; label: string }) { return <Card className="p-6"><p className="text-sm font-bold text-slate-400">{title}</p><p className="mt-2 text-2xl font-black capitalize text-[var(--gold-2)]">{value}</p><p className="mt-1 text-sm text-slate-300">{label}</p></Card>; }
 function Info({ label, value }: { label: string; value?: string | null }) { return <div className="rounded-[8px] bg-[#1a1a1a] p-4"><p className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">{label}</p><p className="mt-2 break-words font-bold text-white">{value || "Not provided"}</p></div>; }
+

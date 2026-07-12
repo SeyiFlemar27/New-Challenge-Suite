@@ -1,58 +1,25 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
-import { SponsorShell } from "@/components/sponsor/sponsor-shell";
-import { SponsorFeatureGate } from "@/components/sponsor/sponsor-feature-gate";
-import { Button, Card, Field, inputClass, textareaClass } from "@/components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { MessageSquare, Search } from "lucide-react";
+import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
+import { Button, Card, EmptyState, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
-type SponsorMessage = { id: string; recipientId?: string; challengeId?: string | null; body?: string; createdAt?: string };
-type SponsorProfile = { sponsorVerificationStatus?: string | null; subscriptionStatus?: string | null; planStatus?: string | null; stripeStatus?: string | null };
-
 export default function SponsorMessagesPage() {
-  const [messages, setMessages] = useState<SponsorMessage[]>([]);
+  const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [recipientId, setRecipientId] = useState("");
-  const [challengeId, setChallengeId] = useState("");
+  const [proposalId, setProposalId] = useState("");
+  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
-  const [profile, setProfile] = useState<SponsorProfile | null>(null);
-
-  useEffect(() => {
-    void apiRequest<{ sponsorProfile: SponsorProfile }>("/api/sponsor/profile").then((result) => setProfile(result.ok ? result.data?.sponsorProfile ?? null : null));
-    void apiRequest<{ messages: SponsorMessage[] }>("/api/sponsor/messages").then((result) => setMessages(result.ok ? result.data?.messages ?? [] : []));
-  }, []);
-
-  async function send() {
-    const result = await apiRequest<{ message: SponsorMessage }>("/api/sponsor/messages", {
-      method: "POST",
-      body: JSON.stringify({ recipientId, challengeId, body })
-    });
-    setNotice(result.message);
-    if (result.ok && result.data?.message) {
-      setMessages((current) => [result.data!.message, ...current]);
-      setBody("");
-    }
-  }
-
-  return (
-    <SponsorShell profile={profile}>
-      <div className="max-w-4xl">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Brand Command Center</p>
-        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Creator & Host Messages</h1>
-        <p className="mt-3 text-slate-300">Start a conversation before proposing sponsorship. Sending a message does not reserve a slot, capture money, or create a sponsorship agreement.</p>
-        <SponsorFeatureGate feature="messages" title="Messages" currentStatus={profile?.sponsorVerificationStatus} subscriptionStatus={profile?.subscriptionStatus ?? profile?.planStatus ?? profile?.stripeStatus}>
-        <Card className="mt-8 grid gap-5 p-5 sm:p-7 md:grid-cols-2">
-          <Field label="Creator / Host User ID"><input className={inputClass} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} /></Field>
-          <Field label="Challenge ID (optional)"><input className={inputClass} value={challengeId} onChange={(event) => setChallengeId(event.target.value)} /></Field>
-          <div className="md:col-span-2"><Field label="Message"><textarea className={textareaClass} value={body} onChange={(event) => setBody(event.target.value)} /></Field></div>
-          <div className="md:col-span-2"><Button onClick={() => void send()} disabled={!recipientId || body.trim().length < 2}>Send Message</Button></div>
-          {notice ? <p className="md:col-span-2 text-sm text-slate-300">{notice}</p> : null}
-        </Card>
-        <div className="mt-8 space-y-3">
-          {messages.length ? messages.map((message) => <Card key={message.id} className="p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">To {message.recipientId}{message.challengeId ? ` · Challenge ${message.challengeId}` : ""}</p><p className="mt-2 whitespace-pre-wrap break-words text-slate-200">{message.body}</p></Card>) : <Card className="p-6 text-slate-300">No sponsor messages yet.</Card>}
-        </div>
-        </SponsorFeatureGate>
-      </div>
-    </SponsorShell>
-  );
+  useEffect(() => { const url = new URL(window.location.href); setProposalId(url.searchParams.get("proposalId") ?? ""); void load(); }, []);
+  async function load() { const [profileResult, messagesResult] = await Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<{ conversations: any[]; messages: any[] }>("/api/sponsor/messages")]); if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile); if (messagesResult.ok && messagesResult.data) { setConversations(messagesResult.data.conversations); setMessages(messagesResult.data.messages); } else setNotice(messagesResult.message || "Messages could not be loaded."); setLoading(false); }
+  async function send() { const result = await apiRequest<{ conversation: any; message: any }>("/api/sponsor/messages", { method: "POST", body: JSON.stringify({ recipientId, proposalId, title, body }) }); setNotice(result.message); if (result.ok) { setBody(""); setTitle(""); setRecipientId(""); void load(); } }
+  const filtered = useMemo(() => conversations.filter((item) => !query || [item.title, item.recipientId, item.relatedProposalId, item.relatedCampaignId].some((value) => String(value ?? "").toLowerCase().includes(query.toLowerCase()))), [conversations, query]);
+  return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Messaging Workspace</p><h1 className="mt-3 text-4xl font-black">Sponsor conversations</h1><p className="mt-3 max-w-3xl leading-7 text-slate-300">Proposal and campaign-linked conversations with creator-visible messages. Private sponsor notes stay separate and internal-only.</p></div><LinkButton href="/sponsor/proposals/new" variant="secondary">Create Proposal</LinkButton></div><div className="mt-8 grid gap-8 xl:grid-cols-[.9fr_1.1fr]"><Card className="p-6"><h2 className="text-2xl font-black">Start conversation</h2><div className="mt-5 grid gap-4"><Field label="Creator / Host User ID"><input className={inputClass} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} /></Field><Field label="Linked Proposal ID"><input className={inputClass} value={proposalId} onChange={(event) => setProposalId(event.target.value)} /></Field><Field label="Conversation title"><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} /></Field><Field label="Creator-visible message"><textarea className={textareaClass} value={body} onChange={(event) => setBody(event.target.value)} /></Field><Button disabled={!recipientId || body.trim().length < 2} onClick={() => void send()}>Send Message</Button>{notice ? <p className="text-sm text-slate-300">{notice}</p> : null}<p className="rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm text-yellow-100">Delivery/read states are foundation labels. Sending does not create a proposal acceptance, contract, or sponsorship agreement.</p></div></Card><div><Card className="p-4"><div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 text-slate-500" size={18} /><input className={`${inputClass} pl-10`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search conversations" /></div></Card>{loading ? <Card className="mt-5 h-72 animate-pulse bg-[#171717]" /> : filtered.length === 0 ? <EmptyState icon={<MessageSquare />} title="No messages yet." body="Conversations will appear here when you send or receive sponsorship proposals." /> : <div className="mt-5 space-y-4">{filtered.map((conversation) => <Card key={conversation.id} className="p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{conversation.status || "active"}</p><h2 className="mt-2 text-xl font-black">{conversation.title || "Sponsor conversation"}</h2><p className="mt-2 text-sm text-slate-400">Recipient: {conversation.recipientId || "Not available yet"}</p><p className="mt-2 text-sm leading-6 text-slate-300">{conversation.lastMessagePreview || "No preview yet."}</p><div className="mt-4 flex flex-wrap gap-3"><LinkButton href={`/sponsor/messages/${conversation.id}`} variant="secondary">Open Thread</LinkButton><LinkButton href={conversation.relatedProposalId ? `/sponsor/proposals/${conversation.relatedProposalId}` : "/sponsor/proposals"} variant="ghost">Proposal Context</LinkButton></div></Card>)}</div>}</div></div><Card className="mt-8 p-6"><h2 className="text-2xl font-black">Recent creator-visible messages</h2><div className="mt-5 grid gap-3 md:grid-cols-2">{messages.slice(0, 6).map((message) => <Card key={message.id} className="p-4 text-sm text-slate-300"><p className="font-black text-[var(--gold)]">{message.status} / {message.deliveryStatus}</p><p className="mt-2">{message.body}</p></Card>)}{messages.length === 0 ? <p className="text-sm text-slate-500">No message records yet.</p> : null}</div></Card></div></SponsorShell>;
 }

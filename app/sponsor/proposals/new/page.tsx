@@ -1,0 +1,25 @@
+﻿"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Save, Send } from "lucide-react";
+import { SponsorShell } from "@/components/sponsor/sponsor-shell";
+import { Button, Card, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
+import { apiRequest } from "@/lib/api/client";
+
+const initial = { title: "", campaignId: "", creatorId: "", challengeId: "", objective: "", proposedBudget: "", currency: "USD", startDate: "", endDate: "", deliverablesText: "", paymentPreference: "milestone_payment", brandRequirements: "", notesToCreator: "" };
+function split(value: string) { return value.split(",").map((item) => item.trim()).filter(Boolean); }
+
+export default function NewSponsorProposalPage() {
+  const search = useSearchParams();
+  const router = useRouter();
+  const [form, setForm] = useState({ ...initial, campaignId: search.get("campaignId") ?? "", creatorId: search.get("creatorId") ?? "", challengeId: search.get("challengeId") ?? "" });
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const payload = useMemo(() => ({ ...form, budget: Number(form.proposedBudget || 0), deliverables: split(form.deliverablesText) }), [form]);
+  function update(field: string, value: string) { setForm((current) => ({ ...current, [field]: value })); }
+  async function save(status: "draft" | "sent") { setSaving(true); setNotice(""); const result = await apiRequest<{ proposal: { id: string } }>("/api/sponsor/proposals", { method: "POST", body: JSON.stringify({ ...payload, status }) }); setSaving(false); setNotice(result.message); if (result.ok && result.data?.proposal.id) router.push(`/sponsor/proposals/${result.data.proposal.id}`); }
+  return <SponsorShell><div className="mx-auto max-w-5xl"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Proposal Builder</p><h1 className="mt-3 text-4xl font-black">Create sponsor proposal</h1><p className="mt-3 max-w-3xl leading-7 text-slate-300">Prepare a creator or challenge sponsorship proposal. Sending creates a foundation proposal only, without contracts, funding, invoices, or payment release.</p></div><LinkButton href="/sponsor/proposals" variant="secondary">Proposal Center</LinkButton></div><Card className="mt-8 p-6 sm:p-8"><div className="grid gap-5 md:grid-cols-2"><Text label="Proposal Title" value={form.title} onChange={(v) => update("title", v)} /><Text label="Campaign Brief ID" value={form.campaignId} onChange={(v) => update("campaignId", v)} /><Text label="Target Creator ID" value={form.creatorId} onChange={(v) => update("creatorId", v)} /><Text label="Challenge Opportunity ID" value={form.challengeId} onChange={(v) => update("challengeId", v)} /><Text label="Proposed Budget" value={form.proposedBudget} onChange={(v) => update("proposedBudget", v)} /><Text label="Currency" value={form.currency} onChange={(v) => update("currency", v)} /><Text label="Start Date" value={form.startDate} onChange={(v) => update("startDate", v)} /><Text label="End Date" value={form.endDate} onChange={(v) => update("endDate", v)} /><Text label="Payment Preference Foundation" value={form.paymentPreference} onChange={(v) => update("paymentPreference", v)} /><Area label="Sponsorship Objective" value={form.objective} onChange={(v) => update("objective", v)} /><Area label="Deliverables (comma separated)" value={form.deliverablesText} onChange={(v) => update("deliverablesText", v)} /><Area label="Brand Requirements" value={form.brandRequirements} onChange={(v) => update("brandRequirements", v)} /><div className="md:col-span-2"><Area label="Notes to Creator" value={form.notesToCreator} onChange={(v) => update("notesToCreator", v)} /></div></div><p className="mt-6 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Accepting or sending this proposal does not create a contract, process campaign funding, release sponsor money, or launch a campaign.</p>{notice ? <p className="mt-5 rounded-[8px] bg-[#1a1a1a] p-3 text-sm text-slate-300">{notice}</p> : null}<div className="mt-7 flex flex-wrap gap-3"><Button disabled={saving || form.title.length < 3} onClick={() => void save("draft")}><Save size={17} /> Save Draft</Button><Button variant="secondary" disabled={saving || form.title.length < 3} onClick={() => void save("sent")}><Send size={17} /> Send Proposal Foundation</Button></div></Card></div></SponsorShell>;
+}
+function Text({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <Field label={label}><input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} /></Field>; }
+function Area({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <Field label={label}><textarea className={textareaClass} value={value} onChange={(event) => onChange(event.target.value)} /></Field>; }

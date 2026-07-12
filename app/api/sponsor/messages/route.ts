@@ -1,55 +1,52 @@
-import { getAdminDb } from "@/lib/firebase/admin";
-import { normalizeAccountType } from "@/lib/plan-access";
-import { requireRequestUser } from "@/lib/server/auth";
-import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+﻿import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
+import { requireSponsorContext } from "@/lib/server/sponsor";
+import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { user, response } = await requireRequestUser(request);
+  const { context, response } = await requireSponsorContext(request);
   if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Sponsor messages");
-  const snap = await db.collection("sponsorMessages").where("sponsorId", "==", user.uid).limit(100).get();
-  const messages = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)).sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
-  return ok({ messages }, "Sponsor messages loaded.");
+  if (!context) return serverError("Sponsor access could not be verified.");
+  try {
+    const [conversationsSnap, messagesSnap] = await Promise.all([
+      context.db.collection("sponsorConversations").where("sponsorId", "==", context.user.uid).limit(100).get(),
+      context.db.collection("sponsorMessages").where("sponsorId", "==", context.user.uid).limit(100).get()
+    ]);
+    const conversations = conversationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => String((b as any).updatedAt ?? "").localeCompare(String((a as any).updatedAt ?? "")));
+    const messages = messagesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => String((b as any).createdAt ?? "").localeCompare(String((a as any).createdAt ?? "")));
+    return ok({ conversations, messages }, "Sponsor messages loaded.");
+  } catch (error) {
+    console.error("[sponsor-messages:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
+    return serverError("Sponsor messages could not be loaded.");
+  }
 }
 
 export async function POST(request: Request) {
-  const { user, response } = await requireRequestUser(request);
+  const { context, response } = await requireSponsorContext(request);
   if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Sponsor messages");
+  if (!context) return serverError("Sponsor access could not be verified.");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const recipientId = typeof parsed.body?.recipientId === "string" ? parsed.body.recipientId.trim() : "";
-  const challengeId = typeof parsed.body?.challengeId === "string" ? parsed.body.challengeId.trim() : "";
-  const body = typeof parsed.body?.body === "string" ? parsed.body.body.trim() : "";
+  const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
+  const recipientId = cleanText(body.recipientId).slice(0, 120);
+  const messageBody = cleanText(body.body).slice(0, 2000);
   if (!recipientId) return validationError({ recipientId: "Creator or host user ID is required." });
-  if (body.length < 2 || body.length > 2000) return validationError({ body: "Message must be between 2 and 2,000 characters." });
-  const [accountSnap, profileSnap, sponsorSnap] = await Promise.all([
-    db.collection("users").doc(user.uid).get(),
-    db.collection("profiles").doc(user.uid).get(),
-    db.collection("sponsorProfiles").doc(user.uid).get()
-  ]);
-  if (normalizeAccountType({ ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) }) !== "sponsor") {
-    return fail("A sponsor account is required.", 403, undefined, "PERMISSION_DENIED");
+  if (messageBody.length < 2) return validationError({ body: "Message must be at least 2 characters." });
+  try {
+    const now = isoNow();
+    const conversationId = cleanText(body.conversationId).slice(0, 120) || context.db.collection("sponsorConversations").doc().id;
+    const conversation = { id: conversationId, sponsorId: context.user.uid, ownerUid: context.user.uid, recipientId, relatedProposalId: cleanText(body.proposalId).slice(0, 120) || null, relatedCampaignId: cleanText(body.campaignId).slice(0, 120) || null, relatedChallengeId: cleanText(body.challengeId).slice(0, 120) || null, title: cleanText(body.title, "Sponsor conversation").slice(0, 180), lastMessagePreview: messageBody.slice(0, 180), unreadCountFoundation: 0, status: "active", updatedAt: now, updatedBy: context.user.uid, createdAt: now, createdBy: context.user.uid };
+    const messageRef = context.db.collection("sponsorMessages").doc();
+    const message = { id: messageRef.id, sponsorId: context.user.uid, ownerUid: context.user.uid, conversationId, recipientId, body: messageBody, attachments: [], visibility: "creator_visible", status: "sent", deliveryStatus: "delivered_foundation", readStatus: "read_foundation", internalOnly: false, createdAt: now, updatedAt: now, createdBy: context.user.uid };
+    await Promise.all([
+      context.db.collection("sponsorConversations").doc(conversationId).set(conversation, { merge: true }),
+      messageRef.set(message),
+      context.db.collection("sponsorProposalActivity").add({ sponsorId: context.user.uid, proposalId: conversation.relatedProposalId, conversationId, action: "message_sent", status: "sent", createdAt: now, createdBy: context.user.uid })
+    ]);
+    return ok({ conversation, message }, "Message saved. Delivery is foundation-only and no sponsorship agreement was created.");
+  } catch (error) {
+    console.error("[sponsor-messages:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
+    return serverError("Sponsor message could not be saved.");
   }
-  if (!sponsorSnap.exists || sponsorSnap.data()?.sponsorOnboardingStatus !== "complete") {
-    return fail("Complete sponsor onboarding before messaging creators or hosts.", 403, { redirectTo: "/sponsor/onboarding" }, "SPONSOR_ONBOARDING_REQUIRED");
-  }
-  const now = new Date().toISOString();
-  const ref = db.collection("sponsorMessages").doc();
-  const message = {
-    id: ref.id,
-    sponsorId: user.uid,
-    recipientId,
-    challengeId: challengeId || null,
-    body,
-    status: "sent",
-    moderationStatus: "unreviewed",
-    sponsorshipId: null,
-    createdAt: now,
-    updatedAt: now
-  };
-  await ref.set(message);
-  return ok({ message }, "Message sent. No sponsorship or payment was created.");
 }
