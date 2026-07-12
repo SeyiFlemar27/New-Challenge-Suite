@@ -276,6 +276,58 @@ service cloud.firestore {
     match /sponsorApprovalActivity/{document=**} {
       allow read, write: if false;
     }
+
+    match /sponsorContracts/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorContractTemplates/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorContractRevisions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorContractSignatures/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorWallets/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorWalletTransactions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCampaignFunding/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorMilestones/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorInvoices/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorReceipts/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorBillingSettings/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorPaymentMethods/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorFinancialAuditLogs/{document=**} {
+      allow read, write: if false;
+    }
     match /fraudFlags/{flagId} {
       allow read, write: if false;
     }
@@ -443,6 +495,4 @@ service cloud.firestore {
     }
   }
 }
-
-
 

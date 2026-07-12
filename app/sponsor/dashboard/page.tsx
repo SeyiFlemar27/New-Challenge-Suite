@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BarChart3, Building2, CalendarClock, CheckCircle2, CreditCard, FileCheck2, Megaphone, MessageSquare, ShieldAlert, ShieldCheck, Target, Users, WalletCards } from "lucide-react";
+import { Megaphone, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Card, LinkButton } from "@/components/ui";
 import { SponsorPlaceholder, SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
@@ -52,7 +52,7 @@ export default function SponsorDashboardPage() {
 
   return <SponsorShell profile={profile}>
     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-      <div><p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">{experience.badgeLabel} / Brand Command Center</p><h1 className="mt-2 text-4xl font-black md:text-5xl">Welcome, {profile?.brandName || "Sponsor"}</h1><p className="mt-3 max-w-3xl text-slate-300">A calm sponsor operating center for brand profile readiness, campaign foundations, marketplace preparation, approvals, reporting foundations, and safe next actions.</p></div>
+      <div><p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">{experience.badgeLabel} / Brand Command Center</p><h1 className="mt-2 text-4xl font-black md:text-5xl">Welcome, {profile?.brandName || "Sponsor"}</h1><p className="mt-3 max-w-3xl text-slate-300">A calm sponsor operating center for brand readiness, campaigns, collaboration, contracts, billing foundations, wallet readiness, and safe next actions.</p></div>
       <div className="flex flex-wrap gap-3"><LinkButton href="/sponsor/campaigns/new">Create Campaign</LinkButton><LinkButton href="/sponsor/discover/creators" variant="secondary">Browse Creators</LinkButton><LinkButton href="/sponsor/discover/challenges" variant="secondary">Browse Challenges</LinkButton></div>
     </div>
 
@@ -81,7 +81,10 @@ const commandSections = [
   { title: "Campaigns", body: "Campaign briefs, proposals, deliverables, and safe next milestones are connected as foundation workflows." },
   { title: "Discover", body: "Creator, challenge, event, and tournament discovery foundations are ready for later phases." },
   { title: "Approvals", body: "Assets, proposal decisions, deliverables, and requested changes now route through the approvals workspace." },
-  { title: "Reports", body: "CSV/PDF exports and advanced analytics remain foundation-only." }
+  { title: "Contracts", body: "Accepted proposals can move into contract review foundations before any campaign funding or launch steps." },
+  { title: "Wallet", body: "Sponsor wallet balances, funding readiness, and transaction histories are visible as foundation records only." },
+  { title: "Billing", body: "Subscription billing, invoices, receipts, and campaign budget separation are documented without client-side status changes." },
+  { title: "Milestones", body: "Milestone approvals can be tracked, but approval does not release money or update wallets." }
 ];
 
 function SponsorAccessNotice({ verificationStatus, subscriptionStatus, completion }: { verificationStatus: SponsorReviewStatus; subscriptionStatus: SponsorSubscriptionStatus; completion: number }) {
@@ -89,7 +92,7 @@ function SponsorAccessNotice({ verificationStatus, subscriptionStatus, completio
   const title = approved && !paid ? "Choose a sponsor plan" : paid && !approved ? "Brand approval still required" : verificationStatus === "suspended" || verificationStatus === "flagged" ? "Sponsor access restricted" : verificationStatus === "rejected" || verificationStatus === "needs_changes" || verificationStatus === "additional_information_required" ? "Brand profile changes required" : completion < 80 ? "Complete sponsor onboarding" : "Sponsor verification pending";
   return <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{sponsorStatusLabel(verificationStatus)} / Subscription {subscriptionStatus.replaceAll("_", " ")}</p><h2 className="mt-2 text-xl font-black">{title}</h2><p className="mt-2 leading-7 text-slate-300">Sponsors can explore the dashboard while pending. Funding campaigns, verified badges, high-value sponsorship tools, payment release actions, and enterprise tools remain restricted until review, plan, and safety checks pass.</p><div className="mt-5 flex flex-wrap gap-3"><LinkButton href={approved && !paid ? "/sponsor/plans" : "/sponsor/onboarding"}>{approved && !paid ? "Choose Sponsor Plan" : "Continue Onboarding"}</LinkButton><LinkButton href="/sponsor/plans" variant="secondary">View Sponsor Plans</LinkButton></div></Card>;
 }
-function actionItems(status: SponsorReviewStatus, subscription: SponsorSubscriptionStatus, completion: number) { const items = []; if (completion < 100) items.push("Complete remaining onboarding fields."); if (!sponsorIsApproved(status)) items.push("Business verification is not fully approved yet."); if (!hasActiveSponsorSubscription(subscription)) items.push("Choose or activate a sponsor plan."); items.push("Review proposals, messages, deliverables, and approval queues from the sponsor collaboration workspace."); items.push("Campaign briefs and funding stay foundation-only until later phases."); return items; }
+function actionItems(status: SponsorReviewStatus, subscription: SponsorSubscriptionStatus, completion: number) { const items = []; if (completion < 100) items.push("Complete remaining onboarding fields."); if (!sponsorIsApproved(status)) items.push("Business verification is not fully approved yet."); if (!hasActiveSponsorSubscription(subscription)) items.push("Choose or activate a sponsor plan."); items.push("Review proposals, messages, deliverables, and approval queues from the sponsor collaboration workspace."); items.push("Review contracts, billing, invoices, wallet readiness, and milestone foundations before campaign funding."); items.push("Campaign funding and payment release stay disabled until provider-backed server flows are configured."); return items; }
 function Metric({ title, value, label }: { title: string; value: string; label: string }) { return <Card className="p-6"><p className="text-sm font-bold text-slate-400">{title}</p><p className="mt-2 text-2xl font-black capitalize text-[var(--gold-2)]">{value}</p><p className="mt-1 text-sm text-slate-300">{label}</p></Card>; }
 function Info({ label, value }: { label: string; value?: string | null }) { return <div className="rounded-[8px] bg-[#1a1a1a] p-4"><p className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">{label}</p><p className="mt-2 break-words font-bold text-white">{value || "Not provided"}</p></div>; }
 

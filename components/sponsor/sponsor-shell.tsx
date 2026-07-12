@@ -30,11 +30,20 @@ const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; ico
     { label: "Brand Profile", icon: Building2, href: "/sponsor/profile", feature: "brand_profile" },
     { label: "Brand Assets", icon: FolderKanban, href: "/sponsor/brand-assets", feature: "brand_assets" },
     { label: "Proposals", icon: Handshake, href: "/sponsor/proposals", feature: "proposals" },
-    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" },
-    { label: "Contracts", icon: FileCheck2, href: "/sponsor/contracts", feature: "contracts" }
+    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" }
+  ] },
+  { label: "Legal", items: [
+    { label: "Contracts", icon: FileCheck2, href: "/sponsor/contracts", feature: "contracts" },
+    { label: "Templates", icon: FileCheck2, href: "/sponsor/contracts/templates", feature: "contracts" }
+  ] },
+  { label: "Finance", items: [
+    { label: "Wallet", icon: WalletCards, href: "/sponsor/wallet", feature: "wallet" },
+    { label: "Billing", icon: CreditCard, href: "/sponsor/billing", feature: "billing" },
+    { label: "Invoices", icon: BadgeDollarSign, href: "/sponsor/billing/invoices", feature: "billing" },
+    { label: "Milestones", icon: CalendarCheck, href: "/sponsor/milestones", feature: "wallet" },
+    { label: "Transactions", icon: WalletCards, href: "/sponsor/wallet/transactions", feature: "wallet" }
   ] },
   { label: "Business", items: [
-    { label: "Wallet", icon: WalletCards, href: "/sponsor/wallet", feature: "wallet" },
     { label: "Analytics", icon: PieChart, href: "/sponsor/analytics", feature: "analytics" },
     { label: "Reports", icon: BarChart3, href: "/sponsor/reports", feature: "reports" },
     { label: "Team", icon: Users, href: "/sponsor/team", feature: "team" },
