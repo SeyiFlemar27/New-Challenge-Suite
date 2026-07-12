@@ -13,24 +13,20 @@ import { calculateSponsorCompletion } from "@/lib/sponsor-foundation";
 import { canAccessSponsorFeature, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorStatusLabel, type SponsorFeatureKey } from "@/lib/sponsor-access";
 
 const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; icon: typeof LayoutDashboard; href: string; feature: SponsorFeatureKey }> }> = [
-  { label: "Command", items: [
-    { label: "Overview", icon: LayoutDashboard, href: "/sponsor/dashboard", feature: "overview" },
+  { label: "Overview", items: [
+    { label: "Dashboard", icon: LayoutDashboard, href: "/sponsor/dashboard", feature: "overview" },
     { label: "Campaigns", icon: Megaphone, href: "/sponsor/campaigns", feature: "campaigns" },
+    { label: "Proposals", icon: Handshake, href: "/sponsor/proposals", feature: "proposals" },
+    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" },
     { label: "Approvals", icon: FileCheck2, href: "/sponsor/approvals", feature: "approvals" },
     { label: "Deliverables", icon: CalendarCheck, href: "/sponsor/deliverables", feature: "deliverables" }
   ] },
   { label: "Discover", items: [
     { label: "Creators", icon: Users, href: "/sponsor/discover/creators", feature: "discover" },
     { label: "Challenges", icon: Store, href: "/sponsor/discover/challenges", feature: "challenges" },
-    { label: "Saved", icon: FolderKanban, href: "/sponsor/saved", feature: "discover" },
     { label: "Events", icon: BriefcaseBusiness, href: "/sponsor/events", feature: "discover" },
-    { label: "Tournaments", icon: Target, href: "/sponsor/tournaments", feature: "discover" }
-  ] },
-  { label: "Brand", items: [
-    { label: "Brand Profile", icon: Building2, href: "/sponsor/profile", feature: "brand_profile" },
-    { label: "Brand Assets", icon: FolderKanban, href: "/sponsor/brand-assets", feature: "brand_assets" },
-    { label: "Proposals", icon: Handshake, href: "/sponsor/proposals", feature: "proposals" },
-    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" }
+    { label: "Tournaments", icon: Target, href: "/sponsor/tournaments", feature: "discover" },
+    { label: "Saved", icon: FolderKanban, href: "/sponsor/saved", feature: "discover" }
   ] },
   { label: "Legal", items: [
     { label: "Contracts", icon: FileCheck2, href: "/sponsor/contracts", feature: "contracts" },
@@ -43,9 +39,13 @@ const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; ico
     { label: "Milestones", icon: CalendarCheck, href: "/sponsor/milestones", feature: "wallet" },
     { label: "Transactions", icon: WalletCards, href: "/sponsor/wallet/transactions", feature: "wallet" }
   ] },
-  { label: "Business", items: [
+  { label: "Growth", items: [
     { label: "Analytics", icon: PieChart, href: "/sponsor/analytics", feature: "analytics" },
-    { label: "Reports", icon: BarChart3, href: "/sponsor/reports", feature: "reports" },
+    { label: "Reports", icon: BarChart3, href: "/sponsor/reports", feature: "reports" }
+  ] },
+  { label: "Brand", items: [
+    { label: "Brand Profile", icon: Building2, href: "/sponsor/profile", feature: "brand_profile" },
+    { label: "Brand Assets", icon: FolderKanban, href: "/sponsor/assets", feature: "brand_assets" },
     { label: "Team", icon: Users, href: "/sponsor/team", feature: "team" },
     { label: "Notifications", icon: Bell, href: "/sponsor/notifications", feature: "notifications" },
     { label: "Settings", icon: Settings, href: "/sponsor/settings", feature: "settings" },
@@ -142,4 +142,3 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 export function SponsorPlaceholder({ title, body }: { title: string; body: string }) {
   return <Card className="p-5"><p className="text-sm font-black text-[var(--gold)]">{title}</p><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></Card>;
 }
-

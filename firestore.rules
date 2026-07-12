@@ -325,6 +325,54 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+
+    match /sponsorAnalyticsSnapshots/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorCampaignAnalytics/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorReports/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorReportJobs/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorAssetFolders/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorAssetVersions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorTeamMembers/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorInvitations/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorRolePermissions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorNotificationPreferences/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorNotificationEvents/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /sponsorSettingsAuditLogs/{document=**} {
+      allow read, write: if false;
+    }
     match /sponsorFinancialAuditLogs/{document=**} {
       allow read, write: if false;
     }
@@ -495,4 +543,3 @@ service cloud.firestore {
     }
   }
 }
-
