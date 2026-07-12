@@ -42,6 +42,7 @@ export function normalizeRewardPrize(id: string, data: Record<string, unknown>):
 export function isPrizeActive(prize: RewardPrize, now = Date.now(), campaignId?: string | null) { if (!prize.enabled || prize.status !== "active" || prize.probabilityWeight <= 0) return false; if (campaignId && prize.campaignId && prize.campaignId !== campaignId) return false; if (prize.startDate && Date.parse(prize.startDate) > now) return false; const end = prize.endDate ?? prize.expiresAt; if (end && Date.parse(end) < now) return false; if (prize.quantityType === "limited" && prize.remainingQuantity !== null && prize.remainingQuantity <= 0) return false; return true; }
 export function availablePrizesForTier(prizes: RewardPrize[], selectedTier: RewardSpinTier, now = Date.now(), campaignId?: string | null) { return prizes.filter((p) => p.prizeTier === selectedTier && isPrizeActive(p, now, campaignId)).sort((a, b) => a.displayOrder - b.displayOrder || a.prizeName.localeCompare(b.prizeName)); }
 export function chooseRewardPrize(prizes: RewardPrize[], selectedTier: RewardSpinTier, now = Date.now(), campaignId?: string | null) { const available = availablePrizesForTier(prizes, selectedTier, now, campaignId); const total = available.reduce((sum, p) => sum + p.probabilityWeight, 0); if (!available.length || total <= 0) return null; let cursor = randomInt(Math.max(1, Math.ceil(total * 1000))) / 1000; for (const p of available) { cursor -= p.probabilityWeight; if (cursor <= 0) return p; } return available[available.length - 1]; }
+export function rewardPrizesNeedSetup(prizes: RewardPrize[]) { return !prizes.length || prizes.every((prize) => prize.id.startsWith("default-")); }
 export async function loadRewardPrizes(db: Firestore) { const snap = await db.collection("rewardPrizes").where("enabled", "==", true).limit(500).get(); const configured = snap.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data())); if (configured.length) return configured; const legacy = await db.collection("rewardWheelPrizes").where("enabled", "==", true).limit(500).get(); const old = legacy.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data())); return old.length ? old : DEFAULT_REWARD_PRIZES; }
 export function publicPrize(prize: RewardPrize) { return { id: prize.id, prizeName: prize.prizeName, prizeDescription: prize.prizeDescription, prizeTier: prize.prizeTier, prizeType: prize.prizeType, fulfillmentType: prize.fulfillmentType, imageUrl: prize.imageUrl, terms: prize.terms, manualFulfillmentRequired: prize.manualFulfillmentRequired, displayOrder: prize.displayOrder, cashOutEnabled: false }; }
 function totalCredits(credits: SpinCredits) { return credits.basic + credits.standard + credits.premium; }
@@ -53,12 +54,14 @@ export async function buildRewardSummary(db: Firestore, userId: string) {
   ]);
   const campaign = await getActiveRewardCampaign(db, settings);
   const prizes = await loadRewardPrizes(db);
+  const prizeSetupRequired = rewardPrizesNeedSetup(prizes);
+  const displayPrizes = prizeSetupRequired ? [] : prizes;
   const profile = { ...(userSnap.data() ?? {}), ...(profileSnap.data() ?? {}) };
   const points = Number(profile.availableRewardPoints ?? profile.voterPoints ?? 0);
   const lifetime = Number(profile.lifetimeRewardPoints ?? profile.voterPoints ?? 0);
   const credits = normalizeSpinCredits(profile.spinCredits ?? profile.rewardSpinCreditsByTier ?? profile.rewardSpinCredits);
   const next = tierDefinitions(settings).find((t) => points < t.pointsRequired) ?? null;
-  return { settings, campaign, points, availableRewardPoints: points, lifetimeRewardPoints: lifetime, spinCreditsByTier: credits, spinCredits: totalCredits(credits), tiers: tierDefinitions(settings), progress: { nextTier: next, pointsNeeded: next ? Math.max(0, next.pointsRequired - points) : 0 }, prizes: TIERS.reduce((acc, t) => ({ ...acc, [t]: availablePrizesForTier(prizes, t, Date.now(), campaign.id).map(publicPrize) }), {} as Record<RewardSpinTier, ReturnType<typeof publicPrize>[]>), history: historySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), claims: claimsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), recentRewards: historySnap.docs.slice(0, 5).map((doc) => ({ id: doc.id, ...doc.data() })), safety: { pointsSource: "server_confirmed_dorocoin_purchase_only", clientCanGrantPoints: false, clientCanGrantSpinCredits: false, serverSelectsPrize: true, cashOutEnabled: false, rewardSelectionExposedToBrowser: false } };
+  return { settings, campaign, points, availableRewardPoints: points, lifetimeRewardPoints: lifetime, spinCreditsByTier: credits, spinCredits: totalCredits(credits), tiers: tierDefinitions(settings), progress: { nextTier: next, pointsNeeded: next ? Math.max(0, next.pointsRequired - points) : 0 }, prizeSetupRequired, prizes: TIERS.reduce((acc, t) => ({ ...acc, [t]: availablePrizesForTier(displayPrizes, t, Date.now(), campaign.id).map(publicPrize) }), {} as Record<RewardSpinTier, ReturnType<typeof publicPrize>[]>), history: historySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), claims: claimsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), recentRewards: historySnap.docs.slice(0, 5).map((doc) => ({ id: doc.id, ...doc.data() })), safety: { pointsSource: "server_confirmed_dorocoin_purchase_only", clientCanGrantPoints: false, clientCanGrantSpinCredits: false, serverSelectsPrize: true, cashOutEnabled: false, rewardSelectionExposedToBrowser: false } };
 }
 
 export async function awardDoroCoinPurchaseRewards(db: Firestore, input: { userId: string; coins: number; sourceId: string; eventId: string }) {
@@ -126,7 +129,9 @@ function spinAvailabilityError(settings: RewardSettings, selectedTier: RewardSpi
 export async function executeRewardSpin(db: Firestore, input: { userId: string; tier: RewardSpinTier; idempotencyKey?: string | null }) {
   const settings = await getRewardSettings(db);
   const campaign = await getActiveRewardCampaign(db, settings);
-  const prizes = availablePrizesForTier(await loadRewardPrizes(db), input.tier, Date.now(), campaign.id);
+  const allPrizes = await loadRewardPrizes(db);
+  if (rewardPrizesNeedSetup(allPrizes)) throw new Error("REWARD_PRIZES_NOT_CONFIGURED");
+  const prizes = availablePrizesForTier(allPrizes, input.tier, Date.now(), campaign.id);
   const selected = chooseRewardPrize(prizes, input.tier, Date.now(), campaign.id);
   if (!selected) throw new Error("NO_AVAILABLE_PRIZES");
   const now = new Date().toISOString();

@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Activity, Award, BarChart3, Crown, Diamond, Flame, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
+import { Activity, Award, BarChart3, Crown, Diamond, Flame, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
@@ -218,6 +218,19 @@ export default function DashboardPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
+      <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
+        <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Rewards</p>
+            <h2 className="mt-2 flex items-center gap-2 text-2xl font-black"><Gift className="text-[var(--gold)]" /> Rewards & Spin Wheel</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Earn reward points from server-confirmed DoroCoin purchases, unlock tier-specific spin credits, and win prizes through reviewed reward flows.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+            <LinkButton href="/rewards/wheel">Open Spin Wheel</LinkButton>
+            <LinkButton href="/rewards/history" variant="secondary">View Reward History</LinkButton>
+          </div>
+        </div>
+      </Card>
       
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierFeatures.map((feature) => (

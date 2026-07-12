@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Coins,
   Diamond,
+  Gift,
   Home,
   LayoutGrid,
   LockKeyhole,
@@ -44,7 +45,10 @@ const competitorSections: NavSection[] = [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift },
+    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
+    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Compete", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -65,7 +69,10 @@ const starterSections: NavSection[] = [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift },
+    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
+    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -88,7 +95,10 @@ const creatorSections: NavSection[] = [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins }
+    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift },
+    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
+    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -119,7 +129,10 @@ const hostSections: NavSection[] = [
     { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Favorites / Saved", icon: Star },
     { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
-    { href: "/wallet", label: "Wallet & Revenue", icon: Coins }
+    { href: "/wallet", label: "Wallet & Revenue", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift },
+    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
+    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -169,6 +182,7 @@ function activeNavigationHref(pathname: string) {
   if (pathname === "/my-challenges") return "/my-challenges";
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
+  if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return pathname;
   if (pathname === "/settings" || pathname.startsWith("/settings/")) return "/settings";
   return pathname;
 }
@@ -204,15 +218,15 @@ export function Sidebar() {
       ? [
           { href: "/dashboard/host", label: "Home", icon: Home },
           { href: "/host/challenges/create", label: "Create", icon: PlusSquare },
-          { href: "/host/participants", label: "People", icon: UsersRound },
           { href: "/host/voting", label: "Voting", icon: Vote },
+          { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ]
       : [
           { href: "/dashboard", label: "Home", icon: Home },
           { href: "/feed", label: "Explore", icon: LayoutGrid },
           { href: "/challenges/create", label: "Create", icon: PlusSquare },
-          { href: "/leaderboards", label: "Rank", icon: BarChart3 },
+          { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ];
 
@@ -318,7 +332,7 @@ function WorkspaceNavigationLoading() {
 }
 
 function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
-  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href; return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
+  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }
 
 

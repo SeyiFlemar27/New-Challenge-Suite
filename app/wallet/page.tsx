@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Coins, LockKeyhole, ShieldCheck, TrendingUp, Vote } from "lucide-react";
+import { Coins, Gift, LockKeyhole, ShieldCheck, TrendingUp, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { money } from "@/lib/utils";
@@ -215,6 +215,17 @@ export default function WalletPage() {
       {!loading && !unauthenticated && !error && account.accountType !== "sponsor" ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="text-xl font-black">Eligible earnings withdrawal</h2><p className="mt-2 text-sm text-slate-300">Verified winnings and approved earnings can be submitted for manual review. DoroCoins are never withdrawable.</p></div>
         <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">Review Withdrawal Eligibility</LinkButton>
+      </Card> : null}
+
+      {!loading && !unauthenticated && !error && account.accountType !== "sponsor" ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-black"><Gift className="text-[var(--gold)]" /> Rewards & Spin Wheel</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Earn reward points when you purchase DoroCoins. Use points to unlock Spin Wheel credits and track prizes through reward history.</p>
+        </div>
+        <div className="flex flex-col gap-3 sm:min-w-52">
+          <LinkButton href="/rewards" className="w-full">View Rewards</LinkButton>
+          <LinkButton href="/rewards/wheel" variant="secondary" className="w-full">Open Spin Wheel</LinkButton>
+        </div>
       </Card> : null}
 
       {!loading && !unauthenticated && !error ? <section className="mt-10">
