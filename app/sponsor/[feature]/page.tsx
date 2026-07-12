@@ -21,13 +21,23 @@ const features: Record<string, FeatureDefinition> = {
   campaigns: { title: "Campaigns", feature: "campaigns", icon: Megaphone, description: "Organize sponsor campaign drafts and approved challenge collaborations." },
   challenges: { title: "Sponsor Challenges", feature: "challenges", icon: Store, description: "Browse sponsor-ready challenge opportunities after sponsor approval." },
   "create-campaign": { title: "Create Campaign", feature: "create_campaign", icon: PlusCircle, description: "Campaign creation remains a structured placeholder until its later implementation phase." },
-  placements: { title: "Placements", feature: "placements", icon: Target, description: "Review planned logo, CTA, feed, banner, and winner-announcement placements." },
+  "discover-creators": { title: "Discover Creators", feature: "discover", icon: Users, description: "Creator discovery and filtering foundations will appear here after marketplace phases." },
+  events: { title: "Discover Events", feature: "discover", icon: Store, description: "Event sponsorship discovery remains a foundation route." },
+  tournaments: { title: "Discover Tournaments", feature: "discover", icon: Target, description: "Tournament sponsorship discovery remains a foundation route." },
+  proposals: { title: "Proposals", feature: "proposals", icon: Megaphone, description: "Sponsorship proposal intake and negotiation foundations will appear here." },
+  approvals: { title: "Approvals", feature: "approvals", icon: Target, description: "Campaign assets, contracts, invoices, and deliverable approvals will be reviewed here." },
+  deliverables: { title: "Deliverables", feature: "deliverables", icon: Target, description: "Sponsor deliverables and creator obligations remain foundation-only." },
+  contracts: { title: "Contracts", feature: "contracts", icon: CreditCard, description: "Contract review foundations are available without enabling payment releases." },
+  "brand-assets": { title: "Brand Assets", feature: "brand_assets", icon: Store, description: "Logo, banner, CTA, and brand asset management foundations are prepared here." },
+  wallet: { title: "Sponsor Wallet", feature: "wallet", icon: CreditCard, description: "Sponsor budget and wallet foundations are read-only. No campaign funding or release is active." },
+  analytics: { title: "Analytics", feature: "analytics", icon: PieChart, description: "Campaign performance analytics remain clean foundation states until real campaign data exists." },
   insights: { title: "Audience Insights", feature: "insights", icon: PieChart, description: "Audience and campaign performance insights will appear here when reporting is implemented." },
   reports: { title: "Reports", feature: "reports", icon: BarChart3, description: "Campaign reporting remains read-only foundation work in this phase." },
   billing: { title: "Budget & Billing", feature: "billing", icon: CreditCard, description: "Subscription billing is separate from campaign budgets. Sponsor money capture and release are not active." },
   team: { title: "Team Members", feature: "team", icon: Users, description: "Manage team access when the active sponsor plan includes team seats." },
-  settings: { title: "Sponsor Settings", feature: "settings", icon: Settings, description: "Manage account and brand preferences through the existing settings foundation." }
-};
+  notifications: { title: "Notifications", feature: "notifications", icon: Settings, description: "Sponsor notification history and preferences are foundation-ready." },
+  settings: { title: "Sponsor Settings", feature: "settings", icon: Settings, description: "Manage account and brand preferences through the sponsor settings foundation." }
+}
 
 export default function SponsorFeaturePage() {
   const params = useParams<{ feature: string }>();

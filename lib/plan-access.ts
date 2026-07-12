@@ -1,4 +1,4 @@
-﻿import type { AccountType, ProductPlanId as BlueprintPlanId, SponsorProductPlanId, UserProductPlanId } from "@/lib/types";
+import type { AccountType, ProductPlanId as BlueprintPlanId, SponsorProductPlanId, UserProductPlanId } from "@/lib/types";
 
 export type ProductPlanId = "free" | "premium" | "creator_pro" | "verified_host";
 export type PlanStatus = "active" | "inactive" | "trial" | "trialing" | "payment_warning_1" | "payment_warning_2" | "expired" | "cancelled" | "canceled" | "past_due" | "incomplete" | "paused";
@@ -257,7 +257,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     privateChallengeLimitLabel: "Unlimited private challenges",
     monthlyChallengeLimit: null,
     monthlyPrivateChallengeLimit: null,
-    teamMemberLimit: 25,
+    teamMemberLimit: 999,
     monthlyBoostLimit: 50,
     voteMultiplierLimit: 20,
     features: {
@@ -290,7 +290,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     dashboardName: "Brand Command Center",
     dashboardSubtitle: "Discover sponsor-ready challenges and prepare focused brand campaigns.",
     badgeLabel: "Sponsor Starter",
-    challengeLimitLabel: "2 campaign workspaces",
+    challengeLimitLabel: "5 active sponsored challenges/month",
     privateChallengeLimitLabel: "Normal challenge creation unavailable",
     monthlyChallengeLimit: 0,
     monthlyPrivateChallengeLimit: 0,
@@ -304,7 +304,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     dashboardName: "Brand Command Center",
     dashboardSubtitle: "Manage brand campaigns, placements, audience insights, reports, and sponsor-ready opportunities.",
     badgeLabel: "Brand Partner",
-    challengeLimitLabel: "10 campaign workspaces",
+    challengeLimitLabel: "20 active sponsored challenges/month",
     privateChallengeLimitLabel: "Normal challenge creation unavailable",
     monthlyChallengeLimit: 0,
     monthlyPrivateChallengeLimit: 0,
@@ -322,7 +322,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     privateChallengeLimitLabel: "Normal challenge creation unavailable",
     monthlyChallengeLimit: 0,
     monthlyPrivateChallengeLimit: 0,
-    teamMemberLimit: 25,
+    teamMemberLimit: 999,
     monthlyBoostLimit: 0,
     voteMultiplierLimit: 0,
     features: {
@@ -558,7 +558,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canUseSponsorDashboard: true,
     canCreateSponsorCampaigns: true,
     canSponsorChallenges: true,
-    sponsorCampaignLimit: 2
+    sponsorCampaignLimit: 5
   },
   brand_partner: {
     planId: "premium",
@@ -595,7 +595,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canUseSponsorDashboard: true,
     canCreateSponsorCampaigns: true,
     canSponsorChallenges: true,
-    sponsorCampaignLimit: 10
+    sponsorCampaignLimit: 20
   },
   enterprise_partner: {
     planId: "verified_host",
@@ -632,7 +632,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canUseSponsorDashboard: true,
     canCreateSponsorCampaigns: true,
     canSponsorChallenges: true,
-    sponsorCampaignLimit: 100
+    sponsorCampaignLimit: 200
   }
 };
 

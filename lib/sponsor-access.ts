@@ -1,11 +1,16 @@
 export const sponsorReviewStatuses = [
   "not_submitted",
   "draft",
+  "in_progress",
   "submitted",
   "pending_review",
+  "under_review",
+  "additional_information_required",
   "approved",
+  "verified",
   "rejected",
   "needs_changes",
+  "flagged",
   "suspended"
 ] as const;
 
@@ -15,24 +20,35 @@ export type SponsorSubscriptionStatus = "none" | "incomplete" | "trialing" | "ac
 export type SponsorFeatureKey =
   | "overview"
   | "campaigns"
+  | "discover"
+  | "proposals"
+  | "messages"
+  | "approvals"
+  | "deliverables"
+  | "contracts"
+  | "wallet"
+  | "analytics"
+  | "reports"
+  | "brand_assets"
+  | "team"
+  | "notifications"
+  | "settings"
   | "challenges"
   | "create_campaign"
   | "brand_profile"
   | "placements"
   | "insights"
-  | "reports"
   | "billing"
-  | "plans"
-  | "team"
-  | "messages"
-  | "settings";
+  | "plans";
 
-const alwaysAvailable = new Set<SponsorFeatureKey>(["overview", "brand_profile", "plans", "settings"]);
+const alwaysAvailable = new Set<SponsorFeatureKey>(["overview", "brand_profile", "plans", "settings", "notifications", "messages"]);
+const setupAvailable = new Set<SponsorFeatureKey>(["discover", "proposals", "brand_assets", "approvals", "deliverables", "contracts", "analytics", "reports", "wallet"]);
 
 export function normalizeSponsorReviewStatus(value: unknown): SponsorReviewStatus {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "not_started" || !normalized) return "not_submitted";
   if (normalized === "under_review") return "pending_review";
+  if (normalized === "additional_info_required") return "additional_information_required";
   return sponsorReviewStatuses.includes(normalized as SponsorReviewStatus)
     ? normalized as SponsorReviewStatus
     : "not_submitted";
@@ -51,11 +67,16 @@ export function hasActiveSponsorSubscription(status: SponsorSubscriptionStatus) 
   return ["active", "trialing", "payment_warning_1", "payment_warning_2"].includes(status);
 }
 
+export function sponsorIsApproved(status: SponsorReviewStatus) {
+  return status === "approved" || status === "verified";
+}
+
 export function canAccessSponsorFeature(status: SponsorReviewStatus, feature: SponsorFeatureKey, subscriptionStatus: SponsorSubscriptionStatus = "none") {
-  if (status === "suspended") return feature === "messages" || feature === "settings";
+  if (status === "suspended" || status === "flagged") return feature === "messages" || feature === "settings" || feature === "notifications";
   if (alwaysAvailable.has(feature)) return true;
-  if (feature === "billing") return status === "approved" || hasActiveSponsorSubscription(subscriptionStatus);
-  return status === "approved" && hasActiveSponsorSubscription(subscriptionStatus);
+  if (feature === "billing" || feature === "wallet") return sponsorIsApproved(status) || hasActiveSponsorSubscription(subscriptionStatus);
+  if (setupAvailable.has(feature)) return status !== "rejected" && status !== "needs_changes";
+  return sponsorIsApproved(status) && hasActiveSponsorSubscription(subscriptionStatus);
 }
 
 export function sponsorStatusLabel(status: SponsorReviewStatus) {
@@ -63,7 +84,7 @@ export function sponsorStatusLabel(status: SponsorReviewStatus) {
 }
 
 export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus: SponsorSubscriptionStatus, featureLabel: string) {
-  if (status !== "approved" && hasActiveSponsorSubscription(subscriptionStatus) && status !== "suspended") {
+  if (!sponsorIsApproved(status) && hasActiveSponsorSubscription(subscriptionStatus) && status !== "suspended" && status !== "flagged") {
     return {
       title: `${featureLabel} are waiting for brand approval`,
       description: "Your sponsor plan is active, but your brand must be approved before this feature unlocks.",
@@ -71,7 +92,7 @@ export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus:
       primaryActionHref: "/sponsor/onboarding"
     };
   }
-  if (status === "submitted" || status === "pending_review") {
+  if (status === "submitted" || status === "pending_review" || status === "under_review") {
     return {
       title: `${featureLabel} are waiting for approval`,
       description: "Your sponsor profile has been submitted. This feature unlocks after platform approval.",
@@ -79,7 +100,7 @@ export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus:
       primaryActionHref: "/sponsor/onboarding"
     };
   }
-  if (status === "rejected" || status === "needs_changes") {
+  if (status === "rejected" || status === "needs_changes" || status === "additional_information_required") {
     return {
       title: `${featureLabel} need sponsor approval`,
       description: "Your sponsor profile needs changes before approval. Update the profile, review any available feedback, and submit it again.",
@@ -87,15 +108,15 @@ export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus:
       primaryActionHref: "/sponsor/onboarding"
     };
   }
-  if (status === "suspended") {
+  if (status === "suspended" || status === "flagged") {
     return {
-      title: "Sponsor access is suspended",
-      description: "Your sponsor access is suspended. Contact support before using sponsor tools.",
+      title: "Sponsor access is restricted",
+      description: "Your sponsor access is restricted. Contact support before using sponsor tools.",
       primaryActionLabel: "Contact Support",
       primaryActionHref: "/sponsor/messages"
     };
   }
-  if (status === "approved" && !hasActiveSponsorSubscription(subscriptionStatus)) {
+  if (sponsorIsApproved(status) && !hasActiveSponsorSubscription(subscriptionStatus)) {
     return {
       title: `${featureLabel} require a sponsor plan`,
       description: "Your brand is approved. Choose and activate a sponsor subscription to unlock this feature.",

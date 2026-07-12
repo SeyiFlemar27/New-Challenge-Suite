@@ -1,0 +1,42 @@
+import { getAdminDb } from "@/lib/firebase/admin";
+import { normalizeAccountType } from "@/lib/plan-access";
+import { requireRequestUser } from "@/lib/server/auth";
+import { forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+
+export const dynamic = "force-dynamic";
+
+async function loadSponsor(db: FirebaseFirestore.Firestore, uid: string): Promise<Record<string, unknown> | null> {
+  const [userSnap, profileSnap, sponsorSnap] = await Promise.all([
+    db.collection("users").doc(uid).get(),
+    db.collection("profiles").doc(uid).get(),
+    db.collection("sponsorProfiles").doc(uid).get()
+  ]);
+  const userData = userSnap.exists ? userSnap.data() ?? {} : {};
+  const profileData = profileSnap.exists ? profileSnap.data() ?? {} : {};
+  const sponsorData = sponsorSnap.exists ? sponsorSnap.data() ?? {} : {};
+  if (normalizeAccountType({ ...profileData, ...userData }) !== "sponsor") return null;
+  return { ...profileData, ...userData, ...sponsorData, userId: uid };
+}
+export async function GET(request: Request) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Sponsor dashboard");
+  try {
+    const sponsor = await loadSponsor(db, user.uid);
+    if (!sponsor) return forbidden("A sponsor account is required.");
+    const [activitySnap, notificationsSnap] = await Promise.all([
+      db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
+      db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get()
+    ]);
+    return ok({
+      sponsorProfile: sponsor,
+      metrics: { activeCampaigns: 0, proposalsAwaitingReview: 0, totalSponsorshipSpendCents: 0, walletBalanceCents: 0, totalCampaignReach: 0, totalParticipants: 0, pendingApprovals: 0 },
+      activity: activitySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      notifications: notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    }, "Sponsor dashboard loaded.");
+  } catch (error) {
+    console.error("[sponsor-dashboard:get]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
+    return serverError("Sponsor dashboard could not be loaded.");
+  }
+}
