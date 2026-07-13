@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -22,10 +22,8 @@ export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
   const { user } = useCurrentUser();
-  const [watching, setWatching] = useState(false);
   const [saved, setSaved] = useState(false);
   const [watchLater, setWatchLater] = useState(false);
-  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [engagementMessage, setEngagementMessage] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
@@ -47,7 +45,6 @@ export default function ChallengeDetailPage() {
   }, [challenge, details?.submissions]);
 
   useEffect(() => {
-    setWatching(Boolean(details?.userState?.interested));
     setSaved(Boolean(details?.userState?.saved));
     setWatchLater(Boolean(details?.userState?.watchLater));
   }, [details?.userState]);
@@ -58,7 +55,7 @@ export default function ChallengeDetailPage() {
       .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
   }, [challengeId]);
 
-  async function updateEngagement(action: "save_challenge" | "watch_later" | "interested", enabled: boolean) {
+  async function updateEngagement(action: "save_challenge" | "watch_later", enabled: boolean) {
     setEngagementMessage("");
     const result = await apiRequest<{ reminderStatus?: string | null }>(`/api/challenges/${challengeId}/engagement`, {
       method: "POST",
@@ -70,7 +67,6 @@ export default function ChallengeDetailPage() {
     }
     if (action === "save_challenge") setSaved(enabled);
     if (action === "watch_later") setWatchLater(enabled);
-    if (action === "interested") setWatching(enabled);
     setEngagementMessage(result.message);
   }
 
@@ -236,19 +232,16 @@ export default function ChallengeDetailPage() {
         <aside className="space-y-5 xl:pt-[432px]">
           <Card className="p-5 text-center sm:p-8">
             <h3 className="text-xl font-black">Ready to compete?</h3>
-            <p className="mt-2 text-slate-300">Enroll first, then continue into the entry flow when you are ready to submit.</p>
-            {!joinOpen ? (
-              <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card>
-            ) : userState?.joined ? (
+            <p className="mt-2 text-slate-300">Enroll for updates, then join when you are ready to submit.</p>
+            {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
+            {userState?.joined ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Continue Entry</LinkButton>
             ) : (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Enroll Now</LinkButton>
+              <LinkButton href={`/challenges/${challenge.id}/enroll`} className="mt-6 w-full">Enroll Now</LinkButton>
             )}
             <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>
-            <Button variant="ghost" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Following updates" : "Follow updates"}</Button>
-            {watching ? <p className="mt-3 text-xs text-slate-400">Challenge updates are saved in-app. Email and push delivery require notification providers to be connected.</p> : null}
+            <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
           </Card>
-
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>

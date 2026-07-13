@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
@@ -116,9 +116,6 @@ export default function DashboardPage() {
               { title: "Reports & Exports", body: "Enterprise reporting and export readiness for program oversight.", icon: BarChart3, active: true },
               { title: "Teams & Integrations", body: `Multi-admin workspace for up to ${planExperience.teamMemberLimit} members, with integrations shown when configured.`, icon: UsersRound, active: true, href: "/dashboard/host" }
             ];
-  const dashboardUserRecord = (dashboard?.user ?? {}) as Record<string, unknown>;
-  const kycStatus = String(dashboardUserRecord.kycStatus ?? "not_required");
-  const showKycBanner = Boolean(dashboardUserRecord.kycRequired && kycStatus !== "verified" && kycStatus !== "not_required");
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
@@ -214,10 +211,21 @@ export default function DashboardPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : null}
-      {showKycBanner && planExperience.planId !== "creator" ? <Card className="mt-8 border-yellow-500/25 bg-yellow-500/5 p-5"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Premium Pending KYC</p><h2 className="mt-2 text-xl font-black">Identity verification required</h2><p className="mt-2 text-sm leading-6 text-slate-300">Your premium payment is active, but premium-sensitive tools remain locked until Sumsub verification is complete. Free/basic participation tools remain available.</p><LinkButton href="/kyc/start" className="mt-4">Start Verification</LinkButton></Card> : null}
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
+      <Card className="mt-8 p-6 md:p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
+            <p className="mt-1 text-slate-300">Challenges gaining the most participation right now.</p>
+          </div>
+          <LinkButton href="/challenges" variant="secondary">View Challenges</LinkButton>
+        </div>
+        <div className="scrollbar-dark mt-6 flex gap-5 overflow-x-auto pb-2">
+          {trendingChallenges.length ? trendingChallenges.map((challenge) => <Link key={challenge.id} href={`/challenges/${challenge.id}`} className="w-60 shrink-0 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-[var(--gold)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]"><div className="h-32 rounded-[8px] bg-cover bg-center" style={{ backgroundImage: `url(${challenge.imageUrl})` }} /><div className="mt-3 line-clamp-2 text-sm font-black">{challenge.title}</div><div className="mt-2 text-xs text-slate-400"><Users size={12} className="inline text-[var(--gold)]" /> {challenge.participants} participants</div></Link>) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
+        </div>
+      </Card>
       {planExperience.planId !== "creator" ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
         <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
@@ -235,17 +243,7 @@ export default function DashboardPage() {
         {tierFeatures.map((feature) => (
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
-      </div>
-      {planExperience.planId === "creator" ? <Card className="mt-8 p-6 md:p-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div><h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2><p className="mt-1 text-slate-300">Challenges gaining the most participation right now.</p></div>
-          <LinkButton href="/challenges" variant="secondary">View All Trending</LinkButton>
-        </div>
-        <div className="scrollbar-dark mt-6 flex gap-5 overflow-x-auto pb-2">
-          {trendingChallenges.length ? trendingChallenges.map((challenge) => <Link key={challenge.id} href={`/challenges/${challenge.id}`} className="w-60 shrink-0 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-[var(--gold)]/50"><div className="h-32 rounded-[8px] bg-cover bg-center transition hover:scale-[1.01]" style={{ backgroundImage: `url(${challenge.imageUrl})` }} /><div className="mt-3 line-clamp-2 text-sm font-black">{challenge.title}</div><div className="mt-2 text-xs text-slate-400"><Users size={12} className="inline text-[var(--gold)]" /> {challenge.participants} participants</div></Link>) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
-        </div>
-      </Card> : null}
-      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
+      </div>      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
         <Card className="p-6 md:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
@@ -274,26 +272,7 @@ export default function DashboardPage() {
             <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
           </Card>
         </div>
-      </div>
-      <Card className={`mt-8 p-6 md:p-8 ${planExperience.planId === "creator" ? "hidden" : ""}`}>
-        <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
-        <p className="text-slate-300">Join the most popular challenges happening right now</p>
-        <div className="scrollbar-dark mt-8 flex gap-6 overflow-x-auto pb-2">
-          {isLoading ? [0, 1, 2, 3, 4].map((item) => (
-            <div key={item} className="w-24 shrink-0 text-center">
-              <div className="mx-auto h-20 w-20 animate-pulse rounded-full border-4 border-[var(--gold)] bg-[#222]" />
-              <div className="mx-auto mt-2 h-4 w-20 animate-pulse rounded bg-[#222]" />
-            </div>
-          )) : trendingChallenges.length ? trendingChallenges.map((challenge) => (
-            <div key={challenge.id} className="w-24 shrink-0 text-center">
-              <div className="mx-auto h-20 w-20 rounded-full border-4 border-[var(--gold)] bg-cover bg-center" style={{ backgroundImage: `url(${challenge.imageUrl})` }} />
-              <div className="mt-2 truncate text-sm font-bold">{challenge.title}</div>
-              <div className="text-xs text-slate-400"><Users size={12} className="inline text-purple-400" /> {challenge.participants}</div>
-            </div>
-          )) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
-        </div>
-      </Card>
-    </AppShell>
+      </div>    </AppShell>
   );
 }
 
@@ -313,6 +292,8 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
 function Stat({ icon, title, value, label, className }: { icon: ReactNode; title: string; value: string; label: string; className?: string | null }) {
   return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black text-[var(--gold-2)]">{value}</div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }
+
+
 
 
 
