@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -159,7 +159,7 @@ export default function ChallengeDetailPage() {
             {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "In Watch Later" : "Watch Later"}</Button>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "Updates Saved" : "Follow Updates"}</Button>
           </div>
           {engagementMessage ? <p className="mt-3 text-sm text-slate-300">{engagementMessage}</p> : null}
           <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
@@ -239,8 +239,8 @@ export default function ChallengeDetailPage() {
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
             )}
-            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Watching Interest Saved" : "Interested in Watching"}</Button>
-            {watching ? <><p className="mt-3 text-xs text-slate-400">In-app reminders are saved for 1 hour, 30 minutes, 5 minutes, and start time. Push/email delivery begins when notification delivery is connected.</p><LinkButton href={`/challenges/${challenge.id}/watch`} variant="ghost" className="mt-4 w-full">View Watch Details</LinkButton></> : null}
+            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Updates Saved" : "Get Challenge Updates"}</Button>
+            {watching ? <><p className="mt-3 text-xs text-slate-400">In-app reminders are saved for 1 hour, 30 minutes, 5 minutes, and start time. Push/email delivery begins when notification delivery is connected.</p><LinkButton href={`/challenges/${challenge.id}/watch`} variant="ghost" className="mt-4 w-full">View Challenge Updates</LinkButton></> : null}
           </Card>
 
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
@@ -305,6 +305,7 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
 
 
 

@@ -609,7 +609,7 @@ function StepMedia({ form, updateMedia, userId, trackMediaStatus }: { form: any;
         <MediaUploadField label="Trailer Video" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={`${basePath}/trailers`} kind="video" buttonLabel="Upload Trailer Video" onStatusChange={trackMediaStatus("trailerVideoUrl")} />
         <MediaUploadField label="Promo Video" value={form.promoVideoUrl} onChange={(url, metadata) => updateMedia("promoVideoUrl", "promoVideoPath", url, metadata)} storagePath={`${basePath}/promo-video`} kind="video" buttonLabel="Upload Promo Video" onStatusChange={trackMediaStatus("promoVideoUrl")} />
       </div>
-      <Card className="mt-6 p-4 text-slate-300 sm:p-6">Uploaded media is stored as secure Firebase Storage metadata. If Storage rules are not published yet, uploads fail closed and the challenge can still be saved without broken media.</Card>
+      <Card className="mt-6 border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300 sm:p-6"><p className="font-black text-white">Media upload status</p><p className="mt-2">Save Draft stays available while media is incomplete. Publishing stays blocked until the required cover image finishes uploading with a saved URL and storage path.</p></Card>
     </section>
   );
 }
@@ -622,7 +622,7 @@ function StepPreview({ form }: { form: any }) {
 function PublishChecklist({ readiness, onOpenIssue, className = "" }: { readiness: ChallengeValidationResult; onOpenIssue: () => void; className?: string }) {
   const blocking = readiness.errors.filter((issue) => issue.severity === "error");
   if (!blocking.length) {
-    return <Card className={`${className} border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100`}>Ready to publish. Server validation will run again before the challenge status changes.</Card>;
+    return <Card className={`${className} border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100`}>Ready to publish. The server will validate these requirements again before the challenge status changes.</Card>;
   }
   return (
     <Card className={`${className} border-yellow-500/30 bg-yellow-500/5 p-4 sm:p-5`}>
@@ -631,7 +631,7 @@ function PublishChecklist({ readiness, onOpenIssue, className = "" }: { readines
           <p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p>
           <h3 className="mt-1 text-lg font-black text-white">Before publishing, complete {readiness.missingCount} item{readiness.missingCount === 1 ? "" : "s"}</h3>
         </div>
-        <Button type="button" variant="secondary" onClick={onOpenIssue}>Review first item</Button>
+        <Button type="button" variant="secondary" onClick={onOpenIssue}>Go to first item</Button>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {Object.entries(readiness.groupedByStep).map(([stepName, issues]) => {
@@ -641,7 +641,7 @@ function PublishChecklist({ readiness, onOpenIssue, className = "" }: { readines
             <div key={stepName} className="rounded-[8px] border border-white/10 bg-black/25 p-3">
               <p className="text-sm font-black text-white">{stepName}</p>
               <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-300">
-                {stepIssues.map((issue) => <li key={`${issue.code}-${issue.field}`}>- {issue.message}</li>)}
+                {stepIssues.map((issue) => <li key={`${issue.code}-${issue.field}`} className="flex gap-2"><span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--gold)]" /><span>{issue.message}</span></li>)}
               </ul>
             </div>
           );
@@ -650,3 +650,4 @@ function PublishChecklist({ readiness, onOpenIssue, className = "" }: { readines
     </Card>
   );
 }
+
