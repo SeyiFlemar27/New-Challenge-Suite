@@ -25,6 +25,7 @@ export default function ChallengeDetailPage() {
   const [watching, setWatching] = useState(false);
   const [saved, setSaved] = useState(false);
   const [watchLater, setWatchLater] = useState(false);
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [engagementMessage, setEngagementMessage] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
@@ -308,6 +309,7 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
 
 
 

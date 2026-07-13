@@ -7,6 +7,10 @@ import { PremiumBadge } from "./brand";
 
 type SubmissionWithProfile = Submission & {
   userPlanId?: UserPlanId;
+  challengeImageUrl?: string;
+  position?: number;
+  rank?: number;
+  prizeStatusLabel?: string;
 };
 
 export function ChallengeCard({ challenge }: { challenge: Challenge }) {
@@ -67,20 +71,31 @@ export function SubmissionCard({ submission }: { submission: SubmissionWithProfi
 }
 
 export function WinnerCard({ submission }: { submission: SubmissionWithProfile }) {
+  const visualUrl = submission.mediaUrl || submission.challengeImageUrl || "";
+  const rank = submission.position ?? submission.rank;
+  const prizeLabel = submission.prizeStatusLabel ?? "Winner announced";
   return (
-    <Card className="flex h-full flex-col overflow-hidden bg-[#0f141d] transition hover:border-[var(--gold)]/35">
-      <div className="relative aspect-[16/10]">
-        <img src={submission.mediaUrl} alt={submission.title} className="h-full w-full object-cover" />
-        <span className="absolute right-3 top-3 flex items-center gap-2 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] text-black"><Trophy size={14} /> Winner</span>
-      </div>
+    <Card className="group flex h-full flex-col overflow-hidden bg-[#0f141d] transition hover:border-[var(--gold)]/35">
+      <Link href={`/winners/${submission.id}`} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View winner ${submission.userName}`}>
+        <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827]">
+          {visualUrl ? <img src={visualUrl} alt={submission.title || submission.challengeTitle || "Winning submission"} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" /> : <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite Winner</div>}
+          <span className="absolute left-3 top-3 flex items-center gap-2 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] text-black"><Trophy size={14} /> Winner</span>
+          {rank ? <span className="absolute bottom-3 right-3 rounded-full bg-black/80 px-3 py-2 text-[11px] font-black uppercase tracking-[.12em] text-white">Rank #{rank}</span> : null}
+        </div>
+      </Link>
       <div className="flex flex-1 flex-col p-5">
-        <h3 className="line-clamp-2 text-lg font-black">{submission.challengeTitle}</h3>
+        <Link href={`/winners/${submission.id}`} className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View winner result for ${submission.challengeTitle}`}>
+          <h3 className="line-clamp-2 text-lg font-black transition group-hover:text-[var(--gold)]">{submission.challengeTitle || submission.title}</h3>
+        </Link>
         <div className="mt-4 flex items-center gap-3 text-[var(--gold)]">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs text-black">{submission.userInitials}</div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{submission.userInitials}</div>
           <span className="flex min-w-0 items-center gap-2 font-black"><span className="truncate">{submission.userName}</span><PremiumBadge planId={submission.userPlanId} compact /></span>
         </div>
-        <div className="mt-5 border-t border-white/10 pt-4 font-bold"><Heart size={17} className="mr-2 inline fill-pink-500 text-pink-500" /> {submission.likes.toLocaleString()} votes</div>
-        <div className="mt-auto pt-4"><LinkButton href={`/winners/${submission.id}`} className="w-full">View Winner</LinkButton></div>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-slate-300">
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">{submission.likes.toLocaleString()} votes</span>
+          <span className="rounded-full border border-[var(--gold)]/20 bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{prizeLabel}</span>
+        </div>
+        <div className="mt-auto pt-5"><LinkButton href={`/winners/${submission.id}`} className="w-full">View Winner</LinkButton></div>
       </div>
     </Card>
   );
@@ -89,3 +104,5 @@ export function WinnerCard({ submission }: { submission: SubmissionWithProfile }
 export function PlanBadge() {
   return <span className="inline-flex items-center gap-2 rounded-full bg-[var(--gold)] px-8 py-4 text-lg font-black text-black gold-glow"><Crown size={19} /> Member</span>;
 }
+
+

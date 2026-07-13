@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
-import { LockKeyhole, UserRound } from "lucide-react";
+import { Award, BadgeCheck, LockKeyhole, Settings, Share2, Trophy, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Card, EmptyState, LinkButton } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
 import { PremiumBadge } from "@/components/brand";
 import { fetchMyProfile } from "@/lib/api/services";
 import type { UserPlanId } from "@/lib/types";
@@ -35,7 +35,8 @@ interface ProfileState {
   stats: {
     totalPoints: number;
     submissions: number;
-    totalLikes: number;
+    totalLikes?: number;
+    wins?: number;
     followers: number;
     following: number;
   };
@@ -44,11 +45,15 @@ interface ProfileState {
 }
 
 function planLabel(planId?: string | null) {
-  if (!planId) return "No plan";
+  if (!planId) return "Free Competitor";
   return planId
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function roleLabel(profile: ProfileState) {
+  return String(profile.user.selectedAccountType ?? profile.user.role ?? profile.user.accountType ?? "competitor").replaceAll("_", " ");
 }
 
 export default function ProfilePage() {
@@ -56,6 +61,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
 
   async function loadProfile() {
     setLoading(true);
@@ -78,15 +84,23 @@ export default function ProfilePage() {
     loadProfile();
   }, []);
 
+  async function shareProfile() {
+    if (!profile) return;
+    const url = profile.user.username ? `${window.location.origin}/profile/${profile.user.username}` : window.location.href;
+    if (navigator.share) await navigator.share({ title: profile.user.displayName, url });
+    else await navigator.clipboard?.writeText(url);
+    setShareMessage("Profile link copied.");
+  }
+
   if (loading) {
     return (
       <AppShell>
-        <Card className="bg-yellow-500/5 p-10">
-          <div className="flex animate-pulse gap-8">
+        <Card className="bg-yellow-500/5 p-6 sm:p-10">
+          <div className="flex animate-pulse flex-col gap-8 sm:flex-row">
             <div className="h-32 w-32 rounded-full bg-white/10" />
             <div className="flex-1 space-y-5">
-              <div className="h-10 w-72 rounded bg-white/10" />
-              <div className="h-5 w-56 rounded bg-white/10" />
+              <div className="h-10 w-72 max-w-full rounded bg-white/10" />
+              <div className="h-5 w-56 max-w-full rounded bg-white/10" />
               <div className="h-11 w-36 rounded bg-white/10" />
             </div>
           </div>
@@ -109,7 +123,7 @@ export default function ProfilePage() {
     return (
       <AppShell>
         <Card>
-          <EmptyState icon={<UserRound />} title="Profile unavailable" body={error ?? "Your profile could not be loaded."} action={<button className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[var(--gold)] px-5 text-sm font-bold text-black" onClick={loadProfile}>Retry</button>} />
+          <EmptyState icon={<UserRound />} title="Profile unavailable" body={error ?? "Your profile could not be loaded."} action={<Button onClick={loadProfile}>Retry</Button>} />
         </Card>
       </AppShell>
     );
@@ -125,32 +139,65 @@ export default function ProfilePage() {
     );
   }
 
+  const wins = Number(profile.stats.wins ?? 0);
+  const joinedDate = profile.user.joinedAt ? new Date(profile.user.joinedAt).toLocaleDateString() : "Joined date unavailable";
+  const publicHref = profile.user.username ? `/profile/${profile.user.username}` : "/profile";
+
   return (
     <AppShell>
-      <Card className={cn("bg-yellow-500/5 p-5 sm:p-8 lg:p-10", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:gap-8">
-            <div className={cn("flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-yellow-500/30 bg-[var(--gold)] text-3xl text-black sm:h-32 sm:w-32 sm:text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
-              {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
+      <Card className={cn("overflow-hidden bg-[#111111]", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
+        <div className="h-28 bg-[radial-gradient(circle_at_top_left,rgba(246,198,75,.24),transparent_35%),linear-gradient(135deg,#171717,#0b0b0b)] sm:h-40" />
+        <div className="p-5 sm:p-8 lg:p-10">
+          <div className="-mt-20 flex flex-col gap-6 lg:-mt-24 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-end sm:gap-7">
+              <div className={cn("flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#101010] bg-[var(--gold)] text-3xl font-black text-black shadow-[0_18px_45px_rgba(0,0,0,.35)] sm:h-36 sm:w-36 sm:text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
+                {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
+              </div>
+              <div className="min-w-0 pb-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}</h1>
+                  <BadgeCheck className="text-[var(--gold)]" size={24} aria-label="Verified profile" />
+                  <PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} labelOverride={profile.user.effectiveTier?.badgeLabel} />
+                </div>
+                <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.username ? `@${profile.user.username}` : "Username not set"}</p>
+                {profile.user.customization?.profileTagline ? <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">Build your competition record through challenges, submissions, votes, and wins.</p>}
+                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.14em]">
+                  <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)] capitalize">{roleLabel(profile)}</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-slate-300">{profile.user.effectiveTier?.memberLabel ?? planLabel(profile.user.planId)}</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-slate-300">{joinedDate}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}<PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} labelOverride={profile.user.effectiveTier?.badgeLabel} /></h1>
-              {profile.user.customization?.profileTagline ? <p className="mt-3 text-lg font-bold text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : null}
-              <p className="mt-3 font-bold">{profile.user.username ? `@${profile.user.username} · ` : ""}{profile.user.email}</p>
-              <p className="mt-2 text-sm font-bold capitalize text-slate-300">{profile.user.selectedAccountType ?? profile.user.role ?? "Role unavailable"} · {profile.user.effectiveTier?.memberLabel ?? planLabel(profile.user.planId)} · {profile.user.joinedAt ? `Joined ${new Date(profile.user.joinedAt).toLocaleDateString()}` : "Joined date unavailable"} · {profile.user.doroBalance} DoroCoins</p>
-              <div className="mt-8 flex flex-wrap gap-3"><LinkButton href="/profile/edit">Edit Profile</LinkButton>{profile.user.username ? <LinkButton href={`/profile/${profile.user.username}`} variant="secondary">View Public Profile</LinkButton> : <LinkButton href="/settings" variant="secondary">Choose Username</LinkButton>}</div>
+            <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4 lg:flex lg:flex-wrap lg:justify-end">
+              <LinkButton href="/profile/edit" className="w-full">Edit Profile</LinkButton>
+              <LinkButton href="/settings" variant="secondary" className="w-full"><Settings size={16} /> Settings</LinkButton>
+              <Button variant="secondary" onClick={() => void shareProfile()} className="w-full"><Share2 size={16} /> Share Profile</Button>
+              <LinkButton href={publicHref} variant="ghost" className="w-full">View Public Profile</LinkButton>
             </div>
           </div>
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--gold)] px-5 py-3 text-base font-black text-black gold-glow">{profile.user.effectiveTier?.displayName ?? planLabel(profile.user.planId)}</span>
-        </div>
-        <div className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
-          {[["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Total Likes", profile.stats.totalLikes], ["Followers", profile.stats.followers], ["Following", profile.stats.following]].map(([label, value]) => <Card key={label} className="p-4 text-center sm:p-6"><div className="text-sm font-bold">{label}</div><div className="mt-3 text-3xl font-black sm:text-4xl">{value}</div></Card>)}
+          {!profile.user.username ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm text-yellow-100">Add a username in settings to make your public profile easier to share.</p> : null}
+          {shareMessage ? <p className="mt-4 text-sm text-slate-300">{shareMessage}</p> : null}
+          <div className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-5">
+            {[ ["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Wins", wins], ["Followers", profile.stats.followers], ["Following", profile.stats.following] ].map(([label, value]) => <Card key={String(label)} className="p-4 text-center sm:p-5"><div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</div><div className="mt-3 text-2xl font-black text-[var(--gold)] sm:text-3xl">{Number(value).toLocaleString()}</div></Card>)}
+          </div>
         </div>
       </Card>
-      <h2 className="mt-12 text-3xl font-black">My Collection <span className="rounded-full border border-white/10 px-4 py-1 text-sm text-slate-300">{profile.badges.length} Badges</span></h2>
-      {profile.badges.length ? <div className="mt-6 grid gap-4 md:grid-cols-3">{profile.badges.map((badge) => <Card key={badge.id ?? badge.name ?? badge.title} className="p-5"><div className="text-xl font-black">{badge.title ?? badge.name}</div><p className="mt-2 text-sm text-[#8fa6ca]">{badge.description ?? ""}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-16 text-center text-[#8fa6ca]"><div className="text-2xl">No badges unlocked yet</div><p className="mt-4">Complete challenges to build your collection.</p></Card>}
-      <h2 className="mt-12 text-3xl font-black">My Submissions</h2>
-      {profile.submissions.length ? <div className="mt-6 grid gap-4">{profile.submissions.map((submission) => <Card key={submission.id ?? submission.title} className="p-5"><div className="font-black">{submission.title ?? "Untitled Submission"}</div><p className="mt-2 text-sm text-slate-400">{submission.challengeTitle ?? ""}</p></Card>)}</div> : <p className="mt-12 text-lg text-slate-400">You haven't submitted anything yet.</p>}
+
+      <section className="mt-12">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-3xl font-black">Achievements</h2>
+          <span className="rounded-full border border-white/10 px-4 py-1 text-sm text-slate-300">{profile.badges.length} badges</span>
+        </div>
+        {profile.badges.length ? <div className="mt-6 grid gap-4 md:grid-cols-3">{profile.badges.map((badge) => <Card key={badge.id ?? badge.name ?? badge.title} className="p-5"><div className="flex items-center gap-3 text-xl font-black"><Award className="text-[var(--gold)]" size={20} />{badge.title ?? badge.name}</div><p className="mt-2 text-sm leading-6 text-[#8fa6ca]">{badge.description ?? "Earned through Challenge Suite activity."}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center text-[#8fa6ca]"><Trophy className="mx-auto text-[var(--gold)]" size={36} /><h3 className="mt-4 text-2xl font-black text-white">No achievements yet</h3><p className="mt-3">Badges will appear as you compete, vote, and win challenges.</p></Card>}
+      </section>
+
+      <section className="mt-12">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-3xl font-black">Submissions</h2>
+          <LinkButton href="/my-entries" variant="secondary">View My Entries</LinkButton>
+        </div>
+        {profile.submissions.length ? <div className="mt-6 grid gap-4">{profile.submissions.map((submission) => <Card key={submission.id ?? submission.title} className="p-5"><div className="font-black">{submission.title ?? "Untitled Submission"}</div><p className="mt-2 text-sm text-slate-400">{submission.challengeTitle ?? "Challenge entry"}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center text-slate-400"><h3 className="text-2xl font-black text-white">No submissions yet</h3><p className="mt-3">Entries submitted to challenges will appear here.</p><LinkButton href="/my-entries" className="mt-5">View My Entries</LinkButton></Card>}
+      </section>
     </AppShell>
   );
 }

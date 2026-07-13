@@ -46,6 +46,7 @@ export default function WinnerDetailPage() {
   const winnerName = String(profile?.displayName ?? winner?.userName ?? "Winner");
   const announcedAt = String(winnerMeta?.announcedAt ?? winnerMeta?.updatedAt ?? winnerMeta?.createdAt ?? "Date not available");
   const rank = Number(winnerMeta?.rank ?? 1);
+  const winnerMediaUrl = winner?.mediaUrl || challenge?.imageUrl || "";
   const badges = [rank === 1 ? "1st Place Winner" : null, winner?.likes ? "Top Voted Entry" : null, winnerMeta?.status === "announced" ? "Challenge Champion" : null, profile?.verified ? "Verified Winner" : null].filter(Boolean) as string[];
 
   async function submitClaim() {
@@ -65,7 +66,7 @@ export default function WinnerDetailPage() {
         <div className="grid gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
           <div className="space-y-6">
             <Card className="overflow-hidden">
-              {winner.mediaUrl ? <img src={winner.mediaUrl} alt={winner.title} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" /> : <div className="flex h-[280px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] px-6 text-center text-xl font-black text-[var(--gold)] sm:h-[360px] sm:text-2xl lg:h-[420px]">Challenge Suite Winner</div>}
+              {winnerMediaUrl ? <img src={winnerMediaUrl} alt={winner.title || challenge?.title || "Winning submission"} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" /> : <div className="flex h-[280px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] px-6 text-center text-xl font-black text-[var(--gold)] sm:h-[360px] sm:text-2xl lg:h-[420px]">Challenge Suite Winner</div>}
               <div className="p-5 sm:p-7">
                 <PageTitle title={winner.title} subtitle={String(winnerMeta?.caption ?? winner.description ?? "Winning submission")} icon={<Trophy className="text-[var(--gold)]" />} />
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -138,3 +139,5 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">{label}</p><p className="mt-2 break-words font-black text-white">{value}</p></div>;
 }
+
+

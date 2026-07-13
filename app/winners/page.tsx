@@ -41,7 +41,7 @@ export default function WinnersPage() {
     return data.data.winners.map((item) => {
       const record = item as WinnerRecord;
       const challenge = record.challenge ? normalizeChallenge(record.challenge as ChallengeApiRecord) : undefined;
-      return { ...normalizeSubmission({ ...record, id: record.submissionId ?? record.id, isWinner: record.status !== "pending_review" }, challenge), winnerStatus: record.status, position: record.position ?? record.rank, resultMessage: record.resultMessage, payoutStatus: record.payoutStatus };
+      return { ...normalizeSubmission({ ...record, id: record.submissionId ?? record.id, isWinner: record.status !== "pending_review" }, challenge), winnerStatus: record.status, position: record.position ?? record.rank, rank: record.rank, resultMessage: record.resultMessage, payoutStatus: record.payoutStatus, prizeStatusLabel: prizeStatusLabel(record.payoutStatus), challengeImageUrl: challenge?.imageUrl };
     }).filter((item) => item.id);
   }, [data]);
 
@@ -60,7 +60,7 @@ export default function WinnersPage() {
 
   return (
     <AppShell>
-      <PageTitle title="Winners" subtitle="Celebrated challenge results and public prize review status." />
+      <PageTitle title="Winners" subtitle="Celebrated challenge results from across Challenge Suite." />
       <div className="mt-8 grid gap-4 md:flex md:items-center">
         <Button className="w-full md:w-auto" variant="secondary">All Challenges</Button>
         <Card className="grid w-full max-w-[520px] gap-3 bg-[#11151d] p-4 text-slate-400 sm:flex sm:min-h-14 sm:items-center sm:gap-4 sm:px-6 sm:py-0"><div className="flex min-w-0 items-center gap-3"><Search size={20} className="shrink-0" /> <input className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-400" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search winners or challenges" /></div> <Button className="w-full sm:ml-auto sm:h-9 sm:w-auto">Search</Button></Card>
@@ -75,10 +75,11 @@ export default function WinnersPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : visibleWinners.length ? (
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{visibleWinners.map((winner) => <div key={winner.id} className="min-w-0 space-y-3"><WinnerCard submission={winner} /><div className="rounded-[8px] border border-white/10 bg-black/30 p-3 text-sm leading-6 text-slate-300"><b className="text-[var(--gold)]">Rank {winner.position ? `#${winner.position}` : "pending"}</b><span className="mt-1 block break-words">{prizeStatusLabel(winner.payoutStatus)}</span></div></div>)}</div>
+        <div className="mt-8 grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{visibleWinners.map((winner) => <WinnerCard key={winner.id} submission={winner} />)}</div>
       ) : (
         <Card className="mt-8 p-5 text-slate-300 sm:p-8">No winners have been recorded yet.</Card>
       )}
     </AppShell>
   );
 }
+
