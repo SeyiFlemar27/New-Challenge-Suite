@@ -5,7 +5,9 @@ import { CheckCircle2, LockKeyhole, Save } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { redistributeSponsorship } from "@/lib/legal";
-import { challengeSchema } from "@/lib/validation";
+import { validateChallengeForPublish, type ChallengeValidationResult } from "@/lib/server/challenge-validation";
+// Publish validation is shared with the server; the API remains the final authority.
+
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience, getUserPlanAccess, type PlanExperience } from "@/lib/plan-access";
 import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
@@ -53,6 +55,7 @@ function CreateChallengeWizard() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [serverPublishValidation, setServerPublishValidation] = useState<ChallengeValidationResult | null>(null);
   const [createdChallengeId, setCreatedChallengeId] = useState("");
   const [form, setForm] = useState({
     title: "The Ultimate Showdown",
@@ -68,6 +71,9 @@ function CreateChallengeWizard() {
     prizeDescription: "",
     prizeValue: "0",
     prizeDeliveryNotes: "",
+    numberOfWinners: "1",
+    winnerSelection: "highest_votes",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     entryFee: "0",
     startsAt: dateInput(1),
     submissionDeadline: dateInput(5),
@@ -121,10 +127,14 @@ function CreateChallengeWizard() {
   const [mediaUploadStatuses, setMediaUploadStatuses] = useState<Record<string, MediaUploadStage>>({});
   const mediaUploadInProgress = Object.values(mediaUploadStatuses).some((status) => ["preparing", "uploading", "processing"].includes(status));
   const mediaUploadFailed = Object.values(mediaUploadStatuses).some((status) => status === "failed");
-  const trackMediaStatus = (field: string) => (status: MediaUploadStage) => setMediaUploadStatuses((current) => ({ ...current, [field]: status }));
+  const trackMediaStatus = (field: string) => (status: MediaUploadStage) => {
+    setMediaUploadStatuses((current) => ({ ...current, [field]: status }));
+    setServerPublishValidation(null);
+  };
   function updateMedia(urlField: keyof typeof form, pathField: keyof typeof form, url: string, metadata?: { path: string }) {
     setForm((current) => ({ ...current, [urlField]: url, [pathField]: metadata?.path ?? "" }));
     setError("");
+    setServerPublishValidation(null);
   }
   const [allocations, setAllocations] = useState([
     { bucket: "Platform Operations", percent: 12, enabled: true },
@@ -153,6 +163,7 @@ function CreateChallengeWizard() {
   function update(field: keyof typeof form, value: string | string[]) {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
+    setServerPublishValidation(null);
   }
 
   function toggleSubmission(type: string) {
@@ -214,6 +225,8 @@ function CreateChallengeWizard() {
       prizeDescription: form.prizeDescription,
       prizeValue: Number(form.prizeValue || 0),
       prizeDeliveryNotes: form.prizeDeliveryNotes,
+      numberOfWinners: Number(form.numberOfWinners || 1),
+      winnerSelection: form.winnerSelection,
       paidEntryEnabled: false,
       entryFee: 0,
       prizePoolEnabled: false,
@@ -225,6 +238,7 @@ function CreateChallengeWizard() {
       endsAt: form.endsAt,
       votingDeadline: form.votingDeadline,
       votingEndsAt: form.votingDeadline,
+      timeZone: form.timeZone,
       coverImageUrl: form.coverImageUrl,
       coverImagePath: form.coverImagePath,
       promoImageUrl: form.promoImageUrl,
@@ -282,6 +296,26 @@ function CreateChallengeWizard() {
     };
   }
 
+  const localPublishReadiness = validateChallengeForPublish(challengePayload(true) as Record<string, unknown>, { mode: "publish", userId: user?.uid });
+  const publishReadiness = serverPublishValidation ?? localPublishReadiness;
+  const publishBlocked = mediaUploadInProgress || mediaUploadFailed || draftOnlyFormat || !localPublishReadiness.valid;
+  const publishBlockLabel = mediaUploadInProgress ? "Upload in Progress" : mediaUploadFailed ? "Fix Upload" : draftOnlyFormat ? "Draft Only" : !localPublishReadiness.valid ? `Complete ${localPublishReadiness.missingCount} Item${localPublishReadiness.missingCount === 1 ? "" : "s"}` : "Publish";
+
+  function stepFromIssue(stepName: string) {
+    const normalizedStep = stepName.toLowerCase();
+    if (normalizedStep.includes("basic")) return 0;
+    if (normalizedStep.includes("format") || normalizedStep.includes("access")) return 1;
+    if (normalizedStep.includes("schedule") || normalizedStep.includes("live event") || normalizedStep.includes("tournament")) return 2;
+    if (normalizedStep.includes("prize")) return 3;
+    if (normalizedStep.includes("media")) return 4;
+    return 5;
+  }
+
+  function openPublishChecklist() {
+    const first = publishReadiness.errors.find((issue) => issue.severity === "error") ?? publishReadiness.errors[0];
+    if (first) setStep(stepFromIssue(first.step));
+  }
+
   async function saveDraft() {
     setSaving(true);
     setError("");
@@ -295,50 +329,34 @@ function CreateChallengeWizard() {
   }
 
   async function publish() {
+    setServerPublishValidation(null);
     if (mediaUploadInProgress) {
       setError("Wait for media uploads to complete before publishing.");
+      openPublishChecklist();
       return;
     }
     if (mediaUploadFailed) {
       setError("Resolve failed media uploads or remove them before publishing.");
-      return;
-    }
-    if (!form.coverImageUrl) {
-      setError("Upload a cover image before publishing this challenge.");
-      setStep(4);
+      openPublishChecklist();
       return;
     }
     if (draftOnlyFormat) {
       setError("This advanced format is a foundation-only builder in the current version. Save it as a draft until its full workflow is activated.");
       return;
     }
-    const result = challengeSchema.safeParse({
-      title: form.title,
-      description: form.description,
-      category: form.category,
-      customCategory: form.category === "Other" ? form.customCategory : undefined,
-      acceptedSubmissionTypes: form.submissionTypes,
-      competitionFormat: form.competitionFormat,
-      bestOf: form.bestOf,
-      prizeType: form.prizeType === "physical_product" ? "Physical Product" : form.prizeType === "digital_product" ? "Digital Product" : form.prizeType === "money" ? "Money" : "Bragging Rights (Leaderboard Ranking)",
-      entryFee: 0,
-      registrationDeadline: form.submissionDeadline,
-      submissionDeadline: form.submissionDeadline,
-      startsAt: form.startsAt,
-      endsAt: form.endsAt,
-      votingDeadline: form.votingDeadline,
-      votingEndsAt: form.votingDeadline,
-      publish: true
-    });
-    if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Invalid challenge");
+    if (!localPublishReadiness.valid) {
+      setError(`Complete ${localPublishReadiness.missingCount} required item${localPublishReadiness.missingCount === 1 ? "" : "s"} before publishing.`);
+      openPublishChecklist();
       return;
     }
     setSaving(true);
     const response = await createChallenge(challengePayload(true));
     setSaving(false);
     if (!response.ok) {
+      const nextValidation = (response as any).details?.publishValidation as ChallengeValidationResult | undefined;
+      if (nextValidation) setServerPublishValidation(nextValidation);
       setError(response.message || "Challenge could not be published.");
+      if (nextValidation?.errors?.length) setStep(stepFromIssue(nextValidation.errors[0].step));
       return;
     }
     const challenge = response.data?.challenge as { id?: string } | undefined;
@@ -404,12 +422,13 @@ function CreateChallengeWizard() {
             </div>
             <Card className="border-emerald-500/20 bg-emerald-500/5 p-4 text-sm leading-6 text-slate-300">Public visibility only. Entry fees, prize pools, sponsorships, tournaments, live events, revenue sharing, Prediction Arena, boosts, advanced voting, and premium analytics are unavailable in this free flow.</Card>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
+            <PublishChecklist readiness={publishReadiness} onOpenIssue={openPublishChecklist} />
             {draftSaved ? <p className="rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved.</p> : null}
             <div className="grid gap-3 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
               <LinkButton href="/subscriptions" variant="secondary">Upgrade for More Creator Tools</LinkButton>
               <div className="grid gap-3 sm:flex">
                 <Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>
-                <Button onClick={publish} disabled={saving || usedAllFreeChallenges}>{saving ? "Publishing..." : "Publish Basic Challenge"}</Button>
+                <Button onClick={publish} disabled={saving || usedAllFreeChallenges || publishBlocked}>{saving ? "Publishing..." : publishBlocked ? publishBlockLabel : "Publish Basic Challenge"}</Button>
               </div>
             </div>
           </div>
@@ -470,13 +489,14 @@ function CreateChallengeWizard() {
         </div>
 
         {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
+        <PublishChecklist readiness={publishReadiness} onOpenIssue={openPublishChecklist} className="mt-5" />
         {draftSaved ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">Draft saved locally.</p> : null}
 
         <div className="mt-8 grid gap-3 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:justify-between">
           <Button className="w-full sm:w-auto" variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> {saving ? "Saving..." : "Save Draft"}</Button>
           <div className="grid grid-cols-2 gap-3 sm:flex">
             <Button className="w-full sm:w-auto" variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button>
-            {step < steps.length - 1 ? <Button className="w-full sm:w-auto" onClick={next}>Next</Button> : <Button className="w-full sm:w-auto" onClick={publish} disabled={saving}>{saving ? "Publishing..." : "Publish Publicly"}</Button>}
+            {step < steps.length - 1 ? <Button className="w-full sm:w-auto" onClick={next}>Next</Button> : <Button className="w-full sm:w-auto" onClick={publish} disabled={saving || publishBlocked}>{saving ? "Publishing..." : publishBlocked ? publishBlockLabel : "Publish Publicly"}</Button>}
           </div>
         </div>
       </Card>
@@ -598,3 +618,35 @@ function StepPreview({ form }: { form: any }) {
   return <section><h2 className="text-xl font-black sm:text-2xl">Step 6: Preview & Publish</h2><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title, Type: form.type, Category: form.category === "Other" ? form.customCategory : form.category, Format: form.competitionFormat, "Best Of": form.bestOf, "Prize Type": form.prizeType, "Submission Types": form.submissionTypes.join(", "), "Start Date": form.startsAt, "Submission Deadline": form.submissionDeadline, "Voting Deadline": form.votingDeadline, "End Date": form.endsAt, "Sponsor Enabled": form.sponsorEnabled === "true" ? "Yes" : "No" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black sm:text-lg">{String(value)}</div></Card>)}</div></section>;
 }
 
+
+function PublishChecklist({ readiness, onOpenIssue, className = "" }: { readiness: ChallengeValidationResult; onOpenIssue: () => void; className?: string }) {
+  const blocking = readiness.errors.filter((issue) => issue.severity === "error");
+  if (!blocking.length) {
+    return <Card className={`${className} border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100`}>Ready to publish. Server validation will run again before the challenge status changes.</Card>;
+  }
+  return (
+    <Card className={`${className} border-yellow-500/30 bg-yellow-500/5 p-4 sm:p-5`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p>
+          <h3 className="mt-1 text-lg font-black text-white">Before publishing, complete {readiness.missingCount} item{readiness.missingCount === 1 ? "" : "s"}</h3>
+        </div>
+        <Button type="button" variant="secondary" onClick={onOpenIssue}>Review first item</Button>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {Object.entries(readiness.groupedByStep).map(([stepName, issues]) => {
+          const stepIssues = issues.filter((issue) => issue.severity === "error");
+          if (!stepIssues.length) return null;
+          return (
+            <div key={stepName} className="rounded-[8px] border border-white/10 bg-black/25 p-3">
+              <p className="text-sm font-black text-white">{stepName}</p>
+              <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-300">
+                {stepIssues.map((issue) => <li key={`${issue.code}-${issue.field}`}>- {issue.message}</li>)}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}

@@ -5,7 +5,7 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
-import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challenge-validation";
+import { serverChallengeCreateSchema, validateChallengeForDraft, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
@@ -39,6 +39,17 @@ export async function POST(request: Request) {
   const validation = serverChallengeCreateSchema.safeParse(parsed.body);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
+
+  const draftValidation = validateChallengeForDraft({ ...body, creatorId: user.uid });
+  if (!draftValidation.valid) {
+    return fail("Draft contains invalid data.", 400, { publishValidation: draftValidation, fieldErrors: Object.fromEntries(draftValidation.errors.map((issue) => [issue.field, issue.message])) }, "DRAFT_VALIDATION_FAILED");
+  }
+  if (body.publish) {
+    const publishValidation = validateChallengeForPublish({ ...body, creatorId: user.uid }, { mode: "publish", userId: user.uid });
+    if (!publishValidation.valid) {
+      return fail("Challenge is not ready to publish.", 422, { publishValidation, fieldErrors: Object.fromEntries(publishValidation.errors.map((issue) => [issue.field, issue.message])) }, "PUBLISH_VALIDATION_FAILED");
+    }
+  }
 
   const now = new Date().toISOString();
   const [accountSnap, profileSnap, ownedChallengesSnap] = await Promise.all([
@@ -124,7 +135,9 @@ export async function POST(request: Request) {
     status: lifecycleStatus,
     lifecycleStatus,
     submissionDeadline: body.submissionDeadline,
-    registrationDeadline: body.submissionDeadline,
+    registrationDeadline: body.registrationDeadline || body.submissionDeadline,
+    timeZone: body.timeZone,
+    lateRegistrationEnabled: body.lateRegistrationEnabled,
     startsAt: body.startsAt,
     endsAt: body.endsAt,
     votingDeadline: body.votingDeadline,
@@ -132,6 +145,8 @@ export async function POST(request: Request) {
     acceptedSubmissionTypes: body.acceptedSubmissionTypes,
     competitionFormat: body.competitionFormat,
     bestOf: body.bestOf,
+    numberOfWinners: body.numberOfWinners,
+    winnerSelection: body.winnerSelection,
     votingSettings: body.votingSettings,
     rules: body.standardRules
       ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
@@ -181,10 +196,14 @@ export async function POST(request: Request) {
     weightedVoteCount: 0,
     requiresSubmissionApproval: body.requiresSubmissionApproval || body.isLiveEvent || body.tournamentType !== "none",
     coverImageUrl: body.coverImageUrl || null,
+    coverImagePath: body.coverImagePath || null,
     promoImageUrl: body.promoImageUrl || null,
+    promoImagePath: body.promoImagePath || null,
     trailerVideoUrl: body.trailerVideoUrl || null,
+    trailerVideoPath: body.trailerVideoPath || null,
     promoVideoUrl: body.promoVideoUrl || null,
-    mediaStorageStatus: "metadata_only",
+    promoVideoPath: body.promoVideoPath || null,
+    mediaStorageStatus: [body.coverImagePath, body.promoImagePath, body.trailerVideoPath, body.promoVideoPath].some(Boolean) ? "uploaded" : "metadata_only",
     isLiveEvent: body.isLiveEvent,
     venueName: body.venueName || null,
     eventAddress: body.eventAddress || null,
