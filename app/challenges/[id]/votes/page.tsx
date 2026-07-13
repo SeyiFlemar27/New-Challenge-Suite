@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,7 +10,7 @@ import { Button, Card, Field, inputClass, LinkButton, PageTitle } from "@/compon
 import { fetchChallengeDetails, fetchVotePackages, voteForSubmission } from "@/lib/api/services";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { canVoteOnChallenge } from "@/lib/challenge-status";
+import { getChallengeLifecycleState } from "@/lib/challenge-status";
 
 type VotePackage = {
   id: string;
@@ -65,7 +65,8 @@ export default function PurchaseVotesPage() {
   const pack = votePackages.find((item) => item.id === selectedId);
   const votes = selectedId === "custom" ? Number(custom || 0) : Number(pack?.votes ?? 0);
   const coins = selectedId === "custom" ? votes : Number(pack?.coins ?? 0);
-  const votingOpen = challenge ? canVoteOnChallenge(challenge) : false;
+  const lifecycle = challenge ? getChallengeLifecycleState(challenge) : null;
+  const votingOpen = lifecycle?.canVote ?? false;
   const walletBalance = currentUser.user?.doroBalance ?? 0;
 
   const voteMutation = useMutation({
@@ -113,7 +114,7 @@ export default function PurchaseVotesPage() {
       return;
     }
     if (!votingOpen) {
-      setError("Voting is closed for this challenge.");
+      setError(lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? "Voting is closed for this challenge.");
       return;
     }
     if (!votes || votes < 1) {
@@ -131,7 +132,7 @@ export default function PurchaseVotesPage() {
     setError("");
     if (!auth.user) return setError("Sign in before voting.");
     if (!submissionId) return setError("Select a submission to vote for.");
-    if (!votingOpen) return setError("Voting is closed for this challenge.");
+    if (!votingOpen) return setError(lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? "Voting is closed for this challenge.");
     voteMutation.mutate("free");
   }
 
@@ -183,7 +184,7 @@ export default function PurchaseVotesPage() {
         ) : (
           <>
             {!auth.user ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Sign in before voting.</p> : null}
-            {!votingOpen ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Voting is closed for this challenge.</p> : null}
+            {!votingOpen ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">{lifecycle?.votingStatus === "voting_not_open" ? "Voting has not opened yet." : lifecycle?.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."}</p> : null}
             {!submissions.length ? <p className="mt-6 rounded-[8px] bg-[#151515] p-3 text-slate-300">No active or approved submissions are available for voting yet.</p> : null}
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {votePackages.map((item) => <button key={item.id} onClick={() => setSelected(item.id)} className={`min-h-28 rounded-[8px] border p-4 text-left sm:p-5 ${selectedId === item.id ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-[#151515]"}`}><h3 className="break-words text-lg font-black sm:text-xl">{item.label ?? item.name ?? `${item.votes} votes`}</h3><p className="mt-3 text-[var(--gold)]">{item.coins} DoroCoins</p></button>)}
@@ -225,6 +226,7 @@ export default function PurchaseVotesPage() {
     </AppShell>
   );
 }
+
 
 
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -12,7 +12,7 @@ import { fetchChallengeDetails, joinChallenge, submitEntry } from "@/lib/api/ser
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { storage } from "@/lib/firebase/client";
 import { appendUploadFileName, classifyStorageError, validateMediaFile } from "@/lib/media-upload";
-import { canJoinChallenge, getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
 
 export default function JoinChallengePage() {
   const params = useParams<{ id: string }>();
@@ -36,7 +36,8 @@ export default function JoinChallengePage() {
   const details = data?.ok ? data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
   const currentChallenge = useMemo(() => rawChallenge ? normalizeChallenge(rawChallenge) : null, [rawChallenge]);
-  const joinOpen = currentChallenge ? canJoinChallenge(currentChallenge) : false;
+  const lifecycle = currentChallenge ? getChallengeLifecycleState(currentChallenge) : null;
+  const joinOpen = lifecycle?.canJoin ?? false;
   const displayStatus = currentChallenge ? getChallengeDisplayStatus(currentChallenge) : "";
   const maxParticipants = typeof rawChallenge?.maxParticipants === "number" ? rawChallenge.maxParticipants : null;
   const isFull = Boolean(maxParticipants && currentChallenge && currentChallenge.participants >= maxParticipants);
@@ -56,7 +57,7 @@ export default function JoinChallengePage() {
       return;
     }
     if (unavailable) {
-      setError("This challenge is not available for new entries.");
+      setError(lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? "This challenge is not available for new entries.");
       return;
     }
 
@@ -216,7 +217,7 @@ export default function JoinChallengePage() {
         <Card className="p-5 sm:p-8">
           <h2 className="text-xl font-black sm:text-2xl">Upload Submission</h2>
           {!auth.user ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">Sign in before joining this challenge. <LinkButton href="/auth/login" variant="ghost" className="mt-4 w-full sm:w-auto">Sign In</LinkButton></Card> : null}
-          {!joinOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">Registration is closed for this challenge. Current status: {displayStatus}.</Card> : null}
+          {!joinOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? `This challenge is not open for entries. Current status: ${displayStatus}.`}</Card> : null}
           {isPrivate ? <Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">This private challenge requires invite or approval before entry.</Card> : null}
           {isFull ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">This challenge is full.</Card> : null}
           <form className="mt-6 space-y-5" onSubmit={submit}>
@@ -225,11 +226,12 @@ export default function JoinChallengePage() {
             <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={`${inputClass} file:mr-3 file:rounded-[6px] file:border-0 file:bg-[var(--gold)] file:px-3 file:py-2 file:text-sm file:font-black file:text-black`} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required onChange={(event) => { const file = event.target.files?.[0]; if (selectedMediaPreview) URL.revokeObjectURL(selectedMediaPreview); setSelectedMediaPreview(file ? URL.createObjectURL(file) : ""); setSelectedMediaType(file?.type.startsWith("video/") ? "video" : file ? "image" : ""); setUploadProgress(0); }} /></Field>{selectedMediaPreview ? <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">{selectedMediaType === "video" ? <video src={selectedMediaPreview} controls className="max-h-72 w-full object-cover" /> : <img src={selectedMediaPreview} alt="Submission preview" className="max-h-72 w-full object-cover" />}</div> : null}{submitting && uploadProgress > 0 ? <div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)] transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-2 text-xs font-bold text-slate-400">Uploading media {uploadProgress}%</p></div> : null}
             <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize foundation terms. Paid-entry prize pools and payouts are not active yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? "Unavailable" : "Submit Entry"}</Button>
+            <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
           </form>
         </Card>
       </div>
     </AppShell>
   );
 }
+
 

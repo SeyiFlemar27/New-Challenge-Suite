@@ -16,7 +16,8 @@ function toDateInput(value: unknown) {
 }
 
 export function normalizeChallenge(record: ChallengeApiRecord): Challenge {
-  return {
+  const normalized: Challenge & Record<string, unknown> = {
+    ...record,
     id: String(record.id ?? ""),
     title: record.title ?? "Untitled Challenge",
     description: record.description ?? "",
@@ -42,6 +43,7 @@ export function normalizeChallenge(record: ChallengeApiRecord): Challenge {
     timeLimitedUploads: record.timeLimitedUploads,
     sponsorshipAllocation: record.sponsorshipAllocation ?? []
   };
+  return normalized;
 }
 
 export type SubmissionApiRecord = Omit<Partial<Submission>, "mediaType"> & {
@@ -73,5 +75,6 @@ export function normalizeSubmission(record: SubmissionApiRecord, challenge?: Cha
     userPlanId: record.userPlanId
   };
 }
+
 
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,7 +10,7 @@ import { fetchChallengeDetails } from "@/lib/api/services";
 import { apiRequest } from "@/lib/api/client";
 import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { canJoinChallenge, canVoteOnChallenge, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
 import type { Submission } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
@@ -125,9 +125,10 @@ export default function ChallengeDetailPage() {
     );
   }
 
+  const lifecycle = getChallengeLifecycleState(challenge);
   const displayStatus = getChallengeDisplayStatus(challenge);
-  const joinOpen = canJoinChallenge(challenge);
-  const votingOpen = canVoteOnChallenge(challenge);
+  const joinOpen = lifecycle.canJoin;
+  const votingOpen = lifecycle.canVote;
   const userState = details?.userState;
   const leaderboard = (details as { leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; entries?: unknown[] } } | null)?.leaderboard;
   const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
@@ -177,7 +178,7 @@ export default function ChallengeDetailPage() {
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
-              <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : "Voting is closed for this challenge."} />
+              <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${lifecycle.nextMilestoneAt ? lifecycle.nextMilestoneAt.toLocaleDateString() : "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
               <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
@@ -232,7 +233,7 @@ export default function ChallengeDetailPage() {
             <h3 className="text-xl font-black">Ready to join?</h3>
             <p className="mt-2 text-slate-300">Enroll first, then upload an accepted image or video submission.</p>
             {!joinOpen ? (
-              <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">Registration is closed. You can still preview submissions when voting is open.</Card>
+              <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card>
             ) : userState?.joined ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">View Entry Flow</LinkButton>
             ) : (
@@ -247,7 +248,7 @@ export default function ChallengeDetailPage() {
             <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
-          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> · Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} · {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
+          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> Â· Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} Â· {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
 
 
           <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
@@ -264,7 +265,7 @@ export default function ChallengeDetailPage() {
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
             <div className="mt-5">
-              {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> Voting Closed</Button>}
+              {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> {lifecycle.votingStatus === "voting_not_open" ? "Voting Not Open" : lifecycle.votingStatus === "voting_not_enabled" ? "Voting Unavailable" : "Voting Closed"}</Button>}
             </div>
             <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Watch Ad for Bonus Vote</p><p className="mt-2 text-xs leading-5 text-slate-400">Ads for votes live here near challenge voting. Google Ad Manager Rewarded Ads is the recommended provider foundation, but no bonus vote is granted without a verified provider callback. After 3 consecutive verified ad watches, a 1-hour cooldown applies.</p><Button className="mt-3 w-full" variant="secondary" disabled title="A verified ad provider callback is required before bonus votes can be granted">Ads for votes are not available yet</Button></div><p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
           </Card>
@@ -304,6 +305,8 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
 
 
 

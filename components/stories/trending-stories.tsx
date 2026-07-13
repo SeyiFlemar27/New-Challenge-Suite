@@ -1,20 +1,25 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Share2, Users, Vote, X } from "lucide-react";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { logoUrl } from "@/components/brand";
 
 type StoryChallenge = Record<string, any>;
 
 export function TrendingStories({ challenges, source = "explore" }: { challenges: StoryChallenge[]; source?: "dashboard" | "explore" | "homepage" }) {
   const stories = useMemo(() => [...challenges]
-    .filter((item) => ["active", "submission_open", "voting_open", "published", "registration_open"].includes(String(item.status ?? item.lifecycleStatus ?? "").toLowerCase()))
+    .filter((item) => {
+      const lifecycle = getChallengeLifecycleState(item);
+      return lifecycle.canJoin || lifecycle.canSubmit || lifecycle.canVote || ["active", "submission_open", "voting_open", "registration_open"].includes(lifecycle.primaryStatus);
+    })
     .sort((a, b) => Number(b.participants ?? b.participantCount ?? 0) - Number(a.participants ?? a.participantCount ?? 0))
     .slice(0, 12), [challenges]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const active = activeIndex === null ? null : stories[activeIndex];
+  const activeLifecycle = active ? getChallengeLifecycleState(active) : null;
 
   function track(challengeId: string, action: string) {
     void apiRequest("/api/stories/track", { method: "POST", body: JSON.stringify({ challengeId, action, source }) });
@@ -74,8 +79,8 @@ export function TrendingStories({ challenges, source = "explore" }: { challenges
             <div className="mt-4 grid grid-cols-3 gap-2"><Mini icon={<Users size={15} />} value={Number(active.participants ?? active.participantCount ?? 0)} label="Participants" /><Mini icon={<Vote size={15} />} value={Number(active.voteCount ?? 0)} label="Votes" /><Mini value={active.publicJackpotEstimateCents ? `$${(Number(active.publicJackpotEstimateCents) / 100).toLocaleString()}` : "Review"} label="Prize" /></div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap">
               <LinkButton href={`/challenges/${active.id}`} onClick={() => track(String(active.id), "view_details")}>View Details</LinkButton>
-              <LinkButton href={`/challenges/${active.id}/join`} variant="secondary" onClick={() => track(String(active.id), "join")}>Participate</LinkButton>
-              <LinkButton href={`/challenges/${active.id}/votes`} variant="secondary" onClick={() => track(String(active.id), "vote")}>Vote Now</LinkButton>
+              {activeLifecycle?.canJoin ? <LinkButton href={`/challenges/${active.id}/join`} variant="secondary" onClick={() => track(String(active.id), "join")}>{activeLifecycle.actionLabel}</LinkButton> : null}
+              {activeLifecycle?.canVote ? <LinkButton href={`/challenges/${active.id}/votes`} variant="secondary" onClick={() => track(String(active.id), "vote")}>Vote Now</LinkButton> : null}
               {active.creatorUsername || active.creatorId ? <Button variant="secondary" onClick={() => void apiRequest(`/api/public/profiles/${active.creatorUsername || active.creatorId}/follow`, { method: "POST" }).then(() => track(String(active.id), "follow"))}>Follow Host</Button> : null}
               <Button variant="secondary" onClick={() => { track(String(active.id), "share"); void navigator.share?.({ title: active.title, url: `${window.location.origin}/challenges/${active.id}` }); }}><Share2 size={16} /> Share</Button>
             </div>
@@ -89,3 +94,6 @@ export function TrendingStories({ challenges, source = "explore" }: { challenges
 function Mini({ icon, value, label }: { icon?: React.ReactNode; value: string | number; label: string }) {
   return <div className="rounded-[8px] bg-white/5 p-3 text-center"><div className="flex items-center justify-center gap-1 font-black text-[var(--gold)]">{icon}{value}</div><div className="mt-1 text-[10px] text-slate-400">{label}</div></div>;
 }
+
+
+

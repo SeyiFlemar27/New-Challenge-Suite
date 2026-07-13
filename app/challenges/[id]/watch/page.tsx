@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,7 +10,7 @@ import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui
 import { apiRequest } from "@/lib/api/client";
 import { fetchChallengeDetails } from "@/lib/api/services";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { canVoteOnChallenge, getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
 
 const reminderOptions = [
   { value: 60, label: "1 hour before" },
@@ -43,13 +43,14 @@ export default function ChallengeWatchPage() {
   if (query.isLoading) return <AppShell><div className="mx-auto max-w-6xl"><Card className="h-[520px] animate-pulse" /></div></AppShell>;
   if (!challenge) return <AppShell><Card className="mx-auto max-w-3xl"><EmptyState icon={<PlayCircle />} title="Watch room unavailable" body={query.data?.message ?? "This challenge is not available."} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card></AppShell>;
 
+  const lifecycle = getChallengeLifecycleState(challenge);
   const status = getChallengeDisplayStatus(challenge);
-  const votingOpen = canVoteOnChallenge(challenge);
-  const startsAt = new Date(challenge.startsAt);
-  const timeUntilStart = startsAt.getTime() - Date.now();
-  const countdown = timeUntilStart > 0
-    ? `${Math.ceil(timeUntilStart / 86_400_000)} day${Math.ceil(timeUntilStart / 86_400_000) === 1 ? "" : "s"} until start`
-    : status === "Active" || status === "Voting Open" ? "Activity is underway" : "Follow final updates";
+  const nextAt = lifecycle.nextMilestoneAt;
+  const timeUntilNext = nextAt ? nextAt.getTime() - Date.now() : 0;
+  const votingOpen = lifecycle.canVote;
+  const countdown = timeUntilNext > 0
+    ? `${Math.ceil(timeUntilNext / 86_400_000)} day${Math.ceil(timeUntilNext / 86_400_000) === 1 ? "" : "s"} until ${String(lifecycle.nextMilestone ?? "next milestone").replaceAll("_", " ")}`
+    : lifecycle.primaryStatus === "active" || lifecycle.primaryStatus === "submission_open" || lifecycle.primaryStatus === "voting_open" ? "Activity is underway" : "Follow final updates";
   const interestedCount = Number((details?.challenge as Record<string, unknown> | undefined)?.interestedCount ?? 0);
 
   return (
@@ -62,7 +63,7 @@ export default function ChallengeWatchPage() {
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
           <Card className="overflow-hidden">
             <div className="flex min-h-[320px] items-center justify-center bg-[#090909] p-8 text-center sm:min-h-[440px]">
-              <div><PlayCircle className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">Live stream is not active yet</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">You can follow submissions, voting, leaderboard updates, and winner announcements here.</p></div>
+              <div><PlayCircle className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">{lifecycle.canWatchLive ? "Live stream is active" : lifecycle.livestreamStatus === "livestream_scheduled" ? "Live stream is scheduled" : "Live stream is not active yet"}</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">{lifecycle.canWatchLive ? "The configured live stream is available from this room." : "You can follow submissions, voting, leaderboard updates, and winner announcements here."}</p></div>
             </div>
             <div className="grid gap-px bg-white/10 sm:grid-cols-4">{[[status, "Status"], [countdown, "Timeline"], [String(challenge.participants), "Participants"], [String(interestedCount), "Interested"]].map(([value, label]) => <div key={label} className="bg-[#121212] p-5"><p className="break-words text-lg font-black text-[var(--gold)]">{value}</p><p className="mt-1 text-xs uppercase text-slate-500">{label}</p></div>)}</div>
           </Card>
@@ -76,3 +77,6 @@ export default function ChallengeWatchPage() {
     </AppShell>
   );
 }
+
+
+
