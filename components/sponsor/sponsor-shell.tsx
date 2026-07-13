@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -14,7 +14,7 @@ import { canAccessSponsorFeature, normalizeSponsorReviewStatus, normalizeSponsor
 
 const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; icon: typeof LayoutDashboard; href: string; feature: SponsorFeatureKey }> }> = [
   { label: "Overview", items: [
-    { label: "Dashboard", icon: LayoutDashboard, href: "/sponsor/dashboard", feature: "overview" },
+    { label: "Overview", icon: LayoutDashboard, href: "/sponsor/dashboard", feature: "overview" },
     { label: "Campaigns", icon: Megaphone, href: "/sponsor/campaigns", feature: "campaigns" },
     { label: "Proposals", icon: Handshake, href: "/sponsor/proposals", feature: "proposals" },
     { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" },
@@ -105,7 +105,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
       <ProductWalkthrough />
       <div className="grid min-h-screen md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="hidden border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:block md:border-b-0 md:border-r">
+        <aside className="hidden h-screen overflow-y-auto border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:sticky md:top-0 md:block md:border-b-0 md:border-r">
           <div className="flex items-center gap-4">
             <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
             <div>
@@ -114,10 +114,10 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             </div>
           </div>
           <Card className="mt-6 border-yellow-500/20 bg-yellow-500/5 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-200">Review Status</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-200">Brand Status</p>
             <p className="mt-2 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)}</p>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)]" style={{ width: `${completion}%` }} /></div>
-            <p className="mt-2 text-xs leading-5 text-slate-400">Onboarding {completion}% complete. Restricted tools remain gated by review, subscription, and later funding approvals.</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">Onboarding {completion}% complete. Some tools remain gated by brand review, subscription status, and secure funding setup.</p>
             <p className="mt-3 border-t border-white/10 pt-3 text-xs font-black text-[var(--gold)]">{experience.badgeLabel} / {subscriptionStatus.replaceAll("_", " ")} / {experience.teamMemberLimit >= 999 ? "unlimited" : experience.teamMemberLimit} team seat{experience.teamMemberLimit === 1 ? "" : "s"}</p>
           </Card>
           {nav}
@@ -129,9 +129,9 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
               <div className="flex min-w-0 items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsor</p><h1 className="truncate text-lg font-black leading-tight">{brandName}</h1></div></div>
               <button onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open sponsor navigation"><Menu /></button>
             </div>
-            <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3"><p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Review Status</p><p className="mt-1 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)} / {completion}% complete</p></Card>
+            <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3"><p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Brand Status</p><p className="mt-1 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)} / {completion}% complete</p></Card>
           </div>
-          {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(90vw,380px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>{nav}<Link href="/landing" onClick={() => setDrawerOpen(false)} className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public Site</Link></aside></div> : null}
+          {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(90vw,380px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>{nav}<Link href="/landing" onClick={() => setDrawerOpen(false)} className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public site</Link></aside></div> : null}
           {children}
         </section>
       </div>

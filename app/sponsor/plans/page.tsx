@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Handshake, Info, ShieldCheck } from "lucide-react";
@@ -62,16 +62,24 @@ export default function SponsorPlansPage() {
 
 const comparisonRows = [
   { label: "Active sponsored challenges/month", values: ["Up to 5", "Up to 20", "Unlimited"] },
-  { label: "Campaign brief builder", values: ["Basic foundation", "Advanced foundation", "Custom program foundation"] },
-  { label: "Creator discovery", values: ["Browse foundation", "Advanced filters foundation", "Unlimited collaboration foundation"] },
-  { label: "Branding placements", values: ["Logo + one CTA", "Leaderboard/voting/winner branding", "Premium homepage and naming rights foundation"] },
-  { label: "Analytics", values: ["Basic campaign metrics", "Advanced engagement and cost metrics", "Custom KPI dashboard foundation"] },
+  { label: "Campaign brief builder", values: ["Basic tools", "Advanced tools", "Custom program"] },
+  { label: "Creator discovery", values: ["Browse tools", "Advanced filters", "Unlimited collaboration"] },
+  { label: "Branding placements", values: ["Logo + one CTA", "Leaderboard/voting/winner branding", "Premium homepage and naming rights"] },
+  { label: "Analytics", values: ["Basic campaign metrics", "Advanced engagement and cost metrics", "Custom KPI dashboard"] },
   { label: "Team", values: ["1 member", "5 members", "Unlimited members"] },
   { label: "Support", values: ["Email support", "Priority support", "Dedicated account manager"] }
 ];
 
 const faq = [
   { q: "Is sponsor subscription the same as campaign budget?", a: "No. Subscription unlocks platform tools. Sponsorship funds, prize contributions, boosts, and placements are separate reviewed budgets." },
-  { q: "Does checkout verify my brand?", a: "No. Brand verification is a separate review foundation. Approved status can unlock verified branding where plan and safety rules allow." },
+  { q: "Does checkout verify my brand?", a: "No. Brand verification is a separate review. Approved status can unlock verified branding where plan and safety rules allow." },
   { q: "Can Enterprise Partner checkout directly?", a: "No. Enterprise Partner uses Contact Sales so contract, invoicing, compliance, and activation needs can be reviewed first." }
 ];
+
+
+
+
+
+
+
+
