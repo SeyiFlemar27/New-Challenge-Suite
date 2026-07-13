@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -38,7 +38,7 @@ export default function ChallengesPage() {
       <TrendingStories challenges={challenges} />
 
       {isLoading ? (
-        <div className="mt-10 grid max-w-6xl gap-6 sm:grid-cols-2 lg:gap-8">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {[0, 1, 2, 3].map((item) => <Card key={item} className="h-[430px] animate-pulse bg-[#171717]" />)}
         </div>
       ) : errorMessage ? (
@@ -47,10 +47,11 @@ export default function ChallengesPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : challenges.length ? (
-        <div className="mt-10 grid max-w-6xl gap-6 sm:grid-cols-2 lg:gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge as any} />)}</div>
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge as any} />)}</div>
       ) : (
         <EmptyState icon={<Trophy />} title="No challenges yet" body="Published challenges will appear here once they are created." action={canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : undefined} />
       )}
     </AppShell>
   );
 }
+

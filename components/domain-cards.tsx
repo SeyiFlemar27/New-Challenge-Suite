@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Heart, Star, Trophy, Users, Hourglass, Crown, LockKeyhole, Rocket } from "lucide-react";
+﻿import Link from "next/link";
+import { CalendarDays, Heart, Star, Trophy, Users, Crown, LockKeyhole, Rocket } from "lucide-react";
 import type { Challenge, Submission, UserPlanId } from "@/lib/types";
 import { Card, LinkButton } from "./ui";
 import { getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
@@ -12,26 +12,28 @@ type SubmissionWithProfile = Submission & {
 export function ChallengeCard({ challenge }: { challenge: Challenge }) {
   const displayStatus = getChallengeDisplayStatus(challenge);
   return (
-    <Card className="overflow-hidden bg-[#171717]">
-      <div className="relative h-44 overflow-hidden">
-        <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" />
-        <span className="absolute right-5 top-5 rounded-full bg-black px-4 py-2 text-xs font-black text-white">{challenge.category}</span>
-        <span className={`absolute bottom-4 right-4 rounded-full px-3 py-2 text-xs font-black ${statusClassName(displayStatus)}`}>{displayStatus}</span>
-        {challenge.type === "Private / Exclusive" ? <span className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-yellow-500 px-3 py-2 text-xs font-black text-black"><LockKeyhole size={13} /> Invite-only</span> : null}
-        {challenge.id === "neon-city-photo" ? <span className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black text-black"><Rocket size={13} /> Boosted</span> : null}
-      </div>
-      <div className="p-6">
-        <h3 className="text-xl font-black">{challenge.title}</h3>
+    <Card className="group flex h-full flex-col overflow-hidden bg-[#171717] transition hover:border-[var(--gold)]/35">
+      <Link href={`/challenges/${challenge.id}`} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View details for ${challenge.title}`}>
+        <div className="relative aspect-[16/10] overflow-hidden">
+          <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" />
+          <span className="absolute right-4 top-4 max-w-[calc(100%-2rem)] rounded-full bg-black/80 px-3 py-2 text-[11px] font-black uppercase tracking-[.12em] text-white backdrop-blur">{challenge.category}</span>
+          <span className={`absolute bottom-4 right-4 max-w-[calc(100%-2rem)] rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] ${statusClassName(displayStatus)}`}>{displayStatus}</span>
+          {challenge.type === "Private / Exclusive" ? <span className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-yellow-500 px-3 py-2 text-xs font-black text-black"><LockKeyhole size={13} /> Invite-only</span> : null}
+          {challenge.id === "neon-city-photo" ? <span className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black text-black"><Rocket size={13} /> Boosted</span> : null}
+        </div>
+      </Link>
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <Link href={`/challenges/${challenge.id}`} className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View details for ${challenge.title}`}>
+          <h3 className="line-clamp-2 text-xl font-black transition group-hover:text-[var(--gold)]">{challenge.title}</h3>
+        </Link>
         <p className="mt-2 line-clamp-2 text-slate-200">{challenge.description}</p>
-        <div className="mt-5 flex gap-8 text-sm text-slate-300">
-          <span className="flex items-center gap-2"><Users size={16} className="text-purple-400" /> {challenge.participants}</span>
-          <span className="flex items-center gap-2"><Hourglass size={16} className="text-yellow-300" /> {challenge.endsAt}</span>
+        <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+          <span className="flex min-w-0 items-center gap-2"><Users size={16} className="shrink-0 text-[var(--gold)]" /> <span className="truncate">{challenge.participants} participants</span></span>
+          <span className="flex min-w-0 items-center gap-2"><CalendarDays size={16} className="shrink-0 text-yellow-300" /> <span className="truncate">{challenge.endsAt}</span></span>
         </div>
-        <div className="mt-5 border-t border-white/10 pt-5">
-          <div className="mb-3 flex justify-between text-sm"><span>Status</span><span className="text-[var(--gold)]">{displayStatus}</span></div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full w-2/3 rounded-full bg-[var(--gold)]" /></div>
+        <div className="mt-auto pt-5">
+          <LinkButton href={`/challenges/${challenge.id}`} variant="ghost" className="w-full border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-[var(--gold)]">View Details</LinkButton>
         </div>
-        <LinkButton href={`/challenges/${challenge.id}`} variant="ghost" className="mt-5 w-full border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-[var(--gold)]">View Details</LinkButton>
       </div>
     </Card>
   );
@@ -66,19 +68,19 @@ export function SubmissionCard({ submission }: { submission: SubmissionWithProfi
 
 export function WinnerCard({ submission }: { submission: SubmissionWithProfile }) {
   return (
-    <Card className="overflow-hidden bg-[#0f141d]">
-      <div className="relative h-40">
+    <Card className="flex h-full flex-col overflow-hidden bg-[#0f141d] transition hover:border-[var(--gold)]/35">
+      <div className="relative aspect-[16/10]">
         <img src={submission.mediaUrl} alt={submission.title} className="h-full w-full object-cover" />
-        <span className="absolute right-3 top-3 flex items-center gap-2 rounded-[5px] bg-[var(--gold)] px-3 py-2 text-xs font-black text-black"><Trophy size={14} /> WINNER</span>
+        <span className="absolute right-3 top-3 flex items-center gap-2 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] text-black"><Trophy size={14} /> Winner</span>
       </div>
-      <div className="p-5">
-        <h3 className="text-lg font-black">{submission.challengeTitle}</h3>
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="line-clamp-2 text-lg font-black">{submission.challengeTitle}</h3>
         <div className="mt-4 flex items-center gap-3 text-[var(--gold)]">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--gold)] text-xs text-black">{submission.userInitials}</div>
-          <span className="flex items-center gap-2 font-black">{submission.userName}<PremiumBadge planId={submission.userPlanId} compact /></span>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs text-black">{submission.userInitials}</div>
+          <span className="flex min-w-0 items-center gap-2 font-black"><span className="truncate">{submission.userName}</span><PremiumBadge planId={submission.userPlanId} compact /></span>
         </div>
-        <div className="mt-5 border-t border-white/10 pt-4 font-bold"><Heart size={17} className="mr-2 inline fill-pink-500 text-pink-500" /> {submission.likes.toLocaleString()} Votes</div>
-        <LinkButton href={`/winners/${submission.id}`} className="mt-4 w-full">View Winner</LinkButton>
+        <div className="mt-5 border-t border-white/10 pt-4 font-bold"><Heart size={17} className="mr-2 inline fill-pink-500 text-pink-500" /> {submission.likes.toLocaleString()} votes</div>
+        <div className="mt-auto pt-4"><LinkButton href={`/winners/${submission.id}`} className="w-full">View Winner</LinkButton></div>
       </div>
     </Card>
   );

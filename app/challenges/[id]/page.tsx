@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -26,7 +26,7 @@ export default function ChallengeDetailPage() {
   const [saved, setSaved] = useState(false);
   const [watchLater, setWatchLater] = useState(false);
   const [engagementMessage, setEngagementMessage] = useState("");
-  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
+  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
   const [participantSearch, setParticipantSearch] = useState("");
@@ -53,7 +53,7 @@ export default function ChallengeDetailPage() {
 
   useEffect(() => {
     if (!challengeId) return;
-    void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
+    void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
       .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
   }, [challengeId]);
 
@@ -74,7 +74,7 @@ export default function ChallengeDetailPage() {
   }
 
   async function addComment() {
-    const result = await apiRequest<{ comment: { id: string; displayName?: string; username?: string; body?: string; createdAt?: string; planId?: string; verified?: boolean } }>(`/api/challenges/${challengeId}/comments`, {
+    const result = await apiRequest<{ comment: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean } }>(`/api/challenges/${challengeId}/comments`, {
       method: "POST",
       body: JSON.stringify({ body: commentBody })
     });
@@ -141,6 +141,10 @@ export default function ChallengeDetailPage() {
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const canBoost = planExperience.monthlyBoostLimit > 0 && (selectedAccountType === "creator" || selectedAccountType === "host");
   const sponsorAccount = user?.accountType === "sponsor";
+  const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
+  const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
+  const predictionEnabled = Boolean((challenge as any).predictionEnabled || (challenge as any).predictionArenaEnabled);
+  const creatorSuiteUrl = String((challenge as any).creatorSuiteUrl ?? (challenge as any).livestreamUrl ?? (challenge as any).livestreamEmbedUrl ?? "");
   const participants = ((details as { participants?: Array<{ id: string; displayName: string; username?: string | null; avatarUrl?: string | null; participantStatus?: string; entryStatus?: string | null; profilePath?: string }> } | null)?.participants ?? []);
   const filteredParticipants = participants.filter((participant) => `${participant.displayName} ${participant.username ?? ""}`.toLowerCase().includes(participantSearch.toLowerCase()));
   const visibleParticipants = filteredParticipants.slice(0, participantLimit);
@@ -159,15 +163,15 @@ export default function ChallengeDetailPage() {
             {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "Updates Saved" : "Follow Updates"}</Button>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "Following updates" : "Follow updates"}</Button>
           </div>
           {engagementMessage ? <p className="mt-3 text-sm text-slate-300">{engagementMessage}</p> : null}
           <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric value={challenge.participants.toString()} label="Participants" />
-            <Metric value={prizeValue} label="Prize Details" />
-            <Metric value={displayStatus} label="Status" />
-            <Metric value={totalVotes.toLocaleString()} label="Votes" />
+            <Metric value={challenge.participants.toString()} label="Participants" support="Registered" />
+            <Metric value={prizeValue} label="Prize details" support="Requires review" />
+            <Metric value={displayStatus} label="Current stage" support={lifecycle.actionLabel} />
+            <Metric value={totalVotes.toLocaleString()} label="Votes" support={votingOpen ? "Voting open" : "Voting unavailable"} />
           </div>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
 
@@ -222,7 +226,7 @@ export default function ChallengeDetailPage() {
               </div>
               {commentMessage ? <p className="mt-3 text-sm text-slate-300">{commentMessage}</p> : null}
               <div className="mt-6 space-y-3">
-                {comments.length ? comments.map((comment) => <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]">{comment.username ? <a href={`/profile/${comment.username}`}>{comment.displayName || "Challenge Suite member"}</a> : comment.displayName || "Challenge Suite member"}<PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div><p className="mt-2 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
+                {comments.length ? comments.map((comment) => { const profileHref = comment.username ? `/profile/${comment.username}` : "/profile"; const name = comment.displayName || "Challenge Suite member"; return <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-3"><a href={profileHref} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-xs font-black text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View ${name} profile`}>{comment.avatarUrl ? <img src={comment.avatarUrl} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</a><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]"><a href={profileHref} className="break-words hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{name}</a><PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div>{comment.username ? <p className="text-xs text-slate-500">@{comment.username}</p> : null}</div></div><p className="mt-3 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>; }) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
               </div>
             </Card>
           </section>
@@ -230,17 +234,18 @@ export default function ChallengeDetailPage() {
 
         <aside className="space-y-5 xl:pt-[432px]">
           <Card className="p-5 text-center sm:p-8">
-            <h3 className="text-xl font-black">Ready to join?</h3>
-            <p className="mt-2 text-slate-300">Enroll first, then upload an accepted image or video submission.</p>
+            <h3 className="text-xl font-black">Ready to compete?</h3>
+            <p className="mt-2 text-slate-300">Enroll first, then continue into the entry flow when you are ready to submit.</p>
             {!joinOpen ? (
               <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card>
             ) : userState?.joined ? (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">View Entry Flow</LinkButton>
+              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Continue Entry</LinkButton>
             ) : (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
+              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Enroll Now</LinkButton>
             )}
-            <Button variant="secondary" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Updates Saved" : "Get Challenge Updates"}</Button>
-            {watching ? <><p className="mt-3 text-xs text-slate-400">In-app reminders are saved for 1 hour, 30 minutes, 5 minutes, and start time. Push/email delivery begins when notification delivery is connected.</p><LinkButton href={`/challenges/${challenge.id}/watch`} variant="ghost" className="mt-4 w-full">View Challenge Updates</LinkButton></> : null}
+            <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>
+            <Button variant="ghost" className="mt-4 w-full" onClick={() => void updateEngagement("interested", !watching)}>{watching ? "Following updates" : "Follow updates"}</Button>
+            {watching ? <p className="mt-3 text-xs text-slate-400">Challenge updates are saved in-app. Email and push delivery require notification providers to be connected.</p> : null}
           </Card>
 
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
@@ -248,26 +253,24 @@ export default function ChallengeDetailPage() {
             <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
-          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool Foundation</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> Â· Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding, release, and payout execution are not active.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} Â· {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Public views intentionally omit the platform allocation breakdown.</p></Card> : null}
+          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> / Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding and prize release require review before they become available.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} / {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Prize details are shown only when available for public viewing.</p></Card> : null}
+          {predictionEnabled ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
+            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Make a prediction for eligible challenges after verification and availability checks.</p></div></div>
+            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Availability depends on verification, region, and provider approval.</p>
+          </Card> : null}
 
-
-          <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
-            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Review the eligible participants, choose a winner prediction, and continue only if compliance, KYC, age, U.S. state eligibility, admin market approval, and payment-provider approval are satisfied. Platform fee is 7% and settlement/refunds remain admin-review only.</p></div></div>
-            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Real-money Prediction Arena is disabled until provider approval and compliance gates are verified.</p>
-          </Card>
-
-          <Card className="border-emerald-500/20 bg-emerald-500/5 p-5 sm:p-7">
-            <h3 className="text-xl font-black">Revenue Share Review</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-300">Generated revenue uses the 65% winners, 15% host, 10% sponsor, 10% platform foundation. Initial prize money remains separate and 100% winner-directed after review. Challenger vote-revenue bonuses remain pending admin review.</p>
-            <LinkButton href="/revenue-share" variant="secondary" className="mt-5 w-full">View Revenue Flow</LinkButton>
-          </Card>
+          {isLiveEvent ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7">
+            <h3 className="text-xl font-black">Live Event Stream</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-300">This event will stream through Creator Suite.</p>
+            {creatorSuiteUrl ? <a href={creatorSuiteUrl} className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-[8px] bg-[var(--gold)] px-5 py-3 text-sm font-black text-black" target="_blank" rel="noreferrer">Open Creator Suite</a> : <Button className="mt-5 w-full" disabled>Creator Suite link not available yet</Button>}
+          </Card> : null}
           <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
             <div className="mt-5">
               {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> {lifecycle.votingStatus === "voting_not_open" ? "Voting Not Open" : lifecycle.votingStatus === "voting_not_enabled" ? "Voting Unavailable" : "Voting Closed"}</Button>}
             </div>
-            <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Watch Ad for Bonus Vote</p><p className="mt-2 text-xs leading-5 text-slate-400">Ads for votes live here near challenge voting. Google Ad Manager Rewarded Ads is the recommended provider foundation, but no bonus vote is granted without a verified provider callback. After 3 consecutive verified ad watches, a 1-hour cooldown applies.</p><Button className="mt-3 w-full" variant="secondary" disabled title="A verified ad provider callback is required before bonus votes can be granted">Ads for votes are not available yet</Button></div><p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
+            <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Bonus Vote</p><p className="mt-2 text-xs leading-5 text-slate-400">Watch an eligible rewarded ad to earn a bonus vote when this feature is available.</p><Button className="mt-3 w-full" variant="secondary" disabled title="Bonus votes require verified ad completion">Ads are not available yet</Button><p className="mt-2 text-xs text-slate-500">Bonus votes require verified ad completion.</p></div><p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
           </Card>
         </aside>
       </div>
@@ -275,8 +278,8 @@ export default function ChallengeDetailPage() {
   );
 }
 
-function Metric({ value, label }: { value: string; label: string }) {
-  return <Card className="p-4 text-center sm:p-6"><div className="break-words text-2xl font-black capitalize text-[var(--gold-2)] sm:text-3xl">{value}</div><div className="mt-3 text-sm text-slate-300">{label}</div></Card>;
+function Metric({ value, label, support }: { value: string; label: string; support?: string }) {
+  return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;
 }
 
 function Info({ title, body }: { title: string; body: string }) {
@@ -305,6 +308,9 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
+
 
 
 
