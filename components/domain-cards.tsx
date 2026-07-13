@@ -22,7 +22,7 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
       </div>
       <div className="p-6">
         <h3 className="text-xl font-black">{challenge.title}</h3>
-        <p className="mt-2 text-slate-200">{challenge.description}</p>
+        <p className="mt-2 line-clamp-2 text-slate-200">{challenge.description}</p>
         <div className="mt-5 flex gap-8 text-sm text-slate-300">
           <span className="flex items-center gap-2"><Users size={16} className="text-purple-400" /> {challenge.participants}</span>
           <span className="flex items-center gap-2"><Hourglass size={16} className="text-yellow-300" /> {challenge.endsAt}</span>
@@ -31,7 +31,7 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
           <div className="mb-3 flex justify-between text-sm"><span>Status</span><span className="text-[var(--gold)]">{displayStatus}</span></div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full w-2/3 rounded-full bg-[var(--gold)]" /></div>
         </div>
-        <LinkButton href={`/challenges/${challenge.id}`} variant="ghost" className="mt-5 w-full border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-[var(--gold)]">Watch Challenge</LinkButton>
+        <LinkButton href={`/challenges/${challenge.id}`} variant="ghost" className="mt-5 w-full border border-[var(--gold)]/30 bg-[var(--gold)]/5 text-[var(--gold)]">View Details</LinkButton>
       </div>
     </Card>
   );
@@ -58,7 +58,7 @@ export function SubmissionCard({ submission }: { submission: SubmissionWithProfi
           <span className="flex h-11 items-center gap-2 rounded-[8px] bg-[#222] px-5 font-bold"><Heart size={18} className="fill-white text-white" /> {submission.likes}</span>
           <span className="flex h-11 items-center rounded-[8px] bg-[#222] px-5"><Star size={18} /></span>
         </div>
-        <LinkButton href={`/submissions/${submission.id}`} variant="secondary">WATCH</LinkButton>
+        <LinkButton href={`/submissions/${submission.id}`} variant="secondary">View Entry</LinkButton>
       </div>
     </Card>
   );

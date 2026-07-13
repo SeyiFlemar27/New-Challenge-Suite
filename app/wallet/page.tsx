@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Coins, Gift, LockKeyhole, ShieldCheck, TrendingUp, Vote } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Coins, History, LockKeyhole, TrendingUp, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { money } from "@/lib/utils";
@@ -17,22 +17,7 @@ interface DoroPackage {
 
 interface DoroTransaction {
   id: string;
-  type: string;
-  description: string;
   amount: number;
-  createdAt?: string | null;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Pending";
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function formatType(type: string) {
-  return type
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 export default function WalletPage() {
@@ -47,9 +32,12 @@ export default function WalletPage() {
   const [customCoins, setCustomCoins] = useState("250");
   const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
   const [financialSummary, setFinancialSummary] = useState<any>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const freeCompetitor = String(account.planId ?? "free") === "free" && !["creator", "host"].includes(String(account.role ?? "user"));
   const hostMode = String(account.planId) === "host";
+  const customCoinAmount = Number(customCoins || 0);
+  const customCoinInvalid = !Number.isInteger(customCoinAmount) || customCoinAmount < 50 || customCoinAmount > 10000;
+  const earningsCents = Number(financialSummary?.pendingEarningsCents ?? 0) + Number(financialSummary?.prizeWinningsCents ?? 0) + Number(financialSummary?.sponsorEarningsCents ?? 0);
+  const showEarnings = !loading && !unauthenticated && !error && account.accountType !== "sponsor" && earningsCents > 0;
+  const recentActivityCount = useMemo(() => transactions.length, [transactions.length]);
 
   async function loadWallet() {
     setLoading(true);
@@ -68,16 +56,9 @@ export default function WalletPage() {
     setBalance(Number(walletResult.data.wallet.balance ?? 0));
     setAccount(walletResult.data.user ?? {});
     setFinancialSummary(walletResult.data.financialSummary ?? null);
-    setWarnings(walletResult.data.warnings ?? []);
-    setTransactions(walletResult.data.transactions.map((txn) => {
+    setTransactions((walletResult.data.transactions ?? []).map((txn) => {
       const record = txn as Partial<DoroTransaction>;
-      return {
-        id: String(record.id ?? ""),
-        type: String(record.type ?? "adjustment"),
-        description: String(record.description ?? "DoroCoin transaction"),
-        amount: Number(record.amount ?? 0),
-        createdAt: record.createdAt ?? null
-      };
+      return { id: String(record.id ?? ""), amount: Number(record.amount ?? 0) };
     }));
 
     if (!packageResult.ok || !packageResult.data) {
@@ -109,6 +90,7 @@ export default function WalletPage() {
   }, []);
 
   async function buyPackage(packageId: string) {
+    if (checkoutPackageId) return;
     setCheckoutPackageId(packageId);
     setStatus("");
     const result = await purchaseDoroCoins(packageId);
@@ -128,14 +110,13 @@ export default function WalletPage() {
   }
 
   async function buyCustomCoins() {
-    const coins = Number(customCoins);
-    if (!Number.isInteger(coins) || coins < 50 || coins > 10000) {
+    if (customCoinInvalid || checkoutPackageId) {
       setStatus("Enter a whole DoroCoin amount between 50 and 10,000.");
       return;
     }
     setCheckoutPackageId("custom");
     setStatus("");
-    const result = await purchaseCustomDoroCoins(coins);
+    const result = await purchaseCustomDoroCoins(customCoinAmount);
     setCheckoutPackageId(null);
     if (result.ok && result.data?.url) {
       if ((result.data as any).mode === "mock" || (result.data as any).developmentOnly) {
@@ -156,11 +137,14 @@ export default function WalletPage() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title={hostMode ? "Wallet & Revenue" : "Wallet / DoroCoin"} subtitle={hostMode ? "Review DoroCoin activity, entry activity, sponsor-interest records, and revenue foundations without moving money." : "DoroCoins are internal platform credits for votes, boosts, and future promotional features. They cannot be withdrawn or converted to cash."} icon={<Coins className="text-[var(--gold)]" />} />
-        <Card className="px-7 py-5 text-right">
-          <div className="text-sm font-bold text-slate-400">DoroCoin Balance</div>
-          <div className="text-4xl font-black text-[var(--gold)]">{balance}</div>
-        </Card>
+        <PageTitle title={hostMode ? "Wallet" : "Wallet / DoroCoin"} subtitle="Use DoroCoin for eligible votes, boosts, and platform actions." icon={<Coins className="text-[var(--gold)]" />} />
+        <div className="flex flex-col gap-3 sm:flex-row xl:items-center">
+          <Card className="px-6 py-4 text-left sm:text-right">
+            <div className="text-sm font-bold text-slate-400">DoroCoin Balance</div>
+            <div className="text-4xl font-black text-[var(--gold)]">{balance}</div>
+          </Card>
+          <LinkButton href="/wallet/transactions" variant="secondary" className="min-h-14 justify-center"><History size={17} /> Transaction History</LinkButton>
+        </div>
       </div>
 
       {loading ? (
@@ -177,113 +161,52 @@ export default function WalletPage() {
         </Card>
       ) : null}
 
-      {!loading && !unauthenticated && !error ? <div className={`mt-8 grid gap-6 ${freeCompetitor ? "md:grid-cols-2" : "xl:grid-cols-4"}`}>
-        {(freeCompetitor ? [
-          { icon: <Vote />, title: "Free & DoroCoin Votes", body: "Use the challenge's free daily vote, then buy DoroCoins for additional eligible votes." },
-          { icon: <Coins />, title: "Internal Platform Credits", body: "DoroCoins are used for platform voting features and cannot be withdrawn or converted to cash." }
-        ] : [
-          { icon: <Vote />, title: "Voting", body: "Buy additional votes for eligible submissions." },
-          { icon: <TrendingUp />, title: "Boosting", body: "Increase challenge visibility when your plan allows it." },
-          { icon: <LockKeyhole />, title: "Premium Entries", body: "Join locked creator challenges when allowed." },
-          { icon: <Coins />, title: "Platform Credits", body: "Use DoroCoins for eligible votes, boosts, and promotional features." }
-        ]).map((item) => <Card key={item.title} className="p-5"><div className="text-[var(--gold)]">{item.icon}</div><h2 className="mt-3 text-xl font-black">{item.title}</h2><p className="mt-2 text-sm text-slate-300">{item.body}</p></Card>)}
+      {!loading && !unauthenticated && !error ? <div className="mt-8 grid gap-6 md:grid-cols-3">
+        <Card className="p-5"><Vote className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Eligible Voting</h2><p className="mt-2 text-sm text-slate-300">Use free daily votes where available, then spend DoroCoins on eligible additional votes.</p></Card>
+        <Card className="p-5"><TrendingUp className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Boosts</h2><p className="mt-2 text-sm text-slate-300">Use DoroCoins for platform actions your account and challenge rules allow.</p></Card>
+        <Card className="p-5"><Coins className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Platform Credits</h2><p className="mt-2 text-sm text-slate-300">DoroCoins are internal credits. They cannot be withdrawn or converted to cash.</p></Card>
       </div> : null}
-      {!loading && !error && warnings.length ? <p className="mt-5 rounded-[8px] border border-amber-400/20 bg-amber-950/20 p-4 text-sm text-amber-100">Your DoroCoin wallet is available. Some review-only financial summaries could not be loaded and will refresh when their indexes are ready.</p> : null}
 
-      {!loading && !unauthenticated && !error && (account.accountType === "sponsor" || account.isAdmin || ["creator", "pro", "host", "enterprise"].includes(String(account.planId))) ? <section className="mt-10">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-black">{account.isAdmin ? "Financial Review Foundation" : account.accountType === "sponsor" ? "Sponsor Budget Overview" : hostMode ? "Host Revenue Review" : "Earnings & Prize Review"}</h2><p className="mt-2 text-sm text-slate-400">{hostMode ? "Entry activity, vote purchases, sponsor payment review, and payout status remain read-only. Withdrawals, automatic payouts, refunds, sponsor releases, and paid-entry prize-pool releases are not active yet." : "Read-only records. Withdrawals, payout execution, refunds, and sponsor release are not active."}</p></div><span className="rounded-full border border-[var(--gold)]/30 px-3 py-2 text-xs font-black capitalize text-[var(--gold)]">{financialSummary?.payoutStatus?.replaceAll("_", " ") || "review only"}</span></div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {account.accountType === "sponsor" ? <>
-            <FinancialCard label="Campaign Budget" cents={financialSummary?.campaignBudgetCents} note="Separate from subscription billing" />
-            <FinancialCard label="Sponsorship Spend" cents={financialSummary?.sponsorshipSpendCents} note="Proposal records only" />
-            <FinancialCard label="Prize Contributions" cents={financialSummary?.prizePoolContributionsCents} note="Funding/release inactive" />
-            <FinancialCard label="Invoices & Reports" cents={0} note="Placeholder" />
-          </> : account.isAdmin ? <>
-            <FinancialCard label="Prize Pool Review" cents={0} note="Use admin review queue" />
-            <FinancialCard label="Payout Review" cents={0} note="No release controls" />
-            <FinancialCard label="Disputes" cents={0} note="Review foundation" />
-            <FinancialCard label="Platform Allocation" cents={0} note="Admin-only ledger" />
-          </> : <>
-            <FinancialCard label="Pending Earnings" cents={financialSummary?.pendingEarningsCents} note="Review-only" />
-            <FinancialCard label="Sponsor Earnings" cents={financialSummary?.sponsorEarningsCents} note="No release active" />
-            <FinancialCard label="Prize Winnings" cents={financialSummary?.prizeWinningsCents} note="Subject to winner review" />
-            <FinancialCard label="Payout Status" cents={0} note="Withdrawals unavailable" />
-          </>}
-        </div>
-      </section> : null}
-
-      {!loading && !unauthenticated && !error && account.accountType !== "sponsor" ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="text-xl font-black">Eligible earnings withdrawal</h2><p className="mt-2 text-sm text-slate-300">Verified winnings and approved earnings can be submitted for manual review. DoroCoins are never withdrawable.</p></div>
-        <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">Review Withdrawal Eligibility</LinkButton>
-      </Card> : null}
-
-      {!loading && !unauthenticated && !error && account.accountType !== "sponsor" ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-black"><Gift className="text-[var(--gold)]" /> Rewards & Spin Wheel</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Earn reward points when you purchase DoroCoins. Use points to unlock Spin Wheel credits and track prizes through reward history.</p>
-        </div>
-        <div className="flex flex-col gap-3 sm:min-w-52">
-          <LinkButton href="/rewards" className="w-full">View Rewards</LinkButton>
-          <LinkButton href="/rewards/wheel" variant="secondary" className="w-full">Open Spin Wheel</LinkButton>
-        </div>
+      {showEarnings ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-xl font-black">Earnings</h2><p className="mt-2 text-sm text-slate-300">Approved winnings and eligible creator earnings can be submitted for withdrawal after verification.</p></div>
+        <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">View Earnings</LinkButton>
       </Card> : null}
 
       {!loading && !unauthenticated && !error ? <section className="mt-10">
-        <h2 className="text-2xl font-black">Buy DoroCoins</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-black">Buy DoroCoins</h2><p className="mt-2 text-sm text-slate-400">Choose a package or enter a custom amount. Checkout updates after payment confirmation.</p></div><p className="text-sm font-bold text-slate-400">{recentActivityCount ? `${recentActivityCount} wallet records` : "No transactions yet"}</p></div>
         <Card className="mt-5 p-6">
           <div className="grid gap-5 lg:grid-cols-[1fr_220px_220px] lg:items-end">
             <div>
-              <h3 className="text-xl font-black">Custom Purchase</h3>
-              <p className="mt-2 text-sm text-slate-300">Enter the exact amount you want. MVP rate: 1 DoroCoin = $0.02.</p>
+              <h3 className="text-xl font-black">Custom DoroCoin Purchase</h3>
+              <p className="mt-2 text-sm text-slate-300">Enter a whole number from 50 to 10,000 DoroCoins.</p>
             </div>
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-slate-300">DoroCoins</span>
-              <input className="h-12 w-full rounded-[8px] border border-white/10 bg-[#11151d] px-4 font-bold outline-none focus:border-[var(--gold)]" value={customCoins} onChange={(event) => setCustomCoins(event.target.value.replace(/[^\d]/g, ""))} />
+              <input className={`h-12 w-full rounded-[8px] border bg-[#11151d] px-4 font-bold outline-none focus:border-[var(--gold)] ${customCoinInvalid ? "border-red-400/70" : "border-white/10"}`} value={customCoins} onChange={(event) => setCustomCoins(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" />
             </label>
             <div className="rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4">
               <div className="text-sm font-bold text-slate-300">Estimated total</div>
-              <div className="text-2xl font-black text-[var(--gold)]">{money((Number(customCoins || 0) * 0.02) || 0)}</div>
+              <div className="text-2xl font-black text-[var(--gold)]">{money((customCoinAmount * 0.02) || 0)}</div>
             </div>
           </div>
-          <Button className="mt-5 w-full md:w-auto" onClick={buyCustomCoins} disabled={checkoutPackageId === "custom"}>{checkoutPackageId === "custom" ? "Preparing Payment..." : "Continue to Payment"}</Button>
+          {customCoinInvalid ? <p className="mt-3 text-sm font-bold text-red-200">Enter at least 50 DoroCoins and no more than 10,000.</p> : null}
+          <Button className="mt-5 w-full md:w-auto" onClick={buyCustomCoins} disabled={customCoinInvalid || checkoutPackageId === "custom"}>{checkoutPackageId === "custom" ? "Preparing Payment..." : "Continue to Payment"}</Button>
         </Card>
         <p className="mt-5 max-w-3xl text-sm text-slate-400">Purchases add internal DoroCoin credits only. DoroCoins have no cash value, cannot be withdrawn, and cannot be converted into payout balance.</p>
         {packages.length ? <div className="mt-5 grid gap-6 md:grid-cols-3">
           {packages.map((pack) => (
-            <Card key={pack.id} className="p-6">
+            <Card key={pack.id} className="flex min-h-[260px] flex-col p-6">
               <h3 className="text-xl font-black">{pack.name}</h3>
-              <div className="mt-4 text-4xl font-black text-[var(--gold)]">{pack.coins}</div>
-              <p className="mt-2 text-slate-300">{pack.bestFor}</p>
-              <p className="mt-5 text-2xl font-black">{money(pack.price)}</p>
-              <Button className="mt-5 w-full" onClick={() => buyPackage(pack.id)} disabled={checkoutPackageId === pack.id}>{checkoutPackageId === pack.id ? "Starting Checkout..." : "Buy Package"}</Button>
+              <div className="mt-4 text-4xl font-black text-[var(--gold)]">{pack.coins.toLocaleString()}</div>
+              <p className="text-sm font-bold text-slate-400">DoroCoins</p>
+              <p className="mt-3 flex-1 text-sm leading-6 text-slate-300">{pack.bestFor}</p>
+              <div className="mt-5 flex items-end justify-between gap-3"><p className="text-2xl font-black">{money(pack.price)}</p><p className="text-xs text-slate-400">{money(pack.price / Math.max(1, pack.coins))} each</p></div>
+              <Button className="mt-5 w-full" onClick={() => buyPackage(pack.id)} disabled={Boolean(checkoutPackageId)}>{checkoutPackageId === pack.id ? "Starting Checkout..." : "Buy Package"}</Button>
             </Card>
           ))}
         </div> : <Card className="mt-5"><EmptyState icon={<Coins />} title="No packages available" body="DoroCoin packages have not been configured yet." action={<Button onClick={loadWallet}>Retry</Button>} /></Card>}
         {status ? <p className={`mt-5 rounded-[8px] p-4 font-bold ${status.startsWith("Checkout started") || status.startsWith("Development checkout") ? "bg-emerald-950/40 text-emerald-200" : "bg-red-950/40 text-red-200"}`}>{status}</p> : null}
-        <Card className="mt-6 border-dashed border-[var(--gold)]/30 p-6">
-          <h3 className="text-xl font-black">Watch an ad for a bonus vote</h3>
-          <p className="mt-2 text-slate-300">Ad rewards are being prepared. A future verified provider callback may grant one limited bonus vote for an eligible challenge. No ads are served and no votes or DoroCoins are granted yet.</p>
-          <Button className="mt-4" variant="secondary" disabled>Coming Soon</Button>
-        </Card>
-      </section> : null}
-
-      {!loading && !unauthenticated && !error ? <section className="mt-10">
-        <h2 className="text-2xl font-black">Transaction History</h2>
-        <Card className="mt-5 overflow-hidden">
-          {transactions.length ? transactions.map((txn) => (
-            <div key={txn.id} className="grid gap-3 border-b border-white/10 p-5 md:grid-cols-[140px_1fr_120px_120px]">
-              <span className="font-bold text-slate-300">{formatDate(txn.createdAt)}</span>
-              <span>{txn.description}</span>
-              <span className="font-bold">{formatType(txn.type)}</span>
-              <span className={`text-right font-black ${txn.amount > 0 ? "text-emerald-300" : "text-red-300"}`}>{txn.amount > 0 ? "+" : ""}{txn.amount}</span>
-            </div>
-          )) : <EmptyState icon={<Coins />} title="No transactions yet" body="DoroCoin purchases, votes, boosts, and admin grants will appear here." />}
-        </Card>
       </section> : null}
     </AppShell>
   );
-}
-
-function FinancialCard({ label, cents = 0, note }: { label: string; cents?: number; note: string }) {
-  return <Card className="p-5"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">{money(Number(cents || 0) / 100)}</p><p className="mt-2 text-xs text-slate-400">{note}</p></Card>;
 }

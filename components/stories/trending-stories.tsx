@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Share2, Users, Vote, X } from "lucide-react";
@@ -57,7 +57,7 @@ export function TrendingStories({ challenges, source = "explore" }: { challenges
   if (!stories.length) return null;
   return (
     <section className="mt-8">
-      <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Trending now</p><h2 className="mt-1 text-2xl font-black">Challenge Stories</h2></div><p className="text-xs text-slate-400">Tap for preview</p></div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Trending now</p><h2 className="mt-1 text-2xl font-black">Trending Challenges</h2><p className="mt-1 text-sm text-slate-400">Challenges gaining the most participation right now.</p></div><p className="text-xs text-slate-400">Tap for preview</p></div>
       <div className="scrollbar-dark mt-4 flex gap-4 overflow-x-auto pb-3">
         {stories.map((story, index) => <button key={story.id} onClick={() => open(index)} className="w-24 shrink-0 text-left"><div className="rounded-full border-[3px] border-[var(--gold)] p-[3px]"><div className="h-[88px] overflow-hidden rounded-full border-4 border-black bg-[#181818]"><img src={story.coverImageUrl || story.imageUrl || story.promoImageUrl || logoUrl} alt={story.title} className="h-full w-full object-cover" /></div></div><p className="mt-2 line-clamp-2 text-center text-xs font-black">{story.title}</p><p className="mt-1 text-center text-[10px] text-slate-400">{Number(story.participants ?? story.participantCount ?? 0)} joined</p></button>)}
       </div>

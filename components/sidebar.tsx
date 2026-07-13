@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -43,12 +43,10 @@ type NavSection = { label: string; items: NavItem[] };
 const competitorSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Saved", icon: Star },
+    { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
-    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
-    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Compete", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -67,12 +65,10 @@ const competitorSections: NavSection[] = [
 const starterSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Saved", icon: Star },
+    { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
-    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
-    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -93,12 +89,10 @@ const starterSections: NavSection[] = [
 const creatorSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
-    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Favorites / Saved", icon: Star },
-    { href: "/wallet", label: "Wallet / DoroCoin", icon: Coins },
+    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Saved", icon: Star },
+    { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
-    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
-    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -126,13 +120,11 @@ const creatorSections: NavSection[] = [
 const hostSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard/host", label: "Host Control Center", icon: Home },
-    { href: "/feed", label: "Feed / Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Favorites / Saved", icon: Star },
+    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/favorites", label: "Saved", icon: Star },
     { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
     { href: "/wallet", label: "Wallet & Revenue", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
-    { href: "/rewards/wheel", label: "Spin Wheel", icon: Trophy },
-    { href: "/rewards/history", label: "Reward History", icon: Award }
   ] },
   { label: "Competitions", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
@@ -182,7 +174,7 @@ function activeNavigationHref(pathname: string) {
   if (pathname === "/my-challenges") return "/my-challenges";
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
-  if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return pathname;
+  if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return "/rewards";
   if (pathname === "/settings" || pathname.startsWith("/settings/")) return "/settings";
   return pathname;
 }

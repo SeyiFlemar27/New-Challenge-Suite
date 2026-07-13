@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,11 @@ import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { loginWithEmail } from "@/lib/firebase/auth-service";
+
+function safeInternalPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
+  return value;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +27,9 @@ export default function LoginPage() {
     if (!profile.ok || !profile.data?.user) {
       throw new Error(profile.message || "Profile could not be loaded.");
     }
-    router.push(getDefaultRouteForAccount(profile.data.user));
+    const params = new URLSearchParams(window.location.search);
+    const next = safeInternalPath(params.get("next"));
+    router.push(next || getDefaultRouteForAccount(profile.data.user));
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
