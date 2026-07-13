@@ -32,6 +32,18 @@ export function defaultMaxSizeMb(kind: MediaUploadKind) {
   return kind === "image" ? 15 : 250;
 }
 
+
+export function formatUploadBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
 export function sanitizeFileName(name: string) {
   const normalized = name.trim().replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(0, 120);
   return normalized || "upload";
@@ -85,15 +97,16 @@ export function mediaErrorMessage(code: MediaUploadErrorCode) {
 }
 
 export function classifyStorageError(error: unknown): { code: MediaUploadErrorCode; message: string } {
-  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const firebaseCode = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  const raw = [firebaseCode, error instanceof Error ? error.message : String(error ?? "")].filter(Boolean).join(" ");
   const lower = raw.toLowerCase();
   let code: MediaUploadErrorCode = "unknown";
-  if (raw === "STORAGE_UPLOAD_TIMEOUT") code = "storage_timeout";
+  if (raw === "STORAGE_UPLOAD_TIMEOUT" || lower.includes("storage_upload_timeout")) code = "storage_timeout";
   else if (lower.includes("storage/unauthorized") || lower.includes("permission") || lower.includes("403")) code = "permission_denied";
-  else if (lower.includes("storage/unauthenticated") || lower.includes("auth")) code = "expired_auth";
+  else if (lower.includes("storage/unauthenticated") || lower.includes("auth token")) code = "expired_auth";
   else if (lower.includes("storage/canceled") || lower.includes("cancelled") || lower.includes("canceled")) code = "upload_cancelled";
   else if (lower.includes("processing failed")) code = "processing_failed";
   else if (lower.includes("storage/retry-limit-exceeded") || lower.includes("network") || lower.includes("offline")) code = "network_failure";
-  else if (lower.includes("bucket") || lower.includes("storage/unknown") || lower.includes("storage/object-not-found")) code = "storage_unavailable";
+  else if (lower.includes("storage/bucket-not-found") || lower.includes("bucket") || lower.includes("storage/unknown") || lower.includes("storage/object-not-found")) code = "storage_unavailable";
   return { code, message: mediaErrorMessage(code) };
 }

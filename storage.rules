@@ -61,6 +61,16 @@ service firebase.storage {
       allow write: if isChallengeManager(challengeId) && isVideo();
     }
 
+    match /challenges/{challengeId}/promo-flyer/{fileName} {
+      allow read: if signedIn();
+      allow write: if isChallengeManager(challengeId) && isImage();
+    }
+
+    match /challenges/{challengeId}/promo-video/{fileName} {
+      allow read: if signedIn();
+      allow write: if isChallengeManager(challengeId) && isVideo();
+    }
+
     match /challenges/{challengeId}/submissions/{userId}/{fileName} {
       allow read: if isOwner(userId) || isChallengeManager(challengeId);
       allow write: if isOwner(userId) && isMedia();
