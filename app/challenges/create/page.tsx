@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience, getUserPlanAccess, type PlanExperience } from "@/lib/plan-access";
 import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
 import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
-import { MediaUploadField } from "@/components/media-upload-field";
+import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
 
 const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
 
@@ -74,9 +74,13 @@ function CreateChallengeWizard() {
     votingDeadline: dateInput(6),
     endsAt: dateInput(7),
     coverImageUrl: "",
+    coverImagePath: "",
     promoImageUrl: "",
+    promoImagePath: "",
     trailerVideoUrl: "",
+    trailerVideoPath: "",
     promoVideoUrl: "",
+    promoVideoPath: "",
     standardRules: "Respect all participants.\nSubmit original work.\nFollow the published voting policy.",
     policyTerms: "Challenge entries remain subject to platform review and community standards.",
     challengeGuidelines: "Keep submissions relevant to the challenge brief and accepted media types.",
@@ -113,7 +117,16 @@ function CreateChallengeWizard() {
     judgeScoringEnabled: "false",
     weightedVotes: "false",
     requiresSubmissionApproval: "false"
-  });  const [allocations, setAllocations] = useState([
+  });
+  const [mediaUploadStatuses, setMediaUploadStatuses] = useState<Record<string, MediaUploadStage>>({});
+  const mediaUploadInProgress = Object.values(mediaUploadStatuses).some((status) => ["preparing", "uploading", "processing"].includes(status));
+  const mediaUploadFailed = Object.values(mediaUploadStatuses).some((status) => status === "failed");
+  const trackMediaStatus = (field: string) => (status: MediaUploadStage) => setMediaUploadStatuses((current) => ({ ...current, [field]: status }));
+  function updateMedia(urlField: keyof typeof form, pathField: keyof typeof form, url: string, metadata?: { path: string }) {
+    setForm((current) => ({ ...current, [urlField]: url, [pathField]: metadata?.path ?? "" }));
+    setError("");
+  }
+  const [allocations, setAllocations] = useState([
     { bucket: "Platform Operations", percent: 12, enabled: true },
     { bucket: "Creator Share", percent: 3, enabled: true },
     { bucket: "Community Pool", percent: 0, enabled: false }
@@ -213,9 +226,13 @@ function CreateChallengeWizard() {
       votingDeadline: form.votingDeadline,
       votingEndsAt: form.votingDeadline,
       coverImageUrl: form.coverImageUrl,
+      coverImagePath: form.coverImagePath,
       promoImageUrl: form.promoImageUrl,
+      promoImagePath: form.promoImagePath,
       trailerVideoUrl: form.trailerVideoUrl,
+      trailerVideoPath: form.trailerVideoPath,
       promoVideoUrl: form.promoVideoUrl,
+      promoVideoPath: form.promoVideoPath,
       standardRules: form.standardRules,
       policyTerms: form.policyTerms,
       challengeGuidelines: form.challengeGuidelines,
@@ -278,6 +295,19 @@ function CreateChallengeWizard() {
   }
 
   async function publish() {
+    if (mediaUploadInProgress) {
+      setError("Wait for media uploads to complete before publishing.");
+      return;
+    }
+    if (mediaUploadFailed) {
+      setError("Resolve failed media uploads or remove them before publishing.");
+      return;
+    }
+    if (!form.coverImageUrl) {
+      setError("Upload a cover image before publishing this challenge.");
+      setStep(4);
+      return;
+    }
     if (draftOnlyFormat) {
       setError("This advanced format is a foundation-only builder in the current version. Save it as a draft until its full workflow is activated.");
       return;
@@ -365,7 +395,7 @@ function CreateChallengeWizard() {
             </div>
             <Field label="Description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field>
             <Field label="Rules"><textarea className={textareaClass} value={form.standardRules} onChange={(event) => update("standardRules", event.target.value)} /></Field>
-            <MediaUploadField label="Cover Image" value={form.coverImageUrl} onChange={(url) => update("coverImageUrl", url)} storagePath={`challengeMedia/drafts/${user?.uid ?? "anonymous"}`} kind="image" buttonLabel="Upload Cover Image" helperText="Free basic challenges use uploaded public cover art only after secure Storage rules are published." />
+            <MediaUploadField label="Cover Image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={`challenges/drafts/${user?.uid ?? "anonymous"}/banner`} required onStatusChange={trackMediaStatus("coverImageUrl")} kind="image" buttonLabel="Upload Cover Image" helperText="Free basic challenges use uploaded public cover art only after secure Storage rules are published." />
             <div className="grid gap-6 sm:grid-cols-2">
               <Field label="Start Date"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></Field>
               <Field label="Entry Deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(event) => update("submissionDeadline", event.target.value)} /></Field>
@@ -399,7 +429,7 @@ function CreateChallengeWizard() {
         <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 sm:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
-              <div className="text-sm font-bold text-[var(--gold-2)]">{planExperience.dashboardName} Ã‚· {planExperience.badgeLabel}</div>
+              <div className="text-sm font-bold text-[var(--gold-2)]">{planExperience.dashboardName} - {planExperience.badgeLabel}</div>
               <p className="mt-1 text-sm text-slate-300">{planExperience.challengeLimitLabel}. {planExperience.privateChallengeLimitLabel}. Paid-entry prize pools remain disabled.</p>
             </div>
             {!planAccess.isCreatorPro ? <LinkButton href="/subscriptions" variant="secondary" className="w-full shrink-0 md:w-auto">Upgrade Plan</LinkButton> : null}
@@ -435,7 +465,7 @@ function CreateChallengeWizard() {
           {step === 1 ? <StepFormat form={form} update={update} toggleSubmission={toggleSubmission} experience={planExperience} /> : null}
           {step === 2 ? <StepDates form={form} update={update} /> : null}
           {step === 3 ? <StepPrize form={form} update={update} braggingRights={braggingRights} normalized={normalized} setAllocations={setAllocations} planAccess={planAccess} /> : null}
-          {step === 4 ? <StepMedia form={form} update={update} userId={user?.uid ?? "anonymous"} /> : null}
+          {step === 4 ? <StepMedia form={form} updateMedia={updateMedia} userId={user?.uid ?? "anonymous"} trackMediaStatus={trackMediaStatus} /> : null}
           {step === 5 ? <StepPreview form={form} /> : null}
         </div>
 
@@ -465,9 +495,9 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
   if (experience.features.host_control_center) formats.push("1 vs 1 Battle");
   if (experience.features.programs) formats.push("Program Challenge (Draft Foundation)", "Campaign Challenge (Draft Foundation)");
   const lockedFormats = [
-    !experience.features.ranked_challenges ? "Ranked Challenge Ã‚· Pro" : null,
-    !experience.features.host_control_center ? "1 vs 1 Battle Ã‚· Host" : null,
-    !experience.features.programs ? "Programs / Campaigns Ã‚· Enterprise" : null
+    !experience.features.ranked_challenges ? "Ranked Challenge - Pro" : null,
+    !experience.features.host_control_center ? "1 vs 1 Battle - Host" : null,
+    !experience.features.programs ? "Programs / Campaigns - Enterprise" : null
   ].filter(Boolean);
 
   return (
@@ -481,7 +511,7 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
         </Field>
         <Field label="Best Of"><select className={inputClass} value={form.bestOf} onChange={(event) => update("bestOf", event.target.value)}><option>1 Rounder</option><option>Best of 3</option><option>Best of 5</option></select></Field>
       </div>
-      {lockedFormats.length ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> {lockedFormats.join(" Ã‚· ")}</Card> : null}
+      {lockedFormats.length ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> {lockedFormats.join(" - ")}</Card> : null}
 
       <div className="mt-6">
         <div className="mb-2 font-bold">Submission Type</div>
@@ -548,16 +578,16 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
   );
 }
 
-function StepMedia({ form, update, userId }: { form: any; update: any; userId: string }) {
-  const basePath = `challengeMedia/drafts/${userId}`;
+function StepMedia({ form, updateMedia, userId, trackMediaStatus }: { form: any; updateMedia: any; userId: string; trackMediaStatus: (field: string) => (status: MediaUploadStage) => void }) {
+  const basePath = `challenges/drafts/${userId}`;
   return (
     <section>
       <h2 className="text-xl font-black sm:text-2xl">Step 5: Media</h2>
       <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <MediaUploadField label="Cover Media" value={form.coverImageUrl} onChange={(url) => update("coverImageUrl", url)} storagePath={`${basePath}/cover`} kind="image" buttonLabel="Upload Cover Image" />
-        <MediaUploadField label="Promo Flyer" value={form.promoImageUrl} onChange={(url) => update("promoImageUrl", url)} storagePath={`${basePath}/promo-flyer`} kind="image" buttonLabel="Upload Promo Image" />
-        <MediaUploadField label="Trailer Video" value={form.trailerVideoUrl} onChange={(url) => update("trailerVideoUrl", url)} storagePath={`${basePath}/trailer`} kind="video" buttonLabel="Upload Trailer Video" />
-        <MediaUploadField label="Promo Video" value={form.promoVideoUrl} onChange={(url) => update("promoVideoUrl", url)} storagePath={`${basePath}/promo-video`} kind="video" buttonLabel="Upload Promo Video" />
+        <MediaUploadField label="Cover Media" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={`${basePath}/banner`} kind="image" buttonLabel="Upload Cover Image" required onStatusChange={trackMediaStatus("coverImageUrl")} />
+        <MediaUploadField label="Promo Flyer" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={`${basePath}/promo-flyer`} kind="image" buttonLabel="Upload Promo Image" onStatusChange={trackMediaStatus("promoImageUrl")} />
+        <MediaUploadField label="Trailer Video" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={`${basePath}/trailers`} kind="video" buttonLabel="Upload Trailer Video" onStatusChange={trackMediaStatus("trailerVideoUrl")} />
+        <MediaUploadField label="Promo Video" value={form.promoVideoUrl} onChange={(url, metadata) => updateMedia("promoVideoUrl", "promoVideoPath", url, metadata)} storagePath={`${basePath}/promo-video`} kind="video" buttonLabel="Upload Promo Video" onStatusChange={trackMediaStatus("promoVideoUrl")} />
       </div>
       <Card className="mt-6 p-4 text-slate-300 sm:p-6">Uploaded media is stored as secure Firebase Storage metadata. If Storage rules are not published yet, uploads fail closed and the challenge can still be saved without broken media.</Card>
     </section>
@@ -567,7 +597,4 @@ function StepMedia({ form, update, userId }: { form: any; update: any; userId: s
 function StepPreview({ form }: { form: any }) {
   return <section><h2 className="text-xl font-black sm:text-2xl">Step 6: Preview & Publish</h2><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title, Type: form.type, Category: form.category === "Other" ? form.customCategory : form.category, Format: form.competitionFormat, "Best Of": form.bestOf, "Prize Type": form.prizeType, "Submission Types": form.submissionTypes.join(", "), "Start Date": form.startsAt, "Submission Deadline": form.submissionDeadline, "Voting Deadline": form.votingDeadline, "End Date": form.endsAt, "Sponsor Enabled": form.sponsorEnabled === "true" ? "Yes" : "No" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black sm:text-lg">{String(value)}</div></Card>)}</div></section>;
 }
-
-
-
 

@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const submissionCreateSchema = z.object({
   challengeId: z.string().trim().min(1, "Challenge ID is required."),
@@ -10,6 +10,7 @@ export const submissionCreateSchema = z.object({
   mediaUploadPending: z.coerce.boolean().default(false),
   originalFileName: z.string().trim().max(240).optional().default(""),
   fileSize: z.coerce.number().min(0).default(0),
+  mediaStoragePath: z.string().trim().max(500).optional().default(""),
   entryAgreementAccepted: z.coerce.boolean().default(false),
   rulesAccepted: z.coerce.boolean().default(false)
 }).superRefine((value, ctx) => {

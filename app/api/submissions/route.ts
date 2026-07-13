@@ -132,6 +132,7 @@ export async function POST(request: Request) {
         mediaUploadPending: body.mediaUploadPending,
         originalFileName: body.originalFileName ?? "",
         fileSize: Number(body.fileSize ?? 0),
+        mediaStoragePath: body.mediaStoragePath ?? "",
         voteCount: 0,
         weightedVoteCount: 0,
         challengeTitle: String(freshChallenge.title ?? "Untitled Challenge"),
@@ -195,5 +196,3 @@ export async function POST(request: Request) {
   });
   return ok({ submission }, status === "pending_review" ? "Submission uploaded and pending review." : status === "submitted" ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded successfully.");
 }
-
-

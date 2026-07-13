@@ -13,6 +13,13 @@ service firebase.storage {
       return signedIn() && request.auth.token.admin == true;
     }
 
+    function isChallengeManager(challengeId) {
+      return signedIn()
+        && (isAdmin()
+          || (firestore.exists(/databases/(default)/documents/challenges/$(challengeId))
+            && firestore.get(/databases/(default)/documents/challenges/$(challengeId)).data.creatorId == request.auth.uid));
+    }
+
     function isImage() {
       return request.resource != null
         && request.resource.size <= 15 * 1024 * 1024
@@ -29,65 +36,64 @@ service firebase.storage {
       return isImage() || isVideo();
     }
 
-    match /challengeMedia/{challengeId}/{userId}/{fileName} {
+    match /challenges/drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /challenges/host-drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /challenges/hybrid-drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isMedia();
+    }
+
+    match /challenges/{challengeId}/banner/{fileName} {
       allow read: if signedIn();
+      allow write: if isChallengeManager(challengeId) && isImage();
+    }
+
+    match /challenges/{challengeId}/trailers/{fileName} {
+      allow read: if signedIn();
+      allow write: if isChallengeManager(challengeId) && isVideo();
+    }
+
+    match /challenges/{challengeId}/submissions/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isChallengeManager(challengeId);
       allow write: if isOwner(userId) && isMedia();
     }
 
-    match /challengeMedia/drafts/{userId}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
-    }
-
-    match /challengeMedia/drafts/{userId}/{folder}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
-    }
-
-    match /challengeMedia/host-drafts/{userId}/{folder}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
-    }
-
-    match /submissions/{challengeId}/{userId}/{fileName} {
-      // Submission media is authenticated-only until the server marks the submission approved and serves public-safe URLs.
+    match /live-events/drafts/{userId}/media/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isOwner(userId) && isMedia();
     }
 
-    match /sponsorMedia/profile/{userId}/{folder}/{fileName} {
+    match /live-events/hybrid-drafts/{userId}/media/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isImage();
+      allow write: if isOwner(userId) && isMedia();
     }
 
-    match /sponsorMedia/{sponsorId}/{userId}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isImage();
+    match /live-events/{eventId}/media/{fileName} {
+      allow read: if signedIn();
+      allow write: if isAdmin() && isMedia();
     }
 
-    match /profileMedia/{userId}/{fileName} {
+    match /users/{userId}/profile/{folder}/{fileName} {
       allow read: if true;
       allow write: if isOwner(userId) && isImage();
     }
 
-    match /profileMedia/{userId}/{folder}/{fileName} {
-      allow read: if true;
-      allow write: if isOwner(userId) && isImage();
+    match /sponsors/{sponsorId}/assets/{folder}/{fileName} {
+      allow read: if isOwner(sponsorId) || isAdmin();
+      allow write: if isOwner(sponsorId) && isImage();
     }
 
     match /rewardPrizeMedia/{prizeId}/{userId}/{fileName} {
       allow read: if signedIn();
       allow write: if isAdmin() && isImage();
-    }
-
-    match /eventMedia/{eventId}/{userId}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
-    }
-
-    match /eventMedia/host-drafts/{userId}/{folder}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
     }
 
     match /users/{userId}/identity-documents/{fileName} {
@@ -100,4 +106,3 @@ service firebase.storage {
     }
   }
 }
-

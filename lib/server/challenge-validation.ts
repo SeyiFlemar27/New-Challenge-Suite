@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 
 export const serverChallengeCreateSchema = z.object({

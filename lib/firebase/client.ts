@@ -13,7 +13,14 @@ const firebaseConfig = {
 };
 
 export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+export const isFirebaseStorageConfigured = Boolean(isFirebaseConfigured && firebaseConfig.storageBucket);
 export const firebaseApp: FirebaseApp | null = isFirebaseConfigured ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig)) : null;
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;
 export const db = firebaseApp ? getFirestore(firebaseApp) : null;
-export const storage = firebaseApp ? getStorage(firebaseApp) : null;
+export const storage = firebaseApp && isFirebaseStorageConfigured ? getStorage(firebaseApp, `gs://${firebaseConfig.storageBucket}`) : null;
+export const firebaseClientConfigStatus = {
+  authConfigured: Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId),
+  firestoreConfigured: isFirebaseConfigured,
+  storageConfigured: isFirebaseStorageConfigured,
+  storageBucketEnvName: "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"
+};

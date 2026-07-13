@@ -11,6 +11,7 @@ import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass }
 import { fetchChallengeDetails, joinChallenge, submitEntry } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { storage } from "@/lib/firebase/client";
+import { appendUploadFileName, classifyStorageError, validateMediaFile } from "@/lib/media-upload";
 import { canJoinChallenge, getChallengeDisplayStatus } from "@/lib/challenge-status";
 
 export default function JoinChallengePage() {
@@ -75,28 +76,26 @@ export default function JoinChallengePage() {
       setError("Upload an accepted media file before submitting.");
       return;
     }
-    const mediaType = file.type.startsWith("video/") ? "video" : "image";
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      setError("INVALID_FILE_TYPE: Upload an image or video file.");
+    const mediaKind = currentChallenge.acceptedSubmissionTypes.length > 1 ? "media" : currentChallenge.acceptedSubmissionTypes[0] === "video" ? "video" : "image";
+    const validation = validateMediaFile(file, mediaKind);
+    if (!validation.ok) {
+      setError(validation.message);
       return;
     }
+    const mediaType = validation.mediaType;
     if (!currentChallenge.acceptedSubmissionTypes.includes(mediaType)) {
       setError(`This challenge accepts: ${currentChallenge.acceptedSubmissionTypes.join(", ")}.`);
-      return;
-    }
-    const maxBytes = mediaType === "video" ? 250 * 1024 * 1024 : 15 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      setError(`FILE_TOO_LARGE: ${mediaType === "video" ? "Video" : "Image"} uploads must be ${mediaType === "video" ? "250MB" : "15MB"} or smaller.`);
       return;
     }
 
     setSubmitting(true);
     try {
       let mediaUrl = "";
+      let mediaStoragePath = "";
       let pendingMedia = false;
       if (storage) {
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `submissions/${currentChallenge.id}/${auth.user.uid}/${Date.now()}-${safeName}`;
+        const path = appendUploadFileName(`challenges/${currentChallenge.id}/submissions/${auth.user.uid}`, file.name);
+        mediaStoragePath = path;
         const uploadRef = ref(storage, path);
         const uploadTask = uploadBytesResumable(uploadRef, file, { contentType: file.type, customMetadata: { originalName: file.name } });
         mediaUrl = await new Promise<string>((resolve, reject) => {
@@ -128,6 +127,7 @@ export default function JoinChallengePage() {
         mediaUploadPending: pendingMedia,
         originalFileName: file.name,
         fileSize: file.size,
+        mediaStoragePath,
         entryAgreementAccepted: true,
         rulesAccepted: true
       });
@@ -138,13 +138,8 @@ export default function JoinChallengePage() {
       setSubmitted(true);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Entry could not be submitted.";
-      const storageUnavailable = message === "STORAGE_UPLOAD_TIMEOUT"
-        || message.includes("storage/unauthorized")
-        || message.includes("storage/object-not-found")
-        || message.includes("bucket");
-      setError(storageUnavailable
-        ? "Media uploads are temporarily unavailable while secure storage is being verified. Your entry was not submitted."
-        : message);
+      const storageFailure = message === "STORAGE_UPLOAD_TIMEOUT" || /storage|bucket|processing failed|network|offline/i.test(message);
+      setError(storageFailure ? classifyStorageError(caught).message : message);
     } finally {
       setSubmitting(false);
     }
@@ -237,6 +232,4 @@ export default function JoinChallengePage() {
     </AppShell>
   );
 }
-
-
 
