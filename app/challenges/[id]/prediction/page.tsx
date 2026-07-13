@@ -43,9 +43,9 @@ export default function ChallengePredictionPage() {
     <AppShell>
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="p-5 sm:p-7 lg:p-9">
-          <PageTitle title="Prediction Arena" subtitle="A compliance-gated real-money prediction foundation for eligible U.S. users. Provider approval, KYC, age, region, terms, market approval, and admin review are required before live activity." icon={<DollarSign />} />
+          <PageTitle title="Prediction Arena" subtitle="Predictions are available only when verification, region, and provider approval allow them." icon={<DollarSign />} />
           {detailsQuery.data && !detailsQuery.data.ok ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-4 text-red-200">{detailsQuery.data.message}</p> : null}
-          {!providerActive ? <Card className="mt-6 border-yellow-500/30 bg-yellow-500/5 p-5 text-yellow-100"><ShieldCheck className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Real-money Prediction Arena is not active yet.</h2><p className="mt-2 text-sm leading-6">Payment provider approval is required. This market remains a gated foundation and does not move money, settle results, or create payouts.</p><p className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">Provider state: {String(feature?.predictionPaymentsProvider ?? "disabled").replaceAll("_", " ")}</p></Card> : null}
+          {!providerActive ? <Card className="mt-6 border-yellow-500/30 bg-yellow-500/5 p-5 text-yellow-100"><ShieldCheck className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Prediction Arena is not available yet.</h2><p className="mt-2 text-sm leading-6">Provider approval is required before predictions can open. This page does not move money or settle results.</p><p className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">Provider state: {String(feature?.predictionPaymentsProvider ?? "disabled").replaceAll("_", " ")}</p></Card> : null}
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Step 1</p><h2 className="mt-2 text-2xl font-black">Choose a participant</h2></div>
@@ -66,7 +66,7 @@ export default function ChallengePredictionPage() {
           {message ? <p className="mt-5 rounded-[8px] bg-yellow-500/10 p-4 text-sm text-yellow-100">{message}</p> : null}
           <div className="mt-7 flex flex-wrap gap-3"><Button onClick={submit} disabled={!participantId || stakeAmount < 1 || !providerActive}>Continue to Payment Review</Button><LinkButton href={`/challenges/${params.id}`} variant="secondary">Back to Challenge</LinkButton></div>
         </Card>
-        <Card className="h-fit p-6 sm:p-7"><h2 className="text-xl font-black">Eligibility gates</h2><div className="mt-5 space-y-3 text-sm text-slate-300">{["Feature flag enabled", "Payment provider approved", "KYC verified", "Age verified", "U.S. state eligibility supported", "Terms and risk notice accepted", "Admin market approval", "Prediction window open"].map((item) => <p key={item} className="rounded-[8px] bg-white/[0.04] p-3 font-bold">{item}</p>)}</div><p className="mt-5 text-xs leading-5 text-slate-500">Challenge Suite does not store raw ID images or face scans. Provider approval and compliance review are required before activation.</p></Card>
+        <Card className="h-fit p-6 sm:p-7"><h2 className="text-xl font-black">Eligibility gates</h2><div className="mt-5 space-y-3 text-sm text-slate-300">{["Feature enabled", "Payment provider approved", "KYC verified", "Age verified", "U.S. state eligibility supported", "Terms and risk notice accepted", "Market approval", "Prediction window open"].map((item) => <p key={item} className="rounded-[8px] bg-white/[0.04] p-3 font-bold">{item}</p>)}</div><p className="mt-5 text-xs leading-5 text-slate-500">Provider approval and compliance review are required before activation.</p></Card>
       </div>
     </AppShell>
   );

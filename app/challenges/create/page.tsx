@@ -14,7 +14,7 @@ import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
 import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
 
-const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Foundation", "Media", "Preview & Publish"];
+const steps = ["Basic Details", "Format & Rules", "Dates & Eligibility", "Prize Terms", "Media", "Preview & Publish"];
 
 function dateInput(daysFromNow: number) {
   const date = new Date();
@@ -341,7 +341,7 @@ function CreateChallengeWizard() {
       return;
     }
     if (draftOnlyFormat) {
-      setError("This advanced format is a foundation-only builder in the current version. Save it as a draft until its full workflow is activated.");
+      setError("This advanced format is not available yet. Save it as a draft until the full workflow is ready.");
       return;
     }
     if (!localPublishReadiness.valid) {
@@ -390,7 +390,7 @@ function CreateChallengeWizard() {
         <Card className="mx-auto mt-14 max-w-2xl p-8 text-center">
           <LockKeyhole className="mx-auto h-12 w-12 text-[var(--gold)]" />
           <h1 className="mt-5 text-3xl font-black">Use Brand Command Center</h1>
-          <p className="mt-3 text-slate-300">Sponsor accounts create and manage campaign foundations from the dedicated sponsor experience.</p>
+          <p className="mt-3 text-slate-300">Sponsor accounts create and manage campaigns from the dedicated sponsor experience.</p>
           <LinkButton href="/sponsor/dashboard" className="mt-6">Open Brand Command Center</LinkButton>
         </Card>
       </AppShell>
@@ -513,7 +513,7 @@ function StepFormat({ form, update, toggleSubmission, experience }: { form: any;
   const formats = ["Group Challenge", "Entry Competition"];
   if (experience.features.ranked_challenges) formats.push("Ranked Challenge");
   if (experience.features.host_control_center) formats.push("1 vs 1 Battle");
-  if (experience.features.programs) formats.push("Program Challenge (Draft Foundation)", "Campaign Challenge (Draft Foundation)");
+  if (experience.features.programs) formats.push("Program Challenge (Draft)", "Campaign Challenge (Draft)");
   const lockedFormats = [
     !experience.features.ranked_challenges ? "Ranked Challenge - Pro" : null,
     !experience.features.host_control_center ? "1 vs 1 Battle - Host" : null,
@@ -575,7 +575,7 @@ function StepDates({ form, update }: { form: any; update: any }) {
       </div>
       <Card className="mt-6 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Submission deadline must be on or before voting deadline. Voting deadline must be after start date and on or before end date.</Card>
       <div className="mt-6 grid gap-5 md:grid-cols-2"><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" /> Age restriction</label><Field label="Minimum Age"><input className={inputClass} type="number" placeholder="13" /></Field><Field label="Location Restrictions"><select className={inputClass}><option>No restriction</option><option>United States only</option><option>Nigeria only</option><option>Invite list only</option></select></Field><label className="flex items-start gap-3 font-bold"><input className="mt-1 shrink-0" type="checkbox" checked={form.isLiveEvent === "true"} onChange={(event) => update("isLiveEvent", event.target.checked ? "true" : "false")} /> Physical / live event</label></div>
-      {form.isLiveEvent === "true" ? <div className="mt-6 grid gap-5 rounded-[8px] border border-[var(--gold)]/20 p-4 md:grid-cols-2"><Field label="Venue Name"><input className={inputClass} value={form.venueName} onChange={(event) => update("venueName", event.target.value)} /></Field><Field label="Address"><input className={inputClass} value={form.eventAddress} onChange={(event) => update("eventAddress", event.target.value)} /></Field><Field label="City"><input className={inputClass} value={form.eventCity} onChange={(event) => update("eventCity", event.target.value)} /></Field><Field label="State / Region"><input className={inputClass} value={form.eventState} onChange={(event) => update("eventState", event.target.value)} /></Field><Field label="Country"><input className={inputClass} value={form.eventCountry} onChange={(event) => update("eventCountry", event.target.value)} /></Field><Field label="Capacity"><input className={inputClass} type="number" min="1" value={form.eventCapacity} onChange={(event) => update("eventCapacity", event.target.value)} /></Field><Field label="Map Link (optional)"><input className={inputClass} value={form.eventMapUrl} onChange={(event) => update("eventMapUrl", event.target.value)} placeholder="https://..." /></Field><Card className="p-4 text-sm text-slate-300">Live-event sync remains hidden until platform approval. Event reminders are saved for a future notification worker.</Card></div> : null}
+      {form.isLiveEvent === "true" ? <div className="mt-6 grid gap-5 rounded-[8px] border border-[var(--gold)]/20 p-4 md:grid-cols-2"><Field label="Venue Name"><input className={inputClass} value={form.venueName} onChange={(event) => update("venueName", event.target.value)} /></Field><Field label="Address"><input className={inputClass} value={form.eventAddress} onChange={(event) => update("eventAddress", event.target.value)} /></Field><Field label="City"><input className={inputClass} value={form.eventCity} onChange={(event) => update("eventCity", event.target.value)} /></Field><Field label="State / Region"><input className={inputClass} value={form.eventState} onChange={(event) => update("eventState", event.target.value)} /></Field><Field label="Country"><input className={inputClass} value={form.eventCountry} onChange={(event) => update("eventCountry", event.target.value)} /></Field><Field label="Capacity"><input className={inputClass} type="number" min="1" value={form.eventCapacity} onChange={(event) => update("eventCapacity", event.target.value)} /></Field><Field label="Map Link (optional)"><input className={inputClass} value={form.eventMapUrl} onChange={(event) => update("eventMapUrl", event.target.value)} placeholder="https://..." /></Field><Card className="p-4 text-sm text-slate-300">Live-event sync is hidden until platform approval. Event reminders are not available yet.</Card></div> : null}
     </section>
   );
 }
@@ -584,7 +584,7 @@ function StepPrize({ form, update, braggingRights, normalized, setAllocations, p
   const sponsorEnabled = form.sponsorEnabled === "true";
   return (
     <section>
-      <h2 className="text-xl font-black sm:text-2xl">Step 4: Prize Foundation</h2>
+      <h2 className="text-xl font-black sm:text-2xl">Step 4: Prize Terms</h2>
       <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /> Paid-entry prize pools, cash payouts, automatic refunds, and sponsor money release are locked. Challenges are created as non-monetized or sponsor-ready metadata only.</Card>
       {!planAccess.canCreatePrizeChallenges ? <Card className="mt-4 border-dashed p-4 text-sm text-[#8fa6ca]">Free accounts can publish up to three lifetime basic public non-monetized challenges. Creator Plan or higher is required for sponsor-enabled, private, prize, or advanced settings.</Card> : null}
       <div className="mt-6 grid gap-6 md:grid-cols-2"><Field label="Prize Type"><select className={inputClass} value={form.prizeType} onChange={(event) => update("prizeType", event.target.value)}><option value="bragging_rights">Bragging Rights</option><option value="physical_product" disabled={!planAccess.canCreatePrizeChallenges}>Physical Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="digital_product" disabled={!planAccess.canCreatePrizeChallenges}>Digital Product {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option><option value="money" disabled={!planAccess.canCreatePrizeChallenges}>Money (Review Only) {!planAccess.canCreatePrizeChallenges ? "(Creator plan+)" : ""}</option></select></Field><Card className="p-4 text-slate-300">Money and physical-product prizes require platform review. Entry fees, cash payout execution, and prize release remain inactive.</Card></div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -208,8 +208,8 @@ export default function JoinChallengePage() {
           <p className="mt-5 break-words text-slate-300">{currentChallenge.description}</p>
           <div className="mt-6 space-y-3 text-slate-200">
             <p><b>Deadline:</b> {currentChallenge.registrationDeadline}</p>
-            <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review. Prize pool release is not active yet."}</p>
-            <p><b>Entry fee:</b> Paid-entry prize pools are not active yet.</p>
+            <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review. Prize release is not available yet."}</p>
+            <p><b>Entry fee:</b> Paid-entry prize pools are not available yet.</p>
           </div>
           <h2 className="mt-8 text-xl font-black">Rules</h2>
           {currentChallenge.rules.length ? currentChallenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-sm text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-sm text-slate-300">Rules have not been published for this challenge yet.</p>}
@@ -224,7 +224,7 @@ export default function JoinChallengePage() {
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
             <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={`${inputClass} file:mr-3 file:rounded-[6px] file:border-0 file:bg-[var(--gold)] file:px-3 file:py-2 file:text-sm file:font-black file:text-black`} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required onChange={(event) => { const file = event.target.files?.[0]; if (selectedMediaPreview) URL.revokeObjectURL(selectedMediaPreview); setSelectedMediaPreview(file ? URL.createObjectURL(file) : ""); setSelectedMediaType(file?.type.startsWith("video/") ? "video" : file ? "image" : ""); setUploadProgress(0); }} /></Field>{selectedMediaPreview ? <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">{selectedMediaType === "video" ? <video src={selectedMediaPreview} controls className="max-h-72 w-full object-cover" /> : <img src={selectedMediaPreview} alt="Submission preview" className="max-h-72 w-full object-cover" />}</div> : null}{submitting && uploadProgress > 0 ? <div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)] transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-2 text-xs font-bold text-slate-400">Uploading media {uploadProgress}%</p></div> : null}
-            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize foundation terms. Paid-entry prize pools and payouts are not active yet.</span></label>
+            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. Paid-entry prize pools and payouts are not available yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
           </form>

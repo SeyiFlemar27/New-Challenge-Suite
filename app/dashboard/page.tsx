@@ -1,13 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Activity, Award, BarChart3, Crown, Diamond, Flame, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, Users, UsersRound, Vote } from "lucide-react";
+import { TrendingStories } from "@/components/stories/trending-stories";
+import { Activity, Award, BarChart3, Crown, Diamond, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
@@ -162,7 +162,7 @@ export default function DashboardPage() {
           ]
         : [
             { icon: <Swords />, title: planExperience.planId === "enterprise" ? "Active Programs" : "Active Competitions", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
-            { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit, label: "Foundation seats" },
+            { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit, label: "Team seats" },
             { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational access" }
           ];
 
@@ -214,18 +214,7 @@ export default function DashboardPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
-      <Card className="mt-8 p-6 md:p-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="flex items-center gap-2 text-2xl font-black text-[var(--gold-2)]"><Flame /> Trending Challenges</h2>
-            <p className="mt-1 text-slate-300">Challenges gaining the most participation right now.</p>
-          </div>
-          <LinkButton href="/challenges" variant="secondary">View Challenges</LinkButton>
-        </div>
-        <div className="scrollbar-dark mt-6 flex gap-5 overflow-x-auto pb-2">
-          {trendingChallenges.length ? trendingChallenges.map((challenge) => <Link key={challenge.id} href={`/challenges/${challenge.id}`} className="w-60 shrink-0 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-[var(--gold)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]"><div className="h-32 rounded-[8px] bg-cover bg-center" style={{ backgroundImage: `url(${challenge.imageUrl})` }} /><div className="mt-3 line-clamp-2 text-sm font-black">{challenge.title}</div><div className="mt-2 text-xs text-slate-400"><Users size={12} className="inline text-[var(--gold)]" /> {challenge.participants} participants</div></Link>) : <p className="text-sm font-bold text-slate-300">No trending challenges yet.</p>}
-        </div>
-      </Card>
+      <TrendingStories challenges={trendingChallenges} source="dashboard" errorMessage={errorMessage ?? ""} />
       {planExperience.planId !== "creator" ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
         <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
@@ -243,7 +232,8 @@ export default function DashboardPage() {
         {tierFeatures.map((feature) => (
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
-      </div>      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
+      </div>
+      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
         <Card className="p-6 md:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
@@ -272,7 +262,8 @@ export default function DashboardPage() {
             <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
           </Card>
         </div>
-      </div>    </AppShell>
+      </div>
+    </AppShell>
   );
 }
 

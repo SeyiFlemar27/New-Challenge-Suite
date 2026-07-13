@@ -251,7 +251,7 @@ export default function CustomizationSettingsPage() {
                     <input className={inputClass} type="file" disabled />
                   </Field>
                 </div>
-                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUsePremiumCustomization ? "Taglines are saved safely with a 120 character limit. Logo upload is a backend-ready placeholder." : "Profile tagline unlocks with Premium."}</p>
+                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUsePremiumCustomization ? "Taglines are saved safely with a 120 character limit. Logo upload is not available yet." : "Profile tagline unlocks with Premium."}</p>
               </Card>
             ) : null}
 
@@ -266,7 +266,7 @@ export default function CustomizationSettingsPage() {
                     <input className={inputClass} type="file" disabled />
                   </Field>
                 </div>
-                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUseVerifiedHostBranding ? "Upload controls are placeholders until the storage workflow is connected." : "Official host branding requires Verified Host approval."}</p>
+                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUseVerifiedHostBranding ? "Upload controls are not available yet." : "Official host branding requires Verified Host approval."}</p>
               </Card>
             ) : null}
           </div>
@@ -367,7 +367,7 @@ function ProfilePreview({ customization, access }: { customization: ProfileCusto
       <div className="flex items-center gap-4">
         <div className={cn("flex h-20 w-20 items-center justify-center rounded-full border-4 bg-indigo-500 text-2xl font-black", ring)}>CS</div>
         <div className="min-w-0">
-          <div className="text-xl font-black">Demo Member</div>
+          <div className="text-xl font-black">Sample Member</div>
           <div className="mt-1 text-sm text-[#8fa6ca]">{customization.profileTagline || access.planName}</div>
           <div className="mt-3"><PremiumBadge planId={access.planId} badgeStyleId={customization.profileBadgeId} compact /></div>
         </div>

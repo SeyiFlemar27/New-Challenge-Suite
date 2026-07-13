@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -63,7 +63,7 @@ export default function ChallengeWatchPage() {
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
           <Card className="overflow-hidden">
             <div className="flex min-h-[320px] items-center justify-center bg-[#090909] p-8 text-center sm:min-h-[440px]">
-              <div><PlayCircle className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">{lifecycle.canWatchLive ? "Live stream is active" : lifecycle.livestreamStatus === "livestream_scheduled" ? "Live stream is scheduled" : "Live stream is not active yet"}</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">{lifecycle.canWatchLive ? "The configured live stream is available from this room." : "You can follow submissions, voting, leaderboard updates, and winner announcements here."}</p></div>
+              <div><PlayCircle className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">{lifecycle.canWatchLive ? "Live stream is active" : lifecycle.livestreamStatus === "livestream_scheduled" ? "Live stream is scheduled" : "Live stream is not available yet"}</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">{lifecycle.canWatchLive ? "The configured live stream is available from this room." : "You can follow submissions, voting, leaderboard updates, and winner announcements here."}</p></div>
             </div>
             <div className="grid gap-px bg-white/10 sm:grid-cols-4">{[[status, "Status"], [countdown, "Timeline"], [String(challenge.participants), "Participants"], [String(interestedCount), "Interested"]].map(([value, label]) => <div key={label} className="bg-[#121212] p-5"><p className="break-words text-lg font-black text-[var(--gold)]">{value}</p><p className="mt-1 text-xs uppercase text-slate-500">{label}</p></div>)}</div>
           </Card>

@@ -14,7 +14,7 @@ const unlockedTools = [
   "Create Challenge",
   "My Challenges",
   "Submission review",
-  "Creator analytics foundation",
+  "Creator analytics tools",
   "Monthly boosts",
   "Wallet and earnings review"
 ];
@@ -57,7 +57,7 @@ export default function CreatorOnboardingPage() {
       {step === 1 ? <div className="grid gap-4 sm:grid-cols-2">
         <AccessCard icon={<Swords />} title="Challenge creation" body="Create public and eligible private challenges within Creator Plan limits." />
         <AccessCard icon={<Compass />} title="Community participation" body="Keep exploring, joining, voting, saving, and tracking your own entries." />
-        <AccessCard icon={<BarChart3 />} title="Creator performance" body="Review submissions and creator analytics foundations from your studio." />
+        <AccessCard icon={<BarChart3 />} title="Creator performance" body="Review submissions and creator analytics from your studio." />
         <AccessCard icon={<Rocket />} title="Monthly boost" body="Use your included monthly boost on an eligible challenge." />
         <Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:col-span-2"><div className="flex items-start gap-3"><WalletCards className="mt-0.5 shrink-0 text-[var(--gold)]" /><p className="text-sm leading-6 text-slate-300">Wallet and earnings remain review-only. Withdrawals and payouts are not active.</p></div></Card>
       </div> : null}

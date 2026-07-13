@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -219,7 +219,7 @@ export default function PurchaseVotesPage() {
               <LinkButton href="/wallet" variant="secondary" className="w-full">Buy DoroCoins</LinkButton>
               <Button variant="secondary" className="w-full" disabled title="A verified Google Ad Manager rewarded-ad callback is required before bonus votes can be granted"><PlayCircle size={18} /> Ads for votes are not available yet</Button>
             </div>
-            <p className="mt-3 text-sm text-slate-400">Ads for votes are not available yet. A future verified provider callback may grant one limited vote credit after completed ad verification; this page does not grant votes from a client-only button.</p>
+            <p className="mt-3 text-sm text-slate-400">Ads for votes are not available yet. Bonus votes require verified ad completion.</p>
           </>
         )}
       </Card>

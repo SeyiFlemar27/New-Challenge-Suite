@@ -170,7 +170,7 @@ export default function SponsorChallengePage() {
           <div className="mt-8">
             <h2 className="text-xl font-black sm:text-2xl">Review Sponsorship</h2>
             <p className="mt-3 text-slate-300">Confirm the proposed collaboration terms. The creator must also approve before platform review. Money capture/release is inactive and no investment return is promised.</p>
-            {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsor proposal with ${proposal.prizePoolContribution.toLocaleString()} contribution request. Money capture/release is not active yet.</p></div> : null}
+            {proposal ? <div className="mt-6 rounded-[8px] bg-black/40 p-4 text-sm text-slate-300"><b className="text-white">{proposal.sponsorName}</b><p className="mt-2">${proposal.amount.toLocaleString()} sponsor proposal with ${proposal.prizePoolContribution.toLocaleString()} contribution request. Money capture and release are not available yet.</p></div> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <div className="mt-6 grid gap-3 sm:flex sm:justify-end">
               <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setReview(false)}>Back</Button>
