@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
+import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError, conflict, serverError } from "@/lib/server/responses";
 import {
@@ -41,7 +42,11 @@ export async function POST(request: Request) {
   const challengeSnap = await db.collection("challenges").doc(body.challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
-  const access = canAccessChallenge(profile, challenge);
+  const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
+  if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
+    return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
+  }
+  const access = canAccessChallenge(profile, accessContext.challenge);
   if (!access.allowed) {
     return fail("Your current plan does not allow access to this challenge.", 403, undefined, access.code ?? "CHALLENGE_ACCESS_DENIED");
   }

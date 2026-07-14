@@ -4,6 +4,7 @@ import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { writeAuditLog } from "@/lib/server/audit";
+import { isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
 import {
   isChallengeJoinable,
   isSponsorProfile,
@@ -39,13 +40,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     result = await db.runTransaction(async (transaction) => {
       const challengeRef = db.collection("challenges").doc(id);
       const participantRef = db.collection("challengeParticipants").doc(`${id}_${user.uid}`);
-      const [challengeSnap, participantSnap] = await Promise.all([
+      const accessRef = db.collection("privateChallengeAccess").doc(`${id}_${user.uid}`);
+      const [challengeSnap, participantSnap, accessSnap] = await Promise.all([
         transaction.get(challengeRef),
-        transaction.get(participantRef)
+        transaction.get(participantRef),
+        transaction.get(accessRef)
       ]);
       if (!challengeSnap.exists) throw new Error("Challenge not found.");
       const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
-      const access = canAccessChallenge(planProfile, challenge);
+      const privateOnly = isPrivateChallengeRecord(challenge);
+      const isOwner = userOwnsChallenge(challenge, user.uid);
+      const hasAccessGrant = isOwner || (accessSnap.exists && accessSnap.data()?.status === "approved");
+      if (privateOnly && !hasAccessGrant) throw new Error("PRIVATE_INVITE_REQUIRED");
+      const accessChallenge = privateOnly && hasAccessGrant ? { ...challenge, visibility: "public" } : challenge;
+      const access = canAccessChallenge(planProfile, accessChallenge);
       if (!access.allowed) throw new Error(access.code ?? "PREMIUM_REQUIRED");
       const joinable = isChallengeJoinable(challenge);
       if (!joinable.allowed) throw new Error(joinable.reason ?? "Registration is closed for this challenge.");
@@ -90,6 +98,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const message = error instanceof Error ? error.message : "Challenge could not be joined.";
     if (message === "PREMIUM_REQUIRED") return fail("Premium membership is required to join this challenge.", 403, undefined, "PREMIUM_REQUIRED");
     if (message === "CREATOR_PRO_REQUIRED") return fail("Creator Pro is required to join this private or exclusive challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
+    if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "CHALLENGE_JOIN_REJECTED");
   }
 

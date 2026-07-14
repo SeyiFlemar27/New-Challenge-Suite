@@ -2,10 +2,11 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { castVote } from "@/lib/server/voting";
-import { getUserPlanAccess } from "@/lib/plan-access";
+import { canAccessChallenge, getUserPlanAccess } from "@/lib/plan-access";
 import { voteRequestSchema, zodFieldErrors } from "@/lib/server/vote-validation";
 import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-signals";
 import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
+import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -28,6 +29,25 @@ export async function POST(request: Request) {
     ]);
     const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
     const planAccess = getUserPlanAccess(profile);
+    const challengeSnap = await db.collection("challenges").doc(body.challengeId).get();
+    if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+
+    const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
+    if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
+      return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
+    }
+
+    const challengeAccess = canAccessChallenge(profile, accessContext.challenge);
+    if (!challengeAccess.allowed) {
+      return fail(
+        challengeAccess.code === "PREMIUM_REQUIRED" ? "Premium membership is required to vote on this challenge." : "Plan access is required for this challenge.",
+        403,
+        undefined,
+        challengeAccess.code ?? "CHALLENGE_ACCESS_DENIED"
+      );
+    }
+
     const signalHashes = voteSignalHashes(request);
     const signals = suspiciousVoteSignals({ quantity: body.quantity, voteMode: body.voteMode });
     const result = await castVote(db, {
