@@ -74,7 +74,7 @@ export function TrendingStories({ challenges, source = "explore", isLoading = fa
   }
 
   if (!stories.length) {
-    return dashboardMode ? <StoryShell><Card className="mt-4 border-dashed p-5 text-sm text-slate-300"><p className="font-black text-white">No trending challenges yet.</p><p className="mt-1">Challenges gaining activity will appear here.</p></Card></StoryShell> : null;
+    return dashboardMode ? <StoryShell><Card className="mt-4 border-dashed p-5 text-sm text-slate-300"><p className="font-black text-white">No trending challenges yet</p><p className="mt-1">Challenges gaining activity will appear here once the community starts participating.</p></Card></StoryShell> : null;
   }
 
   return (

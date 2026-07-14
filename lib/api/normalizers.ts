@@ -3,12 +3,11 @@ import type { Challenge, Submission, SubmissionType, UserPlanId } from "@/lib/ty
 
 export type ChallengeApiRecord = Omit<Partial<Challenge>, "type"> & {
   participantCount?: number;
+  coverImageUrl?: string;
   promoImageUrl?: string;
   trailerVideoUrl?: string;
   type?: Challenge["type"] | "public" | "private";
 };
-
-const fallbackImageUrl = "https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=1400&q=80";
 
 function toDateInput(value: unknown) {
   if (typeof value !== "string" || !value) return new Date().toISOString().slice(0, 10);
@@ -23,7 +22,7 @@ export function normalizeChallenge(record: ChallengeApiRecord): Challenge {
     description: record.description ?? "",
     category: record.category ?? "General",
     customCategory: record.customCategory,
-    imageUrl: record.imageUrl ?? record.promoImageUrl ?? fallbackImageUrl,
+    imageUrl: record.imageUrl ?? record.coverImageUrl ?? record.promoImageUrl ?? "",
     trailerUrl: record.trailerUrl ?? record.trailerVideoUrl,
     type: record.type === "Private / Exclusive" || record.type === "private" ? "Private / Exclusive" : "Normal Challenge",
     competitionFormat: record.competitionFormat ?? "Entry Competition",

@@ -49,7 +49,7 @@ export default function ChallengesPage() {
       ) : challenges.length ? (
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge as any} />)}</div>
       ) : (
-        <EmptyState icon={<Trophy />} title="No challenges yet" body="Published challenges will appear here once they are created." action={canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : undefined} />
+        <EmptyState icon={<Trophy />} title="No public challenges yet" body="Be the first to create a challenge and start the competition." action={<div className="flex flex-col gap-3 sm:flex-row">{canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : null}<LinkButton href="/my-challenges" variant="secondary">View My Challenges</LinkButton></div>} />
       )}
     </AppShell>
   );

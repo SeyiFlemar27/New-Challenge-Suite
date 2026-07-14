@@ -140,7 +140,8 @@ function shortPrizeName(name: string) {
 
 function normalizeVisualPrizes(tier: RewardTier, configured: RewardPrize[]) {
   const active = configured.filter((prize) => String(prize.status ?? "active").toLowerCase() !== "disabled");
-  const source = active.length ? active : tierConfig[tier].fallback;
+  const source = active.length ? active : [];
+  if (!source.length) return [];
   const merged = [...source];
   for (const fallback of tierConfig[tier].fallback) {
     if (merged.length >= 5) break;
@@ -210,7 +211,7 @@ function getAvailability(data: SummaryData | null, tier: RewardTier, prizes: Rew
   if (data.settings?.tierEnabled?.[tier] === false) return { state: "locked", message: `${config.label} is unavailable.` };
   if (points < config.threshold) return { state: "locked", message: `${config.threshold.toLocaleString()} points required.` };
   if (points < config.cost) return { state: "no_points", message: `${config.cost.toLocaleString()} points needed to spin.` };
-  if (!prizes.length && !tierConfig[tier].fallback.length) return { state: "no_prizes", message: "No prizes configured." };
+  if (!prizes.length) return { state: "no_prizes", message: "Reward Wheel Setup Required" };
   if (credits <= 0) return { state: "no_credits", message: `No ${config.label} spins available.` };
   return { state: "active", message: "Ready to spin." };
 }
@@ -369,8 +370,9 @@ export default function RewardWheelPage() {
 
       {loading ? <LoadingWheelState /> : null}
       {!loading && availability.state === "setup_required" ? <WheelUnavailableState /> : null}
+      {!loading && availability.state === "no_prizes" ? <WheelUnavailableState /> : null}
 
-      {!loading && availability.state !== "setup_required" ? (
+      {!loading && !["setup_required", "no_prizes"].includes(availability.state) ? (
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <Card className="overflow-hidden border-white/10 bg-[#10100f] p-5 sm:p-7 lg:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

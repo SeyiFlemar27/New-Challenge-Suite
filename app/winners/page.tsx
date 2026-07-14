@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { WinnerCard } from "@/components/domain-cards";
-import { Button, Card, PageTitle } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchWinners } from "@/lib/api/services";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { Search } from "lucide-react";
+import { Search, Trophy } from "lucide-react";
 
 type WinnerRecord = SubmissionApiRecord & {
   challenge?: unknown;
@@ -77,7 +77,7 @@ export default function WinnersPage() {
       ) : visibleWinners.length ? (
         <div className="mt-8 grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{visibleWinners.map((winner) => <WinnerCard key={winner.id} submission={winner} />)}</div>
       ) : (
-        <Card className="mt-8 p-5 text-slate-300 sm:p-8">No winners have been recorded yet.</Card>
+        <Card className="mt-8"><EmptyState icon={<Trophy />} title="No winners announced yet" body="Winners will appear here once challenges are completed and results are confirmed." action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
       )}
     </AppShell>
   );

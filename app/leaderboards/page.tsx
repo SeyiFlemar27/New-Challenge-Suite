@@ -72,7 +72,7 @@ export default function LeaderboardsPage() {
       ) : errorMessage ? (
         <Card className="mt-8"><EmptyState icon={<Trophy />} title="Leaderboard unavailable" body={errorMessage} action={<Button onClick={() => window.location.reload()}>Retry</Button>} /></Card>
       ) : leaderboardMessage && !rows.length ? (
-        <Card className="mt-8"><EmptyState icon={<Trophy />} title="Leaderboard not public yet" body={leaderboardMessage} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
+        <Card className="mt-8"><EmptyState icon={<Trophy />} title="No rankings yet" body={board === "challenge" ? leaderboardMessage : "Rankings will appear once eligible challenge activity begins."} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
       ) : rows.length ? (
         <>
           <div className="mt-8 grid items-end gap-5 lg:grid-cols-[.85fr_1.15fr_.85fr]">
@@ -111,7 +111,7 @@ export default function LeaderboardsPage() {
           </Card>
         </>
       ) : (
-        <Card className="mt-8"><EmptyState icon={<Trophy />} title="No leaderboard entries yet" body="Rankings will appear once users submit, vote, win, and earn points." action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
+        <Card className="mt-8"><EmptyState icon={<Trophy />} title="No rankings yet" body="Rankings will appear once eligible challenge activity begins." action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card>
       )}
     </AppShell>
   );

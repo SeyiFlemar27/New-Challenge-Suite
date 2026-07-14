@@ -4,7 +4,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
-import { Card, LinkButton, PageTitle } from "@/components/ui";
+import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
 import { TrendingStories } from "@/components/stories/trending-stories";
 import { Activity, Award, BarChart3, Crown, Diamond, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, UsersRound, Vote } from "lucide-react";
@@ -243,7 +243,7 @@ export default function DashboardPage() {
           {challenges.length ? (
             <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
           ) : (
-            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? <div><h3 className="text-xl font-black text-white">No challenges created yet</h3><p className="mt-2 text-sm text-slate-300">Create your first challenge to start receiving entries.</p><LinkButton href="/challenges/create" className="mt-5">Create Challenge</LinkButton></div> : "No current challenges are available yet."}</Card>
+            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? <div><h3 className="text-xl font-black text-white">No challenges created yet</h3><p className="mt-2 text-sm text-slate-300">Create your first challenge to start receiving entries.</p><LinkButton href="/challenges/create" className="mt-5">Create Challenge</LinkButton></div> : <EmptyState icon={<Swords />} title="No current challenges yet" body="Public challenges will appear here once they are created." action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} />}</Card>
           )}
         </Card>
         <div className="space-y-8">

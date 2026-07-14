@@ -1,5 +1,6 @@
 ﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { ok, serverUnavailable } from "@/lib/server/responses";
+import { isPublicChallenge, isPublicSubmission } from "@/lib/server/public-challenge";
 
 type WinnerResult = Record<string, unknown>;
 
@@ -12,6 +13,7 @@ async function enrichWinner(db: NonNullable<ReturnType<typeof getAdminDb>>, subm
   ]);
 
   const challenge: Record<string, unknown> | null = challengeSnap?.exists ? { id: challengeSnap.id, ...challengeSnap.data() } : null;
+  if (!challenge || !isPublicChallenge(challengeId, challenge) || !isPublicSubmission(String(submission.id ?? ""), submission)) return null;
   const profile = profileSnap?.exists ? profileSnap.data() : {};
 
   return {
@@ -24,9 +26,9 @@ async function enrichWinner(db: NonNullable<ReturnType<typeof getAdminDb>>, subm
     challengeEndsAt: challenge?.endsAt ?? null,
     prizeType: challenge?.prizeType ?? null,
     prizePool: null,
-    prizeDisplayStatus: "foundation_only",
-    payoutStatus: String(submission.payoutStatus ?? "not_active"),
-    fundingReleaseStatus: "not_active",
+    prizeDisplayStatus: "review_unavailable",
+    payoutStatus: String(submission.payoutStatus ?? "not_applicable"),
+    fundingReleaseStatus: "not_applicable",
     cashPayoutsEnabled: false,
     userName: submission.userName ?? profile?.displayName ?? "Participant",
     userInitials: submission.userInitials ?? profile?.initials ?? "??",
@@ -47,13 +49,13 @@ export async function GET() {
       const submission = submissionSnap?.exists ? { id: submissionSnap.id, ...submissionSnap.data(), ...winner } : winner;
       return enrichWinner(db, submission, Number(winner.rank ?? 1));
     }));
-    return ok({ winners: submissions }, "Winners loaded.");
+    return ok({ winners: submissions.filter(Boolean) }, "Winners loaded.");
   }
 
   const explicitWinners = await db.collection("submissions").where("isWinner", "==", true).limit(24).get();
   if (!explicitWinners.empty) {
     const winners = await Promise.all(explicitWinners.docs.map((doc, index) => enrichWinner(db, { id: doc.id, ...doc.data() }, index + 1)));
-    return ok({ winners }, "Winners loaded.");
+    return ok({ winners: winners.filter(Boolean) }, "Winners loaded.");
   }
 
   const completedChallenges = await db.collection("challenges").where("status", "==", "completed").limit(24).get();

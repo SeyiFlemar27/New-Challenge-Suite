@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 
 function toMillis(value: unknown) {
   if (typeof value === "string") return Date.parse(value) || 0;
@@ -25,7 +25,12 @@ export async function GET(request: Request) {
     const challengeSnaps = challengeIds.length
       ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id)))
       : [];
-    const challenges = new Map(challengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...publicChallengeFields(snap.data() ?? {}) }]));
+    const challenges = new Map(challengeSnaps.flatMap((snap) => {
+      if (!snap.exists) return [];
+      const data = snap.data() ?? {};
+      if (!isPublicChallenge(snap.id, data)) return [];
+      return [[snap.id, { id: snap.id, ...publicChallengeFields(data) }]];
+    }));
     const items = engagements
       .map((engagement) => {
         const challenge = challenges.get(String(engagement.challengeId ?? ""));

@@ -1,13 +1,29 @@
-﻿"use client";
+"use client";
 
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarDays, Target, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
-import { Target } from "lucide-react";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { fetchDashboard } from "@/lib/api/services";
+import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
+import { getChallengeDisplayStatus } from "@/lib/challenge-status";
+
+type ChallengeRow = ReturnType<typeof normalizeChallenge> & Record<string, unknown>;
 
 export default function MyChallengesPage() {
   const { loading } = useCurrentUser();
-  if (loading) {
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard", "my-challenges"], queryFn: fetchDashboard, staleTime: 30_000 });
+  const challenges = useMemo<ChallengeRow[]>(() => {
+    if (!data?.ok) return [];
+    return ((data.data?.hostedChallenges ?? []) as ChallengeApiRecord[])
+      .map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item) }))
+      .filter((item) => item.id);
+  }, [data]);
+  const errorMessage = !isLoading && data && !data.ok ? data.message : null;
+
+  if (loading || isLoading) {
     return <AppShell><div className="mx-auto max-w-6xl"><div className="h-12 w-80 max-w-full animate-pulse rounded bg-white/10" /><div className="mt-8 space-y-4">{[0, 1, 2].map((item) => <Card key={item} className="h-36 animate-pulse bg-[#151515]" />)}</div></div></AppShell>;
   }
 
@@ -22,10 +38,47 @@ export default function MyChallengesPage() {
           </div>
         </div>
 
-        <Card className="mt-8 overflow-hidden p-0">
-          <EmptyState icon={<Target className="text-[var(--gold)]" />} title="No challenges created yet" body="Create your first challenge to start receiving entries." action={<LinkButton href="/challenges/create">Create Challenge</LinkButton>} />
-        </Card>
+        {errorMessage ? <Card className="mt-8 p-6"><h2 className="text-xl font-black text-[var(--gold-2)]">My Challenges could not load</h2><p className="mt-2 text-slate-300">{errorMessage}</p></Card> : null}
+
+        {!errorMessage && challenges.length ? <div className="mt-8 space-y-4">{challenges.map((challenge) => <MyChallengeRow key={challenge.id} challenge={challenge} />)}</div> : null}
+
+        {!errorMessage && !challenges.length ? <Card className="mt-8 overflow-hidden p-0">
+          <EmptyState icon={<Target className="text-[var(--gold)]" />} title="No challenges created yet" body="Create your first public challenge and start collecting entries." action={<LinkButton href="/challenges/create">Create Challenge</LinkButton>} />
+        </Card> : null}
       </div>
     </AppShell>
+  );
+}
+
+function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
+  const status = getChallengeDisplayStatus(challenge);
+  const imageUrl = String(challenge.imageUrl ?? "");
+  const actionHref = `/challenges/${challenge.id}`;
+  const actionLabel = status === "Completed" ? "View Results" : status === "Draft" ? "Continue Editing" : "View Challenge";
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)]">
+        <a href={actionHref} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
+          <div className="aspect-[16/10] h-full min-h-40 bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827]">
+            {imageUrl ? <img src={imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite</div>}
+          </div>
+        </a>
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{status}</p>
+              <a href={actionHref} className="mt-2 block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]"><h2 className="break-words text-xl font-black sm:text-2xl">{challenge.title}</h2></a>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">{challenge.description || "Challenge details will appear here as you complete the setup."}</p>
+            </div>
+            <LinkButton href={actionHref} className="shrink-0">{actionLabel}</LinkButton>
+          </div>
+          <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
+            <span className="flex items-center gap-2"><Users size={16} className="text-[var(--gold)]" /> {Number(challenge.participants ?? challenge.participantCount ?? 0)} participants</span>
+            <span className="flex items-center gap-2"><CalendarDays size={16} className="text-[var(--gold)]" /> {String(challenge.endsAt ?? "Date not set")}</span>
+            <span>{String(challenge.category ?? "General")}</span>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
