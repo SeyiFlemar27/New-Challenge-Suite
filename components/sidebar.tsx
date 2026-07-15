@@ -43,7 +43,7 @@ type NavSection = { label: string; items: NavItem[] };
 const competitorSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
     { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
@@ -65,7 +65,7 @@ const competitorSections: NavSection[] = [
 const starterSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
     { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
@@ -89,7 +89,7 @@ const starterSections: NavSection[] = [
 const creatorSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
-    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
     { href: "/wallet", label: "Wallet", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
@@ -120,7 +120,7 @@ const creatorSections: NavSection[] = [
 const hostSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard/host", label: "Host Control Center", icon: Home },
-    { href: "/feed", label: "Explore", icon: LayoutGrid },
+    { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
     { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
     { href: "/wallet", label: "Wallet & Revenue", icon: Coins },
@@ -216,7 +216,7 @@ export function Sidebar() {
         ]
       : [
           { href: "/dashboard", label: "Home", icon: Home },
-          { href: "/feed", label: "Explore", icon: LayoutGrid },
+          { href: "/explore", label: "Explore", icon: LayoutGrid },
           { href: "/challenges/create", label: "Create", icon: PlusSquare },
           { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
@@ -326,6 +326,7 @@ function WorkspaceNavigationLoading() {
 function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
   return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }
+
 
 
 

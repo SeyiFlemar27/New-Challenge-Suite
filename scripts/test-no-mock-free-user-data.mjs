@@ -39,5 +39,23 @@ assert.ok(winnersApi.includes("isPublicSubmission"), "winners API should filter 
 const engagementsApi = readFileSync(join(root, "app/api/engagements/route.ts"), "utf8");
 assert.ok(engagementsApi.includes("isPublicChallenge"), "saved challenges API should filter inaccessible/demo challenges");
 
+const dashboardApi = readFileSync(join(root, "app/api/dashboard/route.ts"), "utf8");
+assert.equal(dashboardApi.includes('db.collection("challenges").orderBy("createdAt"'), false, "dashboard API must not load a public challenge feed as personal challenges");
+assert.ok(dashboardApi.includes('db.collection("challengeParticipants").where("userId", "==", user.uid)'), "dashboard API should load joined challenges through user participant records");
+assert.ok(dashboardApi.includes('leaderboard: []'), "dashboard API should not return global leaderboard rows as dashboard performers");
+
+const dashboardPage = readFileSync(join(root, "app/dashboard/page.tsx"), "utf8");
+assert.equal(dashboardPage.includes("TrendingStories"), false, "dashboard home must not render trending discovery stories");
+assert.equal(dashboardPage.includes("Top Performers"), false, "dashboard home must not render global top performers as personal data");
+assert.ok(dashboardPage.includes("No active challenges yet"), "dashboard home should show a personal empty state for brand-new users");
+
+const explorePage = readFileSync(join(root, "app/explore/page.tsx"), "utf8");
+assert.ok(explorePage.includes("TrendingStories"), "explore page should own trending discovery stories");
+assert.ok(explorePage.includes('source="explore"'), "explore stories should use the explore source");
+
+const sidebar = readFileSync(join(root, "components/sidebar.tsx"), "utf8");
+assert.ok(sidebar.includes('href: "/explore", label: "Explore"'), "sidebar Explore should route to /explore");
+assert.equal(sidebar.includes('href: "/feed", label: "Explore"'), false, "sidebar Explore should not route to /feed");
+
 await rm(tempDir, { recursive: true, force: true });
 console.log("No-mock free-user data checks passed.");

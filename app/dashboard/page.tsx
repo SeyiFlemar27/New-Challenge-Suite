@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { TrendingStories } from "@/components/stories/trending-stories";
 import { Activity, Award, BarChart3, Crown, Diamond, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
@@ -15,12 +14,6 @@ import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
 import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
 
-type LeaderboardEntry = {
-  displayName?: string;
-  name?: string;
-  points?: number;
-  score?: number;
-};
 
 type BadgeRecord = {
   id?: string;
@@ -56,8 +49,6 @@ export default function DashboardPage() {
   const challenges = useMemo(() => {
     return (dashboard?.challenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
   }, [dashboard?.challenges]);
-  const trendingChallenges = challenges.slice(0, 10);
-  const leaderboard = (dashboard?.leaderboard ?? []) as LeaderboardEntry[];
   const badges = (dashboard?.badges ?? []) as BadgeRecord[];
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
@@ -88,7 +79,7 @@ export default function DashboardPage() {
     ? freeCompetitor ? [
         { title: "Create Basic Challenge", body: "Create up to three lifetime public, non-monetized challenges before upgrading.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges", body: "Draft, publish, and track your Free Basic Challenge activity.", icon: Trophy, active: true, href: "/my-challenges" },
-        { title: "Join & Vote", body: "Submit entries and use your free daily vote on eligible public challenges.", icon: Vote, active: true, href: "/challenges" }
+        { title: "Explore Challenges", body: "Find public challenges to join, vote in, or follow.", icon: Vote, active: true, href: "/explore" }
       ] : [
         { title: "Basic Public Challenge", body: "Create up to three lifetime public, non-monetized challenges.", icon: Swords, active: true, href: "/challenges/create" },
         { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" }
@@ -120,7 +111,7 @@ export default function DashboardPage() {
     ? freeCompetitor ? [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
         { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
-        { href: "/challenges", label: "Explore Challenges", variant: "ghost" as const }
+        { href: "/explore", label: "Explore Challenges", variant: "ghost" as const }
       ] : [
         { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
         { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const }
@@ -214,7 +205,6 @@ export default function DashboardPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
-      <TrendingStories challenges={trendingChallenges} source="dashboard" errorMessage={errorMessage ?? ""} />
       {planExperience.planId !== "creator" ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
         <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
@@ -234,34 +224,25 @@ export default function DashboardPage() {
         ))}
       </div>
       {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
-      <div className="mt-8 grid gap-8 xl:grid-cols-[1.5fr_1fr]">
+      <div className={cn("mt-8 grid gap-8", badges.length ? "xl:grid-cols-[1.5fr_1fr]" : "xl:grid-cols-1")}>
         <Card className="p-6 md:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-2xl font-black">{planExperience.planId === "creator" ? "Manage your challenges" : "Current Challenges"}</h2>
-            <LinkButton href={planExperience.planId === "creator" ? "/my-challenges" : "/challenges"} variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
+            <LinkButton href={planExperience.planId === "creator" ? "/my-challenges" : "/my-entries"} variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
           </div>
           {challenges.length ? (
             <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
           ) : (
-            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? <div><h3 className="text-xl font-black text-white">No challenges created yet</h3><p className="mt-2 text-sm text-slate-300">Create your first challenge to start receiving entries.</p><LinkButton href="/challenges/create" className="mt-5">Create Challenge</LinkButton></div> : <EmptyState icon={<Swords />} title="No current challenges yet" body="Public challenges will appear here once they are created." action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} />}</Card>
+            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? <div><h3 className="text-xl font-black text-white">No challenges created yet</h3><p className="mt-2 text-sm text-slate-300">Create your first challenge to start receiving entries.</p><LinkButton href="/challenges/create" className="mt-5">Create Challenge</LinkButton></div> : <EmptyState icon={<Swords />} title="No active challenges yet" body="Challenges you join, create, or submit entries to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/explore">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton></div>} />}</Card>
           )}
         </Card>
-        <div className="space-y-8">
-          <Card className="p-6">
-            <h2 className="flex gap-2 text-2xl font-black"><Trophy className="text-[var(--gold)]" /> {planExperience.planId === "creator" ? "Challenge Performance" : "Top Performers"}</h2>
-            {leaderboard.length ? leaderboard.slice(0, 3).map((row, i) => {
-              const name = row.displayName ?? row.name ?? "Unnamed performer";
-              const points = Number(row.points ?? row.score ?? 0).toLocaleString();
-              return <div key={`${name}-${i}`} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{i + 1}. {name} - {points} pts</div>;
-            }) : <div className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold text-slate-300">Performance data will appear as challenges receive activity.</div>}
-            <LinkButton href={planExperience.planId === "creator" ? "/creator/analytics" : "/leaderboards"} variant="ghost" className="mt-5 w-full text-[var(--gold)]">{planExperience.planId === "creator" ? "Open Creator Analytics" : "View Full Leaderboard"}</LinkButton>
-          </Card>
+        {badges.length ? <div className="space-y-8">
           <Card className="p-6">
             <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
-            {badges.length ? badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>) : <p className="mt-8 text-xl font-bold">No badges yet. Start participating!</p>}
+            {badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>)}
             <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
           </Card>
-        </div>
+        </div> : null}
       </div>
     </AppShell>
   );
@@ -283,6 +264,7 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
 function Stat({ icon, title, value, label, className }: { icon: ReactNode; title: string; value: string; label: string; className?: string | null }) {
   return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black text-[var(--gold-2)]">{value}</div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }
+
 
 
 

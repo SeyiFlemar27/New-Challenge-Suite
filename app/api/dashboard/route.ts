@@ -1,9 +1,27 @@
-﻿import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
+import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { ok, serverUnavailable } from "@/lib/server/responses";
 import { getEffectiveTier, getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
-import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
+
+type DashboardChallengeRelationship = "created" | "joined" | "submitted";
+
+function personalChallengeFields(id: string, data: Record<string, unknown>, relationship: DashboardChallengeRelationship) {
+  return {
+    id,
+    ...publicChallengeFields(data),
+    relationship,
+    status: data.status ?? data.lifecycleStatus ?? "draft",
+    visibility: data.visibility ?? "public"
+  };
+}
+
+async function loadChallengeDocs(db: NonNullable<ReturnType<typeof getAdminDb>>, ids: string[]) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return [];
+  return db.getAll(...uniqueIds.map((id) => db.collection("challenges").doc(id)));
+}
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -11,16 +29,15 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Dashboard");
 
-  const [userSnap, profileSnap, walletSnap, challengesSnap, ownedChallengesSnap, submissionsSnap, notificationsSnap, badgesSnap, leaderboardSnap, kycSnap] = await Promise.all([
+  const [userSnap, profileSnap, walletSnap, ownedChallengesSnap, participantsSnap, submissionsSnap, notificationsSnap, badgesSnap, kycSnap] = await Promise.all([
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
     db.collection("doroCoinWallets").doc(user.uid).get(),
-    db.collection("challenges").orderBy("createdAt", "desc").limit(24).get(),
     db.collection("challenges").where("creatorId", "==", user.uid).limit(50).get(),
+    db.collection("challengeParticipants").where("userId", "==", user.uid).limit(50).get(),
     db.collection("submissions").where("userId", "==", user.uid).limit(50).get(),
     db.collection("notifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(8).get(),
     db.collection("badges").where("userId", "==", user.uid).limit(12).get(),
-    db.collection("leaderboards").doc("global").get(),
     db.collection("kycMetadata").doc(user.uid).get()
   ]);
 
@@ -28,17 +45,26 @@ export async function GET(request: Request) {
   const profile = profileSnap.exists ? profileSnap.data() : {};
   const wallet = walletSnap.exists ? walletSnap.data() : {};
   const kyc = kycSnap.exists ? kycSnap.data() ?? {} : {};
-  const challenges: Array<Record<string, unknown>> = challengesSnap.docs.flatMap((doc) => {
-    const data = doc.data();
-    if (!isPublicChallenge(doc.id, data)) return [];
-    return [{ id: doc.id, ...publicChallengeFields(data) }];
-  });
-  const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) }));
-  const submissions = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs.map((doc) => personalChallengeFields(doc.id, doc.data(), "created"));
+  const participants: Array<Record<string, unknown>> = participantsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const submissions: Array<Record<string, unknown>> = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const relatedChallengeSnaps = await loadChallengeDocs(db, [
+    ...participants.map((participant) => String(participant.challengeId ?? "")),
+    ...submissions.map((submission) => String(submission.challengeId ?? ""))
+  ]);
+  const personalChallenges = new Map<string, Record<string, unknown>>();
+  for (const challenge of hostedChallenges) {
+    personalChallenges.set(String(challenge.id), challenge);
+  }
+  for (const snap of relatedChallengeSnaps) {
+    if (!snap.exists) continue;
+    const data = snap.data() ?? {};
+    const relationship: DashboardChallengeRelationship = submissions.some((submission) => String(submission.challengeId ?? "") === snap.id) ? "submitted" : "joined";
+    personalChallenges.set(snap.id, personalChallengeFields(snap.id, data, relationship));
+  }
+  const challenges = [...personalChallenges.values()];
   const notifications = notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const leaderboardData = leaderboardSnap.exists ? leaderboardSnap.data() : {};
-  const leaderboardEntries = Array.isArray(leaderboardData?.entries) ? leaderboardData.entries : [];
   const planProfile = { ...profile, ...account };
   const planAccess = getUserPlanAccess(planProfile);
   const effectiveTier = getEffectiveTier(planProfile);
@@ -87,9 +113,8 @@ export async function GET(request: Request) {
     submissions,
     wallet: walletSnap.exists ? { userId: user.uid, ...wallet } : null,
     badges,
-    leaderboard: leaderboardEntries,
+    leaderboard: [],
     notifications
   }, "Dashboard loaded.");
 }
-
 

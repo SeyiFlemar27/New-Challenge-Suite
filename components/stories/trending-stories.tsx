@@ -65,16 +65,16 @@ export function TrendingStories({ challenges, source = "explore", isLoading = fa
     };
   }, [activeIndex, dashboardMode, stories.length]);
 
-  if (dashboardMode && isLoading) {
+  if (isLoading) {
     return <StoryShell><Card className="mt-4 border-white/10 bg-white/[0.03] p-5 text-sm font-bold text-slate-300">Loading trending challenges...</Card></StoryShell>;
   }
 
-  if (dashboardMode && errorMessage) {
+  if (errorMessage) {
     return <StoryShell><Card className="mt-4 border-red-400/20 bg-red-950/20 p-5 text-sm font-bold text-red-100">Unable to load trending challenges right now.</Card></StoryShell>;
   }
 
   if (!stories.length) {
-    return dashboardMode ? <StoryShell><Card className="mt-4 border-dashed p-5 text-sm text-slate-300"><p className="font-black text-white">No trending challenges yet</p><p className="mt-1">Challenges gaining activity will appear here once the community starts participating.</p></Card></StoryShell> : null;
+    return <StoryShell><Card className="mt-4 border-dashed p-5 text-sm text-slate-300"><p className="font-black text-white">No trending challenges yet</p><p className="mt-1">Public challenges gaining activity will appear here once the community starts participating.</p></Card></StoryShell>;
   }
 
   return (
@@ -162,11 +162,9 @@ function ExploreStoryPreview({ active, stories, activeIndex, lifecycle, onClose,
           <p className="mt-2 line-clamp-2 text-sm text-slate-300">{active.description}</p>
           <p className="mt-3 text-sm font-bold text-slate-300">by @{active.creatorUsername || active.creatorName || "challengehost"}</p>
           <div className="mt-4 grid grid-cols-3 gap-2"><Mini icon={<Users size={15} />} value={Number(active.participants ?? active.participantCount ?? 0)} label="Participants" /><Mini icon={<Vote size={15} />} value={Number(active.voteCount ?? 0)} label="Votes" /><Mini value={active.publicJackpotEstimateCents ? `$${(Number(active.publicJackpotEstimateCents) / 100).toLocaleString()}` : "Review"} label="Prize" /></div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap">
-            <LinkButton href={`/challenges/${active.id}`} onClick={() => onTrack(String(active.id), "view_details")}>View Details</LinkButton>
-            {lifecycle?.canJoin ? <LinkButton href={`/challenges/${active.id}/join`} variant="secondary" onClick={() => onTrack(String(active.id), "join")}>{lifecycle.actionLabel}</LinkButton> : null}
-            {lifecycle?.canVote ? <LinkButton href={`/challenges/${active.id}/votes`} variant="secondary" onClick={() => onTrack(String(active.id), "vote")}>Vote Now</LinkButton> : null}
-            {active.creatorUsername || active.creatorId ? <Button variant="secondary" onClick={() => void apiRequest(`/api/public/profiles/${active.creatorUsername || active.creatorId}/follow`, { method: "POST" }).then(() => onTrack(String(active.id), "follow"))}>Follow Host</Button> : null}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <LinkButton href={`/challenges/${active.id}`} onClick={() => onTrack(String(active.id), "view_details")}>View Challenge</LinkButton>
+            <Button variant="secondary" onClick={onClose}>Close</Button>
           </div>
         </div>
       </Card>
@@ -177,3 +175,4 @@ function ExploreStoryPreview({ active, stories, activeIndex, lifecycle, onClose,
 function Mini({ icon, value, label }: { icon?: React.ReactNode; value: string | number; label: string }) {
   return <div className="rounded-[8px] bg-white/5 p-3 text-center"><div className="flex items-center justify-center gap-1 font-black text-[var(--gold)]">{icon}{value}</div><div className="mt-1 text-[10px] text-slate-400">{label}</div></div>;
 }
+
