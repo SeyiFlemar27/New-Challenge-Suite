@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Activity, Award, BarChart3, Crown, Diamond, Gift, Medal, Radio, Rocket, ShieldCheck, Swords, Trophy, UsersRound, Vote } from "lucide-react";
+import { Activity, Award, BarChart3, ClipboardCheck, Crown, Diamond, Gift, LockKeyhole, Medal, Radio, Rocket, Settings, ShieldCheck, Swords, Trophy, User, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
@@ -30,6 +30,27 @@ type DashboardRedirectData = {
   };
 };
 
+type DashboardChallenge = ReturnType<typeof normalizeChallenge> & Record<string, unknown>;
+
+function isPrivateCreatorChallenge(challenge: Record<string, unknown>) {
+  const visibility = String(challenge.visibility ?? "").toLowerCase();
+  const type = String(challenge.type ?? "").toLowerCase();
+  return visibility.includes("private") || visibility.includes("exclusive") || type.includes("private") || type.includes("exclusive") || type.includes("invite");
+}
+
+function isActiveCreatorChallenge(challenge: Record<string, unknown>) {
+  const status = String(challenge.status ?? challenge.lifecycleStatus ?? challenge.computedStatus ?? "").toLowerCase();
+  return ["published", "scheduled", "active", "registration_open", "submission_open", "voting_open"].includes(status);
+}
+
+function numberField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = Number(record[key] ?? 0);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { data, isLoading } = useQuery({
@@ -49,6 +70,9 @@ export default function DashboardPage() {
   const challenges = useMemo(() => {
     return (dashboard?.challenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
   }, [dashboard?.challenges]);
+  const hostedChallenges = useMemo<DashboardChallenge[]>(() => {
+    return (dashboard?.hostedChallenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
+  }, [dashboard?.hostedChallenges]);
   const badges = (dashboard?.badges ?? []) as BadgeRecord[];
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
@@ -75,6 +99,12 @@ export default function DashboardPage() {
     }
   }, [dashboard?.user.creatorOnboardingComplete, dashboard?.user.hostOnboardingComplete, effectiveTier.id, isLoading, redirectTo, router]);
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
+  const creatorPublicChallenges = hostedChallenges.filter((challenge) => !isPrivateCreatorChallenge(challenge));
+  const creatorPrivateChallenges = hostedChallenges.filter((challenge) => isPrivateCreatorChallenge(challenge));
+  const creatorActiveChallenges = hostedChallenges.filter((challenge) => isActiveCreatorChallenge(challenge));
+  const creatorDrafts = hostedChallenges.filter((challenge) => String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase() === "draft");
+  const creatorSubmissions = hostedChallenges.reduce((sum, challenge) => sum + numberField(challenge, ["submissionCount", "submissions"]), 0);
+  const creatorVotes = hostedChallenges.reduce((sum, challenge) => sum + numberField(challenge, ["voteCount", "weightedVoteCount", "votes"]), 0);
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
         { title: "Create Basic Challenge", body: "Create up to three lifetime public, non-monetized challenges before upgrading.", icon: Swords, active: true, href: "/challenges/create" },
@@ -119,8 +149,8 @@ export default function DashboardPage() {
     : planExperience.planId === "creator"
       ? [
           { href: "/challenges/create", label: "Create Challenge", variant: "primary" as const },
-          { href: "/my-challenges", label: "Creator Projects", variant: "secondary" as const },
-          { href: "/my-entries", label: "My Entries", variant: "ghost" as const }
+          { href: "/creator/challenges", label: "Challenges", variant: "secondary" as const },
+          { href: "/creator/private-challenges", label: "Private Challenges", variant: "ghost" as const }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -141,9 +171,12 @@ export default function DashboardPage() {
       ]
     : planExperience.planId === "creator"
       ? [
-          { icon: <Swords />, title: "Created Challenges", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
-          { icon: <Activity />, title: "Submissions", value: dashboard?.stats.submissionCount ?? 0, label: "Entries received and created" },
-          { icon: <Rocket />, title: "Monthly Boosts", value: planExperience.monthlyBoostLimit, label: "Boost allowance" }
+          { icon: <Swords />, title: "Public Challenges", value: creatorPublicChallenges.length, label: "Creator-owned public challenges" },
+          { icon: <LockKeyhole />, title: "Private Challenges", value: creatorPrivateChallenges.length, label: "Invite-only creator work" },
+          { icon: <ClipboardCheck />, title: "Submissions", value: creatorSubmissions, label: "Entries on your challenges" },
+          { icon: <Activity />, title: "Active Challenges", value: creatorActiveChallenges.length, label: "Currently running" },
+          { icon: <Award />, title: "Drafts", value: creatorDrafts.length, label: "Unpublished setup" },
+          { icon: <Vote />, title: "Votes Received", value: creatorVotes, label: "Across creator challenges" }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -157,6 +190,19 @@ export default function DashboardPage() {
             { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational access" }
           ];
 
+  const creatorTools = [
+    { title: "Create Challenge", body: "Start a public creator challenge.", icon: Swords, href: "/challenges/create" },
+    { title: "Private Challenges", body: "Manage invite-only challenges and access.", icon: LockKeyhole, href: "/creator/private-challenges" },
+    { title: "Review Submissions", body: "Open creator submission review tools.", icon: ClipboardCheck, href: "/creator/submissions" },
+    { title: "Draft Challenges", body: "Continue setup from your challenge list.", icon: Award, href: "/creator/challenges" },
+    { title: "Voting Status", body: "Check voting readiness from your creator challenges.", icon: Vote, href: "/creator/challenges" },
+    { title: "Invite Links", body: "Open private challenge access tools.", icon: ShieldCheck, href: "/creator/private-challenges" },
+    { title: "Creator Analytics", body: "View analytics when real activity is available.", icon: BarChart3, href: "/creator/analytics" },
+    { title: "Sponsor Readiness", body: "Review sponsor-ready setup states.", icon: Rocket, href: "/creator/sponsor-ready" },
+    { title: "Wallet & Rewards", body: "Open wallet and reward tools.", icon: Gift, href: "/wallet" },
+    { title: "Creator Profile", body: "Update public profile and settings.", icon: User, href: "/profile" },
+    { title: "Settings", body: "Manage creator account preferences.", icon: Settings, href: "/settings" }
+  ];
   if (isLoading) {
     return (
       <AppShell>
@@ -182,14 +228,74 @@ export default function DashboardPage() {
     );
   }
 
+  if (planExperience.planId === "creator") {
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex items-start gap-4">
+            <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator Plan</p>
+              <PageTitle title="Creator Studio" subtitle="Run public and private challenges from one creator workspace." />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {quickActions.map((action) => <LinkButton key={action.href} href={action.href} variant={action.variant}>{action.label}</LinkButton>)}
+          </div>
+        </div>
+
+        {errorMessage ? (
+          <Card className="mt-8 p-6 md:p-8">
+            <h2 className="text-2xl font-black text-[var(--gold-2)]">Creator Studio could not load</h2>
+            <p className="mt-3 text-slate-300">{errorMessage}</p>
+          </Card>
+        ) : null}
+
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={String(stat.value)} label={stat.label} />)}
+        </div>
+
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {creatorTools.map((tool) => <CreatorToolCard key={tool.title} {...tool} />)}
+        </div>
+
+        <Card className="mt-8 p-6 md:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator activity</p>
+              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Your creator activity</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Creator-owned challenges, drafts, and active work appear here.</p>
+            </div>
+            <LinkButton href="/creator/challenges" variant="secondary">View All</LinkButton>
+          </div>
+
+          {hostedChallenges.length ? (
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              {hostedChallenges.slice(0, 3).map((challenge) => <CreatorActivityCard key={challenge.id} challenge={challenge} />)}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-[8px] border border-white/10 bg-black/25 p-6">
+              <EmptyState icon={<Swords />} title="No creator activity yet" body="Create your first challenge or open Explore to join existing competitions." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/explore" variant="secondary">Explore Challenges</LinkButton></div>} />
+            </div>
+          )}
+        </Card>
+
+        {badges.length ? <Card className="mt-8 p-6">
+          <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
+          {badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>)}
+          <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
+        </Card> : null}
+      </AppShell>
+    );
+  }
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-4">
           <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
           <div>
-            {planExperience.planId === "creator" ? <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator Plan</p> : !freeCompetitor ? <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{effectiveTier.badgeLabel}</p> : null}
-            <PageTitle title={planExperience.planId === "creator" ? "Creator Studio" : effectiveTier.dashboardName} subtitle={planExperience.planId === "creator" ? undefined : isLoading ? "Loading your dashboard..." : `${firstName}, ${effectiveTier.dashboardSubtitle}`} />
+            {!freeCompetitor ? <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{effectiveTier.badgeLabel}</p> : null}
+            <PageTitle title={effectiveTier.dashboardName} subtitle={isLoading ? "Loading your dashboard..." : `${firstName}, ${effectiveTier.dashboardSubtitle}`} />
           </div>
         </div>
         <div className="flex flex-wrap gap-4">
@@ -205,7 +311,7 @@ export default function DashboardPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
-      {planExperience.planId !== "creator" ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
+      <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 md:p-8">
         <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Rewards</p>
@@ -217,23 +323,22 @@ export default function DashboardPage() {
             <LinkButton href="/rewards/history" variant="secondary">View Reward History</LinkButton>
           </div>
         </div>
-      </Card> : null}
+      </Card>
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierFeatures.map((feature) => (
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
-      </div>
-      {planExperience.planId === "creator" ? <div className="mt-8 flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator operations</p><h2 className="mt-2 text-2xl font-black sm:text-3xl">Manage your challenges</h2><p className="mt-2 text-slate-300">Review challenge status, submissions, voting state, and next actions.</p></div><LinkButton href="/creator/submissions" variant="secondary">Review Submissions</LinkButton></div> : null}
+      </div>
       <div className={cn("mt-8 grid gap-8", badges.length ? "xl:grid-cols-[1.5fr_1fr]" : "xl:grid-cols-1")}>
         <Card className="p-6 md:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-black">{planExperience.planId === "creator" ? "Manage your challenges" : "Current Challenges"}</h2>
-            <LinkButton href={planExperience.planId === "creator" ? "/my-challenges" : "/my-entries"} variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
+            <h2 className="text-2xl font-black">Current Challenges</h2>
+            <LinkButton href="/my-entries" variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
           </div>
           {challenges.length ? (
             <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
           ) : (
-            <Card className="p-6 text-slate-300">{planExperience.planId === "creator" ? <div><h3 className="text-xl font-black text-white">No challenges created yet</h3><p className="mt-2 text-sm text-slate-300">Create your first challenge to start receiving entries.</p><LinkButton href="/challenges/create" className="mt-5">Create Challenge</LinkButton></div> : <EmptyState icon={<Swords />} title="No active challenges yet" body="Challenges you join, create, or submit entries to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/explore">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton></div>} />}</Card>
+            <Card className="p-6 text-slate-300"><EmptyState icon={<Swords />} title="No active challenges yet" body="Challenges you join, create, or submit entries to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/explore">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton></div>} /></Card>
           )}
         </Card>
         {badges.length ? <div className="space-y-8">
@@ -261,6 +366,36 @@ function TierFeatureCard({ title, body, icon: Icon, active, href }: { title: str
   );
 }
 
+function CreatorToolCard({ title, body, icon: Icon, href }: { title: string; body: string; icon: typeof Swords; href: string }) {
+  return (
+    <Card className="flex min-h-44 flex-col p-5">
+      <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-yellow-500/10 text-[var(--gold)]"><Icon size={19} /></div>
+      <h2 className="mt-4 text-lg font-black">{title}</h2>
+      <p className="mt-2 flex-1 text-sm leading-6 text-slate-300">{body}</p>
+      <LinkButton href={href} variant="ghost" className="mt-4 w-full">Open</LinkButton>
+    </Card>
+  );
+}
+
+function CreatorActivityCard({ challenge }: { challenge: DashboardChallenge }) {
+  const privateChallenge = isPrivateCreatorChallenge(challenge);
+  const status = String(challenge.status ?? challenge.lifecycleStatus ?? "Draft").replaceAll("_", " ");
+  return (
+    <Card className="flex h-full flex-col p-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-slate-200">{privateChallenge ? "Private" : "Public"}</span>
+        <span className="rounded-full border border-[var(--gold)]/20 bg-[var(--gold)]/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[var(--gold)]">{status}</span>
+      </div>
+      <h3 className="mt-4 line-clamp-2 text-xl font-black">{challenge.title}</h3>
+      <p className="mt-2 line-clamp-2 flex-1 text-sm leading-6 text-slate-300">{challenge.description || "Challenge setup details will appear as you publish updates."}</p>
+      <div className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <span>{numberField(challenge, ["participantCount", "participants"])} participants</span>
+        <span>{numberField(challenge, ["submissionCount", "submissions"])} entries</span>
+      </div>
+      <LinkButton href={`/challenges/${challenge.id}`} className="mt-5 w-full">View Challenge</LinkButton>
+    </Card>
+  );
+}
 function Stat({ icon, title, value, label, className }: { icon: ReactNode; title: string; value: string; label: string; className?: string | null }) {
   return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black text-[var(--gold-2)]">{value}</div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }

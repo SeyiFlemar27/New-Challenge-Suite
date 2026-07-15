@@ -71,8 +71,8 @@ const starterSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
+    { href: "/creator/challenges", label: "Challenges", icon: Medal },
+    { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
     { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
@@ -95,9 +95,8 @@ const creatorSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
-    { href: "/private/create", label: "Create Private Challenge", icon: PlusSquare },
+    { href: "/creator/challenges", label: "Challenges", icon: Medal },
+    { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
     { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
@@ -166,6 +165,7 @@ const sponsorSections: NavSection[] = [
 
 function activeNavigationHref(pathname: string) {
   if (pathname === "/challenges/create") return "/challenges/create";
+  if (pathname === "/private/create") return "/creator/private-challenges";
   if (pathname === "/dashboard/host/team" || pathname === "/host/team") return "/host/team";
   if (pathname === "/dashboard/host") return "/dashboard/host";
   if (pathname.startsWith("/host/")) return pathname;
@@ -214,13 +214,21 @@ export function Sidebar() {
           { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ]
-      : [
-          { href: "/dashboard", label: "Home", icon: Home },
-          { href: "/explore", label: "Explore", icon: LayoutGrid },
-          { href: "/challenges/create", label: "Create", icon: PlusSquare },
-          { href: "/rewards", label: "Rewards", icon: Gift },
-          { href: "/wallet", label: "Wallet", icon: Coins }
-        ];
+      : effectiveTier.id === "creator" || effectiveTier.id === "pro" || effectiveTier.id === "creator_starter"
+        ? [
+            { href: "/dashboard", label: "Home", icon: Home },
+            { href: "/explore", label: "Explore", icon: LayoutGrid },
+            { href: "/creator/challenges", label: "Challenges", icon: Medal },
+            { href: "/creator/private-challenges", label: "Private", icon: LockKeyhole },
+            { href: "/rewards", label: "Rewards", icon: Gift }
+          ]
+        : [
+            { href: "/dashboard", label: "Home", icon: Home },
+            { href: "/explore", label: "Explore", icon: LayoutGrid },
+            { href: "/challenges/create", label: "Create", icon: PlusSquare },
+            { href: "/rewards", label: "Rewards", icon: Gift },
+            { href: "/wallet", label: "Wallet", icon: Coins }
+          ];
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
