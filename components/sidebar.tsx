@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,8 +18,8 @@ import {
   Menu,
   PlusSquare,
   Radio,
+  ReceiptText,
   Rocket,
-  Shuffle,
   Settings,
   ShieldCheck,
   Star,
@@ -121,53 +121,55 @@ const hostSections: NavSection[] = [
     { href: "/dashboard/host", label: "Host Control Center", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/private-exclusive", label: "Private / Exclusive", icon: LockKeyhole },
     { href: "/wallet", label: "Wallet & Revenue", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift },
+    { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Competitions", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/host/challenges/create", label: "Create Challenge", icon: PlusSquare },
-    { href: "/my-challenges", label: "My Challenges", icon: Target },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
-    { href: "/host/private/create", label: "Create Private Challenge", icon: PlusSquare },
-    { href: "/live-events", label: "Live Events", icon: Radio },
-    { href: "/host/live/create", label: "Create Live Event", icon: PlusSquare },
+    { href: "/host/challenges", label: "Challenges", icon: Medal },
+    { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
+    { href: "/host/live-events", label: "Live Events", icon: Radio },
     { href: "/host/tournaments", label: "Tournaments", icon: Award },
-    { href: "/host/tournaments/create", label: "Create Tournament", icon: PlusSquare },
-    { href: "/host/hybrid", label: "Hybrid Competition", icon: Shuffle },
-    { href: "/host/hybrid/create", label: "Create Hybrid", icon: PlusSquare }
+    { href: "/my-challenges", label: "My Challenges", icon: Target },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
-  { label: "Host Tools", items: [
-    { href: "/host/participants", label: "Participants", icon: UsersRound },
-    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
+  { label: "Operations", items: [
     { href: "/host/voting", label: "Voting Control", icon: Vote },
-    { href: "/host/reports", label: "Reports", icon: BarChart3 },
-    { href: "/host/winners", label: "Winners", icon: Trophy },
-    { href: "/host/notifications", label: "Notifications", icon: Bell },
-    { href: "/host/team", label: "Team Members", icon: UsersRound }
+    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
+    { href: "/host/participants", label: "Participants", icon: UsersRound },
+    { href: "/host/reports", label: "Reports", icon: BarChart3 }
   ] },
   { label: "Account", items: [
-    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings/billing", label: "Billing", icon: ReceiptText },
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];
-
 const sponsorSections: NavSection[] = [
-  { label: "Brand", items: [
-    { href: "/sponsor/dashboard", label: "Brand Command Center", icon: Home },
-    { href: "/sponsor/campaigns/new", label: "Create Campaign", icon: PlusSquare },
-    { href: "/sponsor/onboarding", label: "Brand Profile", icon: User },
-    { href: "/sponsor/plans", label: "Sponsor Plans", icon: Diamond },
+  { label: "Overview", items: [
+    { href: "/sponsor/dashboard", label: "Overview", icon: Home },
+    { href: "/sponsor/campaigns", label: "Campaigns", icon: Target },
+    { href: "/sponsor/proposals", label: "Proposals", icon: ClipboardCheck },
+    { href: "/sponsor/messages", label: "Messages", icon: Bell }
+  ] },
+  { label: "Discover", items: [
+    { href: "/sponsor/discover/creators", label: "Creators", icon: UsersRound },
+    { href: "/sponsor/discover/challenges", label: "Challenges", icon: Medal },
+    { href: "/sponsor/saved", label: "Saved", icon: Star }
+  ] },
+  { label: "Billing", items: [
+    { href: "/sponsor/plans", label: "Plans", icon: Diamond },
+    { href: "/sponsor/billing", label: "Billing", icon: ReceiptText },
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];
-
 function activeNavigationHref(pathname: string) {
   if (pathname === "/challenges/create") return "/challenges/create";
   if (pathname === "/private/create") return "/creator/private-challenges";
   if (pathname === "/dashboard/host/team" || pathname === "/host/team") return "/host/team";
   if (pathname === "/dashboard/host") return "/dashboard/host";
+  if (pathname.startsWith("/host/challenges/create")) return "/host/challenges";
+  if (pathname.startsWith("/host/private/create")) return "/host/private";
+  if (pathname.startsWith("/host/live/create")) return "/host/live-events";
+  if (pathname.startsWith("/host/tournaments/create")) return "/host/tournaments";
   if (pathname.startsWith("/host/")) return pathname;
   if (pathname.startsWith("/creator/")) return pathname;
   if (pathname === "/my-entries") return "/my-entries";
@@ -209,7 +211,7 @@ export function Sidebar() {
     : effectiveTier.id === "host" || effectiveTier.id === "enterprise"
       ? [
           { href: "/dashboard/host", label: "Home", icon: Home },
-          { href: "/host/challenges/create", label: "Create", icon: PlusSquare },
+          { href: "/host/challenges", label: "Challenges", icon: Medal },
           { href: "/host/voting", label: "Voting", icon: Vote },
           { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
@@ -334,6 +336,11 @@ function WorkspaceNavigationLoading() {
 function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
   return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }
+
+
+
+
+
 
 
 

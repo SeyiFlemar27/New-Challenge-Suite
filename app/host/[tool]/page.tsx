@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -11,12 +11,12 @@ import { apiRequest } from "@/lib/api/client";
 type Item = Record<string, unknown> & { id: string };
 type Operations = { challenges: Item[]; participants: Item[]; submissions: Item[]; winners: Item[]; notifications: Item[]; controls: Record<string, boolean> };
 const configs = {
-  participants: { title: "Participant Management", subtitle: "Review registration and check-in foundations across hosted competitions.", icon: UsersRound, empty: "No participants yet", body: "Share your competition link. Registrations will appear here.", tabs: ["All", "Pending", "Approved", "Rejected", "Checked In", "Disqualified"] },
+  participants: { title: "Participant Management", subtitle: "Review registration and check-in status across hosted competitions.", icon: UsersRound, empty: "No participants yet", body: "Share your competition link. Registrations will appear here.", tabs: ["All", "Pending", "Approved", "Rejected", "Checked In", "Disqualified"] },
   submissions: { title: "Submission Review", subtitle: "Review competition entries without exposing unapproved media.", icon: ClipboardCheck, empty: "No submissions yet", body: "Submissions will appear here after participants enter.", tabs: ["Pending Review", "Approved", "Rejected", "Flagged", "Resubmission Requested"] },
   voting: { title: "Voting Control", subtitle: "Monitor voting windows, totals, and leaderboard visibility.", icon: Vote, empty: "No voting sessions yet", body: "Create a competition with voting enabled to prepare a voting session.", tabs: ["All", "Upcoming", "Open", "Paused", "Closed"] },
-  tournaments: { title: "Tournament Planning", subtitle: "Plan knockout, group, leaderboard, and judge-reviewed rounds.", icon: Trophy, empty: "No tournaments yet", body: "Plan your first tournament. Bracket execution remains a foundation.", tabs: ["Drafts", "Upcoming", "Active", "Completed"] },
+  tournaments: { title: "Tournament Planning", subtitle: "Plan knockout, group, leaderboard, and judge-reviewed rounds.", icon: Trophy, empty: "No tournaments yet", body: "Plan your first tournament. Round execution is not available yet.", tabs: ["Drafts", "Upcoming", "Active", "Completed"] },
   reports: { title: "Reports & Results", subtitle: "Prepare participant, submission, vote, winner, attendance, and sponsor-interest reports.", icon: BarChart3, empty: "No reports yet", body: "Reports will be generated after competition activity is recorded.", tabs: ["Participant", "Submission", "Vote", "Winner", "Attendance", "Sponsor Interest"] },
-  winners: { title: "Winner Confirmation", subtitle: "Review leaderboard foundations before publishing results.", icon: Trophy, empty: "No winner reviews yet", body: "Winner review becomes available after voting closes.", tabs: ["Pending Confirmation", "Published", "Disqualified"] },
+  winners: { title: "Winner Confirmation", subtitle: "Review leaderboard status before publishing results.", icon: Trophy, empty: "No winner reviews yet", body: "Winner review becomes available after voting closes.", tabs: ["Pending Confirmation", "Published", "Disqualified"] },
   notifications: { title: "Host Notifications", subtitle: "Track registration, submission, voting, event, report, and team workflow notices.", icon: Bell, empty: "No host notifications", body: "Host workflow notifications will appear here.", tabs: ["All", "Participants", "Submissions", "Voting", "Events", "Reports"] }
 } as const;
 
@@ -43,7 +43,7 @@ export default function HostOperationsPage() {
     {tool === "voting" ? <VotingSummary challenges={data?.challenges ?? []} /> : null}
     {error ? <Card className="mt-6 border-red-500/30 p-5 text-red-200">{error}</Card> : null}
     {!data && !error ? <Card className="mt-6 h-56 animate-pulse" /> : items.length ? <div className="mt-6 grid gap-4">{items.map((item) => <OperationRow key={item.id} item={item} tool={tool} />)}</div> : data ? <Card className="mt-6"><EmptyState icon={<config.icon />} title={config.empty} body={config.body} action={["participants", "submissions"].includes(tool) ? <LinkButton href="/my-challenges">View Hosted Competitions</LinkButton> : <LinkButton href="/challenges/create">Build Competition</LinkButton>} /></Card> : null}
-    <Card className="mt-6 border-yellow-500/20 p-5 text-sm leading-6 text-slate-300">Operational mutations are staged for a later audited batch. No moderation decision, voting-state change, winner publication, export, payout, refund, sponsor release, or prize release is executed from this screen.</Card>
+    <Card className="mt-6 border-yellow-500/20 p-5 text-sm leading-6 text-slate-300">Operational changes are disabled here unless an existing workflow supports them. No moderation decision, voting-state change, winner publication, export, payout, refund, sponsor release, or prize release is executed from this screen.</Card>
   </div></AppShell></PlanFeatureGate>;
 }
 
@@ -54,5 +54,6 @@ function OperationRow({ item, tool }: { item: Item; tool: string }) {
 }
 function VotingSummary({ challenges }: { challenges: Item[] }) {
   const votes = challenges.reduce((total, item) => total + Number(item.voteCount ?? 0), 0);
-  return <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Voting Status", challenges.length ? "Configured" : "Waiting"], ["Total Votes", votes], ["DoroCoin Votes", "Tracked by ledger"], ["Suspicious Activity", "Review foundation"]].map(([label, value]) => <Card key={label} className="p-5"><p className="text-xs font-bold uppercase text-slate-400">{label}</p><p className="mt-2 text-xl font-black">{value}</p></Card>)}</div>;
+  return <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Voting Status", challenges.length ? "Configured" : "Waiting"], ["Total Votes", votes], ["DoroCoin Votes", "Read-only"], ["Leaderboard Visibility", challenges.length ? "Challenge settings" : "Setup required"]].map(([label, value]) => <Card key={label} className="p-5"><p className="text-xs font-bold uppercase text-slate-400">{label}</p><p className="mt-2 text-xl font-black">{value}</p></Card>)}</div>;
 }
+

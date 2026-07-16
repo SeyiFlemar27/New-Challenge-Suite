@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -17,42 +17,19 @@ const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; ico
     { label: "Overview", icon: LayoutDashboard, href: "/sponsor/dashboard", feature: "overview" },
     { label: "Campaigns", icon: Megaphone, href: "/sponsor/campaigns", feature: "campaigns" },
     { label: "Proposals", icon: Handshake, href: "/sponsor/proposals", feature: "proposals" },
-    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" },
-    { label: "Approvals", icon: FileCheck2, href: "/sponsor/approvals", feature: "approvals" },
-    { label: "Deliverables", icon: CalendarCheck, href: "/sponsor/deliverables", feature: "deliverables" }
+    { label: "Messages", icon: MessageSquare, href: "/sponsor/messages", feature: "messages" }
   ] },
   { label: "Discover", items: [
     { label: "Creators", icon: Users, href: "/sponsor/discover/creators", feature: "discover" },
     { label: "Challenges", icon: Store, href: "/sponsor/discover/challenges", feature: "challenges" },
-    { label: "Events", icon: BriefcaseBusiness, href: "/sponsor/events", feature: "discover" },
-    { label: "Tournaments", icon: Target, href: "/sponsor/tournaments", feature: "discover" },
     { label: "Saved", icon: FolderKanban, href: "/sponsor/saved", feature: "discover" }
   ] },
-  { label: "Legal", items: [
-    { label: "Contracts", icon: FileCheck2, href: "/sponsor/contracts", feature: "contracts" },
-    { label: "Templates", icon: FileCheck2, href: "/sponsor/contracts/templates", feature: "contracts" }
-  ] },
-  { label: "Finance", items: [
-    { label: "Wallet", icon: WalletCards, href: "/sponsor/wallet", feature: "wallet" },
+  { label: "Billing", items: [
+    { label: "Plans", icon: BadgeDollarSign, href: "/sponsor/plans", feature: "plans" },
     { label: "Billing", icon: CreditCard, href: "/sponsor/billing", feature: "billing" },
-    { label: "Invoices", icon: BadgeDollarSign, href: "/sponsor/billing/invoices", feature: "billing" },
-    { label: "Milestones", icon: CalendarCheck, href: "/sponsor/milestones", feature: "wallet" },
-    { label: "Transactions", icon: WalletCards, href: "/sponsor/wallet/transactions", feature: "wallet" }
-  ] },
-  { label: "Growth", items: [
-    { label: "Analytics", icon: PieChart, href: "/sponsor/analytics", feature: "analytics" },
-    { label: "Reports", icon: BarChart3, href: "/sponsor/reports", feature: "reports" }
-  ] },
-  { label: "Brand", items: [
-    { label: "Brand Profile", icon: Building2, href: "/sponsor/profile", feature: "brand_profile" },
-    { label: "Brand Assets", icon: FolderKanban, href: "/sponsor/assets", feature: "brand_assets" },
-    { label: "Team", icon: Users, href: "/sponsor/team", feature: "team" },
-    { label: "Notifications", icon: Bell, href: "/sponsor/notifications", feature: "notifications" },
-    { label: "Settings", icon: Settings, href: "/sponsor/settings", feature: "settings" },
-    { label: "Sponsor Plans", icon: BadgeDollarSign, href: "/sponsor/plans", feature: "plans" }
+    { label: "Settings", icon: Settings, href: "/sponsor/settings", feature: "settings" }
   ] }
 ];
-
 export interface SponsorShellProfile {
   brandName?: string | null;
   businessEmail?: string | null;
@@ -117,7 +94,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-200">Brand Status</p>
             <p className="mt-2 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)}</p>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)]" style={{ width: `${completion}%` }} /></div>
-            <p className="mt-2 text-xs leading-5 text-slate-400">Onboarding {completion}% complete. Some tools remain gated by brand review, subscription status, and secure funding setup.</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">Onboarding {completion}% complete. Some tools depend on brand review, subscription status, and secure funding setup.</p>
             <p className="mt-3 border-t border-white/10 pt-3 text-xs font-black text-[var(--gold)]">{experience.badgeLabel} / {subscriptionStatus.replaceAll("_", " ")} / {experience.teamMemberLimit >= 999 ? "unlimited" : experience.teamMemberLimit} team seat{experience.teamMemberLimit === 1 ? "" : "s"}</p>
           </Card>
           {nav}
@@ -142,3 +119,4 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 export function SponsorPlaceholder({ title, body }: { title: string; body: string }) {
   return <Card className="p-5"><p className="text-sm font-black text-[var(--gold)]">{title}</p><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></Card>;
 }
+
