@@ -31,7 +31,7 @@ export default function CreatorPrivateChallengesPage() {
   }, [data]);
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
   const createAction = canCreatePrivate
-    ? <LinkButton href="/private/create" className="w-full sm:w-auto">Create Private Challenge</LinkButton>
+    ? <LinkButton href="/creator/private-challenges/create" className="w-full sm:w-auto">Create Private Challenge</LinkButton>
     : <Button disabled className="w-full sm:w-auto">Available on Creator Plan</Button>;
 
   return (
@@ -45,7 +45,7 @@ export default function CreatorPrivateChallengesPage() {
         {isLoading ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-[390px] animate-pulse bg-[#151515]" />)}</div> : null}
         {errorMessage ? <Card className="mt-8 p-6"><h2 className="text-xl font-black text-[var(--gold-2)]">Private challenges could not load</h2><p className="mt-2 text-slate-300">{errorMessage}</p></Card> : null}
         {!isLoading && !errorMessage && challenges.length ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div> : null}
-        {!isLoading && !errorMessage && !challenges.length ? <Card className="mt-8"><EmptyState icon={<LockKeyhole className="text-[var(--gold)]" />} title="No private challenges yet" body="Private challenges you create or are invited to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row">{canCreatePrivate ? <LinkButton href="/private/create">Create Private Challenge</LinkButton> : <LinkButton href="/subscriptions">View Plans</LinkButton>}<LinkButton href="/explore" variant="secondary">Explore Challenges</LinkButton></div>} /></Card> : null}
+        {!isLoading && !errorMessage && !challenges.length ? <Card className="mt-8"><EmptyState icon={<LockKeyhole className="text-[var(--gold)]" />} title="No private challenges yet" body="Private challenges you create or are invited to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row">{canCreatePrivate ? <LinkButton href="/creator/private-challenges/create">Create Private Challenge</LinkButton> : <LinkButton href="/subscriptions">View Plans</LinkButton>}<LinkButton href="/explore" variant="secondary">Explore Challenges</LinkButton></div>} /></Card> : null}
       </div>
     </AppShell>
   );
