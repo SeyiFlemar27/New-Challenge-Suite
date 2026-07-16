@@ -16,9 +16,29 @@ function pick(source: Record<string, unknown>, keys: string[]) {
   return Object.fromEntries(keys.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
 }
 
+function hasKnownNonProductionText(data: Record<string, unknown>) {
+  const known = [
+    "the ultimate showdown",
+    "the next model spotlight challenge",
+    "next model spotlight",
+    "qa pending challenge",
+    "qa flagged challenge",
+    "qa completed challenge",
+    "neon city photo battle",
+    "street dance finals",
+    "rainline reflections"
+  ];
+  return [data.title, data.name, data.challengeTitle, data.displayName, data.description].some((value) => {
+    if (typeof value !== "string") return false;
+    const normalized = value.trim().toLowerCase();
+    return known.some((item) => normalized.includes(item));
+  });
+}
+
 export function isQaOrDemoRecord(id: string, data: Record<string, unknown>) {
   const normalizedId = id.toLowerCase();
-  return normalizedId.startsWith("demo-")
+  return hasKnownNonProductionText(data)
+    || normalizedId.startsWith("demo-")
     || normalizedId.startsWith("qa-")
     || normalizedId.startsWith("qa_")
     || data.isQaSeed === true

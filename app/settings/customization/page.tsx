@@ -367,13 +367,13 @@ function ProfilePreview({ customization, access }: { customization: ProfileCusto
       <div className="flex items-center gap-4">
         <div className={cn("flex h-20 w-20 items-center justify-center rounded-full border-4 bg-indigo-500 text-2xl font-black", ring)}>CS</div>
         <div className="min-w-0">
-          <div className="text-xl font-black">Sample Member</div>
+          <div className="text-xl font-black">Preview Member</div>
           <div className="mt-1 text-sm text-[#8fa6ca]">{customization.profileTagline || access.planName}</div>
           <div className="mt-3"><PremiumBadge planId={access.planId} badgeStyleId={customization.profileBadgeId} compact /></div>
         </div>
       </div>
       <div className="mt-5 grid grid-cols-3 gap-3">
-        {["Points", "Wins", "Votes"].map((label, index) => <div key={label} className="rounded-[8px] bg-[#161616] p-3 text-center"><div className="text-lg font-black">{[12840, 12, 500][index]}</div><div className="text-xs text-[#8fa6ca]">{label}</div></div>)}
+        {["Points", "Wins", "Votes"].map((label, index) => <div key={label} className="rounded-[8px] bg-[#161616] p-3 text-center"><div className="text-lg font-black">{0}</div><div className="text-xs text-[#8fa6ca]">{label}</div></div>)}
       </div>
     </div>
   );
@@ -395,11 +395,11 @@ function DashboardPreview({ dashboardStyle }: { dashboardStyle: CustomizationOpt
   return (
     <div className={cn("rounded-[8px] border border-white/10 p-4", dashboardStyle?.previewClass ?? "bg-[#121212]")}>
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[8px] bg-black/45 p-3"><Wallet size={18} className="text-[var(--gold)]" /><div className="mt-3 text-xl font-black">500</div><div className="text-xs text-[#8fa6ca]">DoroCoins</div></div>
-        <div className="rounded-[8px] bg-black/45 p-3"><Trophy size={18} className="text-[var(--gold)]" /><div className="mt-3 text-xl font-black">12.8k</div><div className="text-xs text-[#8fa6ca]">Points</div></div>
+        <div className="rounded-[8px] bg-black/45 p-3"><Wallet size={18} className="text-[var(--gold)]" /><div className="mt-3 text-xl font-black">0</div><div className="text-xs text-[#8fa6ca]">DoroCoins</div></div>
+        <div className="rounded-[8px] bg-black/45 p-3"><Trophy size={18} className="text-[var(--gold)]" /><div className="mt-3 text-xl font-black">0</div><div className="text-xs text-[#8fa6ca]">Points</div></div>
       </div>
       <div className="mt-3 rounded-[8px] border border-white/10 bg-black/45 p-4">
-        <div className="text-sm font-black">Neon City Photo Battle</div>
+        <div className="text-sm font-black">Challenge preview</div>
         <div className="mt-2 h-2 rounded-full bg-[var(--gold)]/60" />
       </div>
     </div>
@@ -413,7 +413,7 @@ function ChallengePreview({ customization, access }: { customization: ProfileCus
       <div className="h-28 rounded-[8px] bg-[linear-gradient(135deg,#111827,#f5d90a)]" />
       <div className="mt-4 flex items-start justify-between gap-3">
         <div>
-          <div className="text-lg font-black">Creator Showdown</div>
+          <div className="text-lg font-black">Challenge card</div>
           <div className="mt-1 text-sm text-[#8fa6ca]">Challenge card preview</div>
         </div>
         {access.isVerifiedHost ? <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-black text-emerald-200">Verified Host</span> : access.isCreatorPro ? <span className="rounded-full bg-fuchsia-400/15 px-3 py-1 text-xs font-black text-fuchsia-200">Creator Pro</span> : null}
@@ -447,3 +447,4 @@ function UnlockPanel({ option, onClose }: { option: CustomizationOption; onClose
     </div>
   );
 }
+

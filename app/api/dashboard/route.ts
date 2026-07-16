@@ -1,9 +1,9 @@
 import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireRequestUser } from "@/lib/server/auth";
-import { ok, serverUnavailable } from "@/lib/server/responses";
 import { getEffectiveTier, getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { requireRequestUser } from "@/lib/server/auth";
+import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
+import { ok, serverUnavailable } from "@/lib/server/responses";
 
 type DashboardChallengeRelationship = "created" | "joined" | "submitted";
 
@@ -41,17 +41,26 @@ export async function GET(request: Request) {
     db.collection("kycMetadata").doc(user.uid).get()
   ]);
 
-  const account = userSnap.exists ? userSnap.data() : {};
-  const profile = profileSnap.exists ? profileSnap.data() : {};
-  const wallet = walletSnap.exists ? walletSnap.data() : {};
+  const account = userSnap.exists ? userSnap.data() ?? {} : {};
+  const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
+  const wallet = walletSnap.exists ? walletSnap.data() ?? {} : {};
   const kyc = kycSnap.exists ? kycSnap.data() ?? {} : {};
-  const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs.map((doc) => personalChallengeFields(doc.id, doc.data(), "created"));
-  const participants: Array<Record<string, unknown>> = participantsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const submissions: Array<Record<string, unknown>> = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const profileLooksSeeded = isQaDemoOrPlaceholderProfile(user.uid, { ...account, ...profile });
+
+  const hostedChallenges: Array<Record<string, unknown>> = ownedChallengesSnap.docs
+    .filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()))
+    .map((doc) => personalChallengeFields(doc.id, doc.data(), "created"));
+  const participants: Array<Record<string, unknown>> = participantsSnap.docs
+    .filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()))
+    .map((doc) => ({ id: doc.id, ...doc.data() }));
+  const submissions: Array<Record<string, unknown>> = submissionsSnap.docs
+    .filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()))
+    .map((doc) => ({ id: doc.id, ...doc.data() }));
   const relatedChallengeSnaps = await loadChallengeDocs(db, [
     ...participants.map((participant) => String(participant.challengeId ?? "")),
     ...submissions.map((submission) => String(submission.challengeId ?? ""))
   ]);
+
   const personalChallenges = new Map<string, Record<string, unknown>>();
   for (const challenge of hostedChallenges) {
     personalChallenges.set(String(challenge.id), challenge);
@@ -59,18 +68,25 @@ export async function GET(request: Request) {
   for (const snap of relatedChallengeSnaps) {
     if (!snap.exists) continue;
     const data = snap.data() ?? {};
+    if (isQaOrDemoRecord(snap.id, data)) continue;
     const relationship: DashboardChallengeRelationship = submissions.some((submission) => String(submission.challengeId ?? "") === snap.id) ? "submitted" : "joined";
     personalChallenges.set(snap.id, personalChallengeFields(snap.id, data, relationship));
   }
+
   const challenges = [...personalChallenges.values()];
-  const notifications = notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const badges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const notifications = notificationsSnap.docs
+    .filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()))
+    .map((doc) => ({ id: doc.id, ...doc.data() }));
+  const badges = badgesSnap.docs
+    .filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()))
+    .map((doc) => ({ id: doc.id, ...doc.data() }));
   const planProfile = { ...profile, ...account };
   const planAccess = getUserPlanAccess(planProfile);
   const effectiveTier = getEffectiveTier(planProfile);
   const accountType = normalizeAccountType(planProfile);
   const sponsorOnboardingComplete = Boolean(planProfile.sponsorOnboardingComplete || planProfile.brandProfileComplete);
   const hasSponsorProfile = Boolean(planProfile.hasSponsorProfile || sponsorOnboardingComplete);
+  const safeTotalPoints = profileLooksSeeded ? 0 : Number(profile?.totalPoints ?? account?.totalPoints ?? 0);
 
   return ok({
     redirectTo: planProfile.accountTypeSelectionComplete === false
@@ -96,7 +112,7 @@ export async function GET(request: Request) {
       creatorOnboardingComplete: Boolean(planProfile.creatorOnboardingComplete),
       hostOnboardingComplete: Boolean(planProfile.hostOnboardingComplete),
       verified: Boolean(profile?.verified ?? user.emailVerified),
-      totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
+      totalPoints: safeTotalPoints,
       doroBalance: Number(wallet?.balance ?? 0),
       kycRequired: Boolean(kyc.kycRequired ?? planProfile.kycRequired),
       kycStatus: String(kyc.kycStatus ?? planProfile.kycStatus ?? "not_required"),
@@ -104,7 +120,7 @@ export async function GET(request: Request) {
     },
     stats: {
       activeChallenges: challenges.filter((challenge) => isChallengeActiveForDashboard(challenge.status)).length,
-      totalPoints: Number(profile?.totalPoints ?? account?.totalPoints ?? 0),
+      totalPoints: safeTotalPoints,
       badgeCount: badges.length,
       submissionCount: submissions.length
     },
@@ -117,4 +133,3 @@ export async function GET(request: Request) {
     notifications
   }, "Dashboard loaded.");
 }
-
