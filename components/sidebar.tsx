@@ -275,7 +275,7 @@ export function Sidebar() {
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{effectiveTier.dashboardName}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} mobile />
-          <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link></div>
+          <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link>{!signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}</div>
         </aside>
       </div> : null}
 
@@ -299,6 +299,7 @@ export function Sidebar() {
               {loading ? <div className="font-bold text-slate-300">Loading profile</div> : signedOut ? <><div className="font-bold text-slate-300">Signed out</div><Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link></> : error ? <><div className="font-bold text-slate-300">Profile unavailable</div><Link className="text-sm text-[var(--gold)]" href="/profile">Retry</Link></> : <><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} labelOverride={effectiveTier.badgeLabel} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></>}
             </div>
           </div>
+          {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
 
@@ -336,12 +337,4 @@ function WorkspaceNavigationLoading() {
 function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
   return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
 }
-
-
-
-
-
-
-
-
 

@@ -80,7 +80,7 @@ export default function SponsorFeaturePage() {
         </div>
         {loading ? <Card className="mt-8 h-72 animate-pulse bg-[#171717]" /> : error ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-6 text-red-200">{error}</Card> :
           <SponsorFeatureGate feature={definition.feature} title={definition.title} currentStatus={profile?.sponsorVerificationStatus} subscriptionStatus={profile?.subscriptionStatus ?? profile?.planStatus ?? profile?.stripeStatus}>
-            {teamPlanLocked ? <Card className="mt-8 border-yellow-500/30 p-8 text-center"><Users className="mx-auto text-[var(--gold)]" size={32} /><h2 className="mt-4 text-2xl font-black">Team access requires an eligible sponsor plan</h2><p className="mt-3 text-slate-300">Your sponsor approval remains active, but this plan does not include team management seats.</p><LinkButton href="/subscriptions" className="mt-6">View Sponsor Plans</LinkButton></Card> :
+            {teamPlanLocked ? <Card className="mt-8 border-yellow-500/30 p-8 text-center"><Users className="mx-auto text-[var(--gold)]" size={32} /><h2 className="mt-4 text-2xl font-black">Team access requires an eligible sponsor plan</h2><p className="mt-3 text-slate-300">Your sponsor approval remains active, but this plan does not include team management seats.</p><LinkButton href="/sponsor/plans" className="mt-6">View Sponsor Plans</LinkButton></Card> :
               definition.feature === "billing" ? <BillingFoundation profile={profile} /> :
               <Card className="mt-8 p-6 sm:p-8"><p className={`text-xs font-black uppercase tracking-[0.18em] ${reviewStatus === "approved" ? "text-emerald-300" : "text-[var(--gold)]"}`}>{reviewStatus === "approved" ? "Sponsor access approved" : "Available during onboarding"}</p><h2 className="mt-3 text-2xl font-black">{definition.title} workspace</h2><p className="mt-3 leading-7 text-slate-300">{reviewStatus === "approved" ? `This route is available for approved sponsors. The full ${definition.title.toLowerCase()} workflow remains a planned product phase.` : "This account and brand preference area remains available while your sponsor profile is being completed or reviewed."} No campaign funds, sponsor money, or payouts can move from this page.</p>{definition.feature === "settings" ? <LinkButton href="/settings" className="mt-6">Open Account Settings</LinkButton> : null}</Card>}
           </SponsorFeatureGate>}
@@ -95,18 +95,4 @@ function BillingFoundation({ profile }: { profile: SponsorShellProfile | null })
     <Card className="p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Campaign Budget</p><h2 className="mt-3 text-2xl font-black">Campaign budget readiness</h2><div className="mt-5 grid gap-3 text-sm text-slate-300">{["Sponsorship payments", "Prize pool contributions", "Boost budget", "Pending payments", "Disputes and refund reviews"].map((item) => <div key={item} className="rounded-[8px] bg-black/30 p-4">{item}: <b>Not active</b></div>)}</div><p className="mt-5 text-sm leading-6 text-slate-400">No sponsor money capture, release, refund, payout, or withdrawal action is available.</p></Card>
   </div>;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
