@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Gift, History, ShoppingCart, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type Summary = any;
@@ -20,7 +20,6 @@ export default function RewardsPage() {
   const lifetime = Number(data?.lifetimeRewardPoints ?? points);
   const credits = data?.spinCreditsByTier ?? { basic: 0, standard: 0, premium: 0 };
   const availableSpins = Number(credits.basic ?? 0) + Number(credits.standard ?? 0) + Number(credits.premium ?? 0);
-  const recent = data?.recentRewards ?? data?.history?.slice?.(0, 5) ?? [];
   const setupRequired = Boolean(data?.prizeSetupRequired);
 
   return (
@@ -60,8 +59,6 @@ export default function RewardsPage() {
           <div className="mt-6 grid gap-4 md:grid-cols-3">{[{ id: "basic", label: "Basic", threshold: 150, cost: 50 }, { id: "standard", label: "Standard", threshold: 270, cost: 70 }, { id: "premium", label: "Premium", threshold: 390, cost: 150 }].map((tier) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">Unlocks at {tier.threshold} points.</p><p className="mt-2 text-sm font-bold text-[var(--gold)]">{tier.cost} points per spin</p></Card>)}</div>
           <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/wallet" variant="secondary"><ShoppingCart size={17} /> Earn More Points</LinkButton></div>
         </Card>
-
-        {recent.length ? <Card className="mt-8 p-6 sm:p-8"><h2 className="flex items-center gap-2 text-2xl font-black"><History className="text-[var(--gold)]" /> Recent activity</h2><div className="mt-5 space-y-3">{recent.map((item: any) => <div key={item.id} className="rounded-[8px] bg-white/[0.04] p-4"><p className="font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs capitalize text-slate-400">{String(item.fulfillmentStatus ?? item.status ?? "recorded").replaceAll("_", " ")}</p></div>)}</div></Card> : <Card className="mt-8"><EmptyState icon={<Gift />} title="No reward activity yet" body="Your reward points and spin history will appear here after eligible activity." action={<LinkButton href="/wallet">Earn More Points</LinkButton>} /></Card>}
       </> : null}
     </AppShell>
   );

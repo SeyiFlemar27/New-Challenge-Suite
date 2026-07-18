@@ -138,8 +138,15 @@ function shortPrizeName(name: string) {
 
 function normalizeVisualPrizes(tier: RewardTier, configured: RewardPrize[]) {
   const active = configured.filter((prize) => String(prize.status ?? "active").toLowerCase() !== "disabled");
-  const source = active.length ? active : [];
-  if (!source.length) return [];
+  if (!active.length) {
+    return Array.from({ length: 5 }, (_, index) => ({
+      id: `${tier}-visual-slot-${index + 1}`,
+      prizeName: `Slot ${index + 1}`,
+      rewardType: "visual_slot",
+      status: "visual_only"
+    }));
+  }
+  const source = active;
   const merged = [...source];
   for (const fallback of tierConfig[tier].fallback) {
     if (merged.length >= 5) break;
@@ -209,7 +216,7 @@ function getAvailability(data: SummaryData | null, tier: RewardTier, prizes: Rew
   if (data.settings?.tierEnabled?.[tier] === false) return { state: "locked", message: `${config.label} is unavailable.` };
   if (points < config.threshold) return { state: "locked", message: `You need ${(config.threshold - points).toLocaleString()} more points to unlock this tier.` };
   if (points < config.cost) return { state: "no_points", message: "Not enough points or spins available." };
-  if (!prizes.length) return { state: "no_prizes", message: "Reward Wheel Setup Required" };
+  if (!prizes.length) return { state: "no_prizes", message: "Reward setup is not available for this tier yet." };
   if (credits <= 0) return { state: "no_credits", message: "Not enough points or spins available." };
   return { state: "active", message: "Ready to spin." };
 }
@@ -360,9 +367,8 @@ export default function RewardWheelPage() {
 
       {loading ? <LoadingWheelState /> : null}
       {!loading && availability.state === "setup_required" ? <WheelUnavailableState /> : null}
-      {!loading && availability.state === "no_prizes" ? <WheelUnavailableState /> : null}
 
-      {!loading && !["setup_required", "no_prizes"].includes(availability.state) ? (
+      {!loading && availability.state !== "setup_required" ? (
         <div className="mt-8">
           <Card className="overflow-hidden border-white/10 bg-[#10100f] p-5 sm:p-7 lg:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

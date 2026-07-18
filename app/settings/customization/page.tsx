@@ -54,7 +54,7 @@ const categorySections: Record<CategoryKey, Array<{ title: string; field: keyof 
     { title: "Creator Brand Color", field: "creatorBrandColorId", options: customizationOptions.accentColors }
   ],
   host: [
-    { title: "Host Badge Style", field: "hostBadgeStyleId", options: customizationOptions.badges.filter((option) => option.requiredPlan === "verified_host") },
+    { title: "Host Styling", field: "hostBadgeStyleId", options: [] },
     { title: "Host Event Card Style", field: "cardStyleId", options: customizationOptions.dashboardStyles.filter((option) => option.requiredPlan !== "free") }
   ]
 };
@@ -183,7 +183,7 @@ export default function CustomizationSettingsPage() {
             </div>
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[["Plan", access.planName], ["Unlocked", access.isVerifiedHost ? "Host Elite" : access.isCreatorPro ? "Creator Studio" : access.isPremium ? "Premium" : "Basics"], ["Active Style", selectedTheme?.name ?? "Default"], ["Unsaved", hasChanges ? `${changeCount} changes` : "All saved"]].map(([label, value]) => (
+            {[["Plan", access.planName], ["Unlocked", access.isVerifiedHost ? "Host tools" : access.isCreatorPro ? "Creator Studio" : access.isPremium ? "Premium" : "Basics"], ["Active Style", selectedTheme?.name ?? "Default"], ["Unsaved", hasChanges ? `${changeCount} changes` : "All saved"]].map(([label, value]) => (
               <div key={label} className="rounded-[8px] border border-white/10 bg-black/40 p-4">
                 <div className="text-xs font-bold uppercase tracking-[.18em] text-[#8fa6ca]">{label}</div>
                 <div className="mt-2 text-lg font-black text-white">{value}</div>
@@ -447,3 +447,4 @@ function UnlockPanel({ option, onClose }: { option: CustomizationOption; onClose
     </div>
   );
 }
+

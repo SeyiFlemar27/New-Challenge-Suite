@@ -50,7 +50,6 @@ export const customizationOptions = {
     { id: "neon_champion", name: "Neon Champion", description: "Electric highlights for high-energy competitors.", category: "theme", requiredPlan: "premium", previewClass: "bg-[linear-gradient(135deg,#06202a,#22d3ee)] border-cyan-300" },
     { id: "platinum_minimal", name: "Platinum Minimal", description: "Clean, restrained, and executive.", category: "theme", requiredPlan: "premium", previewClass: "bg-[linear-gradient(135deg,#18181b,#e4e4e7)] border-zinc-200" },
     { id: "creator_studio", name: "Creator Studio", description: "A richer creator-led brand surface.", category: "theme", requiredPlan: "creator_pro", previewClass: "bg-[linear-gradient(135deg,#17111f,#d946ef)] border-fuchsia-300" },
-    { id: "verified_host_elite", name: "Host Elite", description: "Official host styling with trust-forward accents.", category: "theme", requiredPlan: "verified_host", previewClass: "bg-[linear-gradient(135deg,#10140f,#34d399)] border-emerald-300" }
   ],
   accentColors: [
     { id: "gold", name: "Gold", category: "accentColor", requiredPlan: "free", previewClass: "bg-yellow-300" },
@@ -67,8 +66,6 @@ export const customizationOptions = {
     { id: "creator_pro", name: "Creator Crown", description: "Signals advanced creator tools and monetization.", category: "badge", requiredPlan: "creator_pro", previewClass: "border-fuchsia-300/50 bg-fuchsia-400/15 text-fuchsia-200 shadow-[0_0_26px_rgba(217,70,239,.18)]" },
     { id: "top_voter", name: "Top Voter Flame", description: "A premium voting identity badge.", category: "badge", requiredPlan: "premium", previewClass: "border-orange-300/50 bg-orange-400/15 text-orange-200" },
     { id: "rising_star", name: "Rising Star Spark", description: "For emerging competitors and creators.", category: "badge", requiredPlan: "premium", previewClass: "border-amber-300/50 bg-amber-400/15 text-amber-100" },
-    { id: "verified_host", name: "Host Badge", description: "Official trust badge for live event hosts.", category: "badge", requiredPlan: "verified_host", previewClass: "border-emerald-300/50 bg-emerald-400/15 text-emerald-200 shadow-[0_0_26px_rgba(52,211,153,.18)]" },
-    { id: "elite_host", name: "Elite Host Emblem", description: "The highest host identity treatment.", category: "badge", requiredPlan: "verified_host", previewClass: "border-amber-200/60 bg-emerald-400/15 text-amber-100 shadow-[0_0_30px_rgba(251,191,36,.2)]" }
   ],
   avatarRings: [
     { id: "none", name: "None", category: "avatarRing", requiredPlan: "free", previewClass: "border-white/10" },
@@ -76,14 +73,12 @@ export const customizationOptions = {
     { id: "purple_glow", name: "Purple Glow", category: "avatarRing", requiredPlan: "premium", previewClass: "border-purple-300 shadow-[0_0_24px_rgba(168,85,247,.35)]" },
     { id: "diamond_ring", name: "Diamond Ring", category: "avatarRing", requiredPlan: "premium", previewClass: "border-sky-200" },
     { id: "creator_ring", name: "Creator Ring", category: "avatarRing", requiredPlan: "creator_pro", previewClass: "border-fuchsia-300" },
-    { id: "verified_host_ring", name: "Host Ring", category: "avatarRing", requiredPlan: "verified_host", previewClass: "border-emerald-300" }
   ],
   profileFrames: [
     { id: "default", name: "Default", category: "profileFrame", requiredPlan: "free", previewClass: "border-white/10" },
     { id: "gold_edge", name: "Gold Edge", category: "profileFrame", requiredPlan: "premium", previewClass: "border-yellow-400/50" },
     { id: "premium_glow", name: "Premium Glow", category: "profileFrame", requiredPlan: "premium", previewClass: "border-sky-300/40 shadow-[0_0_24px_rgba(125,211,252,.18)]" },
     { id: "creator_studio_frame", name: "Creator Studio Frame", category: "profileFrame", requiredPlan: "creator_pro", previewClass: "border-fuchsia-300/50" },
-    { id: "verified_host_frame", name: "Host Frame", category: "profileFrame", requiredPlan: "verified_host", previewClass: "border-emerald-300/50" }
   ],
   dashboardStyles: [
     { id: "classic_dark", name: "Classic Dark", category: "dashboardStyle", requiredPlan: "free", previewClass: "bg-[#121212]" },
@@ -91,7 +86,6 @@ export const customizationOptions = {
     { id: "compact_pro", name: "Compact Pro", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-[#171717]" },
     { id: "glass_arena", name: "Glass Arena", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-white/10" },
     { id: "creator_studio", name: "Creator Studio", category: "dashboardStyle", requiredPlan: "creator_pro", previewClass: "bg-fuchsia-400/10" },
-    { id: "host_elite", name: "Host Elite", category: "dashboardStyle", requiredPlan: "verified_host", previewClass: "bg-emerald-400/10" }
   ],
   celebrationEffects: [
     { id: "none", name: "None", category: "celebrationEffect", requiredPlan: "free", previewClass: "bg-white/5" },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Eye, ImageIcon, LockKeyhole, Save, Sparkles, Video, X } from "lucide-react";
+import { CheckCircle2, Eye, FileText, ImageIcon, LockKeyhole, Save, Sparkles, Video, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
@@ -221,7 +221,7 @@ function MediaBrandingStep({ form, base, updateMedia, track }: { form: FormState
 function UploadGallery({ form, base, updateMedia, track, className = "" }: { form: FormState; base: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; className?: string }) {
   return <div className={`${className} space-y-7`}>
     <div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">Add up to 3 challenge images. The first image is required and becomes the primary cover image.</p></div><span className="rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">1 required</span></div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">Add up to 3 challenge images. At least one image is required.</p></div><span className="rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">1 required</span></div>
       {!form.coverImageUrl ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
       <div className="mt-4 grid gap-5 lg:grid-cols-3">
         <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" purpose="Primary cover image used on challenge cards and detail pages." required><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={base + "/banner"} kind="image" buttonLabel="Browse cover image" required onStatusChange={track("coverImageUrl")} /></UploadPanel>
@@ -234,6 +234,14 @@ function UploadGallery({ form, base, updateMedia, track, className = "" }: { for
       <p className="mt-1 text-sm text-slate-400">Optional intro video or trailer. You can continue without video.</p>
       <div className="mt-4 max-w-md"><UploadPanel icon={<Video size={20} />} title="Intro video / trailer" purpose="Optional short video to explain the challenge."><MediaUploadField label="Intro video / trailer" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={base + "/trailers"} kind="video" buttonLabel="Browse trailer video" onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
     </div>
+    <div>
+      <h3 className="text-xl font-black text-white">Documents</h3>
+      <p className="mt-1 text-sm text-slate-400">Add up to 2 optional documents. Challenge document persistence needs backend support.</p>
+      <div className="mt-4 grid gap-5 md:grid-cols-2">
+        <DocumentSlot title="Document 1" />
+        <DocumentSlot title="Document 2" />
+      </div>
+    </div>
   </div>;
 }
 
@@ -245,6 +253,18 @@ function UploadPanel({ icon, title, purpose, required = false, children }: { ico
     <div className="mt-4 flex-1 rounded-[8px] border border-dashed border-white/15 bg-black/25 p-4">{children}</div>
   </Card>;
 }
+
+function DocumentSlot({ title }: { title: string }) {
+  return <UploadPanel icon={<FileText size={20} />} title={title} purpose="Optional rules, brief, or reference document for participants when backend document storage is connected.">
+    <div className="flex min-h-36 flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 bg-black/20 p-5 text-center">
+      <FileText className="text-slate-500" size={28} />
+      <p className="mt-3 text-sm font-bold text-slate-300">Document upload setup required</p>
+      <p className="mt-2 text-xs leading-5 text-slate-500">Documents are not published until backend document persistence is connected.</p>
+      <Button className="mt-4" variant="secondary" disabled>Browse document</Button>
+    </div>
+  </UploadPanel>;
+}
+
 function Helper({ mode, step }: { mode: Mode; step: number }) {
   const copy = mode === "private" && step === 1 ? ["Control who can enter", "Private challenges are invite-only.", "Share access only with intended participants.", "Use approval when entries need review."] : step === 0 ? ["Start with a clear challenge", "Make the goal easy to understand.", "Tell competitors what they are joining.", "Keep the title short and specific."] : step >= 4 ? ["Review before publishing", "Preview without saving records.", "Publish only when ready.", "Unsupported premium fields stay locked."] : ["Build a fair challenge", "Keep rules simple.", "Guide strong submissions.", "Keep timelines clear."];
   return <Card className="h-fit p-5 lg:sticky lg:top-24"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Builder Guide</p><h2 className="mt-3 text-xl font-black text-white">{copy[0]}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">{copy.slice(1).map((item) => <li key={item} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--gold)]" /><span>{item}</span></li>)}</ul></Card>;

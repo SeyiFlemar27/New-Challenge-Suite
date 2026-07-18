@@ -30,8 +30,9 @@ assert.equal(normalizers.includes("images.unsplash.com"), false, "challenge norm
 assert.equal(normalizers.includes("fallbackImageUrl"), false, "challenge normalizer must not use a fake fallback image constant");
 
 const rewardWheel = readFileSync(join(root, "app/rewards/wheel/page.tsx"), "utf8");
-assert.ok(rewardWheel.includes("if (!source.length) return []"), "reward wheel should not render fallback prize slices when no prizes are configured");
-assert.ok(rewardWheel.includes('availability.state === "no_prizes"'), "reward wheel should show setup/unavailable state for missing prize configuration");
+assert.ok(rewardWheel.includes('rewardType: "visual_slot"'), "reward wheel should use neutral visual slots when no prizes are configured");
+assert.ok(rewardWheel.includes('availability.state !== "setup_required"'), "reward wheel should keep Standard and Premium inside the same wheel structure.");
+assert.equal(rewardWheel.includes('availability.state === "no_prizes" ? <WheelUnavailableState'), false, "reward wheel should not show a full setup screen only because a tier has no prizes.");
 
 const rewardsServer = readFileSync(join(root, "lib/server/rewards.ts"), "utf8");
 assert.ok(rewardsServer.includes("const displayPrizes = prizeSetupRequired ? [] : prizes"), "reward summary should hide default setup prizes from public prize lists");

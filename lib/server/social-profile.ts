@@ -22,7 +22,7 @@ export function derivedBadges(profile: Record<string, unknown>, stored: Array<Re
   if (profile.verified || profile.verificationStatus === "verified") add("verified-user", "Verified User", "verification");
   if (plan.isCreator) add("creator-plan", "Creator Badge", "plan");
   if (plan.isPro) add("pro-plan", "Pro Badge", "plan");
-  if (plan.isHost) add("host-plan", "Host Badge", "host");
+  if (plan.isHost) add("host-plan", "Host tools", "host");
   if (plan.isSponsor && profile.sponsorVerificationStatus === "approved") add("verified-sponsor", "Verified Sponsor", "sponsor");
   return badges;
 }
@@ -90,3 +90,4 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
     activity
   };
 }
+

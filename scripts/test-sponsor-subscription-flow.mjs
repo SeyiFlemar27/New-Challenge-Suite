@@ -35,10 +35,10 @@ assertNotIncludes(subscriptions, "Sponsors & Brands", "/subscriptions does not s
 assertNotIncludes(subscriptions, "Sponsor & Brands", "/subscriptions does not show Sponsor & Brands toggle");
 assertNotIncludes(subscriptions, "Brand Command Center", "/subscriptions does not sell sponsor dashboard access");
 assertIncludes(subscriptions, "plan.audience === \"user\"", "/subscriptions filters normal user plans");
-assertIncludes(subscriptions, "Free", "/subscriptions supports Free plan content");
-assertIncludes(subscriptions, "Creator", "/subscriptions supports Creator plan content");
-assertIncludes(subscriptions, "Host", "/subscriptions supports Host plan content");
-assertIncludes(subscriptions, "Enterprise", "/subscriptions supports Enterprise plan content");
+assertIncludes(subscriptions, 'plan.id === "free"', "/subscriptions supports Free plan content");
+assertIncludes(subscriptions, 'plan.id === "host"', "/subscriptions supports Host plan content");
+assertIncludes(subscriptions, '!["pro", "enterprise"].includes(plan.id)', "/subscriptions keeps Creator public while excluding pro and enterprise public cards");
+assertIncludes(subscriptions, "Need Enterprise access?", "/subscriptions supports Enterprise application access");
 
 assertIncludes(sidebar, "Become a Sponsor", "account/profile navigation includes Become a Sponsor");
 assertIncludes(sidebar, "/sponsor/onboarding", "Become a Sponsor routes to sponsor onboarding");

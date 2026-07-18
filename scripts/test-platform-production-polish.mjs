@@ -12,6 +12,9 @@ const enterprisePanel = read("app/enterprise/page.tsx");
 const enterpriseApi = read("app/api/enterprise-inquiries/route.ts");
 const settingsPage = read("app/settings/page.tsx");
 const settingsSection = read("app/settings/[section]/page.tsx");
+const customizationPage = read("app/settings/customization/page.tsx");
+const customizationOptions = read("lib/customization/options.ts");
+const socialProfile = read("lib/server/social-profile.ts");
 const builder = read("components/challenge-builder.tsx");
 const rewards = read("app/rewards/page.tsx");
 const rewardWheel = read("app/rewards/wheel/page.tsx");
@@ -28,6 +31,10 @@ assert(!subscriptions.includes("Enterprise Partner"), "Sponsor Enterprise Partne
 assert(!subscriptions.includes("Sponsor Starter"), "Sponsor Starter must not appear on /subscriptions.");
 assert(!subscriptions.includes("Brand Partner"), "Brand Partner must not appear on /subscriptions.");
 assert(!subscriptions.includes("Manage Billing</"), "Manage Billing should not render as a large /subscriptions action.");
+assert(!subscriptions.includes("Creator and Host plans unlock"), "Subscriptions should not show the old top info block.");
+assert(!subscriptions.includes("Looking for brand sponsorship tools?"), "Subscriptions should not show the old sponsor-routing top block.");
+assert(!subscriptions.includes("Current Plan"), "Subscriptions should not show a current-plan top block.");
+assert(!subscriptions.includes("Open Settings Subscription"), "Subscriptions should not show the old settings subscription button.");
 
 assert(enterpriseApply.includes("Enterprise application submitted"), "Enterprise application should have a safe submitted state.");
 assert(enterpriseApply.includes("Submitting an application does not guarantee approval."), "Enterprise application must explain manual approval.");
@@ -45,18 +52,27 @@ assert(settingsSection.includes("Manage Billing - Billing portal setup required"
 assert(settingsSection.includes("Invoices appear after successful payment"), "Settings Subscription should hold invoice empty state.");
 
 assert(builder.includes("Images"), "Builder upload step must include Images section.");
+assert(builder.includes("Add up to 3 challenge images. At least one image is required."), "Builder Images section should explain the required gallery rule.");
 assert(builder.includes("Image 1"), "Builder upload step must include Image 1.");
 assert(builder.includes("Image 2"), "Builder upload step must include Image 2.");
 assert(builder.includes("Image 3"), "Builder upload step must include Image 3.");
 assert(builder.includes("Video"), "Builder upload step must include Video section.");
 assert(builder.includes("Intro video / trailer"), "Builder upload step must include one intro video/trailer upload.");
+assert(builder.includes("Documents"), "Builder upload step must include Documents section.");
+assert(builder.includes("Document 1"), "Builder upload step must include Document 1.");
+assert(builder.includes("Document 2"), "Builder upload step must include Document 2.");
+assert(builder.includes("Document upload setup required"), "Builder document uploads must be setup-safe.");
+const imageSectionIndex = builder.indexOf('text-white">Images');
+const videoSectionIndex = builder.indexOf('text-white">Video');
+const documentsSectionIndex = builder.indexOf('text-white">Documents');
+assert(imageSectionIndex >= 0 && videoSectionIndex > imageSectionIndex && documentsSectionIndex > videoSectionIndex, "Builder media sections must be ordered Images, Video, Documents.");
 assert(builder.includes("Add at least one challenge image to continue."), "Builder must require at least one image.");
 assert(builder.includes("requiredImageMissing"), "Builder must enforce required image state.");
 assert(builder.includes('type="datetime-local"'), "Builder should use a calendar/date input flow.");
-assert(!/Documents|document upload/i.test(builder), "Builder must not include document uploads.");
 assert(!/(Fiverr|gig|buyer|seller)/i.test(builder), "Builder copy must not use marketplace wording.");
 
-assert(!/Verified Host Shield|Verified Host/.test(builder + settingsPage + settingsSection + customizationAccess), "Verified Host user-facing copy must be removed from touched surfaces.");
+const hostBadgeSurfaces = builder + settingsPage + settingsSection + customizationPage + customizationOptions + customizationAccess + socialProfile;
+assert(!/Host Badge|Verified Host Shield|Verified Host|Host Shield/.test(hostBadgeSurfaces), "Host Badge and Verified Host user-facing copy must be removed from touched surfaces.");
 
 assert(rewards.includes("Available Spins"), "Rewards page should use Available Spins naming.");
 assert(rewards.includes("No reward activity yet"), "Rewards page should show empty reward activity state.");
@@ -64,9 +80,15 @@ assert(!/10,000 points|Awaiting Claim|Basic Spins/.test(rewards), "Rewards page 
 assert(rewardWheel.includes("Available Spin"), "Reward wheel should use Available Spins naming.");
 assert(rewardWheel.includes("You need"), "Reward wheel should show threshold lock copy.");
 assert(rewardWheel.includes("Not enough points or spins available."), "Reward wheel should show insufficient eligibility copy.");
+assert(rewardWheel.includes("Reward setup is not available for this tier yet."), "Standard and Premium should stay in the wheel structure when tier prize setup is missing.");
+assert(!rewardWheel.includes('availability.state === "no_prizes" ? <WheelUnavailableState'), "Tier selection should not show the full setup-required screen for missing tier prizes.");
 assert(!/Sound off|Effects on|Prize Set|SpinControls|PrizeLegend|recentResults|Basic Spins/.test(rewardWheel), "Reward wheel must not show old controls, side panels, or fake recent state.");
+assert(!/10,000 points|86 spins|40 \/ 20/.test(rewards + rewardWheel), "Rewards surfaces must not show fake point or spin values.");
 
 assert(layout.includes("icons:"), "App metadata should define favicon icons.");
 assert(exists("app/icon.tsx"), "App Router icon asset should exist.");
+
+const changedProductionSurfaces = subscriptions + builder + rewards + rewardWheel + customizationPage;
+assert(!/withdrawal|payout provider|bank account|Stripe Connect|Paystack payout/i.test(changedProductionSurfaces), "This pass must not introduce withdrawal or payout UI/backend behavior.");
 
 console.log("Platform production polish checks passed.");
