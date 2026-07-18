@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: { default: "Challenge Suite", template: "%s | Challenge Suite" },
   description: "Create, enter, vote, and run structured challenges for competitors, creators, Hosts, and brands.",
   alternates: { canonical: "/" },
+  icons: { icon: "/icon", shortcut: "/icon", apple: "/icon" },
   openGraph: {
     type: "website",
     url: "https://www.challengesuite.com",

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, CheckCircle2, ClipboardList, Download, Radio, ShieldCheck, Swords, UsersRound, Vote } from "lucide-react";
@@ -38,7 +38,7 @@ export default function HostControlCenterPage() {
   return (
     <PlanFeatureGate feature="host_control_center" requiredPlan="Host" title="Host tools are available on the Host Plan">
       <AppShell>
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{tier.id === "host" ? "Host Plan / Verified Host" : experience.badgeLabel}</p>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{tier.id === "host" ? "Host Plan / Host" : experience.badgeLabel}</p>
         <div className="mt-2 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <PageTitle title="Host Control Center" subtitle="Run competitions, manage participants, control voting, review submissions, and monitor event performance." />
           <div className="flex flex-wrap gap-3">
@@ -106,6 +106,3 @@ function Metric({ title, value, note }: { title: string; value: string | number;
 function Checklist({ label, done = false, href }: { label: string; done?: boolean; href: string }) {
   return <LinkButton href={href} variant="ghost" className="min-h-14 justify-start border border-white/10"><CheckCircle2 className={done ? "text-emerald-400" : "text-slate-500"} size={18} /> {label}</LinkButton>;
 }
-
-
-

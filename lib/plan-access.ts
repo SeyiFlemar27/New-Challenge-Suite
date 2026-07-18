@@ -218,7 +218,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     planId: "host",
     dashboardName: "Host Control Center",
     dashboardSubtitle: "Operate competitions, participants, submissions, voting, events, sponsors, and review-safe revenue reporting.",
-    badgeLabel: "Verified Host",
+    badgeLabel: "Host",
     challengeLimitLabel: "Unlimited challenges",
     privateChallengeLimitLabel: "Unlimited private challenges",
     monthlyChallengeLimit: null,
@@ -725,7 +725,7 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
     const experience = planExperiences[planId];
     const id = planId === "creator" || planId === "pro" || planId === "host" || planId === "enterprise" ? planId : "free_competitor";
     const paidDisplayName = planId === "host" ? "Host Plan" : `${experience.badgeLabel} Plan`;
-    const paidMemberLabel = planId === "host" ? "Verified Host" : `${experience.badgeLabel} Member`;
+    const paidMemberLabel = planId === "host" ? "Host" : `${experience.badgeLabel} Member`;
     return {
       id,
       planId,

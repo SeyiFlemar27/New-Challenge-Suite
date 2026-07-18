@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { Gift, History, ShoppingCart, Sparkles, Trophy } from "lucide-react";
+import { Gift, History, ShoppingCart, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
@@ -19,17 +19,14 @@ export default function RewardsPage() {
   const points = Number(data?.availableRewardPoints ?? data?.points ?? 0);
   const lifetime = Number(data?.lifetimeRewardPoints ?? points);
   const credits = data?.spinCreditsByTier ?? { basic: 0, standard: 0, premium: 0 };
-  const tiers = data?.tiers ?? [];
-  const next = data?.progress?.nextTier ?? tiers.find((tier: any) => points < Number(tier.pointsRequired));
-  const needed = next ? Math.max(0, Number(next.pointsRequired) - points) : 0;
+  const availableSpins = Number(credits.basic ?? 0) + Number(credits.standard ?? 0) + Number(credits.premium ?? 0);
   const recent = data?.recentRewards ?? data?.history?.slice?.(0, 5) ?? [];
-  const noCredits = !Number(credits.basic ?? 0) && !Number(credits.standard ?? 0) && !Number(credits.premium ?? 0);
   const setupRequired = Boolean(data?.prizeSetupRequired);
 
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title="Voter Rewards" subtitle="Earn points from eligible DoroCoin purchases and use them for reward spins." icon={<Gift className="text-[var(--gold)]" />} />
+        <PageTitle title="Voter Rewards" subtitle="Track real reward points, available spins, and confirmed reward activity." icon={<Gift className="text-[var(--gold)]" />} />
         <div className="flex flex-col gap-3 sm:flex-row xl:pt-2">
           <LinkButton href="/rewards/history" variant="secondary" className="justify-center"><History size={17} /> Reward History</LinkButton>
           <LinkButton href="/rewards/wheel" className="justify-center"><Trophy size={17} /> Open Spin Wheel</LinkButton>
@@ -37,41 +34,34 @@ export default function RewardsPage() {
       </div>
 
       {message ? <Card className="mt-6 border-yellow-500/20 p-4 text-yellow-100">{message}</Card> : null}
-      {!data && !message ? <div className="mt-8 grid gap-5 md:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-32 animate-pulse" />)}</div> : null}
+      {!data && !message ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-32 animate-pulse" />)}</div> : null}
 
       {data ? <>
-        <div className="mt-8 grid gap-5 md:grid-cols-4">
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
           <Metric label="Available Points" value={points.toLocaleString()} />
           <Metric label="Lifetime Points" value={lifetime.toLocaleString()} />
-          <Metric label="Basic Spins" value={String(credits.basic ?? 0)} />
-          <Metric label="Standard / Premium" value={`${credits.standard ?? 0} / ${credits.premium ?? 0}`} />
+          <Metric label="Available Spins" value={availableSpins.toLocaleString()} />
         </div>
 
-        {points <= 0 && noCredits ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:p-8">
-          <h2 className="flex items-center gap-2 text-2xl font-black"><Gift className="text-[var(--gold)]" /> No rewards yet</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Eligible reward activity will appear here once you earn points.</p>
+        {points <= 0 && availableSpins <= 0 ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:p-8">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><Gift className="text-[var(--gold)]" /> No reward activity yet</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Your reward points and spin history will appear here after eligible activity.</p>
           <div className="mt-5 flex flex-wrap gap-3"><LinkButton href="/wallet"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div>
         </Card> : null}
 
         {setupRequired ? <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-6">
-          <h2 className="text-xl font-black text-yellow-100">Reward prize setup required</h2>
+          <h2 className="text-xl font-black text-yellow-100">Reward Wheel Setup Required</h2>
           <p className="mt-2 text-sm leading-6 text-yellow-50/80">Reward points can still be tracked. Prize setup is required before spins are available.</p>
           <LinkButton href="/rewards/wheel" variant="secondary" className="mt-4">Open Spin Wheel</LinkButton>
         </Card> : null}
 
-        <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_380px]">
-          <Card className="p-6 sm:p-8">
-            <h2 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="text-[var(--gold)]" /> Tier progress</h2>
-            {next ? <div className="mt-6"><div className="flex flex-col gap-2 text-sm font-bold sm:flex-row sm:justify-between"><span>{points.toLocaleString()} points</span><span>{needed.toLocaleString()} more for {next.label}</span></div><div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--gold)]" style={{ width: `${Math.min(100, Math.round(points / Number(next.pointsRequired) * 100))}%` }} /></div><p className="mt-4 rounded-[8px] bg-[var(--gold)]/10 p-4 text-sm font-bold text-[var(--gold)]">{needed.toLocaleString()} more points to unlock your next {next.label} spin.</p></div> : <p className="mt-5 rounded-[8px] bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">All current reward tiers reached. Future DoroCoin purchases continue adding lifetime points and configured spin credits.</p>}
-            <div className="mt-7 grid gap-4 md:grid-cols-3">{[{ id: "basic", label: "Basic", threshold: 150, cost: 50 }, { id: "standard", label: "Standard", threshold: 270, cost: 70 }, { id: "premium", label: "Premium", threshold: 390, cost: 150 }].map((tier) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">Unlock at {tier.threshold} points.</p><p className="mt-2 text-sm font-bold text-[var(--gold)]">{tier.cost} points per spin</p></Card>)}</div>
-            <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/wallet" variant="secondary"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div>
-            
-          </Card>
-          <Card className="p-6 sm:p-8">
-            <h2 className="flex items-center gap-2 text-2xl font-black"><History className="text-[var(--gold)]" /> Recent reward activity</h2>
-            {recent.length ? <div className="mt-5 space-y-3">{recent.map((item: any) => <div key={item.id} className="rounded-[8px] bg-white/[0.04] p-4"><p className="font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs capitalize text-slate-400">{String(item.fulfillmentStatus ?? item.status ?? "recorded").replaceAll("_", " ")}</p></div>)}</div> : <EmptyState icon={<Gift />} title="No rewards yet" body="Eligible reward activity will appear here once you earn points." action={<LinkButton href="/wallet">Buy DoroCoins</LinkButton>} />}
-          </Card>
-        </div>
+        <Card className="mt-8 p-6 sm:p-8">
+          <h2 className="text-2xl font-black">Reward tiers</h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">{[{ id: "basic", label: "Basic", threshold: 150, cost: 50 }, { id: "standard", label: "Standard", threshold: 270, cost: 70 }, { id: "premium", label: "Premium", threshold: 390, cost: 150 }].map((tier) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">Unlocks at {tier.threshold} points.</p><p className="mt-2 text-sm font-bold text-[var(--gold)]">{tier.cost} points per spin</p></Card>)}</div>
+          <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/wallet" variant="secondary"><ShoppingCart size={17} /> Earn More Points</LinkButton></div>
+        </Card>
+
+        {recent.length ? <Card className="mt-8 p-6 sm:p-8"><h2 className="flex items-center gap-2 text-2xl font-black"><History className="text-[var(--gold)]" /> Recent activity</h2><div className="mt-5 space-y-3">{recent.map((item: any) => <div key={item.id} className="rounded-[8px] bg-white/[0.04] p-4"><p className="font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs capitalize text-slate-400">{String(item.fulfillmentStatus ?? item.status ?? "recorded").replaceAll("_", " ")}</p></div>)}</div></Card> : <Card className="mt-8"><EmptyState icon={<Gift />} title="No reward activity yet" body="Your reward points and spin history will appear here after eligible activity." action={<LinkButton href="/wallet">Earn More Points</LinkButton>} /></Card>}
       </> : null}
     </AppShell>
   );

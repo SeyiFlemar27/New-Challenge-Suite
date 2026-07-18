@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Eye, ImageIcon, LockKeyhole, Save, Sparkles, Video, X } from "lucide-react";
@@ -15,7 +15,7 @@ type FormState = {
   title: string; category: string; description: string; shortDescription: string;
   rules: string; terms: string; submission: string; access: string;
   submissionTypes: string[]; startsAt: string; submissionDeadline: string; votingDeadline: string; endsAt: string;
-  coverImageUrl: string; coverImagePath: string; promoImageUrl: string; promoImagePath: string; trailerVideoUrl: string; trailerVideoPath: string;
+  coverImageUrl: string; coverImagePath: string; promoImageUrl: string; promoImagePath: string; galleryImageUrl: string; galleryImagePath: string; trailerVideoUrl: string; trailerVideoPath: string;
 };
 
 const publicSteps = ["Overview", "Rules & Eligibility", "Entry & Submission", "Voting & Timeline", "Media & Branding", "Review & Publish"];
@@ -29,7 +29,7 @@ function dateInput(days: number) {
 }
 
 function initialForm(): FormState {
-  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), submissionDeadline: dateInput(5), votingDeadline: dateInput(6), endsAt: dateInput(9), coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", trailerVideoUrl: "", trailerVideoPath: "" };
+  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), submissionDeadline: dateInput(5), votingDeadline: dateInput(6), endsAt: dateInput(9), coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "" };
 }
 
 export function ChallengeBuilder({ mode }: { mode: Mode }) {
@@ -53,6 +53,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
   const uploadInProgress = Object.values(media).some((status) => ["preparing", "uploading", "processing"].includes(status));
   const uploadFailed = Object.values(media).some((status) => status === "failed");
   const freeLimitReached = isFreePublic && freeUsage.loaded && freeUsage.remaining <= 0;
+  const requiredImageMissing = !form.coverImageUrl || !form.coverImagePath;
 
   useEffect(() => {
     if (!loading && isFreePublic) {
@@ -131,8 +132,8 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
 
   const localValidation = useMemo(() => validateChallengeForPublish(payload(true) as Record<string, unknown>, { mode: "publish", userId: user?.uid }), [form, mode, user?.uid]);
   const validation = serverValidation ?? localValidation;
-  const publishBlocked = uploadInProgress || uploadFailed || privateLocked || freeLimitReached || !localValidation.valid;
-  const publishLabel = uploadInProgress ? "Upload in Progress" : uploadFailed ? "Fix Upload" : privateLocked ? "Upgrade Required" : freeLimitReached ? "Limit Reached" : !localValidation.valid ? "Complete " + localValidation.missingCount + " Item" + (localValidation.missingCount === 1 ? "" : "s") : mode === "private" ? "Publish Private Challenge" : "Publish Challenge";
+  const publishBlocked = uploadInProgress || uploadFailed || privateLocked || freeLimitReached || requiredImageMissing || !localValidation.valid;
+  const publishLabel = uploadInProgress ? "Upload in Progress" : uploadFailed ? "Fix Upload" : privateLocked ? "Upgrade Required" : freeLimitReached ? "Limit Reached" : requiredImageMissing ? "Add Challenge Image" : !localValidation.valid ? "Complete " + localValidation.missingCount + " Item" + (localValidation.missingCount === 1 ? "" : "s") : mode === "private" ? "Publish Private Challenge" : "Publish Challenge";
 
   function validateStep() {
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
@@ -196,7 +197,7 @@ function Locked({ title, body, primaryHref, primaryLabel, secondaryHref, seconda
 }
 
 function Stepper({ steps, current, onSelect }: { steps: string[]; current: number; onSelect: (step: number) => void }) {
-  return <div className="flex gap-3 overflow-x-auto pb-1">{steps.map((label, index) => <button key={label} type="button" onClick={() => onSelect(index)} className={(index === current ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < current ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-[#171717] text-slate-400") + " flex min-w-[170px] items-center gap-3 rounded-[8px] border px-4 py-3 text-left text-sm font-black"}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/20">{index < current ? "âœ“" : index + 1}</span><span>{label}</span></button>)}</div>;
+  return <div className="flex gap-3 overflow-x-auto pb-1">{steps.map((label, index) => <button key={label} type="button" onClick={() => onSelect(index)} className={(index === current ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < current ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-[#171717] text-slate-400") + " flex min-w-[170px] items-center gap-3 rounded-[8px] border px-4 py-3 text-left text-sm font-black"}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/20">{index < current ? "Done" : index + 1}</span><span>{label}</span></button>)}</div>;
 }
 
 function StepTitle({ title, body }: { title: string; body: string }) { return <div><h2 className="text-2xl font-black text-white">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{body}</p></div>; }
@@ -218,10 +219,21 @@ function MediaBrandingStep({ form, base, updateMedia, track }: { form: FormState
 }
 
 function UploadGallery({ form, base, updateMedia, track, className = "" }: { form: FormState; base: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; className?: string }) {
-  return <div className={`${className} grid gap-5 xl:grid-cols-3`}>
-    <UploadPanel icon={<ImageIcon size={20} />} title="Cover image" purpose="Main visual shown on challenge cards and detail pages." required><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={base + "/banner"} kind="image" buttonLabel="Browse cover image" required onStatusChange={track("coverImageUrl")} /></UploadPanel>
-    <UploadPanel icon={<ImageIcon size={20} />} title="Promo flyer / poster" purpose="Optional promotional asset for social sharing and campaign promotion."><MediaUploadField label="Promo flyer / poster" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={base + "/promo-flyer"} kind="image" buttonLabel="Browse promo asset" onStatusChange={track("promoImageUrl")} /></UploadPanel>
-    <UploadPanel icon={<Video size={20} />} title="Intro video / trailer" purpose="Optional short video to explain the challenge. Keep it focused."><MediaUploadField label="Intro video / trailer" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={base + "/trailers"} kind="video" buttonLabel="Browse trailer video" onStatusChange={track("trailerVideoUrl")} /></UploadPanel>
+  return <div className={`${className} space-y-7`}>
+    <div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">Add up to 3 challenge images. The first image is required and becomes the primary cover image.</p></div><span className="rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">1 required</span></div>
+      {!form.coverImageUrl ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
+      <div className="mt-4 grid gap-5 lg:grid-cols-3">
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" purpose="Primary cover image used on challenge cards and detail pages." required><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={base + "/banner"} kind="image" buttonLabel="Browse cover image" required onStatusChange={track("coverImageUrl")} /></UploadPanel>
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 2" purpose="Promo flyer / poster for campaign surfaces when supported."><MediaUploadField label="Promo flyer / poster" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={base + "/promo-flyer"} kind="image" buttonLabel="Browse promo asset" onStatusChange={track("promoImageUrl")} /></UploadPanel>
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 3" purpose="Optional gallery preview. Backend gallery storage will be connected later."><MediaUploadField label="Gallery image" value={form.galleryImageUrl} onChange={(url, metadata) => updateMedia("galleryImageUrl", "galleryImagePath", url, metadata)} storagePath={base + "/gallery"} kind="image" buttonLabel="Browse gallery image" onStatusChange={track("galleryImageUrl")} /></UploadPanel>
+      </div>
+    </div>
+    <div>
+      <h3 className="text-xl font-black text-white">Video</h3>
+      <p className="mt-1 text-sm text-slate-400">Optional intro video or trailer. You can continue without video.</p>
+      <div className="mt-4 max-w-md"><UploadPanel icon={<Video size={20} />} title="Intro video / trailer" purpose="Optional short video to explain the challenge."><MediaUploadField label="Intro video / trailer" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={base + "/trailers"} kind="video" buttonLabel="Browse trailer video" onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
+    </div>
   </div>;
 }
 
@@ -241,10 +253,9 @@ function Helper({ mode, step }: { mode: Mode; step: number }) {
 function Checklist({ readiness, className = "" }: { readiness: ChallengeValidationResult; className?: string }) {
   const blocking = readiness.errors.filter((issue) => issue.severity === "error");
   if (!blocking.length) return <Card className={className + " border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100"}>Ready to publish. The existing server validation will check this again before saving.</Card>;
-  return <Card className={className + " border-yellow-500/30 bg-yellow-500/5 p-4"}><p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p><h3 className="mt-1 text-lg font-black text-white">Complete {readiness.missingCount} item{readiness.missingCount === 1 ? "" : "s"}</h3><ul className="mt-3 space-y-1 text-sm text-slate-300">{blocking.slice(0, 5).map((issue) => <li key={issue.code + issue.field}>â€¢ {issue.message}</li>)}</ul></Card>;
+  return <Card className={className + " border-yellow-500/30 bg-yellow-500/5 p-4"}><p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p><h3 className="mt-1 text-lg font-black text-white">Complete {readiness.missingCount} item{readiness.missingCount === 1 ? "" : "s"}</h3><ul className="mt-3 space-y-1 text-sm text-slate-300">{blocking.slice(0, 5).map((issue) => <li key={issue.code + issue.field}>- {issue.message}</li>)}</ul></Card>;
 }
 
 function Preview({ mode, form, onClose, onPublish, publishDisabled, publishLabel }: { mode: Mode; form: FormState; onClose: () => void; onPublish: () => void; publishDisabled: boolean; publishLabel: string }) {
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="challenge-preview-title"><Card className="max-h-[92vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Preview</p><h2 id="challenge-preview-title" className="mt-2 text-2xl font-black">{form.title || "Untitled challenge"}</h2><p className="mt-2 text-sm text-slate-400">{mode === "private" ? "Private / invite-only" : "Public"} - {form.category || "Category not set"}</p></div><button className="rounded-[8px] bg-white/10 p-2 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" onClick={onClose} aria-label="Close preview"><X size={18} /></button></div>{form.coverImageUrl ? <img src={form.coverImageUrl} alt="" className="mt-5 aspect-[16/9] w-full rounded-[8px] object-cover" /> : <div className="mt-5 flex aspect-[16/9] w-full items-center justify-center rounded-[8px] border border-dashed border-white/15 bg-[#181818] text-sm text-slate-500">Cover image preview</div>}<p className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-300">{form.description || "Challenge description will appear here."}</p><div className="mt-7 grid gap-3 sm:flex sm:justify-end"><Button variant="secondary" onClick={onClose}>Back to editing</Button><Button onClick={onPublish} disabled={publishDisabled}>{publishLabel}</Button></div></Card></div>;
 }
-

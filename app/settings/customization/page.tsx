@@ -24,7 +24,7 @@ const categories: Array<{ id: CategoryKey; label: string; icon: ReactNode; summa
   { id: "dashboard", label: "Dashboard", icon: <BarChart3 size={16} />, summary: "Cards and dashboard atmosphere." },
   { id: "effects", label: "Effects", icon: <Sparkles size={16} />, summary: "Celebration and premium vote effects." },
   { id: "creator", label: "Creator Studio", icon: <Crown size={16} />, summary: "Creator Pro brand controls." },
-  { id: "host", label: "Verified Host", icon: <ShieldCheck size={16} />, summary: "Official live-event host identity." }
+  { id: "host", label: "Host", icon: <ShieldCheck size={16} />, summary: "Official live-event host identity." }
 ];
 
 const categorySections: Record<CategoryKey, Array<{ title: string; field: keyof ProfileCustomization; options: CustomizationOption[] }>> = {
@@ -72,13 +72,13 @@ const badgeIconById: Record<string, React.ReactNode> = {
 
 function requiredPlanLabel(planId: string) {
   if (planId === "creator_pro") return "Creator Pro";
-  if (planId === "verified_host") return "Verified Host";
+  if (planId === "verified_host") return "Host";
   if (planId === "premium") return "Premium";
   return "Free Member";
 }
 
 function unlockCta(planId: ProductPlanId) {
-  if (planId === "verified_host") return { href: "/live-events/host/apply", label: "Apply for Verified Host" };
+  if (planId === "verified_host") return { href: "/live-events/host/apply", label: "Apply for Host Access" };
   if (planId === "creator_pro") return { href: "/subscriptions", label: "Upgrade to Creator Pro" };
   return { href: "/subscriptions", label: "Upgrade to Premium" };
 }
@@ -266,7 +266,7 @@ export default function CustomizationSettingsPage() {
                     <input className={inputClass} type="file" disabled />
                   </Field>
                 </div>
-                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUseVerifiedHostBranding ? "Upload controls are not available yet." : "Official host branding requires Verified Host approval."}</p>
+                <p className="mt-4 text-sm text-[#8fa6ca]">{access.canUseVerifiedHostBranding ? "Upload controls are not available yet." : "Official host branding requires Host approval."}</p>
               </Card>
             ) : null}
           </div>
@@ -416,7 +416,7 @@ function ChallengePreview({ customization, access }: { customization: ProfileCus
           <div className="text-lg font-black">Challenge card</div>
           <div className="mt-1 text-sm text-[#8fa6ca]">Challenge card preview</div>
         </div>
-        {access.isVerifiedHost ? <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-black text-emerald-200">Verified Host</span> : access.isCreatorPro ? <span className="rounded-full bg-fuchsia-400/15 px-3 py-1 text-xs font-black text-fuchsia-200">Creator Pro</span> : null}
+        {access.isVerifiedHost ? <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-black text-emerald-200">Host</span> : access.isCreatorPro ? <span className="rounded-full bg-fuchsia-400/15 px-3 py-1 text-xs font-black text-fuchsia-200">Creator Pro</span> : null}
       </div>
       <div className="mt-4 flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40 text-xs font-black">{access.isCreatorPro ? "LOGO" : "CS"}</div>
@@ -447,4 +447,3 @@ function UnlockPanel({ option, onClose }: { option: CustomizationOption; onClose
     </div>
   );
 }
-

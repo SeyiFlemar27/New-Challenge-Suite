@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
-import { AlertCircle, ArrowLeft, CheckCircle2, Gift, History, RotateCcw, RotateCw, Sparkles, Trophy, Volume2, VolumeX } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Gift, History, RotateCcw, RotateCw, Trophy } from "lucide-react";
 
 const tiers = ["basic", "standard", "premium"] as const;
 type RewardTier = (typeof tiers)[number];
@@ -26,8 +26,6 @@ type SummaryData = {
   settings?: any;
   prizes?: Record<string, RewardPrize[]>;
   spinCreditsByTier?: Record<string, number>;
-  recentRewards?: any[];
-  history?: any[];
   prizeSetupRequired?: boolean;
   availableRewardPoints?: number;
   rewardPoints?: number;
@@ -209,10 +207,10 @@ function getAvailability(data: SummaryData | null, tier: RewardTier, prizes: Rew
   if (!data.settings?.rewardsEnabled) return { state: "unavailable", message: "Rewards are unavailable." };
   if (data.settings?.maintenanceMode) return { state: "unavailable", message: "Rewards are paused." };
   if (data.settings?.tierEnabled?.[tier] === false) return { state: "locked", message: `${config.label} is unavailable.` };
-  if (points < config.threshold) return { state: "locked", message: `${config.threshold.toLocaleString()} points required.` };
-  if (points < config.cost) return { state: "no_points", message: `${config.cost.toLocaleString()} points needed to spin.` };
+  if (points < config.threshold) return { state: "locked", message: `You need ${(config.threshold - points).toLocaleString()} more points to unlock this tier.` };
+  if (points < config.cost) return { state: "no_points", message: "Not enough points or spins available." };
   if (!prizes.length) return { state: "no_prizes", message: "Reward Wheel Setup Required" };
-  if (credits <= 0) return { state: "no_credits", message: `No ${config.label} spins available.` };
+  if (credits <= 0) return { state: "no_credits", message: "Not enough points or spins available." };
   return { state: "active", message: "Ready to spin." };
 }
 
@@ -261,11 +259,6 @@ function friendlySpinError(message: string, code?: string) {
   return map[normalized] ?? message ?? "Spin could not be completed.";
 }
 
-function isMeaningfulReward(result: any) {
-  const key = resultKey(result);
-  return key !== "no-reward" && !String(result?.prizeName ?? "").toLowerCase().includes("luck");
-}
-
 export default function RewardWheelPage() {
   const [data, setData] = useState<SummaryData | null>(null);
   const [tier, setTier] = useState<RewardTier>("basic");
@@ -274,8 +267,6 @@ export default function RewardWheelPage() {
   const [requestingSpin, setRequestingSpin] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<any>(null);
-  const [soundOn, setSoundOn] = useState(false);
-  const [celebrationOn, setCelebrationOn] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lastResultAnnouncement, setLastResultAnnouncement] = useState("");
@@ -310,7 +301,6 @@ export default function RewardWheelPage() {
   const configuredPrizes = useMemo(() => data?.prizes?.[tier] ?? [], [data?.prizes, tier]);
   const visualSlices = useMemo(() => buildVisualSlices(tier, configuredPrizes), [configuredPrizes, tier]);
   const credits = Number(data?.spinCreditsByTier?.[tier] ?? 0);
-  const recentResults = useMemo(() => (data?.recentRewards ?? data?.history ?? []).slice(0, 3), [data?.history, data?.recentRewards]);
   const availability = getAvailability(data, tier, configuredPrizes, credits, points);
   const controlsLocked = spinning || requestingSpin;
   const canSpin = !loading && !controlsLocked && availability.state === "active";
@@ -373,14 +363,14 @@ export default function RewardWheelPage() {
       {!loading && availability.state === "no_prizes" ? <WheelUnavailableState /> : null}
 
       {!loading && !["setup_required", "no_prizes"].includes(availability.state) ? (
-        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-8">
           <Card className="overflow-hidden border-white/10 bg-[#10100f] p-5 sm:p-7 lg:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite Rewards</p>
                 <h2 className="mt-2 text-2xl font-black sm:text-3xl">Choose a tier. Spin when ready.</h2>
               </div>
-              <SpinControls soundOn={soundOn} celebrationOn={celebrationOn} disabled={controlsLocked} onSound={() => setSoundOn((value) => !value)} onCelebration={() => setCelebrationOn((value) => !value)} />
+              <LinkButton href="/rewards/history" variant="secondary" className="justify-center"><History size={17} /> History</LinkButton>
             </div>
 
             <WheelTierSelector data={data} points={points} tier={tier} disabled={controlsLocked} onSelect={chooseTier} />
@@ -391,7 +381,7 @@ export default function RewardWheelPage() {
               <div className="space-y-4">
                 <Card className="border-white/10 bg-white/[0.03] p-5">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{tierConfig[tier].label} Tier</p>
-                  <h3 className="mt-2 text-3xl font-black" style={{ color: tierConfig[tier].accent }}>{spinCreditLabel(credits)}</h3>
+                  <h3 className="mt-2 text-3xl font-black" style={{ color: tierConfig[tier].accent }}>{credits.toLocaleString()} Available Spin{credits === 1 ? "" : "s"}</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <Stat label="Unlock" value={`${tierConfig[tier].threshold} pts`} />
                     <Stat label="Spin Cost" value={`${tierConfig[tier].cost} pts`} />
@@ -408,12 +398,10 @@ export default function RewardWheelPage() {
               </div>
             </div>
           </Card>
-
-          <PrizeLegend tier={tier} slices={visualSlices} recentResults={recentResults} />
         </div>
       ) : null}
 
-      {result ? <ResultModal result={result} tier={tier} celebrationOn={celebrationOn && isMeaningfulReward(result)} onClose={() => setResult(null)} onSpinAgain={() => { setResult(null); void spin(); }} canSpinAgain={canSpin} /> : null}
+      {result ? <ResultModal result={result} tier={tier} onClose={() => setResult(null)} onSpinAgain={() => { setResult(null); void spin(); }} canSpinAgain={canSpin} /> : null}
     </AppShell>
   );
 }
@@ -471,27 +459,8 @@ function RewardWheel({ slices, rotation, duration, requestingSpin, spinning, dis
   );
 }
 
-function SpinControls({ soundOn, celebrationOn, disabled, onSound, onCelebration }: { soundOn: boolean; celebrationOn: boolean; disabled: boolean; onSound: () => void; onCelebration: () => void }) {
-  return <div className="flex flex-wrap gap-2"><ControlButton active={soundOn} disabled={disabled} onClick={onSound} label={soundOn ? "Sound on" : "Sound off"} icon={soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />} /><ControlButton active={celebrationOn} disabled={disabled} onClick={onCelebration} label={celebrationOn ? "Effects on" : "Effects off"} icon={<Sparkles size={16} />} /></div>;
-}
-
-function ControlButton({ active, disabled, icon, label, onClick }: { active: boolean; disabled?: boolean; icon: ReactNode; label: string; onClick: () => void }) {
-  return <Button type="button" variant={active ? "secondary" : "ghost"} disabled={disabled} onClick={onClick} className="min-h-10 px-3 text-xs sm:text-sm">{icon}<span>{label}</span></Button>;
-}
-
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-[8px] bg-black/35 p-3"><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 text-base font-black text-white">{value}</p></div>;
-}
-
-function PrizeLegend({ tier, slices, recentResults }: { tier: RewardTier; slices: VisualSlice[]; recentResults: any[] }) {
-  return (
-    <Card className="h-fit p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Prize Set</p><h2 className="mt-2 text-xl font-black">{tierConfig[tier].label}</h2></div><LinkButton href="/rewards/history" variant="ghost" className="min-h-9 px-3 py-2 text-xs">History</LinkButton></div>
-      <div className="mt-5 space-y-3">{slices.map((slice) => <div key={slice.visualSliceId} className="rounded-[8px] border border-white/10 bg-white/[0.04] p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-black" style={{ backgroundColor: slice.color, color: slice.textColor }}>{slice.label.slice(0, 2).toUpperCase()}</div><div><p className="font-black">{slice.fullLabel}</p><p className="text-xs text-slate-400">{rewardCategory(slice.prize)}</p></div></div></div>)}</div>
-      <p className="mt-4 rounded-[8px] bg-black/30 p-3 text-xs leading-5 text-slate-400">Visible segments are presentation only. Actual rewards come from the existing reward system.</p>
-      <div className="mt-6 border-t border-white/10 pt-5"><h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-400">Recent</h3>{recentResults.length ? <div className="mt-3 space-y-2">{recentResults.map((item: any) => <div key={item.id} className="rounded-[8px] bg-black/30 p-3"><p className="text-sm font-black">{item.prizeName ?? "Reward"}</p><p className="mt-1 text-xs text-slate-500">{titleCase(item.wheelTier ?? tier)} / {resultStatusLabel(item)}</p></div>)}</div> : <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-sm text-slate-400">No recent rewards yet.</p>}</div>
-    </Card>
-  );
 }
 
 function WheelUnavailableState() {
@@ -502,11 +471,10 @@ function LoadingWheelState() {
   return <Card className="mt-8 p-6 sm:p-8"><div className="grid gap-8 lg:grid-cols-[minmax(260px,560px)_1fr] lg:items-center"><div className="mx-auto aspect-square w-full max-w-[520px] animate-pulse rounded-full bg-white/[0.06]" /><div className="space-y-4"><div className="h-5 w-36 animate-pulse rounded bg-white/10" /><div className="h-10 w-72 max-w-full animate-pulse rounded bg-white/10" /><div className="h-24 animate-pulse rounded bg-white/10" /></div></div></Card>;
 }
 
-function ResultModal({ result, tier, celebrationOn, canSpinAgain, onClose, onSpinAgain }: { result: any; tier: RewardTier; celebrationOn: boolean; canSpinAgain: boolean; onClose: () => void; onSpinAgain: () => void }) {
+function ResultModal({ result, tier, canSpinAgain, onClose, onSpinAgain }: { result: any; tier: RewardTier; canSpinAgain: boolean; onClose: () => void; onSpinAgain: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/85 p-4" role="dialog" aria-modal="true" aria-labelledby="reward-result-title">
       <Card className="relative max-h-[92vh] w-full max-w-md overflow-y-auto border-[var(--gold)]/40 p-6 text-center sm:p-8">
-        {celebrationOn ? <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_18%_25%,rgba(246,198,75,.25),transparent_22%),radial-gradient(circle_at_78%_25%,rgba(255,255,255,.14),transparent_20%)]" /> : null}
         <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold)] text-black"><Gift size={34} /></div>
         <p className="relative mt-4 text-sm font-black uppercase tracking-[0.18em] text-[var(--gold)]">{resultStatusLabel(result)}</p>
         <h2 id="reward-result-title" className="relative mt-3 break-words text-3xl font-black">{result.prizeName ?? "Reward"}</h2>

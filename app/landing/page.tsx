@@ -23,7 +23,7 @@ const leaders = [
   ["Competitor profile", "4,850", "competitor"],
   ["Creator profile", "3,940", "creator"],
   ["Rising creator", "3,410", "creator"],
-  ["Verified Host", "2,980", "verified_host"]
+  ["Host", "2,980", "verified_host"]
 ];
 
 function safeInternalPath(destination: string) {

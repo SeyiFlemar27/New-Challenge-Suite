@@ -29,7 +29,7 @@ const categories = [
   { href: "/settings/privacy", title: "Privacy", body: "Profile visibility, activity, messages, and public stats.", icon: Shield },
   { href: "/settings/security", title: "Security", body: "Password, two-factor setup, and login sessions.", icon: LockKeyhole },
   { href: "/kyc/status", title: "Identity Verification", body: "Premium KYC status, Sumsub verification, and review state.", icon: ShieldCheck },
-  { href: "/settings/billing", title: "Billing & Subscription", body: "Current plan, plan management, invoices, and cancellation.", icon: CreditCard },
+  { href: "/settings/billing", title: "Subscription", body: "Current plan, billing portal access, invoices, and cancellation.", icon: CreditCard },
   { href: "/settings/wallet", title: "Wallet & DoroCoin", body: "Internal credits and DoroCoin purchase history.", icon: Coins },
   { href: "/settings/preferences", title: "Challenge Preferences", body: "Categories, challenge types, location, and language.", icon: SlidersHorizontal },
   { href: "/settings/danger", title: "Danger Zone", body: "Protected account deactivation and deletion controls.", icon: TriangleAlert, danger: true }
