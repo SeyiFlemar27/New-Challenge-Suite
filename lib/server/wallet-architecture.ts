@@ -11,11 +11,20 @@ export type MoneySourceType =
   | "creator_sponsorship_deal"
   | "tournament_revenue"
   | "manual_admin_adjustment"
-  | "prediction_arena_settlement";
+  | "prediction_arena_settlement"
+  | "entry_fee"
+  | "paid_vote"
+  | "sponsor_contribution"
+  | "refund"
+  | "dispute";
+
+export type LedgerRevenueType = "entry_fee" | "paid_vote" | "sponsor_contribution" | "manual_admin_adjustment" | "prediction_arena_later" | "refund" | "dispute" | "withdrawal";
+export type LedgerShareType = "winner_share" | "creator_host_share" | "platform_share" | "sponsor_funded_prize" | "hold" | "reversal" | "withdrawal_debit";
 
 export type CashLedgerEntryShape = {
   id: string;
   userId: string;
+  challengeId?: string | null;
   accountType: string;
   sourceType: MoneySourceType | "withdrawal" | "hold" | "adjustment";
   sourceId: string;
@@ -25,6 +34,10 @@ export type CashLedgerEntryShape = {
   status: "created" | "pending" | "available" | "under_review" | "withdrawal_requested" | "processing" | "paid" | "failed" | "rejected" | "reversed" | "adjusted";
   balanceBucket: CashWalletBucket;
   description: string;
+  revenueType?: LedgerRevenueType;
+  shareType?: LedgerShareType;
+  splitPercent?: number | null;
+  holdUntil?: string | null;
   metadata: Record<string, unknown>;
   idempotencyKey: string;
   createdBy: string;

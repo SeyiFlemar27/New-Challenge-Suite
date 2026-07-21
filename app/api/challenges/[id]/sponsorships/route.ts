@@ -1,9 +1,8 @@
-import { isChallengeEligibleForSponsorship } from "@/lib/challenge-status";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { createNotification } from "@/lib/server/notifications";
-import { mergeSponsorPrizePoolPlaceholder } from "@/lib/server/prize-pools";
+import { calculateSponsorContributionSplit, sponsorPlacementFoundation, sponsorshipDiscussionFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { z } from "zod";
 
@@ -53,7 +52,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (sponsorProfile.sponsorVerificationStatus !== "approved") {
     return fail("Sponsor verification is required before contribution proposals can be submitted.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_APPROVAL_REQUIRED");
   }
-  if (!isChallengeEligibleForSponsorship(challenge.status)) return fail("This challenge is not eligible for sponsorship.", 409, undefined, "SPONSORSHIP_REJECTED");
+  const fundingWindow = validateSponsorFundingWindow(challenge);
+  if (!fundingWindow.allowed) return fail("This challenge is not eligible for sponsorship funding right now.", 409, { fundingWindow }, "SPONSORSHIP_WINDOW_CLOSED");
   if (!challenge.sponsorEnabled) return fail("This challenge is not accepting sponsor proposals.", 409, undefined, "SPONSORSHIP_REJECTED");
   const sponsorPackages = Array.isArray(challenge.sponsorPackages) ? challenge.sponsorPackages as Array<Record<string, unknown>> : [];
   const selectedPackage = body.packageId ? sponsorPackages.find((item) => item.id === body.packageId) : null;
@@ -78,6 +78,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const prizePoolContribution = Number(body.prizePoolContribution ?? 0);
   const amountCents = Math.max(0, Math.round(amount * 100));
   const prizePoolContributionCents = Math.max(0, Math.round(prizePoolContribution * 100));
+  const sponsorContribution = calculateSponsorContributionSplit(prizePoolContributionCents > 0 ? prizePoolContributionCents : amountCents);
   const proposal = {
     id: ref.id,
     challengeId: id,
@@ -99,6 +100,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     sponsorReturnPercent: body.sponsorReturnPercent,
     creatorPercent: body.creatorPercent,
     platformPercent: Math.max(0, 100 - body.sponsorReturnPercent - body.creatorPercent),
+    sponsorContributionRule: sponsorContribution,
+    sponsorPlacements: sponsorPlacementFoundation(),
+    discussionFoundation: sponsorshipDiscussionFoundation(id, user.uid),
+    paymentConfirmationRequired: true,
+    prizePoolCreditStatus: "awaiting_provider_confirmation",
     proposedBy: user.uid,
     sponsorApprovedAt: now,
     creatorApprovedAt: null,
@@ -130,9 +136,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       now
     })
   ];
-  if (prizePoolContributionCents > 0) {
-    writes.push(mergeSponsorPrizePoolPlaceholder(db, { challengeId: id, sponsorshipId: ref.id, contributionCents: prizePoolContributionCents, now }));
-  }
   await Promise.all(writes);
   await createNotification(db, { userId: user.uid, type: "sponsorship_submitted", title: "Sponsorship proposal sent", body: "The creator must approve the proposed terms before platform review.", targetId: ref.id });
   if (typeof challenge.creatorId === "string") {

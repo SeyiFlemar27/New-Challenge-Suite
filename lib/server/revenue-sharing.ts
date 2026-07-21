@@ -1,10 +1,11 @@
 import { PLATFORM_FEE_CONFIG, calculateGrossToNet } from "@/lib/server/wallet-architecture";
+import { PAID_REVENUE_SPLIT, calculatePaidRevenueSplit, calculateSponsorContributionSplit } from "@/lib/server/payout-structure";
 
 export const GENERATED_REVENUE_SPLIT = {
-  winnersPercent: 65,
-  hostPercent: 15,
-  sponsorPercent: 10,
-  platformPercent: 10
+  winnersPercent: PAID_REVENUE_SPLIT.winnerSharePercent,
+  hostPercent: PAID_REVENUE_SPLIT.creatorHostOperatorSharePercent,
+  sponsorPercent: 0,
+  platformPercent: PAID_REVENUE_SPLIT.platformAdminSharePercent
 };
 
 export const CHALLENGER_VOTE_REVENUE_BONUS_PERCENT = 10;
@@ -90,6 +91,18 @@ export function revenueGrossToNetFoundation(input: { grossAmountCents: number; p
     moneyMovementEnabled: false,
     feeConfig: PLATFORM_FEE_CONFIG
   };
+}
+
+export function paidEntryRevenueFoundation(grossAmountCents: number) {
+  return calculatePaidRevenueSplit(grossAmountCents, "entry_fee");
+}
+
+export function paidVoteRevenueFoundation(grossAmountCents: number) {
+  return calculatePaidRevenueSplit(grossAmountCents, "paid_vote");
+}
+
+export function sponsorContributionRevenueFoundation(contributionCents: number) {
+  return calculateSponsorContributionSplit(contributionCents);
 }
 
 export const VOTER_REWARD_TIERS = [
