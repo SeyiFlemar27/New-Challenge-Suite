@@ -41,6 +41,8 @@ export function MediaUploadField({
   const localPreviewRef = useRef("");
   const uploadTaskRef = useRef<UploadTask | null>(null);
   const uploadStartedAtRef = useRef(0);
+  const lastProgressAtRef = useRef(0);
+  const lastBytesTransferredRef = useRef(0);
   const [status, setStatusState] = useState<MediaUploadStage>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -135,22 +137,48 @@ export function MediaUploadField({
     const path = appendUploadFileName(storagePath, file.name);
     setStatus("uploading");
     uploadStartedAtRef.current = Date.now();
+    lastProgressAtRef.current = uploadStartedAtRef.current;
+    lastBytesTransferredRef.current = 0;
     logUploadDebug("started", { uploadPath: path, contentType: file.type, size: file.size });
     try {
       const uploadTask = uploadBytesResumable(ref(storage, path), file, { contentType: file.type, customMetadata: { originalName: file.name, uploadedBy: auth.user.uid } });
       uploadTaskRef.current = uploadTask;
       const downloadUrl = await new Promise<string>((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error("STORAGE_UPLOAD_TIMEOUT")), 120_000);
+        let settled = false;
+        const clearTimers = () => {
+          window.clearTimeout(timer);
+          window.clearInterval(stallTimer);
+        };
+        const failUpload = (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          clearTimers();
+          reject(error);
+        };
+        const timer = window.setTimeout(() => failUpload(new Error("STORAGE_UPLOAD_TIMEOUT")), 120_000);
+        const stallTimer = window.setInterval(() => {
+          const noBytesTransferred = lastBytesTransferredRef.current <= 0;
+          const stalled = Date.now() - lastProgressAtRef.current > 30_000;
+          if (noBytesTransferred && stalled) {
+            failUpload(new Error("STORAGE_UPLOAD_STALLED"));
+            uploadTask.cancel();
+          }
+        }, 5_000);
         uploadTask.on("state_changed", (snapshot) => {
           const nextProgress = Math.round((snapshot.bytesTransferred / Math.max(snapshot.totalBytes, 1)) * 100);
+          if (snapshot.bytesTransferred > lastBytesTransferredRef.current) {
+            lastBytesTransferredRef.current = snapshot.bytesTransferred;
+            lastProgressAtRef.current = Date.now();
+          }
           setProgress(Math.max(0, Math.min(100, nextProgress)));
           const elapsedSeconds = Math.max((Date.now() - uploadStartedAtRef.current) / 1000, 0.25);
           setUploadSpeed(`${formatUploadBytes(snapshot.bytesTransferred / elapsedSeconds)}/s`);
         }, (caught) => {
-          window.clearTimeout(timer);
-          reject(caught);
+          failUpload(caught);
         }, async () => {
-          window.clearTimeout(timer);
+          if (settled) return;
+          settled = true;
+          clearTimers();
           setProgress(100);
           setStatus("processing");
           try {
@@ -211,8 +239,8 @@ export function MediaUploadField({
     if (retryFileRef.current) void handleFile(retryFileRef.current);
   }
 
-  const stageLabel = status === "preparing" ? "Preparing upload" : status === "processing" ? "Processing file" : status === "uploading" ? "Uploading to secure storage" : status === "complete" ? "Upload complete" : status === "failed" ? "Upload failed" : value ? "Upload complete" : "Ready to upload";
-  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? "Uploading to secure storage..." : status === "processing" ? "Processing file and saving media reference..." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Review the reason below and retry when ready." : "Choose a file to upload.";
+  const stageLabel = status === "preparing" ? "Preparing upload" : status === "processing" ? "Processing file" : status === "uploading" ? (progress > 0 ? "Uploading image" : "Starting upload") : status === "complete" ? "Upload complete" : status === "failed" ? "Upload failed" : value ? "Upload complete" : "Ready to upload";
+  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? (progress > 0 ? `Uploading image... ${progress}%` : "Starting secure upload...") : status === "processing" ? "Processing file and saving media reference..." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Review the reason below and retry when ready." : "Choose a file to upload.";
 
   return (
     <div>

@@ -11,6 +11,7 @@ export type MediaUploadErrorCode =
   | "expired_auth"
   | "network_failure"
   | "upload_cancelled"
+  | "upload_stalled"
   | "processing_failed"
   | "storage_timeout"
   | "unknown";
@@ -90,6 +91,7 @@ export function mediaErrorMessage(code: MediaUploadErrorCode) {
     case "expired_auth": return "Your sign-in session expired. Sign in again and retry the upload.";
     case "network_failure": return "Network connection failed during upload. Check your connection and retry.";
     case "upload_cancelled": return "Upload was cancelled. You can retry when ready.";
+    case "upload_stalled": return "Upload did not start transferring. Check your connection and retry.";
     case "processing_failed": return "Upload finished, but media processing failed. Please retry.";
     case "storage_timeout": return "Upload timed out. Please retry with a stable connection.";
     default: return "Upload failed. Please retry.";
@@ -102,6 +104,7 @@ export function classifyStorageError(error: unknown): { code: MediaUploadErrorCo
   const lower = raw.toLowerCase();
   let code: MediaUploadErrorCode = "unknown";
   if (raw === "STORAGE_UPLOAD_TIMEOUT" || lower.includes("storage_upload_timeout")) code = "storage_timeout";
+  else if (raw === "STORAGE_UPLOAD_STALLED" || lower.includes("storage_upload_stalled")) code = "upload_stalled";
   else if (lower.includes("storage/unauthorized") || lower.includes("permission") || lower.includes("403")) code = "permission_denied";
   else if (lower.includes("storage/unauthenticated") || lower.includes("auth token")) code = "expired_auth";
   else if (lower.includes("storage/canceled") || lower.includes("cancelled") || lower.includes("canceled")) code = "upload_cancelled";

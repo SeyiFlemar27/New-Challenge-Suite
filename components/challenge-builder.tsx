@@ -183,7 +183,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
   const localValidation = useMemo(() => validateChallengeForPublish(payload(true) as Record<string, unknown>, { mode: "publish", userId: user?.uid }), [form, mode, user?.uid]);
   const validation = serverValidation ?? localValidation;
   const publishBlocked = uploadInProgress || uploadFailed || privateLocked || freeLimitReached || requiredImageMissing || Boolean(monetizationProblem) || !localValidation.valid;
-  const publishLabel = uploadInProgress ? "Upload in Progress" : uploadFailed ? "Fix Upload" : privateLocked ? "Upgrade Required" : freeLimitReached ? "Limit Reached" : requiredImageMissing ? "Add Challenge Image" : monetizationProblem ? monetizationProblem : !localValidation.valid ? "Complete " + localValidation.missingCount + " Item" + (localValidation.missingCount === 1 ? "" : "s") : mode === "private" ? "Publish Private Challenge" : "Publish Challenge";
+  const publishLabel = uploadInProgress ? "Please wait for your image upload to finish." : uploadFailed ? "Please retry the failed image upload before publishing." : privateLocked ? "Upgrade Required" : freeLimitReached ? "Limit Reached" : requiredImageMissing ? "Add Challenge Image" : monetizationProblem ? monetizationProblem : !localValidation.valid ? "Complete " + localValidation.missingCount + " Item" + (localValidation.missingCount === 1 ? "" : "s") : mode === "private" ? "Publish Private Challenge" : "Publish Challenge";
 
   function validateStep() {
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
@@ -236,7 +236,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
         <Card className="mt-6 p-4"><Stepper steps={steps} current={step} onSelect={setStep} /></Card>
         {isFreePublic ? <Card className="mt-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-sm text-slate-300"><b className="text-white">Free Basic builder.</b> Public, non-monetized challenges are available up to three lifetime publishes. Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}.</Card> : null}
         <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]"><Card className="p-4 sm:p-6 lg:p-8"><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} /></Card><Helper mode={mode} step={step} /></div>
-        {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}<Checklist readiness={validation} className="mt-5" />
+        {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}<Checklist readiness={validation} uploadInProgress={uploadInProgress} uploadFailed={uploadFailed} requiredImageMissing={requiredImageMissing} className="mt-5" />
         <div className="mt-8 grid gap-3 border-t border-white/10 pt-6 sm:flex sm:items-center sm:justify-between"><Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button><div className="grid gap-3 sm:flex"><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>{step < steps.length - 1 ? <Button onClick={next}>Continue</Button> : <Button onClick={publish} disabled={saving || publishBlocked}>{saving ? "Publishing..." : publishLabel}</Button>}</div></div>
       </div>
       {preview ? <Preview mode={mode} form={form} publishLabel={publishLabel} publishDisabled={publishBlocked || saving} onClose={() => setPreview(false)} onPublish={publish} /> : null}
@@ -338,7 +338,7 @@ function UploadGallery({ form, base, updateMedia, track, className = "" }: { for
   return <div className={`${className} space-y-7`}>
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">Add up to 3 challenge images. At least one image is required.</p></div><span className="rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">1 required</span></div>
-      {!form.coverImageUrl ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
+      {!form.coverImageUrl || !form.coverImagePath ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
       <div className="mt-4 grid gap-5 lg:grid-cols-3">
         <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" purpose="Primary cover image used on challenge cards and detail pages." required><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={base + "/banner"} kind="image" buttonLabel="Browse cover image" required onStatusChange={track("coverImageUrl")} /></UploadPanel>
         <UploadPanel icon={<ImageIcon size={20} />} title="Image 2" purpose="Promo flyer / poster for campaign surfaces when supported."><MediaUploadField label="Promo flyer / poster" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={base + "/promo-flyer"} kind="image" buttonLabel="Browse promo asset" onStatusChange={track("promoImageUrl")} /></UploadPanel>
@@ -386,8 +386,14 @@ function Helper({ mode, step }: { mode: Mode; step: number }) {
   return <Card className="h-fit p-5 lg:sticky lg:top-24"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Builder Guide</p><h2 className="mt-3 text-xl font-black text-white">{copy[0]}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">{copy.slice(1).map((item) => <li key={item} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--gold)]" /><span>{item}</span></li>)}</ul></Card>;
 }
 
-function Checklist({ readiness, className = "" }: { readiness: ChallengeValidationResult; className?: string }) {
-  const blocking = readiness.errors.filter((issue) => issue.severity === "error");
+function Checklist({ readiness, uploadInProgress, uploadFailed, requiredImageMissing, className = "" }: { readiness: ChallengeValidationResult; uploadInProgress: boolean; uploadFailed: boolean; requiredImageMissing: boolean; className?: string }) {
+  const blocking = readiness.errors.filter((issue) => issue.severity === "error").map((issue) => {
+    if (issue.code === "REQUIRED_BANNER" && uploadInProgress) return { ...issue, message: "Please wait for your image upload to finish." };
+    if (issue.code === "REQUIRED_BANNER" && uploadFailed) return { ...issue, message: "Please retry the failed image upload before publishing." };
+    return issue;
+  });
+  if (requiredImageMissing && uploadInProgress && !blocking.some((issue) => issue.code === "REQUIRED_BANNER")) blocking.unshift({ code: "REQUIRED_BANNER", field: "coverImageUrl", step: "Media", message: "Please wait for your image upload to finish.", severity: "error" });
+  if (requiredImageMissing && uploadFailed && !blocking.some((issue) => issue.code === "REQUIRED_BANNER")) blocking.unshift({ code: "REQUIRED_BANNER", field: "coverImageUrl", step: "Media", message: "Please retry the failed image upload before publishing.", severity: "error" });
   if (!blocking.length) return <Card className={className + " border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100"}>Ready to publish. The existing server validation will check this again before saving.</Card>;
   return <Card className={className + " border-yellow-500/30 bg-yellow-500/5 p-4"}><p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p><h3 className="mt-1 text-lg font-black text-white">Complete {readiness.missingCount} item{readiness.missingCount === 1 ? "" : "s"}</h3><ul className="mt-3 space-y-1 text-sm text-slate-300">{blocking.slice(0, 5).map((issue) => <li key={issue.code + issue.field}>- {issue.message}</li>)}</ul></Card>;
 }

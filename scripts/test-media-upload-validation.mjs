@@ -25,7 +25,9 @@ assert.equal(classifyStorageError({ code: "storage/unauthorized", message: "rule
 assert.equal(classifyStorageError(new Error("Firebase Storage: auth token expired")).code, "expired_auth");
 assert.equal(classifyStorageError(new Error("Firebase Storage: network request failed")).code, "network_failure");
 assert.equal(classifyStorageError(new Error("Firebase Storage: canceled by user (storage/canceled)")).code, "upload_cancelled");
+assert.equal(classifyStorageError(new Error("STORAGE_UPLOAD_STALLED")).code, "upload_stalled");
 assert.equal(classifyStorageError(new Error("processing failed")).code, "processing_failed");
 assert.equal(mediaErrorMessage("unauthenticated"), "Sign in again before uploading media.");
+assert.equal(mediaErrorMessage("upload_stalled"), "Upload did not start transferring. Check your connection and retry.");
 
 console.log("media upload validation tests passed");
