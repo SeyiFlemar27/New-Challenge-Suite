@@ -89,6 +89,6 @@ assert(layout.includes("icons:"), "App metadata should define favicon icons.");
 assert(exists("app/icon.tsx"), "App Router icon asset should exist.");
 
 const changedProductionSurfaces = subscriptions + builder + rewards + rewardWheel + customizationPage;
-assert(!/withdrawal|payout provider|bank account|Stripe Connect|Paystack payout/i.test(changedProductionSurfaces), "This pass must not introduce withdrawal or payout UI/backend behavior.");
+assert(!/withdrawal history|withdrawable balance|bank account|Stripe Connect|Paystack payout|payout provider connected|payout provider active/i.test(changedProductionSurfaces), "This pass must not introduce withdrawal or payout execution UI/backend behavior.");
 
 console.log("Platform production polish checks passed.");

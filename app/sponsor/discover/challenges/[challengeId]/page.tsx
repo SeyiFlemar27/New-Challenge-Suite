@@ -1,9 +1,101 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bookmark, ShieldAlert, Store } from "lucide-react";
+import { Bookmark, MessageSquare, ShieldAlert, Store, WalletCards } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
-export default function ChallengeOpportunityPage() { const params = useParams<{ challengeId: string }>(); const [profile, setProfile] = useState<SponsorShellProfile | null>(null); const [opportunity, setOpportunity] = useState<any>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); useEffect(() => { void Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<{ opportunity: any }>(`/api/sponsor/discover/challenges/${params.challengeId}`)]).then(([profileResult, opportunityResult]) => { if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile); if (opportunityResult.ok && opportunityResult.data) setOpportunity(opportunityResult.data.opportunity); else setError(opportunityResult.message || "Opportunity could not be loaded."); setLoading(false); }); }, [params.challengeId]); async function save() { await apiRequest("/api/sponsor/saved/challenges", { method: "POST", body: JSON.stringify({ challengeId: params.challengeId }) }); } return <SponsorShell profile={profile}>{loading ? <Card className="h-96 animate-pulse bg-[#171717]" /> : error ? <Card className="border-red-500/20 bg-red-950/30 p-6 text-red-200">{error}</Card> : <div className="mx-auto max-w-6xl"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsorship Opportunity</p><h1 className="mt-3 text-4xl font-black">{opportunity.title}</h1><p className="mt-3 max-w-3xl leading-7 text-slate-300">{opportunity.description}</p></div><div className="flex flex-wrap gap-3"><Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button><button disabled className="min-h-12 rounded-[8px] border border-white/10 px-5 text-sm font-bold text-slate-500">Attach to campaign</button></div></div><Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-5"><ShieldAlert className="text-[var(--gold)]" /><h2 className="mt-3 text-xl font-black">Funding is not active</h2><p className="mt-2 text-sm leading-6 text-slate-300">This opportunity page does not process sponsorship payments, release sponsor money, or promise guaranteed reach.</p></Card><div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{[["Creator", opportunity.creatorName], ["Participants", opportunity.participantCount], ["Target Audience", opportunity.targetAudience], ["Budget", opportunity.sponsorshipBudget], ["Estimated Reach", opportunity.estimatedReach], ["Status", opportunity.status]].map(([label, value]) => <Tile key={label} label={label} value={value} />)}</div><Card className="mt-8 p-6"><Store className="text-[var(--gold)]" /><h2 className="mt-3 text-2xl font-black">Available brand placements</h2><div className="mt-5 grid gap-3 md:grid-cols-2">{(opportunity.placements ?? []).map((item: string) => <p key={item} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{item}</p>)}</div></Card><Card className="mt-8 p-6"><h2 className="text-2xl font-black">Deliverables</h2><div className="mt-5 grid gap-3 md:grid-cols-3">{(opportunity.deliverables ?? []).map((item: string) => <p key={item} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{item}</p>)}</div></Card></div>}</SponsorShell>; }
-function Tile({ label, value }: { label: string; value: any }) { return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.15em] text-[var(--gold)]">{label}</p><p className="mt-3 text-sm leading-6 text-slate-300">{String(value || "Not available yet")}</p></Card>; }
+
+type Opportunity = Record<string, any>;
+
+export default function ChallengeOpportunityPage() {
+  const params = useParams<{ challengeId: string }>();
+  const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    void Promise.all([
+      apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"),
+      apiRequest<{ opportunity: Opportunity }>(`/api/sponsor/discover/challenges/${params.challengeId}`)
+    ]).then(([profileResult, opportunityResult]) => {
+      if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
+      if (opportunityResult.ok && opportunityResult.data) setOpportunity(opportunityResult.data.opportunity);
+      else setError(opportunityResult.message || "Opportunity could not be loaded.");
+      setLoading(false);
+    });
+  }, [params.challengeId]);
+
+  async function save() {
+    await apiRequest("/api/sponsor/saved/challenges", { method: "POST", body: JSON.stringify({ challengeId: params.challengeId }) });
+  }
+
+  return <SponsorShell profile={profile}>
+    {loading ? <Card className="h-96 animate-pulse bg-[#171717]" /> : error || !opportunity ? <Card className="border-red-500/20 bg-red-950/30 p-6 text-red-200">{error || "Opportunity could not be loaded."}</Card> : <div className="mx-auto max-w-6xl">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsor-Ready Challenge</p>
+          <h1 className="mt-3 text-4xl font-black">{opportunity.title}</h1>
+          <p className="mt-3 max-w-3xl leading-7 text-slate-300">{opportunity.description}</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button>
+          <button disabled className="min-h-12 rounded-[8px] border border-white/10 px-5 text-sm font-bold text-slate-500"><MessageSquare size={16} className="inline" /> Discuss Sponsorship</button>
+          <button disabled className="min-h-12 rounded-[8px] border border-white/10 px-5 text-sm font-bold text-slate-500"><WalletCards size={16} className="inline" /> Fund Challenge</button>
+        </div>
+      </div>
+
+      <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-5">
+        <ShieldAlert className="text-[var(--gold)]" />
+        <h2 className="mt-3 text-xl font-black">Funding setup required</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{opportunity.fundingSetupCopy}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">Sponsorship messaging uses a discussion-intent foundation only. No message, email, payment, or prize pool credit is created from this page.</p>
+      </Card>
+
+      <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <Tile label="Creator / operator" value={opportunity.creatorName} />
+        <Tile label="Participants" value={opportunity.participantCount} />
+        <Tile label="Category" value={opportunity.category} />
+        <Tile label="Current stage" value={opportunity.status} />
+        <Tile label="Funding window" value={opportunity.fundingWindow?.allowed ? "Open" : statusLabel(opportunity.fundingWindow?.reason)} />
+        <Tile label="Prize pool" value={formatCents(opportunity.currentPrizePoolCents)} />
+      </div>
+
+      <Card className="mt-8 p-6">
+        <Store className="text-[var(--gold)]" />
+        <h2 className="mt-3 text-2xl font-black">Available brand placements</h2>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {(opportunity.placements ?? []).map((item: any) => <p key={typeof item === "string" ? item : item.surface} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{placementLabel(item)}</p>)}
+        </div>
+      </Card>
+
+      <Card className="mt-8 p-6">
+        <h2 className="text-2xl font-black">Admin and payout controls</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {["Confirmed sponsor payment required", "Winner approval required", "KYC and 24-hour hold required"].map((item) => <p key={item} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{item}</p>)}
+        </div>
+      </Card>
+    </div>}
+  </SponsorShell>;
+}
+
+function Tile({ label, value }: { label: string; value: any }) {
+  return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.15em] text-[var(--gold)]">{label}</p><p className="mt-3 text-sm leading-6 text-slate-300">{value === 0 ? "0" : String(value || "-")}</p></Card>;
+}
+
+function formatCents(value: unknown) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "$0.00";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount / 100);
+}
+
+function placementLabel(item: any) {
+  const surface = typeof item === "string" ? item : item?.surface;
+  return String(surface || "Placement").replaceAll("_", " ");
+}
+
+function statusLabel(reason: unknown) {
+  return String(reason || "Setup required").replaceAll("_", " ");
+}

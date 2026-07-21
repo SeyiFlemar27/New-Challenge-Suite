@@ -13,6 +13,7 @@ import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-ch
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
+import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 
 export async function GET() {
   const db = getAdminDb();
@@ -60,6 +61,10 @@ export async function POST(request: Request) {
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
+  const monetizationAccess = getChallengeMonetizationAccess(planProfile);
+  const monetizationIntent = body.monetization;
+  const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
+  const requestedMonetization = Boolean(monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested);
   const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs);
   const freePlan = planAccess.normalizedPlanId === "free";
 
@@ -88,6 +93,24 @@ export async function POST(request: Request) {
   }
   if (freePlan && body.visibility !== "public") {
     return fail("Free Basic Challenges must be public. Upgrade to Creator or Host for private invite-only challenges.", 403, undefined, "PRIVATE_CHALLENGE_LOCKED");
+  }
+  if (requestedMonetization && !(monetizationAccess.canPreparePaidEntry || monetizationAccess.canPrepareSponsorReady || monetizationAccess.canPreparePrizePool || monetizationAccess.canPreparePaidVotes)) {
+    return fail("Monetized challenges are available to Creator, Host, and approved Enterprise accounts.", 403, undefined, "MONETIZATION_LOCKED");
+  }
+  if (monetizationIntent.paidEntryRequested && !monetizationAccess.canPreparePaidEntry) {
+    return fail("Paid entry setup is not available for this account.", 403, undefined, "PAID_ENTRY_LOCKED");
+  }
+  if (monetizationIntent.sponsorReady && !monetizationAccess.canPrepareSponsorReady) {
+    return fail("Sponsor-ready setup is not available for this account.", 403, undefined, "SPONSOR_READY_LOCKED");
+  }
+  if (monetizationIntent.prizePoolRequested && !monetizationAccess.canPreparePrizePool) {
+    return fail("Prize pool setup is not available for this account.", 403, undefined, "PRIZE_POOL_LOCKED");
+  }
+  if (monetizationIntent.paidVotesRequested) {
+    return fail("Paid votes setup required.", 403, undefined, "PAID_VOTES_SETUP_REQUIRED");
+  }
+  if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
+    return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
   if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
     return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
@@ -121,6 +144,28 @@ export async function POST(request: Request) {
 
   const ref = db.collection("challenges").doc();
   const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
+  const safeMonetization = {
+    enabled: Boolean(monetizationIntent.paidEntryRequested || sponsorEnabled || monetizationIntent.prizePoolRequested),
+    paidEntryRequested: Boolean(monetizationIntent.paidEntryRequested && monetizationAccess.canPreparePaidEntry),
+    entryFeeAmountCents: monetizationIntent.paidEntryRequested ? paidEntryValidation.entryFeeCents : 0,
+    currency: "USD",
+    sponsorReady: sponsorEnabled,
+    prizePoolRequested: Boolean(monetizationIntent.prizePoolRequested && monetizationAccess.canPreparePrizePool),
+    paidVotesRequested: false,
+    sponsorshipGoal: sponsorEnabled ? monetizationIntent.sponsorshipGoal : "",
+    preferredSponsorCategory: sponsorEnabled ? monetizationIntent.preferredSponsorCategory : "",
+    sponsorNote: sponsorEnabled ? monetizationIntent.sponsorNote : "",
+    placements: sponsorEnabled ? monetizationIntent.placements : [],
+    status: requestedMonetization ? "setup_required" : "not_requested",
+    paymentActive: false,
+    checkoutActive: false,
+    ledgerCreationEnabled: false,
+    prizeReleaseActive: false,
+    payoutReleaseActive: false,
+    adminApprovalRequired: Boolean(requestedMonetization),
+    kycRequiredBeforeWithdrawal: Boolean(requestedMonetization),
+    cashHoldHours: 24
+  };
   const challenge = {
     id: ref.id,
     creatorId: user.uid,
@@ -183,6 +228,7 @@ export async function POST(request: Request) {
       status: "draft",
       moneyMovementEnabled: false
     } : null,
+    monetization: safeMonetization,
     sponsorMoneyCaptureEnabled: false,
     sponsorMoneyReleaseEnabled: false,
     freeBasicChallenge: freePlan,

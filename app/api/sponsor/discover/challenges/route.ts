@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 function safeChallenge(id: string, data: Record<string, unknown>) {
   const visibility = String(data.visibility ?? "public").toLowerCase();
   if (!["public", "published"].includes(visibility) && visibility !== "public challenge") return null;
-  const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorSlots || data.sponsorPackages || data.minimumSponsorshipAmount);
+  const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
+  if (!sponsorReady) return null;
   const fundingWindow = validateSponsorFundingWindow(data);
   return {
     id,

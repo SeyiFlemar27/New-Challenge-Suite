@@ -1,6 +1,7 @@
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { fail, ok, serverError } from "@/lib/server/responses";
+import { sponsorPlacementFoundation, sponsorshipDiscussionFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
     if (!snap.exists) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
     const data = snap.data() ?? {};
     if (String(data.visibility ?? "public").toLowerCase() !== "public") return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
+    const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
+    if (!sponsorReady) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
+    const fundingWindow = validateSponsorFundingWindow(data);
+    const placementFoundation = sponsorPlacementFoundation();
     const opportunity = {
       id: snap.id,
       title: data.title ?? "Untitled challenge",
@@ -21,15 +26,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
       creatorId: data.creatorId ?? null,
       creatorName: data.creatorName ?? "Creator details pending",
       participantCount: Number(data.participantCount ?? 0),
-      category: data.category ?? "Not available yet",
-      targetAudience: data.targetAudience ?? "Target audience foundation pending",
+      category: data.category ?? null,
+      targetAudience: data.targetAudience ?? null,
       sponsorshipPackages: Array.isArray(data.sponsorPackages) ? data.sponsorPackages : [],
-      placements: Array.isArray(data.sponsorPlacementOptions) ? data.sponsorPlacementOptions : ["Challenge page logo", "Voting page banner", "Leaderboard sponsor placement", "Winner announcement branding", "Sponsored prize section", "Campaign CTA button"],
-      estimatedReach: data.expectedReachLabel ?? "Estimated reach foundation only. No guaranteed reach is promised.",
-      sponsorshipBudget: data.minimumSponsorshipAmount ? `$${data.minimumSponsorshipAmount}` : "Budget foundation pending",
+      placements: Array.isArray(data.sponsorPlacementOptions) && data.sponsorPlacementOptions.length ? data.sponsorPlacementOptions : placementFoundation,
+      estimatedReach: data.expectedReachLabel ?? null,
+      sponsorshipBudget: data.minimumSponsorshipAmount ? `$${data.minimumSponsorshipAmount}` : null,
+      currentPrizePoolCents: Number(data.publicJackpotEstimateCents ?? data.visibleJackpotCents ?? 0),
+      sponsorReady,
+      fundingWindow,
+      discussionFoundation: sponsorshipDiscussionFoundation(snap.id, context.user.uid),
+      fundingSetupCopy: "Sponsor funding checkout is not available yet. Once payment setup is complete, confirmed sponsor contributions will be added 100% to the winner prize pool.",
       timeline: { startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, votingDeadline: data.votingDeadline ?? null },
-      deliverables: ["Brand placement foundation", "Campaign CTA foundation", "Post-campaign reporting foundation"],
-      riskIndicators: { adminReviewRequired: Boolean(data.adminReviewRequired), creatorVerified: data.creatorVerificationStatus ?? "not_available", fundingEnabled: false },
+      riskIndicators: { adminReviewRequired: Boolean(data.adminReviewRequired), fundingEnabled: false },
       status: getChallengeDisplayStatus(data as any)
     };
     return ok({ opportunity }, "Challenge sponsorship opportunity loaded.");
