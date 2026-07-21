@@ -4,6 +4,7 @@ import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/ca
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { getUserPlanAccess } from "@/lib/plan-access";
+import { PLATFORM_FEE_CONFIG, WALLET_POLICY_COPY, WITHDRAWAL_ARCHITECTURE_CONFIG } from "@/lib/server/wallet-architecture";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,9 @@ export async function GET(request: Request) {
         updatedAt: toIso(wallet.updatedAt)
       },
       cashWallet: normalizeCashWallet(user.uid, cashWalletSnap?.data()),
+      walletPolicy: WALLET_POLICY_COPY,
+      withdrawalArchitecture: WITHDRAWAL_ARCHITECTURE_CONFIG,
+      platformFeeConfig: PLATFORM_FEE_CONFIG,
       warnings,
       financialSummary: {
         status: "review_only",

@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type { CashTransactionStatus, CashTransactionType } from "@/lib/server/cash-transactions";
+import { WITHDRAWAL_ARCHITECTURE_CONFIG } from "@/lib/server/wallet-architecture";
 
 export type CashWalletStatus = "inactive" | "review_only" | "locked";
 export type { CashTransactionStatus, CashTransactionType };
@@ -12,10 +13,12 @@ export type CashWalletSnapshot = {
   lockedBalanceCents: number;
   underReviewBalanceCents: number;
   withdrawnBalanceCents: number;
+  lifetimeEarningsCents: number;
   failedWithdrawalBalanceCents: number;
   currency: string;
   withdrawalsEnabled: false;
   payoutProviderConnected: false;
+  minimumWithdrawalAmountCents: number | null;
   updatedAt: string;
 };
 
@@ -28,10 +31,12 @@ export function createCashWalletDefaults(userId: string, now = new Date().toISOS
     lockedBalanceCents: 0,
     underReviewBalanceCents: 0,
     withdrawnBalanceCents: 0,
+    lifetimeEarningsCents: 0,
     failedWithdrawalBalanceCents: 0,
     currency: "USD",
     withdrawalsEnabled: false,
     payoutProviderConnected: false,
+    minimumWithdrawalAmountCents: WITHDRAWAL_ARCHITECTURE_CONFIG.minimumWithdrawalAmountCents,
     updatedAt: now
   };
 }
@@ -57,10 +62,12 @@ export function normalizeCashWallet(userId: string, data: FirebaseFirestore.Docu
     lockedBalanceCents: Number(data?.lockedBalanceCents ?? 0),
     underReviewBalanceCents: Number(data?.underReviewBalanceCents ?? data?.lockedBalanceCents ?? 0),
     withdrawnBalanceCents: Number(data?.withdrawnBalanceCents ?? 0),
+    lifetimeEarningsCents: Number(data?.lifetimeEarningsCents ?? 0),
     failedWithdrawalBalanceCents: Number(data?.failedWithdrawalBalanceCents ?? 0),
     currency: String(data?.currency ?? defaults.currency),
     withdrawalsEnabled: false,
     payoutProviderConnected: false,
+    minimumWithdrawalAmountCents: WITHDRAWAL_ARCHITECTURE_CONFIG.minimumWithdrawalAmountCents,
     updatedAt: String(data?.updatedAt ?? defaults.updatedAt)
   };
 }

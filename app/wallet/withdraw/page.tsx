@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Landmark, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, EmptyState, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
+import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type WithdrawalRecord = {
@@ -24,24 +24,27 @@ type WithdrawalData = {
     underReviewBalanceCents: number;
     withdrawnBalanceCents: number;
     failedWithdrawalBalanceCents: number;
+    lifetimeEarningsCents: number;
     currency: string;
   };
   requests: WithdrawalRecord[];
-  minimumWithdrawalCents: number;
+  minimumWithdrawalCents: number | null;
   kycProcessingActive: false;
   automaticPayoutsActive: false;
+  withdrawalRequestCreationEnabled: boolean;
+  payoutMethodCollectionEnabled: boolean;
+  payoutProviderConfigured: boolean;
+  kycStatus: string;
+  disabledReasons: string[];
+  policy?: { withdrawalsSetupRequired?: string; dorocoinNotCash?: string; rewardPointsNotCash?: string };
   accountType: string;
   eligibilitySourceTypes: string[];
 };
-
-const initialForm = { amount: "", accountHolderName: "", bankName: "", accountNumber: "" };
 
 export default function WithdrawPage() {
   const [data, setData] = useState<WithdrawalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
-  const [form, setForm] = useState(initialForm);
-  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -52,30 +55,6 @@ export default function WithdrawPage() {
   }
 
   useEffect(() => { void load(); }, []);
-
-  async function submit() {
-    if (!data || !window.confirm("Submit this withdrawal request for admin review? No money will move automatically.")) return;
-    setSubmitting(true);
-    setNotice("");
-    const result = await apiRequest("/api/withdrawals", {
-      method: "POST",
-      body: JSON.stringify({
-        amountCents: Math.round(Number(form.amount) * 100),
-        accountHolderName: form.accountHolderName,
-        bankName: form.bankName,
-        accountNumber: form.accountNumber,
-        payoutMethodType: "bank",
-        sourceType: data.eligibilitySourceTypes[0] ?? "prize_winnings",
-        idempotencyKey: crypto.randomUUID()
-      })
-    });
-    setSubmitting(false);
-    setNotice(result.message);
-    if (result.ok) {
-      setForm(initialForm);
-      await load();
-    }
-  }
 
   return (
     <AppShell>
@@ -94,27 +73,28 @@ export default function WithdrawPage() {
             <Balance label="Pending" value={data.wallet.pendingBalanceCents} />
             <Balance label="Under review" value={data.wallet.underReviewBalanceCents} />
             <Balance label="Withdrawn history" value={data.wallet.withdrawnBalanceCents} />
+            <Balance label="Lifetime earnings" value={data.wallet.lifetimeEarningsCents} />
           </div>
           <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
             <Card className="p-6 sm:p-8">
-              <h2 className="text-2xl font-black">Request withdrawal review</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">Minimum request: ${(data.minimumWithdrawalCents / 100).toFixed(2)}. The amount is reserved from available balance while review is pending.</p>
-              {data.wallet.availableBalanceCents < data.minimumWithdrawalCents ? <Card className="mt-6 border-dashed p-5"><EmptyState icon={<Landmark />} title="No withdrawable balance yet" body="Eligible prize winnings and approved earnings will appear here after review." /></Card> : <div className="mt-6 space-y-5">
-                <Field label="Amount (USD)"><input className={inputClass} inputMode="decimal" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} placeholder="25.00" /></Field>
-                <Field label="Account holder name"><input className={inputClass} value={form.accountHolderName} onChange={(event) => setForm({ ...form, accountHolderName: event.target.value })} /></Field>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Bank or institution"><input className={inputClass} value={form.bankName} onChange={(event) => setForm({ ...form, bankName: event.target.value })} /></Field>
-                  <Field label="Account number"><input className={inputClass} autoComplete="off" value={form.accountNumber} onChange={(event) => setForm({ ...form, accountNumber: event.target.value.replace(/\D/g, "") })} /></Field>
-                </div>
-                <Button className="w-full" onClick={submit} disabled={submitting}>{submitting ? "Submitting for Review..." : "Request Withdrawal"}</Button>
-              </div>}
+              <h2 className="text-2xl font-black">Withdrawal architecture</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{data.policy?.withdrawalsSetupRequired ?? "Withdrawals are not configured yet. KYC, payout method setup, admin review, and payout provider integration are required before requests can be created."}</p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Requirement label="KYC status" value={data.kycStatus} complete={data.kycStatus === "verified"} />
+                <Requirement label="Payout provider" value={data.payoutProviderConfigured ? "Configured" : "Not configured"} complete={data.payoutProviderConfigured} />
+                <Requirement label="Payout method setup" value={data.payoutMethodCollectionEnabled ? "Available" : "Not available"} complete={data.payoutMethodCollectionEnabled} />
+                <Requirement label="Available balance" value={data.wallet.availableBalanceCents > 0 ? "Available" : "No balance"} complete={data.wallet.availableBalanceCents > 0} />
+              </div>
+              <button className="mt-6 min-h-12 w-full rounded-[8px] border border-white/10 bg-white/[0.03] px-5 text-sm font-black text-slate-500" disabled>Request Withdrawal - setup required</button>
+              {data.disabledReasons.length ? <div className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4"><p className="text-sm font-black text-yellow-100">Blocked requirements</p><ul className="mt-2 space-y-1 text-sm text-yellow-50/80">{data.disabledReasons.map((reason) => <li key={reason}>- {reason.replaceAll("_", " ")}</li>)}</ul></div> : null}
             </Card>
             <Card className="p-6 sm:p-8">
               <ShieldCheck className="text-[var(--gold)]" size={34} />
               <h2 className="mt-5 text-2xl font-black">Review and identity checks</h2>
               <p className="mt-4 leading-7 text-slate-300">Sumsub identity verification must be verified before withdrawals can be approved for payout. Bank verification and payout providers are not connected yet.</p>
               <div className="mt-6 space-y-3 text-sm text-slate-400">
-                <p>DoroCoins are platform credits and cannot be withdrawn or converted to cash.</p>
+                <p>{data.policy?.dorocoinNotCash ?? "DoroCoins are platform credits and cannot be withdrawn or converted to cash."}</p>
+                <p>{data.policy?.rewardPointsNotCash ?? "Reward points are not cash and cannot be withdrawn."}</p>
                 <p>Withdrawals require admin review before payout.</p>
                 <p>No automatic or instant payout is available.</p><p><a className="font-bold text-[var(--gold)]" href="/kyc/status">Review KYC status</a></p>
               </div>
@@ -141,3 +121,6 @@ function Balance({ label, value }: { label: string; value: number }) {
   return <Card className="p-5"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">${(Number(value || 0) / 100).toFixed(2)}</p></Card>;
 }
 
+function Requirement({ label, value, complete }: { label: string; value: string; complete: boolean }) {
+  return <div className={`rounded-[8px] border p-4 ${complete ? "border-emerald-500/20 bg-emerald-500/5" : "border-white/10 bg-white/[0.03]"}`}><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p><p className={`mt-2 font-black ${complete ? "text-emerald-200" : "text-slate-300"}`}>{value.replaceAll("_", " ")}</p></div>;
+}

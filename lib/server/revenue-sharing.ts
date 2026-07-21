@@ -1,3 +1,5 @@
+import { PLATFORM_FEE_CONFIG, calculateGrossToNet } from "@/lib/server/wallet-architecture";
+
 export const GENERATED_REVENUE_SPLIT = {
   winnersPercent: 65,
   hostPercent: 15,
@@ -6,7 +8,7 @@ export const GENERATED_REVENUE_SPLIT = {
 };
 
 export const CHALLENGER_VOTE_REVENUE_BONUS_PERCENT = 10;
-export const PREDICTION_PLATFORM_FEE_PERCENT = 7;
+export const PREDICTION_PLATFORM_FEE_PERCENT = PLATFORM_FEE_CONFIG.predictionArenaPlatformFeePercent;
 
 export function calculateGeneratedRevenueSplit(generatedRevenueCents: number) {
   const safeRevenue = Math.max(0, Math.round(generatedRevenueCents));
@@ -78,6 +80,15 @@ export function predictionStakeFoundation(stakeAmountUsd: number) {
     platformFeePercent: PREDICTION_PLATFORM_FEE_PERCENT,
     platformFeeUsd,
     netStakeUsd: Math.max(0, Math.round((safeStake - platformFeeUsd) * 100) / 100)
+  };
+}
+
+export function revenueGrossToNetFoundation(input: { grossAmountCents: number; paymentProcessorFeeCents?: number; platformFeeCents?: number; reserveCents?: number }) {
+  return {
+    ...calculateGrossToNet(input),
+    status: "pending_admin_review",
+    moneyMovementEnabled: false,
+    feeConfig: PLATFORM_FEE_CONFIG
   };
 }
 

@@ -1,13 +1,16 @@
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createCashWalletDefaults } from "@/lib/server/cash-wallet";
+import { WITHDRAWAL_ARCHITECTURE_CONFIG, type WithdrawalRequestStatus } from "@/lib/server/wallet-architecture";
 
-export const MIN_WITHDRAWAL_CENTS = 2500;
-export const MAX_DAILY_WITHDRAWAL_CENTS = 500000;
+export const MIN_WITHDRAWAL_CENTS = WITHDRAWAL_ARCHITECTURE_CONFIG.minimumWithdrawalAmountCents;
+export const MAX_DAILY_WITHDRAWAL_CENTS = null as number | null;
 
 export type WithdrawalStatus =
   | "draft"
   | "pending_review"
+  | "requested"
+  | "under_review"
   | "needs_kyc"
   | "approved"
   | "processing"
@@ -16,6 +19,8 @@ export type WithdrawalStatus =
   | "rejected"
   | "cancelled"
   | "reversed";
+
+export type PlannedWithdrawalStatus = WithdrawalRequestStatus;
 
 export function maskAccount(accountNumber: string) {
   const digits = accountNumber.replace(/\D/g, "");

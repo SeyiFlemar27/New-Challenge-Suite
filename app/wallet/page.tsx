@@ -32,6 +32,7 @@ export default function WalletPage() {
   const [customCoins, setCustomCoins] = useState("250");
   const [account, setAccount] = useState<{ planId?: string | null; accountType?: string; role?: string | null; isAdmin?: boolean }>({});
   const [financialSummary, setFinancialSummary] = useState<any>(null);
+  const [cashWallet, setCashWallet] = useState<any>(null);
   const hostMode = String(account.planId) === "host";
   const customCoinAmount = Number(customCoins || 0);
   const customCoinInvalid = !Number.isInteger(customCoinAmount) || customCoinAmount < 50 || customCoinAmount > 10000;
@@ -56,6 +57,7 @@ export default function WalletPage() {
     setBalance(Number(walletResult.data.wallet.balance ?? 0));
     setAccount(walletResult.data.user ?? {});
     setFinancialSummary(walletResult.data.financialSummary ?? null);
+    setCashWallet(walletResult.data.cashWallet ?? null);
     setTransactions((walletResult.data.transactions ?? []).map((txn) => {
       const record = txn as Partial<DoroTransaction>;
       return { id: String(record.id ?? ""), amount: Number(record.amount ?? 0) };
@@ -172,6 +174,24 @@ export default function WalletPage() {
         <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">View Earnings</LinkButton>
       </Card> : null}
 
+      {!loading && !unauthenticated && !error ? <Card className="mt-8 p-6 sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-black">Cash wallet architecture</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Cash earnings are separate from DoroCoins and become withdrawable only after KYC, payout setup, admin review, and provider integration.</p>
+          </div>
+          <LinkButton href="/wallet/withdraw" variant="secondary">Review Withdrawal Setup</LinkButton>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <CashMetric label="Available Balance" value={Number(cashWallet?.availableBalanceCents ?? 0)} />
+          <CashMetric label="Pending Balance" value={Number(cashWallet?.pendingBalanceCents ?? 0)} />
+          <CashMetric label="On Hold" value={Number(cashWallet?.underReviewBalanceCents ?? cashWallet?.lockedBalanceCents ?? 0)} />
+          <CashMetric label="Withdrawn Total" value={Number(cashWallet?.withdrawnBalanceCents ?? 0)} />
+          <CashMetric label="Lifetime Earnings" value={Number(cashWallet?.lifetimeEarningsCents ?? 0)} />
+        </div>
+        <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-50/90">DoroCoins cannot be withdrawn or converted to cash. Reward points are not cash.</p>
+      </Card> : null}
+
       {!loading && !unauthenticated && !error ? <section className="mt-10">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-black">Buy DoroCoins</h2><p className="mt-2 text-sm text-slate-400">Choose a package or enter a custom amount. Checkout updates after payment confirmation.</p></div><p className="text-sm font-bold text-slate-400">{recentActivityCount ? `${recentActivityCount} wallet records` : "No transactions yet"}</p></div>
         <Card className="mt-5 p-6">
@@ -209,4 +229,8 @@ export default function WalletPage() {
       </section> : null}
     </AppShell>
   );
+}
+
+function CashMetric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-[8px] border border-white/10 bg-black/25 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">${(value / 100).toFixed(2)}</p></div>;
 }
