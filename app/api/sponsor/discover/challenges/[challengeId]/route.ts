@@ -32,11 +32,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
       placements: Array.isArray(data.sponsorPlacementOptions) && data.sponsorPlacementOptions.length ? data.sponsorPlacementOptions : placementFoundation,
       estimatedReach: data.expectedReachLabel ?? null,
       sponsorshipBudget: data.minimumSponsorshipAmount ? `$${data.minimumSponsorshipAmount}` : null,
-      currentPrizePoolCents: Number(data.publicJackpotEstimateCents ?? data.visibleJackpotCents ?? 0),
+      currentPrizePoolCents: Number(data.confirmedSponsorContributionWinnerShareCents ?? data.confirmedSponsorContributionCents ?? data.visibleJackpotCents ?? 0),
       sponsorReady,
       fundingWindow,
       discussionFoundation: sponsorshipDiscussionFoundation(snap.id, context.user.uid),
-      fundingSetupCopy: "Sponsor funding checkout is not available yet. Once payment setup is complete, confirmed sponsor contributions will be added 100% to the winner prize pool.",
+      fundingSetupCopy: "Sponsor funding checkout creates a pending Stripe session only. Confirmed sponsor contributions are added 100% to the winner prize pool after webhook confirmation.",
       timeline: { startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, votingDeadline: data.votingDeadline ?? null },
       riskIndicators: { adminReviewRequired: Boolean(data.adminReviewRequired), fundingEnabled: false },
       status: getChallengeDisplayStatus(data as any)

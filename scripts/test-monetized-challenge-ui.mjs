@@ -74,19 +74,20 @@ assert(!sponsorDiscoveryPage.includes("fake"), "sponsor discovery UI must not in
 
 assert(sponsorDetailRoute.includes("if (!sponsorReady) return fail"), "sponsor detail API must reject non-sponsor-ready challenges.");
 assert(sponsorDetailRoute.includes("sponsorshipDiscussionFoundation"), "sponsor detail API must expose discussion foundation only.");
-assert(sponsorDetailRoute.includes("Sponsor funding checkout is not available yet."), "sponsor detail API must keep funding setup-safe.");
+assert(sponsorDetailRoute.includes("pending Stripe session only") && sponsorDetailRoute.includes("webhook confirmation"), "sponsor detail API must keep funding webhook-confirmed and setup-safe.");
 assert(sponsorDetailRoute.includes("fundingEnabled: false"), "sponsor detail API must not enable funding.");
 assert(sponsorDetailPage.includes("Discuss Sponsorship"), "sponsor detail must include discussion CTA.");
 assert(sponsorDetailPage.includes("Fund Challenge"), "sponsor detail must include fund challenge CTA.");
 assert(sponsorDetailPage.includes("Funding setup required"), "sponsor detail must not fake payment availability.");
-assert(sponsorDetailPage.includes("No message, email, payment, or prize pool credit is created from this page."), "sponsor detail must not fake messages or funding.");
+assert(sponsorDetailPage.includes("No sponsor money, prize pool growth, public brand placement, ledger entry, payout, or winner payment"), "sponsor detail must not fake messages or funding.");
 assert(sponsorDetailPage.includes("Confirmed sponsor payment required"), "sponsor detail must explain provider confirmation.");
 assert(!sponsorDetailPage.includes("Message sent"), "sponsor detail must not fake sent messages.");
 assert(!sponsorDetailPage.includes("Payment complete"), "sponsor detail must not fake payment.");
 
 assert(!challengeRoute.includes("stripe.checkout.sessions.create"), "challenge builder must not create checkout sessions.");
 assert(!challengeRoute.includes("revenueLedgerEntries") && !challengeRoute.includes("createLedgerEntry("), "challenge builder route must not create revenue ledger entries.");
-assert(!stripeWebhook.includes("sponsorContribution") && !stripeWebhook.includes("paidEntryRequested"), "Stripe webhook must not be changed for this UI pass.");
+assert(stripeWebhook.includes("paymentPurpose === \"challenge_entry\"") && stripeWebhook.includes("paymentPurpose === \"paid_vote\"") && stripeWebhook.includes("paymentPurpose === \"sponsor_funding\""), "Stripe webhook must branch only by explicit payment purpose for monetization checkout foundation.");
+assert(!stripeWebhook.includes("finalizeApprovedWinnerProposalLedger"), "Stripe webhook must not finalize ledgers or release prizes.");
 assert(withdrawalsRoute.includes("WITHDRAWALS_SETUP_REQUIRED"), "withdrawals must remain setup-safe.");
 assert(!withdrawalsRoute.includes("providerTransferId: \"") && !withdrawalsRoute.includes("markPaid"), "withdrawals must not execute payouts or mark paid.");
 

@@ -30,6 +30,8 @@ export default function ChallengeDetailPage() {
   const [commentMessage, setCommentMessage] = useState("");
   const [participantSearch, setParticipantSearch] = useState("");
   const [participantLimit, setParticipantLimit] = useState(12);
+  const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
+  const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -80,6 +82,21 @@ export default function ChallengeDetailPage() {
       setComments((current) => [...current, result.data!.comment]);
       setCommentBody("");
     }
+  }
+
+  async function startPaidEntryCheckout() {
+    setEntryCheckoutLoading(true);
+    setEntryCheckoutMessage("");
+    const result = await apiRequest<{ url?: string }>(`/api/challenges/${challengeId}/entry-checkout`, {
+      method: "POST",
+      body: JSON.stringify({ entryAgreementAccepted: true })
+    });
+    setEntryCheckoutLoading(false);
+    if (!result.ok || !result.data?.url) {
+      setEntryCheckoutMessage(result.message);
+      return;
+    }
+    window.location.href = result.data.url;
   }
 
   if (isLoading) {
@@ -145,6 +162,11 @@ export default function ChallengeDetailPage() {
   const participants = ((details as { participants?: Array<{ id: string; displayName: string; username?: string | null; avatarUrl?: string | null; participantStatus?: string; entryStatus?: string | null; profilePath?: string }> } | null)?.participants ?? []);
   const filteredParticipants = participants.filter((participant) => `${participant.displayName} ${participant.username ?? ""}`.toLowerCase().includes(participantSearch.toLowerCase()));
   const visibleParticipants = filteredParticipants.slice(0, participantLimit);
+  const rawChallenge = details?.challenge as Record<string, any> | undefined;
+  const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, any> : {};
+  const paidEntryRequired = Boolean(monetization.paidEntryRequested || rawChallenge?.paidEntryEnabled || rawChallenge?.entryFeeRequired);
+  const entryFeeCents = Number(monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
+  const entryFeeLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.max(0, entryFeeCents) / 100);
 
   return (
     <AppShell>
@@ -232,14 +254,17 @@ export default function ChallengeDetailPage() {
         <aside className="space-y-5 xl:pt-[432px]">
           <Card className="p-5 text-center sm:p-8">
             <h3 className="text-xl font-black">Ready to compete?</h3>
-            <p className="mt-2 text-slate-300">Enroll for updates, then join when you are ready to submit.</p>
+            <p className="mt-2 text-slate-300">{paidEntryRequired ? `Paid entry is required for this challenge. Entry updates only after Stripe webhook confirmation.` : "Enroll for updates, then join when you are ready to submit."}</p>
             {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
-            {userState?.joined ? (
+            {paidEntryRequired ? (
+              <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee (${entryFeeLabel})`}</Button>
+            ) : userState?.joined ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Continue Entry</LinkButton>
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/enroll`} className="mt-6 w-full">Enroll Now</LinkButton>
             )}
-            <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>
+            {paidEntryRequired ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>}
+            {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
             <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
           </Card>
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">

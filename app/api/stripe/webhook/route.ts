@@ -6,6 +6,14 @@ import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { awardDoroCoinPurchaseRewards } from "@/lib/server/rewards";
 import {
+  confirmChallengeEntryPayment,
+  confirmPaidVotePurchase,
+  confirmSponsorContribution,
+  expireChallengeEntryPayment,
+  expirePaidVotePurchase,
+  expireSponsorContribution
+} from "@/lib/server/monetization-payments";
+import {
   invoicePaymentIntentId,
   invoiceSubscriptionId,
   persistStripeSubscriptionLifecycle,
@@ -15,6 +23,7 @@ import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses
 
 const handledEventTypes = new Set<Stripe.Event.Type>([
   "checkout.session.completed",
+  "checkout.session.expired",
   "invoice.payment_succeeded",
   "invoice.payment_failed",
   "customer.subscription.updated",
@@ -145,7 +154,14 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        if (session.metadata?.type === "dorocoin_purchase") {
+        const paymentPurpose = session.metadata?.paymentPurpose;
+        if (paymentPurpose === "challenge_entry") {
+          outcome = await confirmChallengeEntryPayment(db, event, session);
+        } else if (paymentPurpose === "paid_vote") {
+          outcome = await confirmPaidVotePurchase(db, event, session);
+        } else if (paymentPurpose === "sponsor_funding") {
+          outcome = await confirmSponsorContribution(db, event, session);
+        } else if (session.metadata?.type === "dorocoin_purchase") {
           assertPaidPaymentSession(session);
           const transaction = await applyDoroCoinTransaction(db, {
             userId: session.metadata.userId,
@@ -162,6 +178,14 @@ export async function POST(request: Request) {
         } else if (session.mode === "subscription") {
           outcome = await processSubscriptionCheckout(stripe, db, event, session);
         }
+        break;
+      }
+      case "checkout.session.expired": {
+        const session = event.data.object;
+        const paymentPurpose = session.metadata?.paymentPurpose;
+        if (paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
+        else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
+        else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
         break;
       }
       case "invoice.payment_succeeded":

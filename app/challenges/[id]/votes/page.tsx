@@ -211,6 +211,11 @@ export default function PurchaseVotesPage() {
               <p><b>Wallet:</b> {walletBalance} DoroCoins</p>
               <p className="mt-2"><b>DoroCoin vote request:</b> {votes || 0} votes for {coins || 0} DoroCoins</p>
             </Card>
+            <Card className="mt-6 border-yellow-500/20 bg-yellow-500/[0.04] p-4 sm:p-5">
+              <h2 className="text-lg font-black">Paid Vote Checkout</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Card-based paid vote checkout is prepared as a webhook-confirmed foundation. Paid vote credits are granted only after Stripe webhook confirmation and cannot be granted from the success page.</p>
+              <Button className="mt-4 w-full" variant="secondary" disabled title="Paid vote checkout requires payment setup and challenge-level paid vote activation">Paid votes setup required</Button>
+            </Card>
             <label className="mt-6 flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I acknowledge DoroCoin votes are final once recorded and are subject to the voting policy. DoroCoin is an internal platform credit, not cash.</span></label>
             {packagesQuery.data && !packagesQuery.data.ok ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{packagesQuery.data.message}</p> : null}
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}

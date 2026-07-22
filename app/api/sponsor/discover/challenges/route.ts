@@ -25,7 +25,7 @@ function safeChallenge(id: string, data: Record<string, unknown>) {
     status: getChallengeDisplayStatus(data as any),
     sponsorReady,
     fundingWindow,
-    currentPrizePoolCents: Number(data.publicJackpotEstimateCents ?? data.visibleJackpotCents ?? 0),
+    currentPrizePoolCents: Number(data.confirmedSponsorContributionWinnerShareCents ?? data.confirmedSponsorContributionCents ?? data.visibleJackpotCents ?? 0),
     sponsorPackages: Array.isArray(data.sponsorPackages) ? data.sponsorPackages : [],
     placements: Array.isArray(data.sponsorPlacementOptions) && data.sponsorPlacementOptions.length ? data.sponsorPlacementOptions : sponsorPlacementFoundation()
   };
