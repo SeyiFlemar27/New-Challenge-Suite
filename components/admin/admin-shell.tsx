@@ -27,6 +27,7 @@ const groups: NavGroup[] = [
     { href: "/admin/submissions", label: "Submissions", icon: ClipboardCheck },
     { href: "/admin/participants", label: "Participants", icon: UsersRound },
     { href: "/admin/winners", label: "Winners", icon: Trophy },
+    { href: "/admin/prize-approvals", label: "Prize Approvals", icon: ClipboardCheck },
     { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
     { href: "/admin/disputes", label: "Disputes", icon: Flag }
   ] },
