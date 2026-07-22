@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ClipboardCheck, RefreshCw, ShieldCheck } from "lucide-react";
-import { Button, Card, EmptyState, PageTitle } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type PrizeProposal = {
@@ -101,6 +101,7 @@ export default function AdminPrizeApprovalsPage() {
                   {winners.length ? <div className="mt-3 space-y-2">{winners.map((winner, index) => <div key={`${proposal.id}_${winner.userId}_${index}`} className="flex flex-wrap justify-between gap-2 text-sm text-slate-300"><span>Place {winner.placement ?? index + 1}: {winner.userId ?? "Winner unavailable"}</span><span>{winner.splitPercent ?? 0}% / {money(winner.proposedAmountPreviewCents)}</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">Winner details are unavailable on this proposal.</p>}
                 </div>
                 <p className="mt-5 text-sm leading-6 text-slate-400">Use the admin prize approval API to preview, approve, reject, or request changes. Approved records remain non-paying until confirmed revenue, ledger finalization, hold, KYC, and payout provider requirements are complete.</p>
+                <LinkButton href={`/admin/prize-approvals/${proposal.id}`} className="mt-5 w-full">Review Proposal</LinkButton>
               </Card>
             );
           })}

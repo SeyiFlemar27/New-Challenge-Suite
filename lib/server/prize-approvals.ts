@@ -1,9 +1,11 @@
-import type { DocumentData, Firestore } from "firebase-admin/firestore";
+import { FieldValue, type DocumentData, type Firestore } from "firebase-admin/firestore";
+import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import type { RequestUser } from "@/lib/server/auth";
 import {
   CASH_EARNING_HOLD_HOURS,
   DEFAULT_CASH_CURRENCY,
   DEFAULT_WINNER_SPLITS,
+  calculatePaidRevenueSplit,
   calculateWinnerDistribution,
   calculateWinnerPrizePool,
   holdUntilFromApproval
@@ -123,8 +125,12 @@ export function canProposeChallengeWinners(user: RequestUser, challenge: Record<
   const eligibleOperator = owned && ["creator", "host", "enterprise", "admin", "user"].includes(role);
   const challengeStatus = status(challenge.status ?? challenge.lifecycleStatus);
   const blockedStatus = ["cancelled", "paused", "archived", "deleted"].includes(challengeStatus);
+  const monetization = typeof challenge.monetization === "object" && challenge.monetization !== null ? challenge.monetization as Record<string, unknown> : {};
   const monetized = Boolean(
-    challenge.monetization
+    monetization.paidEntryRequested
+    || monetization.sponsorReady
+    || monetization.prizePoolRequested
+    || monetization.paidVotesRequested
     || challenge.prizePoolEnabled
     || challenge.prizeType === "money"
     || challenge.sponsorReady
@@ -148,14 +154,43 @@ export function canProposeChallengeWinners(user: RequestUser, challenge: Record<
   };
 }
 
+export function winnerProposalLifecycleReadiness(challenge: Record<string, unknown>, now = new Date()) {
+  const lifecycle = getChallengeLifecycleState(challenge, now);
+  const challengeStatus = status(challenge.status ?? challenge.lifecycleStatus);
+  const terminalBlocked = ["cancelled", "paused", "postponed", "archived", "deleted"].includes(challengeStatus);
+  const alreadyApproved = Boolean(challenge.winnersApprovedAt || challenge.adminWinnersApprovedAt || challenge.adminWinnerApprovalStatus === "approved");
+  const votingClosed = lifecycle.votingStatus === "voting_closed" || ["voting_closed", "under_review", "completed", "winners_announced"].includes(lifecycle.primaryStatus);
+  const challengeEnded = lifecycle.participationStatus === "challenge_ended" || ["voting_closed", "under_review", "completed", "winners_announced"].includes(lifecycle.primaryStatus);
+  const submissionsFinalized = lifecycle.submissionStatus === "submissions_closed" || lifecycle.submissionStatus === "no_submission_required";
+  const ready = !terminalBlocked && !alreadyApproved && votingClosed && challengeEnded && submissionsFinalized;
+  return {
+    ready,
+    lifecycle,
+    terminalBlocked,
+    alreadyApproved,
+    votingClosed,
+    challengeEnded,
+    submissionsFinalized,
+    message: ready ? "Winners can be proposed." : "Winners can be proposed after the challenge ends and voting closes."
+  };
+}
+
 export function getConfirmedPrizeSources(challenge: Record<string, unknown>) {
-  const entryFeeWinnerShareCents = cents(challenge.confirmedEntryFeeWinnerShareCents ?? challenge.entryFeeRevenueWinnerShareCents);
-  const paidVoteWinnerShareCents = cents(challenge.confirmedPaidVoteWinnerShareCents ?? challenge.paidVoteRevenueWinnerShareCents);
+  const entryFeeGrossCents = cents(challenge.confirmedEntryFeeGrossCents ?? challenge.confirmedPaidEntryGrossCents ?? challenge.confirmedEntryFeeRevenueCents);
+  const paidVoteGrossCents = cents(challenge.confirmedPaidVoteGrossCents ?? challenge.confirmedPaidVoteRevenueCents);
+  const entrySplit = calculatePaidRevenueSplit(entryFeeGrossCents, "entry_fee");
+  const voteSplit = calculatePaidRevenueSplit(paidVoteGrossCents, "paid_vote");
+  const entryFeeWinnerShareCents = cents(challenge.confirmedEntryFeeWinnerShareCents ?? challenge.entryFeeRevenueWinnerShareCents ?? entrySplit.winnerShareCents);
+  const paidVoteWinnerShareCents = cents(challenge.confirmedPaidVoteWinnerShareCents ?? challenge.paidVoteRevenueWinnerShareCents ?? voteSplit.winnerShareCents);
   const sponsorContributionWinnerShareCents = cents(challenge.confirmedSponsorContributionWinnerShareCents ?? challenge.confirmedSponsorContributionCents);
   const approvedManualPrizeFundsCents = cents(challenge.approvedManualPrizeFundsCents);
   return {
+    entryFeeGrossCents,
+    paidVoteGrossCents,
     entryFeeWinnerShareCents,
     paidVoteWinnerShareCents,
+    creatorHostOperatorShareCents: entrySplit.creatorHostOperatorShareCents + voteSplit.creatorHostOperatorShareCents,
+    platformAdminShareCents: entrySplit.platformAdminShareCents + voteSplit.platformAdminShareCents,
     sponsorContributionWinnerShareCents,
     approvedManualPrizeFundsCents,
     usesConfirmedSourcesOnly: true,
@@ -208,6 +243,8 @@ export function buildPrizeApprovalPreview(input: {
     confirmedEntryFeeWinnerShareCents: sources.entryFeeWinnerShareCents,
     confirmedPaidVoteWinnerShareCents: sources.paidVoteWinnerShareCents,
     confirmedSponsorContributionWinnerShareCents: sources.sponsorContributionWinnerShareCents,
+    creatorHostOperatorShareCents: sources.creatorHostOperatorShareCents,
+    platformAdminShareCents: sources.platformAdminShareCents,
     sponsorContributionGoesFullyToWinners: true,
     sponsorContributionIgnoredIfUnconfirmed: true,
     platformShareNotFakedFromUnconfirmedRevenue: true,
@@ -220,6 +257,14 @@ export function buildPrizeApprovalPreview(input: {
     marksPaidOrWithdrawn: false,
     createsCashLedgerEntries: false
   };
+}
+
+export function operatorRecipientId(challenge: Record<string, unknown>) {
+  return text(challenge.operatorId, 160)
+    || text(challenge.hostId, 160)
+    || text(challenge.creatorId, 160)
+    || text(challenge.ownerId, 160)
+    || text(challenge.userId, 160);
 }
 
 export function buildLedgerFinalizationFoundation(input: {
@@ -256,6 +301,202 @@ export function buildLedgerFinalizationFoundation(input: {
     marksPaidAutomatically: false,
     kycStillRequiredBeforeWithdrawal: true
   };
+}
+
+export async function getWinnerCandidates(db: Firestore, challengeId: string) {
+  const snap = await db.collection("submissions").where("challengeId", "==", challengeId).limit(250).get();
+  const eligibleStatuses = new Set(["approved", "active", "winner", "submitted", "published"]);
+  return snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
+    .filter((submission) => eligibleStatuses.has(status(submission.status)) && !["flagged", "removed", "rejected", "disqualified"].includes(status(submission.moderationStatus)))
+    .map((submission) => ({
+      id: submission.id,
+      submissionId: submission.id,
+      userId: text(submission.userId ?? submission.participantUserId, 160),
+      participantId: text(submission.participantId, 160) || null,
+      displayName: text(submission.userName ?? submission.userDisplayName ?? submission.displayName, 120) || "Participant",
+      title: text(submission.title, 160) || "Untitled submission",
+      status: text(submission.status, 80) || "approved",
+      voteCount: cents(submission.voteCount ?? submission.likes),
+      weightedVoteCount: cents(submission.weightedVoteCount ?? submission.voteCount ?? submission.likes),
+      submittedAt: typeof submission.submittedAt === "string" ? submission.submittedAt : typeof submission.createdAt === "string" ? submission.createdAt : null,
+      eligible: Boolean(text(submission.userId ?? submission.participantUserId, 160)),
+      source: "submissions"
+    }))
+    .filter((candidate) => candidate.eligible)
+    .sort((a, b) => b.weightedVoteCount - a.weightedVoteCount || b.voteCount - a.voteCount);
+}
+
+export async function getAdminPrizeApprovalDetail(db: Firestore, proposalId: string) {
+  const proposal = await getProposalOrNull(db, proposalId);
+  if (!proposal) return null;
+  const challengeId = text(proposal.challengeId, 160);
+  const challenge = challengeId ? await getChallengeOrNull(db, challengeId) : null;
+  const winners = normalizeWinnerProposalWinners(proposal.winners);
+  const validation = validateWinnerProposalWinners(winners);
+  const preview = challenge ? buildPrizeApprovalPreview({ challengeId, proposalId, challenge, winners, approvedAt: text(proposal.reviewedAt, 80) || undefined }) : null;
+  return {
+    proposal,
+    challenge,
+    validation,
+    preview,
+    readiness: challenge ? winnerProposalLifecycleReadiness(challenge) : null,
+    moneyMovementEnabled: false,
+    payoutProviderCalled: false
+  };
+}
+
+export async function finalizeApprovedWinnerProposalLedger(db: Firestore, input: {
+  challengeId: string;
+  proposalId: string;
+  adminId: string;
+}) {
+  const proposalRef = db.collection("winnerProposals").doc(input.proposalId);
+  const now = new Date().toISOString();
+  return db.runTransaction(async (transaction) => {
+    const [proposalSnap, challengeSnap] = await Promise.all([
+      transaction.get(proposalRef),
+      transaction.get(db.collection("challenges").doc(input.challengeId))
+    ]);
+    if (!proposalSnap.exists) return { finalized: false, status: "proposal_not_found", message: "Winner proposal not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    if (!challengeSnap.exists) return { finalized: false, status: "challenge_not_found", message: "Challenge not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    const proposal = { id: proposalSnap.id, ...(proposalSnap.data() ?? {}) } as Record<string, unknown> & { id: string };
+    const challenge = { id: challengeSnap.id, ...(challengeSnap.data() ?? {}) } as Record<string, unknown> & { id: string };
+    if (proposal.status !== "approved") return { finalized: false, status: "manual_review_required", message: "Admin approval is required before ledger finalization.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    if (proposal.ledgerFinalizationStatus === "finalized_pending_hold") return { finalized: true, status: "already_finalized", message: "Ledger finalization is already recorded for this proposal.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+
+    const winners = normalizeWinnerProposalWinners(proposal.winners);
+    const validation = validateWinnerProposalWinners(winners);
+    const readiness = winnerProposalLifecycleReadiness(challenge);
+    const preview = buildPrizeApprovalPreview({ challengeId: input.challengeId, proposalId: input.proposalId, challenge, winners, approvedAt: text(proposal.reviewedAt, 80) || now });
+    if (!validation.valid) return { finalized: false, status: "manual_review_required", message: "Winner split requires manual review.", validation, ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    if (!readiness.ready) return { finalized: false, status: "manual_review_required", message: readiness.message, readiness, ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    if (!preview.ledgerFinalizationAvailable || preview.totalWinnerPrizePoolCents <= 0) {
+      transaction.set(proposalRef, { ledgerFinalizationStatus: "awaiting_confirmed_payments", ledgerFinalizationAttemptedAt: now, updatedAt: now }, { merge: true });
+      return { finalized: false, status: "awaiting_confirmed_payments", message: "No confirmed payment sources available for ledger finalization.", preview, ledgerEntriesCreated: 0, payoutProviderCalled: false };
+    }
+
+    const holdUntil = preview.holdUntil;
+    const createdEntries: Array<Record<string, unknown>> = [];
+    for (const winner of preview.winnerAmounts) {
+      if (winner.proposedAmountPreviewCents <= 0) continue;
+      const id = `${input.challengeId}_${input.proposalId}_winner_share_${winner.userId}_${winner.placement}`;
+      const ref = db.collection("cashLedger").doc(id);
+      const entry = {
+        id,
+        userId: winner.userId,
+        challengeId: input.challengeId,
+        proposalId: input.proposalId,
+        sourceType: "challenge_prize",
+        sourceId: input.proposalId,
+        direction: "credit",
+        amountCents: winner.proposedAmountPreviewCents,
+        currency: preview.currency,
+        status: "pending_hold",
+        balanceBucket: "pending",
+        revenueType: "sponsor_contribution",
+        shareType: "winner_share",
+        splitPercent: winner.splitPercent,
+        holdUntil,
+        idempotencyKey: id,
+        metadata: { placement: winner.placement, sourceConfirmedOnly: true, kycRequiredBeforeWithdrawal: true },
+        createdBy: "admin_prize_approval",
+        reviewedBy: input.adminId,
+        providerReference: null,
+        payoutProviderCalled: false,
+        paid: false,
+        withdrawn: false,
+        createdAt: now,
+        updatedAt: now
+      };
+      transaction.set(ref, entry);
+      createdEntries.push(entry);
+    }
+
+    const operatorId = operatorRecipientId(challenge);
+    if (operatorId && preview.creatorHostOperatorShareCents > 0) {
+      const id = `${input.challengeId}_${input.proposalId}_operator_share_${operatorId}`;
+      const ref = db.collection("cashLedger").doc(id);
+      const entry = {
+        id,
+        userId: operatorId,
+        challengeId: input.challengeId,
+        proposalId: input.proposalId,
+        sourceType: "challenge_revenue_share",
+        sourceId: input.proposalId,
+        direction: "credit",
+        amountCents: preview.creatorHostOperatorShareCents,
+        currency: preview.currency,
+        status: "pending_hold",
+        balanceBucket: "pending",
+        revenueType: "entry_fee",
+        shareType: "creator_host_share",
+        splitPercent: 20,
+        holdUntil,
+        idempotencyKey: id,
+        metadata: { sourceConfirmedOnly: true, kycRequiredBeforeWithdrawal: true },
+        createdBy: "admin_prize_approval",
+        reviewedBy: input.adminId,
+        providerReference: null,
+        payoutProviderCalled: false,
+        paid: false,
+        withdrawn: false,
+        createdAt: now,
+        updatedAt: now
+      };
+      transaction.set(ref, entry);
+      createdEntries.push(entry);
+    }
+
+    if (preview.platformAdminShareCents > 0 && challenge.platformShareRecordedAtPaymentConfirmation !== true) {
+      const id = `${input.challengeId}_${input.proposalId}_platform_share`;
+      const ref = db.collection("platformLedger").doc(id);
+      transaction.set(ref, {
+        id,
+        challengeId: input.challengeId,
+        proposalId: input.proposalId,
+        sourceType: "platform_revenue",
+        sourceId: input.proposalId,
+        amountCents: preview.platformAdminShareCents,
+        currency: preview.currency,
+        status: "recorded",
+        shareType: "platform_share",
+        idempotencyKey: id,
+        metadata: { sourceConfirmedOnly: true, reversibleForRefundOrDispute: true },
+        createdBy: "admin_prize_approval",
+        reviewedBy: input.adminId,
+        providerReference: null,
+        payoutProviderCalled: false,
+        paid: false,
+        withdrawn: false,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    transaction.set(proposalRef, {
+      ledgerFinalizationStatus: "finalized_pending_hold",
+      ledgerFinalizedAt: now,
+      ledgerFinalizedByAdminId: input.adminId,
+      ledgerEntriesCreated: createdEntries.length > 0,
+      ledgerEntryCount: FieldValue.increment(createdEntries.length),
+      payoutProviderCalled: false,
+      payoutMarkedPaid: false,
+      cashBalancesCredited: false,
+      holdUntil,
+      updatedAt: now
+    }, { merge: true });
+    return {
+      finalized: true,
+      status: "finalized_pending_hold",
+      message: "Ledger entries were finalized into pending hold. No payout provider was called.",
+      preview,
+      ledgerEntriesCreated: createdEntries.length,
+      holdUntil,
+      payoutProviderCalled: false,
+      marksPaidOrWithdrawn: false
+    };
+  });
 }
 
 export function serializeProposal(doc: { id: string; data(): DocumentData }): Record<string, unknown> & { id: string } {

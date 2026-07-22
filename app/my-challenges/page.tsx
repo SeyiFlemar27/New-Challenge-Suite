@@ -72,6 +72,9 @@ function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
             </div>
             <LinkButton href={actionHref} className="shrink-0">{actionLabel}</LinkButton>
           </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <LinkButton href={`/challenges/${challenge.id}/propose-winners`} variant="secondary">Propose Winners</LinkButton>
+          </div>
           <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
             <span className="flex items-center gap-2"><Users size={16} className="text-[var(--gold)]" /> {Number(challenge.participants ?? challenge.participantCount ?? 0)} participants</span>
             <span className="flex items-center gap-2"><CalendarDays size={16} className="text-[var(--gold)]" /> {String(challenge.endsAt ?? "Date not set")}</span>

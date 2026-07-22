@@ -5,9 +5,11 @@ import {
   buildPrizeApprovalPreview,
   canProposeChallengeWinners,
   getChallengeOrNull,
+  getWinnerCandidates,
   normalizeWinnerProposalWinners,
   serializeProposal,
-  validateWinnerProposalWinners
+  validateWinnerProposalWinners,
+  winnerProposalLifecycleReadiness
 } from "@/lib/server/prize-approvals";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
@@ -40,10 +42,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const access = canProposeChallengeWinners(user, challenge);
   if (!access.allowed) return fail(access.reason, 403, { reason: access.reason }, "WINNER_PROPOSAL_FORBIDDEN");
+  const readiness = winnerProposalLifecycleReadiness(challenge);
+  if (!readiness.ready) return fail(readiness.message, 409, { readiness }, "WINNER_PROPOSAL_NOT_READY");
 
   const winners = normalizeWinnerProposalWinners(parsed.body?.winners);
   const validation = validateWinnerProposalWinners(winners);
   if (!validation.valid) return validationError(validation.errors, "Winner proposal is invalid.");
+  const [candidates, existingProposalSnap] = await Promise.all([
+    getWinnerCandidates(db, challengeId),
+    db.collection("winnerProposals").where("challengeId", "==", challengeId).limit(25).get()
+  ]);
+  const blockingStatuses = new Set(["pending_admin_review", "approved"]);
+  const activeProposal = existingProposalSnap.docs.find((doc) => blockingStatuses.has(String(doc.data().status ?? "")));
+  if (activeProposal) return fail("An active winner proposal already exists for this challenge.", 409, { proposalId: activeProposal.id }, "ACTIVE_WINNER_PROPOSAL_EXISTS");
+  const candidateByUserId = new Set(candidates.map((candidate) => candidate.userId));
+  const candidateBySubmissionId = new Set(candidates.map((candidate) => candidate.submissionId));
+  const invalidWinner = winners.find((winner) => !candidateByUserId.has(winner.userId) || (winner.submissionId && !candidateBySubmissionId.has(winner.submissionId)));
+  if (invalidWinner) return fail("Selected winner must belong to an eligible challenge submission.", 400, { winner: invalidWinner }, "WINNER_CANDIDATE_INVALID");
 
   const now = new Date().toISOString();
   const ref = db.collection("winnerProposals").doc();

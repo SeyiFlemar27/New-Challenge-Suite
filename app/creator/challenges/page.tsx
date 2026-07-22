@@ -36,7 +36,7 @@ export default function CreatorChallengesPage() {
         </div>
         {isLoading ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-[390px] animate-pulse bg-[#151515]" />)}</div> : null}
         {errorMessage ? <Card className="mt-8 p-6"><h2 className="text-xl font-black text-[var(--gold-2)]">Challenges could not load</h2><p className="mt-2 text-slate-300">{errorMessage}</p></Card> : null}
-        {!isLoading && !errorMessage && challenges.length ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div> : null}
+        {!isLoading && !errorMessage && challenges.length ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{challenges.map((challenge) => <div key={challenge.id} className="space-y-3"><ChallengeCard challenge={challenge} /><LinkButton href={`/challenges/${challenge.id}/propose-winners`} variant="secondary" className="w-full">Propose Winners</LinkButton></div>)}</div> : null}
         {!isLoading && !errorMessage && !challenges.length ? <Card className="mt-8"><EmptyState icon={<Swords className="text-[var(--gold)]" />} title="No public challenges yet" body="Create a public challenge for competitors to discover and join." action={<LinkButton href="/challenges/create">Create Challenge</LinkButton>} /></Card> : null}
       </div>
     </AppShell>
