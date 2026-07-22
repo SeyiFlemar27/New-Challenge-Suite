@@ -27,7 +27,13 @@ assert.equal(classifyStorageError(new Error("Firebase Storage: network request f
 assert.equal(classifyStorageError(new Error("Firebase Storage: canceled by user (storage/canceled)")).code, "upload_cancelled");
 assert.equal(classifyStorageError(new Error("STORAGE_UPLOAD_STALLED")).code, "upload_stalled");
 assert.equal(classifyStorageError(new Error("processing failed")).code, "processing_failed");
-assert.equal(mediaErrorMessage("unauthenticated"), "Sign in again before uploading media.");
+assert.equal(classifyStorageError(new Error("Firebase Storage: invalid URL (storage/invalid-argument)")).code, "storage_misconfigured");
+assert.equal(classifyStorageError(new Error("Firebase Storage: user is unauthenticated (storage/unauthenticated)")).code, "unauthenticated");
+assert.equal(mediaErrorMessage("storage_unavailable"), "Storage bucket is not configured.");
+assert.equal(mediaErrorMessage("storage_misconfigured"), "Storage bucket configuration is invalid. Check the deployed Firebase Storage bucket setting.");
+assert.equal(mediaErrorMessage("unauthenticated"), "You must be signed in to upload.");
+assert.equal(mediaErrorMessage("permission_denied"), "Storage permission denied.");
+assert.equal(mediaErrorMessage("upload_cancelled"), "Upload was interrupted. Try again.");
 assert.equal(mediaErrorMessage("upload_stalled"), "Upload did not start transferring. Check your connection and retry.");
 
 console.log("media upload validation tests passed");

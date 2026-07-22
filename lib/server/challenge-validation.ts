@@ -26,6 +26,10 @@ export const serverChallengeCreateSchema = z.object({
   challengeGuidelines: z.string().trim().max(6000).default(""),
   coverImageUrl: z.string().trim().url("Cover image URL must be valid.").optional().or(z.literal("")),
   coverImagePath: z.string().trim().max(500).default(""),
+  mediaUploadStatus: z.enum(["required", "uploaded", "storage_disabled"]).default("required"),
+  mediaStatus: z.enum(["required", "uploaded", "skipped_storage_not_configured"]).default("required"),
+  usesPlaceholderMedia: z.coerce.boolean().default(false),
+  mediaFallbackType: z.string().trim().max(80).default(""),
   promoImageUrl: z.string().trim().url("Promo image URL must be valid.").optional().or(z.literal("")),
   promoImagePath: z.string().trim().max(500).default(""),
   trailerVideoUrl: z.string().trim().url("Trailer video URL must be valid.").optional().or(z.literal("")),
@@ -285,6 +289,26 @@ function validStoragePath(path: string, prefixes: string[]) {
   return Boolean(path && prefixes.some((prefix) => path.startsWith(prefix)) && !path.includes("..") && !/^https?:/i.test(path));
 }
 
+function storageDisabledEnvFlag() {
+  return process.env.NEXT_PUBLIC_DISABLE_MEDIA_UPLOADS === "true";
+}
+
+function storageBucketConfiguredForValidation() {
+  const bucket = (process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "").trim().replace(/^gs:\/\//i, "").replace(/\/+$/g, "");
+  return Boolean(bucket);
+}
+
+function canSkipCoverMedia(challenge: Record<string, unknown>) {
+  const status = text(challenge.mediaUploadStatus);
+  const mediaStatus = text(challenge.mediaStatus);
+  const fallbackType = text(challenge.mediaFallbackType);
+  const requestedSkippedMedia = status === "storage_disabled"
+    && mediaStatus === "skipped_storage_not_configured"
+    && challenge.usesPlaceholderMedia === true
+    && fallbackType === "challenge_suite_placeholder";
+  return requestedSkippedMedia && (storageDisabledEnvFlag() || !storageBucketConfiguredForValidation());
+}
+
 export function validateChallengeForDraft(challenge: ChallengeLike): ChallengeValidationResult {
   const errors: ChallengeValidationIssue[] = [];
   if (text(challenge.title).length > 120) makeIssue(errors, "TITLE_TOO_LONG", "title", "Basics", "Challenge title must be 120 characters or fewer.");
@@ -342,11 +366,12 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const challengeId = text(challenge.id);
   const coverUrl = text(challenge.coverImageUrl);
   const coverPath = text(challenge.coverImagePath);
+  const coverMediaSkipped = canSkipCoverMedia(challenge);
   const allowedDraftPrefixes = ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `challenges/hybrid-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`, `live-events/hybrid-drafts/${ownerId}/media/`] : [];
   const allowedChallengePrefixes = challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [];
   const allowedMediaPrefixes = [...allowedDraftPrefixes, ...allowedChallengePrefixes];
-  if (!coverUrl || !coverPath) makeIssue(errors, "REQUIRED_BANNER", "coverImageUrl", "Media", "Upload a challenge banner.");
-  else if (!validStoragePath(coverPath, allowedMediaPrefixes)) makeIssue(errors, "INVALID_BANNER_STORAGE_PATH", "coverImagePath", "Media", "Challenge banner storage path must belong to this challenge or owner draft path.");
+  if ((!coverUrl || !coverPath) && !coverMediaSkipped) makeIssue(errors, "REQUIRED_BANNER", "coverImageUrl", "Media", "Upload a challenge banner.");
+  else if (!coverMediaSkipped && !validStoragePath(coverPath, allowedMediaPrefixes)) makeIssue(errors, "INVALID_BANNER_STORAGE_PATH", "coverImagePath", "Media", "Challenge banner storage path must belong to this challenge or owner draft path.");
   for (const field of ["promoImagePath", "trailerVideoPath", "promoVideoPath"]) {
     const value = text(challenge[field]);
     if (value && !validStoragePath(value, allowedMediaPrefixes)) makeIssue(errors, "INVALID_MEDIA_STORAGE_PATH", field, "Media", "Optional media storage paths must belong to this challenge or owner draft path.");

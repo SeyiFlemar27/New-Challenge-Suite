@@ -104,7 +104,8 @@ export function publicChallengeFields(data: Record<string, unknown>) {
     "competitionFormat", "bestOf", "votingSettings", "rules", "standardRules",
     "challengeGuidelines", "prizeType", "prizeTitle", "prizeDescription", "publicPrizeStatus",
     "participantCount", "submissionCount", "voteCount", "weightedVoteCount", "coverImageUrl",
-    "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "isLiveEvent", "venueName",
+    "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "mediaUploadStatus", "mediaStatus",
+    "usesPlaceholderMedia", "mediaFallbackType", "mediaStorageStatus", "isLiveEvent", "venueName",
     "eventCity", "eventState", "eventCountry", "eventCapacity", "tournamentType",
     "divisionFormat", "maxParticipants", "scoringMode", "sponsorEnabled", "creatorName",
     "creatorUsername", "creatorAvatarUrl", "publishedAt", "createdAt", "updatedAt"

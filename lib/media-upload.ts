@@ -4,6 +4,7 @@ export type MediaUploadStage = "idle" | "preparing" | "uploading" | "processing"
 
 export type MediaUploadErrorCode =
   | "storage_unavailable"
+  | "storage_misconfigured"
   | "unauthenticated"
   | "unsupported_format"
   | "file_too_large"
@@ -83,14 +84,15 @@ export function validateMediaFile(file: Pick<File, "type" | "size" | "name">, ki
 
 export function mediaErrorMessage(code: MediaUploadErrorCode) {
   switch (code) {
-    case "storage_unavailable": return "Media uploads are temporarily unavailable. Storage is not configured for this environment.";
-    case "unauthenticated": return "Sign in again before uploading media.";
+    case "storage_unavailable": return "Storage bucket is not configured.";
+    case "storage_misconfigured": return "Storage bucket configuration is invalid. Check the deployed Firebase Storage bucket setting.";
+    case "unauthenticated": return "You must be signed in to upload.";
     case "unsupported_format": return "This file format is not supported.";
     case "file_too_large": return "This file is too large for upload.";
-    case "permission_denied": return "You do not have permission to upload to this location.";
+    case "permission_denied": return "Storage permission denied.";
     case "expired_auth": return "Your sign-in session expired. Sign in again and retry the upload.";
     case "network_failure": return "Network connection failed during upload. Check your connection and retry.";
-    case "upload_cancelled": return "Upload was cancelled. You can retry when ready.";
+    case "upload_cancelled": return "Upload was interrupted. Try again.";
     case "upload_stalled": return "Upload did not start transferring. Check your connection and retry.";
     case "processing_failed": return "Upload finished, but media processing failed. Please retry.";
     case "storage_timeout": return "Upload timed out. Please retry with a stable connection.";
@@ -106,10 +108,12 @@ export function classifyStorageError(error: unknown): { code: MediaUploadErrorCo
   if (raw === "STORAGE_UPLOAD_TIMEOUT" || lower.includes("storage_upload_timeout")) code = "storage_timeout";
   else if (raw === "STORAGE_UPLOAD_STALLED" || lower.includes("storage_upload_stalled")) code = "upload_stalled";
   else if (lower.includes("storage/unauthorized") || lower.includes("permission") || lower.includes("403")) code = "permission_denied";
-  else if (lower.includes("storage/unauthenticated") || lower.includes("auth token")) code = "expired_auth";
+  else if (lower.includes("storage/unauthenticated")) code = "unauthenticated";
+  else if (lower.includes("auth token")) code = "expired_auth";
   else if (lower.includes("storage/canceled") || lower.includes("cancelled") || lower.includes("canceled")) code = "upload_cancelled";
   else if (lower.includes("processing failed")) code = "processing_failed";
   else if (lower.includes("storage/retry-limit-exceeded") || lower.includes("network") || lower.includes("offline")) code = "network_failure";
-  else if (lower.includes("storage/bucket-not-found") || lower.includes("bucket") || lower.includes("storage/unknown") || lower.includes("storage/object-not-found")) code = "storage_unavailable";
+  else if (lower.includes("storage/invalid-argument") || lower.includes("invalid url") || lower.includes("invalid storage bucket")) code = "storage_misconfigured";
+  else if (lower.includes("storage/bucket-not-found") || lower.includes("storage/no-default-bucket") || lower.includes("bucket") || lower.includes("storage/unknown") || lower.includes("storage/object-not-found")) code = "storage_unavailable";
   return { code, message: mediaErrorMessage(code) };
 }

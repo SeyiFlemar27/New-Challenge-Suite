@@ -22,6 +22,8 @@ export function MediaUploadField({
   buttonLabel,
   helperText,
   required = false,
+  disabled = false,
+  disabledReason = "Media uploads are temporarily unavailable while storage is being connected.",
   onStatusChange
 }: {
   label: string;
@@ -33,6 +35,8 @@ export function MediaUploadField({
   buttonLabel?: string;
   helperText?: string;
   required?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   onStatusChange?: (status: MediaUploadStage) => void;
 }) {
   const auth = useAuth();
@@ -87,11 +91,16 @@ export function MediaUploadField({
   }
 
   function logUploadDebug(event: string, details: Record<string, unknown>) {
+    if (process.env.NODE_ENV !== "development") return;
     console.info("[media-upload]", {
       event,
       label,
       storageConfigured: firebaseClientConfigStatus.storageConfigured,
+      storageInitialized: firebaseClientConfigStatus.storageInitialized,
       storageBucketEnvName: firebaseClientConfigStatus.storageBucketEnvName,
+      storageBucketAcceptsFormats: firebaseClientConfigStatus.storageBucketAcceptsFormats,
+      initializationError: firebaseClientConfigStatus.initializationError,
+      storageInitializationError: firebaseClientConfigStatus.storageInitializationError,
       authUserPresent: Boolean(auth.user),
       ...details
     });
@@ -103,6 +112,14 @@ export function MediaUploadField({
     setRemovedNotice("");
     setPreviewFailed(false);
     if (!file) return;
+    if (disabled) {
+      setStatus("idle");
+      setError("");
+      setErrorCode("");
+      setRemovedNotice("Media skipped for now.");
+      resetFileInput();
+      return;
+    }
     retryFileRef.current = file;
     setPreview(file);
     setSelectedFile({ name: file.name, size: file.size, type: file.type || "unknown" });
@@ -112,9 +129,10 @@ export function MediaUploadField({
 
     if (!storage) {
       setStatus("failed");
-      setError(mediaErrorMessage("storage_unavailable"));
-      setErrorCode("storage_unavailable");
-      logUploadDebug("blocked", { reason: "storage_unavailable", uploadPath: storagePath });
+      const code = firebaseClientConfigStatus.storageConfigured ? "storage_misconfigured" : "storage_unavailable";
+      setError(mediaErrorMessage(code));
+      setErrorCode(code);
+      logUploadDebug("blocked", { reason: code, uploadPath: storagePath });
       return;
     }
     if (!auth.user) {
@@ -251,13 +269,13 @@ export function MediaUploadField({
             {isVideo ? <video src={displayUrl} controls className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable. The uploaded media URL is saved.</div>}
           </div>
         ) : (
-          <button type="button" onClick={chooseAnotherFile} className="flex min-h-36 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 bg-[#151515] px-4 py-8 text-center text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]">
+          <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-36 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 px-4 py-8 text-center ${disabled ? "cursor-not-allowed bg-[#101010] text-slate-500" : "bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
             {kind === "video" ? <Video className="mb-3" /> : kind === "image" ? <ImageIcon className="mb-3" /> : <UploadCloud className="mb-3" />}
-            <span className="font-black">{buttonLabel ?? (kind === "video" ? "Upload Video" : kind === "image" ? "Upload Image" : "Upload Media")}</span>
-            <span className="mt-2 text-xs text-slate-500">{kind === "video" ? "MP4, WebM, or QuickTime" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to {limitMb}MB</span>
+            <span className="font-black">{disabled ? "Media skipped for now" : buttonLabel ?? (kind === "video" ? "Upload Video" : kind === "image" ? "Upload Image" : "Upload Media")}</span>
+            <span className="mt-2 text-xs text-slate-500">{disabled ? disabledReason : `${kind === "video" ? "MP4, WebM, or QuickTime" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to ${limitMb}MB`}</span>
           </button>
         )}
-        <input ref={inputRef} className="hidden" type="file" accept={accept} onChange={(event) => void handleFile(event.target.files?.[0])} />
+        <input ref={inputRef} className="hidden" type="file" accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />
         {(uploading || status === "failed" || status === "complete" || value) ? (
           <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -274,8 +292,9 @@ export function MediaUploadField({
           </div>
         ) : null}
         {status === "complete" || value ? <p className="mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 size={16} /> Upload complete. Media URL and storage path are ready to save.</p> : null}
-        {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button><Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}
-        {status === "failed" ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryFileRef.current}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}
+        {disabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : null}
+        {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3">{!disabled ? <Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button> : null}<Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}
+        {status === "failed" && !disabled ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryFileRef.current}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}
         {helperText ? <p className="mt-3 text-xs leading-5 text-slate-500">{helperText}</p> : null}
         {removedNotice ? <p className="mt-3 rounded-[8px] bg-slate-900 p-3 text-sm font-bold text-slate-200">{removedNotice}</p> : null}
         {error ? <div className="mt-3 rounded-[8px] bg-red-950/50 p-3 text-sm font-bold text-red-200" role="alert"><p className="flex items-center gap-2"><XCircle size={16} /> {error}</p>{errorCode ? <p className="mt-2 text-xs font-semibold text-red-200/70">Error code: {errorCode}</p> : null}</div> : null}

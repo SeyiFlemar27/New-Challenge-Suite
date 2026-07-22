@@ -173,7 +173,7 @@ export default function ChallengeDetailPage() {
       <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
         <div className="min-w-0">
           <div className="relative h-[260px] overflow-hidden rounded-[16px] sm:h-[320px] md:h-[400px]">
-            <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" />
+            {challenge.imageUrl ? <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <ChallengeMediaPlaceholder />}
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
             <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus)}`}>{displayStatus}</span>
           </div>
@@ -299,6 +299,15 @@ export default function ChallengeDetailPage() {
 
 function Metric({ value, label, support }: { value: string; label: string; support?: string }) {
   return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;
+}
+
+function ChallengeMediaPlaceholder() {
+  return <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.24),transparent_45%),linear-gradient(135deg,#161616,#050505)] px-6 text-center">
+    <div>
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--gold)]">Challenge Suite</p>
+      <p className="mt-3 text-3xl font-black text-white sm:text-5xl">Live Challenge</p>
+    </div>
+  </div>;
 }
 
 function Info({ title, body }: { title: string; body: string }) {

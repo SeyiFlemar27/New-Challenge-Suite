@@ -241,15 +241,19 @@ export async function POST(request: Request) {
     voteCount: 0,
     weightedVoteCount: 0,
     requiresSubmissionApproval: body.requiresSubmissionApproval || body.isLiveEvent || body.tournamentType !== "none",
-    coverImageUrl: body.coverImageUrl || null,
-    coverImagePath: body.coverImagePath || null,
+    coverImageUrl: body.usesPlaceholderMedia ? null : body.coverImageUrl || null,
+    coverImagePath: body.usesPlaceholderMedia ? null : body.coverImagePath || null,
     promoImageUrl: body.promoImageUrl || null,
     promoImagePath: body.promoImagePath || null,
     trailerVideoUrl: body.trailerVideoUrl || null,
     trailerVideoPath: body.trailerVideoPath || null,
     promoVideoUrl: body.promoVideoUrl || null,
     promoVideoPath: body.promoVideoPath || null,
-    mediaStorageStatus: [body.coverImagePath, body.promoImagePath, body.trailerVideoPath, body.promoVideoPath].some(Boolean) ? "uploaded" : "metadata_only",
+    mediaUploadStatus: body.usesPlaceholderMedia ? "storage_disabled" : body.mediaUploadStatus,
+    mediaStatus: body.usesPlaceholderMedia ? "skipped_storage_not_configured" : body.mediaStatus,
+    usesPlaceholderMedia: Boolean(body.usesPlaceholderMedia),
+    mediaFallbackType: body.usesPlaceholderMedia ? "challenge_suite_placeholder" : body.mediaFallbackType || "",
+    mediaStorageStatus: body.usesPlaceholderMedia ? "storage_disabled" : [body.coverImagePath, body.promoImagePath, body.trailerVideoPath, body.promoVideoPath].some(Boolean) ? "uploaded" : "metadata_only",
     isLiveEvent: body.isLiveEvent,
     venueName: body.venueName || null,
     eventAddress: body.eventAddress || null,
@@ -344,5 +348,10 @@ export async function POST(request: Request) {
     metadata: { source: "api/challenges", lifecycleStatus, moneyLocked: true }
   }, db).catch((error) => console.warn("[audit] challenge create log failed", error instanceof Error ? error.message : String(error)));
 
-  return ok({ challenge }, body.publish ? lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled." : "Challenge draft saved.");
+  const publishMessage = body.usesPlaceholderMedia
+    ? "Challenge published successfully without media."
+    : lifecycleStatus === "pending_review"
+      ? "Challenge submitted for review."
+      : "Challenge scheduled.";
+  return ok({ challenge }, body.publish ? publishMessage : "Challenge draft saved.");
 }
