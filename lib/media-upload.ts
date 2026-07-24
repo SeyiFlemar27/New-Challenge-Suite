@@ -1,4 +1,4 @@
-export type MediaUploadKind = "image" | "video" | "media";
+export type MediaUploadKind = "image" | "video" | "document" | "media";
 
 export type MediaUploadStage = "idle" | "preparing" | "uploading" | "processing" | "complete" | "failed";
 
@@ -18,20 +18,22 @@ export type MediaUploadErrorCode =
   | "unknown";
 
 export type MediaUploadValidation =
-  | { ok: true; mediaType: "image" | "video"; maxSizeMb: number }
+  | { ok: true; mediaType: "image" | "video" | "document"; maxSizeMb: number }
   | { ok: false; code: MediaUploadErrorCode; message: string; maxSizeMb?: number };
 
 const imageTypes = ["image/jpeg", "image/png", "image/webp"];
 const videoTypes = ["video/mp4", "video/webm", "video/quicktime"];
+const documentTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
 
 export function mediaAccept(kind: MediaUploadKind) {
   if (kind === "image") return imageTypes.join(",");
   if (kind === "video") return videoTypes.join(",");
+  if (kind === "document") return documentTypes.join(",");
   return [...imageTypes, ...videoTypes].join(",");
 }
 
 export function defaultMaxSizeMb(kind: MediaUploadKind) {
-  return kind === "image" ? 15 : 250;
+  return kind === "video" ? 250 : 15;
 }
 
 
@@ -67,19 +69,20 @@ export function appendUploadFileName(basePath: string, fileName: string, now = D
 export function validateMediaFile(file: Pick<File, "type" | "size" | "name">, kind: MediaUploadKind, maxSizeMb = defaultMaxSizeMb(kind)): MediaUploadValidation {
   const imageOk = imageTypes.includes(file.type);
   const videoOk = videoTypes.includes(file.type);
-  const typeAllowed = kind === "image" ? imageOk : kind === "video" ? videoOk : imageOk || videoOk;
+  const documentOk = documentTypes.includes(file.type);
+  const typeAllowed = kind === "image" ? imageOk : kind === "video" ? videoOk : kind === "document" ? documentOk : imageOk || videoOk;
   if (!typeAllowed) {
     return {
       ok: false,
       code: "unsupported_format",
-      message: kind === "video" ? "Upload an MP4, WebM, or QuickTime video." : kind === "image" ? "Upload a JPG, PNG, or WebP image." : "Upload a supported JPG, PNG, WebP, MP4, WebM, or QuickTime file.",
+      message: kind === "video" ? "Upload an MP4, WebM, or QuickTime video." : kind === "document" ? "Upload a PDF, Word document, or text file." : kind === "image" ? "Upload a JPG, PNG, or WebP image." : "Upload a supported JPG, PNG, WebP, MP4, WebM, or QuickTime file.",
       maxSizeMb
     };
   }
   if (file.size > maxSizeMb * 1024 * 1024) {
     return { ok: false, code: "file_too_large", message: `File must be ${maxSizeMb}MB or smaller.`, maxSizeMb };
   }
-  return { ok: true, mediaType: videoOk ? "video" : "image", maxSizeMb };
+  return { ok: true, mediaType: videoOk ? "video" : documentOk ? "document" : "image", maxSizeMb };
 }
 
 export function mediaErrorMessage(code: MediaUploadErrorCode) {

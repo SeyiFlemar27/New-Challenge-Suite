@@ -14,8 +14,14 @@ export const submissionCreateSchema = z.object({
   entryAgreementAccepted: z.coerce.boolean().default(false),
   rulesAccepted: z.coerce.boolean().default(false)
 }).superRefine((value, ctx) => {
-  if (!value.mediaUrl && !value.mediaUploadPending) {
-    ctx.addIssue({ code: "custom", path: ["mediaUrl"], message: "Media URL is required unless media upload is pending." });
+  if (value.mediaUploadPending) {
+    ctx.addIssue({ code: "custom", path: ["mediaUploadPending"], message: "Participant media must be uploaded before submitting. Storage-disabled challenge demo mode does not apply to participant submissions." });
+  }
+  if (!value.mediaUrl) {
+    ctx.addIssue({ code: "custom", path: ["mediaUrl"], message: "Upload an accepted media file before submitting." });
+  }
+  if (!value.mediaStoragePath || /^https?:/i.test(value.mediaStoragePath) || value.mediaStoragePath.includes("..")) {
+    ctx.addIssue({ code: "custom", path: ["mediaStoragePath"], message: "Submission media must include a valid Firebase Storage path." });
   }
   if (!value.entryAgreementAccepted && !value.rulesAccepted) {
     ctx.addIssue({ code: "custom", path: ["entryAgreementAccepted"], message: "Accept the challenge rules and entry agreement before submitting." });

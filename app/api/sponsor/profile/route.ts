@@ -4,6 +4,7 @@ import { calculateSponsorCompletion, normalizeBusinessVerificationStatus } from 
 import { requireAdminUser, requireRequestUser } from "@/lib/server/auth";
 import { forbidden, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { normalizeSponsorReviewStatus } from "@/lib/sponsor-access";
+import { sponsorMediaPath } from "@/lib/media-upload-paths";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +94,12 @@ function fieldErrorsFromZod(error: z.ZodError) {
     fieldErrors[field] = issue.message;
   }
   return fieldErrors;
+}
+
+function invalidSponsorMediaPath(userId: string, path: string, folder: "logo" | "banner") {
+  if (!path) return false;
+  const expected = sponsorMediaPath(userId, folder) + "/";
+  return !path.startsWith(expected) || /^https?:/i.test(path) || path.includes("..");
 }
 
 function defaultSponsorProfile(userId: string, email?: string) {
@@ -231,6 +238,9 @@ async function persistSponsorProfile(request: Request) {
     if (sponsorError) return sponsorError;
 
     const input: SponsorProfileInput = parsed.data;
+    if (invalidSponsorMediaPath(user.uid, input.logoPath ?? "", "logo")) return validationError({ logoPath: "Sponsor logo must be uploaded to your authenticated sponsor media path." });
+    if (invalidSponsorMediaPath(user.uid, input.bannerPath ?? "", "banner")) return validationError({ bannerPath: "Sponsor banner must be uploaded to your authenticated sponsor media path." });
+    if (invalidSponsorMediaPath(user.uid, input.coverImagePath ?? "", "banner")) return validationError({ coverImagePath: "Sponsor cover image must be uploaded to your authenticated sponsor banner path." });
     const now = new Date().toISOString();
     const brandSlug = slugify(input.brandName);
     const currentVerificationStatus = normalizeSponsorReviewStatus({ ...context.profileData, ...context.userData, ...context.sponsorData }.sponsorVerificationStatus);

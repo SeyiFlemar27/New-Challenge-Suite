@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import { MediaUploadField } from "@/components/media-upload-field";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { profileMediaPath } from "@/lib/media-upload-paths";
 
 type SettingsData = {
   account: { displayName: string; username: string; email: string; phone: string; accountType: string; planId: string; subscriptionStatus: string; effectiveTier?: { id: string; displayName: string } };
@@ -78,7 +79,9 @@ export default function SettingsSectionPage() {
         username: settings.account.username,
         phone: settings.account.phone,
         avatarUrl: settings.profile.avatarUrl,
+        avatarPath: settings.profile.avatarPath,
         coverImageUrl: settings.profile.coverImageUrl,
+        coverImagePath: settings.profile.coverImagePath,
         bio: settings.profile.bio,
         location: settings.profile.location,
         website: settings.profile.website,
@@ -142,7 +145,7 @@ function Account({ settings, update }: { settings: SettingsData; update: Update 
 }
 
 function Profile({ settings, update, list, userId }: { settings: SettingsData; update: Update; list: (value: string) => string[]; userId: string }) {
-  return <div className="space-y-6"><MediaUploadField label="Profile Avatar" value={settings.profile.avatarUrl} onChange={(url, metadata) => { update("profile", "avatarUrl", url); update("profile", "avatarPath", metadata?.path ?? ""); }} storagePath={`users/${userId}/profile/avatar`} kind="image" buttonLabel="Upload Avatar" /><MediaUploadField label="Profile Cover Image" value={settings.profile.coverImageUrl} onChange={(url, metadata) => { update("profile", "coverImageUrl", url); update("profile", "coverImagePath", metadata?.path ?? ""); }} storagePath={`users/${userId}/profile/cover`} kind="image" buttonLabel="Upload Cover Image" /><Field label="Bio"><textarea className={textareaClass} value={settings.profile.bio} onChange={(event) => update("profile", "bio", event.target.value)} /></Field><Field label="Location"><input className={inputClass} value={settings.profile.location} onChange={(event) => update("profile", "location", event.target.value)} /></Field><Field label="Website"><input className={inputClass} value={settings.profile.website} onChange={(event) => update("profile", "website", event.target.value)} /></Field><Field label="Social Links"><input className={inputClass} value={settings.profile.socialLinks.join(", ")} onChange={(event) => update("profile", "socialLinks", list(event.target.value))} /></Field><Field label="Category Interests"><input className={inputClass} value={settings.profile.categoryInterests.join(", ")} onChange={(event) => update("profile", "categoryInterests", list(event.target.value))} /></Field></div>;
+  return <div className="space-y-6"><MediaUploadField label="Profile Avatar" value={settings.profile.avatarUrl} onChange={(url, metadata) => { update("profile", "avatarUrl", url); update("profile", "avatarPath", metadata?.path ?? ""); }} storagePath={profileMediaPath(userId, "avatar")} kind="image" buttonLabel="Upload Avatar" /><MediaUploadField label="Profile Cover Image" value={settings.profile.coverImageUrl} onChange={(url, metadata) => { update("profile", "coverImageUrl", url); update("profile", "coverImagePath", metadata?.path ?? ""); }} storagePath={profileMediaPath(userId, "banner")} kind="image" buttonLabel="Upload Cover Image" /><Field label="Bio"><textarea className={textareaClass} value={settings.profile.bio} onChange={(event) => update("profile", "bio", event.target.value)} /></Field><Field label="Location"><input className={inputClass} value={settings.profile.location} onChange={(event) => update("profile", "location", event.target.value)} /></Field><Field label="Website"><input className={inputClass} value={settings.profile.website} onChange={(event) => update("profile", "website", event.target.value)} /></Field><Field label="Social Links"><input className={inputClass} value={settings.profile.socialLinks.join(", ")} onChange={(event) => update("profile", "socialLinks", list(event.target.value))} /></Field><Field label="Category Interests"><input className={inputClass} value={settings.profile.categoryInterests.join(", ")} onChange={(event) => update("profile", "categoryInterests", list(event.target.value))} /></Field></div>;
 }
 
 function Appearance({ value, choose }: { value: string; choose: (value: "system" | "light" | "dark") => void }) {

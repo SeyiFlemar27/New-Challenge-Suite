@@ -3,16 +3,47 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { CheckCircle2, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
+import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails, joinChallenge, submitEntry } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
-import { storage } from "@/lib/firebase/client";
-import { appendUploadFileName, classifyStorageError, validateMediaFile } from "@/lib/media-upload";
+import { firebaseClientConfigStatus } from "@/lib/firebase/client";
+import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
+import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
+
+type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
+
+function SubmissionUploadField({ challengeId, userId, acceptedSubmissionTypes, value, disabled, onStatusChange, onUploaded }: { challengeId: string; userId: string; acceptedSubmissionTypes: string[]; value: string; disabled: boolean; onStatusChange: (status: MediaUploadStage) => void; onUploaded: (media: UploadedSubmissionMedia | null) => void }) {
+  const mediaKind: MediaUploadKind = acceptedSubmissionTypes.length > 1 ? "media" : acceptedSubmissionTypes[0] === "video" ? "video" : "image";
+  const pathMediaType = mediaKind === "video" ? "video" : "image";
+  const disabledReason = disabled
+    ? "Participant media submission requires Firebase Storage. Uploads are not available in storage-disabled demo mode."
+    : mediaErrorMessage("storage_unavailable");
+  return <MediaUploadField
+    label={`Upload ${acceptedSubmissionTypes.join(" or ")}`}
+    value={value}
+    onChange={(url, metadata) => {
+      if (!url || !metadata) {
+        onUploaded(null);
+        return;
+      }
+      const mediaType = metadata.contentType.startsWith("video/") ? "video" : "image";
+      onUploaded({ url, path: metadata.path, fileName: metadata.fileName, size: metadata.size, contentType: metadata.contentType, mediaType });
+    }}
+    storagePath={submissionMediaPath(challengeId, userId, submissionFolderForMediaType(pathMediaType))}
+    kind={mediaKind}
+    buttonLabel="Upload submission media"
+    required
+    disabled={disabled}
+    disabledReason={disabledReason}
+    onStatusChange={onStatusChange}
+    helperText="Your submission media is saved only after Firebase Storage confirms the upload and returns a media URL."
+  />;
+}
 
 export default function JoinChallengePage() {
   const params = useParams<{ id: string }>();
@@ -23,9 +54,8 @@ export default function JoinChallengePage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean; status?: string } | null>(null);
-  const [selectedMediaPreview, setSelectedMediaPreview] = useState("");
-  const [selectedMediaType, setSelectedMediaType] = useState<"image" | "video" | "">("");
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [submissionMedia, setSubmissionMedia] = useState<UploadedSubmissionMedia | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<MediaUploadStage>("idle");
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -64,7 +94,6 @@ export default function JoinChallengePage() {
     const formData = new FormData(event.currentTarget);
     const title = String(formData.get("title") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
-    const file = formData.get("media");
     if (!title) {
       setError("Submission title is required.");
       return;
@@ -73,48 +102,29 @@ export default function JoinChallengePage() {
       setError("Caption / description is required.");
       return;
     }
-    if (!(file instanceof File) || !file.name) {
+    if (firebaseClientConfigStatus.mediaUploadsDisabled) {
+      setError("Participant media submission requires Firebase Storage. Uploads are not available in storage-disabled demo mode.");
+      return;
+    }
+    if (["preparing", "uploading", "processing"].includes(uploadStatus)) {
+      setError("Please wait for your media upload to finish.");
+      return;
+    }
+    if (uploadStatus === "failed") {
+      setError("Please retry the failed media upload before submitting.");
+      return;
+    }
+    if (!submissionMedia?.url || !submissionMedia.path) {
       setError("Upload an accepted media file before submitting.");
       return;
     }
-    const mediaKind = currentChallenge.acceptedSubmissionTypes.length > 1 ? "media" : currentChallenge.acceptedSubmissionTypes[0] === "video" ? "video" : "image";
-    const validation = validateMediaFile(file, mediaKind);
-    if (!validation.ok) {
-      setError(validation.message);
-      return;
-    }
-    const mediaType = validation.mediaType;
-    if (!currentChallenge.acceptedSubmissionTypes.includes(mediaType)) {
+    if (!currentChallenge.acceptedSubmissionTypes.includes(submissionMedia.mediaType)) {
       setError(`This challenge accepts: ${currentChallenge.acceptedSubmissionTypes.join(", ")}.`);
       return;
     }
 
     setSubmitting(true);
     try {
-      let mediaUrl = "";
-      let mediaStoragePath = "";
-      let pendingMedia = false;
-      if (storage) {
-        const path = appendUploadFileName(`challenges/${currentChallenge.id}/submissions/${auth.user.uid}`, file.name);
-        mediaStoragePath = path;
-        const uploadRef = ref(storage, path);
-        const uploadTask = uploadBytesResumable(uploadRef, file, { contentType: file.type, customMetadata: { originalName: file.name } });
-        mediaUrl = await new Promise<string>((resolve, reject) => {
-          const timer = window.setTimeout(() => reject(new Error("STORAGE_UPLOAD_TIMEOUT")), 90_000);
-          uploadTask.on("state_changed", (snapshot) => {
-            setUploadProgress(Math.round((snapshot.bytesTransferred / Math.max(snapshot.totalBytes, 1)) * 100));
-          }, (caught) => {
-            window.clearTimeout(timer);
-            reject(caught);
-          }, async () => {
-            window.clearTimeout(timer);
-            resolve(await getDownloadURL(uploadTask.snapshot.ref));
-          });
-        });
-      } else {
-        pendingMedia = true;
-      }
-
       const joinResult = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true });
       if (!joinResult.ok) throw new Error(joinResult.message);
 
@@ -123,24 +133,23 @@ export default function JoinChallengePage() {
         title,
         description,
         caption: description,
-        mediaUrl,
-        mediaType,
-        mediaUploadPending: pendingMedia,
-        originalFileName: file.name,
-        fileSize: file.size,
-        mediaStoragePath,
+        mediaUrl: submissionMedia.url,
+        mediaType: submissionMedia.mediaType,
+        mediaUploadPending: false,
+        originalFileName: submissionMedia.fileName,
+        fileSize: submissionMedia.size,
+        mediaStoragePath: submissionMedia.path,
         entryAgreementAccepted: true,
         rulesAccepted: true
       });
       if (!submissionResult.ok) throw new Error(submissionResult.message);
 
       const submission = submissionResult.data?.submission as { id?: string; status?: string } | undefined;
-      setSuccessSubmission({ id: submission?.id, title, pendingMedia, status: submission?.status });
+      setSuccessSubmission({ id: submission?.id, title, pendingMedia: false, status: submission?.status });
       setSubmitted(true);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Entry could not be submitted.";
-      const storageFailure = message === "STORAGE_UPLOAD_TIMEOUT" || /storage|bucket|processing failed|network|offline/i.test(message);
-      setError(storageFailure ? classifyStorageError(caught).message : message);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -223,10 +232,10 @@ export default function JoinChallengePage() {
           <form className="mt-6 space-y-5" onSubmit={submit}>
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
-            <Field label={`Upload ${currentChallenge.acceptedSubmissionTypes.join(" or ")}`}><input name="media" className={`${inputClass} file:mr-3 file:rounded-[6px] file:border-0 file:bg-[var(--gold)] file:px-3 file:py-2 file:text-sm file:font-black file:text-black`} type="file" accept={currentChallenge.acceptedSubmissionTypes.map((type) => `${type}/*`).join(",")} required onChange={(event) => { const file = event.target.files?.[0]; if (selectedMediaPreview) URL.revokeObjectURL(selectedMediaPreview); setSelectedMediaPreview(file ? URL.createObjectURL(file) : ""); setSelectedMediaType(file?.type.startsWith("video/") ? "video" : file ? "image" : ""); setUploadProgress(0); }} /></Field>{selectedMediaPreview ? <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">{selectedMediaType === "video" ? <video src={selectedMediaPreview} controls className="max-h-72 w-full object-cover" /> : <img src={selectedMediaPreview} alt="Submission preview" className="max-h-72 w-full object-cover" />}</div> : null}{submitting && uploadProgress > 0 ? <div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)] transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-2 text-xs font-bold text-slate-400">Uploading media {uploadProgress}%</p></div> : null}
+            <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
             <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. Paid-entry prize pools and payouts are not available yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="w-full" disabled={!auth.user || unavailable || submitting}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
+            <Button className="w-full" disabled={!auth.user || unavailable || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
           </form>
         </Card>
       </div>

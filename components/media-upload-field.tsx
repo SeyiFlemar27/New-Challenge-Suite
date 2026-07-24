@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDownloadURL, ref, uploadBytesResumable, type UploadTask } from "firebase/storage";
-import { CheckCircle2, ImageIcon, RotateCcw, Trash2, UploadCloud, Video, XCircle } from "lucide-react";
+import { CheckCircle2, FileText, ImageIcon, RotateCcw, Trash2, UploadCloud, Video, XCircle } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
 import { firebaseClientConfigStatus, storage } from "@/lib/firebase/client";
@@ -68,6 +68,8 @@ export function MediaUploadField({
   const displayFileSize = selectedFile?.size ?? uploadedFile?.size ?? 0;
   const hasUploadedValue = Boolean(value);
   const displayProgress = (value && !uploading && status !== "failed") ? 100 : progress;
+  const isDocument = kind === "document";
+  const typeLabel = kind === "video" ? "video" : kind === "document" ? "document" : "image";
 
   function setStatus(next: MediaUploadStage) {
     setStatusState(next);
@@ -257,8 +259,8 @@ export function MediaUploadField({
     if (retryFileRef.current) void handleFile(retryFileRef.current);
   }
 
-  const stageLabel = status === "preparing" ? "Preparing upload" : status === "processing" ? "Processing file" : status === "uploading" ? (progress > 0 ? "Uploading image" : "Starting upload") : status === "complete" ? "Upload complete" : status === "failed" ? "Upload failed" : value ? "Upload complete" : "Ready to upload";
-  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? (progress > 0 ? `Uploading image... ${progress}%` : "Starting secure upload...") : status === "processing" ? "Processing file and saving media reference..." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Review the reason below and retry when ready." : "Choose a file to upload.";
+  const stageLabel = status === "preparing" ? "Preparing upload" : status === "processing" ? "Processing file" : status === "uploading" ? (progress > 0 ? `Uploading ${typeLabel}` : "Starting upload") : status === "complete" ? "Upload complete" : status === "failed" ? "Upload failed" : value ? "Upload complete" : "Ready to upload";
+  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? (progress > 0 ? `Uploading ${typeLabel}... ${progress}%` : "Starting secure upload...") : status === "processing" ? "Processing file and saving media reference..." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Review the reason below and retry when ready." : "Choose a file to upload.";
 
   return (
     <div>
@@ -266,13 +268,13 @@ export function MediaUploadField({
       <Card className="border-white/10 bg-black/30 p-4">
         {displayUrl ? (
           <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">
-            {isVideo ? <video src={displayUrl} controls className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable. The uploaded media URL is saved.</div>}
+            {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded. Preview opens after saving where supported.</div> : isVideo ? <video src={displayUrl} controls className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable. The uploaded media URL is saved.</div>}
           </div>
         ) : (
           <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-36 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 px-4 py-8 text-center ${disabled ? "cursor-not-allowed bg-[#101010] text-slate-500" : "bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
-            {kind === "video" ? <Video className="mb-3" /> : kind === "image" ? <ImageIcon className="mb-3" /> : <UploadCloud className="mb-3" />}
-            <span className="font-black">{disabled ? "Media skipped for now" : buttonLabel ?? (kind === "video" ? "Upload Video" : kind === "image" ? "Upload Image" : "Upload Media")}</span>
-            <span className="mt-2 text-xs text-slate-500">{disabled ? disabledReason : `${kind === "video" ? "MP4, WebM, or QuickTime" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to ${limitMb}MB`}</span>
+            {kind === "video" ? <Video className="mb-3" /> : kind === "document" ? <FileText className="mb-3" /> : kind === "image" ? <ImageIcon className="mb-3" /> : <UploadCloud className="mb-3" />}
+            <span className="font-black">{disabled ? "Media skipped for now" : buttonLabel ?? (kind === "video" ? "Upload Video" : kind === "document" ? "Upload Document" : kind === "image" ? "Upload Image" : "Upload Media")}</span>
+            <span className="mt-2 text-xs text-slate-500">{disabled ? disabledReason : `${kind === "video" ? "MP4, WebM, or QuickTime" : kind === "document" ? "PDF, Word document, or text file" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to ${limitMb}MB`}</span>
           </button>
         )}
         <input ref={inputRef} className="hidden" type="file" accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />

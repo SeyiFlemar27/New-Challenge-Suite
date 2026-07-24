@@ -3,9 +3,12 @@ import { appendUploadFileName, classifyStorageError, formatUploadBytes, mediaErr
 
 const image = { name: "banner.png", type: "image/png", size: 1024 };
 const video = { name: "clip.mp4", type: "video/mp4", size: 1024 };
+const document = { name: "brief.pdf", type: "application/pdf", size: 1024 };
 
 assert.equal(validateMediaFile(image, "image").ok, true, "valid image should pass");
 assert.equal(validateMediaFile(video, "video").ok, true, "valid video should pass");
+assert.equal(validateMediaFile(document, "document").ok, true, "valid document should pass document upload validation");
+assert.equal(validateMediaFile(document, "media").ok, false, "mixed challenge submission media should not accept documents");
 
 const unsupported = validateMediaFile({ name: "script.exe", type: "application/x-msdownload", size: 10 }, "media");
 assert.equal(unsupported.ok, false, "unsupported file type should fail");

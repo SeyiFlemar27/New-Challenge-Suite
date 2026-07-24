@@ -3,13 +3,16 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { profileMediaPath } from "@/lib/media-upload-paths";
 
 const settingsSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
   username: z.string().trim().regex(/^[a-zA-Z0-9._]{3,30}$/, "Username must be 3-30 letters, numbers, dots, or underscores."),
   phone: z.string().trim().max(40).optional().default(""),
   avatarUrl: z.string().trim().url().optional().or(z.literal("")),
+  avatarPath: z.string().trim().max(500).optional().default(""),
   coverImageUrl: z.string().trim().url().optional().or(z.literal("")),
+  coverImagePath: z.string().trim().max(500).optional().default(""),
   bio: z.string().trim().max(600).optional().default(""),
   location: z.string().trim().max(120).optional().default(""),
   website: z.string().trim().url().optional().or(z.literal("")),
@@ -52,6 +55,12 @@ const settingsSchema = z.object({
   }).optional()
 });
 
+function invalidProfileMediaPath(userId: string, path: string, folder: "avatar" | "banner") {
+  if (!path) return false;
+  const expected = profileMediaPath(userId, folder) + "/";
+  return !path.startsWith(expected) || /^https?:/i.test(path) || path.includes("..");
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -81,7 +90,9 @@ export async function GET(request: Request) {
     },
     profile: {
       avatarUrl: profile.avatarUrl ?? "",
+      avatarPath: profile.avatarPath ?? "",
       coverImageUrl: profile.coverImageUrl ?? "",
+      coverImagePath: profile.coverImagePath ?? "",
       bio: profile.bio ?? "",
       location: profile.location ?? "",
       website: profile.website ?? "",
@@ -119,6 +130,8 @@ export async function PATCH(request: Request) {
   const parsed = settingsSchema.safeParse(parsedBody.body);
   if (!parsed.success) return validationError(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0] ?? "settings"), issue.message])));
   const input = parsed.data;
+  if (invalidProfileMediaPath(user.uid, input.avatarPath, "avatar")) return validationError({ avatarPath: "Profile avatar must be uploaded to your authenticated profile media path." });
+  if (invalidProfileMediaPath(user.uid, input.coverImagePath, "banner")) return validationError({ coverImagePath: "Profile banner must be uploaded to your authenticated profile media path." });
   const usernameNormalized = input.username.toLowerCase();
   const usernameMatch = await db.collection("profiles").where("usernameNormalized", "==", usernameNormalized).limit(1).get();
   if (usernameMatch.docs[0] && usernameMatch.docs[0].id !== user.uid) return fail("Username is already in use.", 409, undefined, "USERNAME_TAKEN");
@@ -129,7 +142,9 @@ export async function PATCH(request: Request) {
     usernameNormalized,
     phone: input.phone || null,
     avatarUrl: input.avatarUrl || null,
+    avatarPath: input.avatarUrl ? input.avatarPath || null : null,
     coverImageUrl: input.coverImageUrl || null,
+    coverImagePath: input.coverImageUrl ? input.coverImagePath || null : null,
     bio: input.bio,
     location: input.location,
     website: input.website || null,

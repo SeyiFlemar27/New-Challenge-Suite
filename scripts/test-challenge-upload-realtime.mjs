@@ -27,7 +27,7 @@ assert(uploadField.includes("STORAGE_UPLOAD_STALLED"), "zero-progress stalled up
 assert(uploadField.includes("lastBytesTransferredRef.current <= 0"), "stall detection must check whether bytes transferred.");
 assert(uploadField.includes("uploadTask.cancel()"), "stalled upload task should be cancelled after fail-closed state.");
 assert(uploadField.includes("Starting secure upload..."), "0% active upload copy must avoid implying transfer progress.");
-assert(uploadField.includes("Uploading image..."), "progress copy must show active upload percent.");
+assert(uploadField.includes("Uploading ${typeLabel}..."), "progress copy must show active upload percent for the selected media type.");
 assert(uploadField.includes("Retry Upload"), "failed uploads must offer retry.");
 assert(uploadField.includes("Choose Another File"), "failed uploads must allow another file.");
 assert(uploadField.includes("process.env.NODE_ENV !== \"development\""), "upload debug logging must be development-only.");
@@ -49,7 +49,7 @@ assert(firebaseClient.includes("replace(/^gs:\\/\\//i, \"\")"), "storage bucket 
 assert(firebaseClient.includes("storageBucketAcceptsFormats"), "client status should document accepted storage bucket formats.");
 
 assert(builder.includes("updateMedia(\"coverImageUrl\", \"coverImagePath\""), "Image 1 must map to coverImageUrl and coverImagePath.");
-assert(builder.includes("storagePath={base + \"/banner\"}"), "Image 1 must upload under the banner storage path.");
+assert(builder.includes("challengeDraftMediaPath(userId, \"banner\")"), "Image 1 must upload under the shared banner storage path.");
 assert(builder.includes("const requiredImageMissing = !mediaUploadDisabled && (!form.coverImageUrl || !form.coverImagePath)"), "builder must require both URL and storage path unless storage-disabled mode is active.");
 assert(builder.includes("coverImageUrl: mediaUploadDisabled ? \"\" : form.coverImageUrl"), "save/publish payload must include coverImageUrl when storage is configured.");
 assert(builder.includes("coverImagePath: mediaUploadDisabled ? \"\" : form.coverImagePath"), "save/publish payload must include coverImagePath when storage is configured.");
@@ -57,7 +57,7 @@ assert(builder.includes("Please wait for your image upload to finish."), "builde
 assert(builder.includes("Please retry the failed image upload before publishing."), "builder must show retry failed upload blocker.");
 assert(builder.includes("uploadInProgress") && builder.includes("uploadFailed"), "builder must synchronize upload status with publish blocking.");
 assert(builder.includes("kind=\"video\"") && builder.includes("Optional intro video or trailer"), "optional video must remain optional.");
-assert(builder.includes("Document upload setup required"), "documents must remain optional/setup-safe.");
+assert(builder.includes("kind=\"document\"") && builder.includes("Documents are stored as optional challenge metadata"), "documents must remain optional and use real upload state when available.");
 assert(!builder.includes("placeholder uploaded") && !builder.includes("fake upload"), "builder must not fake uploaded media.");
 
 assert(challengeValidation.includes("if ((!coverUrl || !coverPath) && !coverMediaSkipped) makeIssue(errors, \"REQUIRED_BANNER\""), "publish validation must use the same Image 1 cover fields unless storage-disabled mode is active.");

@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/submission-lifecycle";
 import { submissionCreateSchema, zodFieldErrors } from "@/lib/server/submission-validation";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -59,6 +60,10 @@ export async function POST(request: Request) {
   const acceptedTypes = Array.isArray(challenge.acceptedSubmissionTypes) ? challenge.acceptedSubmissionTypes.map(String) : ["image"];
   if (!acceptedTypes.includes(body.mediaType)) {
     return validationError({ mediaType: `This challenge accepts: ${acceptedTypes.join(", ")}.` });
+  }
+  const expectedSubmissionPrefix = submissionMediaPath(body.challengeId, user.uid, submissionFolderForMediaType(body.mediaType)) + "/";
+  if (!body.mediaStoragePath.startsWith(expectedSubmissionPrefix)) {
+    return validationError({ mediaStoragePath: "Submission media must be uploaded to your authenticated challenge submission path." });
   }
 
   const now = new Date().toISOString();
