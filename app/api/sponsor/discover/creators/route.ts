@@ -5,12 +5,15 @@ export const dynamic = "force-dynamic";
 
 function safeCreator(id: string, data: Record<string, unknown>) {
   const accountType = String(data.accountType ?? data.role ?? "").toLowerCase();
-  const isCreator = ["creator", "host", "user"].includes(accountType) || Boolean(data.creatorProfileEnabled || data.canCreateChallenges);
+  const isCreator = ["creator", "host"].includes(accountType) || Boolean(data.creatorProfileEnabled || data.canCreateChallenges);
+  const profileComplete = Boolean(data.creatorProfileCompletedAt || data.profileCompletedAt || data.creatorProfileComplete || data.profileComplete || data.hasCreatorProfile);
+  const sponsorReady = Boolean(data.sponsorReadyEnabled || data.sponsorReady || data.acceptingSponsors || data.openToSponsors);
   const privateProfile = String(data.profileVisibility ?? "public") === "private";
-  if (!isCreator || privateProfile) return null;
+  const displayName = String(data.displayName ?? data.fullName ?? data.username ?? "").trim();
+  if (!isCreator || !profileComplete || !sponsorReady || privateProfile || !displayName) return null;
   return {
     id,
-    displayName: data.displayName ?? data.fullName ?? data.username ?? "Challenge Suite Creator",
+    displayName,
     username: data.username ?? data.handle ?? id,
     avatarUrl: data.avatarUrl ?? data.photoURL ?? null,
     verificationStatus: data.creatorVerificationStatus ?? data.verificationStatus ?? "not_available",
@@ -24,7 +27,9 @@ function safeCreator(id: string, data: Record<string, unknown>) {
     responseTimeLabel: data.responseTimeLabel ?? "Not available yet",
     startingPriceLabel: data.startingCollaborationPriceLabel ?? "Not available yet",
     challengeCategory: data.preferredChallengeCategory ?? data.category ?? "Not available yet",
-    sponsorVisible: true
+    sponsorVisible: true,
+    profileComplete,
+    sponsorReady
   };
 }
 

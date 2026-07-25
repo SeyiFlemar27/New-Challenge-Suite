@@ -106,8 +106,8 @@ export async function POST(request: Request) {
   if (monetizationIntent.prizePoolRequested && !monetizationAccess.canPreparePrizePool) {
     return fail("Prize pool setup is not available for this account.", 403, undefined, "PRIZE_POOL_LOCKED");
   }
-  if (monetizationIntent.paidVotesRequested) {
-    return fail("Paid votes setup required.", 403, undefined, "PAID_VOTES_SETUP_REQUIRED");
+  if (monetizationIntent.paidVotesRequested && !monetizationAccess.canPreparePaidVotes) {
+    return fail("Paid votes are available to Creator premium, Host premium, and approved Enterprise accounts.", 403, undefined, "PAID_VOTES_LOCKED");
   }
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
@@ -145,13 +145,14 @@ export async function POST(request: Request) {
   const ref = db.collection("challenges").doc();
   const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
   const safeMonetization = {
-    enabled: Boolean(monetizationIntent.paidEntryRequested || sponsorEnabled || monetizationIntent.prizePoolRequested),
+    enabled: Boolean(monetizationIntent.paidEntryRequested || sponsorEnabled || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested),
     paidEntryRequested: Boolean(monetizationIntent.paidEntryRequested && monetizationAccess.canPreparePaidEntry),
     entryFeeAmountCents: monetizationIntent.paidEntryRequested ? paidEntryValidation.entryFeeCents : 0,
     currency: "USD",
     sponsorReady: sponsorEnabled,
     prizePoolRequested: Boolean(monetizationIntent.prizePoolRequested && monetizationAccess.canPreparePrizePool),
-    paidVotesRequested: false,
+    paidVotesRequested: Boolean(monetizationIntent.paidVotesRequested && monetizationAccess.canPreparePaidVotes),
+    paidVotesCheckoutStatus: monetizationIntent.paidVotesRequested && monetizationAccess.canPreparePaidVotes ? "setup_required" : "not_requested",
     sponsorshipGoal: sponsorEnabled ? monetizationIntent.sponsorshipGoal : "",
     preferredSponsorCategory: sponsorEnabled ? monetizationIntent.preferredSponsorCategory : "",
     sponsorNote: sponsorEnabled ? monetizationIntent.sponsorNote : "",

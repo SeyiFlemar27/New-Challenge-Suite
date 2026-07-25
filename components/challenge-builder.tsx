@@ -116,7 +116,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
     const safeSponsorReady = Boolean(monetizationEligible && form.sponsorReady);
     const safePaidEntryRequested = Boolean(monetizationEligible && form.paidEntryEnabled);
     const safePrizePoolRequested = Boolean(monetizationEligible && form.prizePoolEnabled);
-    const safePaidVotesRequested = false;
+    const safePaidVotesRequested = Boolean(monetizationEligible && form.paidVotesEnabled);
     return {
       title: form.title.trim(),
       description: (form.shortDescription.trim() ? form.shortDescription.trim() + "\n\n" : "") + form.description.trim(),
@@ -178,7 +178,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
         preferredSponsorCategory: safeSponsorReady ? form.preferredSponsorCategory.trim() : "",
         sponsorNote: safeSponsorReady ? form.sponsorNote.trim() : "",
         placements: safeSponsorReady ? form.sponsorPlacementPreferences : [],
-        status: safePaidEntryRequested || safeSponsorReady || safePrizePoolRequested ? "setup_required" : "not_requested",
+        status: safePaidEntryRequested || safeSponsorReady || safePrizePoolRequested || safePaidVotesRequested ? "setup_required" : "not_requested",
         paymentActive: false,
         checkoutActive: false,
         ledgerCreationEnabled: false,
@@ -313,7 +313,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
             <li>- Winner payout requires admin approval, KYC, and a 24-hour hold.</li>
           </ul>
         </MonetizationCard>
-        <MonetizationCard title="Enable Paid Votes" enabled={false} disabled onChange={() => undefined} setupCopy="Paid votes setup required. Paid vote revenue follows the same 65 / 20 / 15 split after payment setup is complete." />
+        <MonetizationCard title="Enable Paid Votes" enabled={form.paidVotesEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidVotesEnabled", enabled)} setupCopy="Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts, but checkout remains setup-required and webhook-confirmed until payment setup is complete." />
       </div>
       <Card className="h-fit p-5">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Monetization Preview</p>

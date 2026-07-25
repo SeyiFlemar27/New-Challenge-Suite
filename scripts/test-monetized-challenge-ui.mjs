@@ -33,7 +33,7 @@ assert(builder.includes("65% of paid entry revenue goes to winners."), "prize po
 assert(builder.includes("65% of paid vote revenue goes to winners."), "prize pool copy must explain paid-vote winner share.");
 assert(builder.includes("100% of confirmed sponsor contributions goes to winners."), "prize pool copy must explain sponsor contribution handling.");
 assert(builder.includes("Enable Paid Votes"), "paid votes control must exist.");
-assert(builder.includes("Paid votes setup required."), "paid votes must remain setup-safe.");
+assert(builder.includes("Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts") && builder.includes("checkout remains setup-required"), "paid votes must remain setup-safe for eligible paid accounts.");
 assert(builder.includes("Monetization Preview"), "builder must show monetization preview panel.");
 assert(builder.includes("Rules, not actual earnings"), "builder preview must not claim actual earnings.");
 assert(builder.includes("Estimates are not saved as revenue and do not create ledger entries."), "builder estimates must not be revenue.");
@@ -51,7 +51,7 @@ assert(challengeRoute.includes("getChallengeMonetizationAccess"), "challenge API
 assert(challengeRoute.includes("validateEntryFee"), "challenge API must validate entry fee server-side.");
 assert(challengeRoute.includes("MONETIZATION_LOCKED"), "challenge API must reject locked monetization intent.");
 assert(challengeRoute.includes("ENTRY_FEE_MINIMUM"), "challenge API must reject invalid paid-entry amounts.");
-assert(challengeRoute.includes("PAID_VOTES_SETUP_REQUIRED"), "challenge API must keep paid votes setup-safe.");
+assert(challengeRoute.includes("PAID_VOTES_LOCKED") && challengeRoute.includes("paidVotesCheckoutStatus") && challengeRoute.includes("setup_required"), "challenge API must keep paid votes setup-safe.");
 assert(challengeRoute.includes("safeMonetization"), "challenge API must sanitize monetization before persistence.");
 assert(challengeRoute.includes("ledgerCreationEnabled: false"), "challenge API must not create ledger entries from builder submission.");
 assert(challengeRoute.includes("checkoutActive: false"), "challenge API must not activate checkout from builder submission.");
@@ -68,7 +68,7 @@ assert(sponsorDiscoveryRoute.includes("validateSponsorFundingWindow"), "sponsor 
 assert(sponsorDiscoveryRoute.includes("currentPrizePoolCents"), "sponsor discovery API must expose real/zero prize pool value.");
 assert(sponsorDiscoveryPage.includes("No sponsor-ready challenges yet."), "sponsor discovery must have a clean empty state.");
 assert(sponsorDiscoveryPage.includes("Challenges marked Sponsor Ready will appear here after they are published."), "sponsor discovery empty state must be clear.");
-assert(sponsorDiscoveryPage.includes("Fund setup required"), "sponsor discovery funding CTA must be setup-safe.");
+assert(sponsorDiscoveryPage.includes("/sponsor/funding/") && sponsorDiscoveryPage.includes("Fund Challenge"), "sponsor discovery funding CTA must route to the setup-safe funding foundation.");
 assert(!sponsorDiscoveryPage.includes("Estimated reach foundation only"), "sponsor discovery must not show fake reach copy.");
 assert(!sponsorDiscoveryPage.includes("fake"), "sponsor discovery UI must not include fake labels.");
 

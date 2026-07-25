@@ -25,7 +25,7 @@ assert(helper.includes("MINIMUM_ENTRY_FEE_CENTS") && helper.includes("validateEn
 assert(helper.includes("paymentPurpose: \"challenge_entry\""), "entry payment record must use challenge_entry purpose.");
 assert(checkoutRoute.includes("paymentPurpose=challenge_entry"), "checkout success URL must carry challenge_entry purpose.");
 assert(checkoutRoute.includes("checkoutSuccessActivatesEntry: false"), "checkout route must not activate entry.");
-assert(successPage.includes("will update only after secure webhook confirmation"), "success page must not activate paid entry.");
+assert(successPage.includes("update only after webhook confirmation"), "success page must not activate paid entry.");
 assert(webhook.includes("paymentPurpose === \"challenge_entry\""), "webhook must branch for challenge_entry.");
 assert(webhook.includes("confirmChallengeEntryPayment"), "webhook must confirm paid entry via helper.");
 assert(helper.includes("assertStripeSessionMatchesRecord(session, payment, \"challenge_entry\")"), "webhook confirmation must verify stored payment record.");
@@ -42,4 +42,3 @@ assert(!helper.includes("stripe.transfers.create") && !helper.includes("payouts.
 assert(webhook.includes("session.mode === \"subscription\""), "subscription webhook/checkout branch must remain present.");
 
 console.log("Paid entry checkout foundation checks passed.");
-

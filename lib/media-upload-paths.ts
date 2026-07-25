@@ -6,6 +6,7 @@ export type SubmissionMediaFolder = "images" | "videos" | "documents";
 export type ProfileMediaFolder = "avatar" | "banner";
 export type SponsorMediaFolder = "logo" | "banner";
 export type SponsorCampaignMediaFolder = "logo" | "banner" | "creative" | "video" | "documents";
+export type SponsorConversationMediaFolder = "images" | "documents";
 
 export const storageRulesBaseline = {
   challengeDrafts: "challenges/drafts/{userId}/{folder}/{fileName}",
@@ -13,7 +14,8 @@ export const storageRulesBaseline = {
   submissions: "challenges/{challengeId}/submissions/{userId}/{folder}/{fileName}",
   profile: "users/{userId}/profile/{folder}/{fileName}",
   sponsor: "sponsors/{userId}/{folder}/{fileName}",
-  sponsorCampaigns: "sponsors/{userId}/campaigns/{campaignId}/{folder}/{fileName}"
+  sponsorCampaigns: "sponsors/{userId}/campaigns/{campaignId}/{folder}/{fileName}",
+  sponsorConversations: "sponsor-conversations/{conversationId}/{userId}/{folder}/{fileName}"
 } as const;
 
 export function challengeDraftMediaPath(userId: string, folder: ChallengeDraftMediaFolder) {
@@ -44,6 +46,10 @@ export function sponsorMediaPath(userId: string, folder: SponsorMediaFolder) {
 
 export function sponsorCampaignMediaPath(userId: string, campaignId: string, folder: SponsorCampaignMediaFolder) {
   return joinStoragePath("sponsors", userId, "campaigns", campaignId, folder);
+}
+
+export function sponsorConversationMediaPath(conversationId: string, userId: string, folder: SponsorConversationMediaFolder) {
+  return joinStoragePath("sponsor-conversations", conversationId, userId, folder);
 }
 
 export function legacyHostDraftMediaPath(userId: string, folder: string) {

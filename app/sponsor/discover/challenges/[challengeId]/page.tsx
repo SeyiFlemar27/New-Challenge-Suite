@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Bookmark, MessageSquare, ShieldAlert, Store, WalletCards } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
-import { Button, Card, Field, inputClass, textareaClass } from "@/components/ui";
+import { Button, Card, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type Opportunity = Record<string, any>;
 
 export default function ChallengeOpportunityPage() {
   const params = useParams<{ challengeId: string }>();
+  const router = useRouter();
   const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,7 @@ export default function ChallengeOpportunityPage() {
   const [placementNotes, setPlacementNotes] = useState("");
   const [fundingMessage, setFundingMessage] = useState("");
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [discussionLoading, setDiscussionLoading] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -64,6 +67,29 @@ export default function ChallengeOpportunityPage() {
     window.location.href = result.data.url;
   }
 
+  async function discussSponsorship() {
+    if (!opportunity?.creatorId) {
+      setFundingMessage("Creator or host details are not available yet.");
+      return;
+    }
+    setDiscussionLoading(true);
+    const result = await apiRequest<{ conversation: { id?: string } }>("/api/sponsor/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        recipientId: opportunity.creatorId,
+        challengeId: params.challengeId,
+        title: `Sponsorship discussion: ${opportunity.title}`,
+        body: `I am interested in sponsoring ${opportunity.title}. I would like to discuss brand placement, funding fit, and any custom challenge options before checkout.`
+      })
+    });
+    setDiscussionLoading(false);
+    if (!result.ok || !result.data?.conversation?.id) {
+      setFundingMessage(result.message || "Sponsorship discussion could not be opened.");
+      return;
+    }
+    router.push(`/sponsor/messages/${result.data.conversation.id}`);
+  }
+
   return <SponsorShell profile={profile}>
     {loading ? <Card className="h-96 animate-pulse bg-[#171717]" /> : error || !opportunity ? <Card className="border-red-500/20 bg-red-950/30 p-6 text-red-200">{error || "Opportunity could not be loaded."}</Card> : <div className="mx-auto max-w-6xl">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -74,8 +100,8 @@ export default function ChallengeOpportunityPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button>
-          <button disabled className="min-h-12 rounded-[8px] border border-white/10 px-5 text-sm font-bold text-slate-500"><MessageSquare size={16} className="inline" /> Discuss Sponsorship</button>
-          <a href="#funding-checkout" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] border border-white/10 px-5 text-sm font-bold text-white"><WalletCards size={16} /> Fund Challenge</a>
+          <Button variant="secondary" onClick={() => void discussSponsorship()} disabled={discussionLoading || !opportunity.creatorId}><MessageSquare size={16} /> {discussionLoading ? "Opening..." : "Discuss Sponsorship"}</Button>
+          <LinkButton href={`/sponsor/funding/${opportunity.id}/checkout`}><WalletCards size={16} /> Fund Challenge</LinkButton>
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, Clock3, Coins, Rocket, Trophy, Users, Vote } from "lucide-react";
+import { Bookmark, Coins, Rocket, Trophy, Users, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
@@ -23,7 +23,6 @@ export default function ChallengeDetailPage() {
   const challengeId = params.id;
   const { user } = useCurrentUser();
   const [saved, setSaved] = useState(false);
-  const [watchLater, setWatchLater] = useState(false);
   const [engagementMessage, setEngagementMessage] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
@@ -48,7 +47,6 @@ export default function ChallengeDetailPage() {
 
   useEffect(() => {
     setSaved(Boolean(details?.userState?.saved));
-    setWatchLater(Boolean(details?.userState?.watchLater));
   }, [details?.userState]);
 
   useEffect(() => {
@@ -57,7 +55,7 @@ export default function ChallengeDetailPage() {
       .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
   }, [challengeId]);
 
-  async function updateEngagement(action: "save_challenge" | "watch_later", enabled: boolean) {
+  async function updateEngagement(action: "save_challenge", enabled: boolean) {
     setEngagementMessage("");
     const result = await apiRequest<{ reminderStatus?: string | null }>(`/api/challenges/${challengeId}/engagement`, {
       method: "POST",
@@ -68,7 +66,6 @@ export default function ChallengeDetailPage() {
       return;
     }
     if (action === "save_challenge") setSaved(enabled);
-    if (action === "watch_later") setWatchLater(enabled);
     setEngagementMessage(result.message);
   }
 
@@ -165,6 +162,8 @@ export default function ChallengeDetailPage() {
   const rawChallenge = details?.challenge as Record<string, any> | undefined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, any> : {};
   const paidEntryRequired = Boolean(monetization.paidEntryRequested || rawChallenge?.paidEntryEnabled || rawChallenge?.entryFeeRequired);
+  const premiumOnlyChallenge = Boolean(rawChallenge?.premiumOnly || rawChallenge?.planRequired || monetization.paidEntryRequested || rawChallenge?.hostPremiumOnly || rawChallenge?.creatorPremiumOnly);
+  const freePremiumBlocked = Boolean(freeCompetitor && premiumOnlyChallenge);
   const entryFeeCents = Number(monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
   const entryFeeLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.max(0, entryFeeCents) / 100);
 
@@ -182,7 +181,6 @@ export default function ChallengeDetailPage() {
             {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("watch_later", !watchLater)}><Clock3 size={17} /> {watchLater ? "Following updates" : "Follow updates"}</Button>
           </div>
           {engagementMessage ? <p className="mt-3 text-sm text-slate-300">{engagementMessage}</p> : null}
           <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
@@ -256,14 +254,16 @@ export default function ChallengeDetailPage() {
             <h3 className="text-xl font-black">Ready to compete?</h3>
             <p className="mt-2 text-slate-300">{paidEntryRequired ? `Paid entry is required for this challenge. Entry updates only after Stripe webhook confirmation.` : "Enroll for updates, then join when you are ready to submit."}</p>
             {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
-            {paidEntryRequired ? (
+            {freePremiumBlocked ? (
+              <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
+            ) : paidEntryRequired ? (
               <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee (${entryFeeLabel})`}</Button>
             ) : userState?.joined ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Continue Entry</LinkButton>
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/enroll`} className="mt-6 w-full">Enroll Now</LinkButton>
             )}
-            {paidEntryRequired ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>}
+            {paidEntryRequired ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : freePremiumBlocked ? null : <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>}
             {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
             <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
           </Card>

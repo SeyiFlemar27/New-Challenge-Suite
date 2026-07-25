@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock3, TriangleAlert } from "lucide-react";
-import { Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 
@@ -52,25 +52,25 @@ function CheckoutSuccessContent() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-black px-5 py-12 sm:px-8">
-      <Card className="w-full max-w-3xl border-[var(--gold)]/25 p-6 text-center sm:p-10 lg:p-12">
+      <Card className="w-full max-w-xl border-[var(--gold)]/25 p-6 text-center sm:p-8">
         <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
         <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">{paymentPurpose ? "Secure payment verification" : "Secure plan verification"}</p>
         {state === "pending" ? <Clock3 className="mx-auto mt-5 text-[var(--gold)]" size={42} /> : state === "confirmed" ? <CheckCircle2 className="mx-auto mt-5 text-emerald-400" size={42} /> : <TriangleAlert className="mx-auto mt-5 text-amber-300" size={42} />}
-        <h1 className="mt-5 text-3xl font-black text-white sm:text-4xl">{paymentPurpose ? "Payment received for confirmation" : state === "pending" ? "Confirming your subscription..." : state === "confirmed" ? expectedPlan ? "Your plan is ready" : "Checkout received" : "Payment not completed"}</h1>
-        <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">{paymentPurpose ? "Stripe has returned you to Challenge Suite. Your entry, vote credits, or sponsor contribution will update only after secure webhook confirmation." : state === "pending" ? "This usually takes a few seconds. Challenge Suite is waiting for secure webhook verification before unlocking access." : state === "incomplete" ? "Challenge Suite has not received an active subscription confirmation yet. No plan access was granted by this page." : expectedPlan ? `Your verified ${expectedPlan === "host" ? "Host" : expectedPlan === "creator" ? "Creator" : "subscription"} access is ready. Premium accounts may need KYC verification before full tools unlock.` : "Your checkout returned successfully. Account updates still depend on verified webhook processing."}</p>
-        <div className="mx-auto mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-4">
-          {(paymentPurpose ? ["Checkout returned", "Webhook pending", "Record updates after confirmation", "No payout or prize release"] : ["Payment confirmed", "Subscription verified", "Plan unlocked", "Start onboarding"]).map((label, index) => {
+        <h1 className="mt-5 text-3xl font-black text-white sm:text-4xl">{paymentPurpose ? "Payment is being verified" : state === "pending" ? "Your plan is being verified" : state === "confirmed" ? "Your plan is active" : "Payment not completed"}</h1>
+        <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-300">{paymentPurpose ? "Stripe has returned you to Challenge Suite. Entries, vote credits, or sponsor contributions update only after webhook confirmation." : state === "pending" ? "We're confirming your payment. Access changes only after the secure Stripe webhook verifies the subscription." : state === "incomplete" ? "Challenge Suite has not received active subscription confirmation yet. No access was granted by this page." : expectedPlan ? `Your verified ${expectedPlan === "host" ? "Host" : expectedPlan === "creator" ? "Creator" : "subscription"} plan is active. Complete setup or KYC if required.` : "Your checkout returned successfully. Account updates still depend on verified webhook processing."}</p>
+        <div className="mx-auto mt-8 grid max-w-xl gap-3 text-left sm:grid-cols-3">
+          {(paymentPurpose ? ["Payment received", "Webhook confirmation", "Record updated"] : ["Payment received", "Subscription verified", "Setup / KYC"]).map((label, index) => {
             const reached = state === "confirmed" || (state === "pending" && index === 0);
             return <div key={label} className={`rounded-[8px] border p-4 ${reached ? "border-[var(--gold)]/40 bg-[var(--gold)]/10" : "border-white/10 bg-white/[0.025]"}`}><p className="text-xs font-black text-slate-500">0{index + 1}</p><p className={`mt-2 text-sm font-bold ${reached ? "text-[var(--gold)]" : "text-slate-400"}`}>{label}</p></div>;
           })}
         </div>
-        <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-slate-400">This page never activates subscriptions, paid entries, vote credits, sponsor contributions, prize pools, ledgers, or payouts by itself. Updates are verified securely by the Stripe webhook.</p>
+        <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-slate-400">This page never activates subscriptions, paid entries, vote credits, sponsor contributions, prize pools, ledgers, or payouts by itself.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {state === "confirmed" ? <LinkButton href={destination}>{expectedPlan === "host" || expectedPlan === "creator" ? "Continue to KYC Status" : "Return to Dashboard"}</LinkButton> : null}
-          {state === "confirmed" && expectedPlan === "host" ? <LinkButton href="/onboarding/host" variant="secondary">Open Host Setup</LinkButton> : null}
-          {state === "confirmed" && expectedPlan === "creator" ? <LinkButton href="/onboarding/creator" variant="secondary">Open Creator Setup</LinkButton> : null}
+          {state === "confirmed" ? <LinkButton href={destination}>{expectedPlan === "host" || expectedPlan === "creator" ? "Complete KYC" : "Continue to Dashboard"}</LinkButton> : null}
+          {state === "confirmed" && expectedPlan === "host" ? <LinkButton href="/onboarding/host" variant="secondary">Start Setup</LinkButton> : null}
+          {state === "confirmed" && expectedPlan === "creator" ? <LinkButton href="/onboarding/creator" variant="secondary">Start Setup</LinkButton> : null}
           {state === "incomplete" ? <><LinkButton href="/subscriptions">Try Again</LinkButton><LinkButton href="/subscriptions" variant="secondary">Return to Plans</LinkButton></> : null}
-          {state === "pending" ? <LinkButton href="/settings/billing" variant="secondary">View Billing Status</LinkButton> : null}
+          {state === "pending" ? <Button variant="secondary" onClick={() => window.location.reload()}>Refresh Status</Button> : null}
         </div>
       </Card>
     </main>

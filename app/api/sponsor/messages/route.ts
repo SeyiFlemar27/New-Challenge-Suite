@@ -1,8 +1,27 @@
 ﻿import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
+import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
 
 export const dynamic = "force-dynamic";
+
+function safeAttachments(value: unknown, conversationId: string, sponsorId: string) {
+  if (!Array.isArray(value)) return [];
+  const allowedPrefixes = [
+    sponsorConversationMediaPath(conversationId, sponsorId, "images") + "/",
+    sponsorConversationMediaPath(conversationId, sponsorId, "documents") + "/"
+  ];
+  return value.slice(0, 4).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const url = cleanText(record.url).slice(0, 700);
+    const path = cleanText(record.path).slice(0, 700);
+    const contentType = cleanText(record.contentType).slice(0, 140);
+    const kind = contentType.startsWith("image/") ? "image" : contentType === "application/pdf" || contentType.includes("wordprocessingml") || contentType === "application/msword" || contentType === "text/plain" ? "document" : "";
+    if (!url || !path || !kind || !allowedPrefixes.some((prefix) => path.startsWith(prefix))) return [];
+    return [{ url, path, contentType, kind, fileName: cleanText(record.fileName).slice(0, 180), size: Number(record.size ?? 0) }];
+  });
+}
 
 export async function GET(request: Request) {
   const { context, response } = await requireSponsorContext(request);
@@ -38,7 +57,8 @@ export async function POST(request: Request) {
     const conversationId = cleanText(body.conversationId).slice(0, 120) || context.db.collection("sponsorConversations").doc().id;
     const conversation = { id: conversationId, sponsorId: context.user.uid, ownerUid: context.user.uid, recipientId, relatedProposalId: cleanText(body.proposalId).slice(0, 120) || null, relatedCampaignId: cleanText(body.campaignId).slice(0, 120) || null, relatedChallengeId: cleanText(body.challengeId).slice(0, 120) || null, title: cleanText(body.title, "Sponsor conversation").slice(0, 180), lastMessagePreview: messageBody.slice(0, 180), unreadCountFoundation: 0, status: "active", updatedAt: now, updatedBy: context.user.uid, createdAt: now, createdBy: context.user.uid };
     const messageRef = context.db.collection("sponsorMessages").doc();
-    const message = { id: messageRef.id, sponsorId: context.user.uid, ownerUid: context.user.uid, conversationId, recipientId, body: messageBody, attachments: [], visibility: "creator_visible", status: "sent", deliveryStatus: "delivered_foundation", readStatus: "read_foundation", internalOnly: false, createdAt: now, updatedAt: now, createdBy: context.user.uid };
+    const attachments = safeAttachments(body.attachments, conversationId, context.user.uid);
+    const message = { id: messageRef.id, sponsorId: context.user.uid, ownerUid: context.user.uid, conversationId, recipientId, body: messageBody, attachments, attachmentCount: attachments.length, visibility: "creator_visible", status: "sent", deliveryStatus: "delivery_foundation", readStatus: "not_tracked", internalOnly: false, createdAt: now, updatedAt: now, createdBy: context.user.uid };
     await Promise.all([
       context.db.collection("sponsorConversations").doc(conversationId).set(conversation, { merge: true }),
       messageRef.set(message),
