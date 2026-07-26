@@ -6,6 +6,8 @@ import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { publicPrizePoolFields } from "@/lib/server/prize-pools";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
+import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const challengeData = challengeSnap.data() ?? {};
   const publiclyVisible = isPublicChallenge(challengeSnap.id, challengeData);
   const user = await getOptionalRequestUser(request);
+  let requestProfile: Record<string, unknown> = {};
   if (!user && !publiclyVisible) {
     return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   }
@@ -28,11 +31,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get()
     ]);
+    requestProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
     const accessContext = await challengeForPlanAccess(db, { id: challengeSnap.id, ...challengeData }, user.uid);
     if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
       return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     }
-    const access = canAccessChallenge({ ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) }, accessContext.challenge);
+    const access = canAccessChallenge(requestProfile, accessContext.challenge);
     if (!access.allowed) {
       return fail(access.code === "PREMIUM_REQUIRED" ? "Premium membership is required to view this challenge." : "Plan access is required for this challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
     }
@@ -85,10 +89,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
   const entryPayment = activeEntryPaymentSnap?.exists ? { id: activeEntryPaymentSnap.id, ...activeEntryPaymentSnap.data() } as Record<string, unknown> : null;
   const participantData = participantSnap?.exists ? participantSnap.data() ?? {} : null;
+  const paidEntryRequired = isPaidEntryChallenge(challengeData);
+  const paidEntryAmountCentsValue = paidEntryAmountCents(challengeData);
   const entryPaymentStatus = participantData && ["paid", "confirmed"].includes(String(participantData.entryPaymentStatus ?? "")) ? "paid" : String(entryPayment?.status ?? participantData?.entryPaymentStatus ?? "not_started");
+  const paidEntryEnrolled = entryPaymentStatus === "paid" || entryPaymentStatus === "confirmed";
+  const joinable = isChallengeJoinable({ id: challengeSnap.id, ...challengeData });
+  const sponsorAccount = isSponsorProfile(requestProfile);
+  const paidEntryState = {
+    required: paidEntryRequired,
+    amountCents: paidEntryRequired ? paidEntryAmountCentsValue : 0,
+    currency: "usd",
+    paymentStatus: paidEntryRequired ? entryPaymentStatus : "not_required",
+    reservationStatus: entryPayment?.reservationStatus ?? null,
+    canPay: Boolean(user && paidEntryRequired && !paidEntryEnrolled && entryPaymentStatus !== "pending" && joinable.allowed && !sponsorAccount),
+    canSubmit: Boolean(!paidEntryRequired || paidEntryEnrolled),
+    joinWindowOpen: joinable.allowed,
+    blockedReason: paidEntryRequired && sponsorAccount
+      ? "sponsor_account_blocked"
+      : paidEntryRequired && !joinable.allowed
+        ? joinable.code ?? "registration_closed"
+        : null
+  };
 
   return ok({
-    challenge: { id: challengeSnap.id, ...publicChallenge },
+    challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
     submissions: leaderboard.entries,
     leaderboard: leaderboardPayload,
     sponsorships,
@@ -102,7 +126,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       entryPaymentReservationStatus: entryPayment?.reservationStatus ?? null,
       entryPaymentId: entryPayment?.id ?? null,
       entryPaymentPending: entryPaymentStatus === "pending",
-      paidEntryEnrolled: entryPaymentStatus === "paid" || entryPaymentStatus === "confirmed",
+      paidEntryEnrolled,
+      paidEntry: paidEntryState,
       submitted: Boolean(userSubmissionSnap?.exists),
       submissionId: userSubmissionSnap?.id ?? null,
       votedSubmissionIds: userVotes.map((vote) => vote.submissionId).filter(Boolean),

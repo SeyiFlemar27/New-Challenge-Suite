@@ -18,17 +18,24 @@ const successPage = read("app/checkout/success/page.tsx");
 const cancelPage = read("app/checkout/cancel/page.tsx");
 const builder = read("components/challenge-builder.tsx");
 const challengeApi = read("app/api/challenges/route.ts");
+const challengeDetailApi = read("app/api/challenges/[id]/route.ts");
+const publicChallenge = read("lib/server/public-challenge.ts");
 
 assert(exists("app/api/challenges/[id]/entry-checkout/route.ts"), "paid entry checkout API must exist.");
 assert(exists("app/api/challenges/[id]/entry-payment-status/route.ts"), "paid entry status API must exist.");
 
 assert(detailPage.includes("paidEntryRequired") && detailPage.includes("entryFeeCents > 0"), "paid challenge CTA must activate only when entry fee is enabled and greater than zero.");
+assert(detailPage.includes("challengePaidEntry") && detailPage.includes("userPaidEntry"), "detail page must read normalized paid-entry state from the backend payload.");
 assert(detailPage.includes("Join Challenge") && detailPage.includes("Submit Entry") && detailPage.includes("Pay & Enroll"), "detail page must support free join, submit, and paid-entry CTAs.");
 assert(detailPage.includes("paidEntryRequired ? alreadySubmitted") && detailPage.includes("paidEntryEnrolled") && detailPage.includes("paidEntryPending"), "paid-entry CTA must be state-driven by submitted/enrolled/pending states.");
 assert(!detailPage.includes("Enroll Now"), "detail page must not show legacy Enroll Now CTA.");
 assert(detailPage.includes("Sponsor accounts cannot join or submit entries"), "sponsor accounts must be blocked from participant CTAs.");
 
+assert(challengeDetailApi.includes("paidEntryState") && challengeDetailApi.includes("challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry:"), "challenge detail API must expose normalized paid-entry state with sanitized public challenge data.");
+assert(challengeDetailApi.includes("canPay") && challengeDetailApi.includes("canSubmit") && challengeDetailApi.includes("paymentStatus"), "challenge detail API must expose payment-state flags for paid-entry UI.");
+assert(publicChallenge.includes("publicChallengeFields") && !publicChallenge.includes("\"monetization\""), "raw monetization remains omitted from public challenge fields, so paid-entry state must be explicit.");
 assert(submissionPage.includes("Entry fee required"), "submission page must show an actionable paid-entry gate.");
+assert(submissionPage.includes("challengePaidEntry") && submissionPage.includes("userPaidEntry"), "submission page must read normalized paid-entry state from the backend payload.");
 assert(submissionPage.includes("Pay Entry Fee") && submissionPage.includes("entry-checkout"), "unpaid users on submission page must get Pay Entry Fee action.");
 assert(submissionPage.includes("paidEntryRequired && !paidEntryEnrolled") && submissionPage.includes("Pay Entry Fee First"), "submission form must remain blocked until webhook-confirmed enrollment.");
 assert(submissionPage.includes("Sponsor accounts cannot Pay & Enroll or submit entries"), "sponsor accounts must be blocked from paid-entry submission flow.");
