@@ -1,0 +1,16 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const read = (path) => readFileSync(join(root, path), "utf8");
+assert(existsSync(join(root, "app/tournaments/create/page.tsx")), "Dedicated tournament create route must exist.");
+assert(read("app/tournaments/create/page.tsx").includes("TournamentBuilder"), "Tournament create route must use dedicated builder.");
+const builder = read("components/tournament-builder.tsx");
+assert(builder.includes("Basics") && builder.includes("Review & Launch"), "Builder must include requested steps.");
+assert(builder.includes("MediaUploadField") && builder.includes("tournamentDraftMediaPath"), "Builder must use real media upload infrastructure.");
+assert(builder.includes("single_elimination") && !builder.includes("double_elimination"), "Builder must expose V1 single elimination only.");
+assert(builder.includes("[8, 16, 32, 64]"), "Builder must support 8/16/32/64 capacity.");
+assert(builder.includes("Hybrid scoring must total 100%"), "Hybrid scoring validation must exist.");
+assert(builder.includes("Prize distribution must total 100%"), "Prize distribution validation must exist.");
+assert(builder.includes("/api/tournaments"), "Draft save must use backend tournament API.");
+console.log("Tournament builder flow checks passed.");

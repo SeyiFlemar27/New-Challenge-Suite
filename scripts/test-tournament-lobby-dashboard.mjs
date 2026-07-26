@@ -1,0 +1,11 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+assert(existsSync(join(root, "app/tournaments/[id]/lobby/page.tsx")), "Lobby route must exist.");
+assert(existsSync(join(root, "app/tournaments/[id]/me/page.tsx")), "Participant dashboard route must exist.");
+const lobby = readFileSync(join(root, "app/tournaments/[id]/lobby/page.tsx"), "utf8");
+const me = readFileSync(join(root, "app/tournaments/[id]/me/page.tsx"), "utf8");
+assert(lobby.includes("check-in") && lobby.includes("backend participant records"), "Lobby must include check-in and backend participant state.");
+assert(me.includes("Next Action") && me.includes("My Match") && me.includes("History"), "Participant dashboard must include next-action tabs.");
+console.log("Tournament lobby/dashboard checks passed.");

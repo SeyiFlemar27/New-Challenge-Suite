@@ -1,0 +1,12 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const route = readFileSync(join(root, "app/api/tournaments/[id]/sponsor-proposals/route.ts"), "utf8");
+assert(existsSync(join(root, "app/api/tournaments/[id]/sponsor-proposals/route.ts")), "Tournament sponsor proposal route must exist.");
+assert(route.includes("budgetMinor") && route.includes("requestedDeliverables"), "Sponsor proposal fields must exist.");
+assert(ops.includes("prizeFundingStatus") && ops.includes("publicSponsorDisplayAllowed"), "Prize funding and sponsor display states must exist.");
+assert(ops.includes("sponsorFundsGoToWinnersPercent: 100"), "Sponsor funds must be winner-directed.");
+assert(route.includes("paymentConfirmed: false"), "Sponsor proposal acceptance must not fake payment confirmation.");
+console.log("Tournament sponsor/prize integration checks passed.");

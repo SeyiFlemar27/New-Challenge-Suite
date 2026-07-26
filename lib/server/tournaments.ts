@@ -1,4 +1,4 @@
-import type { TournamentFoundation } from "@/lib/tournament-types";
+import type { TournamentFoundation, TournamentPrizeDistribution, TournamentResultMethod, TournamentRoundPlanItem } from "@/lib/tournament-types";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -7,6 +7,58 @@ function text(value: unknown, fallback = "") {
 function positiveInteger(value: unknown, fallback: number) {
   const parsed = Math.trunc(Number(value));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function singleEliminationMatchCount(capacity: number) {
+  return Math.max(0, capacity - 1);
+}
+
+export function singleEliminationStageCount(capacity: number) {
+  return Math.max(0, Math.log2(capacity));
+}
+
+export function roundTitlesForCapacity(capacity: number) {
+  const titles: Record<number, string[]> = {
+    8: ["Quarterfinal", "Semifinal", "Final"],
+    16: ["Round of 16", "Quarterfinal", "Semifinal", "Final"],
+    32: ["Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"],
+    64: ["Round of 64", "Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"]
+  };
+  return titles[capacity] ?? [];
+}
+
+export function buildRoundPlan(capacity: number, resultMethod: TournamentResultMethod = "votes", thirdPlaceMethod = "none"): TournamentRoundPlanItem[] {
+  const base = roundTitlesForCapacity(capacity).map((title, index) => ({
+    roundNumber: index + 1,
+    title,
+    brief: "",
+    submissionOpensAt: null,
+    submissionDeadlineAt: null,
+    votingOpensAt: null,
+    votingClosesAt: null,
+    acceptedMedia: ["image", "video"] as ("image" | "video")[],
+    resultMethod,
+    advancementRule: title === "Final" ? "final_placements_after_review" : "winner_advances_to_next_round"
+  }));
+  if (thirdPlaceMethod === "bronze_match" || thirdPlaceMethod === "third_place_match") {
+    base.push({
+      roundNumber: base.length + 1,
+      title: "Bronze Match",
+      brief: "",
+      submissionOpensAt: null,
+      submissionDeadlineAt: null,
+      votingOpensAt: null,
+      votingClosesAt: null,
+      acceptedMedia: ["image", "video"],
+      resultMethod,
+      advancementRule: "winner_receives_third_place_after_review"
+    });
+  }
+  return base;
+}
+
+export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
+  return [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }];
 }
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
@@ -24,6 +76,7 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     participantCount: 0,
     privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
     registrationType: text(input.registrationType, "open") as TournamentFoundation["registrationType"],
+    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
     registrationOpensAt: text(input.registrationOpensAt) || null,
     registrationClosesAt: text(input.registrationClosesAt) || null,
     tournamentStartsAt: text(input.tournamentStartsAt) || null,
@@ -40,6 +93,9 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     judging: { setupRequired: true },
     tieBreaker: text(input.tieBreaker, "host_review") as TournamentFoundation["tieBreaker"],
     thirdPlaceMethod: text(input.thirdPlaceMethod, "none") as TournamentFoundation["thirdPlaceMethod"],
+    scoreVisibility: text(input.scoreVisibility, "final_only") as TournamentFoundation["scoreVisibility"],
+    prizeDistribution: Array.isArray(input.prizeDistribution) ? input.prizeDistribution as TournamentPrizeDistribution[] : defaultPrizeDistribution(),
+    readiness: { readyToLaunch: false, lastCheckedAt: now, blockingErrors: [], warnings: [] },
     currentRoundId: null,
     currentRoundNumber: 0,
     prizePool: { confirmedPrizePoolMinor: 0, fakePrizePoolAllowed: false, adminApprovalRequired: true },
@@ -71,4 +127,23 @@ export function tournamentSubdomainFoundation() {
     tournamentPrizePools: { implemented: "model_foundation", confirmedSourcesOnly: true },
     tournamentPayouts: { implemented: "model_foundation", payoutProviderCalled: false }
   };
+}
+
+export function evaluateTournamentReadiness(tournament: Record<string, unknown>) {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (!text(tournament.title)) errors.push("Tournament name is required.");
+  if (!text(tournament.description)) errors.push("Full description is required.");
+  if (!text(tournament.category)) errors.push("Category is required.");
+  if (text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded" && text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "storage_disabled") errors.push("Cover media must be uploaded unless storage-disabled mode is active.");
+  if (text(tournament.format) !== "single_elimination") errors.push("V1 tournaments support single elimination only.");
+  if (![8, 16, 32, 64].includes(Number(tournament.participantCapacity))) errors.push("Capacity must be 8, 16, 32, or 64.");
+  if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Registration and tournament dates are required.");
+  if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
+  if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");
+  const distribution = Array.isArray(tournament.prizeDistribution) ? tournament.prizeDistribution as TournamentPrizeDistribution[] : [];
+  if (distribution.reduce((sum, item) => sum + Number(item.percent ?? 0), 0) !== 100) errors.push("Prize distribution must total 100%.");
+  if (text(tournament.entryType) === "paid_entry_setup_required") warnings.push("Paid entry requires provider-confirmed checkout before registrations can become paid.");
+  if (Number((tournament.prizePool as Record<string, unknown> | undefined)?.confirmedPrizePoolMinor ?? 0) <= 0) warnings.push("No confirmed prize funding is available yet.");
+  return { ready: errors.length === 0, errors, warnings };
 }

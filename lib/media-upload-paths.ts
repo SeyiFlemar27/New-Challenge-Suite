@@ -7,6 +7,8 @@ export type ProfileMediaFolder = "avatar" | "banner";
 export type SponsorMediaFolder = "logo" | "banner";
 export type SponsorCampaignMediaFolder = "logo" | "banner" | "creative" | "video" | "documents";
 export type SponsorConversationMediaFolder = "images" | "documents";
+export type TournamentDraftMediaFolder = "cover" | "trailer";
+export type TournamentSubmissionMediaFolder = "images" | "videos";
 
 export const storageRulesBaseline = {
   challengeDrafts: "challenges/drafts/{userId}/{folder}/{fileName}",
@@ -15,7 +17,9 @@ export const storageRulesBaseline = {
   profile: "users/{userId}/profile/{folder}/{fileName}",
   sponsor: "sponsors/{userId}/{folder}/{fileName}",
   sponsorCampaigns: "sponsors/{userId}/campaigns/{campaignId}/{folder}/{fileName}",
-  sponsorConversations: "sponsor-conversations/{conversationId}/{userId}/{folder}/{fileName}"
+  sponsorConversations: "sponsor-conversations/{conversationId}/{userId}/{folder}/{fileName}",
+  tournamentDrafts: "tournaments/drafts/{userId}/{folder}/{fileName}",
+  tournamentSubmissions: "tournaments/{tournamentId}/rounds/{roundId}/matches/{matchId}/participants/{participantId}/{folder}/{fileName}"
 } as const;
 
 export function challengeDraftMediaPath(userId: string, folder: ChallengeDraftMediaFolder) {
@@ -50,6 +54,14 @@ export function sponsorCampaignMediaPath(userId: string, campaignId: string, fol
 
 export function sponsorConversationMediaPath(conversationId: string, userId: string, folder: SponsorConversationMediaFolder) {
   return joinStoragePath("sponsor-conversations", conversationId, userId, folder);
+}
+
+export function tournamentDraftMediaPath(userId: string, folder: TournamentDraftMediaFolder) {
+  return joinStoragePath("tournaments", "drafts", userId, folder);
+}
+
+export function tournamentSubmissionMediaPath(tournamentId: string, roundId: string, matchId: string, participantId: string, folder: TournamentSubmissionMediaFolder) {
+  return joinStoragePath("tournaments", tournamentId, "rounds", roundId, "matches", matchId, "participants", participantId, folder);
 }
 
 export function legacyHostDraftMediaPath(userId: string, folder: string) {

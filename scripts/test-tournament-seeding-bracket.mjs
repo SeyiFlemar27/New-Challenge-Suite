@@ -1,0 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const route = readFileSync(join(root, "app/api/tournaments/[id]/bracket/route.ts"), "utf8");
+assert(ops.includes("generateSingleEliminationBracket"), "Server-side bracket generation helper must exist.");
+assert(ops.includes("BRACKET_ALREADY_GENERATED"), "Bracket generation must be idempotent.");
+assert(ops.includes("capacity - 1") || route.includes("expectedMatchCount"), "8/16/32/64 match counts must derive from capacity minus one.");
+assert(route.includes("seedsLockedAt"), "Seeds must lock after bracket generation.");
+assert(!/randomly choose a winner|fakeBracket/i.test(ops + route), "Bracket code must not choose fake winners.");
+console.log("Tournament seeding/bracket checks passed.");

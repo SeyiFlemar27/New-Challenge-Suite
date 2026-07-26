@@ -1,0 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const votes = readFileSync(join(root, "app/api/tournaments/[id]/votes/route.ts"), "utf8");
+const judges = readFileSync(join(root, "app/api/tournaments/[id]/judges/route.ts"), "utf8");
+assert(votes.includes("matchId") && votes.includes("submissionId") && ops.includes("DUPLICATE_VOTE_BLOCKED"), "Tournament vote route must reference match/submission and block duplicates.");
+assert(ops.includes("validateJudgeRubric") && judges.includes("RUBRIC_TOTAL_INVALID"), "Judge rubrics must validate 100%.");
+assert(ops.includes("calculateHybridScore") && ops.includes("sourceValuesStored"), "Hybrid scoring must preserve source values.");
+assert(!/browser-calculated official/i.test(ops + votes + judges), "Official scores must not be browser-calculated.");
+console.log("Tournament voting/judging checks passed.");

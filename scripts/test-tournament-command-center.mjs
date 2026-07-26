@@ -1,0 +1,12 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const page = readFileSync(join(root, "app/tournaments/[id]/manage/page.tsx"), "utf8");
+const permissions = readFileSync(join(root, "lib/server/tournament-permissions.ts"), "utf8");
+const actionRoute = readFileSync(join(root, "app/api/tournaments/[id]/manage/actions/route.ts"), "utf8");
+assert(existsSync(join(root, "app/tournaments/[id]/manage/page.tsx")), "Host command center route must exist.");
+["Participants", "Applications", "Waitlist", "Bracket", "Judges", "Sponsors", "Prize Pool", "Disputes", "Audit"].forEach((section) => assert(page.includes(section), `${section} section must exist.`));
+assert(permissions.includes("participant_manager") && permissions.includes("judge_coordinator") && permissions.includes("finance_viewer"), "Granular management roles must exist.");
+assert(actionRoute.includes("schedule_change") && actionRoute.includes("pause") && actionRoute.includes("cancel"), "Schedule/pause/cancel foundation must exist.");
+console.log("Tournament command center checks passed.");

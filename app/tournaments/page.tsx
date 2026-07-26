@@ -1,37 +1,54 @@
-"use client";
-
-import { AppShell } from "@/components/app-shell";
-import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { Trophy } from "lucide-react";
-import { useState } from "react";
-import { PlanFeatureGate } from "@/components/plan-feature-gate";
+import { AppShell } from "@/components/app-shell";
+import { ChallengeMediaFrame } from "@/components/media-display";
+import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { listPublicTournaments, tournamentSections } from "@/lib/server/tournament-public";
 
-export default function TournamentsPage() {
-  return (
-    <PlanFeatureGate feature="tournament_builder" requiredPlan="Host" title="Tournament tools require Host Plan">
-      <TournamentPreview />
-    </PlanFeatureGate>
-  );
+function friendly(value: unknown) {
+  return String(value ?? "not available").replaceAll("_", " ");
 }
 
-function TournamentPreview() {
-  const [type, setType] = useState("knockout");
-  const stages = ["Registration", "Round 1", type === "league_table" ? "Table Review" : "Advancement", "Final", "Host Confirmation", "Admin Review"];
+function prizeLabel(tournament: Record<string, unknown>) {
+  const cents = Number((tournament.prizePool as Record<string, unknown> | undefined)?.confirmedPrizePoolMinor ?? 0);
+  return cents > 0 ? `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "Prize not funded yet";
+}
+
+export default async function TournamentsPage() {
+  const result = await listPublicTournaments();
+  const sections = tournamentSections(result.tournaments);
   return (
     <AppShell>
-      <PageTitle title="Tournament Manager" subtitle="A tournament is a multi-stage competition with rounds, advancement rules, participant review, voting or judging, finals, and admin-reviewed winner confirmation." />
-      <div className="mt-6 flex flex-wrap gap-3">{["knockout", "bracket", "league_table", "audition_to_final", "group_stage_to_final", "custom_rounds"].map((item) => <Button key={item} variant={type === item ? "primary" : "ghost"} onClick={() => setType(item)}>{item.replaceAll("_", " ")}</Button>)}</div>
-      <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_360px]">
-        <Card className="p-6 sm:p-8">
-          <h2 className="text-2xl font-black capitalize">{type.replaceAll("_", " ")} Flow</h2>
-          <div className="mt-7 grid gap-4 md:grid-cols-3">{stages.map((stage, index) => <Card key={stage} className="p-4"><p className="text-xs font-black uppercase text-[var(--gold)]">Stage {index + 1}</p><h3 className="mt-2 font-black">{stage}</h3><p className="mt-2 text-sm text-slate-400">{stage === "Admin Review" ? "Winner announcement and revenue/prize foundations require review. No payout is executed." : "Configure rules, participants, submissions, votes, and advancement before moving forward."}</p></Card>)}</div>
-        </Card>
-        <Card className="p-6">
-          <EmptyState icon={<Trophy />} title="No tournament plans yet" body="Create a Host competition and choose Tournament to start planning rounds, participant approvals, advancement rules, and finals." action={<LinkButton href="/tournaments/create">Create Tournament</LinkButton>} />
-          <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Bracket execution, automatic advancement, prize release, and payout actions remain inactive foundations.</p>
-        </Card>
+      <PageTitle title="Tournaments" subtitle="Discover real tournament records with registration, bracket, rounds, sponsor, prize, and archive states." icon={<Trophy />} />
+      <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-400">
+        {["category", "status", "entry type", "capacity", "single elimination", "eligibility"].map((filter) => <span key={filter} className="rounded-[8px] border border-white/10 px-3 py-2">{filter}</span>)}
+      </div>
+      {!result.available || !sections.length ? <Card className="mt-8"><EmptyState icon={<Trophy />} title="No tournaments yet" body={result.message || "Real public tournaments will appear here after hosts publish them."} action={<LinkButton href="/tournaments/create">Create Tournament</LinkButton>} /></Card> : null}
+      <div className="mt-8 space-y-10">
+        {sections.map((section) => (
+          <section key={section.title}>
+            <h2 className="text-2xl font-black">{section.title}</h2>
+            <div className="mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {section.rows.map((tournament) => (
+                <Card key={String(tournament.id)} className="overflow-hidden">
+                  <ChallengeMediaFrame src={String((tournament.coverMedia as Record<string, unknown> | undefined)?.url ?? "")} alt={String(tournament.title ?? "Tournament cover")} placeholder="Challenge Suite Tournament" />
+                  <div className="p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendly(tournament.status)}</p>
+                    <h3 className="mt-2 text-xl font-black">{String(tournament.title ?? "Untitled tournament")}</h3>
+                    <dl className="mt-4 grid gap-2 text-sm text-slate-400">
+                      <div className="flex justify-between gap-3"><dt>Host</dt><dd className="break-all text-right">{String(tournament.hostId ?? "Host unavailable")}</dd></div>
+                      <div className="flex justify-between gap-3"><dt>Category</dt><dd>{String(tournament.category ?? "Uncategorized")}</dd></div>
+                      <div className="flex justify-between gap-3"><dt>Participants</dt><dd>{Number(tournament.participantCount ?? 0)} / {Number(tournament.participantCapacity ?? 0)}</dd></div>
+                      <div className="flex justify-between gap-3"><dt>Entry</dt><dd>{friendly(tournament.entryType)}</dd></div>
+                      <div className="flex justify-between gap-3"><dt>Prize</dt><dd>{prizeLabel(tournament)}</dd></div>
+                    </dl>
+                    <LinkButton href={`/tournaments/${String(tournament.id)}`} className="mt-5 w-full">View Tournament</LinkButton>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </AppShell>
   );
 }
-

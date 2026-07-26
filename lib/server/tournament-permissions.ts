@@ -1,6 +1,7 @@
 import { getUserPlanAccess } from "@/lib/plan-access";
 
 export type TournamentPermissionProfile = Record<string, unknown> & { uid?: string; id?: string; role?: string; accountType?: string };
+export type TournamentManagementRole = "host" | "manager" | "participant_manager" | "submission_reviewer" | "moderator" | "judge_coordinator" | "finance_viewer";
 
 function isApprovedEnterprise(profile: TournamentPermissionProfile) {
   const access = getUserPlanAccess(profile);
@@ -21,7 +22,9 @@ export function canCreateTournament(profile: TournamentPermissionProfile) {
 export function canEditTournament(profile: TournamentPermissionProfile, tournament: Record<string, unknown>) {
   const userId = String(profile.uid ?? profile.id ?? "");
   const owner = String(tournament.hostId ?? tournament.creatorId ?? "");
-  return { allowed: Boolean(userId && (userId === owner || profile.role === "admin" || profile.isAdmin === true)), reason: userId === owner ? "owner" : profile.role === "admin" || profile.isAdmin === true ? "admin" : "not_tournament_manager" };
+  const team = Array.isArray(tournament.managementTeam) ? tournament.managementTeam as Array<Record<string, unknown>> : [];
+  const member = team.find((item) => String(item.userId ?? "") === userId && String(item.status ?? "active") === "active");
+  return { allowed: Boolean(userId && (userId === owner || profile.role === "admin" || profile.isAdmin === true || member)), reason: userId === owner ? "owner" : profile.role === "admin" || profile.isAdmin === true ? "admin" : member ? `role_${String(member.role)}` : "not_tournament_manager" };
 }
 
 export function canPublishTournament(profile: TournamentPermissionProfile, tournament: Record<string, unknown>) {
@@ -37,6 +40,15 @@ export function canManageTournamentJudges(profile: TournamentPermissionProfile, 
 export function canModerateTournament(profile: TournamentPermissionProfile) { return { allowed: Boolean(profile.role === "admin" || profile.isAdmin === true), reason: "admin_only" }; }
 export function canViewTournamentFinance(profile: TournamentPermissionProfile, tournament: Record<string, unknown>) { return canEditTournament(profile, tournament); }
 export function canOverrideTournamentResult(profile: TournamentPermissionProfile) { return { allowed: Boolean(profile.role === "admin" || profile.isAdmin === true), reason: "admin_result_override_only" }; }
+
+export function canPerformTournamentRole(profile: TournamentPermissionProfile, tournament: Record<string, unknown>, allowedRoles: TournamentManagementRole[]) {
+  const userId = String(profile.uid ?? profile.id ?? "");
+  if (profile.role === "admin" || profile.isAdmin === true) return { allowed: true, reason: "admin" };
+  if (String(tournament.hostId ?? "") === userId && allowedRoles.includes("host")) return { allowed: true, reason: "host" };
+  const team = Array.isArray(tournament.managementTeam) ? tournament.managementTeam as Array<Record<string, unknown>> : [];
+  const role = String(team.find((item) => String(item.userId ?? "") === userId && String(item.status ?? "active") === "active")?.role ?? "") as TournamentManagementRole;
+  return { allowed: Boolean(role && allowedRoles.includes(role)), reason: role ? `role_${role}` : "role_required" };
+}
 
 export function canSponsorCompeteInTournament(profile: TournamentPermissionProfile) {
   const access = getUserPlanAccess(profile);

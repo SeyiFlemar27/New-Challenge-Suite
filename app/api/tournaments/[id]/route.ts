@@ -4,6 +4,7 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { canEditTournament } from "@/lib/server/tournament-permissions";
 import { assertTournamentTransition } from "@/lib/server/tournament-lifecycle";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
+import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
 import type { TournamentFoundation, TournamentStatus } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,21 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const snap = await db.collection("tournaments").doc(id).get();
   if (!snap.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-  return ok({ tournament: { id: snap.id, ...snap.data(), bracketExecutionEnabled: false, payoutExecutionEnabled: false } }, "Tournament loaded.");
+  const [participants, rounds, matches, announcements, sponsors] = await Promise.all([
+    db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(100).get(),
+    db.collection("tournamentRounds").where("tournamentId", "==", id).orderBy("roundNumber", "asc").limit(20).get(),
+    db.collection("tournamentMatches").where("tournamentId", "==", id).orderBy("roundNumber", "asc").orderBy("matchNumber", "asc").limit(100).get(),
+    db.collection("tournamentAnnouncements").where("tournamentId", "==", id).where("status", "==", "published").limit(20).get(),
+    db.collection("tournamentSponsorProposals").where("tournamentId", "==", id).where("publicDisplayApproved", "==", true).limit(10).get()
+  ]);
+  return ok({
+    tournament: { id: snap.id, ...snap.data(), bracketExecutionEnabled: true, payoutExecutionEnabled: false },
+    participants: participants.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    rounds: rounds.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    matches: matches.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    announcements: announcements.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    sponsors: sponsors.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  }, "Tournament loaded.");
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -38,7 +53,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
   const validation = validateTournamentFoundation({ ...tournament, ...body }, { publish: body.status === "scheduled" || body.status === "pending_review" });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
-  const update = { ...body, updatedAt: new Date().toISOString(), bracketExecutionEnabled: false, paymentActivationEnabled: false, payoutExecutionEnabled: false };
+  const merged = { ...tournament, ...body };
+  const update = { ...body, readiness: evaluateTournamentReadiness(merged), updatedAt: new Date().toISOString(), bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
   await ref.set(update, { merge: true });
   return ok({ tournament: { ...tournament, ...update } }, "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
 }

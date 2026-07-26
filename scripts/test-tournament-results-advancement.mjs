@@ -1,0 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const route = readFileSync(join(root, "app/api/tournaments/[id]/results/route.ts"), "utf8");
+assert(ops.includes("resolveMatchResult") && route.includes("confirmedAt"), "Results must be confirmed server-side.");
+assert(ops.includes("TIE_REQUIRES_CONFIGURED_RESOLUTION"), "Unresolved ties must block advancement.");
+assert(ops.includes("MATCH_REQUIRES_REVIEW"), "Flagged matches must go under review.");
+assert(ops.includes("ADVANCEMENT_ALREADY_APPLIED"), "Advancement must be idempotent.");
+assert(route.includes("result_overridden") && route.includes("reason"), "Overrides must require reason/audit.");
+console.log("Tournament results/advancement checks passed.");

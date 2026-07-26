@@ -1,0 +1,14 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const read = (path) => readFileSync(join(root, path), "utf8");
+assert(existsSync(join(root, "app/tournaments/page.tsx")), "Tournament discovery route must exist.");
+assert(existsSync(join(root, "app/tournaments/[id]/page.tsx")), "Public tournament detail route must exist.");
+const discovery = read("app/tournaments/page.tsx");
+const detail = read("app/tournaments/[id]/page.tsx");
+assert(discovery.includes("listPublicTournaments") && discovery.includes("tournamentSections"), "Discovery must use backend tournament records.");
+assert(discovery.includes("No tournaments yet"), "Discovery must show clean backend empty state.");
+assert(detail.includes("participantEligibilitySummary"), "Eligibility reasons must come from server/foundation helper.");
+assert(!/static placeholder|sample tournament|fake tournament/i.test(discovery + detail), "Discovery/detail must not include fake tournament cards.");
+console.log("Tournament discovery/detail checks passed.");

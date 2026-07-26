@@ -1,0 +1,11 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+assert(existsSync(join(root, "app/my-tournaments/page.tsx")), "My tournaments route must exist.");
+const page = readFileSync(join(root, "app/my-tournaments/page.tsx"), "utf8");
+const types = readFileSync(join(root, "lib/tournament-types.ts"), "utf8");
+assert(page.includes("Active") && page.includes("Upcoming") && page.includes("Completed") && page.includes("Hosted"), "My tournaments tabs must exist.");
+assert(types.includes("TournamentPlacementFoundation"), "Placement/archive foundation must exist.");
+assert(!/fake achievement|sample champion/i.test(page + types), "Profile/archive achievements must not be fake.");
+console.log("My tournaments/archive/profile checks passed.");

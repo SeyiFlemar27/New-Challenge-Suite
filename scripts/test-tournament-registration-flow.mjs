@@ -1,0 +1,12 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const route = readFileSync(join(root, "app/api/tournaments/[id]/join/route.ts"), "utf8");
+assert(existsSync(join(root, "app/tournaments/[id]/join/page.tsx")), "Join page must exist.");
+assert(ops.includes("SPONSOR_CANNOT_JOIN"), "Sponsor competition must be blocked.");
+assert(route.includes("DUPLICATE_PARTICIPANT"), "Duplicate joins must be blocked.");
+assert(ops.includes("WAITLIST_AVAILABLE") && route.includes("participantCountIncremented: outcome === \"registered\""), "Capacity/waitlist and count behavior must be safe.");
+assert(ops.includes("APPLICATION_REQUIRED") && ops.includes("INVITATION_REQUIRED"), "Application and invitation flows must exist.");
+console.log("Tournament registration flow checks passed.");

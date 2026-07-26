@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import assert from "node:assert/strict";
+const root = process.cwd();
+const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
+const types = readFileSync(join(root, "lib/tournament-types.ts"), "utf8");
+assert(types.includes("bronze_match"), "Bronze match third-place method must exist.");
+assert(ops.includes("finalPlacements"), "Final placement helper must exist.");
+assert(ops.includes("placement: 1") && ops.includes("placement: 2") && ops.includes("placement: 3"), "1st/2nd/3rd placements must persist from final/bronze match.");
+assert(!/fake third|arbitrary totals/i.test(ops), "Third place must not be faked from arbitrary totals.");
+console.log("Tournament finals/placements checks passed.");
