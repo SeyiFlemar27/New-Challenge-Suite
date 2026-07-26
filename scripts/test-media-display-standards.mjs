@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const display = readFileSync(join(process.cwd(), "components/media-display.tsx"), "utf8");
+const challenge = readFileSync(join(process.cwd(), "app/challenges/[id]/page.tsx"), "utf8");
+const mine = readFileSync(join(process.cwd(), "app/my-challenges/page.tsx"), "utf8");
+const messages = readFileSync(join(process.cwd(), "app/sponsor/messages/page.tsx"), "utf8");
+assert(display.includes("aspect-video") && display.includes("aspect-[4/5]") && display.includes("aspect-square") && display.includes("aspect-[3/1]"), "Media display frames must cover 16:9, 4:5, 1:1, and 3:1.");
+assert(display.includes("object-cover") && display.includes("object-contain"), "Media display frames must support cover and contain without mutating files.");
+assert(challenge.includes("ChallengeMediaFrame") && challenge.includes("SubmissionMediaFrame") && challenge.includes("AvatarFrame"), "Challenge detail must use controlled media frames.");
+assert(mine.includes("ChallengeMediaFrame"), "My Challenges must use controlled challenge media frame.");
+assert(messages.includes("MessageAttachmentPreview"), "Messages must use controlled attachment preview.");
+assert(display.includes("placeholder") && !display.includes("http"), "Media display fallback must not use remote fake image URLs.");
+console.log("Media display standard checks passed.");

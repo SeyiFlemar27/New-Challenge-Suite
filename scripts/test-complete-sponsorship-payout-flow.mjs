@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const flow = readFileSync(join(process.cwd(), "lib/server/financial/sponsorship-flow.ts"), "utf8");
+const challenge = readFileSync(join(process.cwd(), "app/challenges/[id]/page.tsx"), "utf8");
+const myChallenges = readFileSync(join(process.cwd(), "app/my-challenges/page.tsx"), "utf8");
+assert(flow.includes("sponsorFundsGoToWinnersPercent: 100"), "Sponsor funds must go 100% to winners.");
+assert(flow.includes("admin_approves_winners") && flow.includes("ledger_credits_pending_hold"), "Admin approval must gate ledger flow visibility.");
+assert(challenge.includes("Sponsor-funded prizes go 100% to winners") && challenge.includes("KYC and 24-hour hold"), "Challenge detail must explain sponsor/winner ledger flow.");
+assert(myChallenges.includes("Sponsor state:") && myChallenges.includes("webhook-confirmed payment"), "Creator/host view must show sponsor state safely.");
+assert(!/payout sent|winners paid|prize released/i.test(flow + challenge + myChallenges), "Sponsorship flow must not claim payout or prize release.");
+console.log("Complete sponsorship payout flow visibility checks passed.");

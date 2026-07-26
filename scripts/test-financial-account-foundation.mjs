@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const types = readFileSync(join(process.cwd(), "lib/server/financial/financial-types.ts"), "utf8");
+const service = readFileSync(join(process.cwd(), "lib/server/financial/financial-service.ts"), "utf8");
+const money = readFileSync(join(process.cwd(), "lib/server/financial/money.ts"), "utf8");
+assert(types.includes("FinancialAccountFoundation") && types.includes("currencies") && types.includes("withdrawalEligibility"), "Financial account model must support currencies and withdrawal eligibility.");
+assert(service.includes("createFinancialAccount"), "Financial account helper must exist.");
+assert(money.includes("toMinorUnits") && money.includes("calculatePercentMinor") && money.includes("SUPPORTED_FINANCIAL_CURRENCIES"), "Money helpers must use integer minor units and explicit currencies.");
+assert(!money.includes("parseFloat"), "Money helper must not use parseFloat.");
+console.log("Financial account foundation checks passed.");

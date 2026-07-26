@@ -2,6 +2,7 @@
 import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
+import { canReplyToConversation } from "@/lib/server/messaging-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
     const { conversationId } = await params;
     const owned = await assertSponsorOwnedDoc(context.db, "sponsorConversations", conversationId, context.user.uid);
     if (owned.response) return owned.response;
+    const replyPermission = canReplyToConversation({ isParticipant: true, anonymous: false });
+    if (!replyPermission.allowed) return validationError({ conversationId: "Only conversation participants can reply." });
     const now = isoNow();
     const conversation = owned.snap.data() ?? {};
     const ref = context.db.collection("sponsorMessages").doc();

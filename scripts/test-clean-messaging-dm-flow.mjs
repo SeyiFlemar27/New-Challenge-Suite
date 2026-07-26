@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const page = readFileSync(join(process.cwd(), "app/sponsor/messages/page.tsx"), "utf8");
+const route = readFileSync(join(process.cwd(), "app/api/sponsor/messages/route.ts"), "utf8");
+const reply = readFileSync(join(process.cwd(), "app/api/sponsor/messages/[conversationId]/route.ts"), "utf8");
+const perms = readFileSync(join(process.cwd(), "lib/server/messaging-permissions.ts"), "utf8");
+assert(!page.includes("Creator / Host User ID") && !page.includes("Thread title"), "Normal DM page must not expose manual recipient ID or thread title fields.");
+assert(page.includes("conversation list") || page.includes("Search conversations"), "DM layout must include conversation list.");
+assert(page.includes("MessageAttachmentPreview") && page.includes("Attach image") && page.includes("Attach document"), "DM attachments must support images/documents.");
+assert(!page.includes("video attachments are enabled"), "Video attachments must not be enabled.");
+assert(route.includes("manualRecipientIdEntryAllowed: false"), "Conversation route must mark manual ID entry disallowed.");
+assert(reply.includes("canReplyToConversation"), "Existing conversation participants must be able to reply through permission helper.");
+assert(perms.includes("senderType === \"sponsor\"") && perms.includes("senderType === \"host\"") && perms.includes("senderType === \"creator\""), "Messaging permission matrix must cover sponsors, hosts, and creators.");
+assert(!/fake delivery|fake read|fake message/i.test(page + route + reply), "Messaging must not fake delivery/read/messages.");
+console.log("Clean messaging DM flow checks passed.");

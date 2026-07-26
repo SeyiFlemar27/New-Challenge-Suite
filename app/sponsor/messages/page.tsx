@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, ImageIcon, MessageSquare, Search, Send, Star, WalletCards } from "lucide-react";
+import { MessageSquare, Search, Send, Star, WalletCards } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
-import { Button, Card, EmptyState, Field, inputClass, LinkButton, textareaClass } from "@/components/ui";
+import { Button, Card, EmptyState, inputClass, LinkButton, textareaClass } from "@/components/ui";
 import { MediaUploadField } from "@/components/media-upload-field";
+import { MessageAttachmentPreview } from "@/components/media-display";
 import { apiRequest } from "@/lib/api/client";
 import { useAuth } from "@/components/auth-provider";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
@@ -81,7 +82,9 @@ export default function SponsorMessagesPage() {
   const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const thread = selected ? messages.filter((item) => item.conversationId === selected.id) : [];
   const uploadConversationId = selected?.id || draftConversationId;
-  const canSend = body.trim().length >= 2 && (recipientId || selected?.recipientId);
+  const contextRecipientId = selected?.recipientId || recipientId;
+  const contextTitle = selected?.title || title || (challengeId ? "Sponsorship discussion" : "");
+  const canSend = body.trim().length >= 2 && Boolean(contextRecipientId);
 
   return <SponsorShell profile={profile}>
     <div className="mx-auto max-w-[1500px]">
@@ -121,22 +124,19 @@ export default function SponsorMessagesPage() {
           <div className="border-b border-white/10 p-5">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{selected?.status || "Conversation"}</p>
             <h2 className="mt-2 text-2xl font-black">{selected?.title || title || "Start a sponsorship discussion"}</h2>
-            <p className="mt-2 text-sm text-slate-400">Recipient: {selected?.recipientId || recipientId || "Select or enter a creator/host"}</p>
+            <p className="mt-2 text-sm text-slate-400">{contextTitle || "Start from a creator profile, challenge opportunity, invite, or discovery card."}</p>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {thread.length ? thread.map((message) => <div key={message.id} className="max-w-[82%] rounded-[10px] bg-[var(--gold)]/10 p-4 text-slate-100">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">Sponsor / {message.status || "sent"}</p>
               <p className="mt-2 whitespace-pre-wrap leading-6">{message.body}</p>
-              {Array.isArray(message.attachments) && message.attachments.length ? <div className="mt-3 grid gap-2">{message.attachments.map((attachment: Attachment) => <a key={attachment.path} href={attachment.url} className="inline-flex items-center gap-2 rounded-[8px] border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-slate-200" target="_blank" rel="noreferrer">{String(attachment.contentType ?? "").startsWith("image/") ? <ImageIcon size={15} /> : <FileText size={15} />} {attachment.fileName || "Attachment"}</a>)}</div> : null}
+              {Array.isArray(message.attachments) && message.attachments.length ? <div className="mt-3 grid gap-2">{message.attachments.map((attachment: Attachment) => <a key={attachment.path} href={attachment.url} className="block" target="_blank" rel="noreferrer"><MessageAttachmentPreview attachment={attachment} /></a>)}</div> : null}
               <p className="mt-2 text-xs text-slate-500">{message.createdAt || "Timestamp not available yet"}</p>
             </div>) : <div className="flex h-full items-center justify-center"><EmptyState icon={<MessageSquare />} title="No thread selected" body="Choose a conversation or start one using the composer below." /></div>}
           </div>
           <div className="border-t border-white/10 bg-black/30 p-5">
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Creator / Host User ID"><input className={inputClass} value={recipientId || selected?.recipientId || ""} onChange={(event) => setRecipientId(event.target.value)} /></Field>
-              <Field label="Thread title"><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={selected?.title || "Sponsorship discussion"} /></Field>
-            </div>
-            <Field label="Creator-visible message"><textarea className={textareaClass} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Discuss sponsor fit, placements, custom challenge ideas, or funding intent." /></Field>
+            {!contextRecipientId ? <Card className="mb-4 border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-yellow-100">Start a conversation from a creator profile, host profile, challenge opportunity, invite button, or discovery card. Normal messaging does not require typing a user ID or thread title.</Card> : null}
+            <textarea aria-label="Creator-visible message" className={textareaClass} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Discuss sponsor fit, placements, custom challenge ideas, or funding intent." />
             <div className="grid gap-3 md:grid-cols-2">
               <MediaUploadField label="Attach image" value={attachments.find((item) => String(item.contentType ?? "").startsWith("image/"))?.url ?? ""} onChange={(url, metadata) => setAttachments((current) => [...current.filter((item) => !String(item.contentType ?? "").startsWith("image/")), { url, path: metadata?.path ?? "", fileName: metadata?.fileName, contentType: metadata?.contentType, size: metadata?.size }])} storagePath={sponsorConversationMediaPath(uploadConversationId, auth.user?.uid ?? "anonymous", "images")} kind="image" buttonLabel="Attach Image" />
               <MediaUploadField label="Attach document" value={attachments.find((item) => !String(item.contentType ?? "").startsWith("image/"))?.url ?? ""} onChange={(url, metadata) => setAttachments((current) => [...current.filter((item) => String(item.contentType ?? "").startsWith("image/")), { url, path: metadata?.path ?? "", fileName: metadata?.fileName, contentType: metadata?.contentType, size: metadata?.size }])} storagePath={sponsorConversationMediaPath(uploadConversationId, auth.user?.uid ?? "anonymous", "documents")} kind="document" buttonLabel="Attach PDF / Document" />
@@ -152,7 +152,7 @@ export default function SponsorMessagesPage() {
           <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Context</p>
           <h3 className="mt-2 text-xl font-black">Creator / opportunity summary</h3>
           <div className="mt-5 grid gap-3 text-sm">
-            <Info label="Creator / host" value={selected?.recipientName || selected?.recipientId || recipientId} />
+            <Info label="Creator / host" value={selected?.recipientName || "Profile context loaded from conversation"} />
             <Info label="Challenge" value={selected?.relatedChallengeTitle || selected?.relatedChallengeId || challengeId} />
             <Info label="Proposal" value={selected?.relatedProposalId || proposalId} />
             <Info label="Sponsorship status" value={selected?.status || "pending discussion"} />

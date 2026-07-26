@@ -2,6 +2,7 @@
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
+import { canStartConversation } from "@/lib/server/messaging-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,15 @@ export async function POST(request: Request) {
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   const recipientId = cleanText(body.recipientId).slice(0, 120);
   const messageBody = cleanText(body.body).slice(0, 2000);
-  if (!recipientId) return validationError({ recipientId: "Creator or host user ID is required." });
+  if (!recipientId) return validationError({ recipientId: "Open a conversation from a creator profile, host profile, challenge opportunity, invite, or discovery card." });
   if (messageBody.length < 2) return validationError({ body: "Message must be at least 2 characters." });
   try {
     const now = isoNow();
     const conversationId = cleanText(body.conversationId).slice(0, 120) || context.db.collection("sponsorConversations").doc().id;
-    const conversation = { id: conversationId, sponsorId: context.user.uid, ownerUid: context.user.uid, recipientId, relatedProposalId: cleanText(body.proposalId).slice(0, 120) || null, relatedCampaignId: cleanText(body.campaignId).slice(0, 120) || null, relatedChallengeId: cleanText(body.challengeId).slice(0, 120) || null, title: cleanText(body.title, "Sponsor conversation").slice(0, 180), lastMessagePreview: messageBody.slice(0, 180), unreadCountFoundation: 0, status: "active", updatedAt: now, updatedBy: context.user.uid, createdAt: now, createdBy: context.user.uid };
+    const source = cleanText(body.source).slice(0, 80) || (body.challengeId ? "opportunity" : "discovery_card");
+    const permission = canStartConversation({ senderType: "sponsor", recipientType: "creator", source: source === "profile" || source === "challenge" || source === "opportunity" || source === "invite" ? source : "discovery_card" });
+    if (!permission.allowed) return validationError({ recipientId: "This conversation must start from an allowed profile, challenge, opportunity, invite, or discovery context." });
+    const conversation = { id: conversationId, sponsorId: context.user.uid, ownerUid: context.user.uid, recipientId, relatedProposalId: cleanText(body.proposalId).slice(0, 120) || null, relatedCampaignId: cleanText(body.campaignId).slice(0, 120) || null, relatedChallengeId: cleanText(body.challengeId).slice(0, 120) || null, title: cleanText(body.title, "Sponsor conversation").slice(0, 180), conversationStartSource: source, manualRecipientIdEntryAllowed: false, lastMessagePreview: messageBody.slice(0, 180), unreadCountFoundation: 0, status: "active", updatedAt: now, updatedBy: context.user.uid, createdAt: now, createdBy: context.user.uid };
     const messageRef = context.db.collection("sponsorMessages").doc();
     const attachments = safeAttachments(body.attachments, conversationId, context.user.uid);
     const message = { id: messageRef.id, sponsorId: context.user.uid, ownerUid: context.user.uid, conversationId, recipientId, body: messageBody, attachments, attachmentCount: attachments.length, visibility: "creator_visible", status: "sent", deliveryStatus: "delivery_foundation", readStatus: "not_tracked", internalOnly: false, createdAt: now, updatedAt: now, createdBy: context.user.uid };

@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+const root = process.cwd();
+const read = (file) => readFileSync(join(root, file), "utf8");
+const exists = (file) => existsSync(join(root, file));
+const types = read("lib/tournament-types.ts");
+const helper = read("lib/server/tournaments.ts");
+assert(exists("lib/tournament-types.ts"), "Tournament types file must exist.");
+assert(types.includes("TournamentFoundation") && types.includes("hostId") && types.includes("currentRoundId"), "Tournament domain model should include core tournament fields.");
+assert(types.includes("tournamentParticipants") && types.includes("tournamentPayouts"), "Tournament subdomain collection foundations must be listed.");
+assert(helper.includes("fakeParticipantsAllowed: false") && helper.includes("fakeMatchesAllowed: false"), "Tournament helper must reject fake participant/match foundations.");
+assert(!/demo tournament|mock tournament|sample bracket/i.test(helper), "Tournament foundation must not add fake tournament records.");
+console.log("Tournament domain foundation checks passed.");

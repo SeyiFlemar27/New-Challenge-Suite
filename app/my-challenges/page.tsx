@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { ChallengeMediaFrame } from "@/components/media-display";
 
 type ChallengeRow = ReturnType<typeof normalizeChallenge> & Record<string, unknown>;
 
@@ -55,13 +56,12 @@ function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
   const imageUrl = String(challenge.imageUrl ?? "");
   const actionHref = `/challenges/${challenge.id}`;
   const actionLabel = status === "Completed" ? "View Results" : status === "Draft" ? "Continue Editing" : "View Challenge";
+  const sponsorState = String(challenge.sponsorFundingStatus ?? challenge.sponsorshipStatus ?? (challenge.confirmedSponsorFundingCents ? "funding_confirmed" : challenge.sponsorEnabled || challenge.sponsorReady ? "discussion_started" : "no_sponsor")).replaceAll("_", " ");
   return (
     <Card className="overflow-hidden p-0">
       <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)]">
         <a href={actionHref} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
-          <div className="aspect-[16/10] h-full min-h-40 bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827]">
-            {imageUrl ? <img src={imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite</div>}
-          </div>
+          <ChallengeMediaFrame src={imageUrl} alt={challenge.title} className="h-full min-h-40 rounded-none border-0" placeholder="Challenge Suite" />
         </a>
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -80,6 +80,7 @@ function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
             <span className="flex items-center gap-2"><CalendarDays size={16} className="text-[var(--gold)]" /> {String(challenge.endsAt ?? "Date not set")}</span>
             <span>{String(challenge.category ?? "General")}</span>
           </div>
+          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Sponsor state: {sponsorState}. Confirmed sponsor funds are shown only after webhook-confirmed payment.</div>
         </div>
       </div>
     </Card>

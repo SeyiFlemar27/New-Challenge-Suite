@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const sandbox = readFileSync(join(process.cwd(), "lib/server/financial/sandbox.ts"), "utf8");
+const route = readFileSync(join(process.cwd(), "app/api/admin/finance/sandbox/route.ts"), "utf8");
+assert(sandbox.includes("productionControlsBlocked") && route.includes("SANDBOX_DISABLED_IN_PRODUCTION"), "Sandbox must be blocked in production.");
+assert(sandbox.includes("frontendToggleCanActivateSandbox: false"), "Frontend toggles must not activate sandbox mode.");
+assert(route.includes("requireAdminUser"), "Sandbox control route must require admin.");
+assert(route.includes("directSetBalanceAllowed: false"), "Sandbox must not allow direct Set Balance.");
+console.log("Financial sandbox guard checks passed.");

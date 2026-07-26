@@ -15,6 +15,7 @@ import type { Submission } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
+import { AvatarFrame, ChallengeMediaFrame, SubmissionMediaFrame } from "@/components/media-display";
 
 type DetailSubmission = Submission & { userPlanId?: string };
 
@@ -171,8 +172,8 @@ export default function ChallengeDetailPage() {
     <AppShell>
       <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
         <div className="min-w-0">
-          <div className="relative h-[260px] overflow-hidden rounded-[16px] sm:h-[320px] md:h-[400px]">
-            {challenge.imageUrl ? <img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <ChallengeMediaPlaceholder />}
+          <div className="relative overflow-hidden rounded-[16px]">
+            <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="border-0" placeholder="Challenge Suite" />
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
             <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus)}`}>{displayStatus}</span>
           </div>
@@ -200,6 +201,7 @@ export default function ChallengeDetailPage() {
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
               <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${lifecycle.nextMilestoneAt ? lifecycle.nextMilestoneAt.toLocaleDateString() : "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
+              <Info title="Prize and ledger flow" body="Winners are approved by admin. Earnings enter pending balance first. Sponsor-funded prizes go 100% to winners. Paid vote revenue applies platform fee first, then participant vote-share, then challenge revenue split. KYC and 24-hour hold are required before withdrawal." />
               <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
@@ -215,7 +217,7 @@ export default function ChallengeDetailPage() {
             </div>
             {visibleParticipants.length ? (
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleParticipants.map((participant) => <a key={participant.id} href={participant.profilePath || "/profile"} className="rounded-[8px] border border-white/10 bg-[#151515] p-4 transition hover:border-[var(--gold)]/50"><div className="flex items-center gap-3"><div className="h-12 w-12 overflow-hidden rounded-full bg-black/50">{participant.avatarUrl ? <img src={participant.avatarUrl} alt={participant.displayName} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-[var(--gold)]"><Users size={18} /></div>}</div><div className="min-w-0"><p className="truncate font-black">{participant.displayName}</p>{participant.username ? <p className="truncate text-xs text-slate-400">@{participant.username}</p> : null}</div></div><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em]"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{String(participant.participantStatus ?? "active").replaceAll("_", " ")}</span>{participant.entryStatus ? <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">{participant.entryStatus.replaceAll("_", " ")}</span> : null}</div></a>)}
+                {visibleParticipants.map((participant) => <a key={participant.id} href={participant.profilePath || "/profile"} className="rounded-[8px] border border-white/10 bg-[#151515] p-4 transition hover:border-[var(--gold)]/50"><div className="flex items-center gap-3"><AvatarFrame src={participant.avatarUrl} alt={participant.displayName} className="h-12 w-12 shrink-0 border-0" placeholder={String(participant.displayName ?? "CS").slice(0, 2).toUpperCase()} /><div className="min-w-0"><p className="truncate font-black">{participant.displayName}</p>{participant.username ? <p className="truncate text-xs text-slate-400">@{participant.username}</p> : null}</div></div><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em]"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{String(participant.participantStatus ?? "active").replaceAll("_", " ")}</span>{participant.entryStatus ? <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">{participant.entryStatus.replaceAll("_", " ")}</span> : null}</div></a>)}
               </div>
             ) : <Card className="mt-6 border-dashed p-6 text-center text-slate-400">No public participants match this view yet.</Card>}
             {filteredParticipants.length > visibleParticipants.length ? <Button variant="secondary" className="mt-5" onClick={() => setParticipantLimit((value) => value + 24)}>Load More Participants</Button> : null}
@@ -318,7 +320,7 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
   return (
     <Card className="overflow-hidden bg-[#151515]">
       <div className="relative h-48">
-        {submission.mediaUrl ? <img src={submission.mediaUrl} alt={submission.title} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-[#202020]" />}
+        <SubmissionMediaFrame src={submission.mediaUrl} alt={submission.title} className="h-full rounded-none border-0" placeholder="Submission" />
         <span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-xs font-black">Rank #{rank}</span>
       </div>
       <div className="p-5">

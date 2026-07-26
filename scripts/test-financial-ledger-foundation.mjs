@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const types = readFileSync(join(process.cwd(), "lib/server/financial/financial-types.ts"), "utf8");
+const service = readFileSync(join(process.cwd(), "lib/server/financial/financial-service.ts"), "utf8");
+assert(types.includes("immutable: true"), "Ledger entries must be immutable by design.");
+assert(types.includes("negativeBalance") && types.includes("reserved") && types.includes("paidOut"), "Ledger balance buckets must include reserved/paidOut/negativeBalance.");
+assert(service.includes("reverseTransaction") && service.includes("_reversal"), "Corrections must use reversal/compensating entries.");
+assert(service.includes("sourceOfTruth: \"ledger_entries\"") && service.includes("mutableUserBalanceTrusted: false"), "Balances must be ledger-derived.");
+assert(!service.includes("user.balance +="), "Real-money flow must not mutate user.balance directly.");
+console.log("Financial ledger foundation checks passed.");

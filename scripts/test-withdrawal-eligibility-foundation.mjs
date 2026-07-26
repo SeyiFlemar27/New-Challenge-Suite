@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const eligibility = readFileSync(join(process.cwd(), "lib/server/financial/withdrawal-eligibility.ts"), "utf8");
+assert(eligibility.includes("kyc_required"), "KYC must block withdrawal.");
+assert(eligibility.includes("payout_method_required"), "Missing payout method must block withdrawal.");
+assert(eligibility.includes("active_hold"), "Active hold must block withdrawal.");
+assert(eligibility.includes("negative_balance"), "Negative balance must block withdrawal.");
+assert(eligibility.includes("insufficient_balance"), "Insufficient balance must block withdrawal.");
+assert(eligibility.includes("payoutProviderCalled: false") && eligibility.includes("withdrawalExecuted: false"), "Eligibility check must not execute payouts.");
+console.log("Withdrawal eligibility foundation checks passed.");

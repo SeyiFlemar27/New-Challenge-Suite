@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const helper = readFileSync(join(process.cwd(), "lib/server/financial/paid-vote-participant-share.ts"), "utf8");
+assert(helper.includes("PAID_VOTE_PARTICIPANT_SHARE_PERCENT = 15"), "Participant paid-vote share must be 15%.");
+assert(helper.includes("PAID_VOTE_PLATFORM_FEE_PERCENT_FIRST = 15"), "Platform fee must be calculated first at 15%.");
+assert(helper.includes("appliesOnlyToPaidVotes: true") && helper.includes("freeVotesIncluded: false"), "Free votes must not count for participant share.");
+assert(helper.includes("pending_hold") && helper.includes("kycRequiredBeforeWithdrawal: true"), "Participant share must enter hold and require KYC before withdrawal.");
+assert(helper.includes("payoutProviderCalled: false") && helper.includes("fakeVoteRevenueAllowed: false"), "Participant share must not call payout provider or fake vote revenue.");
+console.log("Paid vote participant share checks passed.");

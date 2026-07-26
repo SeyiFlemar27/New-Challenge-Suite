@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const validation = readFileSync(join(process.cwd(), "lib/server/tournament-validation.ts"), "utf8");
+assert(validation.includes("[8, 16, 32, 64]"), "Single-elimination capacity must be limited to 8/16/32/64.");
+assert(validation.includes("Registration must close before the tournament starts."), "Date ordering validation must exist.");
+assert(validation.includes("Prize distribution total must equal 100."), "Prize distribution total must equal 100.");
+assert(validation.includes("Hybrid scoring total must equal 100."), "Hybrid scoring total must equal 100.");
+assert(validation.includes("Tournament title is required.") && validation.includes("Tournament category is required."), "Required field validation must exist.");
+console.log("Tournament validation foundation checks passed.");
