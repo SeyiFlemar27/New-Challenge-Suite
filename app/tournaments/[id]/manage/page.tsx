@@ -3,6 +3,9 @@ import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const sections = ["Overview", "Participants", "Applications", "Waitlist", "Bracket", "Rounds", "Matches", "Submissions", "Voting", "Judges", "Leaderboard", "Announcements", "Sponsors", "Prize Pool", "Reports", "Disputes", "Analytics", "Settings", "Audit"];
 
 export default async function TournamentManagePage({ params }: { params: Promise<{ id: string }> }) {

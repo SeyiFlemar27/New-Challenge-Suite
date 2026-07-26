@@ -4,6 +4,9 @@ import { ChallengeMediaFrame } from "@/components/media-display";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { getTournamentBundle, participantEligibilitySummary } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function friendly(value: unknown) { return String(value ?? "not available").replaceAll("_", " "); }
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {

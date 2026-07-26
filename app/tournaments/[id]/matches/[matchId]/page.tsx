@@ -4,6 +4,9 @@ import { SubmissionMediaFrame } from "@/components/media-display";
 import { Card, EmptyState, PageTitle } from "@/components/ui";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function TournamentMatchPage({ params }: { params: Promise<{ id: string; matchId: string }> }) {
   const { id, matchId } = await params;
   const bundle = await getTournamentBundle(id);

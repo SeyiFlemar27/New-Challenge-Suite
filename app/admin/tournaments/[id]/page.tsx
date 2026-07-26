@@ -2,6 +2,9 @@ import { ShieldCheck } from "lucide-react";
 import { Card, EmptyState, PageTitle } from "@/components/ui";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminTournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const bundle = await getTournamentBundle(id);

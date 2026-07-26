@@ -3,6 +3,9 @@ import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { getTournamentBundle, participantEligibilitySummary } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function TournamentJoinPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const bundle = await getTournamentBundle(id);

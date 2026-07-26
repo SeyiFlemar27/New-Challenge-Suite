@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateTournament } from "@/lib/server/tournament-permissions";
+import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 
@@ -13,11 +14,22 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status");
   const category = url.searchParams.get("category");
-  let query: FirebaseFirestore.Query = db.collection("tournaments");
-  if (status) query = query.where("status", "==", status);
-  if (category) query = query.where("category", "==", category);
-  const snap = await query.orderBy("createdAt", "desc").limit(50).get();
-  return ok({ tournaments: snap.docs.map((doc) => ({ id: doc.id, ...doc.data(), bracketExecutionEnabled: true, fakeBracketData: false })), foundation: tournamentSubdomainFoundation(), emptyState: snap.empty ? "No tournaments found from backend state." : null }, "Tournament records loaded.");
+  try {
+    const snap = await db.collection("tournaments").limit(100).get();
+    const tournaments = (snap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data(), bracketExecutionEnabled: true, fakeBracketData: false }) as Record<string, unknown> & { id: string })
+      .filter((item) => !status || item.status === status)
+      .filter((item) => !category || item.category === category)
+      .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
+      .slice(0, 50));
+    return ok({ tournaments, foundation: tournamentSubdomainFoundation(), emptyState: tournaments.length ? null : "No tournaments found from backend state." }, "Tournament records loaded.");
+  } catch (error) {
+    if (isFirestoreMissingIndexError(error)) {
+      console.warn("[tournament-firestore-index]", { scope: "api:tournaments:list", message: "Firestore index required for this query." });
+      return ok({ tournaments: [], foundation: tournamentSubdomainFoundation(), emptyState: "Tournament data is not available yet. Please try again shortly." }, "Tournament listing unavailable.");
+    }
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {

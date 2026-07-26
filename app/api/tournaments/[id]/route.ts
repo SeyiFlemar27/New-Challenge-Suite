@@ -5,30 +5,23 @@ import { canEditTournament } from "@/lib/server/tournament-permissions";
 import { assertTournamentTransition } from "@/lib/server/tournament-lifecycle";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
+import { getTournamentBundle } from "@/lib/server/tournament-public";
 import type { TournamentFoundation, TournamentStatus } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Tournament detail");
   const { id } = await context.params;
-  const snap = await db.collection("tournaments").doc(id).get();
-  if (!snap.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-  const [participants, rounds, matches, announcements, sponsors] = await Promise.all([
-    db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(100).get(),
-    db.collection("tournamentRounds").where("tournamentId", "==", id).orderBy("roundNumber", "asc").limit(20).get(),
-    db.collection("tournamentMatches").where("tournamentId", "==", id).orderBy("roundNumber", "asc").orderBy("matchNumber", "asc").limit(100).get(),
-    db.collection("tournamentAnnouncements").where("tournamentId", "==", id).where("status", "==", "published").limit(20).get(),
-    db.collection("tournamentSponsorProposals").where("tournamentId", "==", id).where("publicDisplayApproved", "==", true).limit(10).get()
-  ]);
+  const bundle = await getTournamentBundle(id);
+  if (!bundle.available) return ok({ tournament: bundle.tournament, participants: [], rounds: [], matches: [], announcements: [], sponsors: [] }, bundle.message);
+  if (!bundle.tournament) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
   return ok({
-    tournament: { id: snap.id, ...snap.data(), bracketExecutionEnabled: true, payoutExecutionEnabled: false },
-    participants: participants.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    rounds: rounds.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    matches: matches.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    announcements: announcements.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    sponsors: sponsors.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    tournament: { ...bundle.tournament, bracketExecutionEnabled: true, payoutExecutionEnabled: false },
+    participants: bundle.participants.slice(0, 100),
+    rounds: bundle.rounds.sort((a, b) => Number(a.roundNumber ?? 0) - Number(b.roundNumber ?? 0)).slice(0, 20),
+    matches: bundle.matches.sort((a, b) => Number(a.roundNumber ?? 0) - Number(b.roundNumber ?? 0) || Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0)).slice(0, 100),
+    announcements: bundle.announcements.slice(0, 20),
+    sponsors: bundle.sponsors.slice(0, 10)
   }, "Tournament loaded.");
 }
 

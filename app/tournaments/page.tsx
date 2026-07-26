@@ -4,6 +4,9 @@ import { ChallengeMediaFrame } from "@/components/media-display";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { listPublicTournaments, tournamentSections } from "@/lib/server/tournament-public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function friendly(value: unknown) {
   return String(value ?? "not available").replaceAll("_", " ");
 }

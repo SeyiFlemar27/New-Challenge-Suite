@@ -2,6 +2,9 @@ import { ShieldAlert, Trophy } from "lucide-react";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { getAdminDb } from "@/lib/firebase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const views = ["pending_review", "scheduled", "registration_open", "active", "flagged", "disputed", "payout_pending", "completed", "cancelled"];
 
 export default async function AdminTournamentsPage() {
