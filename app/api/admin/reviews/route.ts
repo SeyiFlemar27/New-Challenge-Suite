@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
+import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
 
 const reviewTypes = new Set(["sponsor", "challenge", "sponsorship"]);
 const reviewActions = new Set(["approve", "reject"]);
@@ -69,15 +70,13 @@ export async function PATCH(request: Request) {
     if (!snap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
     const challenge = snap.data() ?? {};
     const approved = action === "approve";
+    const reviewUpdate = approved ? buildChallengeApprovalUpdate(challenge, user.uid, now) : buildChallengeRejectionUpdate(user.uid, now);
     await ref.set({
-      adminReviewRequired: false,
-      adminApprovalStatus: approved ? "approved" : "rejected",
+      ...reviewUpdate,
       prizeApprovalStatus: approved ? "approved" : "rejected",
       eventApprovalStatus: challenge.isLiveEvent ? approved ? "approved" : "rejected" : challenge.eventApprovalStatus ?? "not_required",
       eventSyncStatus: challenge.isLiveEvent ? approved ? "synced" : "rejected" : challenge.eventSyncStatus ?? "not_applicable",
-      eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable",
-      status: approved ? "scheduled" : "draft",
-      updatedAt: now
+      eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable"
     }, { merge: true });
     if (approved && challenge.isLiveEvent) {
       await db.collection("liveEvents").doc(id).set({

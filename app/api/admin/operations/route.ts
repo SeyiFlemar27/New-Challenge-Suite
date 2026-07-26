@@ -1,6 +1,7 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { writeAuditLog } from "@/lib/server/audit";
+import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
 import { requireAdminUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
@@ -340,7 +341,7 @@ export async function PATCH(request: Request) {
   if (!id) return validationError({ id: "Target ID is required." });
   if (reasonRequired.has(action) && !reason) return validationError({ reason: "A reason is required for this action." });
   if (action === "add_note" && !note) return validationError({ note: "Enter an internal admin note." });
-  const status = nextStatus(type, action);
+  let status = nextStatus(type, action);
   const now = new Date().toISOString();
 
   try {
@@ -412,10 +413,50 @@ export async function PATCH(request: Request) {
           });
         }
       });
+    } else if (type === "challenge") {
+      const ref = db.collection("challenges").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return fail("Challenge record not found.", 404, undefined, "NOT_FOUND");
+      const challenge = snap.data() ?? {};
+      previousStatus = String(challenge.status ?? "unknown");
+      const update = action === "approve" ? buildChallengeApprovalUpdate(challenge, user.uid, now) : action === "reject" ? buildChallengeRejectionUpdate(user.uid, now) : {
+        status,
+        reviewedBy: user.uid,
+        reviewedAt: now,
+        moneyMovementEnabled: false,
+        transferEnabled: false,
+        updatedAt: now
+      };
+      status = String(update.status ?? status);
+      await ref.set({
+        ...update,
+        moneyMovementEnabled: false,
+        transferEnabled: false
+      }, { merge: true });
+      if (action === "approve" && challenge.isLiveEvent) {
+        await db.collection("liveEvents").doc(id).set({
+          id,
+          challengeId: id,
+          title: challenge.title ?? "",
+          description: challenge.description ?? "",
+          hostName: challenge.creatorName ?? "Challenge Host",
+          creatorId: challenge.creatorId ?? null,
+          imageUrl: challenge.coverImageUrl ?? challenge.promoImageUrl ?? null,
+          location: [challenge.venueName, challenge.eventCity, challenge.eventCountry].filter(Boolean).join(", "),
+          startsAt: challenge.startsAt,
+          time: challenge.startsAt,
+          capacity: challenge.eventCapacity ?? challenge.maxParticipants ?? 0,
+          status: "scheduled",
+          visibility: "public",
+          source: "challenge_sync",
+          moneyMovementEnabled: false,
+          updatedAt: now,
+          createdAt: challenge.createdAt ?? now
+        }, { merge: true });
+      }
     } else {
       const config: Record<string, { collection: string; statusField: string }> = {
         sponsor: { collection: "sponsorProfiles", statusField: "sponsorVerificationStatus" },
-        challenge: { collection: "challenges", statusField: "status" },
         submission: { collection: "submissions", statusField: "status" },
         participant: { collection: "challengeParticipants", statusField: "status" },
         winner: { collection: "winners", statusField: "adminReviewStatus" }

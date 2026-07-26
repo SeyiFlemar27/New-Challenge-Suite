@@ -1,4 +1,4 @@
-﻿export const challengeLifecycleStatuses = [
+export const challengeLifecycleStatuses = [
   "draft",
   "pending_review",
   "scheduled",
@@ -121,6 +121,49 @@ export function resolveInitialChallengeStatus(input: ChallengeLifecycleInput, no
   if (now <= submissionDeadline) return "submission_open";
   if (now <= votingDeadline) return "voting_open";
   return "under_review";
+}
+
+export function resolveApprovedChallengeStatus(input: Pick<ChallengeLifecycleInput, "startsAt" | "submissionDeadline" | "votingDeadline">, now = new Date()): Exclude<ChallengeLifecycleStatus, "draft" | "pending_review" | "cancelled" | "paused"> {
+  const startsAt = parseDate(input.startsAt);
+  const submissionDeadline = parseDate(input.submissionDeadline);
+  const votingDeadline = parseDate(input.votingDeadline);
+
+  if (startsAt && startsAt > now) return "scheduled";
+  if (submissionDeadline && now <= submissionDeadline) return "submission_open";
+  if (votingDeadline && now <= votingDeadline) return "voting_open";
+  if (startsAt || submissionDeadline || votingDeadline) return "under_review";
+  return "scheduled";
+}
+
+export function buildChallengeApprovalUpdate(challenge: Record<string, unknown>, adminId: string, now: string) {
+  const approvedStatus = resolveApprovedChallengeStatus({
+    startsAt: String(challenge.startsAt ?? ""),
+    submissionDeadline: String(challenge.submissionDeadline ?? ""),
+    votingDeadline: String(challenge.votingDeadline ?? challenge.votingEndsAt ?? "")
+  }, new Date(now));
+
+  return {
+    status: approvedStatus,
+    lifecycleStatus: approvedStatus,
+    publishedAt: challenge.publishedAt ?? now,
+    adminReviewRequired: false,
+    adminApprovalStatus: "approved",
+    reviewedBy: adminId,
+    reviewedAt: now,
+    updatedAt: now
+  };
+}
+
+export function buildChallengeRejectionUpdate(adminId: string, now: string) {
+  return {
+    status: "draft",
+    lifecycleStatus: "draft",
+    adminReviewRequired: false,
+    adminApprovalStatus: "rejected",
+    reviewedBy: adminId,
+    reviewedAt: now,
+    updatedAt: now
+  };
 }
 
 export function shouldCountAgainstActiveChallengeLimit(status: unknown) {
