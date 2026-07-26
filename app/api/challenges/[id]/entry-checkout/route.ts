@@ -46,10 +46,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    line_items: [checkoutLineItem({ amountCents: paidEntryAmountCents(challenge), currency: "USD", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&paymentPurpose=challenge_entry&challengeId=${encodeURIComponent(challengeId)}`,
-    cancel_url: `${origin}/checkout/cancel?paymentPurpose=challenge_entry&challengeId=${encodeURIComponent(challengeId)}`,
-    metadata: checkoutMetadataForPurpose("challenge_entry", record)
+    line_items: [checkoutLineItem({ amountCents: paidEntryAmountCents(challenge), currency: "usd", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
+    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&paymentPurpose=challenge_entry_fee&challengeId=${encodeURIComponent(challengeId)}`,
+    cancel_url: `${origin}/checkout/cancel?paymentPurpose=challenge_entry_fee&challengeId=${encodeURIComponent(challengeId)}`,
+    metadata: checkoutMetadataForPurpose("challenge_entry_fee", record)
   });
   await attachCheckoutSession(db, "challengeEntryPayments", record.id, session);
   return ok({ url: session.url, entryPaymentId: record.id, status: "pending", webhookConfirmationRequired: true, checkoutSuccessActivatesEntry: false }, "Paid entry checkout session created. Entry activates only after Stripe webhook confirmation.");

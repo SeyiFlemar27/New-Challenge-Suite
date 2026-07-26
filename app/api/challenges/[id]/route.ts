@@ -38,14 +38,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
-  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap] = await Promise.all([
+  const entryPaymentId = user ? `challenge_entry_fee_${id}_${user.uid}` : null;
+  const legacyEntryPaymentId = user ? `challenge_entry_${id}_${user.uid}` : null;
+  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
     db.collection("challengeParticipants").where("challengeId", "==", id).limit(250).get(),
     user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
     user ? db.collection("challengeEngagements").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
-    db.collection("prizePools").doc(id).get()
+    db.collection("prizePools").doc(id).get(),
+    entryPaymentId ? db.collection("challengeEntryPayments").doc(entryPaymentId).get() : Promise.resolve(null),
+    legacyEntryPaymentId ? db.collection("challengeEntryPayments").doc(legacyEntryPaymentId).get() : Promise.resolve(null),
+    user ? db.collection("submissions").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
   ]);
 
   const sponsorships = sponsorshipsSnap.docs
@@ -77,6 +82,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
 
   const publicChallenge = publicChallengeFields(challengeData);
+  const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
+  const entryPayment = activeEntryPaymentSnap?.exists ? { id: activeEntryPaymentSnap.id, ...activeEntryPaymentSnap.data() } as Record<string, unknown> : null;
+  const participantData = participantSnap?.exists ? participantSnap.data() ?? {} : null;
+  const entryPaymentStatus = participantData && ["paid", "confirmed"].includes(String(participantData.entryPaymentStatus ?? "")) ? "paid" : String(entryPayment?.status ?? participantData?.entryPaymentStatus ?? "not_started");
 
   return ok({
     challenge: { id: challengeSnap.id, ...publicChallenge },
@@ -89,6 +98,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     userState: user ? {
       authenticated: true,
       joined: Boolean(participantSnap?.exists),
+      entryPaymentStatus,
+      entryPaymentReservationStatus: entryPayment?.reservationStatus ?? null,
+      entryPaymentId: entryPayment?.id ?? null,
+      entryPaymentPending: entryPaymentStatus === "pending",
+      paidEntryEnrolled: entryPaymentStatus === "paid" || entryPaymentStatus === "confirmed",
+      submitted: Boolean(userSubmissionSnap?.exists),
+      submissionId: userSubmissionSnap?.id ?? null,
       votedSubmissionIds: userVotes.map((vote) => vote.submissionId).filter(Boolean),
       voteCount: userVotes.length,
       saved: Boolean(engagementSnap?.data()?.saved),

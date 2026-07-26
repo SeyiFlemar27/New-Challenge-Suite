@@ -56,6 +56,7 @@ export default function JoinChallengePage() {
   const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean; status?: string } | null>(null);
   const [submissionMedia, setSubmissionMedia] = useState<UploadedSubmissionMedia | null>(null);
   const [uploadStatus, setUploadStatus] = useState<MediaUploadStage>("idle");
+  const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -72,8 +73,38 @@ export default function JoinChallengePage() {
   const maxParticipants = typeof rawChallenge?.maxParticipants === "number" ? rawChallenge.maxParticipants : null;
   const isFull = Boolean(maxParticipants && currentChallenge && currentChallenge.participants >= maxParticipants);
   const isPrivate = currentChallenge?.type === "Private / Exclusive" && !details?.userState.joined;
+  const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, unknown> : {};
+  const entryFeeCents = Number(monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
+  const paidEntryRequired = Boolean((monetization as any).paidEntryRequested || rawChallenge?.paidEntryEnabled || rawChallenge?.entryFeeRequired) && entryFeeCents > 0;
+  const entryFeeLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.max(0, entryFeeCents) / 100);
+  const userState = details?.userState as Record<string, unknown> | undefined;
+  const entryPaymentStatus = String(userState?.entryPaymentStatus ?? "not_started");
+  const paidEntryEnrolled = Boolean(userState?.paidEntryEnrolled || ["paid", "confirmed"].includes(entryPaymentStatus));
+  const paidEntryPending = Boolean(userState?.entryPaymentPending || entryPaymentStatus === "pending");
+  const authProfile = auth.user as ({ accountType?: string; role?: string } & typeof auth.user) | null;
+  const sponsorAccount = authProfile?.accountType === "sponsor" || authProfile?.role === "sponsor";
   const unavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
 
+
+  async function startPaidEntryCheckout() {
+    setError("");
+    if (!auth.user) {
+      setError("Sign in before paying the entry fee.");
+      return;
+    }
+    setEntryCheckoutLoading(true);
+    const result = await fetch(`/api/challenges/${challengeId}/entry-checkout`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ entryAgreementAccepted: true })
+    }).then((response) => response.json()).catch(() => ({ ok: false, message: "Paid entry checkout could not start." }));
+    setEntryCheckoutLoading(false);
+    if (!result.ok || !result.data?.url) {
+      setError(result.message ?? "Paid entry checkout could not start.");
+      return;
+    }
+    window.location.href = result.data.url;
+  }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -84,6 +115,10 @@ export default function JoinChallengePage() {
     if (!currentChallenge) return;
     if (!agreed) {
       setError("Accept the challenge rules before submitting.");
+      return;
+    }
+    if (paidEntryRequired && !paidEntryEnrolled) {
+      setError("Pay the entry fee before submitting your entry.");
       return;
     }
     if (unavailable) {
@@ -229,13 +264,14 @@ export default function JoinChallengePage() {
           {!joinOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? `This challenge is not open for entries. Current status: ${displayStatus}.`}</Card> : null}
           {isPrivate ? <Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">This private challenge requires invite or approval before entry.</Card> : null}
           {isFull ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">This challenge is full.</Card> : null}
+                    {paidEntryRequired && !paidEntryEnrolled ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Entry fee required</h3><p className="mt-2 text-slate-200">Pay the {entryFeeLabel} entry fee before submitting your entry. Checkout success does not unlock submission until Stripe webhook confirmation updates your enrollment.</p>{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot Pay & Enroll or submit entries.</p> : paidEntryPending ? <Button className="mt-4 w-full" disabled>Payment Processing...</Button> : <Button className="mt-4 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!auth.user || unavailable || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button>}</Card> : null}
           <form className="mt-6 space-y-5" onSubmit={submit}>
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
             <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
             <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. Paid-entry prize pools and payouts are not available yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="w-full" disabled={!auth.user || unavailable || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
+            <Button className="w-full" disabled={!auth.user || unavailable || (paidEntryRequired && !paidEntryEnrolled) || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : paidEntryRequired && !paidEntryEnrolled ? "Pay Entry Fee First" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
           </form>
         </Card>
       </div>

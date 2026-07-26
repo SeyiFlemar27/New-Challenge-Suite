@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
-        if (paymentPurpose === "challenge_entry") {
+        if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") {
           outcome = await confirmChallengeEntryPayment(db, event, session);
         } else if (paymentPurpose === "paid_vote") {
           outcome = await confirmPaidVotePurchase(db, event, session);
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       case "checkout.session.expired": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
-        if (paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
+        if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
         else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
         else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
         break;

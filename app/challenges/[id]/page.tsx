@@ -32,7 +32,7 @@ export default function ChallengeDetailPage() {
   const [participantLimit, setParticipantLimit] = useState(12);
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
     enabled: Boolean(challengeId),
@@ -152,7 +152,7 @@ export default function ChallengeDetailPage() {
   const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const canBoost = planExperience.monthlyBoostLimit > 0 && (selectedAccountType === "creator" || selectedAccountType === "host");
-  const sponsorAccount = user?.accountType === "sponsor";
+  const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
   const predictionEnabled = Boolean((challenge as any).predictionEnabled || (challenge as any).predictionArenaEnabled);
@@ -162,11 +162,17 @@ export default function ChallengeDetailPage() {
   const visibleParticipants = filteredParticipants.slice(0, participantLimit);
   const rawChallenge = details?.challenge as Record<string, any> | undefined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, any> : {};
-  const paidEntryRequired = Boolean(monetization.paidEntryRequested || rawChallenge?.paidEntryEnabled || rawChallenge?.entryFeeRequired);
-  const premiumOnlyChallenge = Boolean(rawChallenge?.premiumOnly || rawChallenge?.planRequired || monetization.paidEntryRequested || rawChallenge?.hostPremiumOnly || rawChallenge?.creatorPremiumOnly);
-  const freePremiumBlocked = Boolean(freeCompetitor && premiumOnlyChallenge);
   const entryFeeCents = Number(monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
+  const paidEntryRequired = Boolean(monetization.paidEntryRequested || rawChallenge?.paidEntryEnabled || rawChallenge?.entryFeeRequired) && entryFeeCents > 0;
+  const premiumOnlyChallenge = Boolean(rawChallenge?.premiumOnly || rawChallenge?.planRequired || rawChallenge?.hostPremiumOnly || rawChallenge?.creatorPremiumOnly);
+  const freePremiumBlocked = Boolean(freeCompetitor && premiumOnlyChallenge);
   const entryFeeLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.max(0, entryFeeCents) / 100);
+  const entryPaymentStatus = String((userState as any)?.entryPaymentStatus ?? "not_started");
+  const paidEntryPending = Boolean((userState as any)?.entryPaymentPending || entryPaymentStatus === "pending");
+  const paidEntryEnrolled = Boolean((userState as any)?.paidEntryEnrolled || ["paid", "confirmed"].includes(entryPaymentStatus));
+  const alreadySubmitted = Boolean((userState as any)?.submitted);
+  const submissionId = String((userState as any)?.submissionId ?? "");
+  const paidEntryCtaLabel = paidEntryPending ? "Payment Processing..." : `Pay & Enroll - ${entryFeeLabel}`;
 
   return (
     <AppShell>
@@ -254,18 +260,26 @@ export default function ChallengeDetailPage() {
         <aside className="space-y-5 xl:pt-[432px]">
           <Card className="p-5 text-center sm:p-8">
             <h3 className="text-xl font-black">Ready to compete?</h3>
-            <p className="mt-2 text-slate-300">{paidEntryRequired ? `Paid entry is required for this challenge. Entry updates only after Stripe webhook confirmation.` : "Enroll for updates, then join when you are ready to submit."}</p>
+            {paidEntryRequired ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-left"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p><p className="mt-2 text-sm text-slate-300">Secure payment is required to enter. Entry-fee money is recorded as pending challenge revenue only; prize settlement is not activated.</p></div> : <p className="mt-2 text-slate-300">Join when you are ready to submit.</p>}
             {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
-            {freePremiumBlocked ? (
+            {sponsorAccount ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-sm text-yellow-50">Sponsor accounts cannot join or submit entries. Use sponsor funding and messaging flows instead.</Card> : freePremiumBlocked ? (
               <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
-            ) : paidEntryRequired ? (
-              <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee (${entryFeeLabel})`}</Button>
-            ) : userState?.joined ? (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Continue Entry</LinkButton>
+            ) : paidEntryRequired ? alreadySubmitted ? (
+              <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
+            ) : paidEntryEnrolled ? (
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Entry</LinkButton></>
+            ) : paidEntryPending ? (
+              <><Button className="mt-6 w-full" disabled>{paidEntryCtaLabel}</Button><Button variant="secondary" className="mt-3 w-full" onClick={() => void refetch()}>Refresh Payment Status</Button></>
             ) : (
-              <LinkButton href={`/challenges/${challenge.id}/enroll`} className="mt-6 w-full">Enroll Now</LinkButton>
+              <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : paidEntryCtaLabel}</Button>
+            ) : alreadySubmitted ? (
+              <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
+            ) : userState?.joined ? (
+              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Entry</LinkButton>
+            ) : (
+              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
             )}
-            {paidEntryRequired ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : freePremiumBlocked ? null : <LinkButton href={`/challenges/${challenge.id}/join`} variant="secondary" className="mt-4 w-full">Join Challenge</LinkButton>}
+            {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : null}
             {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
             <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
           </Card>

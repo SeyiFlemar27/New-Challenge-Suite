@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const now = new Date().toISOString();
       if (participantSnap.exists) {
         const current = participantSnap.data() ?? {};
-        if (paidEntry && current.entryPaymentStatus !== "confirmed") throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
+        if (paidEntry && !["paid", "confirmed"].includes(String(current.entryPaymentStatus ?? ""))) throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
         const participant = {
           ...current,
           id: participantRef.id,
@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message === "PREMIUM_REQUIRED") return fail("Premium membership is required to join this challenge.", 403, undefined, "PREMIUM_REQUIRED");
     if (message === "CREATOR_PRO_REQUIRED") return fail("Creator Pro is required to join this private or exclusive challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
     if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
-    if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Paid entry payment is required before this challenge can be joined.", 402, { redirectTo: `/api/challenges/${id}/entry-checkout`, entryFeeCents: 0 }, "PAID_ENTRY_PAYMENT_REQUIRED");
+    if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee payment is required before submitting to this challenge.", 402, { checkoutUrl: `/api/challenges/${id}/entry-checkout`, challengePath: `/challenges/${id}`, action: "pay_entry_fee" }, "PAID_ENTRY_PAYMENT_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "CHALLENGE_JOIN_REJECTED");
   }
 

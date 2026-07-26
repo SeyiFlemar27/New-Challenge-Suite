@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       }
 
       const participantData = participantSnap.exists ? participantSnap.data() ?? {} : null;
-      if (isPaidEntryChallenge(freshChallenge) && participantData?.entryPaymentStatus !== "confirmed") {
+      if (isPaidEntryChallenge(freshChallenge) && !["paid", "confirmed"].includes(String(participantData?.entryPaymentStatus ?? ""))) {
         throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
       }
       participantWasCreated = !participantData;
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission could not be created.";
     if (message.includes("already submitted")) return conflict(message);
-    if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Paid entry payment must be confirmed before submitting to this challenge.", 402, undefined, "PAID_ENTRY_PAYMENT_REQUIRED");
+    if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee required. Pay the entry fee before submitting your entry.", 402, { action: "pay_entry_fee", checkoutUrl: `/api/challenges/${body.challengeId}/entry-checkout`, challengePath: `/challenges/${body.challengeId}` }, "PAID_ENTRY_PAYMENT_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "SUBMISSION_REJECTED");
   }
 
