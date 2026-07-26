@@ -280,9 +280,8 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
 
 function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number }) {
   const entryFeeEstimate = form.paidEntryEnabled && entryFeeCents >= 500 ? {
-    winners: Math.floor(entryFeeCents * 0.65),
-    operator: Math.floor(entryFeeCents * 0.2),
-    platform: entryFeeCents - Math.floor(entryFeeCents * 0.65) - Math.floor(entryFeeCents * 0.2)
+    platform: Math.floor(entryFeeCents * 0.15),
+    generatedNet: entryFeeCents - Math.floor(entryFeeCents * 0.15)
   } : null;
   return <section>
     <StepTitle title="Monetization & Prize Pool" body="Choose how this challenge can be funded. Paid features require payment setup, admin review, and payout rules before they can go live." />
@@ -307,8 +306,8 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         </MonetizationCard>
         <MonetizationCard title="Enable Prize Pool" enabled={form.prizePoolEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("prizePoolEnabled", enabled)} setupCopy="Prize pools start at $0 until confirmed payments or sponsor contributions are received.">
           <ul className="space-y-2 text-sm leading-6 text-slate-300">
-            <li>- 65% of paid entry revenue goes to winners.</li>
-            <li>- 65% of paid vote revenue goes to winners.</li>
+            <li>- Platform fee is 15% of confirmed generated revenue only.</li>
+            <li>- Entry-fee and paid-vote net distribution remains a ledger finalization foundation.</li>
             <li>- 100% of confirmed sponsor contributions goes to winners.</li>
             <li>- Winner payout requires admin approval, KYC, and a 24-hour hold.</li>
           </ul>
@@ -319,10 +318,10 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Monetization Preview</p>
         <h3 className="mt-2 text-xl font-black text-white">Rules, not actual earnings</h3>
         <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-          <p><b className="text-white">Paid entry and paid votes:</b> 65% winners, 20% creator/host/operator, 15% platform/admin.</p>
-          <p><b className="text-white">Sponsor contributions:</b> 100% goes to winners.</p>
+          <p><b className="text-white">Generated revenue:</b> platform fee is 15% of confirmed paid entry, paid vote, and boost revenue only.</p>
+          <p><b className="text-white">Sponsor contributions:</b> excluded from platform fee and 100% goes to approved winners after provider confirmation.</p>
           <p><b className="text-white">Withdrawal rules:</b> admin approval, 24-hour hold, and KYC are required.</p>
-          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Estimated split based on your entry fee.</p><p>Winners: {formatCents(entryFeeEstimate.winners)}</p><p>Creator/host/operator: {formatCents(entryFeeEstimate.operator)}</p><p>Platform/admin: {formatCents(entryFeeEstimate.platform)}</p></div> : null}
+          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Gross paid-entry preview.</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Platform fee foundation: {formatCents(entryFeeEstimate.platform)}</p><p>Generated revenue after platform fee: {formatCents(entryFeeEstimate.generatedNet)}</p></div> : null}
           <p className="text-xs text-slate-500">Estimates are not saved as revenue and do not create ledger entries.</p>
         </div>
       </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, UploadCloud } from "lucide-react";
@@ -57,18 +57,25 @@ export default function JoinChallengePage() {
   const [submissionMedia, setSubmissionMedia] = useState<UploadedSubmissionMedia | null>(null);
   const [uploadStatus, setUploadStatus] = useState<MediaUploadStage>("idle");
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
-  const { data, isLoading } = useQuery({
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [paymentReturnProcessing, setPaymentReturnProcessing] = useState(false);
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
     enabled: Boolean(challengeId) && !auth.loading,
     staleTime: 30_000
   });
 
+  useEffect(() => {
+    setPaymentReturnProcessing(new URLSearchParams(window.location.search).get("payment") === "processing");
+  }, []);
+
   const details = data?.ok ? data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
   const currentChallenge = useMemo(() => rawChallenge ? normalizeChallenge(rawChallenge) : null, [rawChallenge]);
   const lifecycle = currentChallenge ? getChallengeLifecycleState(currentChallenge) : null;
   const joinOpen = lifecycle?.canJoin ?? false;
+  const submissionOpen = lifecycle?.canSubmit ?? false;
   const displayStatus = currentChallenge ? getChallengeDisplayStatus(currentChallenge) : "";
   const maxParticipants = typeof rawChallenge?.maxParticipants === "number" ? rawChallenge.maxParticipants : null;
   const isFull = Boolean(maxParticipants && currentChallenge && currentChallenge.participants >= maxParticipants);
@@ -85,7 +92,9 @@ export default function JoinChallengePage() {
   const paidEntryPending = Boolean(userState?.entryPaymentPending || entryPaymentStatus === "pending");
   const authProfile = auth.user as ({ accountType?: string; role?: string } & typeof auth.user) | null;
   const sponsorAccount = authProfile?.accountType === "sponsor" || authProfile?.role === "sponsor";
-  const unavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
+  const alreadyJoined = Boolean(userState?.joined);
+  const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
+  const submitUnavailable = !submissionOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
 
 
   async function startPaidEntryCheckout() {
@@ -107,6 +116,24 @@ export default function JoinChallengePage() {
     }
     window.location.href = result.data.url;
   }
+
+  async function startFreeJoin() {
+    setError("");
+    if (!auth.user) {
+      setError("Sign in before joining this challenge.");
+      return;
+    }
+    if (!currentChallenge) return;
+    setJoinLoading(true);
+    const result = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true });
+    setJoinLoading(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    await refetch();
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -123,8 +150,12 @@ export default function JoinChallengePage() {
       setError("Pay the entry fee before submitting your entry.");
       return;
     }
-    if (unavailable) {
-      setError(lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? "This challenge is not available for new entries.");
+    if (!alreadyJoined && !paidEntryEnrolled) {
+      setError("Join this challenge before submitting your entry.");
+      return;
+    }
+    if (submitUnavailable) {
+      setError(submissionOpen ? "This challenge is not available for new entries." : "Submissions are not open yet.");
       return;
     }
 
@@ -162,9 +193,6 @@ export default function JoinChallengePage() {
 
     setSubmitting(true);
     try {
-      const joinResult = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true });
-      if (!joinResult.ok) throw new Error(joinResult.message);
-
       const submissionResult = await submitEntry({
         challengeId: currentChallenge.id,
         title,
@@ -263,17 +291,19 @@ export default function JoinChallengePage() {
         <Card className="p-5 sm:p-8">
           <h2 className="text-xl font-black sm:text-2xl">Upload Submission</h2>
           {!auth.user ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">Sign in before joining this challenge. <LinkButton href="/auth/login" variant="ghost" className="mt-4 w-full sm:w-auto">Sign In</LinkButton></Card> : null}
-          {!joinOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? `This challenge is not open for entries. Current status: ${displayStatus}.`}</Card> : null}
+          {!joinOpen && !submissionOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? `This challenge is not open for entries. Current status: ${displayStatus}.`}</Card> : null}
           {isPrivate ? <Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">This private challenge requires invite or approval before entry.</Card> : null}
           {isFull ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">This challenge is full.</Card> : null}
-                    {paidEntryRequired && !paidEntryEnrolled ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Entry fee required</h3><p className="mt-2 text-slate-200">Pay the {entryFeeLabel} entry fee before submitting your entry. Checkout success does not unlock submission until Stripe webhook confirmation updates your enrollment.</p>{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot Pay & Enroll or submit entries.</p> : paidEntryPending ? <Button className="mt-4 w-full" disabled>Payment Processing...</Button> : <Button className="mt-4 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!auth.user || unavailable || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button>}</Card> : null}
+          {paidEntryRequired && !paidEntryEnrolled ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Entry fee required</h3><p className="mt-2 text-slate-200">Pay the {entryFeeLabel} entry fee before submitting your entry. Checkout success does not unlock submission until Stripe webhook confirmation updates your enrollment.</p>{paymentReturnProcessing ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-slate-200">We are confirming your enrollment from the webhook. Refresh if this state does not update shortly.</p> : null}{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot Pay & Enroll or submit entries.</p> : paidEntryPending ? <><Button className="mt-4 w-full" disabled>Payment Processing...</Button><Button className="mt-3 w-full" variant="secondary" onClick={() => void refetch()}>Refresh Payment Status</Button></> : <Button className="mt-4 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!auth.user || joinUnavailable || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button>}</Card> : null}
+          {!paidEntryRequired && !alreadyJoined ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Enrollment required</h3><p className="mt-2 text-slate-200">Join during registration to reserve your participant spot. Submissions open after the enrollment window.</p>{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot join or submit entries.</p> : <Button className="mt-4 w-full" onClick={() => void startFreeJoin()} disabled={!auth.user || joinUnavailable || joinLoading}>{joinLoading ? "Joining..." : "Join Challenge"}</Button>}</Card> : null}
+          {alreadyJoined && !submissionOpen ? <Card className="mt-5 border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100"><h3 className="font-black">You're enrolled</h3><p className="mt-2 text-slate-300">Submissions are not open yet. Return when the submission window begins.</p></Card> : null}
           <form className="mt-6 space-y-5" onSubmit={submit}>
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
             <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
             <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. Paid-entry prize pools and payouts are not available yet.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="w-full" disabled={!auth.user || unavailable || (paidEntryRequired && !paidEntryEnrolled) || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : paidEntryRequired && !paidEntryEnrolled ? "Pay Entry Fee First" : unavailable ? lifecycle?.actionLabel ?? "Unavailable" : "Submit Entry"}</Button>
+            <Button className="w-full" disabled={!auth.user || submitUnavailable || (!alreadyJoined && !paidEntryEnrolled) || (paidEntryRequired && !paidEntryEnrolled) || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : paidEntryRequired && !paidEntryEnrolled ? "Pay Entry Fee First" : !alreadyJoined && !paidEntryEnrolled ? "Join Before Submitting" : !submissionOpen ? "Submissions Not Open" : "Submit Entry"}</Button>
           </form>
         </Card>
       </div>

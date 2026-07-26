@@ -6,7 +6,7 @@ const root = process.cwd();
 const success = readFileSync(join(root, "app/checkout/success/page.tsx"), "utf8");
 
 assert(success.includes("Your plan is being verified"), "Checkout success should show simple verification state.");
-assert(success.includes("Your plan is active"), "Checkout success should show simple active state.");
+assert(success.includes("Subscription verified"), "Checkout success should show contextual subscription verification state.");
 assert(success.includes("Payment received") && success.includes("Subscription verified") && success.includes("Setup / KYC"), "Checkout success should use a compact three-step plan verification stepper.");
 assert(success.includes("Refresh Status"), "Pending state should offer refresh status CTA.");
 assert(success.includes("Complete KYC") && success.includes("Start Setup"), "Confirmed Creator/Host state should expose setup/KYC CTAs.");

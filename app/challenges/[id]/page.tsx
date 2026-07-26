@@ -140,6 +140,7 @@ export default function ChallengeDetailPage() {
   const lifecycle = getChallengeLifecycleState(challenge);
   const displayStatus = getChallengeDisplayStatus(challenge);
   const joinOpen = lifecycle.canJoin;
+  const submissionOpen = lifecycle.canSubmit;
   const votingOpen = lifecycle.canVote;
   const userState = details?.userState;
   const leaderboard = (details as { leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; entries?: unknown[] } } | null)?.leaderboard;
@@ -268,16 +269,20 @@ export default function ChallengeDetailPage() {
               <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
             ) : paidEntryRequired ? alreadySubmitted ? (
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
-            ) : paidEntryEnrolled ? (
+            ) : paidEntryEnrolled && submissionOpen ? (
               <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Entry</LinkButton></>
+            ) : paidEntryEnrolled ? (
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Submissions open after registration closes.</p></div><Button className="mt-5 w-full" disabled>Submissions Not Open</Button></>
             ) : paidEntryPending ? (
               <><Button className="mt-6 w-full" disabled>{paidEntryCtaLabel}</Button><Button variant="secondary" className="mt-3 w-full" onClick={() => void refetch()}>Refresh Payment Status</Button></>
             ) : (
               <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : paidEntryCtaLabel}</Button>
             ) : alreadySubmitted ? (
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
-            ) : userState?.joined ? (
+            ) : userState?.joined && submissionOpen ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Entry</LinkButton>
+            ) : userState?.joined ? (
+              <Button className="mt-6 w-full" disabled>Submissions Not Open</Button>
             ) : (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
             )}

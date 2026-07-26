@@ -47,8 +47,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [checkoutLineItem({ amountCents: paidEntryAmountCents(challenge), currency: "usd", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&paymentPurpose=challenge_entry_fee&challengeId=${encodeURIComponent(challengeId)}`,
-    cancel_url: `${origin}/checkout/cancel?paymentPurpose=challenge_entry_fee&challengeId=${encodeURIComponent(challengeId)}`,
+    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/join?payment=processing&entryPaymentId=${encodeURIComponent(record.id)}`,
+    cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/join?payment=canceled`,
     metadata: checkoutMetadataForPurpose("challenge_entry_fee", record)
   });
   await attachCheckoutSession(db, "challengeEntryPayments", record.id, session);

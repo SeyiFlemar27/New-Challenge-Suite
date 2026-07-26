@@ -59,9 +59,9 @@ function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
   const sponsorState = String(challenge.sponsorFundingStatus ?? challenge.sponsorshipStatus ?? (challenge.confirmedSponsorFundingCents ? "funding_confirmed" : challenge.sponsorEnabled || challenge.sponsorReady ? "discussion_started" : "no_sponsor")).replaceAll("_", " ");
   return (
     <Card className="overflow-hidden p-0">
-      <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid gap-0 md:grid-cols-[180px_minmax(0,1fr)]">
         <a href={actionHref} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
-          <ChallengeMediaFrame src={imageUrl} alt={challenge.title} className="h-full min-h-40 rounded-none border-0" placeholder="Challenge Suite" />
+          <ChallengeMediaFrame src={imageUrl} alt={challenge.title} className="h-full min-h-36 rounded-none border-0" placeholder="Challenge Suite" />
         </a>
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -80,7 +80,7 @@ function MyChallengeRow({ challenge }: { challenge: ChallengeRow }) {
             <span className="flex items-center gap-2"><CalendarDays size={16} className="text-[var(--gold)]" /> {String(challenge.endsAt ?? "Date not set")}</span>
             <span>{String(challenge.category ?? "General")}</span>
           </div>
-          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Sponsor state: {sponsorState}. Confirmed sponsor funds are shown only after webhook-confirmed payment.</div>
+          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Sponsor state: {sponsorState}. Confirmed funds appear after webhook verification.</div>
         </div>
       </div>
     </Card>

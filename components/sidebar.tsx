@@ -27,7 +27,6 @@ import {
   Trophy,
   User,
   UsersRound,
-  Vote,
   X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +34,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier } from "@/lib/plan-access";
+import { NotificationBell } from "@/components/notification-bell";
 
 type NavIcon = typeof Home;
 type NavItem = { href: string; label: string; icon: NavIcon };
@@ -133,7 +133,6 @@ const hostSections: NavSection[] = [
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Operations", items: [
-    { href: "/host/voting", label: "Voting Control", icon: Vote },
     { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
     { href: "/host/participants", label: "Participants", icon: UsersRound },
     { href: "/host/reports", label: "Reports", icon: BarChart3 }
@@ -191,7 +190,6 @@ function sectionsForTier(tierId: string, sponsor: boolean) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [notificationStatus, setNotificationStatus] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, loading, signedOut, error } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
@@ -212,7 +210,7 @@ export function Sidebar() {
       ? [
           { href: "/dashboard/host", label: "Home", icon: Home },
           { href: "/host/challenges", label: "Challenges", icon: Medal },
-          { href: "/host/voting", label: "Voting", icon: Vote },
+          { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
           { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
         ]
@@ -239,17 +237,6 @@ export function Sidebar() {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
-  async function enableNotifications() {
-    if (!("Notification" in window)) {
-      setNotificationStatus("Unsupported");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    await fetch("/api/notifications/enable", { method: "POST", body: JSON.stringify({ permission }) }).catch(() => null);
-    setNotificationStatus(permission === "granted" ? "Enabled" : "Blocked");
-    if (permission === "granted") new Notification("Challenge Suite", { body: "Notifications enabled." });
-  }
-
   if (loading) return <WorkspaceNavigationLoading />;
 
   return (
@@ -265,6 +252,7 @@ export function Sidebar() {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
+            <NotificationBell compact />
             <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={20} /></button>
           </div>
         </div>
@@ -290,7 +278,7 @@ export function Sidebar() {
         <div className="space-y-3 p-5">
           <div className="grid grid-cols-2 gap-2">
             <Link href="/wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
-            <button type="button" onClick={enableNotifications} className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.025] px-2 text-xs font-bold text-slate-300" title="Enable notifications"><Bell size={15} /> {notificationStatus || "Alerts"}</button>
+            <NotificationBell />
           </div>
           <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#171717] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
           <div className="flex items-center gap-3 pt-2">

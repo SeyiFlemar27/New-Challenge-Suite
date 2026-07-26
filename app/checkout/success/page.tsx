@@ -25,7 +25,9 @@ function CheckoutSuccessContent() {
   const paymentPurpose = searchParams.get("paymentPurpose");
   const challengeId = searchParams.get("challengeId");
   const paidEntryReturn = paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry";
-  const [state, setState] = useState<VerificationState>(expectedPlan || paidEntryReturn ? "pending" : "confirmed");
+  const paidVoteReturn = paymentPurpose === "paid_vote";
+  const sponsorFundingReturn = paymentPurpose === "sponsor_funding";
+  const [state, setState] = useState<VerificationState>(expectedPlan || paidEntryReturn || paidVoteReturn || sponsorFundingReturn ? "pending" : "confirmed");
   const [destination, setDestination] = useState("/dashboard");
 
   useEffect(() => {
@@ -101,17 +103,21 @@ function CheckoutSuccessContent() {
     };
   }, [paidEntryReturn, challengeId]);
 
-  const isSubscriptionReturn = Boolean(expectedPlan && !paidEntryReturn);
+  const isSubscriptionReturn = Boolean(expectedPlan && !paidEntryReturn && !paidVoteReturn && !sponsorFundingReturn);
   const title = paidEntryReturn
     ? state === "confirmed"
       ? "Enrollment successful"
       : state === "incomplete"
         ? "Payment still pending"
         : "Payment received"
+    : paidVoteReturn
+      ? "Paid vote purchase pending"
+      : sponsorFundingReturn
+        ? "Sponsor funding pending"
     : state === "pending"
       ? "Your plan is being verified"
       : state === "confirmed"
-        ? "Your plan is active"
+        ? expectedPlan ? "Subscription verified" : "Checkout received"
         : "Payment not completed";
   const copy = paidEntryReturn
     ? state === "confirmed"
@@ -119,6 +125,10 @@ function CheckoutSuccessContent() {
       : state === "incomplete"
         ? "Challenge Suite has not received webhook confirmation yet. Your entry has not been activated by this page."
         : "We're confirming your enrollment from the backend payment record. This page does not activate paid entry by itself."
+    : paidVoteReturn
+      ? "Paid vote credits are granted only after Stripe webhook confirmation. This page does not grant votes."
+      : sponsorFundingReturn
+        ? "Sponsor contributions are confirmed only after Stripe webhook confirmation. This page does not fund a challenge by itself."
     : state === "pending"
       ? "We're confirming your payment. Access changes only after the secure Stripe webhook verifies the subscription."
       : state === "incomplete"

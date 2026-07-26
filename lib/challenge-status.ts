@@ -562,7 +562,8 @@ function resolvePrimaryStatus(persisted: CanonicalChallengeStatus, timeline: Nor
   }
   if (submissionStatus === "submissions_closed") return "submission_closed";
   if (persisted === "scheduled" && !timeline.challengeStartsAt) return "scheduled";
-  if (["active", "submission_open", "registration_open"].includes(persisted)) return "active";
+  if (persisted === "registration_open") return "registration_open";
+  if (["active", "submission_open"].includes(persisted)) return "active";
   return persisted === "scheduled" ? "scheduled" : "active";
 }
 
@@ -571,12 +572,13 @@ function resolveSubmissionStatus(record: Record<string, unknown>, timeline: Norm
   const noSubmissionRequired = record.submissionRequired === false || record.requiresSubmission === false || String(record.competitionFormat ?? "").toLowerCase().includes("no submission") || accepted.includes("none");
   if (noSubmissionRequired) return "no_submission_required";
   const opensAt = timeline.submissionOpensAt ?? timeline.challengeStartsAt;
-  const closesAt = timeline.submissionClosesAt ?? timeline.registrationClosesAt ?? timeline.challengeEndsAt;
+  const closesAt = timeline.submissionClosesAt ?? timeline.challengeEndsAt;
   if (opensAt && now < opensAt) return "submissions_not_open";
   if (closesAt && now > closesAt) return "submissions_closed";
   if (opensAt || closesAt) return "submissions_open";
   const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
-  if (["active", "submission_open", "registration_open"].includes(persisted)) return "submissions_open";
+  if (persisted === "registration_open" || persisted === "registration_not_open" || persisted === "registration_closed") return "submissions_not_open";
+  if (["active", "submission_open"].includes(persisted)) return "submissions_open";
   return "submissions_not_open";
 }
 

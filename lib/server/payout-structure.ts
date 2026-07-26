@@ -97,6 +97,37 @@ export function calculatePaidRevenueSplit(grossAmountCents: number, revenueType:
   };
 }
 
+export function calculateChallengeRevenueSplitPreview(input: {
+  confirmedEntryFeeRevenueCents?: number;
+  confirmedPaidVoteRevenueCents?: number;
+  confirmedBoostRevenueCents?: number;
+  confirmedSponsorContributionCents?: number;
+}) {
+  const confirmedEntryFeeRevenueCents = cents(input.confirmedEntryFeeRevenueCents ?? 0);
+  const confirmedPaidVoteRevenueCents = cents(input.confirmedPaidVoteRevenueCents ?? 0);
+  const confirmedBoostRevenueCents = cents(input.confirmedBoostRevenueCents ?? 0);
+  const confirmedSponsorContributionCents = cents(input.confirmedSponsorContributionCents ?? 0);
+  const generatedRevenueCents = confirmedEntryFeeRevenueCents + confirmedPaidVoteRevenueCents + confirmedBoostRevenueCents;
+  const platformFeeCents = Math.floor(generatedRevenueCents * PAID_REVENUE_SPLIT.platformAdminSharePercent / 100);
+  return {
+    currency: DEFAULT_CASH_CURRENCY,
+    generatedRevenueCents,
+    confirmedEntryFeeRevenueCents,
+    confirmedPaidVoteRevenueCents,
+    confirmedBoostRevenueCents,
+    confirmedSponsorContributionCents,
+    platformFeePercent: PAID_REVENUE_SPLIT.platformAdminSharePercent,
+    platformFeeCents,
+    netGeneratedRevenueCents: generatedRevenueCents - platformFeeCents,
+    sponsorContributionPlatformFeeCents: 0,
+    sponsorFundsExcludedFromPlatformFee: true,
+    sponsorContributionWinnerShareCents: confirmedSponsorContributionCents,
+    distributionStatus: "foundation_only_pending_admin_ledger_finalization",
+    noPayoutExecution: true,
+    noFakePrizePool: true
+  };
+}
+
 export function calculateSponsorContributionSplit(contributionCents: number) {
   const gross = cents(contributionCents);
   return {

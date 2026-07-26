@@ -8,6 +8,7 @@ import { publicPrizePoolFields } from "@/lib/server/prize-pools";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { getChallengeLifecycleState } from "@/lib/challenge-status";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -94,7 +95,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const entryPaymentStatus = participantData && ["paid", "confirmed"].includes(String(participantData.entryPaymentStatus ?? "")) ? "paid" : String(entryPayment?.status ?? participantData?.entryPaymentStatus ?? "not_started");
   const paidEntryEnrolled = entryPaymentStatus === "paid" || entryPaymentStatus === "confirmed";
   const joinable = isChallengeJoinable({ id: challengeSnap.id, ...challengeData });
+  const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
+  const submitted = Boolean(userSubmissionSnap?.exists);
   const paidEntryState = {
     required: paidEntryRequired,
     amountCents: paidEntryRequired ? paidEntryAmountCentsValue : 0,
@@ -102,13 +105,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     paymentStatus: paidEntryRequired ? entryPaymentStatus : "not_required",
     reservationStatus: entryPayment?.reservationStatus ?? null,
     canPay: Boolean(user && paidEntryRequired && !paidEntryEnrolled && entryPaymentStatus !== "pending" && joinable.allowed && !sponsorAccount),
-    canSubmit: Boolean(!paidEntryRequired || paidEntryEnrolled),
+    canSubmit: Boolean(lifecycle.canSubmit && (!paidEntryRequired || paidEntryEnrolled) && !submitted && !sponsorAccount),
     joinWindowOpen: joinable.allowed,
     blockedReason: paidEntryRequired && sponsorAccount
       ? "sponsor_account_blocked"
       : paidEntryRequired && !joinable.allowed
         ? joinable.code ?? "registration_closed"
         : null
+  };
+  const participationState = {
+    phase: lifecycle.primaryStatus,
+    participationStatus: lifecycle.participationStatus,
+    submissionStatus: lifecycle.submissionStatus,
+    votingStatus: lifecycle.votingStatus,
+    canJoin: Boolean(lifecycle.canJoin && !sponsorAccount && !participantSnap?.exists),
+    canPay: paidEntryState.canPay,
+    canSubmit: paidEntryState.canSubmit,
+    canVote: Boolean(lifecycle.canVote && !sponsorAccount),
+    blockReason: sponsorAccount ? "sponsor_account_blocked" : lifecycle.disabledReason ?? paidEntryState.blockedReason ?? null,
+    message: lifecycle.userFacingMessage
   };
 
   return ok({
@@ -128,7 +143,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       entryPaymentPending: entryPaymentStatus === "pending",
       paidEntryEnrolled,
       paidEntry: paidEntryState,
-      submitted: Boolean(userSubmissionSnap?.exists),
+      participation: participationState,
+      submitted,
       submissionId: userSubmissionSnap?.id ?? null,
       votedSubmissionIds: userVotes.map((vote) => vote.submissionId).filter(Boolean),
       voteCount: userVotes.length,
@@ -139,6 +155,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } : {
       authenticated: false,
       joined: false,
+      participation: {
+        phase: lifecycle.primaryStatus,
+        participationStatus: lifecycle.participationStatus,
+        submissionStatus: lifecycle.submissionStatus,
+        votingStatus: lifecycle.votingStatus,
+        canJoin: lifecycle.canJoin,
+        canPay: false,
+        canSubmit: false,
+        canVote: lifecycle.canVote,
+        blockReason: lifecycle.disabledReason,
+        message: lifecycle.userFacingMessage
+      },
       votedSubmissionIds: [],
       voteCount: 0
     }

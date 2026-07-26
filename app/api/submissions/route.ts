@@ -8,7 +8,6 @@ import { ok, serverUnavailable, fail, readJson, validationError, conflict, serve
 import {
   isChallengeSubmittable,
   isSponsorProfile,
-  resolveParticipantStatus,
   resolveSubmissionStatus
 } from "@/lib/server/submission-lifecycle";
 import { submissionCreateSchema, zodFieldErrors } from "@/lib/server/submission-validation";
@@ -73,7 +72,6 @@ export async function POST(request: Request) {
   const displayName = String(profile.displayName ?? profile.fullName ?? user.email ?? "Participant");
   const userInitials = String(profile.initials ?? initialsFromName(displayName)).slice(0, 2).toUpperCase();
   const status = resolveSubmissionStatus(challenge, body.mediaUploadPending);
-  const participantStatus = resolveParticipantStatus(challenge);
   const duplicateBlockingStatuses = new Set(["draft", "submitted", "pending_review", "approved", "flagged", "active", "eliminated", "winner"]);
 
   let submission: Record<string, unknown> = {};
@@ -103,34 +101,18 @@ export async function POST(request: Request) {
       }
 
       const participantData = participantSnap.exists ? participantSnap.data() ?? {} : null;
+      if (!participantData) {
+        throw new Error("NOT_ENROLLED_FOR_SUBMISSION");
+      }
       if (isPaidEntryChallenge(freshChallenge) && !["paid", "confirmed"].includes(String(participantData?.entryPaymentStatus ?? ""))) {
         throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
       }
-      participantWasCreated = !participantData;
-      if (!participantData) {
-        transaction.set(participantRef, {
-          id: participantRef.id,
-          challengeId: body.challengeId,
-          userId: user.uid,
-          status: participantStatus,
-          registeredAt: now,
-          joinedAt: now,
-          entryAgreementAccepted: true,
-          entryAgreementAcceptedAt: now,
-          paidEntryEnabled: false,
-          entryFeeCents: 0,
-          planId: profile.planId ?? "free",
-          accountType: profile.accountType ?? "user",
-          createdAt: now,
-          updatedAt: now
-        });
-      } else {
-        transaction.set(participantRef, {
-          entryAgreementAccepted: true,
-          entryAgreementAcceptedAt: participantData.entryAgreementAcceptedAt ?? now,
-          updatedAt: now
-        }, { merge: true });
-      }
+      participantWasCreated = false;
+      transaction.set(participantRef, {
+        entryAgreementAccepted: true,
+        entryAgreementAcceptedAt: participantData.entryAgreementAcceptedAt ?? now,
+        updatedAt: now
+      }, { merge: true });
 
       submission = {
         id: submissionRef.id,
@@ -174,7 +156,7 @@ export async function POST(request: Request) {
       transaction.set(participantRef, {
         submissionId: submissionRef.id,
         lastSubmissionId: submissionRef.id,
-        status: participantData?.status ?? participantStatus,
+        status: participantData.status ?? "active",
         updatedAt: now
       }, { merge: true });
       transaction.set(db.collection("challenges").doc(body.challengeId), {
@@ -187,6 +169,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Submission could not be created.";
     if (message.includes("already submitted")) return conflict(message);
     if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee required. Pay the entry fee before submitting your entry.", 402, { action: "pay_entry_fee", checkoutUrl: `/api/challenges/${body.challengeId}/entry-checkout`, challengePath: `/challenges/${body.challengeId}` }, "PAID_ENTRY_PAYMENT_REQUIRED");
+    if (message === "NOT_ENROLLED_FOR_SUBMISSION") return fail("Join this challenge during registration before submitting your entry.", 403, { action: "join_challenge", challengePath: `/challenges/${body.challengeId}/join` }, "NOT_ENROLLED_FOR_SUBMISSION");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "SUBMISSION_REJECTED");
   }
 

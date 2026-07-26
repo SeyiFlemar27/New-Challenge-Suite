@@ -16,7 +16,7 @@ assert(detail.includes("Save Challenge") && detail.includes("ChallengeShare"), "
 assert(detail.includes("Upgrade to Creator Plan to participate in this premium challenge."), "Free users should get premium upgrade prompt.");
 assert(detail.includes("freePremiumBlocked"), "Premium challenge join/submit should be blocked for free users without hiding challenge.");
 assert(detail.includes("grid gap-4 sm:grid-cols-2 lg:grid-cols-4"), "Challenge stat cards should stay aligned in a consistent grid.");
-assert(myChallenges.includes("md:grid-cols-[220px_minmax(0,1fr)]") && myChallenges.includes("Propose Winners"), "My Challenges should keep clean horizontal cards with winner proposal action.");
+assert(myChallenges.includes("md:grid-cols-[180px_minmax(0,1fr)]") && myChallenges.includes("Propose Winners"), "My Challenges should keep clean compact horizontal cards with winner proposal action.");
 assert(builder.includes("Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts"), "Paid Votes copy should be setup-safe and premium-unlocked.");
 assert(api.includes("PAID_VOTES_LOCKED") && api.includes("paidVotesCheckoutStatus"), "Paid Votes server logic should distinguish plan lock from setup-required state.");
 assert(prediction.includes("Prediction Arena is coming soon") && prediction.includes("compliance-gated"), "Prediction Arena should stay coming soon and compliance-gated.");
