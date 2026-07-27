@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Eye, FileText, ImageIcon, LockKeyhole, Save, Sparkles, Video, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
-import { createChallenge, fetchChallengeUsage } from "@/lib/api/services";
+import { createChallenge, fetchChallengeDraft, fetchChallengeUsage, publishChallengeDraft, updateChallengeDraft } from "@/lib/api/services";
 import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { challengeDraftMediaPath } from "@/lib/media-upload-paths";
@@ -45,7 +45,50 @@ function initialForm(): FormState {
   return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), submissionDeadline: dateInput(5), votingDeadline: dateInput(6), endsAt: dateInput(9), coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
 }
 
-export function ChallengeBuilder({ mode }: { mode: Mode }) {
+function formFromChallenge(challenge: Record<string, unknown>): FormState {
+  const monetization = typeof challenge.monetization === "object" && challenge.monetization !== null ? challenge.monetization as Record<string, unknown> : {};
+  const docs = Array.isArray(challenge.documentUrls) ? challenge.documentUrls.map(String) : [];
+  const docPaths = Array.isArray(challenge.documentPaths) ? challenge.documentPaths.map(String) : [];
+  const description = String(challenge.description ?? "");
+  return {
+    ...initialForm(),
+    title: String(challenge.title ?? ""),
+    category: String(challenge.category ?? ""),
+    description,
+    shortDescription: String(challenge.shortDescription ?? ""),
+    rules: String(challenge.standardRules ?? ""),
+    terms: String(challenge.policyTerms ?? ""),
+    submission: String(challenge.challengeGuidelines ?? ""),
+    access: String(challenge.privateAccessInstructions ?? ""),
+    submissionTypes: Array.isArray(challenge.acceptedSubmissionTypes) && challenge.acceptedSubmissionTypes.length ? challenge.acceptedSubmissionTypes.map(String) : ["image"],
+    startsAt: String(challenge.startsAt ?? dateInput(8)).slice(0, 16),
+    submissionDeadline: String(challenge.submissionDeadline ?? dateInput(5)).slice(0, 16),
+    votingDeadline: String(challenge.votingDeadline ?? challenge.votingEndsAt ?? dateInput(6)).slice(0, 16),
+    endsAt: String(challenge.endsAt ?? dateInput(9)).slice(0, 16),
+    coverImageUrl: String(challenge.coverImageUrl ?? ""),
+    coverImagePath: String(challenge.coverImagePath ?? ""),
+    promoImageUrl: String(challenge.promoImageUrl ?? ""),
+    promoImagePath: String(challenge.promoImagePath ?? ""),
+    trailerVideoUrl: String(challenge.trailerVideoUrl ?? challenge.promoVideoUrl ?? ""),
+    trailerVideoPath: String(challenge.trailerVideoPath ?? challenge.promoVideoPath ?? ""),
+    documentOneUrl: docs[0] ?? "",
+    documentOnePath: docPaths[0] ?? "",
+    documentTwoUrl: docs[1] ?? "",
+    documentTwoPath: docPaths[1] ?? "",
+    paidEntryEnabled: Boolean(monetization.paidEntryRequested ?? challenge.paidEntryEnabled),
+    entryFeeAmount: String(Number(monetization.entryFeeAmountCents ?? challenge.entryFeeAmountCents ?? challenge.entryFeeCents ?? 0) / 100 || ""),
+    entryCurrency: "USD",
+    sponsorReady: Boolean(monetization.sponsorReady ?? challenge.sponsorEnabled),
+    prizePoolEnabled: Boolean(monetization.prizePoolRequested ?? challenge.prizePoolEnabled),
+    paidVotesEnabled: Boolean(monetization.paidVotesRequested ?? challenge.paidVotesEnabled),
+    sponsorshipGoal: String(monetization.sponsorshipGoal ?? ""),
+    preferredSponsorCategory: String(monetization.preferredSponsorCategory ?? ""),
+    sponsorNote: String(monetization.sponsorNote ?? ""),
+    sponsorPlacementPreferences: Array.isArray(monetization.placements) && monetization.placements.length ? monetization.placements.map(String) : ["challenge_detail", "voting_page"]
+  };
+}
+
+export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: string }) {
   const { user, loading } = useCurrentUser();
   const planProfile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
   const planAccess = getUserPlanAccess(planProfile);
@@ -65,6 +108,10 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
   const [notice, setNotice] = useState("");
   const [preview, setPreview] = useState(false);
   const [createdId, setCreatedId] = useState("");
+  const [draftLoaded, setDraftLoaded] = useState(!draftId);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved" | "failed" | "offline">("idle");
+  const hydratedDraftRef = useRef(false);
+  const recoveryKey = draftId ? `challenge-draft-recovery:${draftId}` : "challenge-draft-recovery:new";
   const mediaUploadDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
   const mediaUploadDisabledReason = firebaseClientConfigStatus.mediaUploadAvailability === "disabled_demo_mode"
     ? "Media uploads are temporarily disabled for demo mode. You can publish this challenge without media for now."
@@ -86,6 +133,60 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
       fetchChallengeUsage().then((result) => result.ok && result.data ? setFreeUsage({ ...result.data.freeBasic, loaded: true }) : setFreeUsage((current) => ({ ...current, loaded: true })));
     }
   }, [isFreePublic, loading]);
+
+  useEffect(() => {
+    if (!draftId || hydratedDraftRef.current) return;
+    hydratedDraftRef.current = true;
+    setDraftLoaded(false);
+    void fetchChallengeDraft(draftId).then((result) => {
+      if (result.ok && result.data?.challenge) {
+        const serverDraft = result.data.challenge;
+        let nextForm = formFromChallenge(serverDraft);
+        try {
+          const rawRecovery = window.localStorage.getItem(recoveryKey);
+          if (rawRecovery) {
+            const recovery = JSON.parse(rawRecovery) as { savedAt?: string; form?: FormState; step?: number };
+            const localSaved = Date.parse(String(recovery.savedAt ?? ""));
+            const serverSaved = Date.parse(String(serverDraft.lastAutosavedAt ?? serverDraft.updatedAt ?? ""));
+            if (recovery.form && Number.isFinite(localSaved) && (!Number.isFinite(serverSaved) || localSaved > serverSaved)) {
+              nextForm = recovery.form;
+              if (typeof recovery.step === "number") setStep(Math.max(0, Math.min(recovery.step, steps.length - 1)));
+              setNotice("Recovered unsynced local changes.");
+            }
+          }
+        } catch {
+          window.localStorage.removeItem(recoveryKey);
+        }
+        setForm(nextForm);
+        const draftStep = Number(serverDraft.creationStep ?? 0);
+        if (Number.isFinite(draftStep)) setStep(Math.max(0, Math.min(draftStep, steps.length - 1)));
+      } else {
+        setError(result.message || "Draft could not be loaded.");
+      }
+      setDraftLoaded(true);
+    });
+  }, [draftId, recoveryKey, steps.length]);
+
+  useEffect(() => {
+    if (!draftId || !draftLoaded || createdId) return;
+    try {
+      window.localStorage.setItem(recoveryKey, JSON.stringify({ form, step, savedAt: new Date().toISOString() }));
+    } catch {
+      setAutosaveState("offline");
+    }
+    const timer = window.setTimeout(() => {
+      setAutosaveState("saving");
+      void updateChallengeDraft(draftId, { ...payload(false), creationStep: step }).then((result) => {
+        if (result.ok) {
+          window.localStorage.removeItem(recoveryKey);
+          setAutosaveState("saved");
+          return;
+        }
+        setAutosaveState("failed");
+      }).catch(() => setAutosaveState("offline"));
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [draftId, draftLoaded, form, step, createdId]);
 
   function update(field: keyof FormState, value: FormState[keyof FormState]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -216,16 +317,18 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
   async function saveDraft() {
     if (privateLocked) return setError("Private challenge drafts require Creator Plan.");
     setSaving(true);
-    const response = await createChallenge(payload(false));
+    const response = draftId ? await updateChallengeDraft(draftId, { ...payload(false), creationStep: step }) : await createChallenge(payload(false));
     setSaving(false);
     if (!response.ok) return setError(response.message || "Draft could not be saved.");
+    setAutosaveState("saved");
+    try { window.localStorage.removeItem(recoveryKey); } catch {}
     setNotice("Draft saved.");
   }
 
   async function publish() {
     if (publishBlocked) return setError(publishLabel);
     setSaving(true);
-    const response = await createChallenge(payload(true));
+    const response = draftId ? await publishChallengeDraft(draftId, { ...payload(true), creationStep: step }) : await createChallenge(payload(true));
     setSaving(false);
     if (!response.ok) {
       const nextValidation = (response as { details?: { publishValidation?: ChallengeValidationResult } }).details?.publishValidation;
@@ -233,10 +336,11 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
       return setError(response.message || "Challenge could not be published.");
     }
     const challenge = response.data?.challenge as { id?: string } | undefined;
-    setCreatedId(challenge?.id ?? "");
+    try { window.localStorage.removeItem(recoveryKey); } catch {}
+    setCreatedId(challenge?.id ?? draftId ?? "");
   }
 
-  if (loading) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Builder" subtitle="Loading builder..." /></Card></AppShell>;
+  if (loading || !draftLoaded) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Builder" subtitle="Loading builder..." /></Card></AppShell>;
   if (user?.accountType === "sponsor") return <Locked title="Use Brand Command Center" body="Sponsor accounts create and manage campaigns from the dedicated sponsor experience." primaryHref="/sponsor/dashboard" primaryLabel="Open Brand Command Center" />;
   if (privateLocked) return <Locked title="Private challenges are available on Creator Plan" body="Upgrade to create invite-only challenges and manage private competition access." primaryHref="/subscriptions" primaryLabel="View Plans" secondaryHref="/creator/private-challenges" secondaryLabel="Back to Private Challenges" />;
   if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400" /><h1 className="mt-6 text-3xl font-black">{mode === "private" ? "Private Challenge Submitted" : "Challenge Submitted"}</h1><p className="mt-3 text-slate-300">{mediaUploadDisabled ? "Challenge published successfully without media. A branded Challenge Suite placeholder will be shown until uploads are available." : "Your challenge was saved through the existing creation flow."}</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href={mode === "private" ? "/creator/private-challenges" : "/creator/challenges"} variant="secondary">Back to Challenges</LinkButton></div></Card></AppShell>;
@@ -244,7 +348,7 @@ export function ChallengeBuilder({ mode }: { mode: Mode }) {
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={mode === "private" ? "Create Private Challenge" : "Create Challenge"} subtitle={mode === "private" ? "Create a private challenge." : "Create a public challenge."} icon={<Sparkles />} /><div className="flex flex-col gap-3 sm:flex-row"><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={() => setPreview(true)}><Eye size={17} /> Preview</Button></div></div>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={mode === "private" ? "Create Private Challenge" : "Create Challenge"} subtitle={mode === "private" ? "Create a private challenge." : "Create a public challenge."} icon={<Sparkles />} /><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="text-xs font-bold text-slate-400">{autosaveState === "saving" ? "Saving..." : autosaveState === "saved" ? "Saved" : autosaveState === "offline" ? "Offline - changes will sync" : autosaveState === "failed" ? "Save failed - retry" : draftId ? "Autosave on" : ""}</span><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={() => setPreview(true)}><Eye size={17} /> Preview</Button></div></div>
         <div className="mt-7 grid gap-7 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-24 lg:h-fit"><Stepper steps={steps} current={step} onSelect={setStep} /></aside>
           <div className="min-w-0">
@@ -421,4 +525,7 @@ function ChallengeSuitePlaceholder({ className = "", label = "Challenge Suite" }
     </div>
   </div>;
 }
+
+
+
 

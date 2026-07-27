@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
@@ -9,6 +9,7 @@ import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
+import { resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const publiclyVisible = isPublicChallenge(challengeSnap.id, challengeData);
   const user = await getOptionalRequestUser(request);
   let requestProfile: Record<string, unknown> = {};
+  let hasPrivateAccess = false;
   if (!user && !publiclyVisible) {
     return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   }
@@ -34,6 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ]);
     requestProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
     const accessContext = await challengeForPlanAccess(db, { id: challengeSnap.id, ...challengeData }, user.uid);
+    hasPrivateAccess = accessContext.hasAccessGrant;
     if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
       return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     }
@@ -45,7 +48,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const entryPaymentId = user ? `challenge_entry_fee_${id}_${user.uid}` : null;
   const legacyEntryPaymentId = user ? `challenge_entry_${id}_${user.uid}` : null;
-  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap] = await Promise.all([
+  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap, entryRequestSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
@@ -55,7 +58,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     db.collection("prizePools").doc(id).get(),
     entryPaymentId ? db.collection("challengeEntryPayments").doc(entryPaymentId).get() : Promise.resolve(null),
     legacyEntryPaymentId ? db.collection("challengeEntryPayments").doc(legacyEntryPaymentId).get() : Promise.resolve(null),
-    user ? db.collection("submissions").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
+    user ? db.collection("submissions").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
+    user ? db.collection("challengeEntryRequests").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
   ]);
 
   const sponsorships = sponsorshipsSnap.docs
@@ -90,6 +94,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
   const entryPayment = activeEntryPaymentSnap?.exists ? { id: activeEntryPaymentSnap.id, ...activeEntryPaymentSnap.data() } as Record<string, unknown> : null;
   const participantData = participantSnap?.exists ? participantSnap.data() ?? {} : null;
+  const entryRequestData = entryRequestSnap?.exists ? entryRequestSnap.data() ?? {} : null;
   const paidEntryRequired = isPaidEntryChallenge(challengeData);
   const paidEntryAmountCentsValue = paidEntryAmountCents(challengeData);
   const entryPaymentStatus = participantData && ["paid", "confirmed"].includes(String(participantData.entryPaymentStatus ?? "")) ? "paid" : String(entryPayment?.status ?? participantData?.entryPaymentStatus ?? "not_started");
@@ -116,6 +121,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         ? joinable.code ?? "registration_closed"
         : null
   };
+  const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size });
   const participationState = {
     phase: lifecycle.primaryStatus,
     participationStatus: lifecycle.participationStatus,
@@ -146,6 +152,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       entryPaymentPending: paymentPending,
       paidEntryEnrolled,
       paidEntry: paidEntryState,
+      viewerState,
       participation: participationState,
       submitted,
       submissionId: userSubmissionSnap?.id ?? null,
@@ -158,6 +165,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } : {
       authenticated: false,
       joined: false,
+      viewerState,
       participation: {
         phase: lifecycle.primaryStatus,
         participationStatus: lifecycle.participationStatus,
@@ -175,6 +183,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }, "Challenge details loaded.");
 }
+
+
+
+
+
+
 
 
 

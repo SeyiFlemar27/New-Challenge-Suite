@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -14,6 +14,7 @@ import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRe
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
+import { calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
 
 export async function GET() {
   const db = getAdminDb();
@@ -241,6 +242,8 @@ export async function POST(request: Request) {
     submissionCount: 0,
     voteCount: 0,
     weightedVoteCount: 0,
+    participantApprovalMode: body.requiresParticipantApproval ? "manual" : "automatic",
+    requiresParticipantApproval: Boolean(body.requiresParticipantApproval),
     requiresSubmissionApproval: body.requiresSubmissionApproval || body.isLiveEvent || body.tournamentType !== "none",
     coverImageUrl: body.usesPlaceholderMedia ? null : body.coverImageUrl || null,
     coverImagePath: body.usesPlaceholderMedia ? null : body.coverImagePath || null,
@@ -302,6 +305,10 @@ export async function POST(request: Request) {
     } : null,
     votingStartsAt: body.votingStartsAt || body.submissionDeadline,
     adminReviewRequired: lifecycleStatus === "pending_review",
+    completionPercentage: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).completionPercentage,
+    nextIncompleteSection: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).nextIncompleteSection,
+    lastAutosavedAt: body.publish ? null : now,
+    entitlementConsumed: Boolean(body.publish),
     adminPriceApprovalStatus: body.prizeType === "money" ? "pending_review" : "not_required",
     creatorPlanId: planAccess.normalizedPlanId,
     creatorLegacyPlanId: planAccess.planId,
@@ -358,3 +365,4 @@ export async function POST(request: Request) {
       : "Challenge scheduled.";
   return ok({ challenge }, body.publish ? publishMessage : "Challenge draft saved.");
 }
+

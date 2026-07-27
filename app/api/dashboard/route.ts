@@ -1,18 +1,26 @@
-import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
+﻿import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getEffectiveTier, getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
+import { calculateChallengeDraftProgress, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { ok, serverUnavailable } from "@/lib/server/responses";
 
 type DashboardChallengeRelationship = "created" | "joined" | "submitted";
 
 function personalChallengeFields(id: string, data: Record<string, unknown>, relationship: DashboardChallengeRelationship) {
+  const progress = calculateChallengeDraftProgress(data);
   return {
     id,
     ...publicChallengeFields(data),
     relationship,
     status: data.status ?? data.lifecycleStatus ?? "draft",
+    lifecycleStatus: data.lifecycleStatus ?? data.status ?? "draft",
+    reviewStatus: data.reviewStatus ?? data.adminReviewStatus ?? null,
+    managementState: resolveChallengeManagementState(data),
+    completionPercentage: Number(data.completionPercentage ?? progress.completionPercentage),
+    nextIncompleteSection: data.nextIncompleteSection ?? progress.nextIncompleteSection,
+    lastAutosavedAt: data.lastAutosavedAt ?? data.updatedAt ?? null,
     visibility: data.visibility ?? "public"
   };
 }
@@ -133,3 +141,4 @@ export async function GET(request: Request) {
     notifications
   }, "Dashboard loaded.");
 }
+

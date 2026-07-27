@@ -1,4 +1,4 @@
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+﻿import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
@@ -56,8 +56,11 @@ function calculateEntryRevenueFoundation(amountCents: number) {
   const split = calculatePaidRevenueSplit(amountCents, "entry_fee");
   return {
     amountGrossCents: amountCents,
+    winnerShareCents: split.winnerShareCents,
+    creatorHostOperatorShareCents: split.creatorHostOperatorShareCents,
     platformFeeCents: split.platformAdminShareCents,
     amountNetCents: Math.max(0, amountCents - split.platformAdminShareCents),
+    split,
     platformFeeSource: "calculatePaidRevenueSplit",
     prizeSettlementReady: false
   };
@@ -127,6 +130,8 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     amountGrossCents: revenue.amountGrossCents,
     platformFeeCents: revenue.platformFeeCents,
     amountNetCents: revenue.amountNetCents,
+    winnerShareCents: revenue.winnerShareCents,
+    creatorHostOperatorShareCents: revenue.creatorHostOperatorShareCents,
     currency: "usd",
     provider: "stripe",
     providerSessionId: null,
@@ -257,6 +262,9 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       amountGrossCents: revenue.amountGrossCents,
       platformFeeCents: revenue.platformFeeCents,
       amountNetCents: revenue.amountNetCents,
+      winnerShareCents: revenue.winnerShareCents,
+      creatorHostOperatorShareCents: revenue.creatorHostOperatorShareCents,
+      paidEntryDistribution: revenue.split,
       pendingChallengeRevenue: true,
       prizeSettlementReady: false
     }, { merge: true });
@@ -280,6 +288,8 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
     transaction.set(challengeRef, {
       pendingEntryFeeRevenueGrossCents: FieldValue.increment(amountCents),
       pendingEntryFeePlatformFeeCents: FieldValue.increment(revenue.platformFeeCents),
+      pendingEntryFeeWinnerShareCents: FieldValue.increment(revenue.winnerShareCents),
+      pendingEntryFeeCreatorShareCents: FieldValue.increment(revenue.creatorHostOperatorShareCents),
       pendingEntryFeeNetCents: FieldValue.increment(revenue.amountNetCents),
       paidEntryConfirmedCount: FieldValue.increment(1),
       participantCount: FieldValue.increment(participantSnap.exists ? 0 : 1),
@@ -288,6 +298,26 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       payoutExecutionEnabled: false,
       updatedAt: now
     }, { merge: true });
+    for (const [shareType, amount] of [["winner_share", revenue.winnerShareCents], ["creator_host_share", revenue.creatorHostOperatorShareCents], ["platform_share", revenue.platformFeeCents]] as const) {
+      transaction.set(db.collection("challengeFinancialLedger").doc(deterministicId("entry_fee", id, shareType)), {
+        id: deterministicId("entry_fee", id, shareType),
+        challengeId,
+        userId,
+        entryPaymentId: id,
+        revenueType: "entry_fee",
+        shareType,
+        amountCents: amount,
+        currency: "usd",
+        status: "pending_hold",
+        source: "stripe_webhook_confirmed_entry_fee",
+        payoutProviderCalled: false,
+        payoutExecutionEnabled: false,
+        prizeReleaseEnabled: false,
+        createdAt: now,
+        updatedAt: now
+      }, { merge: true });
+    }
+
     transaction.set(db.collection("auditLogs").doc(deterministicId("challenge_entry_fee_paid", id, event.id)), {
       actorId: userId,
       actorType: "user",
@@ -582,3 +612,4 @@ export async function getConfirmedSponsorContributionForChallenge(db: Firestore,
   const split = calculateSponsorContributionSplit(source.grossAmountCents);
   return { ...source, ...split, sponsorContributionGoesFullyToWinners: true, brandingAutoApproved: false };
 }
+

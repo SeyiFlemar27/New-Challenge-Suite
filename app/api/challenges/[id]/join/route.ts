@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError } from "@/lib/server/responses";
@@ -51,7 +51,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
       const privateOnly = isPrivateChallengeRecord(challenge);
       const isOwner = userOwnsChallenge(challenge, user.uid);
-      const hasAccessGrant = isOwner || (accessSnap.exists && accessSnap.data()?.status === "approved");
+      if (isOwner) throw new Error("SELF_ENTRY_NOT_ALLOWED");
+      const manualApproval = challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
+      if (manualApproval) throw new Error("ENTRY_REQUEST_REQUIRED");
+      const hasAccessGrant = accessSnap.exists && accessSnap.data()?.status === "approved";
       if (privateOnly && !hasAccessGrant) throw new Error("PRIVATE_INVITE_REQUIRED");
       const accessChallenge = privateOnly && hasAccessGrant ? { ...challenge, visibility: "public" } : challenge;
       const access = canAccessChallenge(planProfile, accessChallenge);
@@ -103,6 +106,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message === "PREMIUM_REQUIRED") return fail("Premium membership is required to join this challenge.", 403, undefined, "PREMIUM_REQUIRED");
     if (message === "CREATOR_PRO_REQUIRED") return fail("Creator Pro is required to join this private or exclusive challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
     if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
+    if (message === "SELF_ENTRY_NOT_ALLOWED") return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
+    if (message === "ENTRY_REQUEST_REQUIRED") return fail("Request entry before joining this challenge.", 409, { action: "request_entry", requestUrl: `/api/challenges/${id}/entry-request` }, "ENTRY_REQUEST_REQUIRED");
     if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee payment is required before submitting to this challenge.", 402, { checkoutUrl: `/api/challenges/${id}/entry-checkout`, challengePath: `/challenges/${id}`, action: "pay_entry_fee" }, "PAID_ENTRY_PAYMENT_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "CHALLENGE_JOIN_REJECTED");
   }
@@ -120,3 +125,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await createNotification(db, { userId: user.uid, type: "challenge_joined", title: "Challenge joined", body: result.alreadyJoined ? "You were already registered for this challenge." : "You successfully registered for the challenge.", targetId: id });
   return ok(result, result.alreadyJoined ? "You already joined this challenge." : "Challenge joined successfully.");
 }
+

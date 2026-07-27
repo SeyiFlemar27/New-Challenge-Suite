@@ -1,4 +1,4 @@
-﻿import { getChallengeLifecycleState } from "@/lib/challenge-status";
+import { getChallengeLifecycleState } from "@/lib/challenge-status";
 
 export const submissionStatuses = [
   "draft",
@@ -8,6 +8,7 @@ export const submissionStatuses = [
   "rejected",
   "flagged",
   "active",
+  "incomplete",
   "eliminated",
   "winner",
   "disqualified",
@@ -20,6 +21,7 @@ export const participantStatuses = [
   "approved",
   "rejected",
   "active",
+  "incomplete",
   "eliminated",
   "winner",
   "disqualified",
@@ -79,3 +81,5 @@ export function normalizeParticipantStatus(status: unknown): ParticipantLifecycl
   if (value === "joined") return "registered";
   return "registered";
 }
+
+

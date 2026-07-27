@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -160,6 +160,8 @@ export default function ChallengeDetailPage() {
   const submissionOpen = lifecycle.canSubmit;
   const votingOpen = lifecycle.canVote;
   const userState = details?.userState;
+  const viewerState = (userState as any)?.viewerState;
+  const viewerRelationship = String(viewerState?.relationship ?? "viewer");
   const leaderboard = (details as { leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; entries?: unknown[] } } | null)?.leaderboard;
   const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
   const sponsorships = details?.sponsorships ?? [];
@@ -286,7 +288,7 @@ export default function ChallengeDetailPage() {
             <h3 className="text-xl font-black">Ready to compete?</h3>
             {paidEntryRequired ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-left"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p><p className="mt-2 text-sm text-slate-300">Secure payment is required to enter. Entry-fee money is recorded as pending challenge revenue only; prize settlement is not activated.</p></div> : <p className="mt-2 text-slate-300">Join when you are ready to submit.</p>}
             {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
-            {sponsorAccount ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-sm text-yellow-50">Sponsor accounts cannot join or submit entries. Use sponsor funding and messaging flows instead.</Card> : freePremiumBlocked ? (
+            {viewerRelationship === "owner" ? <Card className="mt-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-left text-sm text-yellow-50"><b>You manage this challenge.</b><p className="mt-2 text-slate-300">Creators and hosts cannot compete in their own challenge.</p><LinkButton href="/challenges" className="mt-4 w-full">Manage Challenges</LinkButton></Card> : sponsorAccount ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-sm text-yellow-50">Sponsor accounts cannot join or submit entries. Use sponsor funding and messaging flows instead.</Card> : freePremiumBlocked ? (
               <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
             ) : paidEntryRequired ? alreadySubmitted ? (
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
@@ -380,6 +382,8 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
 
 
 

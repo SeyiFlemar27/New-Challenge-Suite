@@ -299,6 +299,21 @@ export function createChallenge(payload: unknown) {
   return apiRequest<{ challenge: unknown }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
 }
 
+export function createChallengeDraft() {
+  return apiRequest<{ challenge: { id: string } & Record<string, unknown> }>("/api/challenges/drafts", { method: "POST", body: JSON.stringify({}) });
+}
+
+export function fetchChallengeDraft(draftId: string) {
+  return apiRequest<{ challenge: Record<string, unknown> }>(`/api/challenges/drafts/${draftId}`);
+}
+
+export function updateChallengeDraft(draftId: string, payload: unknown) {
+  return apiRequest<{ challenge: Record<string, unknown> }>(`/api/challenges/drafts/${draftId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function publishChallengeDraft(draftId: string, payload: unknown) {
+  return apiRequest<{ challenge: Record<string, unknown> }>(`/api/challenges/${draftId}/publish`, { method: "POST", body: JSON.stringify(payload) });
+}
 export function joinChallenge(challengeId: string, payload: { entryAgreementAccepted?: boolean } = {}) {
   return apiRequest(`/api/challenges/${challengeId}/join`, { method: "POST", body: JSON.stringify(payload) });
 }
@@ -365,6 +380,7 @@ export function registerForEvent(eventId: string, payload: unknown) {
 export function fetchNotifications() {
   return apiRequest<{ notifications: unknown[] }>("/api/notifications");
 }
+
 
 
 

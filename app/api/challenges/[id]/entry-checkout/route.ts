@@ -1,9 +1,9 @@
-import { getStripe } from "@/lib/stripe";
+﻿import { getStripe } from "@/lib/stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
-import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { createPendingEntryPayment, attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
@@ -18,20 +18,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return fail("Accept the challenge rules and entry agreement before paid entry checkout.", 400, { fieldErrors: { entryAgreementAccepted: "Required before checkout." } }, "VALIDATION_ERROR");
   }
   const { id: challengeId } = await params;
-  const [accountSnap, profileSnap, challengeSnap] = await Promise.all([
+  const [accountSnap, profileSnap, challengeSnap, entryRequestSnap] = await Promise.all([
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
-    db.collection("challenges").doc(challengeId).get()
+    db.collection("challenges").doc(challengeId).get(),
+    db.collection("challengeEntryRequests").doc(`${challengeId}_${user.uid}`).get()
   ]);
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
   if (isSponsorProfile(profile)) return fail("Sponsor accounts cannot join normal paid-entry challenges.", 403, undefined, "SPONSOR_ACCOUNT_BLOCKED");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (userOwnsChallenge(challenge, user.uid)) return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
   if (!isPaidEntryChallenge(challenge)) return fail("This challenge does not require paid entry checkout.", 409, undefined, "PAID_ENTRY_NOT_REQUIRED");
   const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
   if (accessContext.privateOnly && !accessContext.hasAccessGrant) return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
   const access = canAccessChallenge(profile, accessContext.challenge);
   if (!access.allowed) return fail("Your current plan does not allow access to this challenge.", 403, undefined, access.code ?? "CHALLENGE_ACCESS_DENIED");
+  const manualApproval = challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
+  if (manualApproval) {
+    const entryRequest = entryRequestSnap.exists ? entryRequestSnap.data() ?? {} : null;
+    if (!entryRequest || entryRequest.status !== "approved") return fail("Entry request approval is required before payment.", 403, { action: "request_entry", requestUrl: `/api/challenges/${challengeId}/entry-request` }, "ENTRY_REQUEST_APPROVAL_REQUIRED");
+    const deadlineMs = Date.parse(String(entryRequest.paymentDeadline ?? ""));
+    if (Number.isFinite(deadlineMs) && deadlineMs <= Date.now()) return fail("The payment window for this entry request expired.", 409, undefined, "PAYMENT_EXPIRED");
+  }
   const joinable = isChallengeJoinable(challenge);
   if (!joinable.allowed) return fail(joinable.reason ?? "Registration is closed for this challenge.", 409, { lifecycle: joinable.lifecycle }, "CHALLENGE_JOIN_REJECTED");
 
@@ -54,4 +63,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await attachCheckoutSession(db, "challengeEntryPayments", record.id, session);
   return ok({ url: session.url, entryPaymentId: record.id, status: "pending", webhookConfirmationRequired: true, checkoutSuccessActivatesEntry: false }, "Paid entry checkout session created. Entry activates only after Stripe webhook confirmation.");
 }
+
 

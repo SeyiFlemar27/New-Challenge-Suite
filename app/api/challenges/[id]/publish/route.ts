@@ -1,0 +1,143 @@
+﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { requireRequestUser } from "@/lib/server/auth";
+import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
+import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
+import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
+import { writeAuditLog } from "@/lib/server/audit";
+import { createNotification } from "@/lib/server/notifications";
+import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
+import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
+import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
+import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
+import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
+import { editableDraftStatus, calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
+import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Challenge publishing");
+  const parsed = await readJson(request);
+  if (parsed.response) return parsed.response;
+  const rawBody = { ...((parsed.body ?? {}) as Record<string, unknown>), publish: true };
+  const validation = serverChallengeCreateSchema.safeParse(rawBody);
+  if (!validation.success) return validationError(zodFieldErrors(validation.error));
+  const body = validation.data;
+  const { id } = await params;
+  const now = new Date().toISOString();
+
+  const [challengeSnap, accountSnap, profileSnap, ownedChallengesSnap] = await Promise.all([
+    db.collection("challenges").doc(id).get(),
+    db.collection("users").doc(user.uid).get(),
+    db.collection("profiles").doc(user.uid).get(),
+    db.collection("challenges").where("creatorId", "==", user.uid).limit(200).get()
+  ]);
+  if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
+  const current = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (!userOwnsChallenge(current, user.uid)) return fail("You can only publish your own challenge drafts.", 403, undefined, "PERMISSION_DENIED");
+  if (!editableDraftStatus(current) && current.status !== "pending_review") return fail("This challenge is not editable for publishing.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
+
+  const publishValidation = validateChallengeForPublish({ ...body, creatorId: user.uid }, { mode: "publish", userId: user.uid });
+  if (!publishValidation.valid) {
+    return fail("Challenge is not ready to publish.", 422, { publishValidation, fieldErrors: Object.fromEntries(publishValidation.errors.map((issue) => [issue.field, issue.message])) }, "PUBLISH_VALIDATION_FAILED");
+  }
+
+  const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
+  const planAccess = getUserPlanAccess(planProfile);
+  const planExperience = getPlanExperience(planProfile);
+  const monetizationAccess = getChallengeMonetizationAccess(planProfile);
+  if (planAccess.isSponsor) return fail("Sponsor accounts manage campaigns from the sponsor dashboard.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
+
+  const freePlan = planAccess.normalizedPlanId === "free";
+  const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs.filter((doc) => doc.id !== id));
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const publishedThisMonth = ownedChallengesSnap.docs.filter((document) => {
+    if (document.id === id) return false;
+    const data = document.data();
+    const createdAt = Date.parse(String(data.createdAt ?? ""));
+    return Number.isFinite(createdAt) && createdAt >= monthStart.getTime() && !["draft", "cancelled"].includes(String(data.status ?? ""));
+  });
+  if (!freePlan && planExperience.monthlyChallengeLimit !== null && publishedThisMonth.length >= planExperience.monthlyChallengeLimit) {
+    return fail(`Your ${planAccess.planName} plan allows ${planExperience.challengeLimitLabel}.`, 409, undefined, "PLAN_LIMIT_REACHED");
+  }
+  if (freePlan && freeBasicChallengeCount >= FREE_BASIC_CHALLENGE_LIFETIME_LIMIT) {
+    return fail("You have used all 3 lifetime Free Basic Challenges. Upgrade to Creator or Host to keep creating.", 409, { used: freeBasicChallengeCount, limit: FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, redirectTo: "/subscriptions" }, "FREE_BASIC_LIMIT_REACHED");
+  }
+  if (freePlan && body.visibility !== "public") return fail("Free Basic Challenges must be public.", 403, undefined, "PRIVATE_CHALLENGE_LOCKED");
+
+  const monetizationIntent = body.monetization;
+  const requestedMonetization = Boolean(monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested);
+  const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
+  if (requestedMonetization && !(monetizationAccess.canPreparePaidEntry || monetizationAccess.canPrepareSponsorReady || monetizationAccess.canPreparePrizePool || monetizationAccess.canPreparePaidVotes)) return fail("Monetized challenges are available to Creator, Host, and approved Enterprise accounts.", 403, undefined, "MONETIZATION_LOCKED");
+  if (monetizationIntent.paidEntryRequested && (!monetizationAccess.canPreparePaidEntry || !paidEntryValidation.valid)) return fail(paidEntryValidation.message || "Paid entry setup is not available for this account.", 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
+
+  let lifecycleStatus = resolveInitialChallengeStatus({ publish: true, startsAt: body.startsAt, endsAt: body.endsAt, submissionDeadline: body.submissionDeadline, votingDeadline: body.votingDeadline, sponsorEnabled: body.sponsorEnabled, visibility: body.visibility, competitionFormat: body.competitionFormat, premiumOnly: body.premiumOnly });
+  const advancedReviewRequired = body.prizeType === "money" || body.prizeType === "physical_product" || body.isLiveEvent || body.tournamentType !== "none" || body.competitionFormat.toLowerCase().includes("tournament");
+  if (advancedReviewRequired) lifecycleStatus = "pending_review";
+  const moneyLocks = normalizeMoneyLockedChallengeFields();
+  const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
+  if (!creationAccess.allowed) return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
+
+  const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
+  const safeMonetization = {
+    ...body.monetization,
+    enabled: requestedMonetization,
+    paidEntryRequested: Boolean(monetizationIntent.paidEntryRequested && monetizationAccess.canPreparePaidEntry),
+    entryFeeAmountCents: monetizationIntent.paidEntryRequested ? paidEntryValidation.entryFeeCents : 0,
+    currency: "USD",
+    sponsorReady: sponsorEnabled,
+    prizePoolRequested: Boolean(monetizationIntent.prizePoolRequested && monetizationAccess.canPreparePrizePool),
+    paidVotesRequested: Boolean(monetizationIntent.paidVotesRequested && monetizationAccess.canPreparePaidVotes),
+    status: requestedMonetization ? "setup_required" : "not_requested",
+    paymentActive: false,
+    checkoutActive: false,
+    ledgerCreationEnabled: false,
+    prizeReleaseActive: false,
+    payoutReleaseActive: false,
+    adminApprovalRequired: Boolean(requestedMonetization),
+    kycRequiredBeforeWithdrawal: Boolean(requestedMonetization),
+    cashHoldHours: 24
+  };
+  const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
+  const update = {
+    ...body,
+    ...moneyLocks,
+    id,
+    creatorId: user.uid,
+    ownerId: user.uid,
+    status: lifecycleStatus,
+    lifecycleStatus,
+    monetization: safeMonetization,
+    sponsorEnabled,
+    participantApprovalMode: body.requiresParticipantApproval ? "manual" : "automatic",
+    reviewStatus: lifecycleStatus === "pending_review" ? "pending_review" : "approved",
+    adminReviewRequired: lifecycleStatus === "pending_review",
+    submittedForReviewAt: lifecycleStatus === "pending_review" ? now : current.submittedForReviewAt ?? null,
+    publishedAt: lifecycleStatus !== "pending_review" ? current.publishedAt ?? now : current.publishedAt ?? null,
+    entitlementConsumed: true,
+    freeBasicChallenge: freePlan,
+    freeBasicChallengeLimit: freePlan ? FREE_BASIC_CHALLENGE_LIFETIME_LIMIT : null,
+    freeBasicChallengesUsedAtCreation: freePlan ? freeBasicChallengeCount + 1 : null,
+    freeBasicChallengesRemainingAfterPublish: freePlan ? freeBasicRemaining(freeBasicChallengeCount + 1) : null,
+    completionPercentage: progress.completionPercentage,
+    nextIncompleteSection: progress.nextIncompleteSection,
+    updatedAt: now,
+    lastPublishedAt: now
+  };
+
+  await Promise.all([
+    db.collection("challenges").doc(id).set(update, { merge: true }),
+    (body.visibility === "private" || body.visibility === "exclusive") ? createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }) : Promise.resolve(null),
+    db.collection("revenueShareLedgers").doc(`revenue_share_${id}`).set(revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
+    writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, now }),
+    writeCashTransactionPlaceholder(db, { id: `challenge_${id}_prize_placeholder`, userId: user.uid, type: "prize_placeholder_created", status: "recorded", amountCents: 0, currency: "USD", sourceType: "challenge", sourceId: id, challengeId: id, description: `Prize foundation placeholder created for challenge ${id}. No cash prize or payout movement is active.`, now })
+  ]);
+  await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: lifecycleStatus === "pending_review" ? "Challenge submitted" : "Challenge scheduled", body: lifecycleStatus === "pending_review" ? "Your challenge is awaiting review." : "Your challenge is scheduled.", targetId: id });
+  await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.published", targetType: "challenge", targetId: id, after: { status: lifecycleStatus, title: body.title }, reason: lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge published from draft.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true } }, db).catch(() => undefined);
+  return ok({ challenge: update }, lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.");
+}

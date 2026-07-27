@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 
 export const serverChallengeCreateSchema = z.object({
@@ -53,6 +53,8 @@ export const serverChallengeCreateSchema = z.object({
     weightedVotes: z.coerce.boolean().default(true)
   }).default({ allowFreeVotes: true, allowDoroCoinVotes: true, weightedVotes: true }),
   requiresSubmissionApproval: z.coerce.boolean().default(false),
+  requiresParticipantApproval: z.coerce.boolean().default(false),
+  participantApprovalMode: z.enum(["automatic", "manual"]).default("automatic"),
   sponsorEnabled: z.coerce.boolean().default(false),
   sponsorSlots: z.coerce.number().int().min(0).max(20).default(0),
   minimumSponsorshipAmount: z.coerce.number().min(0).default(0),
@@ -411,3 +413,4 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   errors.push(...draftResult.errors);
   return validationResult(errors);
 }
+

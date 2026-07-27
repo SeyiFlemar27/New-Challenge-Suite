@@ -1,8 +1,8 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
-import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError, conflict, serverError } from "@/lib/server/responses";
 import {
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
   const challengeSnap = await db.collection("challenges").doc(body.challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (userOwnsChallenge(challenge, user.uid)) return fail("Creators and hosts cannot submit entries to their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
   const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
   if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
     return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
@@ -194,3 +195,4 @@ export async function POST(request: Request) {
   });
   return ok({ submission }, status === "pending_review" ? "Submission uploaded and pending review." : status === "submitted" ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded successfully.");
 }
+

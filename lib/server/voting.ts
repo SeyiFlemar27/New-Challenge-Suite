@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore";
+﻿import type { Firestore } from "firebase-admin/firestore";
 import { todayKey } from "@/lib/utils";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { getVoteWeight } from "@/lib/plan-access";
@@ -94,6 +94,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     if (!submissionSnap.exists) throw voteReject("Submission not found.", "NOT_FOUND");
     const submission = { id: submissionSnap.id, ...submissionSnap.data() } as Record<string, unknown>;
     if (submission.challengeId !== input.challengeId) throw voteReject("Submission does not belong to this challenge.", "SUBMISSION_CHALLENGE_MISMATCH");
+    if (String(submission.userId ?? "") === input.userId) throw voteReject("You cannot vote for your own submission.", "SELF_VOTING_NOT_ALLOWED");
     if (!canSubmissionReceiveVotes(submission.status)) {
       throw voteReject("This submission is not eligible for voting.", "SUBMISSION_NOT_VOTABLE");
     }
@@ -257,5 +258,6 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
   return result;
 }
+
 
 
