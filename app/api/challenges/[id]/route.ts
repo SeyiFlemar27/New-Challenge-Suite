@@ -98,6 +98,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
   const submitted = Boolean(userSubmissionSnap?.exists);
+  const paymentPending = entryPaymentStatus === "pending";
+  const paymentRequired = paidEntryRequired && !paidEntryEnrolled;
+  const baseBlockReason = sponsorAccount ? "sponsor_blocked" : submitted ? "already_submitted" : paymentPending ? "payment_pending" : paymentRequired ? "payment_required" : !lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_not_open" ? "submission_not_open" : !lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_closed" ? "submission_closed" : !participantSnap?.exists && !paidEntryEnrolled ? "not_enrolled" : lifecycle.disabledReason ? "ineligible" : null;
   const paidEntryState = {
     required: paidEntryRequired,
     amountCents: paidEntryRequired ? paidEntryAmountCentsValue : 0,
@@ -122,7 +125,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     canPay: paidEntryState.canPay,
     canSubmit: paidEntryState.canSubmit,
     canVote: Boolean(lifecycle.canVote && !sponsorAccount),
-    blockReason: sponsorAccount ? "sponsor_account_blocked" : lifecycle.disabledReason ?? paidEntryState.blockedReason ?? null,
+    blockReason: baseBlockReason,
     message: lifecycle.userFacingMessage
   };
 
@@ -140,7 +143,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       entryPaymentStatus,
       entryPaymentReservationStatus: entryPayment?.reservationStatus ?? null,
       entryPaymentId: entryPayment?.id ?? null,
-      entryPaymentPending: entryPaymentStatus === "pending",
+      entryPaymentPending: paymentPending,
       paidEntryEnrolled,
       paidEntry: paidEntryState,
       participation: participationState,
@@ -172,5 +175,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }, "Challenge details loaded.");
 }
+
+
 
 

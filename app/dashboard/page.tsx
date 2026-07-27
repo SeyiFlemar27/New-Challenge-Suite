@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
-import { ChallengeCard } from "@/components/domain-cards";
 import { Activity, Award, BarChart3, ClipboardCheck, Crown, Diamond, Gift, LockKeyhole, Medal, Radio, Rocket, Settings, ShieldCheck, Swords, Trophy, User, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
@@ -67,9 +66,6 @@ export default function DashboardPage() {
     if (redirectTo) router.replace(redirectTo);
   }, [redirectTo, router]);
 
-  const challenges = useMemo(() => {
-    return (dashboard?.challenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
-  }, [dashboard?.challenges]);
   const hostedChallenges = useMemo<DashboardChallenge[]>(() => {
     return (dashboard?.hostedChallenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
   }, [dashboard?.hostedChallenges]);
@@ -107,12 +103,12 @@ export default function DashboardPage() {
   const creatorVotes = hostedChallenges.reduce((sum, challenge) => sum + numberField(challenge, ["voteCount", "weightedVoteCount", "votes"]), 0);
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { title: "Create Basic Challenge", body: "Create up to three lifetime public, non-monetized challenges before upgrading.", icon: Swords, active: true, href: "/challenges/create" },
-        { title: "My Challenges", body: "Draft, publish, and track your Free Basic Challenge activity.", icon: Trophy, active: true, href: "/my-challenges" },
+        { title: "Challenges", body: "Create and manage your public challenges.", icon: Swords, active: true, href: "/challenges" },
+        { title: "Challenges", body: "Draft, publish, and track your Free Basic Challenge activity.", icon: Trophy, active: true, href: "/challenges" },
         { title: "Explore Challenges", body: "Find public challenges to join, vote in, or follow.", icon: Vote, active: true, href: "/explore" }
       ] : [
-        { title: "Basic Public Challenge", body: "Create up to three lifetime public, non-monetized challenges.", icon: Swords, active: true, href: "/challenges/create" },
-        { title: "My Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/my-challenges" }
+        { title: "Challenges", body: "Create and manage your public challenges.", icon: Swords, active: true, href: "/challenges" },
+        { title: "Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/challenges" }
       ]
     : planExperience.planId === "creator"
       ? [
@@ -139,28 +135,28 @@ export default function DashboardPage() {
             ];
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
-        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const },
+        { href: "/challenges", label: "Challenges", variant: "primary" as const },
+        { href: "/challenges", label: "Challenges", variant: "secondary" as const },
         { href: "/explore", label: "Explore Challenges", variant: "ghost" as const }
       ] : [
-        { href: "/challenges/create", label: "Create Basic Challenge", variant: "primary" as const },
-        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const }
+        { href: "/challenges", label: "Challenges", variant: "primary" as const },
+        { href: "/challenges", label: "Challenges", variant: "secondary" as const }
       ]
     : planExperience.planId === "creator"
       ? [
-          { href: "/challenges/create", label: "Create Challenge", variant: "primary" as const },
-          { href: "/creator/challenges", label: "Challenges", variant: "secondary" as const },
+          { href: "/challenges", label: "Challenges", variant: "primary" as const },
+          { href: "/challenges", label: "Challenges", variant: "secondary" as const },
           { href: "/creator/private-challenges", label: "Private Challenges", variant: "ghost" as const }
         ]
       : planExperience.planId === "pro"
         ? [
-            { href: "/challenges/create", label: "Create Ranked Challenge", variant: "primary" as const },
+            { href: "/challenges", label: "Challenges", variant: "primary" as const },
             { href: "/leaderboards", label: "Performance & Rank", variant: "secondary" as const },
             { href: "/profile", label: "Highlight Profile", variant: "ghost" as const }
           ]
         : [
             { href: "/dashboard/host", label: planExperience.planId === "enterprise" ? "Open Command Center" : "Open Host Controls", variant: "primary" as const },
-            { href: "/challenges/create", label: "Build Competition", variant: "secondary" as const },
+            { href: "/challenges", label: "Challenges", variant: "secondary" as const },
             { href: "/wallet", label: "Revenue Overview", variant: "ghost" as const }
           ];
   const tierStats = planExperience.planId === "free"
@@ -191,11 +187,11 @@ export default function DashboardPage() {
           ];
 
   const creatorTools = [
-    { title: "Create Challenge", body: "Start a public creator challenge.", icon: Swords, href: "/challenges/create" },
+    { title: "Challenges", body: "Create and manage your public challenges.", icon: Swords, href: "/challenges" },
     { title: "Private Challenges", body: "Manage invite-only challenges and access.", icon: LockKeyhole, href: "/creator/private-challenges" },
     { title: "Review Submissions", body: "Open creator submission review tools.", icon: ClipboardCheck, href: "/creator/submissions" },
-    { title: "Draft Challenges", body: "Continue setup from your challenge list.", icon: Award, href: "/creator/challenges" },
-    { title: "Voting Status", body: "Check voting readiness from your creator challenges.", icon: Vote, href: "/creator/challenges" },
+    { title: "Draft Challenges", body: "Continue setup from your challenge list.", icon: Award, href: "/challenges" },
+    { title: "Voting Status", body: "Check voting readiness from your creator challenges.", icon: Vote, href: "/challenges" },
     { title: "Invite Links", body: "Open private challenge access tools.", icon: ShieldCheck, href: "/creator/private-challenges" },
     { title: "Creator Analytics", body: "View analytics when real activity is available.", icon: BarChart3, href: "/creator/analytics" },
     { title: "Sponsor Readiness", body: "Review sponsor-ready setup states.", icon: Rocket, href: "/creator/sponsor-ready" },
@@ -266,7 +262,7 @@ export default function DashboardPage() {
               <h2 className="mt-2 text-2xl font-black sm:text-3xl">Your creator activity</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Creator-owned challenges, drafts, and active work appear here.</p>
             </div>
-            <LinkButton href="/creator/challenges" variant="secondary">View All</LinkButton>
+            <LinkButton href="/challenges" variant="secondary">View All</LinkButton>
           </div>
 
           {hostedChallenges.length ? (
@@ -275,7 +271,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="mt-6 rounded-[8px] border border-white/10 bg-black/25 p-6">
-              <EmptyState icon={<Swords />} title="No creator activity yet" body="Create your first challenge or open Explore to join existing competitions." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/explore" variant="secondary">Explore Challenges</LinkButton></div>} />
+              <EmptyState icon={<Swords />} title="No creator activity yet" body="Create your first challenge or open Explore to join existing competitions." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/challenges">Open Challenges</LinkButton><LinkButton href="/explore" variant="secondary">Explore</LinkButton></div>} />
             </div>
           )}
         </Card>
@@ -328,27 +324,14 @@ export default function DashboardPage() {
         {tierFeatures.map((feature) => (
           <TierFeatureCard key={feature.title} {...feature} />
         ))}
-      </div>
-      <div className={cn("mt-8 grid gap-8", badges.length ? "xl:grid-cols-[1.5fr_1fr]" : "xl:grid-cols-1")}>
-        <Card className="p-6 md:p-8">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-black">Current Challenges</h2>
-            <LinkButton href="/my-entries" variant="ghost" className="text-[var(--gold)]">View All</LinkButton>
-          </div>
-          {challenges.length ? (
-            <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-1">{challenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div>
-          ) : (
-            <Card className="p-6 text-slate-300"><EmptyState icon={<Swords />} title="No active challenges yet" body="Challenges you join, create, or submit entries to will appear here." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/explore">Explore Challenges</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton></div>} /></Card>
-          )}
-        </Card>
-        {badges.length ? <div className="space-y-8">
+      </div>
+      {badges.length ? <div className="mt-8 grid gap-8">
           <Card className="p-6">
             <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
             {badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>)}
             <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
           </Card>
         </div> : null}
-      </div>
     </AppShell>
   );
 }
@@ -399,6 +382,9 @@ function CreatorActivityCard({ challenge }: { challenge: DashboardChallenge }) {
 function Stat({ icon, title, value, label, className }: { icon: ReactNode; title: string; value: string; label: string; className?: string | null }) {
   return <Card className={cn("flex items-center gap-5 p-6", className)}><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><div><div className="font-bold">{title}</div><div className="text-3xl font-black text-[var(--gold-2)]">{value}</div><div className="text-sm text-slate-300">{label}</div></div></Card>;
 }
+
+
+
 
 
 

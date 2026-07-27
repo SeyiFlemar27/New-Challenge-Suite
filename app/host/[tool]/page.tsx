@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -42,7 +42,7 @@ export default function HostOperationsPage() {
     <div className="mt-6 flex gap-2 overflow-x-auto pb-2">{config.tabs.map((label) => <Button key={label} variant={tab === label ? "primary" : "secondary"} onClick={() => setTab(label)}>{label}</Button>)}</div>
     {tool === "voting" ? <VotingSummary challenges={data?.challenges ?? []} /> : null}
     {error ? <Card className="mt-6 border-red-500/30 p-5 text-red-200">{error}</Card> : null}
-    {!data && !error ? <Card className="mt-6 h-56 animate-pulse" /> : items.length ? <div className="mt-6 grid gap-4">{items.map((item) => <OperationRow key={item.id} item={item} tool={tool} />)}</div> : data ? <Card className="mt-6"><EmptyState icon={<config.icon />} title={config.empty} body={config.body} action={["participants", "submissions"].includes(tool) ? <LinkButton href="/my-challenges">View Hosted Competitions</LinkButton> : <LinkButton href="/challenges/create">Build Competition</LinkButton>} /></Card> : null}
+    {!data && !error ? <Card className="mt-6 h-56 animate-pulse" /> : items.length ? <div className="mt-6 grid gap-4">{items.map((item) => <OperationRow key={item.id} item={item} tool={tool} />)}</div> : data ? <Card className="mt-6"><EmptyState icon={<config.icon />} title={config.empty} body={config.body} action={["participants", "submissions"].includes(tool) ? <LinkButton href="/challenges">View Hosted Competitions</LinkButton> : <LinkButton href="/challenges">Challenges</LinkButton>} /></Card> : null}
     <Card className="mt-6 border-yellow-500/20 p-5 text-sm leading-6 text-slate-300">Operational changes are disabled here unless an existing workflow supports them. No moderation decision, voting-state change, winner publication, export, payout, refund, sponsor release, or prize release is executed from this screen.</Card>
   </div></AppShell></PlanFeatureGate>;
 }
@@ -56,4 +56,5 @@ function VotingSummary({ challenges }: { challenges: Item[] }) {
   const votes = challenges.reduce((total, item) => total + Number(item.voteCount ?? 0), 0);
   return <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Voting Status", challenges.length ? "Configured" : "Waiting"], ["Total Votes", votes], ["DoroCoin Votes", "Read-only"], ["Leaderboard Visibility", challenges.length ? "Challenge settings" : "Setup required"]].map(([label, value]) => <Card key={label} className="p-5"><p className="text-xs font-bold uppercase text-slate-400">{label}</p><p className="mt-2 text-xl font-black">{value}</p></Card>)}</div>;
 }
+
 

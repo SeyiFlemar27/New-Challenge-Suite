@@ -29,7 +29,7 @@ assert(checkoutRoute.includes("isChallengeJoinable(challenge)"), "paid entry che
 assert(checkoutRoute.includes("entryAgreementAccepted"), "paid entry checkout must require entry agreement.");
 assert(helper.includes("MINIMUM_ENTRY_FEE_CENTS") && helper.includes("validateEntryFee"), "entry fee minimum must be helper-based.");
 assert(helper.includes("paymentPurpose: \"challenge_entry_fee\""), "entry payment record must use challenge_entry_fee purpose.");
-assert(checkoutRoute.includes("/join?payment=processing") && checkoutRoute.includes("entryPaymentId"), "paid entry success URL must return to the challenge join page with contextual processing state.");
+assert(checkoutRoute.includes("?payment=processing") && !checkoutRoute.includes("/join?payment=processing") && checkoutRoute.includes("entryPaymentId"), "paid entry success URL must return to the challenge detail page with contextual processing state.");
 assert(checkoutRoute.includes("checkoutMetadataForPurpose(\"challenge_entry_fee\", record)"), "Stripe metadata must still carry challenge_entry_fee purpose for webhook fulfillment.");
 assert(checkoutRoute.includes("checkoutSuccessActivatesEntry: false"), "checkout route must not activate entry.");
 assert(successPage.includes("This page never activates") && successPage.includes("entry-payment-status"), "success page must poll backend status and not activate paid entry from URL.");
@@ -57,3 +57,4 @@ assert(!helper.includes("stripe.refunds.create") && !helper.includes("stripe.tra
 assert(webhook.includes("session.mode === \"subscription\""), "subscription webhook/checkout branch must remain present.");
 
 console.log("Paid entry checkout foundation checks passed.");
+

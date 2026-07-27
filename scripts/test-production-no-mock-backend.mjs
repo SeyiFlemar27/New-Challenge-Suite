@@ -44,9 +44,9 @@ assertIncludes(dashboardApi, "leaderboard: []", "dashboard does not return globa
 const dashboardPage = read("app/dashboard/page.tsx");
 for (const forbidden of ["The Ultimate Showdown", "The Next Model Spotlight", "12840", "12,840", "Top Voter", "Verified Competitor", "TrendingStories", "Top Performers"]) {
   assertNotIncludes(dashboardPage, forbidden, `dashboard page must not contain ${forbidden}`);
+assertNotIncludes(dashboardPage, "Current Challenges", "dashboard no longer shows Current Challenges section");
+assertNotIncludes(dashboardPage, "Challenges you join, create, or submit entries to will appear here.", "dashboard no longer shows current-challenge helper copy");
 }
-assertIncludes(dashboardPage, "No active challenges yet", "dashboard has brand-new empty state");
-assertIncludes(dashboardPage, "Challenges you join, create, or submit entries to will appear here.", "dashboard explains personal challenge criteria");
 
 const subscriptions = read("app/subscriptions/page.tsx");
 for (const forbidden of ["Sponsor Starter", "Brand Partner", "Enterprise Partner", "Sponsors & Brands", "Sponsor & Brands"]) {
@@ -79,3 +79,4 @@ for (const forbidden of ["12840", "12.8k", "Neon City Photo Battle", "Creator Sh
 
 await rm(tempDir, { recursive: true, force: true });
 console.log("Production no-mock backend checks passed.");
+

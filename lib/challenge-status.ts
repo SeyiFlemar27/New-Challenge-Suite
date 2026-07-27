@@ -1,4 +1,4 @@
-﻿import type { Challenge } from "./types";
+import type { Challenge } from "./types";
 
 export type CanonicalChallengeStatus =
   | "draft"
@@ -586,8 +586,10 @@ function resolveVotingStatus(record: Record<string, unknown>, timeline: Normaliz
   const votingSettings = isRecord(record.votingSettings) ? record.votingSettings : {};
   const votingEnabled = record.votingEnabled === true || votingSettings.enabled === true || Boolean(timeline.votingOpensAt || timeline.votingClosesAt) || persisted === "voting_open" || persisted === "voting_closed";
   if (!votingEnabled) return "voting_not_enabled";
-  if (persisted === "voting_open") return "voting_open";
   if (persisted === "voting_closed") return "voting_closed";
+  const liveVotingDuringSubmission = record.liveVotingEnabled === true || record.votingDuringSubmission === true || votingSettings.liveVotingEnabled === true || votingSettings.allowDuringSubmissions === true;
+  if (!liveVotingDuringSubmission && resolveSubmissionStatus(record, timeline, now) === "submissions_open") return "voting_not_open";
+  if (persisted === "voting_open") return "voting_open";
   if (timeline.votingOpensAt && now < timeline.votingOpensAt) return "voting_not_open";
   if (timeline.votingClosesAt && now > timeline.votingClosesAt) return "voting_closed";
   if (timeline.votingOpensAt || timeline.votingClosesAt) return "voting_open";
@@ -633,6 +635,7 @@ function formatMilestoneDate(date: Date) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
 
 
 

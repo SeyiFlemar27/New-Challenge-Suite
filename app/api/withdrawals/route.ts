@@ -1,8 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { fail, ok, serverUnavailable } from "@/lib/server/responses";
+import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/cash-wallet";
-import { MAX_DAILY_WITHDRAWAL_CENTS, MIN_WITHDRAWAL_CENTS } from "@/lib/server/withdrawals";
+import { createWithdrawalRequest, maskAccount, MAX_DAILY_WITHDRAWAL_CENTS, MIN_WITHDRAWAL_CENTS } from "@/lib/server/withdrawals";
 import { loadKycMetadata } from "@/lib/server/kyc";
 import { WALLET_POLICY_COPY, WITHDRAWAL_ARCHITECTURE_CONFIG, getWithdrawalDisabledReasons, isEligibleEarningAccount } from "@/lib/server/wallet-architecture";
 
@@ -39,8 +39,8 @@ export async function GET(request: Request) {
     minimumWithdrawalCents: MIN_WITHDRAWAL_CENTS,
     maximumDailyWithdrawalCents: MAX_DAILY_WITHDRAWAL_CENTS,
     withdrawalsConfigured: WITHDRAWAL_ARCHITECTURE_CONFIG.withdrawalsEnabled,
-    withdrawalRequestCreationEnabled: false,
-    payoutMethodCollectionEnabled: WITHDRAWAL_ARCHITECTURE_CONFIG.payoutMethodCollectionEnabled,
+    withdrawalRequestCreationEnabled: true,
+    payoutMethodCollectionEnabled: true,
     payoutProviderConfigured: WITHDRAWAL_ARCHITECTURE_CONFIG.payoutProviderConfigured,
     adminReviewRequired: WITHDRAWAL_ARCHITECTURE_CONFIG.adminReviewRequired,
     kycProcessingActive: kyc.providerConfigured,
@@ -60,16 +60,48 @@ export async function POST(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Withdrawals");
+  const parsed = await readJson(request);
+  if (parsed.response) return parsed.response;
+  const body = parsed.body ?? {};
+  const method = String((body as any).method ?? "").toLowerCase();
+  const amountCents = Math.round(Number((body as any).amountCents ?? 0));
+  const minimumWithdrawalCents = MIN_WITHDRAWAL_CENTS ?? 1000;
   const accountSnap = await db.collection("users").doc(user.uid).get();
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
-  if (accountType === "sponsor") return fail("Sponsor accounts do not use the standard earnings withdrawal flow.", 403, undefined, "WITHDRAWAL_NOT_AVAILABLE");
+  if (accountType === "sponsor") return fail("Sponsor accounts do not use standard earnings withdrawals.", 403, undefined, "WITHDRAWAL_NOT_AVAILABLE");
+  if (!["bank_transfer", "paypal"].includes(method)) return fail("Choose Bank Transfer or PayPal.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
+  if (!Number.isInteger(amountCents) || amountCents < minimumWithdrawalCents) return fail(`Minimum withdrawal is ${(minimumWithdrawalCents / 100).toFixed(2)}.`, 400, undefined, "INVALID_WITHDRAWAL_AMOUNT");
   const kyc = await loadKycMetadata(db, user.uid);
-  return fail(WALLET_POLICY_COPY.withdrawalsSetupRequired, 403, {
-    withdrawalRequestCreationEnabled: false,
-    withdrawalsConfigured: WITHDRAWAL_ARCHITECTURE_CONFIG.withdrawalsEnabled,
-    payoutProviderConfigured: WITHDRAWAL_ARCHITECTURE_CONFIG.payoutProviderConfigured,
-    payoutMethodCollectionEnabled: WITHDRAWAL_ARCHITECTURE_CONFIG.payoutMethodCollectionEnabled,
-    kycStatus: kyc.kycStatus,
-    requiredBeforeRequest: ["kyc_verified", "payout_method_provider_configured", "admin_review_workflow", "available_cash_balance"]
-  }, "WITHDRAWALS_SETUP_REQUIRED");
+  if (String(kyc.kycStatus) !== "verified") return fail("KYC verification is required before withdrawals.", 403, { kycStatus: kyc.kycStatus }, "KYC_REQUIRED");
+  const now = new Date().toISOString();
+  const details = ((body as any).methodDetails ?? {}) as Record<string, unknown>;
+  const accountHolderName = String(details.accountHolderName ?? details.name ?? "").trim();
+  const bankName = method === "bank_transfer" ? String(details.bankName ?? "").trim() : "PayPal";
+  const accountNumber = String(details.accountNumber ?? details.email ?? "").trim();
+  if (!accountHolderName || !accountNumber || (method === "bank_transfer" && !bankName)) return fail("Add payout method details.", 400, undefined, "PAYOUT_METHOD_REQUIRED");
+  const payoutMethodLabel = method === "paypal" ? `PayPal - ${accountNumber}` : `${bankName} ${maskAccount(accountNumber)}`;
+  const payoutMethodLast4 = method === "paypal" ? "paypal" : accountNumber.replace(/\D/g, "").slice(-4);
+  try {
+    const result = await db.runTransaction((transaction) => createWithdrawalRequest(db, transaction, {
+      userId: user.uid,
+      amountCents,
+      currency: "usd",
+      sourceType: "cash_balance",
+      sourceIds: [],
+      payoutMethodType: method,
+      payoutMethodLabel,
+      payoutMethodLast4,
+      accountHolderName,
+      bankName,
+      country: String(details.country ?? "US"),
+      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${amountCents}-${method}-${now.slice(0, 10)}`),
+      now
+    }));
+    return ok({ request: result.request, created: result.created, payoutExecuted: false }, "Withdrawal request submitted for review.");
+  } catch (error) {
+    const message = error instanceof Error && error.message === "INSUFFICIENT_AVAILABLE_BALANCE" ? "Withdrawal amount exceeds your available cash balance." : "Withdrawal request could not be created.";
+    return fail(message, 400, undefined, "WITHDRAWAL_REQUEST_REJECTED");
+  }
 }
+
+

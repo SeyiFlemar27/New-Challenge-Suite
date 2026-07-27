@@ -18,7 +18,7 @@ const modules = [
   { title: "Reports & Export", body: "Review operational report readiness.", icon: Download, href: "/host/reports" },
   { title: "Team Members", body: "Review host team access.", icon: UsersRound, href: "/host/team" },
   { title: "Revenue Overview", body: "Read-only entry, vote, sponsor, and payout review status.", icon: BarChart3, href: "/dashboard/host/revenue" },
-  { title: "Sponsor Requests", body: "Review sponsor-interest setup for sponsor-ready competitions.", icon: ClipboardList, href: "/dashboard/host/sponsors" }
+  { title: "Sponsor Requests", body: "Review sponsor interest for sponsor-ready competitions.", icon: ClipboardList, href: "/dashboard/host/sponsors" }
 ];
 
 export default function HostControlCenterPage() {
@@ -42,7 +42,7 @@ export default function HostControlCenterPage() {
         <div className="mt-2 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <PageTitle title="Host Control Center" subtitle="Run competitions, manage participants, control voting, review submissions, and monitor event performance." />
           <div className="flex flex-wrap gap-3">
-            <LinkButton href="/challenges/create">Create Challenge</LinkButton>
+            <LinkButton href="/challenges">Challenges</LinkButton>
             <LinkButton href="/host/live/create" variant="secondary">Create Live Event</LinkButton>
             <LinkButton href="/host/submissions" variant="secondary">Review Submissions</LinkButton>
             <LinkButton href="/host/voting" variant="secondary">Voting Control</LinkButton>
@@ -55,9 +55,9 @@ export default function HostControlCenterPage() {
           <Metric title="Upcoming Events" value={upcomingEvents} />
           <Metric title="Pending Participants" value={0} note="Awaiting activity" />
           <Metric title="Pending Submissions" value={pendingSubmissions} />
-          <Metric title="Live Voting Sessions" value={0} note="Setup required" />
+          <Metric title="Live Voting Sessions" value={0} note="Not active" />
           <Metric title="Total Votes" value={totalVotes} />
-          <Metric title="Reports Ready" value={0} note="Setup required" />
+          <Metric title="Reports Ready" value={0} note="Not active" />
           <Metric title="Team Seats" value={`1/${experience.teamMemberLimit}`} />
           <Metric title="Revenue Review" value="Review only" note="No money movement" />
         </div>
@@ -106,3 +106,4 @@ function Metric({ title, value, note }: { title: string; value: string | number;
 function Checklist({ label, done = false, href }: { label: string; done?: boolean; href: string }) {
   return <LinkButton href={href} variant="ghost" className="min-h-14 justify-start border border-white/10"><CheckCircle2 className={done ? "text-emerald-400" : "text-slate-500"} size={18} /> {label}</LinkButton>;
 }
+

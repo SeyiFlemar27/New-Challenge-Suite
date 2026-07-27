@@ -9,17 +9,20 @@ import { fetchFeed } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { ChallengeMediaFrame } from "@/components/media-display";
 import { getChallengeDisplayStatus, getChallengeLifecycleState, statusClassName } from "@/lib/challenge-status";
-import { Compass, Grid3X3, PlusSquare } from "lucide-react";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { Compass } from "lucide-react";
 
 export default function ExplorePage() {
-  const { data, isLoading } = useQuery({ queryKey: ["explore-feed"], queryFn: () => fetchFeed(30), staleTime: 30_000 });
+  const { user } = useCurrentUser();
+  const { data, isLoading } = useQuery({ queryKey: ["explore-feed"], queryFn: () => fetchFeed(40), staleTime: 30_000 });
   const challenges = useMemo(() => {
     if (!data?.ok) return [];
+    const userId = String(user?.uid ?? "");
     return (data.data?.challenges ?? [])
       .map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) }))
-      .filter((item) => item.id);
-  }, [data]);
-  const categories = useMemo(() => Array.from(new Set(challenges.map((challenge) => String(challenge.category ?? "General")).filter(Boolean))).slice(0, 8), [challenges]);
+      .filter((item) => item.id)
+      .filter((item) => !userId || !isOwnedByUser(item as Record<string, unknown>, userId));
+  }, [data, user?.uid]);
   const trendingChallenges = useMemo(() => challenges.filter((challenge) => {
     const record = challenge as Record<string, unknown>;
     const lifecycle = getChallengeLifecycleState(record);
@@ -33,41 +36,26 @@ export default function ExplorePage() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title="Explore" subtitle="Discover trending public challenges, then open the full challenge listing when you are ready to browse deeper." icon={<Compass className="text-[var(--gold)]" />} />
-        <div className="flex flex-wrap gap-3">
-          <LinkButton href="/challenges">View All Challenges</LinkButton>
-          <LinkButton href="/challenges/create" variant="secondary">Create Challenge</LinkButton>
-        </div>
-      </div>
+      <PageTitle title="Explore" subtitle="Discover public challenges." icon={<Compass className="text-[var(--gold)]" />} />
 
-      <TrendingStories challenges={trendingChallenges} source="explore" isLoading={isLoading} errorMessage={errorMessage || ""} />
+      {trendingChallenges.length ? <TrendingStories challenges={trendingChallenges} source="explore" isLoading={isLoading} errorMessage={errorMessage || ""} /> : null}
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_320px]">
-        <Card className="p-6 md:p-8">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] bg-[var(--gold)]/10 text-[var(--gold)]"><Grid3X3 /></div>
-            <div>
-              <h2 className="text-2xl font-black">Public Challenge Grid</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Browse real public challenges from the live feed. Trending requires at least 100 participants and an active, open, or recent challenge state.</p>
-            </div>
+      <section className="mt-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-black">Public Challenges</h2>
           </div>
-          {challenges.length ? <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge} />)}</div> : <p className="mt-6 rounded-[8px] border border-dashed border-white/10 p-6 text-center text-sm text-slate-400">No public challenges are available yet.</p>}
-        </Card>
-        <Card className="p-6">
-          <PlusSquare className="text-[var(--gold)]" />
-          <h2 className="mt-3 text-xl font-black">Start a Public Challenge</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Free users can create public basic challenges within the configured limit.</p>
-          <LinkButton href="/challenges/create" variant="secondary" className="mt-5 w-full">Create Challenge</LinkButton>
-        </Card>
-      </div>
-
-      {categories.length ? <Card className="mt-8 p-6">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Categories</p>
-        <div className="mt-4 flex flex-wrap gap-3">{categories.map((category) => <span key={category} className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-bold text-slate-300">{category}</span>)}</div>
-      </Card> : null}
+          {trendingChallenges.length ? <span className="text-sm font-bold text-slate-400">Trending requires 100+ participants</span> : null}
+        </div>
+        {isLoading ? <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{[0, 1, 2, 3].map((item) => <Card key={item} className="h-[330px] animate-pulse bg-[#171717]" />)}</div> : errorMessage ? <Card className="mt-5 p-6 text-slate-300">{errorMessage}</Card> : challenges.length ? <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge as Record<string, unknown>} />)}</div> : <Card className="mt-5 border-dashed p-8 text-center text-sm text-slate-400">No public challenges available.</Card>}
+      </section>
     </AppShell>
   );
+}
+
+function isOwnedByUser(challenge: Record<string, unknown>, userId: string) {
+  return [challenge.userId, challenge.ownerId, challenge.creatorId, challenge.hostId, challenge.createdBy, challenge.createdByUserId]
+    .some((value) => String(value ?? "") === userId);
 }
 
 function ExploreChallengeCard({ challenge }: { challenge: Record<string, unknown> }) {
@@ -75,20 +63,21 @@ function ExploreChallengeCard({ challenge }: { challenge: Record<string, unknown
   const participantCount = Number(challenge.participantCount ?? challenge.participants ?? 0);
   const href = `/challenges/${String(challenge.id)}`;
   return (
-    <a href={href} className="block overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] transition hover:border-[var(--gold)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
+    <Card className="flex h-full flex-col overflow-hidden p-0">
       <ChallengeMediaFrame src={String(challenge.imageUrl ?? challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="rounded-none border-0" placeholder="Challenge Suite" />
-      <div className="p-4">
+      <div className="flex flex-1 flex-col p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${statusClassName(status)}`}>{status}</span>
           {participantCount >= 100 ? <span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[11px] font-black uppercase text-[var(--gold)]">Trending</span> : null}
         </div>
         <h3 className="mt-3 line-clamp-2 min-h-12 break-words text-base font-black">{String(challenge.title ?? "Untitled Challenge")}</h3>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{String(challenge.description ?? "Open challenge")}</p>
+        <p className="mt-2 line-clamp-2 flex-1 text-sm leading-6 text-slate-400">{String(challenge.description ?? "")}</p>
         <div className="mt-4 flex items-center justify-between gap-3 text-xs font-bold text-slate-400">
           <span>{participantCount.toLocaleString()} participants</span>
           <span>{String(challenge.category ?? "General")}</span>
         </div>
+        <LinkButton href={href} className="mt-4 w-full">View Challenge</LinkButton>
       </div>
-    </a>
+    </Card>
   );
 }

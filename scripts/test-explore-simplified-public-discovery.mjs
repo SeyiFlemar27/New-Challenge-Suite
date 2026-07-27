@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+const page = readFileSync("app/explore/page.tsx", "utf8");
+assert(!page.includes("Categories"), "Explore categories card must be removed");
+assert(!page.includes("Full Challenge Listing"), "Explore full listing card must be removed");
+assert(!page.includes("Discover trending public challenges"), "Explore generic helper paragraph must be removed");
+assert(page.includes("participantCount >= 100"), "Trending threshold must require 100+ participants");
+assert(page.includes("Public Challenges"), "Public challenge grid must remain");
+assert(page.includes("isOwnedByUser"), "Explore should exclude own challenges where possible");
+assert(!page.includes("Start a Public Challenge"), "Explore must not show creation promo card");
+console.log("explore simplified discovery checks passed");

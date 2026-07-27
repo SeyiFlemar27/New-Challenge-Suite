@@ -26,7 +26,7 @@ for (const step of ["Overview", "Access & Invites", "Rules & Eligibility", "Entr
 assert(builder.includes("canCreatePrivateChallenges"), "Private builder must use existing private challenge entitlement gate.");
 assert(builder.includes("Private challenges are available on Creator Plan"), "Private builder locked state copy is missing.");
 assert(privateList.includes('href="/creator/private-challenges/create"'), "Private Challenges create action must route to creator private builder.");
-assert(sidebar.includes('href: "/creator/challenges", label: "Challenges"'), "Creator sidebar Challenges item missing.");
+assert(sidebar.includes('href: "/challenges", label: "Challenges"'), "Creator sidebar Challenges item missing.");
 assert(sidebar.includes('href: "/creator/private-challenges", label: "Private Challenges"'), "Creator sidebar Private Challenges item missing.");
 
 const creatorSection = sidebar.slice(sidebar.indexOf("const creatorSections"), sidebar.indexOf("const starterSections"));
@@ -39,3 +39,4 @@ assert(builder.includes("createChallenge(payload(false))"), "Save Draft must use
 assert(builder.includes("createChallenge(payload(true))"), "Publish must use existing challenge creation service.");
 
 console.log("Challenge builder flow checks passed.");
+

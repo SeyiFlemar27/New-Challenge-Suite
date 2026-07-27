@@ -266,7 +266,7 @@ export default function JoinChallengePage() {
           <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Media upload is pending storage configuration. Your submission metadata is saved and ready to be completed." : successSubmission?.status === "active" || successSubmission?.status === "approved" ? "Your media was uploaded and the submission is live." : "Your media was uploaded and the submission is pending review."}</p>
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:justify-center">
             <LinkButton href={`/challenges/${currentChallenge.id}`} className="w-full sm:w-auto">View Challenge</LinkButton>
-            <LinkButton href="/my-challenges" variant="secondary" className="w-full sm:w-auto">View My Submissions</LinkButton>
+            <LinkButton href="/my-entries" variant="secondary" className="w-full sm:w-auto">View My Entries</LinkButton>
             <LinkButton href="/dashboard" variant="ghost" className="w-full sm:w-auto">Go to Dashboard</LinkButton>
           </div>
         </Card>
@@ -282,8 +282,8 @@ export default function JoinChallengePage() {
           <p className="mt-5 break-words text-slate-300">{currentChallenge.description}</p>
           <div className="mt-6 space-y-3 text-slate-200">
             <p><b>Deadline:</b> {currentChallenge.registrationDeadline}</p>
-            <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review. Prize release is not available yet."}</p>
-            <p><b>Entry fee:</b> Paid-entry prize pools are not available yet.</p>
+            <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review"}</p>
+            {paidEntryRequired ? <p><b>Entry fee:</b> {entryFeeLabel}</p> : <p><b>Entry fee:</b> Free</p>}
           </div>
           <h2 className="mt-8 text-xl font-black">Rules</h2>
           {currentChallenge.rules.length ? currentChallenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-sm text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-sm text-slate-300">Rules have not been published for this challenge yet.</p>}
@@ -301,7 +301,7 @@ export default function JoinChallengePage() {
             <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
             <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
             <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
-            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. Paid-entry prize pools and payouts are not available yet.</span></label>
+            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. I accept the challenge rules, voting policy, and prize terms.</span></label>
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
             <Button className="w-full" disabled={!auth.user || submitUnavailable || (!alreadyJoined && !paidEntryEnrolled) || (paidEntryRequired && !paidEntryEnrolled) || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : paidEntryRequired && !paidEntryEnrolled ? "Pay Entry Fee First" : !alreadyJoined && !paidEntryEnrolled ? "Join Before Submitting" : !submissionOpen ? "Submissions Not Open" : "Submit Entry"}</Button>
           </form>
@@ -310,5 +310,6 @@ export default function JoinChallengePage() {
     </AppShell>
   );
 }
+
 
 

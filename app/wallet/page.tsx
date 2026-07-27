@@ -171,16 +171,16 @@ export default function WalletPage() {
 
       {showEarnings ? <Card className="mt-8 flex flex-col gap-5 border-[var(--gold)]/25 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="text-xl font-black">Earnings</h2><p className="mt-2 text-sm text-slate-300">Approved winnings and eligible creator earnings can be submitted for withdrawal after verification.</p></div>
-        <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">View Earnings</LinkButton>
+        <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">Withdraw</LinkButton>
       </Card> : null}
 
       {!loading && !unauthenticated && !error ? <Card className="mt-8 p-6 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-2xl font-black">Cash wallet architecture</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Cash earnings are separate from DoroCoins and become withdrawable only after KYC, payout setup, admin review, and provider integration.</p>
+            <h2 className="text-2xl font-black">Cash Balance</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Cash earnings are separate from DoroCoins. Withdrawals require KYC and review.</p>
           </div>
-          <LinkButton href="/wallet/withdraw" variant="secondary">Review Withdrawal Setup</LinkButton>
+          <LinkButton href="/wallet/withdraw" variant="secondary">Withdraw</LinkButton>
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <CashMetric label="Available Balance" value={Number(cashWallet?.availableBalanceCents ?? 0)} />
@@ -234,3 +234,4 @@ export default function WalletPage() {
 function CashMetric({ label, value }: { label: string; value: number }) {
   return <div className="rounded-[8px] border border-white/10 bg-black/25 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">${(value / 100).toFixed(2)}</p></div>;
 }
+

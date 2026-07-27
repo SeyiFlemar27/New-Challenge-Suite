@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+const builder = readFileSync("components/challenge-builder.tsx", "utf8");
+assert(builder.includes("lg:grid-cols-[260px_minmax(0,1fr)]"), "Challenge builder must use left rail layout");
+assert(!builder.includes("overflow-x-auto"), "Challenge builder must not use horizontal step scrolling");
+assert(builder.includes("Save Draft"), "Save Draft must remain");
+assert(builder.includes("Review & Publish"), "Review/publish step must remain");
+assert(builder.includes("MediaUploadField"), "Media upload must remain");
+assert(builder.includes("Paid Entry"), "Paid-entry fields must remain");
+assert(builder.includes("Sponsor Ready"), "Sponsor-ready fields must remain");
+console.log("challenge vertical builder layout checks passed");

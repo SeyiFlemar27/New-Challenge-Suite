@@ -47,10 +47,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [checkoutLineItem({ amountCents: paidEntryAmountCents(challenge), currency: "usd", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/join?payment=processing&entryPaymentId=${encodeURIComponent(record.id)}`,
-    cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/join?payment=canceled`,
+    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=processing&entryPaymentId=${encodeURIComponent(record.id)}`,
+    cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=canceled`,
     metadata: checkoutMetadataForPurpose("challenge_entry_fee", record)
   });
   await attachCheckoutSession(db, "challengeEntryPayments", record.id, session);
   return ok({ url: session.url, entryPaymentId: record.id, status: "pending", webhookConfirmationRequired: true, checkoutSuccessActivatesEntry: false }, "Paid entry checkout session created. Entry activates only after Stripe webhook confirmation.");
 }
+

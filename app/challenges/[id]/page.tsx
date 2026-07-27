@@ -32,6 +32,7 @@ export default function ChallengeDetailPage() {
   const [participantLimit, setParticipantLimit] = useState(12);
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
+  const [paymentReturnState, setPaymentReturnState] = useState<"" | "processing" | "canceled">("");
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -49,6 +50,22 @@ export default function ChallengeDetailPage() {
   useEffect(() => {
     setSaved(Boolean(details?.userState?.saved));
   }, [details?.userState]);
+
+  useEffect(() => {
+    const payment = new URLSearchParams(window.location.search).get("payment");
+    if (payment === "processing" || payment === "canceled") setPaymentReturnState(payment);
+  }, []);
+
+  useEffect(() => {
+    if (paymentReturnState !== "processing") return;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      void refetch();
+      if (attempts >= 12) window.clearInterval(timer);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [paymentReturnState, refetch]);
 
   useEffect(() => {
     if (!challengeId) return;
@@ -173,9 +190,11 @@ export default function ChallengeDetailPage() {
   const entryPaymentStatus = String(userPaidEntry.paymentStatus ?? (userState as any)?.entryPaymentStatus ?? "not_started");
   const paidEntryPending = Boolean((userState as any)?.entryPaymentPending || entryPaymentStatus === "pending");
   const paidEntryEnrolled = Boolean(userPaidEntry.canSubmit || (userState as any)?.paidEntryEnrolled || ["paid", "confirmed"].includes(entryPaymentStatus));
+  const paidEntryReturnedPending = paymentReturnState === "processing" && paidEntryRequired && !paidEntryEnrolled;
+  const paidEntryCanceled = paymentReturnState === "canceled" && paidEntryRequired && !paidEntryEnrolled;
   const alreadySubmitted = Boolean((userState as any)?.submitted);
   const submissionId = String((userState as any)?.submissionId ?? "");
-  const paidEntryCtaLabel = paidEntryPending ? "Payment Processing..." : `Pay & Enroll - ${entryFeeLabel}`;
+  const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enroll - ${entryFeeLabel}`;
 
   return (
     <AppShell>
@@ -193,6 +212,8 @@ export default function ChallengeDetailPage() {
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
           </div>
           {engagementMessage ? <p className="mt-3 text-sm text-slate-300">{engagementMessage}</p> : null}
+          {paidEntryReturnedPending ? <Card className="mt-4 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">Payment received. We are confirming your enrollment.</Card> : null}
+          {paidEntryCanceled ? <Card className="mt-4 border-slate-600 bg-slate-900/60 p-4 text-sm text-slate-300">Payment canceled. You remain unenrolled.</Card> : null}
           <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" support="Registered" />
@@ -270,21 +291,21 @@ export default function ChallengeDetailPage() {
             ) : paidEntryRequired ? alreadySubmitted ? (
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
             ) : paidEntryEnrolled && submissionOpen ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Entry</LinkButton></>
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Now</LinkButton></>
             ) : paidEntryEnrolled ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Submissions open after registration closes.</p></div><Button className="mt-5 w-full" disabled>Submissions Not Open</Button></>
-            ) : paidEntryPending ? (
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Submissions open after registration closes.</p></div><Button className="mt-5 w-full" disabled>Enrolled - Waiting for submissions</Button></>
+            ) : paidEntryPending || paidEntryReturnedPending ? (
               <><Button className="mt-6 w-full" disabled>{paidEntryCtaLabel}</Button><Button variant="secondary" className="mt-3 w-full" onClick={() => void refetch()}>Refresh Payment Status</Button></>
             ) : (
               <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : paidEntryCtaLabel}</Button>
             ) : alreadySubmitted ? (
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
             ) : userState?.joined && submissionOpen ? (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Entry</LinkButton>
+              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Now</LinkButton>
             ) : userState?.joined ? (
               <Button className="mt-6 w-full" disabled>Submissions Not Open</Button>
             ) : (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton>
+              joinOpen ? <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton> : <Button className="mt-6 w-full" disabled>Registration Closed</Button>
             )}
             {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : null}
             {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
@@ -359,6 +380,10 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
+
+
 
 
 

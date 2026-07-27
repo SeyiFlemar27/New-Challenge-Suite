@@ -1,0 +1,12 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+const route = readFileSync("app/api/challenges/[id]/entry-checkout/route.ts", "utf8");
+const detail = readFileSync("app/challenges/[id]/page.tsx", "utf8");
+assert(route.includes('/challenges/${encodeURIComponent(challengeId)}?payment=processing'), "Paid-entry success URL must return to challenge detail");
+assert(route.includes('/challenges/${encodeURIComponent(challengeId)}?payment=canceled'), "Paid-entry cancel URL must return to challenge detail");
+assert(!route.includes('/join?payment=processing'), "Paid-entry success must not return to join page");
+assert(detail.includes('paymentReturnState'), "Detail page must track payment return state");
+assert(detail.includes('Confirming Payment'), "Detail page must show confirmation state");
+assert(detail.includes('Enrolled - Waiting for submissions'), "Detail page must show waiting state before submissions open");
+assert(detail.includes('Submit Now'), "Detail page must show Submit Now only when available");
+console.log("paid-entry return-to-detail checks passed");

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,7 +16,6 @@ import {
   LockKeyhole,
   Medal,
   Menu,
-  PlusSquare,
   Radio,
   ReceiptText,
   Rocket,
@@ -50,8 +49,6 @@ const competitorSections: NavSection[] = [
   ] },
   { label: "Compete", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/challenges/create", label: "Create Challenge", icon: PlusSquare },
-    { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
     { href: "/winners", label: "Winners", icon: Trophy }
@@ -71,9 +68,8 @@ const starterSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
-    { href: "/creator/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Community", items: [
@@ -95,9 +91,8 @@ const creatorSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
-    { href: "/creator/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Creator Tools", items: [
@@ -125,11 +120,10 @@ const hostSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Competitions", items: [
-    { href: "/host/challenges", label: "Challenges", icon: Medal },
+    { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
     { href: "/host/live-events", label: "Live Events", icon: Radio },
     { href: "/host/tournaments", label: "Tournaments", icon: Award },
-    { href: "/my-challenges", label: "My Challenges", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Operations", items: [
@@ -161,18 +155,18 @@ const sponsorSections: NavSection[] = [
   ] }
 ];
 function activeNavigationHref(pathname: string) {
-  if (pathname === "/challenges/create") return "/challenges/create";
+  if (pathname === "/challenges/create") return "/challenges";
   if (pathname === "/private/create") return "/creator/private-challenges";
   if (pathname === "/dashboard/host/team" || pathname === "/host/team") return "/host/team";
   if (pathname === "/dashboard/host") return "/dashboard/host";
-  if (pathname.startsWith("/host/challenges/create")) return "/host/challenges";
+  if (pathname.startsWith("/host/challenges/create")) return "/challenges";
   if (pathname.startsWith("/host/private/create")) return "/host/private";
   if (pathname.startsWith("/host/live/create")) return "/host/live-events";
   if (pathname.startsWith("/host/tournaments/create")) return "/host/tournaments";
   if (pathname.startsWith("/host/")) return pathname;
   if (pathname.startsWith("/creator/")) return pathname;
   if (pathname === "/my-entries") return "/my-entries";
-  if (pathname === "/my-challenges") return "/my-challenges";
+  if (pathname === "/my-challenges") return "/challenges";
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
   if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return "/rewards";
@@ -209,7 +203,7 @@ export function Sidebar() {
     : effectiveTier.id === "host" || effectiveTier.id === "enterprise"
       ? [
           { href: "/dashboard/host", label: "Home", icon: Home },
-          { href: "/host/challenges", label: "Challenges", icon: Medal },
+          { href: "/challenges", label: "Challenges", icon: Medal },
           { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
           { href: "/rewards", label: "Rewards", icon: Gift },
           { href: "/wallet", label: "Wallet", icon: Coins }
@@ -218,14 +212,14 @@ export function Sidebar() {
         ? [
             { href: "/dashboard", label: "Home", icon: Home },
             { href: "/explore", label: "Explore", icon: LayoutGrid },
-            { href: "/creator/challenges", label: "Challenges", icon: Medal },
+            { href: "/challenges", label: "Challenges", icon: Medal },
             { href: "/creator/private-challenges", label: "Private", icon: LockKeyhole },
             { href: "/rewards", label: "Rewards", icon: Gift }
           ]
         : [
             { href: "/dashboard", label: "Home", icon: Home },
             { href: "/explore", label: "Explore", icon: LayoutGrid },
-            { href: "/challenges/create", label: "Create", icon: PlusSquare },
+            { href: "/challenges", label: "Challenges", icon: Medal },
             { href: "/rewards", label: "Rewards", icon: Gift },
             { href: "/wallet", label: "Wallet", icon: Coins }
           ];
