@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -27,10 +27,12 @@ assert(exists("app/api/challenges/[id]/entry-payment-status/route.ts"), "paid en
 
 assert(detailPage.includes("paidEntryRequired") && detailPage.includes("entryFeeCents > 0"), "paid challenge CTA must activate only when entry fee is enabled and greater than zero.");
 assert(detailPage.includes("challengePaidEntry") && detailPage.includes("userPaidEntry"), "detail page must read normalized paid-entry state from the backend payload.");
-assert(detailPage.includes("Join Challenge") && detailPage.includes("Submit Now") && detailPage.includes("Pay & Enroll"), "detail page must support free join, submit, and paid-entry CTAs.");
-assert(detailPage.includes("paidEntryRequired ? alreadySubmitted") && detailPage.includes("paidEntryEnrolled") && detailPage.includes("paidEntryPending"), "paid-entry CTA must be state-driven by submitted/enrolled/pending states.");
+const participantJourney = read("lib/server/participant-journey.ts");
+assert(detailPage.includes("ParticipantJourneyPanel") && detailPage.includes("JourneyAction"), "detail page must render journey-driven CTAs.");
+for (const action of ["register", "enter_challenge", "pay_entry_fee", "refresh_payment", "submit_entry", "view_entry"]) assert(participantJourney.includes(action) || detailPage.includes(action), `detail journey must support ${action}`);
+assert(participantJourney.includes("payment_required") && participantJourney.includes("payment_pending") && participantJourney.includes("can_submit"), "paid-entry CTA must be state-driven by backend journey states.");
 assert(!detailPage.includes("Enroll Now"), "detail page must not show legacy Enroll Now CTA.");
-assert(detailPage.includes("Sponsor accounts cannot join or submit entries"), "sponsor accounts must be blocked from participant CTAs.");
+assert(participantJourney.includes("blocked_sponsor") && participantJourney.includes("Sponsors cannot participate as competitors"), "sponsor accounts must be blocked from participant CTAs.");
 
 assert(challengeDetailApi.includes("paidEntryState") && challengeDetailApi.includes("challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry:"), "challenge detail API must expose normalized paid-entry state with sanitized public challenge data.");
 assert(challengeDetailApi.includes("canPay") && challengeDetailApi.includes("canSubmit") && challengeDetailApi.includes("paymentStatus"), "challenge detail API must expose payment-state flags for paid-entry UI.");
@@ -70,4 +72,7 @@ assert(builder.includes("Monetized challenges are available to Creator, Host, an
 assert(challengeApi.includes("paidEntryRequested") && challengeApi.includes("FREE_BASIC_ADVANCED_LOCKED"), "API must keep free-user paid-entry creation lock.");
 
 console.log("Paid entry enrollment flow checks passed.");
+
+
+
 

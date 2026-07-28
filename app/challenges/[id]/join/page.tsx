@@ -18,15 +18,16 @@ import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/cha
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
 
-function SubmissionAccessCard({ access, entryFeeLabel, challengeId, submissionId, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; entryFeeLabel: string; challengeId: string; submissionId?: string | null; onPay: () => void; onJoin: () => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
+function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, submissionId, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; journey: any; entryFeeLabel: string; challengeId: string; submissionId?: string | null; onPay: () => void; onJoin: (action: "register" | "enter_challenge") => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
   if (access.canSubmit) return null;
-  const action = access.action;
+  const action = String(journey?.primaryAction ?? access.action ?? "back_to_challenge");
   return (
     <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">
       <h3 className="font-black">{access.title}</h3>
       <p className="mt-2 text-slate-200">{access.reason === "payment_required" ? `Pay the ${entryFeeLabel} entry fee before submitting.` : access.message}</p>
       {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button> : null}
-      {action === "join" ? <Button className="mt-4 w-full" onClick={onJoin} disabled={joinLoading}>{joinLoading ? "Joining..." : "Join Challenge"}</Button> : null}
+      {action === "register" || action === "join" ? <Button className="mt-4 w-full" onClick={() => onJoin("register")} disabled={joinLoading}>{joinLoading ? "Saving..." : "Register for Challenge"}</Button> : null}
+      {action === "enter_challenge" ? <Button className="mt-4 w-full" onClick={() => onJoin("enter_challenge")} disabled={joinLoading}>{joinLoading ? "Entering..." : "Enter Challenge"}</Button> : null}
       {action === "refresh_status" ? <Button className="mt-4 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button> : null}
       {action === "view_entry" && submissionId ? <LinkButton href={`/submissions/${submissionId}`} className="mt-4 w-full">View My Entry</LinkButton> : null}
       {action === "manage_challenge" ? <LinkButton href="/challenges" className="mt-4 w-full">Manage Challenge</LinkButton> : null}
@@ -101,6 +102,7 @@ export default function JoinChallengePage() {
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, unknown> : {};
   const userState = details?.userState as Record<string, unknown> | undefined;
   const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
+  const participantJourney = (userState?.participantJourney && typeof userState.participantJourney === "object" ? userState.participantJourney : null) as any;
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, unknown> : {};
   const userPaidEntry = userState?.paidEntry && typeof userState.paidEntry === "object" ? userState.paidEntry as Record<string, unknown> : {};
   const entryFeeCents = Number(userPaidEntry.amountCents ?? challengePaidEntry.amountCents ?? monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
@@ -114,7 +116,7 @@ export default function JoinChallengePage() {
   const alreadyJoined = Boolean(userState?.joined);
   const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
   const submitUnavailable = !submissionOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
-  const canSubmitNow = Boolean(submissionAccess?.canSubmit);
+  const canSubmitNow = Boolean(participantJourney?.canSubmit ?? submissionAccess?.canSubmit);
 
 
   async function startPaidEntryCheckout() {
@@ -137,7 +139,7 @@ export default function JoinChallengePage() {
     window.location.href = result.data.url;
   }
 
-  async function startFreeJoin() {
+  async function startFreeJoin(action: "register" | "enter_challenge" = "register") {
     setError("");
     if (!auth.user) {
       setError("Sign in before joining this challenge.");
@@ -145,7 +147,7 @@ export default function JoinChallengePage() {
     }
     if (!currentChallenge) return;
     setJoinLoading(true);
-    const result = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true });
+    const result = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true, action } as any);
     setJoinLoading(false);
     if (!result.ok) {
       setError(result.message);
@@ -313,11 +315,12 @@ export default function JoinChallengePage() {
           {submissionAccess && !canSubmitNow ? (
             <SubmissionAccessCard
               access={submissionAccess}
+              journey={participantJourney}
               entryFeeLabel={entryFeeLabel}
               challengeId={currentChallenge.id}
               submissionId={typeof userState?.submissionId === "string" ? userState.submissionId : null}
               onPay={() => void startPaidEntryCheckout()}
-              onJoin={() => void startFreeJoin()}
+              onJoin={(action) => void startFreeJoin(action)}
               onRefresh={() => void refetch()}
               entryCheckoutLoading={entryCheckoutLoading}
               joinLoading={joinLoading}

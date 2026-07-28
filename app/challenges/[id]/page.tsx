@@ -198,7 +198,8 @@ export default function ChallengeDetailPage() {
   const paidEntryCanceled = paymentReturnState === "canceled" && paidEntryRequired && !paidEntryEnrolled;
   const alreadySubmitted = Boolean((userState as any)?.submitted);
   const submissionId = String((userState as any)?.submissionId ?? "");
-  const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enroll - ${entryFeeLabel}`;
+  const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enter - ${entryFeeLabel}`;
+  const participantJourney = (userState as any)?.participantJourney;
 
   return (
     <AppShell>
@@ -286,44 +287,20 @@ export default function ChallengeDetailPage() {
         </div>
 
         <aside className="space-y-5 xl:pt-[432px]">
-          <Card className="p-5 text-center sm:p-8">
-            <h3 className="text-xl font-black">Ready to compete?</h3>
-            {paidEntryRequired ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-left"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p><p className="mt-2 text-sm text-slate-300">Secure payment is required to enter. Entry-fee money is recorded as pending challenge revenue. Prize settlement requires review.</p></div> : <p className="mt-2 text-slate-300">Join when you are ready to submit.</p>}
-            {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
-            {viewerRelationship === "owner" ? <Card className="mt-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-left text-sm text-yellow-50"><b>You manage this challenge.</b><p className="mt-2 text-slate-300">Creators and hosts cannot compete in their own challenge.</p><LinkButton href="/challenges" className="mt-4 w-full">Manage Challenges</LinkButton></Card> : sponsorAccount ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-sm text-yellow-50">Sponsor accounts cannot join or submit entries. Use sponsor funding and messaging flows instead.</Card> : freePremiumBlocked ? (
-              <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
-            ) : paidEntryRequired ? alreadySubmitted ? (
-              <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
-            ) : paidEntryEnrolled && submissionOpen ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Now</LinkButton></>
-            ) : paidEntryEnrolled && votingOpen ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Submission closed. Voting is now open.</p></div><LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-5 w-full">View Voting</LinkButton></>
-            ) : paidEntryEnrolled && phase === "timeline_needs_review" ? (
-              <><Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-left text-sm text-yellow-50"><b>Timeline Needs Review</b><p className="mt-2 text-slate-300">This challenge timeline is being reviewed.</p></Card><Button className="mt-5 w-full" disabled>Timeline Needs Review</Button></>
-            ) : paidEntryEnrolled && ["submission_closed", "voting_pending", "voting_closed", "under_review", "winners_announced", "completed"].includes(phase) ? (
-              <><Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-left text-sm text-slate-300"><b>Submissions closed</b><p className="mt-2">The submission window has closed.</p></Card><LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-5 w-full" variant="secondary">View Challenge Activity</LinkButton></>
-            ) : paidEntryEnrolled ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. {formatPhaseDate(phaseSummary?.submissionStartAt) ? `Submissions open at ${formatPhaseDate(phaseSummary?.submissionStartAt)}.` : "Waiting for submissions."}</p></div><Button className="mt-5 w-full" disabled>Enrolled - Waiting for submissions</Button></>
-            ) : paidEntryPending || paidEntryReturnedPending ? (
-              <><Button className="mt-6 w-full" disabled>{paidEntryCtaLabel}</Button><Button variant="secondary" className="mt-3 w-full" onClick={() => void refetch()}>Refresh Payment Status</Button></>
-            ) : (
-              <Button className="mt-6 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!joinOpen || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : paidEntryCtaLabel}</Button>
-            ) : alreadySubmitted ? (
-              <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
-            ) : userState?.joined && submissionOpen ? (
-              <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Now</LinkButton>
-            ) : userState?.joined && votingOpen ? (
-              <LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-6 w-full">View Voting</LinkButton>
-            ) : userState?.joined ? (
-              <Button className="mt-6 w-full" disabled>Submissions Not Open</Button>
-            ) : (
-              joinOpen ? <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton> : <Button className="mt-6 w-full" disabled>Registration Closed</Button>
-            )}
+          <Card className="p-5 sm:p-8">
+            <ParticipantJourneyPanel
+              journey={participantJourney}
+              phaseLabel={displayStatus}
+              challengeId={challenge.id}
+              entryFeeLabel={entryFeeLabel}
+              paidEntryRequired={paidEntryRequired}
+              entryCheckoutLoading={entryCheckoutLoading}
+              entryCheckoutMessage={entryCheckoutMessage}
+              onPay={() => void startPaidEntryCheckout()}
+              onRefresh={() => void refetch()}
+            />
             {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Payment confirmation is processed securely before enrollment updates.</p> : null}
-            {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
-            <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
-          </Card>
-          {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
+          </Card>          {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Sponsor contributions are confirmed before any public funding status updates. No investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
@@ -354,6 +331,33 @@ export default function ChallengeDetailPage() {
 }
 
 
+function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLabel, paidEntryRequired, entryCheckoutLoading, entryCheckoutMessage, onPay, onRefresh }: { journey: any; phaseLabel: string; challengeId: string; entryFeeLabel: string; paidEntryRequired: boolean; entryCheckoutLoading: boolean; entryCheckoutMessage: string; onPay: () => void; onRefresh: () => void }) {
+  const action = String(journey?.primaryAction ?? "back_to_challenge");
+  const label = String(journey?.label ?? "Challenge Entry");
+  const message = String(journey?.message ?? "Open the entry page for the next step.");
+  const checklist = journey?.checklist ?? {};
+  const items = [
+    ["Register", checklist.registered ? "Done" : "Required"],
+    ["Approval", checklist.approvalRequired ? checklist.approvalGranted ? "Approved" : "Pending" : "Not required"],
+    ["Payment", checklist.paymentRequired ? checklist.paymentConfirmed ? "Confirmed" : action === "refresh_payment" ? "Processing" : "Required" : "Not required"],
+    ["Entered", checklist.entered ? "Yes" : "No"],
+    ["Submission", checklist.submissionOpen ? "Open" : "Closed"],
+    ["Entry", checklist.alreadySubmitted ? "Submitted" : "Not submitted"]
+  ];
+  return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
+}
+
+function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPay, onRefresh }: { action: string; href?: string | null; challengeId: string; entryFeeLabel: string; loading: boolean; onPay: () => void; onRefresh: () => void }) {
+  if (action === "pay_entry_fee") return <Button className="mt-5 w-full" onClick={onPay} disabled={loading}>{loading ? "Starting Checkout..." : `Pay & Enter - ${entryFeeLabel}`}</Button>;
+  if (action === "refresh_payment") return <Button className="mt-5 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button>;
+  if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
+  if (action === "register" || action === "enter_challenge" || action === "request_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "register" ? "Register for Challenge" : action === "enter_challenge" ? "Enter Challenge" : "Request Entry"}</LinkButton>;
+  if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">View Voting</LinkButton>;
+  if (action === "view_entry" && href) return <LinkButton href={href} className="mt-5 w-full">View My Entry</LinkButton>;
+  if (action === "manage_challenge") return <LinkButton href="/challenges" className="mt-5 w-full">Manage Challenge</LinkButton>;
+  if (action === "sign_in") return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}`)}`} className="mt-5 w-full">Sign In to Continue</LinkButton>;
+  return href ? <LinkButton href={href} className="mt-5 w-full" variant="secondary">View Challenge</LinkButton> : null;
+}
 function formatPhaseDate(value: unknown) {
   if (typeof value !== "string" || !value) return null;
   const date = new Date(value);

@@ -7,6 +7,7 @@ import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError, conflict, serverError } from "@/lib/server/responses";
 import {
   isChallengeSubmittable,
+  isEnteredParticipantStatus,
   isSponsorProfile,
   resolveSubmissionStatus
 } from "@/lib/server/submission-lifecycle";

@@ -10,6 +10,8 @@ import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetiz
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/challenge-status";
 import { resolveChallengeSubmissionAccess, resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
+import { getParticipantJourneyState } from "@/lib/server/participant-journey";
+import { isEnteredParticipantStatus } from "@/lib/server/submission-lifecycle";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -94,6 +96,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
   const entryPayment = activeEntryPaymentSnap?.exists ? { id: activeEntryPaymentSnap.id, ...activeEntryPaymentSnap.data() } as Record<string, unknown> : null;
   const participantData = participantSnap?.exists ? participantSnap.data() ?? {} : null;
+  const participantEntered = Boolean(participantData && isEnteredParticipantStatus(participantData.status));
   const entryRequestData = entryRequestSnap?.exists ? entryRequestSnap.data() ?? {} : null;
   const paidEntryRequired = isPaidEntryChallenge(challengeData);
   const paidEntryAmountCentsValue = paidEntryAmountCents(challengeData);
@@ -124,6 +127,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   };
   const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
   const submissionAccess = resolveChallengeSubmissionAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
+  const participantJourney = getParticipantJourneyState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, entryRequest: entryRequestData, payment: entryPayment, submission: userSubmissionSnap?.exists ? { id: userSubmissionSnap.id, ...userSubmissionSnap.data() } : null, phaseSummary });
   const participationState = {
     phase: phaseSummary.phase,
     participationStatus: lifecycle.participationStatus,
@@ -131,7 +135,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     votingStatus: lifecycle.votingStatus,
     canJoin: Boolean(phaseSummary.canJoin && !sponsorAccount && !participantSnap?.exists),
     canPay: paidEntryState.canPay,
-    canSubmit: Boolean(phaseSummary.canSubmit && paidEntryState.canSubmit),
+    canSubmit: Boolean(participantJourney.canSubmit && paidEntryState.canSubmit),
     canVote: Boolean(phaseSummary.canVote && !sponsorAccount),
     blockReason: baseBlockReason,
     message: phaseSummary.label
@@ -148,7 +152,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     voteCount: votes.length,
     userState: user ? {
       authenticated: true,
-      joined: Boolean(participantSnap?.exists),
+      joined: participantEntered,
+      registered: Boolean(participantSnap?.exists),
       entryPaymentStatus,
       entryPaymentReservationStatus: entryPayment?.reservationStatus ?? null,
       entryPaymentId: entryPayment?.id ?? null,
@@ -157,6 +162,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       paidEntry: paidEntryState,
       viewerState,
       submissionAccess,
+      participantJourney,
       participation: participationState,
       submitted,
       submissionId: userSubmissionSnap?.id ?? null,
@@ -171,6 +177,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       joined: false,
       viewerState,
       submissionAccess,
+      participantJourney,
       participation: {
         phase: phaseSummary.phase,
         participationStatus: lifecycle.participationStatus,

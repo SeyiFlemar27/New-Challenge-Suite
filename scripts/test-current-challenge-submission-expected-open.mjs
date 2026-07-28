@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const diagnostic = readFileSync("scripts/inspect-challenge-participant-journey.mjs", "utf8");
+const helper = readFileSync("lib/server/participant-journey.ts", "utf8");
+assert(diagnostic.includes("challengeId") && diagnostic.includes("participantStatus") && diagnostic.includes("paymentStatus"), "diagnostic must expose safe status fields");
+assert(!/email|displayName|phone|privateKey|clientEmail|FIREBASE_/i.test(diagnostic), "diagnostic must not contain PII or secret config fields");
+assert(helper.includes("Nq7fK1VeC8QPJdPQ1eog") === false, "current challenge logic must not be hard-coded");
+console.log("current challenge submission expected-open diagnostics checks passed");

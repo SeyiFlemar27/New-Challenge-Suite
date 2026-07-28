@@ -367,12 +367,18 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     blocker = "timeline_needs_review";
   } else if (timeline.registrationOpensAt && now < timeline.registrationOpensAt) {
     phase = "scheduled";
+  } else if (timeline.submissionClosesAt && now <= timeline.submissionClosesAt) {
+    if (timeline.submissionOpensAt && now >= timeline.submissionOpensAt) {
+      phase = "submission_open";
+    } else if (timeline.registrationClosesAt && now <= timeline.registrationClosesAt) {
+      phase = "registration_open";
+    } else {
+      phase = "registration_closed";
+    }
   } else if (timeline.registrationClosesAt && now <= timeline.registrationClosesAt) {
     phase = "registration_open";
   } else if (timeline.submissionOpensAt && now < timeline.submissionOpensAt) {
     phase = "registration_closed";
-  } else if (timeline.submissionClosesAt && now <= timeline.submissionClosesAt) {
-    phase = "submission_open";
   } else if (timeline.votingOpensAt && now < timeline.votingOpensAt) {
     phase = "submission_closed";
   } else if (timeline.votingClosesAt && now > timeline.votingClosesAt) {
@@ -386,7 +392,7 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     phase = "submission_closed";
   }
 
-  const registrationOpen = phase === "registration_open";
+  const registrationOpen = Boolean(timeline.registrationClosesAt && now <= timeline.registrationClosesAt && (!timeline.registrationOpensAt || now >= timeline.registrationOpensAt));
   const submissionOpen = phase === "submission_open";
   const votingOpen = phase === "voting_open";
   return {

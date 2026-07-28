@@ -1,10 +1,12 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
 const api = read("app/api/challenges/[id]/route.ts");
 const detail = read("app/challenges/[id]/page.tsx");
 const join = read("app/challenges/[id]/join/page.tsx");
-assert(api.includes("viewerState") && api.includes("submissionAccess") && api.includes("participationState"), "API must provide normalized viewer, participation, and submission-access state");
-for (const label of ["Join Challenge", "Pay & Enroll", "Confirming Payment", "Submit Now", "View My Entry", "Waiting for submissions", "Registration Closed"]) assert(detail.includes(label), `detail page must include CTA state ${label}`);
-assert(join.includes("SubmissionAccessCard") && join.includes("access.action"), "join page must derive blocked CTAs from submissionAccess action");
+const journey = read("lib/server/participant-journey.ts");
+assert(api.includes("viewerState") && api.includes("submissionAccess") && api.includes("participationState") && api.includes("participantJourney"), "API must provide normalized viewer, participation, submission-access, and journey state");
+for (const step of ["register", "registered_not_entered", "payment_required", "payment_pending", "entered_waiting_submission", "can_submit", "already_submitted", "registration_closed"]) assert(journey.includes(step), `participant journey must include CTA state ${step}`);
+for (const label of ["Register for Challenge", "Enter Challenge", "Pay & Enter", "Refresh Status", "Submit Entry", "View My Entry"]) assert(detail.includes(label) || journey.includes(label), `detail page must include journey action ${label}`);
+assert(join.includes("SubmissionAccessCard") && join.includes("action") && join.includes("Register for Challenge") && join.includes("Enter Challenge"), "join page must derive blocked CTAs from submissionAccess/journey actions");
 assert(!detail.includes("Enroll Now"), "legacy Enroll Now CTA must stay removed");
 console.log("challenge CTA state consistency checks passed");

@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { ok, serverUnavailable, fail, readJson, validationError } from "@/lib/server/responses";
@@ -8,8 +8,7 @@ import { isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challe
 import {
   isChallengeJoinable,
   isSponsorProfile,
-  normalizeParticipantStatus,
-  resolveParticipantStatus
+  normalizeParticipantStatus
 } from "@/lib/server/submission-lifecycle";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 
@@ -62,32 +61,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const joinable = isChallengeJoinable(challenge);
       if (!joinable.allowed) throw new Error(joinable.reason ?? "Registration is closed for this challenge.");
       const paidEntry = isPaidEntryChallenge(challenge);
-
+      const requestedAction = String(body.action ?? "register");
       const now = new Date().toISOString();
+      if (paidEntry) throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
+      if (!participantSnap.exists && requestedAction === "enter_challenge") throw new Error("REGISTRATION_REQUIRED");
       if (participantSnap.exists) {
         const current = participantSnap.data() ?? {};
-        if (paidEntry && !["paid", "confirmed"].includes(String(current.entryPaymentStatus ?? ""))) throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
+        const currentStatus = normalizeParticipantStatus(current.status);
+        const entering = requestedAction === "enter_challenge";
+        const alreadyEntered = ["entered", "enrolled", "approved", "active", "winner"].includes(currentStatus);
+        const nextStatus = entering ? "active" : currentStatus;
         const participant = {
           ...current,
           id: participantRef.id,
-          status: normalizeParticipantStatus(current.status),
+          status: nextStatus,
+          enteredAt: entering ? current.enteredAt ?? now : current.enteredAt ?? null,
+          joinedAt: entering ? current.joinedAt ?? now : current.joinedAt ?? null,
           entryAgreementAccepted: true,
           entryAgreementAcceptedAt: current.entryAgreementAcceptedAt ?? now,
           updatedAt: now
         };
         transaction.set(participantRef, participant, { merge: true });
-        return { alreadyJoined: true, participant };
+        if (entering && !alreadyEntered) transaction.set(challengeRef, { participantCount: Number(challenge.participantCount ?? 0) + 1, updatedAt: now }, { merge: true });
+        return { alreadyJoined: alreadyEntered, participant };
       }
 
-      if (paidEntry) throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
-      const status = resolveParticipantStatus(challenge);
       const participant = {
         id: participantRef.id,
         challengeId: id,
         userId: user.uid,
-        status,
+        status: "registered",
         registeredAt: now,
-        joinedAt: now,
+        joinedAt: null,
+        enteredAt: null,
         entryAgreementAccepted: true,
         entryAgreementAcceptedAt: now,
         paidEntryEnabled: false,
@@ -98,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         updatedAt: now
       };
       transaction.set(participantRef, participant);
-      transaction.set(challengeRef, { participantCount: Number(challenge.participantCount ?? 0) + 1, updatedAt: now }, { merge: true });
+      transaction.set(challengeRef, { registrationCount: Number(challenge.registrationCount ?? 0) + 1, updatedAt: now }, { merge: true });
       return { alreadyJoined: false, participant };
     });
   } catch (error) {
@@ -108,6 +114,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     if (message === "SELF_ENTRY_NOT_ALLOWED") return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
     if (message === "ENTRY_REQUEST_REQUIRED") return fail("Request entry before joining this challenge.", 409, { action: "request_entry", requestUrl: `/api/challenges/${id}/entry-request` }, "ENTRY_REQUEST_REQUIRED");
+    if (message === "REGISTRATION_REQUIRED") return fail("Register for this challenge before entering.", 409, { action: "register" }, "REGISTRATION_REQUIRED");
     if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee payment is required before submitting to this challenge.", 402, { checkoutUrl: `/api/challenges/${id}/entry-checkout`, challengePath: `/challenges/${id}`, action: "pay_entry_fee" }, "PAID_ENTRY_PAYMENT_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "CHALLENGE_JOIN_REJECTED");
   }
@@ -122,7 +129,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     metadata: { alreadyJoined: result.alreadyJoined }
   }, db).catch((error) => console.warn("[audit] challenge join audit failed", { challengeId: id, userId: user.uid, error: error instanceof Error ? error.message : "unknown" }));
 
-  await createNotification(db, { userId: user.uid, type: "challenge_joined", title: "Challenge joined", body: result.alreadyJoined ? "You were already registered for this challenge." : "You successfully registered for the challenge.", targetId: id });
-  return ok(result, result.alreadyJoined ? "You already joined this challenge." : "Challenge joined successfully.");
+  await createNotification(db, { userId: user.uid, type: "challenge_joined", title: result.participant.status === "active" ? "Challenge entered" : "Challenge registered", body: result.participant.status === "active" ? "You entered the challenge." : "You registered for the challenge.", targetId: id });
+  return ok(result, result.participant.status === "active" ? "Challenge entered successfully." : "Challenge registration saved.");
 }
 

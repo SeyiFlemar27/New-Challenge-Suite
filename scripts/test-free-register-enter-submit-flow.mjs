@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const joinRoute = readFileSync("app/api/challenges/[id]/join/route.ts", "utf8");
+const viewer = readFileSync("lib/server/challenge-viewer-state.ts", "utf8");
+assert(joinRoute.includes('requestedAction = String(body.action ?? "register")'), "free flow should register first by default");
+assert(joinRoute.includes('requestedAction === "enter_challenge"'), "free flow should support explicit enter transition");
+assert(joinRoute.includes('status: "registered"'), "registration should create registered status");
+assert(joinRoute.includes('status: nextStatus'), "enter should update participant status");
+assert(viewer.includes("isEnteredParticipantStatus(status)"), "registered-only participants must not be treated as entered");
+console.log("free register enter submit flow checks passed");

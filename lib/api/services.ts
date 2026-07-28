@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { apiRequest } from "./client";
 import type { AccountType, SubscriptionPlan } from "@/lib/types";
@@ -314,7 +314,7 @@ export function updateChallengeDraft(draftId: string, payload: unknown) {
 export function publishChallengeDraft(draftId: string, payload: unknown) {
   return apiRequest<{ challenge: Record<string, unknown> }>(`/api/challenges/${draftId}/publish`, { method: "POST", body: JSON.stringify(payload) });
 }
-export function joinChallenge(challengeId: string, payload: { entryAgreementAccepted?: boolean } = {}) {
+export function joinChallenge(challengeId: string, payload: { entryAgreementAccepted?: boolean; action?: "register" | "enter_challenge" } = {}) {
   return apiRequest(`/api/challenges/${challengeId}/join`, { method: "POST", body: JSON.stringify(payload) });
 }
 

@@ -17,6 +17,8 @@ export const submissionStatuses = [
 
 export const participantStatuses = [
   "registered",
+  "entered",
+  "enrolled",
   "pending_approval",
   "approved",
   "rejected",
@@ -76,10 +78,14 @@ export function canSubmissionReceiveVotes(status: unknown) {
 }
 
 export function normalizeParticipantStatus(status: unknown): ParticipantLifecycleStatus {
-  const value = String(status ?? "");
+  const value = String(status ?? "").toLowerCase();
   if (participantStatuses.includes(value as ParticipantLifecycleStatus)) return value as ParticipantLifecycleStatus;
-  if (value === "joined") return "registered";
+  if (value === "joined" || value === "checked_in") return "active";
   return "registered";
+}
+
+export function isEnteredParticipantStatus(status: unknown) {
+  return ["entered", "enrolled", "approved", "active", "joined", "checked_in", "submitted", "winner"].includes(String(status ?? "").toLowerCase());
 }
 
 

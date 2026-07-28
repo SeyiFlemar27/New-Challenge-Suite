@@ -2,7 +2,7 @@ import { canAccessChallenge } from "@/lib/plan-access";
 import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/challenge-status";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
-import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
 export type ChallengeBlockerCode =
   | "AUTH_REQUIRED"
@@ -65,7 +65,7 @@ function text(value: unknown) {
 }
 
 function isActiveParticipant(status: unknown) {
-  return ["registered", "approved", "active", "joined", "checked_in", "submitted", "winner"].includes(text(status).toLowerCase());
+  return isEnteredParticipantStatus(status);
 }
 
 function isTerminalSubmission(status: unknown) {
