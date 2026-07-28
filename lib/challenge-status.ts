@@ -122,6 +122,7 @@ interface NormalizedTimeline {
   publishedAt: Date | null;
   cancelledAt: Date | null;
   completedAt: Date | null;
+  submissionDeadlineFallbackApplied: boolean;
 }
 
 export const challengeStatusLabels: Record<CanonicalChallengeStatus, ChallengeDisplayStatus> = {
@@ -349,6 +350,8 @@ export interface ChallengePhaseSummary {
   submissionDeadline: string | null;
   votingStartAt: string | null;
   votingEndAt: string | null;
+  eligibleSubmissionCount: number | null;
+  submissionDeadlineFallbackApplied: boolean;
 }
 
 export function getChallengePhaseSummary(challenge: Challenge | Record<string, unknown>, now = new Date(), context: { eligibleSubmissionCount?: number | null } = {}): ChallengePhaseSummary {
@@ -401,7 +404,18 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     && now >= timeline.submissionOpensAt
     && now <= timeline.submissionClosesAt
   );
-  const votingOpen = phase === "voting_open";
+  const votingWindowOpen = Boolean(
+    (timeline.votingOpensAt || persisted === "voting_open")
+    && (!timeline.votingOpensAt || now >= timeline.votingOpensAt)
+    && (!timeline.votingClosesAt || now <= timeline.votingClosesAt)
+  );
+  const votingOpen = Boolean(votingWindowOpen && eligibleSubmissionCount !== null && eligibleSubmissionCount > 0);
+  if (!submissionOpen && votingWindowOpen && eligibleSubmissionCount !== null && eligibleSubmissionCount <= 0) {
+    phase = "voting_pending";
+    blocker = "no_eligible_submissions";
+  } else if (!submissionOpen && votingOpen) {
+    phase = "voting_open";
+  }
   const label = registrationOpen && submissionOpen
     ? "Registration & Submission Open"
     : submissionOpen
@@ -422,7 +436,9 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     submissionStartAt: timeline.submissionOpensAt?.toISOString() ?? null,
     submissionDeadline: timeline.submissionClosesAt?.toISOString() ?? null,
     votingStartAt: timeline.votingOpensAt?.toISOString() ?? null,
-    votingEndAt: timeline.votingClosesAt?.toISOString() ?? null
+    votingEndAt: timeline.votingClosesAt?.toISOString() ?? null,
+    eligibleSubmissionCount,
+    submissionDeadlineFallbackApplied: timeline.submissionDeadlineFallbackApplied
   };
 }
 export function compareChallengeDates(left: unknown, right: unknown) {
@@ -632,7 +648,17 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
   const timeLimitedUploads = isRecord(record.timeLimitedUploads) ? record.timeLimitedUploads : {};
   const registrationClosesAt = firstDate(record, ["registrationEndAt", "registrationClosesAt", "registrationDeadline", "registrationEndsAt", "registrationEndDate"], "end");
   const submissionOpensAt = firstDate(record, ["submissionStartAt", "submissionOpensAt", "submissionStartsAt", "submissionOpensAt", "submissionsOpenAt", "submissionStartDate"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start") ?? registrationClosesAt;
-  const submissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate", "deadline"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
+  const configuredSubmissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
+  const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
+  const publishedRecord = Boolean(record.publishedAt) || !["draft", "pending_review"].includes(persisted);
+  const needsDeadlineFallback = Boolean(
+    publishedRecord
+    && submissionOpensAt
+    && (!configuredSubmissionClosesAt || configuredSubmissionClosesAt.getTime() <= submissionOpensAt.getTime())
+  );
+  const submissionClosesAt = needsDeadlineFallback && submissionOpensAt
+    ? new Date(submissionOpensAt.getTime() + 24 * 60 * 60 * 1000)
+    : configuredSubmissionClosesAt;
   const votingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start") ?? submissionClosesAt;
   return {
     timezone: resolveChallengeTimeZone(record),
@@ -654,6 +680,8 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
     publishedAt: firstDate(record, ["publishedAt"], "start"),
     cancelledAt: firstDate(record, ["cancelledAt"], "start"),
     completedAt: firstDate(record, ["completedAt"], "start")
+    ,
+    submissionDeadlineFallbackApplied: needsDeadlineFallback
   };
 }
 
@@ -712,9 +740,6 @@ function resolveVotingStatus(record: Record<string, unknown>, timeline: Normaliz
   const votingEnabled = record.votingEnabled === true || votingSettings.enabled === true || Boolean(timeline.votingOpensAt || timeline.votingClosesAt) || persisted === "voting_open" || persisted === "voting_closed";
   if (!votingEnabled) return "voting_not_enabled";
   if (persisted === "voting_closed") return "voting_closed";
-  const liveVotingDuringSubmission = record.liveVotingEnabled === true || record.votingDuringSubmission === true || votingSettings.liveVotingEnabled === true || votingSettings.allowDuringSubmissions === true;
-  const submissionStatus = resolveSubmissionStatus(record, timeline, now);
-  if (!liveVotingDuringSubmission && submissionStatus !== "submissions_closed" && submissionStatus !== "no_submission_required") return "voting_not_open";
   if (timeline.votingOpensAt && now < timeline.votingOpensAt) return "voting_not_open";
   if (timeline.votingClosesAt && now > timeline.votingClosesAt) return "voting_closed";
   if (timeline.votingOpensAt || timeline.votingClosesAt || persisted === "voting_open") return "voting_open";

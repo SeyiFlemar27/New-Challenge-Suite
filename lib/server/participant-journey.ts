@@ -165,8 +165,10 @@ export function getParticipantJourneyState(input: JourneyInput) {
     return result("register", "Register for Challenge", "Register first, then enter this challenge when you are ready.", "register", input, flags, null);
   }
   if (!entered) return result("registered_not_entered", "Registration complete", "You are registered. Enter the challenge to become eligible to submit.", "enter_challenge", input, flags, null);
-  if (phase.canSubmit) return result("can_submit", "Ready to submit", `Submission is open. Submit your entry before ${submissionDeadline ?? "the deadline"}.`, "submit_entry", input, flags, null);
-  if (["voting_open", "voting_pending", "voting_closed"].includes(phase.phase)) return result("voting_open", phase.votingOpen ? "Voting open" : "Submissions closed", phase.votingOpen ? "Submission closed. Voting is now open." : "The submission window has closed.", "view_voting", input, flags, "submission_closed");
+  if (phase.canSubmit) return result("can_submit", "Ready to submit", "You can submit now.", "submit_entry", input, flags, null);
+  if (phase.phase === "voting_pending") return result("submission_closed", "Voting unavailable", "No eligible submissions are available for voting yet.", null, input, flags, "no_eligible_submissions");
+  if (phase.votingOpen && Number(phase.eligibleSubmissionCount ?? 0) > 0) return result("voting_open", "Voting open", "Eligible submissions are available for voting.", "view_voting", input, flags, null);
+  if (phase.phase === "voting_closed") return result("submission_closed", "Submission closed", "The submission window has closed.", "back_to_challenge", input, flags, "submission_closed");
   if (["under_review", "winners_announced"].includes(phase.phase)) return result("results_pending", "Results pending", "Entries are under review.", "back_to_challenge", input, flags, "results_pending");
   if (phase.phase === "completed") return result("completed", "Challenge completed", "This challenge has ended.", "back_to_challenge", input, flags, "completed");
   if (phase.phase === "submission_closed") return result("submission_closed", "Submission closed", "The submission deadline has passed.", "back_to_challenge", input, flags, "submission_closed");

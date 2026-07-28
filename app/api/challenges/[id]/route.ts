@@ -128,6 +128,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
   const submissionAccess = resolveChallengeSubmissionAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
   const participantJourney = getParticipantJourneyState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, entryRequest: entryRequestData, payment: entryPayment, submission: userSubmissionSnap?.exists ? { id: userSubmissionSnap.id, ...userSubmissionSnap.data() } : null, phaseSummary });
+  const eligibleSubmissionCount = leaderboard.entries.length;
+  const approvedSubmissionCount = leaderboard.entries.filter((entry) => String(entry.status ?? "").toLowerCase() === "approved").length;
+  const activeSubmissionCount = leaderboard.entries.filter((entry) => ["active", "winner"].includes(String(entry.status ?? "").toLowerCase())).length;
+  const votingAccess = {
+    canVote: Boolean(phaseSummary.votingOpen && eligibleSubmissionCount > 0 && !sponsorAccount),
+    reason: eligibleSubmissionCount <= 0
+      ? "no_eligible_submissions"
+      : !phaseSummary.votingOpen
+        ? "voting_not_open"
+        : sponsorAccount
+          ? "sponsor_blocked"
+          : null,
+    eligibleSubmissionCount,
+    approvedSubmissionCount,
+    activeSubmissionCount
+  };
   const participationState = {
     phase: phaseSummary.phase,
     participationStatus: lifecycle.participationStatus,
@@ -163,6 +179,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       viewerState,
       submissionAccess,
       participantJourney,
+      votingAccess,
       participation: participationState,
       submitted,
       submissionId: userSubmissionSnap?.id ?? null,
@@ -178,6 +195,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       viewerState,
       submissionAccess,
       participantJourney,
+      votingAccess,
       participation: {
         phase: phaseSummary.phase,
         participationStatus: lifecycle.participationStatus,

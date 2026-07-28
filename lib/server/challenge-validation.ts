@@ -15,6 +15,7 @@ export const serverChallengeCreateSchema = z.object({
   startsAt: z.string().trim().default(""),
   endsAt: z.string().trim().default(""),
   submissionDeadline: z.string().trim().default(""),
+  submissionStartAt: z.string().trim().optional(),
   votingDeadline: z.string().trim().default(""),
   votingStartsAt: z.string().trim().optional(),
   registrationDeadline: z.string().trim().optional(),
@@ -344,7 +345,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
 
   requireDate(errors, challenge, "startsAt", "Schedule", "Add a challenge start date.");
   requireDate(errors, challenge, "endsAt", "Schedule", "Add a challenge end date.");
-  requireDate(errors, challenge, "submissionDeadline", "Schedule", "Add a submission deadline.");
+  requireDate(errors, challenge, "submissionDeadline", "Schedule", "Please set a submission deadline before publishing this challenge.");
   requireDate(errors, challenge, "votingDeadline", "Schedule", "Add a voting deadline.");
   if (!text(challenge.votingStartsAt)) makeIssue(errors, "REQUIRED_VOTING_START", "votingStartsAt", "Schedule", "Add a voting opening date or use the submission deadline as the voting start.", "warning");
   if (!text(challenge.registrationDeadline)) makeIssue(errors, "REQUIRED_REGISTRATION_CLOSE", "registrationDeadline", "Schedule", "Add a registration closing date.", "warning");
@@ -353,6 +354,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const startsAt = dateValue(challenge.startsAt);
   const endsAt = dateValue(challenge.endsAt);
   const submissionDeadline = dateValue(challenge.submissionDeadline);
+  const submissionStartAt = dateValue(challenge.submissionStartAt ?? challenge.registrationDeadline);
   const votingStartsAt = dateValue(challenge.votingStartsAt ?? challenge.submissionDeadline);
   const votingDeadline = dateValue(challenge.votingDeadline);
   const registrationDeadline = dateValue(challenge.registrationDeadline ?? challenge.submissionDeadline);
@@ -361,6 +363,8 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   if (startsAt && startsAt <= now && !context.isAdmin) makeIssue(errors, "START_DATE_IN_PAST", "startsAt", "Schedule", "Newly published challenges must start in the future.");
   if (startsAt && endsAt && startsAt >= endsAt) makeIssue(errors, "START_AFTER_END", "startsAt", "Schedule", "Challenge start date must be before the end date.");
   if (submissionDeadline && startsAt && submissionDeadline > startsAt) makeIssue(errors, "SUBMISSION_AFTER_START", "submissionDeadline", "Schedule", "Submission deadline must be before the challenge begins.");
+  if (!submissionStartAt) makeIssue(errors, "REQUIRED_SUBMISSION_START", "submissionStartAt", "Schedule", "Please set when submissions open.");
+  if (submissionStartAt && submissionDeadline && submissionDeadline <= submissionStartAt) makeIssue(errors, "SUBMISSION_DEADLINE_NOT_AFTER_START", "submissionDeadline", "Schedule", "Please set a submission deadline after submissions open.");
   if (votingStartsAt && votingDeadline && votingStartsAt >= votingDeadline) makeIssue(errors, "VOTING_START_AFTER_CLOSE", "votingStartsAt", "Schedule", "Voting must open before voting closes.");
   if (votingDeadline && endsAt && votingDeadline > endsAt) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", "Voting must close before the challenge ends.");
   if (registrationDeadline && startsAt && registrationDeadline > startsAt && !bool(challenge.lateRegistrationEnabled)) makeIssue(errors, "REGISTRATION_AFTER_START", "registrationDeadline", "Schedule", "Registration must close before the challenge begins unless late registration is enabled.");

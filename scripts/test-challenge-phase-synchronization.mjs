@@ -6,7 +6,7 @@ const join = readFileSync("app/challenges/[id]/join/page.tsx", "utf8");
 const api = readFileSync("app/api/challenges/[id]/route.ts", "utf8");
 const journey = readFileSync("lib/server/participant-journey.ts", "utf8");
 assert(status.includes("getChallengePhaseSummary"), "canonical phase summary helper must exist");
-assert(status.includes('submissionStatus !== "submissions_closed"'), "voting must not open before submissions close");
+assert(status.includes("const votingWindowOpen") && status.includes("eligibleSubmissionCount"), "voting overlap must remain timeline-driven and require eligible submissions");
 assert(status.includes('phase = "voting_pending"'), "voting pending state must exist");
 assert(api.includes("phaseSummary") && api.includes("participantJourney"), "challenge API must expose phaseSummary and participant journey state");
 assert(detail.includes("phaseSummary") && detail.includes("ParticipantJourneyPanel"), "challenge detail must consume backend phase and journey state");

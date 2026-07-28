@@ -6,7 +6,7 @@ const votes = read("app/api/votes/route.ts");
 assert(status.includes("registration_not_open") && status.includes("registration_closed"), "registration guardrails must exist");
 assert(status.includes("submissions_not_open") && status.includes("submissions_closed"), "submission guardrails must exist");
 assert(status.includes("voting_not_open") && status.includes("voting_closed"), "voting guardrails must exist");
-assert(status.includes("submissionStatus !== \"submissions_closed\"") && status.includes("submissionStatus !== \"no_submission_required\""), "normal voting must not open until submissions are closed");
+assert(status.includes("const votingWindowOpen") && status.includes("eligibleSubmissionCount"), "voting overlap must remain bounded by its window and real eligible submissions");
 assert(submissions.includes("isChallengeSubmittable") && submissions.includes("CHALLENGE_NOT_SUBMITTABLE"), "submission API must enforce server timeline");
 assert(votes.includes("castVote"), "voting API must delegate to server-authoritative voting helper");
 console.log("timeline phase guardrail checks passed");

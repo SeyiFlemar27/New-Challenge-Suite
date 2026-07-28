@@ -216,6 +216,8 @@ export default function ChallengeDetailPage() {
   const submissionId = String((userState as any)?.submissionId ?? "");
   const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enter - ${entryFeeLabel}`;
   const participantJourney = (userState as any)?.participantJourney;
+  const votingAccess = (userState as any)?.votingAccess;
+  const eligibleSubmissionCount = Number(votingAccess?.eligibleSubmissionCount ?? phaseSummary?.eligibleSubmissionCount ?? challengeSubmissions.length);
   const challengeTimeZone = String(phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? "Africa/Lagos");
   const stageSupport = participantJourney?.step === "entered_waiting_submission"
     ? "Entered"
@@ -343,9 +345,9 @@ export default function ChallengeDetailPage() {
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
             <div className="mt-5">
-              {votingOpen ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> Purchase Additional Votes{userState?.voteCount ? ` (${userState.voteCount})` : ""}</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> {lifecycle.votingStatus === "voting_not_open" ? "Voting Not Open" : lifecycle.votingStatus === "voting_not_enabled" ? "Voting Unavailable" : "Voting Closed"}</Button>}
+              {votingOpen && eligibleSubmissionCount > 0 ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> View Voting</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> {eligibleSubmissionCount <= 0 ? "Voting Unavailable" : lifecycle.votingStatus === "voting_not_open" ? "Voting Not Open" : lifecycle.votingStatus === "voting_not_enabled" ? "Voting Unavailable" : "Voting Closed"}</Button>}
             </div>
-            <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Bonus Vote</p><p className="mt-2 text-xs leading-5 text-slate-400">Watch an eligible rewarded ad to earn a bonus vote when this feature is available.</p><Button className="mt-3 w-full" variant="secondary" disabled title="Bonus votes require verified ad completion">Ads are not available yet</Button><p className="mt-2 text-xs text-slate-500">Bonus votes require verified ad completion.</p></div><p className="mt-3 text-xs text-slate-400">Free users get 1 vote per challenge/day. Additional DoroCoin votes require voting policy acknowledgement. DoroCoins are not cash.</p>
+            {votingOpen && eligibleSubmissionCount > 0 ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Bonus Votes</p><p className="mt-2 text-xs leading-5 text-slate-400">Use DoroCoins for additional votes while voting is open.</p><LinkButton href={`/challenges/${challenge.id}/bonus-votes`} className="mt-3 w-full" variant="secondary">DoroCoin Bonus Votes</LinkButton></div> : <p className="mt-4 text-sm text-slate-400">{eligibleSubmissionCount <= 0 ? "No eligible submissions are available for voting yet." : "Bonus votes become available when voting opens."}</p>}
           </Card>
         </aside>
       </div>
@@ -368,12 +370,12 @@ function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLab
     ["Submission", submissionChecklistLabel(checklist, timeZone)],
     ["Entry", checklist.alreadySubmitted ? "Submitted" : "Not submitted"]
   ];
-  return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
+  return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} submissionOpensAt={checklist.submissionOpensAt} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
 }
-function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPay, onRefresh, waitLabel }: { action: string; href?: string | null; challengeId: string; entryFeeLabel: string; loading: boolean; onPay: () => void; onRefresh: () => void; waitLabel?: string }) {
+function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPay, onRefresh, waitLabel, submissionOpensAt }: { action: string; href?: string | null; challengeId: string; entryFeeLabel: string; loading: boolean; onPay: () => void; onRefresh: () => void; waitLabel?: string; submissionOpensAt?: string | null }) {
   if (action === "pay_entry_fee") return <Button className="mt-5 w-full" onClick={onPay} disabled={loading}>{loading ? "Starting Checkout..." : `Pay & Enter - ${entryFeeLabel}`}</Button>;
   if (action === "refresh_payment") return <Button className="mt-5 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button>;
-  if (action === "wait_for_submission") return <Button className="mt-5 w-full" variant="secondary" disabled>{waitLabel ?? "Submission opens soon"}</Button>;
+  if (action === "wait_for_submission") return <SubmissionCountdown opensAt={submissionOpensAt} formattedOpenAt={waitLabel} onOpen={onRefresh} />;
   if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
   if (action === "register" || action === "enter_challenge" || action === "request_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "register" ? "Register for Challenge" : action === "enter_challenge" ? "Enter Challenge" : "Request Entry"}</LinkButton>;
   if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">View Voting</LinkButton>;
@@ -381,6 +383,37 @@ function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPa
   if (action === "manage_challenge") return <LinkButton href="/challenges" className="mt-5 w-full">Manage Challenge</LinkButton>;
   if (action === "sign_in") return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}`)}`} className="mt-5 w-full">Sign In to Continue</LinkButton>;
   return href ? <LinkButton href={href} className="mt-5 w-full" variant="secondary">View Challenge</LinkButton> : null;
+}
+
+function SubmissionCountdown({ opensAt, formattedOpenAt, onOpen }: { opensAt?: string | null; formattedOpenAt?: string; onOpen: () => void }) {
+  const target = Date.parse(String(opensAt ?? ""));
+  const [remaining, setRemaining] = useState(() => Number.isFinite(target) ? Math.max(0, target - Date.now()) : null);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    let requested = false;
+    const tick = () => {
+      const next = Math.max(0, target - Date.now());
+      setRemaining(next);
+      if (next === 0 && !requested) {
+        requested = true;
+        setChecking(true);
+        onOpen();
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [target, onOpen]);
+  if (checking) return <Button className="mt-5 w-full" variant="secondary" disabled>Checking submission access...</Button>;
+  if (remaining === null) return <Button className="mt-5 w-full" variant="secondary" disabled>Submission opens soon</Button>;
+  const totalSeconds = Math.ceil(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const countdown = days > 0 ? `${days}d ${hours}h ${minutes}m` : hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  return <div className="mt-5"><p className="text-center text-sm font-black text-[var(--gold)]">Submissions open in {countdown}</p>{formattedOpenAt ? <p className="mt-1 text-center text-xs text-slate-400">{formattedOpenAt.replace(/^Submission opens at\s+/i, "")}</p> : null}<Button className="mt-3 w-full" variant="secondary" disabled>Submission opens soon</Button></div>;
 }
 function Metric({ value, label, support }: { value: string; label: string; support?: string }) {
   return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;

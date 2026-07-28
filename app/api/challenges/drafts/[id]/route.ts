@@ -7,7 +7,7 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 
 const allowedDraftFields = new Set([
   "title", "description", "category", "customCategory", "type", "visibility", "premiumOnly",
-  "acceptedSubmissionTypes", "competitionFormat", "bestOf", "startsAt", "endsAt", "submissionDeadline",
+  "acceptedSubmissionTypes", "competitionFormat", "bestOf", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline",
   "registrationDeadline", "votingDeadline", "votingStartsAt", "votingEndsAt", "timeZone", "lateRegistrationEnabled",
   "standardRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
