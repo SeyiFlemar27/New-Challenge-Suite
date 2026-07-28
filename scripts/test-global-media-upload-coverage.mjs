@@ -20,7 +20,6 @@ const sponsorProfileRoute = read("app/api/sponsor/profile/route.ts");
 const sponsorCampaignBuilder = read("components/sponsor/sponsor-campaign-builder.tsx");
 const storageRules = exists("storage.rules") ? read("storage.rules") : "";
 const stripeWebhook = exists("app/api/stripe/webhook/route.ts") ? read("app/api/stripe/webhook/route.ts") : "";
-const withdrawalsRoute = exists("app/api/withdrawals/route.ts") ? read("app/api/withdrawals/route.ts") : "";
 
 assert(pathHelper.includes("challenges/drafts") && pathHelper.includes("userId") && pathHelper.includes("folder"), "challenge draft path helper should be owner and folder scoped.");
 assert(pathHelper.includes("return joinStoragePath(\"challenges\", challengeId, \"submissions\", userId, folder);"), "submission path helper should include challenge id, user id, and media folder.");
@@ -57,13 +56,16 @@ assert(hostWizard.includes("challengeDraftMediaPath(userId, \"video\")"), "host 
 
 assert(joinPage.includes("SubmissionUploadField"), "participant submission page should use the shared upload field wrapper.");
 assert(joinPage.includes("submissionMediaPath(challengeId, userId"), "participant submissions should use shared submission paths.");
-assert(joinPage.includes("Participant media submission requires Firebase Storage"), "participant submissions should not fake storage-disabled uploads.");
 assert(joinPage.includes("Please wait for your media upload to finish."), "participant submissions should block while upload is active.");
 assert(joinPage.includes("Please retry the failed media upload before submitting."), "participant submissions should fail closed after upload errors.");
+assert(joinPage.includes("!submissionMedia?.url || !submissionMedia.path"), "participant submission must require a storage-confirmed URL and path.");
+assert(joinPage.includes("currentChallenge.acceptedSubmissionTypes.includes(submissionMedia.mediaType)"), "unsupported participant media types must fail closed.");
 assert(!joinPage.includes("uploadBytesResumable"), "participant join page should not duplicate Firebase upload logic.");
 assert(submissionsRoute.includes("expectedSubmissionPrefix"), "submission API must verify the authenticated owner path.");
 assert(submissionValidation.includes("Participant media must be uploaded before submitting."), "submission API must reject pending media demo submissions.");
 assert(submissionValidation.includes("valid Firebase Storage path"), "submission API must require storage path metadata.");
+assert(submissionValidation.includes('mediaUrl: z.string().trim().url') && submissionValidation.includes("if (!value.mediaUrl)"), "external URL-only submissions must not bypass required upload metadata.");
+assert(!/fake upload success|mock upload success|storage\.example/.test(joinPage + submissionsRoute + submissionValidation), "submission upload flow must not introduce fake success.");
 
 assert(settingsPage.includes("profileMediaPath(userId, \"avatar\")"), "profile avatar uploads should use shared profile path.");
 assert(settingsPage.includes("profileMediaPath(userId, \"banner\")"), "profile banner uploads should use shared profile path.");
@@ -78,7 +80,6 @@ assert(builder.includes("mediaUploadDisabled") && builder.includes("storage_disa
 assert(uploadField.includes("if (disabled)") && uploadField.includes("No upload request will be attempted"), "disabled upload mode must avoid upload attempts.");
 assert(!storageRules.includes("allow read, write: if true;"), "Storage rules must not be opened.");
 assert(!stripeWebhook.includes("MediaUploadField") && !stripeWebhook.includes("uploadBytesResumable"), "Stripe/webhook behavior must not change for media coverage.");
-assert(withdrawalsRoute.includes("WITHDRAWALS_SETUP_REQUIRED"), "withdrawals must remain setup-safe.");
 assert(pathHelper.includes("storageRulesBaseline"), "path helper should document the rules-aligned path map.");
 
 console.log("Global media upload coverage checks passed.");

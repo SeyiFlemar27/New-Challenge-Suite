@@ -13,7 +13,7 @@ import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalize
 import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
-import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
@@ -79,6 +79,8 @@ export default function JoinChallengePage() {
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [paymentReturnProcessing, setPaymentReturnProcessing] = useState(false);
+  const [checkingSubmissionAccess, setCheckingSubmissionAccess] = useState(false);
+  const [submissionWindowExpired, setSubmissionWindowExpired] = useState(false);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -93,9 +95,6 @@ export default function JoinChallengePage() {
   const details = data?.ok ? data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
   const currentChallenge = useMemo(() => rawChallenge ? normalizeChallenge(rawChallenge) : null, [rawChallenge]);
-  const lifecycle = currentChallenge ? getChallengeLifecycleState(currentChallenge) : null;
-  const joinOpen = lifecycle?.canJoin ?? false;
-  const submissionOpen = lifecycle?.canSubmit ?? false;
   const displayStatus = currentChallenge ? getChallengeDisplayStatus(currentChallenge) : "";
   const maxParticipants = typeof rawChallenge?.maxParticipants === "number" ? rawChallenge.maxParticipants : null;
   const isFull = Boolean(maxParticipants && currentChallenge && currentChallenge.participants >= maxParticipants);
@@ -103,6 +102,7 @@ export default function JoinChallengePage() {
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, unknown> : {};
   const userState = details?.userState as Record<string, unknown> | undefined;
   const phaseSummary = (details as any)?.phaseSummary as Record<string, unknown> | undefined;
+  const joinOpen = Boolean(phaseSummary?.canJoin);
   const challengeTimeZone = String(phaseSummary?.timeZone ?? rawChallenge?.timezone ?? rawChallenge?.timeZone ?? "Africa/Lagos");
   const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
   const participantJourney = (userState?.participantJourney && typeof userState.participantJourney === "object" ? userState.participantJourney : null) as any;
@@ -118,8 +118,8 @@ export default function JoinChallengePage() {
   const sponsorAccount = authProfile?.accountType === "sponsor" || authProfile?.role === "sponsor";
   const alreadyJoined = Boolean(userState?.joined);
   const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
-  const submitUnavailable = !submissionOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
-  const canSubmitNow = Boolean(participantJourney?.canSubmit ?? submissionAccess?.canSubmit);
+  const backendCanSubmit = submissionAccess?.canSubmit === true && participantJourney?.canSubmit === true;
+  const canSubmitNow = backendCanSubmit && !submissionWindowExpired && !checkingSubmissionAccess;
   const existingSubmissionId = typeof userState?.submissionId === "string" ? userState.submissionId : null;
   const pageTitle = participantJourney?.step === "fix_and_resubmit"
     ? "Fix & Resubmit"
@@ -137,6 +137,30 @@ export default function JoinChallengePage() {
           : uploadStatus === "failed"
             ? "Retry or replace the failed upload."
             : "";
+
+  useEffect(() => {
+    const opensAt = typeof phaseSummary?.submissionStartAt === "string" ? Date.parse(phaseSummary.submissionStartAt) : Number.NaN;
+    const closesAt = typeof phaseSummary?.submissionDeadline === "string" ? Date.parse(phaseSummary.submissionDeadline) : Number.NaN;
+    const timers: number[] = [];
+
+    setSubmissionWindowExpired(Number.isFinite(closesAt) && Date.now() >= closesAt);
+
+    if (Number.isFinite(opensAt) && Date.now() < opensAt) {
+      timers.push(window.setTimeout(() => {
+        setCheckingSubmissionAccess(true);
+        void refetch().finally(() => setCheckingSubmissionAccess(false));
+      }, Math.max(0, opensAt - Date.now()) + 50));
+    }
+
+    if (Number.isFinite(closesAt) && Date.now() < closesAt) {
+      timers.push(window.setTimeout(() => {
+        setSubmissionWindowExpired(true);
+        void refetch();
+      }, Math.max(0, closesAt - Date.now()) + 50));
+    }
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [phaseSummary?.submissionDeadline, phaseSummary?.submissionStartAt, refetch]);
 
 
   async function startPaidEntryCheckout() {
@@ -196,8 +220,8 @@ export default function JoinChallengePage() {
       setError("Join this challenge before submitting your entry.");
       return;
     }
-    if (submitUnavailable) {
-      setError(submissionOpen ? "This challenge is not available for new entries." : "Submissions are not open yet.");
+    if (!canSubmitNow) {
+      setError(submissionAccess?.message ?? "Submission is not available.");
       return;
     }
 
@@ -336,7 +360,12 @@ export default function JoinChallengePage() {
         </Card>
         <Card className="p-5 sm:p-8">
           <h2 className="text-xl font-black sm:text-2xl">{pageTitle}</h2>
-          {submissionAccess && !canSubmitNow ? (
+          {checkingSubmissionAccess ? (
+            <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">
+              <h3 className="font-black">Checking submission access...</h3>
+              <p className="mt-2 text-slate-200">We are confirming the official challenge window.</p>
+            </Card>
+          ) : submissionAccess && !canSubmitNow ? (
             <SubmissionAccessCard
               access={submissionAccess}
               journey={participantJourney}
