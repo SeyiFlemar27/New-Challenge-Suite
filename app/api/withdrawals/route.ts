@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/cash-wallet";
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     disabledReasons,
     policy: WALLET_POLICY_COPY,
     eligibilitySourceTypes: accountType === "host" ? ["prize_winnings", "host_earnings"] : accountType === "creator" ? ["prize_winnings", "creator_earnings"] : accountType === "sponsor" ? [] : ["prize_winnings"],
-    supportedProviderFoundations: ["manual", "stripe_connect", "paystack_transfers", "flutterwave_transfers"]
+    supportedPayoutMethods: ["bank_transfer", "paypal"]
   }, "Withdrawal review data loaded.");
 }
 
@@ -79,7 +79,8 @@ export async function POST(request: Request) {
   const bankName = method === "bank_transfer" ? String(details.bankName ?? "").trim() : "PayPal";
   const accountNumber = String(details.accountNumber ?? details.email ?? "").trim();
   if (!accountHolderName || !accountNumber || (method === "bank_transfer" && !bankName)) return fail("Add payout method details.", 400, undefined, "PAYOUT_METHOD_REQUIRED");
-  const payoutMethodLabel = method === "paypal" ? `PayPal - ${accountNumber}` : `${bankName} ${maskAccount(accountNumber)}`;
+  const paypalDomain = accountNumber.includes("@") ? accountNumber.slice(accountNumber.lastIndexOf("@")) : "";
+  const payoutMethodLabel = method === "paypal" ? `PayPal - ***${paypalDomain}` : `${bankName} ${maskAccount(accountNumber)}`;
   const payoutMethodLast4 = method === "paypal" ? "paypal" : accountNumber.replace(/\D/g, "").slice(-4);
   try {
     const result = await db.runTransaction((transaction) => createWithdrawalRequest(db, transaction, {
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
       accountHolderName,
       bankName,
       country: String(details.country ?? "US"),
+      kycStatusAtRequest: String(kyc.kycStatus),
       idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${amountCents}-${method}-${now.slice(0, 10)}`),
       now
     }));
