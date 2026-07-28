@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,8 +15,9 @@ const RESEND_SECONDS = 60;
 
 function getSafeReturnUrl() {
   if (typeof window === "undefined") return null;
-  const value = new URLSearchParams(window.location.search).get("returnUrl");
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : null;
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get("returnUrl") || params.get("next");
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : null;
 }
 
 async function getVerifiedDestination() {

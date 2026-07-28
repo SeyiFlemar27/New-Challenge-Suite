@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
@@ -15,21 +15,30 @@ function safeInternalPath(value: string | null) {
   return value;
 }
 
+function getNextPath() {
+  if (typeof window === "undefined") return "";
+  return safeInternalPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [nextPath, setNextPath] = useState("");
+
+  useEffect(() => {
+    setNextPath(getNextPath());
+  }, []);
 
   async function routeAfterLogin() {
     const profile = await fetchBootstrapProfile();
     if (!profile.ok || !profile.data?.user) {
       throw new Error(profile.message || "Profile could not be loaded.");
     }
-    const params = new URLSearchParams(window.location.search);
-    const next = safeInternalPath(params.get("next"));
-    router.push(next || getDefaultRouteForAccount(profile.data.user));
+    const destination = getNextPath() || getDefaultRouteForAccount(profile.data.user);
+    router.replace(destination);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -46,9 +55,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await loginWithEmail(form.email, form.password);
+      const destination = getNextPath();
       if (result.mode === "firebase" && !result.emailVerified) {
         localStorage.setItem("challenge_suite_signup_email", form.email);
-        router.push("/auth/verify-email");
+        router.push(destination ? `/auth/verify-email?returnUrl=${encodeURIComponent(destination)}` : "/auth/verify-email");
         return;
       }
       await routeAfterLogin();
@@ -62,8 +72,8 @@ export default function LoginPage() {
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
       <Card className="w-full max-w-[450px] rounded-[12px] p-6 sm:p-8 lg:p-10">
         <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" />
-        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">Sign In</h1>
-        <p className="mx-auto mt-3 max-w-sm text-center text-base leading-7 text-slate-300 sm:text-lg">Welcome back to Challenge Suite</p>
+        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{nextPath ? "Sign in to continue" : "Sign In"}</h1>
+        <p className="mx-auto mt-3 max-w-sm text-center text-base leading-7 text-slate-300 sm:text-lg">{nextPath ? "Continue to Challenge Suite." : "Welcome back to Challenge Suite"}</p>
         <form className="mt-8 space-y-6 sm:mt-10" onSubmit={submit}>
           <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" type="email" /></Field>
           <Field label="Password">
