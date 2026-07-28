@@ -39,7 +39,7 @@ function SubmissionUploadField({ challengeId, userId, acceptedSubmissionTypes, v
   const mediaKind: MediaUploadKind = acceptedSubmissionTypes.length > 1 ? "media" : acceptedSubmissionTypes[0] === "video" ? "video" : "image";
   const pathMediaType = mediaKind === "video" ? "video" : "image";
   const disabledReason = disabled
-    ? "Participant media submission requires Firebase Storage. Uploads are not available in storage-disabled demo mode."
+    ? "Media uploads are temporarily unavailable. Return when uploads are available to submit your entry."
     : mediaErrorMessage("storage_unavailable");
   return <MediaUploadField
     label={`Upload ${acceptedSubmissionTypes.join(" or ")}`}
@@ -191,7 +191,7 @@ export default function JoinChallengePage() {
       return;
     }
     if (firebaseClientConfigStatus.mediaUploadsDisabled) {
-      setError("Participant media submission requires Firebase Storage. Uploads are not available in storage-disabled demo mode.");
+      setError("Media uploads are temporarily unavailable. Return when uploads are available to submit your entry.");
       return;
     }
     if (["preparing", "uploading", "processing"].includes(uploadStatus)) {
@@ -283,7 +283,7 @@ export default function JoinChallengePage() {
           <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400 sm:h-20 sm:w-20" />
           <h1 className="mt-6 text-3xl font-black sm:text-4xl">Submission received</h1>
           <p className="mt-3 text-slate-300"><b>{successSubmission?.title}</b> was recorded for {currentChallenge.title}.</p>
-          <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Media upload is pending storage configuration. Your submission metadata is saved and ready to be completed." : successSubmission?.status === "active" || successSubmission?.status === "approved" ? "Your media was uploaded and the submission is live." : "Your media was uploaded and the submission is pending review."}</p>
+          <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Your submission media is still being processed." : successSubmission?.status === "active" || successSubmission?.status === "approved" ? "Your media was uploaded and the submission is live." : "Your media was uploaded and the submission is pending review."}</p>
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:justify-center">
             <LinkButton href={`/challenges/${currentChallenge.id}`} className="w-full sm:w-auto">View Challenge</LinkButton>
             <LinkButton href="/my-entries" variant="secondary" className="w-full sm:w-auto">View My Entries</LinkButton>
@@ -338,6 +338,7 @@ export default function JoinChallengePage() {
     </AppShell>
   );
 }
+
 
 
 

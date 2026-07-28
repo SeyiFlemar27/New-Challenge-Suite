@@ -194,6 +194,7 @@ export async function POST(request: Request) {
     body: status === "pending_review" ? "Your submission is pending review." : status === "submitted" ? "Your submission metadata was saved and media upload is pending." : "Your submission is live.",
     targetId: String(submission.id)
   });
-  return ok({ submission }, status === "pending_review" ? "Submission uploaded and pending review." : status === "submitted" ? "Submission received. Media upload is pending storage configuration." : "Submission uploaded successfully.");
+  return ok({ submission }, status === "pending_review" ? "Submission uploaded and pending review." : status === "submitted" ? "Submission received. Media processing is pending." : "Submission uploaded successfully.");
 }
+
 

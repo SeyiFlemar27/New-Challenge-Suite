@@ -51,7 +51,7 @@ export default function EntryRequestsPage() {
 
     {isLoading ? <div className="mt-8 grid gap-5 md:grid-cols-2">{[0, 1].map((item) => <Card key={item} className="h-48 animate-pulse bg-[#171717]" />)}</div> : null}
     {!isLoading && (!data?.ok || !payload) ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-5 text-red-200">{data?.message || "Entry requests could not be loaded."}</Card> : null}
-    {payload && !requests.length ? <Card className="mt-8"><EmptyState icon={<Clock3 />} title="No entry requests" body="Pending participant requests will appear here." /></Card> : null}
+    {payload && !requests.length ? <Card className="mt-8"><EmptyState icon={<Clock3 />} title="No entry requests yet" body="Requests from participants will appear here." /></Card> : null}
     {requests.length ? <div className="mt-8 grid gap-5 xl:grid-cols-2">
       {requests.map((request) => <Card key={request.id} className="p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

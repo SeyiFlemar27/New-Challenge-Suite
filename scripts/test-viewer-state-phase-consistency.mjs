@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const viewer = readFileSync("lib/server/challenge-viewer-state.ts", "utf8");
+const api = readFileSync("app/api/challenges/[id]/route.ts", "utf8");
+assert(viewer.includes("getChallengePhaseSummary"), "viewer state must use canonical phase summary");
+assert(viewer.includes("phaseSummary.canSubmit"), "submission access must be gated by phaseSummary.canSubmit");
+assert(viewer.includes("Submission closed. Voting is now open."), "voting phase must not show waiting-for-submissions copy");
+assert(api.includes("eligibleSubmissionCount: leaderboard.entries.length"), "API must pass eligible submission count into viewer state");
+assert(api.includes("phaseSummary.phase"), "participation phase must come from phaseSummary");
+console.log("viewer state phase consistency checks passed");

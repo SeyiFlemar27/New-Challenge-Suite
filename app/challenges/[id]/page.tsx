@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,7 +10,7 @@ import { fetchChallengeDetails } from "@/lib/api/services";
 import { apiRequest } from "@/lib/api/client";
 import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { getChallengeLifecycleState, getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, statusClassName } from "@/lib/challenge-status";
 import type { Submission } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
@@ -155,10 +155,12 @@ export default function ChallengeDetailPage() {
   }
 
   const lifecycle = getChallengeLifecycleState(challenge);
-  const displayStatus = getChallengeDisplayStatus(challenge);
-  const joinOpen = lifecycle.canJoin;
-  const submissionOpen = lifecycle.canSubmit;
-  const votingOpen = lifecycle.canVote;
+  const phaseSummary = (details as any)?.phaseSummary;
+  const displayStatus = String(phaseSummary?.label ?? lifecycle.primaryLabel);
+  const phase = String(phaseSummary?.phase ?? lifecycle.primaryStatus);
+  const joinOpen = Boolean(phaseSummary?.canJoin ?? lifecycle.canJoin);
+  const submissionOpen = Boolean(phaseSummary?.canSubmit ?? lifecycle.canSubmit);
+  const votingOpen = Boolean(phaseSummary?.canVote ?? lifecycle.canVote);
   const userState = details?.userState;
   const viewerState = (userState as any)?.viewerState;
   const viewerRelationship = String(viewerState?.relationship ?? "viewer");
@@ -205,7 +207,7 @@ export default function ChallengeDetailPage() {
           <div className="relative overflow-hidden rounded-[16px]">
             <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="border-0" placeholder="Challenge Suite" />
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
-            <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus)}`}>{displayStatus}</span>
+            <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>
           <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
@@ -220,7 +222,7 @@ export default function ChallengeDetailPage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" support="Registered" />
             <Metric value={prizeValue} label="Prize details" support="Requires review" />
-            <Metric value={displayStatus} label="Current stage" support={lifecycle.actionLabel} />
+            <Metric value={displayStatus} label="Current stage" support={phase === "voting_pending" ? "No eligible submissions yet" : lifecycle.actionLabel} />
             <Metric value={totalVotes.toLocaleString()} label="Votes" support={votingOpen ? "Voting open" : "Voting unavailable"} />
           </div>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
@@ -232,9 +234,9 @@ export default function ChallengeDetailPage() {
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
-              <Info title="Voting rules" body={votingOpen ? "Voting is currently available. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are internal platform credits." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${lifecycle.nextMilestoneAt ? lifecycle.nextMilestoneAt.toLocaleDateString() : "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
-              <Info title="Prize and ledger flow" body="Winners are approved by admin. Earnings enter pending balance first. Sponsor-funded prizes go 100% to winners. Paid vote revenue applies platform fee first, then participant vote-share, then challenge revenue split. KYC and 24-hour hold are required before withdrawal." />
-              <Info title="Timeline" body={`Registration closes ${challenge.registrationDeadline}. Challenge runs ${challenge.startsAt} to ${challenge.endsAt}.`} />
+              <Info title="Voting rules" body={votingOpen ? "Voting is open. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are platform points." : phase === "voting_pending" ? "No eligible submissions are available for voting yet." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${formatPhaseDate(phaseSummary?.votingStartAt) ?? "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
+              <Info title="Prize and earnings" body="Winners are reviewed before earnings become available. Sponsor-funded prizes go 100% to approved winners. KYC and review checks are required before withdrawal." />
+              <Info title="Timeline" body={`Registration closes ${formatPhaseDate(phaseSummary?.registrationEndAt) ?? challenge.registrationDeadline}. Submissions ${submissionOpen ? "are open" : `open ${formatPhaseDate(phaseSummary?.submissionStartAt) ?? "after registration"}`}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
             </div>
@@ -286,7 +288,7 @@ export default function ChallengeDetailPage() {
         <aside className="space-y-5 xl:pt-[432px]">
           <Card className="p-5 text-center sm:p-8">
             <h3 className="text-xl font-black">Ready to compete?</h3>
-            {paidEntryRequired ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-left"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p><p className="mt-2 text-sm text-slate-300">Secure payment is required to enter. Entry-fee money is recorded as pending challenge revenue only; prize settlement is not activated.</p></div> : <p className="mt-2 text-slate-300">Join when you are ready to submit.</p>}
+            {paidEntryRequired ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-left"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p><p className="mt-2 text-sm text-slate-300">Secure payment is required to enter. Entry-fee money is recorded as pending challenge revenue. Prize settlement requires review.</p></div> : <p className="mt-2 text-slate-300">Join when you are ready to submit.</p>}
             {!joinOpen ? <Card className="mt-6 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle.disabledReason ?? lifecycle.userFacingMessage}</Card> : null}
             {viewerRelationship === "owner" ? <Card className="mt-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-left text-sm text-yellow-50"><b>You manage this challenge.</b><p className="mt-2 text-slate-300">Creators and hosts cannot compete in their own challenge.</p><LinkButton href="/challenges" className="mt-4 w-full">Manage Challenges</LinkButton></Card> : sponsorAccount ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-4 text-sm text-yellow-50">Sponsor accounts cannot join or submit entries. Use sponsor funding and messaging flows instead.</Card> : freePremiumBlocked ? (
               <Card className="mt-6 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-left text-sm text-yellow-50"><b>Upgrade to Creator Plan to participate in this premium challenge.</b><p className="mt-2 text-slate-300">You can view this challenge, but Join and Submit actions are locked for free accounts.</p><LinkButton href="/subscriptions" className="mt-4 w-full">View Creator Plan</LinkButton></Card>
@@ -294,8 +296,14 @@ export default function ChallengeDetailPage() {
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
             ) : paidEntryEnrolled && submissionOpen ? (
               <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Upload your entry before the submission deadline.</p></div><LinkButton href={`/challenges/${challenge.id}/join`} className="mt-5 w-full">Submit Now</LinkButton></>
+            ) : paidEntryEnrolled && votingOpen ? (
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Submission closed. Voting is now open.</p></div><LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-5 w-full">View Voting</LinkButton></>
+            ) : paidEntryEnrolled && phase === "timeline_needs_review" ? (
+              <><Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-left text-sm text-yellow-50"><b>Timeline Needs Review</b><p className="mt-2 text-slate-300">This challenge timeline is being reviewed.</p></Card><Button className="mt-5 w-full" disabled>Timeline Needs Review</Button></>
+            ) : paidEntryEnrolled && ["submission_closed", "voting_pending", "voting_closed", "under_review", "winners_announced", "completed"].includes(phase) ? (
+              <><Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-left text-sm text-slate-300"><b>Submissions closed</b><p className="mt-2">The submission window has closed.</p></Card><LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-5 w-full" variant="secondary">View Challenge Activity</LinkButton></>
             ) : paidEntryEnrolled ? (
-              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. Submissions open after registration closes.</p></div><Button className="mt-5 w-full" disabled>Enrolled - Waiting for submissions</Button></>
+              <><div className="mt-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-4 text-left"><p className="font-black text-emerald-300">You're enrolled</p><p className="mt-1 text-sm text-slate-300">Entry fee paid: {entryFeeLabel}. {formatPhaseDate(phaseSummary?.submissionStartAt) ? `Submissions open at ${formatPhaseDate(phaseSummary?.submissionStartAt)}.` : "Waiting for submissions."}</p></div><Button className="mt-5 w-full" disabled>Enrolled - Waiting for submissions</Button></>
             ) : paidEntryPending || paidEntryReturnedPending ? (
               <><Button className="mt-6 w-full" disabled>{paidEntryCtaLabel}</Button><Button variant="secondary" className="mt-3 w-full" onClick={() => void refetch()}>Refresh Payment Status</Button></>
             ) : (
@@ -304,23 +312,25 @@ export default function ChallengeDetailPage() {
               <LinkButton href={submissionId ? `/submissions/${submissionId}` : `/challenges/${challenge.id}/join`} className="mt-6 w-full">View My Entry</LinkButton>
             ) : userState?.joined && submissionOpen ? (
               <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Submit Now</LinkButton>
+            ) : userState?.joined && votingOpen ? (
+              <LinkButton href={`/challenges/${challenge.id}/votes`} className="mt-6 w-full">View Voting</LinkButton>
             ) : userState?.joined ? (
               <Button className="mt-6 w-full" disabled>Submissions Not Open</Button>
             ) : (
               joinOpen ? <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-6 w-full">Join Challenge</LinkButton> : <Button className="mt-6 w-full" disabled>Registration Closed</Button>
             )}
-            {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Checkout success does not activate entry. Confirmation is webhook-only.</p> : null}
+            {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Payment confirmation is processed securely before enrollment updates.</p> : null}
             {entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}
             <p className="mt-4 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-400">{displayStatus}</p>
           </Card>
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
-            <p className="mt-3">Submit a sponsor contribution request. Money capture and release are not active, and no investment return is promised.</p>
+            <p className="mt-3">Submit a sponsor contribution request. Sponsor contributions are confirmed before any public funding status updates. No investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
-          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> / Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding and prize release require review before they become available.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} / {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Prize details are shown only when available for public viewing.</p></Card> : null}
+          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> / Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding and prize status require review before public release.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} / {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Prize details are shown when available for public viewing.</p></Card> : null}
           {predictionEnabled ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
-            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Make a prediction for eligible challenges after verification and availability checks.</p></div></div>
+            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Prediction Arena availability depends on verification, region, and provider approval.</p></div></div>
             <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Availability depends on verification, region, and provider approval.</p>
           </Card> : null}
 
@@ -343,6 +353,12 @@ export default function ChallengeDetailPage() {
   );
 }
 
+
+function formatPhaseDate(value: unknown) {
+  if (typeof value !== "string" || !value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
 function Metric({ value, label, support }: { value: string; label: string; support?: string }) {
   return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;
 }
@@ -382,6 +398,10 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
+
+
+
+
 
 
 

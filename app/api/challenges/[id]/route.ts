@@ -8,7 +8,7 @@ import { publicPrizePoolFields } from "@/lib/server/prize-pools";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
-import { getChallengeLifecycleState } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/challenge-status";
 import { resolveChallengeSubmissionAccess, resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -100,6 +100,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const entryPaymentStatus = participantData && ["paid", "confirmed"].includes(String(participantData.entryPaymentStatus ?? "")) ? "paid" : String(entryPayment?.status ?? participantData?.entryPaymentStatus ?? "not_started");
   const paidEntryEnrolled = entryPaymentStatus === "paid" || entryPaymentStatus === "confirmed";
   const joinable = isChallengeJoinable({ id: challengeSnap.id, ...challengeData });
+  const phaseSummary = getChallengePhaseSummary({ id: challengeSnap.id, ...challengeData }, new Date(), { eligibleSubmissionCount: leaderboard.entries.length });
   const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
   const submitted = Boolean(userSubmissionSnap?.exists);
@@ -121,22 +122,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         ? joinable.code ?? "registration_closed"
         : null
   };
-  const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size });
-  const submissionAccess = resolveChallengeSubmissionAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, hasPrivateAccess, participantCount: publicParticipantsSnap.size });
+  const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
+  const submissionAccess = resolveChallengeSubmissionAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, hasPrivateAccess, participantCount: publicParticipantsSnap.size, eligibleSubmissionCount: leaderboard.entries.length });
   const participationState = {
-    phase: lifecycle.primaryStatus,
+    phase: phaseSummary.phase,
     participationStatus: lifecycle.participationStatus,
     submissionStatus: lifecycle.submissionStatus,
     votingStatus: lifecycle.votingStatus,
-    canJoin: Boolean(lifecycle.canJoin && !sponsorAccount && !participantSnap?.exists),
+    canJoin: Boolean(phaseSummary.canJoin && !sponsorAccount && !participantSnap?.exists),
     canPay: paidEntryState.canPay,
-    canSubmit: paidEntryState.canSubmit,
-    canVote: Boolean(lifecycle.canVote && !sponsorAccount),
+    canSubmit: Boolean(phaseSummary.canSubmit && paidEntryState.canSubmit),
+    canVote: Boolean(phaseSummary.canVote && !sponsorAccount),
     blockReason: baseBlockReason,
-    message: lifecycle.userFacingMessage
+    message: phaseSummary.label
   };
 
   return ok({
+    phaseSummary,
     challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
     submissions: leaderboard.entries,
     leaderboard: leaderboardPayload,
@@ -170,22 +172,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       viewerState,
       submissionAccess,
       participation: {
-        phase: lifecycle.primaryStatus,
+        phase: phaseSummary.phase,
         participationStatus: lifecycle.participationStatus,
         submissionStatus: lifecycle.submissionStatus,
         votingStatus: lifecycle.votingStatus,
-        canJoin: lifecycle.canJoin,
+        canJoin: phaseSummary.canJoin,
         canPay: false,
         canSubmit: false,
-        canVote: lifecycle.canVote,
+        canVote: phaseSummary.canVote,
         blockReason: lifecycle.disabledReason,
-        message: lifecycle.userFacingMessage
+        message: phaseSummary.label
       },
       votedSubmissionIds: [],
       voteCount: 0
     }
   }, "Challenge details loaded.");
 }
+
+
+
+
 
 
 

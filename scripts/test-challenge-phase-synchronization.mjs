@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const status = readFileSync("lib/challenge-status.ts", "utf8");
+const detail = readFileSync("app/challenges/[id]/page.tsx", "utf8");
+const join = readFileSync("app/challenges/[id]/join/page.tsx", "utf8");
+const api = readFileSync("app/api/challenges/[id]/route.ts", "utf8");
+assert(status.includes("getChallengePhaseSummary"), "canonical phase summary helper must exist");
+assert(status.includes('submissionStatus !== "submissions_closed"'), "voting must not open before submissions close");
+assert(status.includes('phase = "voting_pending"'), "voting pending state must exist");
+assert(api.includes("phaseSummary"), "challenge API must expose phaseSummary");
+assert(detail.includes("phaseSummary"), "challenge detail must consume phaseSummary");
+assert(join.includes("submissionAccess") && join.includes("canSubmitNow"), "join page must use submissionAccess");
+assert(!detail.includes("Voting Open") || detail.includes("votingOpen"), "voting display must be state-driven");
+assert(detail.includes('href={`/challenges/${challenge.id}/join`}'), "Submit Entry CTA must route to join/submission page");
+console.log("challenge phase synchronization checks passed");

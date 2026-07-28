@@ -1,5 +1,5 @@
 import { canAccessChallenge } from "@/lib/plan-access";
-import { getChallengeLifecycleState } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/challenge-status";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
@@ -77,6 +77,12 @@ function capacity(challenge: Record<string, unknown>) {
   return value > 0 ? value : null;
 }
 
+function formatAccessDate(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 export function evaluateChallengeEligibility(input: {
   challenge: Record<string, unknown>;
   userId?: string | null;
@@ -85,11 +91,13 @@ export function evaluateChallengeEligibility(input: {
   submission?: Record<string, unknown> | null;
   hasPrivateAccess?: boolean;
   participantCount?: number;
+  eligibleSubmissionCount?: number | null;
   now?: Date;
 }) {
   const blockers: EligibilityBlocker[] = [];
   const challenge = input.challenge;
   const lifecycle = getChallengeLifecycleState(challenge, input.now ?? new Date());
+  const phaseSummary = getChallengePhaseSummary(challenge, input.now ?? new Date(), { eligibleSubmissionCount: input.eligibleSubmissionCount });
   const profile = input.profile ?? {};
   const userId = input.userId ?? null;
   if (!userId) blockers.push({ code: "AUTH_REQUIRED", message: "Sign in to enter this challenge." });
@@ -103,8 +111,8 @@ export function evaluateChallengeEligibility(input: {
   if ((visibility.includes("private") || visibility.includes("exclusive")) && !input.hasPrivateAccess && !(userId && userOwnsChallenge(challenge, userId))) {
     blockers.push({ code: "INVITATION_REQUIRED", message: "A valid invite is required." });
   }
-  if (!lifecycle.canJoin && !input.participant) {
-    const code = lifecycle.reasonCode === "registration_closed" ? "REGISTRATION_CLOSED" : lifecycle.reasonCode === "registration_not_open" ? "REGISTRATION_NOT_STARTED" : "CHALLENGE_NOT_OPEN";
+  if (!phaseSummary.canJoin && !input.participant) {
+    const code = phaseSummary.phase === "scheduled" ? "REGISTRATION_NOT_STARTED" : phaseSummary.phase === "registration_closed" ? "REGISTRATION_CLOSED" : "CHALLENGE_NOT_OPEN";
     blockers.push({ code, message: lifecycle.disabledReason ?? lifecycle.userFacingMessage ?? "Registration is not open." });
   }
   const max = capacity(challenge);
@@ -124,9 +132,12 @@ export function resolveChallengeViewerState(input: {
   entryRequest?: Record<string, unknown> | null;
   hasPrivateAccess?: boolean;
   participantCount?: number;
+  eligibleSubmissionCount?: number | null;
   now?: Date;
 }) {
-  const lifecycle = getChallengeLifecycleState(input.challenge, input.now ?? new Date());
+  const now = input.now ?? new Date();
+  const lifecycle = getChallengeLifecycleState(input.challenge, now);
+  const phaseSummary = getChallengePhaseSummary(input.challenge, now, { eligibleSubmissionCount: input.eligibleSubmissionCount });
   const authenticated = Boolean(input.userId);
   const relationship = input.userId && userOwnsChallenge(input.challenge, input.userId) ? "owner" : input.participant ? "participant" : input.submission ? "submitted" : "viewer";
   const eligibility = evaluateChallengeEligibility(input);
@@ -144,13 +155,13 @@ export function resolveChallengeViewerState(input: {
   else if (relationship === "owner") nextAction = "NONE";
   else if (blockers.some((item) => item.code === "INVITATION_REQUIRED")) nextAction = "ENTER_INVITE_CODE";
   else if (entryRequestStatus === "pending") nextAction = "WAIT_FOR_ENTRY_APPROVAL";
-  else if (paidEntryRequired && !paymentPaid) nextAction = paymentStatus === "pending" ? "PAY_ENTRY_FEE" : "PAY_ENTRY_FEE";
+  else if (paidEntryRequired && !paymentPaid) nextAction = "PAY_ENTRY_FEE";
   else if (!input.participant && eligibility.eligible) nextAction = "JOIN";
-  else if (input.submission && submissionStatus === "rejected" && lifecycle.canSubmit) nextAction = "RESUBMIT_ENTRY";
+  else if (input.submission && submissionStatus === "rejected" && phaseSummary.canSubmit) nextAction = "RESUBMIT_ENTRY";
   else if (input.submission && ["submitted", "pending_review"].includes(submissionStatus)) nextAction = "WAIT_FOR_SUBMISSION_REVIEW";
-  else if (input.submission) nextAction = lifecycle.canVote ? "VOTE" : "VIEW_ENTRY";
-  else if (input.participant && lifecycle.canSubmit) nextAction = "SUBMIT_ENTRY";
-  else if (input.participant && lifecycle.canVote) nextAction = "VOTE";
+  else if (input.submission) nextAction = phaseSummary.canVote ? "VOTE" : "VIEW_ENTRY";
+  else if (input.participant && phaseSummary.canSubmit) nextAction = "SUBMIT_ENTRY";
+  else if (input.participant && phaseSummary.canVote) nextAction = "VOTE";
   else if (lifecycle.primaryStatus === "completed" || lifecycle.primaryStatus === "winners_announced") nextAction = "VIEW_RESULTS";
   return {
     authenticated,
@@ -159,12 +170,13 @@ export function resolveChallengeViewerState(input: {
     participantStatus,
     submissionStatus,
     entryRequestStatus,
+    phaseSummary,
     payment: { required: paidEntryRequired, amountCents: paidEntryRequired ? paidEntryAmountCents(input.challenge) : 0, status: paymentStatus, paid: paymentPaid },
     permissions: {
-      canJoin: eligibility.eligible && !input.participant && !paidEntryRequired && lifecycle.canJoin,
-      canPay: eligibility.eligible && paidEntryRequired && !paymentPaid && lifecycle.canJoin,
-      canSubmit: Boolean(input.participant && lifecycle.canSubmit && (!paidEntryRequired || paymentPaid) && !input.submission),
-      canVote: Boolean(lifecycle.canVote && relationship !== "owner")
+      canJoin: eligibility.eligible && !input.participant && !paidEntryRequired && phaseSummary.canJoin,
+      canPay: eligibility.eligible && paidEntryRequired && !paymentPaid && phaseSummary.canJoin,
+      canSubmit: Boolean(input.participant && phaseSummary.canSubmit && (!paidEntryRequired || paymentPaid) && !input.submission),
+      canVote: Boolean(phaseSummary.canVote && relationship !== "owner")
     },
     ranking: null,
     winner: null,
@@ -173,7 +185,6 @@ export function resolveChallengeViewerState(input: {
     blockers
   };
 }
-
 
 export type ChallengeSubmissionAccessReason =
   | "auth_required"
@@ -217,10 +228,13 @@ export function resolveChallengeSubmissionAccess(input: {
   entryPayment?: Record<string, unknown> | null;
   hasPrivateAccess?: boolean;
   participantCount?: number;
+  eligibleSubmissionCount?: number | null;
   now?: Date;
 }): ChallengeSubmissionAccess {
   const challenge = input.challenge;
-  const lifecycle = getChallengeLifecycleState(challenge, input.now ?? new Date());
+  const now = input.now ?? new Date();
+  const lifecycle = getChallengeLifecycleState(challenge, now);
+  const phaseSummary = getChallengePhaseSummary(challenge, now, { eligibleSubmissionCount: input.eligibleSubmissionCount });
   const profile = input.profile ?? {};
   const userId = input.userId ?? null;
   const paidEntryRequired = isPaidEntryChallenge(challenge);
@@ -233,12 +247,13 @@ export function resolveChallengeSubmissionAccess(input: {
   if (isSponsorProfile(profile)) return { canSubmit: false, reason: "sponsor_blocked", action: "back_to_challenge", title: "Sponsors cannot submit entries", message: "Use a competitor account to participate." };
   if (input.submission && isTerminalSubmission(input.submission.status)) return { canSubmit: false, reason: "already_submitted", action: "view_entry", title: "Entry already submitted", message: "You have already submitted your entry for this challenge." };
   if (paidEntryRequired && paymentStatus === "pending") return { canSubmit: false, reason: "payment_pending", action: "refresh_status", title: "Payment processing", message: "We are confirming your payment." };
-  if (paidEntryRequired && !paymentPaid) return { canSubmit: false, reason: "payment_required", action: lifecycle.canJoin ? "pay_entry_fee" : "back_to_challenge", title: "Entry fee required", message: `Pay the $${(paidEntryAmountCents(challenge) / 100).toFixed(2)} entry fee before submitting.` };
-  if (!participantActive && !paymentPaid) return { canSubmit: false, reason: "not_enrolled", action: lifecycle.canJoin ? "join" : "back_to_challenge", title: "Enrollment required", message: "Join this challenge before submitting." };
-  if (!lifecycle.canSubmit && lifecycle.participationStatus === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: "You can submit after registration closes." };
-  if (!lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_not_open") return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: participantActive || paymentPaid ? "You are enrolled. Submission opens after registration closes." : "Submission is not open yet." };
-  if (!lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_closed") return { canSubmit: false, reason: "submission_closed", action: "back_to_challenge", title: "Submissions closed", message: "The submission deadline has passed." };
-  if (!lifecycle.canSubmit) return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Submission unavailable", message: lifecycle.disabledReason ?? lifecycle.userFacingMessage ?? "This challenge is not accepting submissions." };
+  if (paidEntryRequired && !paymentPaid) return { canSubmit: false, reason: "payment_required", action: phaseSummary.canJoin ? "pay_entry_fee" : "back_to_challenge", title: "Entry fee required", message: `Pay the $${(paidEntryAmountCents(challenge) / 100).toFixed(2)} entry fee before submitting.` };
+  if (!participantActive && !paymentPaid) return { canSubmit: false, reason: "not_enrolled", action: phaseSummary.canJoin ? "join" : "back_to_challenge", title: "Enrollment required", message: "Join this challenge before submitting." };
+  if (!phaseSummary.canSubmit && phaseSummary.phase === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: formatAccessDate(phaseSummary.submissionStartAt) ? `Submissions open at ${formatAccessDate(phaseSummary.submissionStartAt)}.` : "Waiting for submissions." };
+  if (!phaseSummary.canSubmit && ["registration_closed", "scheduled"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: formatAccessDate(phaseSummary.submissionStartAt) ? `Submissions open at ${formatAccessDate(phaseSummary.submissionStartAt)}.` : "Submission is not open yet." };
+  if (!phaseSummary.canSubmit && ["submission_closed", "voting_pending", "voting_open", "voting_closed", "under_review", "winners_announced", "completed"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_closed", action: "back_to_challenge", title: phaseSummary.votingOpen ? "Submission closed" : "Submissions closed", message: phaseSummary.votingOpen ? "Submission closed. Voting is now open." : "The submission deadline has passed." };
+  if (!phaseSummary.canSubmit && phaseSummary.phase === "timeline_needs_review") return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Timeline Needs Review", message: "This challenge timeline is being reviewed." };
+  if (!phaseSummary.canSubmit || !lifecycle.canSubmit) return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Submission unavailable", message: lifecycle.disabledReason ?? lifecycle.userFacingMessage ?? "This challenge is not accepting submissions." };
 
   return { canSubmit: true, reason: null, action: "submit", title: "Submit Entry", message: "Upload your entry and submit it before the deadline." };
 }

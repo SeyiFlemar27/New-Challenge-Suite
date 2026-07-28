@@ -10,12 +10,14 @@ export type CanonicalChallengeStatus =
   | "active"
   | "submission_open"
   | "submission_closed"
+  | "voting_pending"
   | "voting_not_open"
   | "voting_open"
   | "voting_closed"
   | "under_review"
   | "winners_announced"
   | "completed"
+  | "timeline_needs_review"
   | "paused"
   | "postponed"
   | "cancelled";
@@ -32,12 +34,14 @@ export type ChallengeDisplayStatus =
   | "Active"
   | "Submissions Open"
   | "Submissions Closed"
+  | "Voting Pending"
   | "Voting Not Open"
   | "Voting Open"
   | "Voting Closed"
   | "Under Review"
   | "Winners Announced"
   | "Completed"
+  | "Timeline Needs Review"
   | "Paused"
   | "Postponed"
   | "Cancelled"
@@ -129,12 +133,14 @@ export const challengeStatusLabels: Record<CanonicalChallengeStatus, ChallengeDi
   active: "Active",
   submission_open: "Submissions Open",
   submission_closed: "Submissions Closed",
+  voting_pending: "Voting Pending",
   voting_not_open: "Voting Not Open",
   voting_open: "Voting Open",
   voting_closed: "Voting Closed",
   under_review: "Under Review",
   winners_announced: "Winners Announced",
   completed: "Completed",
+  timeline_needs_review: "Timeline Needs Review",
   paused: "Paused",
   postponed: "Postponed",
   cancelled: "Cancelled"
@@ -235,12 +241,14 @@ export function isCanonicalChallengeStatus(status: unknown): status is Canonical
     "active",
     "submission_open",
     "submission_closed",
+    "voting_pending",
     "voting_not_open",
     "voting_open",
     "voting_closed",
     "under_review",
     "winners_announced",
     "completed",
+    "timeline_needs_review",
     "paused",
     "postponed",
     "cancelled"
@@ -306,6 +314,98 @@ export function normalizeChallengeDate(value: unknown, boundary: "start" | "end"
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+
+export type ChallengePhase =
+  | "draft"
+  | "pending_review"
+  | "scheduled"
+  | "registration_open"
+  | "registration_closed"
+  | "submission_open"
+  | "submission_closed"
+  | "voting_pending"
+  | "voting_open"
+  | "voting_closed"
+  | "under_review"
+  | "winners_announced"
+  | "completed"
+  | "cancelled"
+  | "timeline_needs_review";
+
+export interface ChallengePhaseSummary {
+  phase: ChallengePhase;
+  label: string;
+  blocker: string | null;
+  registrationOpen: boolean;
+  submissionOpen: boolean;
+  votingOpen: boolean;
+  canJoin: boolean;
+  canSubmit: boolean;
+  canVote: boolean;
+  registrationEndAt: string | null;
+  submissionStartAt: string | null;
+  submissionDeadline: string | null;
+  votingStartAt: string | null;
+  votingEndAt: string | null;
+}
+
+export function getChallengePhaseSummary(challenge: Challenge | Record<string, unknown>, now = new Date(), context: { eligibleSubmissionCount?: number | null } = {}): ChallengePhaseSummary {
+  const record = challenge as Record<string, unknown>;
+  const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
+  const timeline = normalizeTimeline(record);
+  const warningCodes = timelineWarnings(timeline).map((warning) => warning.code);
+  const reversedTimeline = warningCodes.some((code) => code.endsWith("_REVERSED"));
+  const eligibleSubmissionCount = context.eligibleSubmissionCount ?? numberOrNull(record.eligibleApprovedSubmissionCount ?? record.approvedSubmissionCount ?? record.eligibleSubmissionCount);
+  const missingTimeline = !timeline.registrationClosesAt || !timeline.submissionOpensAt || !timeline.submissionClosesAt;
+  let phase: ChallengePhase;
+  let blocker: string | null = null;
+
+  if (["draft", "pending_review", "cancelled", "completed", "winners_announced", "under_review"].includes(persisted)) {
+    phase = persisted as ChallengePhase;
+  } else if (reversedTimeline || missingTimeline) {
+    phase = "timeline_needs_review";
+    blocker = "timeline_needs_review";
+  } else if (timeline.registrationOpensAt && now < timeline.registrationOpensAt) {
+    phase = "scheduled";
+  } else if (timeline.registrationClosesAt && now <= timeline.registrationClosesAt) {
+    phase = "registration_open";
+  } else if (timeline.submissionOpensAt && now < timeline.submissionOpensAt) {
+    phase = "registration_closed";
+  } else if (timeline.submissionClosesAt && now <= timeline.submissionClosesAt) {
+    phase = "submission_open";
+  } else if (timeline.votingOpensAt && now < timeline.votingOpensAt) {
+    phase = "submission_closed";
+  } else if (timeline.votingClosesAt && now > timeline.votingClosesAt) {
+    phase = "voting_closed";
+  } else if (eligibleSubmissionCount !== null && eligibleSubmissionCount <= 0) {
+    phase = "voting_pending";
+    blocker = "no_eligible_submissions";
+  } else if (timeline.votingOpensAt || persisted === "voting_open") {
+    phase = "voting_open";
+  } else {
+    phase = "submission_closed";
+  }
+
+  const registrationOpen = phase === "registration_open";
+  const submissionOpen = phase === "submission_open";
+  const votingOpen = phase === "voting_open";
+  return {
+    phase,
+    label: phase === "submission_open" ? "Submission Open" : getLifecycleLabel(phase as CanonicalChallengeStatus),
+    blocker,
+    registrationOpen,
+    submissionOpen,
+    votingOpen,
+    canJoin: registrationOpen,
+    canSubmit: submissionOpen,
+    canVote: votingOpen,
+    registrationEndAt: timeline.registrationClosesAt?.toISOString() ?? null,
+    submissionStartAt: timeline.submissionOpensAt?.toISOString() ?? null,
+    submissionDeadline: timeline.submissionClosesAt?.toISOString() ?? null,
+    votingStartAt: timeline.votingOpensAt?.toISOString() ?? null,
+    votingEndAt: timeline.votingClosesAt?.toISOString() ?? null
+  };
+}
 export function compareChallengeDates(left: unknown, right: unknown) {
   const a = normalizeChallengeDate(left);
   const b = normalizeChallengeDate(right);
@@ -320,6 +420,7 @@ export function getLifecycleLabel(status: CanonicalChallengeStatus): ChallengeDi
 export function getLifecycleAction(status: CanonicalChallengeStatus) {
   if (status === "registration_not_open") return "Registration Opens";
   if (status === "registration_open" || status === "submission_open" || status === "active") return "Join Challenge";
+  if (status === "voting_pending") return "View Details";
   if (status === "voting_not_open") return "Voting Opens";
   if (status === "voting_open") return "Vote Now";
   if (status === "winners_announced") return "View Results";
@@ -503,23 +604,27 @@ export function statusClassName(status: ChallengeDisplayStatus | CanonicalChalle
   if (["open", "registration_open", "active", "submission_open", "submissions_open"].includes(value)) return "bg-emerald-500 text-black";
   if (value === "closing_soon") return "bg-yellow-400 text-black";
   if (value === "voting_open") return "bg-indigo-500 text-white";
-  if (["pending_review", "under_review", "scheduled", "registration_not_open", "voting_not_open"].includes(value)) return "bg-yellow-500 text-black";
+  if (["pending_review", "under_review", "scheduled", "registration_not_open", "voting_pending", "voting_not_open", "timeline_needs_review"].includes(value)) return "bg-yellow-500 text-black";
   if (["cancelled", "paused", "postponed"].includes(value)) return "bg-red-900 text-red-100";
   return "bg-slate-700 text-white";
 }
 
 function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline {
   const timeLimitedUploads = isRecord(record.timeLimitedUploads) ? record.timeLimitedUploads : {};
+  const registrationClosesAt = firstDate(record, ["registrationEndAt", "registrationClosesAt", "registrationDeadline", "registrationEndsAt", "registrationEndDate"], "end");
+  const submissionOpensAt = firstDate(record, ["submissionStartAt", "submissionOpensAt", "submissionStartsAt", "submissionOpensAt", "submissionsOpenAt", "submissionStartDate"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start") ?? registrationClosesAt;
+  const submissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate", "deadline"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
+  const votingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start") ?? submissionClosesAt;
   return {
     timezone: String(record.timezone ?? record.timeZone ?? "UTC"),
-    registrationOpensAt: firstDate(record, ["registrationOpensAt", "registrationStartsAt", "registrationOpenAt", "registrationStartDate"], "start"),
-    registrationClosesAt: firstDate(record, ["registrationClosesAt", "registrationDeadline", "registrationEndsAt", "registrationEndDate"], "end"),
-    submissionOpensAt: firstDate(record, ["submissionOpensAt", "submissionStartsAt", "submissionsOpenAt", "submissionStartDate"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start"),
-    submissionClosesAt: firstDate(record, ["submissionClosesAt", "submissionDeadline", "submissionsCloseAt", "submissionEndDate"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end"),
+    registrationOpensAt: firstDate(record, ["registrationStartAt", "registrationOpensAt", "registrationStartsAt", "registrationOpenAt", "registrationStartDate"], "start"),
+    registrationClosesAt,
+    submissionOpensAt,
+    submissionClosesAt,
     challengeStartsAt: firstDate(record, ["challengeStartsAt", "startsAt", "startDate"], "start"),
     challengeEndsAt: firstDate(record, ["challengeEndsAt", "endsAt", "endDate"], "end"),
-    votingOpensAt: firstDate(record, ["votingOpensAt", "votingStartsAt", "votingStartDate"], "start"),
-    votingClosesAt: firstDate(record, ["votingClosesAt", "votingDeadline", "votingEndsAt", "votingEndDate"], "end"),
+    votingOpensAt,
+    votingClosesAt: firstDate(record, ["votingEndAt", "votingClosesAt", "votingDeadline", "votingEndsAt", "votingEndDate"], "end"),
     judgingStartsAt: firstDate(record, ["judgingStartsAt", "judgingStartDate"], "start"),
     judgingEndsAt: firstDate(record, ["judgingEndsAt", "judgingEndDate"], "end"),
     winnersAnnouncedAt: firstDate(record, ["winnersAnnouncedAt", "winnerAnnouncementAt", "winnerAnnouncementDate"], "start"),
@@ -546,8 +651,8 @@ function resolvePrimaryStatus(persisted: CanonicalChallengeStatus, timeline: Nor
   if (persisted === "draft" || persisted === "pending_review" || persisted === "paused" || persisted === "postponed" || persisted === "cancelled") return persisted;
   if (persisted === "winners_announced") return "winners_announced";
   if (timeline.winnersAnnouncedAt && now >= timeline.winnersAnnouncedAt) return "winners_announced";
-  if (votingStatus === "voting_open") return "voting_open";
   if (submissionStatus === "submissions_open") return "submission_open";
+  if (votingStatus === "voting_open") return "voting_open";
   if (timeline.challengeStartsAt && now < timeline.challengeStartsAt) {
     if (timeline.registrationOpensAt && now < timeline.registrationOpensAt) return "registration_not_open";
     if (timeline.registrationClosesAt && now <= timeline.registrationClosesAt) return "registration_open";
@@ -561,6 +666,7 @@ function resolvePrimaryStatus(persisted: CanonicalChallengeStatus, timeline: Nor
     return "completed";
   }
   if (submissionStatus === "submissions_closed") return "submission_closed";
+  if (persisted === "timeline_needs_review") return "timeline_needs_review";
   if (persisted === "scheduled" && !timeline.challengeStartsAt) return "scheduled";
   if (persisted === "registration_open") return "registration_open";
   if (["active", "submission_open"].includes(persisted)) return "active";
@@ -588,11 +694,11 @@ function resolveVotingStatus(record: Record<string, unknown>, timeline: Normaliz
   if (!votingEnabled) return "voting_not_enabled";
   if (persisted === "voting_closed") return "voting_closed";
   const liveVotingDuringSubmission = record.liveVotingEnabled === true || record.votingDuringSubmission === true || votingSettings.liveVotingEnabled === true || votingSettings.allowDuringSubmissions === true;
-  if (!liveVotingDuringSubmission && resolveSubmissionStatus(record, timeline, now) === "submissions_open") return "voting_not_open";
-  if (persisted === "voting_open") return "voting_open";
+  const submissionStatus = resolveSubmissionStatus(record, timeline, now);
+  if (!liveVotingDuringSubmission && submissionStatus !== "submissions_closed" && submissionStatus !== "no_submission_required") return "voting_not_open";
   if (timeline.votingOpensAt && now < timeline.votingOpensAt) return "voting_not_open";
   if (timeline.votingClosesAt && now > timeline.votingClosesAt) return "voting_closed";
-  if (timeline.votingOpensAt || timeline.votingClosesAt) return "voting_open";
+  if (timeline.votingOpensAt || timeline.votingClosesAt || persisted === "voting_open") return "voting_open";
   return "voting_not_open";
 }
 
@@ -632,9 +738,24 @@ function formatMilestoneDate(date: Date) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function numberOrNull(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
