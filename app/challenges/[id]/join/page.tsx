@@ -120,6 +120,23 @@ export default function JoinChallengePage() {
   const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
   const submitUnavailable = !submissionOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
   const canSubmitNow = Boolean(participantJourney?.canSubmit ?? submissionAccess?.canSubmit);
+  const existingSubmissionId = typeof userState?.submissionId === "string" ? userState.submissionId : null;
+  const pageTitle = participantJourney?.step === "fix_and_resubmit"
+    ? "Fix & Resubmit"
+    : existingSubmissionId
+      ? "Edit Entry"
+      : "Submit Entry";
+  const submitDisabledReason = !auth.user
+    ? "Sign in to submit."
+    : !agreed
+      ? "Accept the challenge rules before submitting."
+      : !submissionMedia?.url || !submissionMedia.path
+        ? "Upload an accepted media file before submitting."
+        : ["preparing", "uploading", "processing"].includes(uploadStatus)
+          ? "Wait for the upload to finish."
+          : uploadStatus === "failed"
+            ? "Retry or replace the failed upload."
+            : "";
 
 
   async function startPaidEntryCheckout() {
@@ -290,7 +307,7 @@ export default function JoinChallengePage() {
           <p className="mt-3 text-slate-300"><b>{successSubmission?.title}</b> was recorded for {currentChallenge.title}.</p>
           <p className="mt-3 text-slate-400">{successSubmission?.pendingMedia ? "Your submission media is still being processed." : successSubmission?.status === "active" || successSubmission?.status === "approved" ? "Your media was uploaded and the submission is live." : "Your media was uploaded and the submission is pending review."}</p>
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:justify-center">
-            <LinkButton href={`/challenges/${currentChallenge.id}`} className="w-full sm:w-auto">View Challenge</LinkButton>
+            {successSubmission?.id ? <LinkButton href={`/submissions/${successSubmission.id}`} className="w-full sm:w-auto">View My Entry</LinkButton> : <LinkButton href={`/challenges/${currentChallenge.id}`} className="w-full sm:w-auto">View Challenge</LinkButton>}
             <LinkButton href="/my-entries" variant="secondary" className="w-full sm:w-auto">View My Entries</LinkButton>
             <LinkButton href="/dashboard" variant="ghost" className="w-full sm:w-auto">Go to Dashboard</LinkButton>
           </div>
@@ -303,12 +320,14 @@ export default function JoinChallengePage() {
     <AppShell>
       <div className="grid max-w-6xl gap-6 lg:gap-8 xl:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
         <Card className="p-5 sm:p-7">
-          <PageTitle title="Challenge Entry" subtitle={currentChallenge.title} />
+          <PageTitle title={pageTitle} subtitle={currentChallenge.title} />
           <p className="mt-5 break-words text-slate-300">{currentChallenge.description}</p>
           <div className="mt-6 space-y-3 text-slate-200">
             <p><b>Registration closes:</b> {formatChallengeDateTime(phaseSummary?.registrationEndAt, challengeTimeZone) ?? currentChallenge.registrationDeadline}</p>
             <p><b>Submissions open:</b> {formatChallengeDateTime(phaseSummary?.submissionStartAt, challengeTimeZone) ?? "Timeline needs review"}</p>
             <p><b>Submission deadline:</b> {formatChallengeDateTime(phaseSummary?.submissionDeadline, challengeTimeZone) ?? "Timeline needs review"}</p>
+            <p><b>Accepted media:</b> {currentChallenge.acceptedSubmissionTypes.join(" or ")}</p>
+            <p><b>Current entry status:</b> {participantJourney?.step === "fix_and_resubmit" ? "Changes requested" : existingSubmissionId ? "Submitted" : "Not submitted"}</p>
             <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review"}</p>
             {paidEntryRequired ? <p><b>Entry fee:</b> {entryFeeLabel}</p> : <p><b>Entry fee:</b> Free</p>}
           </div>
@@ -316,14 +335,14 @@ export default function JoinChallengePage() {
           {currentChallenge.rules.length ? currentChallenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-sm text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-sm text-slate-300">Rules have not been published for this challenge yet.</p>}
         </Card>
         <Card className="p-5 sm:p-8">
-          <h2 className="text-xl font-black sm:text-2xl">Upload Submission</h2>
+          <h2 className="text-xl font-black sm:text-2xl">{pageTitle}</h2>
           {submissionAccess && !canSubmitNow ? (
             <SubmissionAccessCard
               access={submissionAccess}
               journey={participantJourney}
               entryFeeLabel={entryFeeLabel}
               challengeId={currentChallenge.id}
-              submissionId={typeof userState?.submissionId === "string" ? userState.submissionId : null}
+              submissionId={existingSubmissionId}
               onPay={() => void startPaidEntryCheckout()}
               onJoin={(action) => void startFreeJoin(action)}
               onRefresh={() => void refetch()}
@@ -338,7 +357,8 @@ export default function JoinChallengePage() {
               <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
               <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label>
               {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-              <Button className="w-full" disabled={!auth.user || !canSubmitNow || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : "Submit Entry"}</Button>
+              {submitDisabledReason && !error ? <p className="text-sm text-slate-400">{submitDisabledReason}</p> : null}
+              <Button className="w-full" disabled={!auth.user || !canSubmitNow || !agreed || !submissionMedia?.url || !submissionMedia.path || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus) || uploadStatus === "failed"}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : participantJourney?.step === "fix_and_resubmit" ? "Resubmit Entry" : "Submit Entry"}</Button>
             </form>
           ) : null}
         </Card>
