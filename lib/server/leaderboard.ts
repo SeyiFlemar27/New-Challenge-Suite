@@ -117,9 +117,22 @@ function sortSubmissionRows(a: Record<string, unknown>, b: Record<string, unknow
   return timestampMs(a.submittedAt ?? a.createdAt) - timestampMs(b.submittedAt ?? b.createdAt);
 }
 
+function isEligibleLeaderboardSubmission(submission: Record<string, unknown>) {
+  if (!canSubmissionReceiveVotes(submission.status)) return false;
+  const participantStatus = String(submission.participantStatus ?? submission.enrollmentStatus ?? "approved").toLowerCase();
+  if (["pending", "pending_payment", "pending_review", "rejected", "withdrawn", "disqualified", "incomplete"].includes(participantStatus)) return false;
+  const accountType = String(submission.userAccountType ?? submission.accountType ?? submission.role ?? "user").toLowerCase();
+  if (["sponsor", "brand"].includes(accountType)) return false;
+  if (submission.isChallengeOwner === true || submission.ownerSubmission === true || submission.selfEntry === true) return false;
+  const paidEntryRequired = submission.paidEntryRequired === true || submission.entryFeeRequired === true;
+  const paymentStatus = String(submission.entryPaymentStatus ?? submission.paymentStatus ?? "not_required").toLowerCase();
+  if (paidEntryRequired && !["paid", "confirmed"].includes(paymentStatus)) return false;
+  return true;
+}
+
 export function rankSubmissions(submissions: Record<string, unknown>[], limit?: number): LeaderboardRow[] {
   const rows = submissions
-    .filter((submission) => canSubmissionReceiveVotes(submission.status))
+    .filter(isEligibleLeaderboardSubmission)
     .sort(sortSubmissionRows)
     .map((submission, index) => {
       const rank = index + 1;

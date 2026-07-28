@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!db) return serverUnavailable("Entry request rejection");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const note = typeof parsed.body?.note === "string" ? parsed.body.note.trim().slice(0, 1000) : "";
+  const note = typeof parsed.body?.reason === "string" ? parsed.body.reason.trim().slice(0, 1000) : typeof parsed.body?.note === "string" ? parsed.body.note.trim().slice(0, 1000) : "";
   const { id, requestId } = await params;
   const now = new Date().toISOString();
   const result = await db.runTransaction(async (transaction) => {
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const entryRequest = { id: requestSnap.id, ...requestSnap.data() } as Record<string, unknown>;
-    if (!userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
     if (String(entryRequest.challengeId) !== id) throw new Error("ENTRY_REQUEST_MISMATCH");
     const update = { status: "rejected", rejectedAt: now, rejectedBy: user.uid, rejectionReason: note || null, updatedAt: now };
     transaction.set(requestRef, update, { merge: true });

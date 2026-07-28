@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const challenges = read("app/challenges/page.tsx");
+const createReq = read("app/api/challenges/[id]/entry-request/route.ts");
+const approve = read("app/api/challenges/[id]/entry-request/[requestId]/approve/route.ts");
+const reject = read("app/api/challenges/[id]/entry-request/[requestId]/reject/route.ts");
+assert(challenges.includes("Entry Requests") || challenges.includes("entry request") || challenges.includes("entry-request"), "Challenges management UI must surface entry request management context");
+assert(createReq.includes("challengeEntryRequests") && approve.includes("challengeEntryRequests") && reject.includes("challengeEntryRequests"), "entry request APIs must use real request records");
+assert(approve.includes("paymentWindow") || approve.includes("paymentWindowExpiresAt") || approve.includes("payment_required"), "paid approval must expose a payment window state");
+assert(reject.includes("reason") && reject.includes("rejected"), "reject route must support rejection reason/status");
+console.log("creator entry request management UI checks passed");

@@ -1,6 +1,6 @@
-﻿export const proposalStatuses = ["draft", "sent", "received", "under_review", "negotiating", "changes_requested", "accepted", "declined", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
+export const proposalStatuses = ["draft", "sent", "received", "under_review", "negotiating", "changes_requested", "accepted", "declined", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
 export const proposalRevisionStatuses = ["proposed", "countered", "changes_requested", "accepted", "declined", "withdrawn"] as const;
-export const deliverableStatuses = ["not_started", "in_progress", "submitted", "under_review", "changes_requested", "approved", "overdue", "cancelled"] as const;
+export const deliverableStatuses = ["not_started", "pending", "in_progress", "active", "submitted", "under_review", "changes_requested", "approved", "completed", "blocked", "overdue", "cancelled"] as const;
 export const approvalStatuses = ["pending", "under_review", "approved", "changes_requested", "rejected", "overdue", "cancelled"] as const;
 export const messageStatuses = ["draft", "sent", "delivered_foundation", "read_foundation", "failed"] as const;
 export type ProposalStatus = typeof proposalStatuses[number];

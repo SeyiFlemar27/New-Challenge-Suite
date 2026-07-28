@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const createReq = read("app/api/challenges/[id]/entry-request/route.ts");
+const approve = read("app/api/challenges/[id]/entry-request/[requestId]/approve/route.ts");
+const reject = read("app/api/challenges/[id]/entry-request/[requestId]/reject/route.ts");
+assert(createReq.includes("requireRequestUser") && approve.includes("requireRequestUser") && reject.includes("requireRequestUser"), "entry request APIs must require auth");
+assert(createReq.includes("SPONSOR_ACCOUNT_BLOCKED") && createReq.includes("SELF_ENTRY_NOT_ALLOWED"), "request creation must block sponsor and self-entry");
+assert(approve.includes("userOwnsChallenge") || approve.includes("isAdmin"), "approval must enforce owner/admin permission");
+assert(reject.includes("userOwnsChallenge") || reject.includes("isAdmin"), "rejection must enforce owner/admin permission");
+console.log("entry request permission safety checks passed");

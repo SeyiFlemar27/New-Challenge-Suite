@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const entryRequest = { id: requestSnap.id, ...requestSnap.data() } as Record<string, unknown>;
-    if (!userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
     if (String(entryRequest.challengeId) !== id) throw new Error("ENTRY_REQUEST_MISMATCH");
     if (String(entryRequest.status) === "approved") return { entryRequest, duplicate: true };
     const participantId = `${id}_${entryRequest.userId}`;

@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -6,6 +6,41 @@ import { createNotification } from "@/lib/server/notifications";
 import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { evaluateChallengeEligibility } from "@/lib/server/challenge-viewer-state";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Entry requests");
+  const { id } = await params;
+  const challengeSnap = await db.collection("challenges").doc(id).get();
+  if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
+  const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) return fail("Only the challenge owner or an admin can review entry requests.", 403, undefined, "PERMISSION_DENIED");
+  const requestSnap = await db.collection("challengeEntryRequests").where("challengeId", "==", id).limit(100).get();
+  const profileSnaps = requestSnap.docs.length ? await db.getAll(...requestSnap.docs.map((doc) => db.collection("profiles").doc(String(doc.data().userId ?? "")))) : [];
+  const profiles = new Map(profileSnaps.map((snap) => [snap.id, snap.exists ? snap.data() ?? {} : {}]));
+  const requests = requestSnap.docs.map((doc) => {
+    const data = doc.data();
+    const profile = profiles.get(String(data.userId ?? "")) ?? {};
+    return {
+      id: doc.id,
+      ...data,
+      participantProfile: {
+        userId: data.userId,
+        displayName: profile.displayName ?? profile.username ?? "Participant",
+        username: profile.username ?? null,
+        avatarUrl: profile.avatarUrl ?? null,
+        profileUrl: `/profile/${data.userId}`,
+        followerCount: profile.publicFollowerCount ?? profile.followerCount ?? null,
+        verificationStatus: profile.verificationStatus ?? profile.creatorVerificationStatus ?? null,
+        location: profile.publicLocation ?? profile.location ?? profile.country ?? null
+      }
+    };
+  }).sort((left, right) => String((right as Record<string, unknown>).createdAt ?? "").localeCompare(String((left as Record<string, unknown>).createdAt ?? "")));
+  return ok({ challenge: { id, title: challenge.title ?? "Challenge" }, requests }, "Entry requests loaded.");
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -27,6 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
   const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
+  if (isSponsorProfile(profile)) return fail("Sponsor accounts cannot request competitor entry.", 403, undefined, "SPONSOR_ACCOUNT_BLOCKED");
   const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
   const eligibility = evaluateChallengeEligibility({ challenge: accessContext.challenge, userId: user.uid, profile, participant: participantSnap.exists ? participantSnap.data() ?? {} : null, hasPrivateAccess: accessContext.hasAccessGrant });
   if (!eligibility.eligible) return fail(eligibility.blockers[0]?.message ?? "You are not eligible to request entry.", 403, { blockers: eligibility.blockers }, eligibility.blockers[0]?.code ?? "NOT_ELIGIBLE");
