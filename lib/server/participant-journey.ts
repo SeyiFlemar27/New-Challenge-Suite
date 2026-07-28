@@ -2,6 +2,7 @@ import type { ChallengePhaseSummary } from "@/lib/challenge-status";
 import { paidEntryAmountCents, isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 export type ParticipantJourneyStep =
   | "auth_required"
@@ -61,12 +62,6 @@ function isSubmitted(status: unknown) {
   return ["submitted", "pending_review", "approved", "active", "winner"].includes(text(status).toLowerCase());
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
 function manualApprovalRequired(challenge: Record<string, unknown>) {
   return challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
 }
@@ -100,6 +95,7 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
       submissionOpen: flags.submissionOpen,
       submissionOpensAt: input.phaseSummary.submissionStartAt,
       submissionDeadline: input.phaseSummary.submissionDeadline,
+      timeZone: input.phaseSummary.timeZone,
       timelineNeedsReview: input.phaseSummary.phase === "timeline_needs_review",
       alreadySubmitted: flags.alreadySubmitted
     },
@@ -145,8 +141,8 @@ export function getParticipantJourneyState(input: JourneyInput) {
   const alreadySubmitted = Boolean(submission && (isSubmitted(submission.status) || isRejectedSubmission(submission.status)));
   const flags = { authenticated, allowedRole, registered, approvalRequired, approvalGranted, paymentRequired, paymentConfirmed, entered, submissionOpen: phase.canSubmit, alreadySubmitted };
   const fee = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(paidEntryAmountCents(challenge) / 100);
-  const submissionOpenAt = formatDate(phase.submissionStartAt);
-  const submissionDeadline = formatDate(phase.submissionDeadline);
+  const submissionOpenAt = formatChallengeDateTime(phase.submissionStartAt, phase.timeZone);
+  const submissionDeadline = formatChallengeDateTime(phase.submissionDeadline, phase.timeZone);
 
   if (!authenticated) return result("auth_required", "Sign in to continue", "Sign in before participating in this challenge.", "sign_in", input, flags, "auth_required");
   if (input.userId && userOwnsChallenge(challenge, input.userId)) return result("blocked_owner", "You created this challenge", "Creators cannot participate in their own challenge.", "manage_challenge", input, flags, "self_entry_not_allowed");

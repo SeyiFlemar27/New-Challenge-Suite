@@ -3,6 +3,7 @@ import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/chal
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 export type ChallengeBlockerCode =
   | "AUTH_REQUIRED"
@@ -75,12 +76,6 @@ function isTerminalSubmission(status: unknown) {
 function capacity(challenge: Record<string, unknown>) {
   const value = Math.trunc(Number(challenge.maxParticipants ?? challenge.participantLimit ?? 0) || 0);
   return value > 0 ? value : null;
-}
-
-function formatAccessDate(value: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export function evaluateChallengeEligibility(input: {
@@ -249,8 +244,9 @@ export function resolveChallengeSubmissionAccess(input: {
   if (paidEntryRequired && paymentStatus === "pending") return { canSubmit: false, reason: "payment_pending", action: "refresh_status", title: "Payment processing", message: "We are confirming your payment." };
   if (paidEntryRequired && !paymentPaid) return { canSubmit: false, reason: "payment_required", action: phaseSummary.canJoin ? "pay_entry_fee" : "back_to_challenge", title: "Entry fee required", message: `Pay the $${(paidEntryAmountCents(challenge) / 100).toFixed(2)} entry fee before submitting.` };
   if (!participantActive && !paymentPaid) return { canSubmit: false, reason: "not_enrolled", action: phaseSummary.canJoin ? "join" : "back_to_challenge", title: "Enrollment required", message: "Join this challenge before submitting." };
-  if (!phaseSummary.canSubmit && phaseSummary.phase === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: formatAccessDate(phaseSummary.submissionStartAt) ? `Submissions open at ${formatAccessDate(phaseSummary.submissionStartAt)}.` : "Waiting for submissions." };
-  if (!phaseSummary.canSubmit && ["registration_closed", "scheduled"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: formatAccessDate(phaseSummary.submissionStartAt) ? `Submissions open at ${formatAccessDate(phaseSummary.submissionStartAt)}.` : "Submission is not open yet." };
+  const submissionOpensAt = formatChallengeDateTime(phaseSummary.submissionStartAt, phaseSummary.timeZone);
+  if (!phaseSummary.canSubmit && phaseSummary.phase === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: submissionOpensAt ? `Submissions open at ${submissionOpensAt}.` : "Waiting for submissions." };
+  if (!phaseSummary.canSubmit && ["registration_closed", "scheduled"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: submissionOpensAt ? `Submissions open at ${submissionOpensAt}.` : "Submission is not open yet." };
   if (!phaseSummary.canSubmit && ["submission_closed", "voting_pending", "voting_open", "voting_closed", "under_review", "winners_announced", "completed"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_closed", action: "back_to_challenge", title: phaseSummary.votingOpen ? "Submission closed" : "Submissions closed", message: phaseSummary.votingOpen ? "Submission closed. Voting is now open." : "The submission deadline has passed." };
   if (!phaseSummary.canSubmit && phaseSummary.phase === "timeline_needs_review") return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Timeline Needs Review", message: "This challenge timeline is being reviewed." };
   if (!phaseSummary.canSubmit || !lifecycle.canSubmit) return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Submission unavailable", message: lifecycle.disabledReason ?? lifecycle.userFacingMessage ?? "This challenge is not accepting submissions." };

@@ -1,4 +1,5 @@
 import type { Challenge } from "./types";
+import { resolveChallengeTimeZone } from "./challenge-date-time";
 
 export type CanonicalChallengeStatus =
   | "draft"
@@ -342,6 +343,7 @@ export interface ChallengePhaseSummary {
   canJoin: boolean;
   canSubmit: boolean;
   canVote: boolean;
+  timeZone: string;
   registrationEndAt: string | null;
   submissionStartAt: string | null;
   submissionDeadline: string | null;
@@ -393,11 +395,21 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
   }
 
   const registrationOpen = Boolean(timeline.registrationClosesAt && now <= timeline.registrationClosesAt && (!timeline.registrationOpensAt || now >= timeline.registrationOpensAt));
-  const submissionOpen = phase === "submission_open";
+  const submissionOpen = Boolean(
+    timeline.submissionOpensAt
+    && timeline.submissionClosesAt
+    && now >= timeline.submissionOpensAt
+    && now <= timeline.submissionClosesAt
+  );
   const votingOpen = phase === "voting_open";
+  const label = registrationOpen && submissionOpen
+    ? "Registration & Submission Open"
+    : submissionOpen
+      ? "Submission Open"
+      : getLifecycleLabel(phase as CanonicalChallengeStatus);
   return {
     phase,
-    label: phase === "submission_open" ? "Submission Open" : getLifecycleLabel(phase as CanonicalChallengeStatus),
+    label,
     blocker,
     registrationOpen,
     submissionOpen,
@@ -405,6 +417,7 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     canJoin: registrationOpen,
     canSubmit: submissionOpen,
     canVote: votingOpen,
+    timeZone: timeline.timezone,
     registrationEndAt: timeline.registrationClosesAt?.toISOString() ?? null,
     submissionStartAt: timeline.submissionOpensAt?.toISOString() ?? null,
     submissionDeadline: timeline.submissionClosesAt?.toISOString() ?? null,
@@ -622,7 +635,7 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
   const submissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate", "deadline"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
   const votingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start") ?? submissionClosesAt;
   return {
-    timezone: String(record.timezone ?? record.timeZone ?? "UTC"),
+    timezone: resolveChallengeTimeZone(record),
     registrationOpensAt: firstDate(record, ["registrationStartAt", "registrationOpensAt", "registrationStartsAt", "registrationOpenAt", "registrationStartDate"], "start"),
     registrationClosesAt,
     submissionOpensAt,

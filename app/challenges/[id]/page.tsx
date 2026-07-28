@@ -16,6 +16,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
 import { AvatarFrame, ChallengeMediaFrame, SubmissionMediaFrame } from "@/components/media-display";
+import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 type DetailSubmission = Submission & { userPlanId?: string };
 
@@ -215,6 +216,12 @@ export default function ChallengeDetailPage() {
   const submissionId = String((userState as any)?.submissionId ?? "");
   const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enter - ${entryFeeLabel}`;
   const participantJourney = (userState as any)?.participantJourney;
+  const challengeTimeZone = String(phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? "Africa/Lagos");
+  const stageSupport = participantJourney?.step === "entered_waiting_submission"
+    ? "Entered"
+    : participantJourney?.step === "can_submit"
+      ? "Submit entry"
+      : lifecycle.actionLabel;
 
   return (
     <AppShell>
@@ -238,7 +245,7 @@ export default function ChallengeDetailPage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric value={challenge.participants.toString()} label="Participants" support="Registered" />
             <Metric value={prizeValue} label="Prize details" support="Requires review" />
-            <Metric value={displayStatus} label="Current stage" support={phase === "voting_pending" ? "No eligible submissions yet" : lifecycle.actionLabel} />
+            <Metric value={displayStatus} label="Current stage" support={phase === "voting_pending" ? "No eligible submissions yet" : stageSupport} />
             <Metric value={totalVotes.toLocaleString()} label="Votes" support={votingOpen ? "Voting open" : "Voting unavailable"} />
           </div>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
@@ -250,9 +257,9 @@ export default function ChallengeDetailPage() {
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
-              <Info title="Voting rules" body={votingOpen ? "Voting is open. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are platform points." : phase === "voting_pending" ? "No eligible submissions are available for voting yet." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${formatPhaseDate(phaseSummary?.votingStartAt) ?? "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
+              <Info title="Voting rules" body={votingOpen ? "Voting is open. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are platform points." : phase === "voting_pending" ? "No eligible submissions are available for voting yet." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${formatChallengeDateTime(phaseSummary?.votingStartAt, challengeTimeZone) ?? "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
               <Info title="Prize and earnings" body="Winners are reviewed before earnings become available. Sponsor-funded prizes go 100% to approved winners. KYC and review checks are required before withdrawal." />
-              <Info title="Timeline" body={`Registration closes ${formatPhaseDate(phaseSummary?.registrationEndAt) ?? challenge.registrationDeadline}. Submissions ${submissionOpen ? "are open" : `open ${formatPhaseDate(phaseSummary?.submissionStartAt) ?? "after registration"}`}.`} />
+              <Info title="Timeline" body={`Registration closes ${formatChallengeDateTime(phaseSummary?.registrationEndAt, challengeTimeZone) ?? challenge.registrationDeadline}. Submissions ${submissionOpen ? "are open" : `open ${formatChallengeDateTime(phaseSummary?.submissionStartAt, challengeTimeZone) ?? "after registration"}`}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
             </div>
@@ -313,6 +320,7 @@ export default function ChallengeDetailPage() {
               entryCheckoutMessage={entryCheckoutMessage}
               onPay={() => void startPaidEntryCheckout()}
               onRefresh={() => void refetch()}
+              timeZone={challengeTimeZone}
             />
             {paidEntryRequired && !sponsorAccount ? <p className="mt-3 text-xs leading-5 text-slate-400">Payment confirmation is processed securely before enrollment updates.</p> : null}
           </Card>          {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
@@ -346,18 +354,18 @@ export default function ChallengeDetailPage() {
 }
 
 
-function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLabel, paidEntryRequired, entryCheckoutLoading, entryCheckoutMessage, onPay, onRefresh }: { journey: any; phaseLabel: string; challengeId: string; entryFeeLabel: string; paidEntryRequired: boolean; entryCheckoutLoading: boolean; entryCheckoutMessage: string; onPay: () => void; onRefresh: () => void }) {
+function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLabel, paidEntryRequired, entryCheckoutLoading, entryCheckoutMessage, onPay, onRefresh, timeZone }: { journey: any; phaseLabel: string; challengeId: string; entryFeeLabel: string; paidEntryRequired: boolean; entryCheckoutLoading: boolean; entryCheckoutMessage: string; onPay: () => void; onRefresh: () => void; timeZone: string }) {
   const action = String(journey?.primaryAction ?? "back_to_challenge");
   const label = String(journey?.label ?? "Challenge Entry");
   const message = String(journey?.message ?? "Open the entry page for the next step.");
   const checklist = journey?.checklist ?? {};
-  const waitLabel = checklist.submissionOpensAt ? `Submission opens at ${formatJourneyDate(checklist.submissionOpensAt)}` : "Submission opens soon";
+  const waitLabel = checklist.submissionOpensAt ? `Submission opens at ${formatChallengeDateTime(checklist.submissionOpensAt, timeZone)}` : "Submission opens soon";
   const items = [
     ["Register", checklist.registered ? "Done" : "Required"],
     ["Approval", checklist.approvalRequired ? checklist.approvalGranted ? "Approved" : "Pending" : "Not required"],
     ["Payment", checklist.paymentRequired ? checklist.paymentConfirmed ? "Confirmed" : action === "refresh_payment" ? "Processing" : "Required" : "Not required"],
     ["Entered", checklist.entered ? "Yes" : "No"],
-    ["Submission", submissionChecklistLabel(checklist)],
+    ["Submission", submissionChecklistLabel(checklist, timeZone)],
     ["Entry", checklist.alreadySubmitted ? "Submitted" : "Not submitted"]
   ];
   return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
@@ -374,28 +382,17 @@ function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPa
   if (action === "sign_in") return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}`)}`} className="mt-5 w-full">Sign In to Continue</LinkButton>;
   return href ? <LinkButton href={href} className="mt-5 w-full" variant="secondary">View Challenge</LinkButton> : null;
 }
-function formatPhaseDate(value: unknown) {
-  if (typeof value !== "string" || !value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
 function Metric({ value, label, support }: { value: string; label: string; support?: string }) {
   return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;
 }
 
 
-function submissionChecklistLabel(checklist: any) {
+function submissionChecklistLabel(checklist: any, timeZone: string) {
   if (checklist.timelineNeedsReview) return "Timeline needs review";
   if (checklist.submissionOpen) return "Open";
   if (checklist.submissionDeadline && Date.now() > new Date(String(checklist.submissionDeadline)).getTime()) return "Closed";
-  if (checklist.submissionOpensAt) return `Opens ${formatJourneyDate(checklist.submissionOpensAt)}`;
+  if (checklist.submissionOpensAt) return `Opens ${formatChallengeDateTime(checklist.submissionOpensAt, timeZone)}`;
   return "Not open yet";
-}
-
-function formatJourneyDate(value: unknown) {
-  if (!value) return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 function ChallengeMediaPlaceholder() {
   return <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.24),transparent_45%),linear-gradient(135deg,#161616,#050505)] px-6 text-center">

@@ -14,6 +14,7 @@ import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
@@ -101,6 +102,8 @@ export default function JoinChallengePage() {
   const isPrivate = currentChallenge?.type === "Private / Exclusive" && !details?.userState.joined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, unknown> : {};
   const userState = details?.userState as Record<string, unknown> | undefined;
+  const phaseSummary = (details as any)?.phaseSummary as Record<string, unknown> | undefined;
+  const challengeTimeZone = String(phaseSummary?.timeZone ?? rawChallenge?.timezone ?? rawChallenge?.timeZone ?? "Africa/Lagos");
   const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
   const participantJourney = (userState?.participantJourney && typeof userState.participantJourney === "object" ? userState.participantJourney : null) as any;
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, unknown> : {};
@@ -303,7 +306,9 @@ export default function JoinChallengePage() {
           <PageTitle title="Challenge Entry" subtitle={currentChallenge.title} />
           <p className="mt-5 break-words text-slate-300">{currentChallenge.description}</p>
           <div className="mt-6 space-y-3 text-slate-200">
-            <p><b>Deadline:</b> {currentChallenge.registrationDeadline}</p>
+            <p><b>Registration closes:</b> {formatChallengeDateTime(phaseSummary?.registrationEndAt, challengeTimeZone) ?? currentChallenge.registrationDeadline}</p>
+            <p><b>Submissions open:</b> {formatChallengeDateTime(phaseSummary?.submissionStartAt, challengeTimeZone) ?? "Timeline needs review"}</p>
+            <p><b>Submission deadline:</b> {formatChallengeDateTime(phaseSummary?.submissionDeadline, challengeTimeZone) ?? "Timeline needs review"}</p>
             <p><b>Prize details:</b> {currentChallenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Leaderboard ranking" : "Pending review"}</p>
             {paidEntryRequired ? <p><b>Entry fee:</b> {entryFeeLabel}</p> : <p><b>Entry fee:</b> Free</p>}
           </div>
