@@ -1,4 +1,4 @@
-﻿export type DisputeStatus = "open" | "reviewing" | "resolved" | "dismissed";
+export type DisputeStatus = "open" | "under_review" | "resolved" | "rejected" | "escalated" | "closed" | "reviewing" | "dismissed";
 
 export type DisputeFoundation = {
   id: string;
@@ -9,6 +9,7 @@ export type DisputeFoundation = {
   reason: string;
   resolutionEnabled: false;
   adminUiEnabled: false;
+  providerExecutionEnabled: false;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,6 +25,7 @@ export function createDisputePlaceholder(input: { id: string; userId: string; ta
     reason: input.reason,
     resolutionEnabled: false,
     adminUiEnabled: false,
+    providerExecutionEnabled: false,
     createdAt: now,
     updatedAt: now
   };

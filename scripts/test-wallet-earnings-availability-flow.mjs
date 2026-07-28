@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const wallet = read("app/wallet/page.tsx");
+const withdraw = read("app/wallet/withdraw/page.tsx");
+const arch = read("lib/server/wallet-architecture.ts");
+const withdrawals = read("lib/server/withdrawals.ts");
+assert(wallet.includes("Cash Balance") && wallet.includes("Available Balance") && wallet.includes("Pending Balance"), "wallet must separate cash balance states");
+assert(arch.includes("blocked_kyc") && arch.includes("blocked_review") && arch.includes("withdrawal_requested") && arch.includes("approved_for_manual_payout"), "wallet architecture must include pending/available/blocked/requested states");
+assert(withdraw.includes("KYC is required before withdrawal approval") && withdraw.includes("Submit Withdrawal Request"), "withdrawal UI must present KYC and request action");
+assert(withdrawals.includes("status: \"pending_review\"") && withdrawals.includes("payoutExecuted: false"), "withdrawals must create pending review only and not execute payout");
+console.log("wallet earnings availability flow checks passed");

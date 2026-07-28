@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const wallet = read("app/wallet/page.tsx");
+const withdraw = read("app/wallet/withdraw/page.tsx");
+const policy = read("lib/server/wallet-architecture.ts");
+assert(wallet.includes("DoroCoins cannot be withdrawn or converted to cash"), "wallet must state DoroCoins are not cash");
+assert(withdraw.includes("DoroCoins cannot be withdrawn or converted to cash"), "withdraw page must state DoroCoins are not withdrawable");
+assert(policy.includes("dorocoinNotCash"), "wallet policy must keep DoroCoin not-cash rule");
+assert(!withdraw.includes("DoroCoin withdrawal") && !withdraw.toLowerCase().includes("crypto"), "withdrawal UI must not support DoroCoin or crypto withdrawal");
+console.log("DoroCoin not withdrawable checks passed");

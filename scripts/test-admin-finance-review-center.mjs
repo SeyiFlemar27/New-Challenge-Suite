@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const page = read("app/admin/finance/page.tsx");
+const adminOps = read("app/api/admin/operations/route.ts");
+const shell = read("components/admin/admin-shell.tsx");
+assert(page.includes("Finance Review") && page.includes("Review settlements, withdrawals, holds, refunds"), "admin finance page must be production review-center copy");
+assert(shell.includes("/admin/finance") || shell.includes("/admin/cash-ledger"), "admin navigation must expose finance/ledger review surfaces");
+assert(adminOps.includes("withdrawalSnap") && adminOps.includes("cashLedgerSnap") && adminOps.includes("predictionSettlementSnap"), "admin operations API must load withdrawal, ledger, and settlement records");
+assert(adminOps.includes("requireAdminUser"), "admin finance data must be admin protected through admin operations route");
+console.log("admin finance review center checks passed");

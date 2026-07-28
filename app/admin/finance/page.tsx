@@ -4,7 +4,7 @@ import { WalletCards } from "lucide-react";
 
 export default function AdminFinancePage() {
   return <AdminShell>
-    <PageTitle title="Finance Foundation" subtitle="Ledger, provider-event, withdrawal, hold, and sandbox controls are foundation-only. Production money movement is not active." icon={<WalletCards />} />
-    <Card className="mt-8"><EmptyState icon={<WalletCards />} title="No finance review queue yet." body="No fake balances, fake transactions, fake payouts, or fake sponsor funding are displayed." action={<LinkButton href="/admin/finance/sandbox" variant="secondary">Sandbox Foundation</LinkButton>} /></Card>
+    <PageTitle title="Finance Review" subtitle="Review settlements, withdrawals, holds, refunds, sponsor funds, and ledger activity before any manual payout step." icon={<WalletCards />} />
+    <Card className="mt-8"><EmptyState icon={<WalletCards />} title="No finance review items" body="Sensitive payment and payout records will appear here when they require review." action={<LinkButton href="/admin/finance/sandbox" variant="secondary">Sandbox Controls</LinkButton>} /></Card>
   </AdminShell>;
 }

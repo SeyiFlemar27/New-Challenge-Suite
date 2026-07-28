@@ -1,7 +1,7 @@
-export const CASH_WALLET_BUCKETS = ["available", "pending", "hold", "withdrawn"] as const;
+export const CASH_WALLET_BUCKETS = ["available", "pending", "held", "blocked_kyc", "blocked_review", "withdrawal_requested", "approved_for_manual_payout", "paid_out", "reversed"] as const;
 export type CashWalletBucket = typeof CASH_WALLET_BUCKETS[number];
 
-export const WITHDRAWAL_STATUSES = ["draft", "requested", "under_review", "approved", "processing", "paid", "failed", "rejected", "cancelled"] as const;
+export const WITHDRAWAL_STATUSES = ["draft", "pending_review", "requested", "under_review", "approved", "processing", "paid", "failed", "rejected", "cancelled"] as const;
 export type WithdrawalRequestStatus = typeof WITHDRAWAL_STATUSES[number];
 
 export type MoneySourceType =
@@ -31,7 +31,7 @@ export type CashLedgerEntryShape = {
   direction: "credit" | "debit";
   amountCents: number;
   currency: string;
-  status: "created" | "pending" | "available" | "under_review" | "withdrawal_requested" | "processing" | "paid" | "failed" | "rejected" | "reversed" | "adjusted";
+  status: "created" | "pending" | "held" | "available" | "blocked_kyc" | "blocked_review" | "under_review" | "withdrawal_requested" | "approved_for_manual_payout" | "processing" | "paid" | "failed" | "rejected" | "reversed" | "adjusted";
   balanceBucket: CashWalletBucket;
   description: string;
   revenueType?: LedgerRevenueType;
@@ -80,9 +80,9 @@ export const PLATFORM_FEE_CONFIG = {
 } as const;
 
 export const WITHDRAWAL_ARCHITECTURE_CONFIG = {
-  withdrawalsEnabled: false,
+  withdrawalsEnabled: true,
   payoutProviderConfigured: false,
-  payoutMethodCollectionEnabled: false,
+  payoutMethodCollectionEnabled: true,
   adminReviewRequired: true,
   kycRequired: true,
   minimumWithdrawalAmountCents: null as number | null
@@ -91,7 +91,7 @@ export const WITHDRAWAL_ARCHITECTURE_CONFIG = {
 export const WALLET_POLICY_COPY = {
   dorocoinNotCash: "DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash.",
   rewardPointsNotCash: "Reward points are not cash and cannot be withdrawn.",
-  withdrawalsSetupRequired: "Withdrawals are not configured yet. KYC, payout method setup, admin review, and payout provider integration are required before requests can be created."
+  withdrawalsSetupRequired: "Withdrawals require KYC, payout details, and admin review before manual payout handling."
 };
 
 export function isEligibleEarningAccount(accountType: string, hasCashEarnings = false) {
