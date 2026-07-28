@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { predictionStakeFoundation } from "@/lib/server/revenue-sharing";
@@ -75,6 +76,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
+  const rateLimit = consumeRateLimit(`prediction:${user.uid}`, { limit: 10, windowMs: 60_000 });
+  if (!rateLimit.allowed) return fail("Too many prediction attempts. Please wait before trying again.", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, "RATE_LIMITED");
   const db = getAdminDb();
   if (!db) return serverUnavailable("Prediction Arena");
   const parsed = await readJson(request);

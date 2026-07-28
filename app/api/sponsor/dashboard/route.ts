@@ -1,32 +1,15 @@
-import { getAdminDb } from "@/lib/firebase/admin";
-import { normalizeAccountType } from "@/lib/plan-access";
-import { requireRequestUser } from "@/lib/server/auth";
+import { requireSponsorContext } from "@/lib/server/sponsor";
 import { buildSponsorReportingSummary } from "@/lib/server/sponsor-reporting";
-import { forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { ok, serverError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
-async function loadSponsor(db: FirebaseFirestore.Firestore, uid: string): Promise<Record<string, unknown> | null> {
-  const [userSnap, profileSnap, sponsorSnap] = await Promise.all([
-    db.collection("users").doc(uid).get(),
-    db.collection("profiles").doc(uid).get(),
-    db.collection("sponsorProfiles").doc(uid).get()
-  ]);
-  const userData = userSnap.exists ? userSnap.data() ?? {} : {};
-  const profileData = profileSnap.exists ? profileSnap.data() ?? {} : {};
-  const sponsorData = sponsorSnap.exists ? sponsorSnap.data() ?? {} : {};
-  if (normalizeAccountType({ ...profileData, ...userData }) !== "sponsor") return null;
-  return { ...profileData, ...userData, ...sponsorData, userId: uid };
-}
-
 export async function GET(request: Request) {
-  const { user, response } = await requireRequestUser(request);
+  const { context, response } = await requireSponsorContext(request);
   if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Sponsor dashboard");
+  if (!context) return serverError("Sponsor access could not be verified.");
+  const { db, user, sponsorProfile: sponsor } = context;
   try {
-    const sponsor = await loadSponsor(db, user.uid);
-    if (!sponsor) return forbidden("A sponsor account is required.");
     const [activitySnap, notificationsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap] = await Promise.all([
       db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),

@@ -23,6 +23,10 @@ export const submissionCreateSchema = z.object({
   if (!value.mediaStoragePath || /^https?:/i.test(value.mediaStoragePath) || value.mediaStoragePath.includes("..")) {
     ctx.addIssue({ code: "custom", path: ["mediaStoragePath"], message: "Submission media must include a valid Firebase Storage path." });
   }
+  const maxBytes = (value.mediaType === "video" ? 250 : 15) * 1024 * 1024;
+  if (value.fileSize <= 0 || value.fileSize > maxBytes) {
+    ctx.addIssue({ code: "custom", path: ["fileSize"], message: `${value.mediaType === "video" ? "Video" : "Image"} uploads must be larger than 0 bytes and no more than ${value.mediaType === "video" ? 250 : 15}MB.` });
+  }
   if (!value.entryAgreementAccepted && !value.rulesAccepted) {
     ctx.addIssue({ code: "custom", path: ["entryAgreementAccepted"], message: "Accept the challenge rules and entry agreement before submitting." });
   }
