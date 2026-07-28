@@ -67,7 +67,11 @@ export async function POST(request: Request) {
     return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, coinCost: result.coinCost, walletTransactionId: result.walletTransactionId }, body.voteMode === "dorocoin" ? `${result.quantity} DoroCoin vote${result.quantity === 1 ? "" : "s"} counted.` : "Free vote counted.");
   } catch (error) {
     const err = error as Error & { code?: string };
-    const status = err.code === "NOT_FOUND" ? 404 : err.code === "SPONSOR_ACCOUNT_BLOCKED" ? 403 : 409;
+    const status = err.code === "NOT_FOUND"
+      ? 404
+      : ["SPONSOR_ACCOUNT_BLOCKED", "CHALLENGE_OWNER_VOTING_BLOCKED"].includes(String(err.code))
+        ? 403
+        : 409;
     return fail(err.message || "Vote could not be recorded.", status, undefined, err.code ?? "VOTE_REJECTED");
   }
 }
