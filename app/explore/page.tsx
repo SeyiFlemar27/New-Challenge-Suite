@@ -5,16 +5,17 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, inputClass, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { ChallengeMediaFrame } from "@/components/media-display";
-import { CalendarDays, Filter, Search, SlidersHorizontal, Trophy, Users } from "lucide-react";
+import { Bookmark, CalendarDays, Filter, Search, SlidersHorizontal, Trophy, Users } from "lucide-react";
 
 type ExploreChallenge = Record<string, any>;
-type ExploreResponse = { challenges: ExploreChallenge[]; featured: ExploreChallenge[]; categories: string[]; total: number; page: number; hasMore: boolean; filters: Record<string, string> };
+type ExploreResponse = { challenges: ExploreChallenge[]; featured?: ExploreChallenge[]; trending?: ExploreChallenge[]; categories: string[]; total: number; page: number; hasMore: boolean; filters: Record<string, string> };
 
 const phaseOptions = [
-  ["", "Any stage"],
+  ["", "Active stages"],
   ["registration_open", "Registration"],
   ["submission_open", "Submissions"],
   ["voting_open", "Voting"],
+  ["voting_closed", "Voting closed"],
   ["completed", "Completed"]
 ];
 const entryOptions = [["", "Any entry"], ["free", "Free"], ["paid", "Paid entry"]];
@@ -70,32 +71,33 @@ export default function ExplorePage() {
       window.history.replaceState(null, "", browserUrl);
     });
     return () => { active = false; };
-  }, [requestPath]);
+  }, [requestPath, reloadKey]);
 
   function applySearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1);
+    setReloadKey((value) => value + 1);
   }
 
   const challenges = data?.challenges ?? [];
-  const featured = data?.featured ?? [];
+  const trending = data?.trending ?? data?.featured ?? [];
   const categories = data?.categories ?? [];
 
   return (
     <AppShell>
-      <div className="min-h-screen bg-[#f5f1e8] px-0 py-0 text-[#161616] -m-4 sm:-m-6 lg:-m-8">
+      <div className="min-h-screen bg-[#080808] px-0 py-0 text-white -m-4 sm:-m-6 lg:-m-8">
         <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
-          <header className="border-b border-black/10 pb-5">
+          <header className="rounded-[8px] border border-white/10 bg-[#111111] p-5 shadow-2xl shadow-black/30 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8c6a16]">Challenge Suite Marketplace</p>
-                <h1 className="mt-2 text-3xl font-black text-black sm:text-4xl">Explore Challenges</h1>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
+                <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Explore Challenges</h1>
               </div>
-              <p className="text-sm font-bold text-black/60">{loading ? "Loading challenges" : `${Number(data?.total ?? 0).toLocaleString()} public challenge${Number(data?.total ?? 0) === 1 ? "" : "s"}`}</p>
+              <p className="text-sm font-bold text-slate-400">{loading ? "Loading challenges" : `${Number(data?.total ?? 0).toLocaleString()} active challenge${Number(data?.total ?? 0) === 1 ? "" : "s"}`}</p>
             </div>
             <form className="mt-5 flex flex-col gap-3 lg:flex-row" onSubmit={applySearch}>
-              <div className="relative flex-1"><Search className="pointer-events-none absolute left-4 top-4 text-black/40" size={18} /><input className={`${inputClass} border-black/10 bg-white pl-11 text-black placeholder:text-black/40`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search challenges, creators, categories" /></div>
-              <Button className="bg-black text-white hover:bg-[#242424]" type="submit">Search</Button>
+              <div className="relative flex-1"><Search className="pointer-events-none absolute left-4 top-4 text-slate-500" size={18} /><input className={`${inputClass} border-white/10 bg-black/40 pl-11 text-white placeholder:text-slate-500`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search challenges, creators, categories" /></div>
+              <Button type="submit">Search</Button>
             </form>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
               <Select label="Category" value={category} onChange={(value) => { setCategory(value); setPage(1); }} options={[["", "All categories"], ...categories.map((item) => [item, item] as [string, string])]} />
@@ -105,12 +107,12 @@ export default function ExplorePage() {
             </div>
           </header>
 
-          {featured.length ? <section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-black text-black">Featured challenges</h2><span className="text-xs font-black uppercase tracking-[0.14em] text-black/50">Real activity only</span></div><div className="flex gap-4 overflow-x-auto pb-2">{featured.map((item) => <FeaturedCard key={String(item.id)} challenge={item} />)}</div></section> : null}
+          {trending.length ? <section className="mt-7"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black text-white">Trending Challenges</h2><p className="mt-1 text-sm text-slate-400">Popular challenges gaining activity across Challenge Suite.</p></div><span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">Real activity only</span></div><div className="flex gap-4 overflow-x-auto pb-2">{trending.map((item) => <TrendingCard key={String(item.id)} challenge={item} />)}</div></section> : null}
 
           <section className="mt-8">
-            <div className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-black/50"><SlidersHorizontal size={16} /> Browse</div>
-            {loading ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-[390px] animate-pulse rounded-[8px] bg-white" />)}</div> : error ? <Card className="border-black/10 bg-white p-6 text-black"><p className="font-black">Explore could not load</p><p className="mt-2 text-sm text-black/60">{error}</p><Button className="mt-4" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button></Card> : challenges.length ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge} />)}</div> : <div className="rounded-[8px] border border-black/10 bg-white p-10 text-center"><Filter className="mx-auto text-black/30" size={36} /><h2 className="mt-4 text-2xl font-black text-black">No challenges found</h2><p className="mt-2 text-sm text-black/60">Adjust your search or filters.</p></div>}
-            {data?.hasMore ? <div className="mt-8 flex justify-center"><Button className="bg-black text-white hover:bg-[#242424]" onClick={() => setPage((value) => value + 1)}>Load more challenges</Button></div> : null}
+            <div className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500"><SlidersHorizontal size={16} /> Browse</div>
+            {loading ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-[390px] animate-pulse rounded-[8px] bg-[#151515]" />)}</div> : error ? <Card className="border-red-500/20 bg-red-950/20 p-6 text-red-100"><p className="font-black">Explore could not load</p><p className="mt-2 text-sm text-red-100/70">{error}</p><Button className="mt-4" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button></Card> : challenges.length ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge} />)}</div> : <div className="rounded-[8px] border border-white/10 bg-[#111111] p-10 text-center"><Filter className="mx-auto text-slate-600" size={36} /><h2 className="mt-4 text-2xl font-black text-white">No challenges found</h2><p className="mt-2 text-sm text-slate-400">Adjust your search or filters.</p></div>}
+            {data?.hasMore ? <div className="mt-8 flex justify-center"><Button onClick={() => setPage((value) => value + 1)}>Load more challenges</Button></div> : null}
           </section>
         </div>
       </div>
@@ -119,23 +121,31 @@ export default function ExplorePage() {
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-black uppercase tracking-[0.12em] text-black/50">{label}</span><select className="min-h-12 w-full rounded-[8px] border border-black/10 bg-white px-3 text-sm font-bold text-black outline-none focus:border-[#b58a1f]" value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([key, labelText]) => <option key={key || labelText} value={key}>{labelText}</option>)}</select></label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span><select className="min-h-12 w-full rounded-[8px] border border-white/10 bg-black/40 px-3 text-sm font-bold text-white outline-none focus:border-[var(--gold)]" value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([key, labelText]) => <option key={key || labelText} value={key}>{labelText}</option>)}</select></label>;
 }
 
-function FeaturedCard({ challenge }: { challenge: ExploreChallenge }) {
-  return <LinkButton href={`/challenges/${challenge.id}`} variant="secondary" className="min-h-0 w-[280px] shrink-0 border-black/10 bg-white p-0 text-black hover:bg-white"><div className="w-full text-left"><ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-32 rounded-b-none border-0" placeholder="Challenge Suite" /><div className="p-4"><p className="text-xs font-black uppercase text-[#8c6a16]">{challenge.phaseSummary?.label ?? "Challenge"}</p><h3 className="mt-2 line-clamp-2 font-black text-black">{challenge.title}</h3><p className="mt-2 text-xs font-bold text-black/50">{Number(challenge.participantCount ?? 0).toLocaleString()} participants</p></div></div></LinkButton>;
+function TrendingCard({ challenge }: { challenge: ExploreChallenge }) {
+  return <LinkButton href={detailHref(challenge)} variant="secondary" className="min-h-0 w-[280px] shrink-0 border-white/10 bg-[#151515] p-0 text-white hover:bg-[#1d1d1d]"><div className="w-full text-left"><ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-32 rounded-b-none border-0" placeholder="Challenge Suite" /><div className="p-4"><p className="text-xs font-black uppercase text-[var(--gold)]">{challenge.phaseSummary?.label ?? "Challenge"}</p><h3 className="mt-2 line-clamp-2 font-black text-white">{challenge.title}</h3><p className="mt-2 text-xs font-bold text-slate-400">{Number(challenge.participantCount ?? 0).toLocaleString()} participants</p></div></div></LinkButton>;
 }
 
 function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
   const phase = challenge.phaseSummary ?? {};
   const paid = challenge.paidEntry?.required === true;
   const fee = paid ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(challenge.paidEntry.amountCents ?? 0) / 100) : "Free";
-  const cta = challenge.cta ?? { label: "View Challenge", href: `/challenges/${challenge.id}` };
-  return <article className="flex h-full flex-col overflow-hidden rounded-[8px] border border-black/10 bg-white shadow-sm"><ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-44 rounded-none border-0" placeholder="Challenge Suite" /><div className="flex flex-1 flex-col p-4"><div className="flex flex-wrap gap-2"><Badge>{phase.label ?? "Challenge"}</Badge>{paid ? <Badge>{fee}</Badge> : <Badge>Free entry</Badge>}</div><h2 className="mt-3 line-clamp-2 min-h-12 text-lg font-black leading-tight text-black">{challenge.title}</h2><p className="mt-2 line-clamp-2 text-sm leading-6 text-black/60">{challenge.shortDescription || challenge.description}</p><div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-black/60"><span className="flex items-center gap-1"><Users size={14} /> {Number(challenge.participantCount ?? 0).toLocaleString()}</span><span className="flex items-center gap-1"><Trophy size={14} /> {String(challenge.category ?? "General")}</span><span className="col-span-2 flex items-center gap-1"><CalendarDays size={14} /> {formatShortDate(challenge.submissionDeadline) ?? "Timeline listed on detail"}</span></div><div className="mt-auto pt-4"><LinkButton href={String(cta.href ?? `/challenges/${challenge.id}`)} className="w-full bg-black text-white hover:bg-[#242424]">{String(cta.label ?? "View Challenge")}</LinkButton></div></div></article>;
+  const cta = challenge.cta ?? { label: "View Challenge", href: detailHref(challenge), disabled: false };
+  const href = detailHref(challenge);
+  const creator = challenge.creator ?? {};
+  const creatorHref = creator.username ? `/profile/${creator.username}` : "/profile";
+  const openCard = () => { window.location.href = href; };
+  return <article role="link" tabIndex={0} onClick={openCard} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } }} className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] shadow-lg shadow-black/20 transition hover:border-[var(--gold)]/50 hover:bg-[#1a1a1a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]"><ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-44 rounded-none border-0" placeholder="Challenge Suite" /><div className="flex flex-1 flex-col p-4"><div className="flex flex-wrap gap-2"><Badge>{phase.label ?? "Challenge"}</Badge>{paid ? <Badge>{fee}</Badge> : <Badge>Free entry</Badge>}</div><h2 className="mt-3 line-clamp-2 min-h-12 text-lg font-black leading-tight text-white">{challenge.title}</h2><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{challenge.shortDescription || challenge.description}</p><a href={creatorHref} onClick={(event) => event.stopPropagation()} className="mt-3 text-xs font-black text-[var(--gold)] hover:underline">{creator.displayName ?? "Challenge creator"}</a><div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-slate-400"><span className="flex items-center gap-1"><Users size={14} /> {Number(challenge.participantCount ?? 0).toLocaleString()}</span><span className="flex items-center gap-1"><Trophy size={14} /> {String(challenge.category ?? "General")}</span><span className="col-span-2 flex items-center gap-1"><CalendarDays size={14} /> {formatShortDate(challenge.submissionDeadline) ?? "Timeline listed on detail"}</span></div><div className="mt-auto grid grid-cols-[1fr_auto] gap-3 pt-4">{cta.disabled ? <Button className="w-full" variant="secondary" disabled>{String(cta.label ?? "Voting Closed")}</Button> : <LinkButton href={String(cta.href ?? href)} onClick={(event: any) => event.stopPropagation()} className="w-full">{String(cta.label ?? "View Challenge")}</LinkButton>}<button type="button" onClick={(event) => event.stopPropagation()} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10 bg-black/30 text-slate-300 transition hover:border-[var(--gold)]/60 hover:text-[var(--gold)]" aria-label="Save challenge"><Bookmark size={17} /></button></div></div></article>;
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full bg-black/[0.06] px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-black/70">{children}</span>;
+  return <span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-[var(--gold)]">{children}</span>;
+}
+
+function detailHref(challenge: ExploreChallenge) {
+  return String(challenge.detailHref ?? `/challenges/${challenge.id}`);
 }
 
 function formatShortDate(value: unknown) {
@@ -143,4 +153,3 @@ function formatShortDate(value: unknown) {
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
-

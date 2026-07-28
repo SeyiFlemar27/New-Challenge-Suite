@@ -37,6 +37,7 @@ export type ParticipantJourneyAction =
   | "view_entry"
   | "view_voting"
   | "manage_challenge"
+  | "wait_for_submission"
   | "back_to_challenge"
   | null;
 
@@ -78,6 +79,7 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
     : primaryAction === "view_entry" && submissionId ? `/submissions/${submissionId}`
     : primaryAction === "view_voting" ? `/challenges/${challengeId}/votes`
     : primaryAction === "manage_challenge" ? "/challenges"
+    : primaryAction === "wait_for_submission" ? null
     : primaryAction === "back_to_challenge" ? `/challenges/${challengeId}`
     : null;
   return {
@@ -96,6 +98,9 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
       paymentConfirmed: flags.paymentConfirmed,
       entered: flags.entered,
       submissionOpen: flags.submissionOpen,
+      submissionOpensAt: input.phaseSummary.submissionStartAt,
+      submissionDeadline: input.phaseSummary.submissionDeadline,
+      timelineNeedsReview: input.phaseSummary.phase === "timeline_needs_review",
       alreadySubmitted: flags.alreadySubmitted
     },
     canRegister: step === "register",
@@ -164,10 +169,10 @@ export function getParticipantJourneyState(input: JourneyInput) {
     return result("register", "Register for Challenge", "Register first, then enter this challenge when you are ready.", "register", input, flags, null);
   }
   if (!entered) return result("registered_not_entered", "Registration complete", "You are registered. Enter the challenge to become eligible to submit.", "enter_challenge", input, flags, null);
-  if (phase.phase === "submission_open") return result("can_submit", "Ready to submit", `Submission is open. Submit your entry before ${submissionDeadline ?? "the deadline"}.`, "submit_entry", input, flags, null);
+  if (phase.canSubmit) return result("can_submit", "Ready to submit", `Submission is open. Submit your entry before ${submissionDeadline ?? "the deadline"}.`, "submit_entry", input, flags, null);
   if (["voting_open", "voting_pending", "voting_closed"].includes(phase.phase)) return result("voting_open", phase.votingOpen ? "Voting open" : "Submissions closed", phase.votingOpen ? "Submission closed. Voting is now open." : "The submission window has closed.", "view_voting", input, flags, "submission_closed");
   if (["under_review", "winners_announced"].includes(phase.phase)) return result("results_pending", "Results pending", "Entries are under review.", "back_to_challenge", input, flags, "results_pending");
   if (phase.phase === "completed") return result("completed", "Challenge completed", "This challenge has ended.", "back_to_challenge", input, flags, "completed");
   if (phase.phase === "submission_closed") return result("submission_closed", "Submission closed", "The submission deadline has passed.", "back_to_challenge", input, flags, "submission_closed");
-  return result("entered_waiting_submission", "You are entered", submissionOpenAt ? `Submissions open at ${submissionOpenAt}.` : "Waiting for submissions to open.", "back_to_challenge", input, flags, "submission_not_open");
+  return result("entered_waiting_submission", "You're entered", submissionOpenAt ? `Submissions open at ${submissionOpenAt}.` : "Waiting for submissions to open.", "wait_for_submission", input, flags, "submission_not_open");
 }

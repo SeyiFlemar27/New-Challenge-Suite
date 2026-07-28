@@ -68,6 +68,21 @@ export default function ChallengeDetailPage() {
   }, [paymentReturnState, refetch]);
 
   useEffect(() => {
+    const runtimeDetails = details as any;
+    const journey = runtimeDetails?.userState?.participantJourney;
+    const start = runtimeDetails?.phaseSummary?.submissionStartAt;
+    if (journey?.step !== "entered_waiting_submission" || !start) return;
+    const openAt = new Date(String(start)).getTime();
+    if (!Number.isFinite(openAt)) return;
+    const delay = openAt - Date.now();
+    if (delay <= 0) {
+      void refetch();
+      return;
+    }
+    const timer = window.setTimeout(() => void refetch(), Math.min(delay + 500, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [(details as any)?.phaseSummary?.submissionStartAt, (details as any)?.userState?.participantJourney, refetch]);
+  useEffect(() => {
     if (!challengeId) return;
     void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
       .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
@@ -336,20 +351,21 @@ function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLab
   const label = String(journey?.label ?? "Challenge Entry");
   const message = String(journey?.message ?? "Open the entry page for the next step.");
   const checklist = journey?.checklist ?? {};
+  const waitLabel = checklist.submissionOpensAt ? `Submission opens at ${formatJourneyDate(checklist.submissionOpensAt)}` : "Submission opens soon";
   const items = [
     ["Register", checklist.registered ? "Done" : "Required"],
     ["Approval", checklist.approvalRequired ? checklist.approvalGranted ? "Approved" : "Pending" : "Not required"],
     ["Payment", checklist.paymentRequired ? checklist.paymentConfirmed ? "Confirmed" : action === "refresh_payment" ? "Processing" : "Required" : "Not required"],
     ["Entered", checklist.entered ? "Yes" : "No"],
-    ["Submission", checklist.submissionOpen ? "Open" : "Closed"],
+    ["Submission", submissionChecklistLabel(checklist)],
     ["Entry", checklist.alreadySubmitted ? "Submitted" : "Not submitted"]
   ];
-  return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
+  return <div className="text-left"><div className="text-center"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Current phase</p><h3 className="mt-2 text-xl font-black">{phaseLabel}</h3></div>{paidEntryRequired ? <div className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-2xl font-black text-[var(--gold)]">{entryFeeLabel}</p></div> : null}<div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h4 className="font-black text-white">{label}</h4><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div><div className="mt-5 space-y-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry Progress</p>{items.map(([name, value]) => <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="font-black text-white">{value}</span></div>)}</div><JourneyAction action={action} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
 }
-
-function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPay, onRefresh }: { action: string; href?: string | null; challengeId: string; entryFeeLabel: string; loading: boolean; onPay: () => void; onRefresh: () => void }) {
+function JourneyAction({ action, href, challengeId, entryFeeLabel, loading, onPay, onRefresh, waitLabel }: { action: string; href?: string | null; challengeId: string; entryFeeLabel: string; loading: boolean; onPay: () => void; onRefresh: () => void; waitLabel?: string }) {
   if (action === "pay_entry_fee") return <Button className="mt-5 w-full" onClick={onPay} disabled={loading}>{loading ? "Starting Checkout..." : `Pay & Enter - ${entryFeeLabel}`}</Button>;
   if (action === "refresh_payment") return <Button className="mt-5 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button>;
+  if (action === "wait_for_submission") return <Button className="mt-5 w-full" variant="secondary" disabled>{waitLabel ?? "Submission opens soon"}</Button>;
   if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
   if (action === "register" || action === "enter_challenge" || action === "request_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "register" ? "Register for Challenge" : action === "enter_challenge" ? "Enter Challenge" : "Request Entry"}</LinkButton>;
   if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">View Voting</LinkButton>;
@@ -367,6 +383,20 @@ function Metric({ value, label, support }: { value: string; label: string; suppo
   return <Card className="flex min-h-32 flex-col justify-between p-4 sm:p-5"><div><div className="break-words text-xl font-black capitalize leading-tight text-[var(--gold-2)] sm:text-2xl">{value}</div><div className="mt-2 text-sm font-bold text-slate-200">{label}</div></div>{support ? <div className="mt-4 inline-flex w-fit rounded-full border border-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-slate-400">{support}</div> : null}</Card>;
 }
 
+
+function submissionChecklistLabel(checklist: any) {
+  if (checklist.timelineNeedsReview) return "Timeline needs review";
+  if (checklist.submissionOpen) return "Open";
+  if (checklist.submissionDeadline && Date.now() > new Date(String(checklist.submissionDeadline)).getTime()) return "Closed";
+  if (checklist.submissionOpensAt) return `Opens ${formatJourneyDate(checklist.submissionOpensAt)}`;
+  return "Not open yet";
+}
+
+function formatJourneyDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
 function ChallengeMediaPlaceholder() {
   return <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.24),transparent_45%),linear-gradient(135deg,#161616,#050505)] px-6 text-center">
     <div>
@@ -402,27 +432,3 @@ function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: Deta
     </Card>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
