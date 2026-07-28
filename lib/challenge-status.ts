@@ -372,7 +372,7 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     blocker = "timeline_needs_review";
   } else if (timeline.registrationOpensAt && now < timeline.registrationOpensAt) {
     phase = "scheduled";
-  } else if (timeline.submissionClosesAt && now <= timeline.submissionClosesAt) {
+  } else if (timeline.submissionClosesAt && now < timeline.submissionClosesAt) {
     if (timeline.submissionOpensAt && now >= timeline.submissionOpensAt) {
       phase = "submission_open";
     } else if (timeline.registrationClosesAt && now <= timeline.registrationClosesAt) {
@@ -402,7 +402,7 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     timeline.submissionOpensAt
     && timeline.submissionClosesAt
     && now >= timeline.submissionOpensAt
-    && now <= timeline.submissionClosesAt
+    && now < timeline.submissionClosesAt
   );
   const votingWindowOpen = Boolean(
     (timeline.votingOpensAt || persisted === "voting_open")
@@ -727,7 +727,7 @@ function resolveSubmissionStatus(record: Record<string, unknown>, timeline: Norm
   const opensAt = timeline.submissionOpensAt ?? timeline.challengeStartsAt;
   const closesAt = timeline.submissionClosesAt ?? timeline.challengeEndsAt;
   if (opensAt && now < opensAt) return "submissions_not_open";
-  if (closesAt && now > closesAt) return "submissions_closed";
+  if (closesAt && now >= closesAt) return "submissions_closed";
   if (opensAt || closesAt) return "submissions_open";
   const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
   if (persisted === "registration_open" || persisted === "registration_not_open" || persisted === "registration_closed") return "submissions_not_open";
