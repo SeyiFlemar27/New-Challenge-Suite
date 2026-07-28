@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -93,12 +93,12 @@ export async function POST(request: Request) {
       if (!freshSubmittable.allowed) throw new Error(freshSubmittable.reason ?? "Challenge is not accepting submissions.");
 
       if (!allowMultipleEntries) {
-        if (directSubmissionSnap.exists) throw new Error("You have already submitted an entry for this challenge.");
+        if (directSubmissionSnap.exists) throw new Error("DUPLICATE_SUBMISSION");
         const existing = userSubmissionsSnap.docs.find((doc) => {
           const entry = doc.data();
           return entry.challengeId === body.challengeId && duplicateBlockingStatuses.has(String(entry.status ?? ""));
         });
-        if (existing) throw new Error("You have already submitted an entry for this challenge.");
+        if (existing) throw new Error("DUPLICATE_SUBMISSION");
       }
 
       const participantData = participantSnap.exists ? participantSnap.data() ?? {} : null;
@@ -171,6 +171,7 @@ export async function POST(request: Request) {
     if (message.includes("already submitted")) return conflict(message);
     if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee required. Pay the entry fee before submitting your entry.", 402, { action: "pay_entry_fee", checkoutUrl: `/api/challenges/${body.challengeId}/entry-checkout`, challengePath: `/challenges/${body.challengeId}` }, "PAID_ENTRY_PAYMENT_REQUIRED");
     if (message === "NOT_ENROLLED_FOR_SUBMISSION") return fail("Join this challenge during registration before submitting your entry.", 403, { action: "join_challenge", challengePath: `/challenges/${body.challengeId}/join` }, "NOT_ENROLLED_FOR_SUBMISSION");
+    if (message === "DUPLICATE_SUBMISSION") return fail("You have already submitted an entry for this challenge.", 409, { action: "view_entry", challengePath: `/challenges/${body.challengeId}` }, "DUPLICATE_SUBMISSION");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "SUBMISSION_REJECTED");
   }
 

@@ -1,4 +1,4 @@
-﻿import { canAccessChallenge } from "@/lib/plan-access";
+import { canAccessChallenge } from "@/lib/plan-access";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
@@ -174,3 +174,71 @@ export function resolveChallengeViewerState(input: {
   };
 }
 
+
+export type ChallengeSubmissionAccessReason =
+  | "auth_required"
+  | "registration_open"
+  | "submission_not_open"
+  | "payment_required"
+  | "payment_pending"
+  | "not_enrolled"
+  | "self_entry_not_allowed"
+  | "sponsor_blocked"
+  | "already_submitted"
+  | "submission_closed"
+  | "ineligible"
+  | null;
+
+export type ChallengeSubmissionAccessAction =
+  | "sign_in"
+  | "back_to_challenge"
+  | "pay_entry_fee"
+  | "join"
+  | "refresh_status"
+  | "view_entry"
+  | "manage_challenge"
+  | "submit"
+  | null;
+
+export interface ChallengeSubmissionAccess {
+  canSubmit: boolean;
+  reason: ChallengeSubmissionAccessReason;
+  action: ChallengeSubmissionAccessAction;
+  title: string;
+  message: string;
+}
+
+export function resolveChallengeSubmissionAccess(input: {
+  challenge: Record<string, unknown>;
+  userId?: string | null;
+  profile?: Record<string, unknown> | null;
+  participant?: Record<string, unknown> | null;
+  submission?: Record<string, unknown> | null;
+  entryPayment?: Record<string, unknown> | null;
+  hasPrivateAccess?: boolean;
+  participantCount?: number;
+  now?: Date;
+}): ChallengeSubmissionAccess {
+  const challenge = input.challenge;
+  const lifecycle = getChallengeLifecycleState(challenge, input.now ?? new Date());
+  const profile = input.profile ?? {};
+  const userId = input.userId ?? null;
+  const paidEntryRequired = isPaidEntryChallenge(challenge);
+  const paymentStatus = text(input.entryPayment?.status ?? input.participant?.entryPaymentStatus ?? "not_started").toLowerCase() || "not_started";
+  const paymentPaid = ["paid", "confirmed"].includes(paymentStatus);
+  const participantActive = Boolean(input.participant && isActiveParticipant(input.participant.status));
+
+  if (!userId) return { canSubmit: false, reason: "auth_required", action: "sign_in", title: "Sign in required", message: "Sign in before submitting to this challenge." };
+  if (userOwnsChallenge(challenge, userId)) return { canSubmit: false, reason: "self_entry_not_allowed", action: "manage_challenge", title: "You created this challenge", message: "Creators cannot submit entries to their own challenge." };
+  if (isSponsorProfile(profile)) return { canSubmit: false, reason: "sponsor_blocked", action: "back_to_challenge", title: "Sponsors cannot submit entries", message: "Use a competitor account to participate." };
+  if (input.submission && isTerminalSubmission(input.submission.status)) return { canSubmit: false, reason: "already_submitted", action: "view_entry", title: "Entry already submitted", message: "You have already submitted your entry for this challenge." };
+  if (paidEntryRequired && paymentStatus === "pending") return { canSubmit: false, reason: "payment_pending", action: "refresh_status", title: "Payment processing", message: "We are confirming your payment." };
+  if (paidEntryRequired && !paymentPaid) return { canSubmit: false, reason: "payment_required", action: lifecycle.canJoin ? "pay_entry_fee" : "back_to_challenge", title: "Entry fee required", message: `Pay the $${(paidEntryAmountCents(challenge) / 100).toFixed(2)} entry fee before submitting.` };
+  if (!participantActive && !paymentPaid) return { canSubmit: false, reason: "not_enrolled", action: lifecycle.canJoin ? "join" : "back_to_challenge", title: "Enrollment required", message: "Join this challenge before submitting." };
+  if (!lifecycle.canSubmit && lifecycle.participationStatus === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: "You can submit after registration closes." };
+  if (!lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_not_open") return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: participantActive || paymentPaid ? "You are enrolled. Submission opens after registration closes." : "Submission is not open yet." };
+  if (!lifecycle.canSubmit && lifecycle.submissionStatus === "submissions_closed") return { canSubmit: false, reason: "submission_closed", action: "back_to_challenge", title: "Submissions closed", message: "The submission deadline has passed." };
+  if (!lifecycle.canSubmit) return { canSubmit: false, reason: "ineligible", action: "back_to_challenge", title: "Submission unavailable", message: lifecycle.disabledReason ?? lifecycle.userFacingMessage ?? "This challenge is not accepting submissions." };
+
+  return { canSubmit: true, reason: null, action: "submit", title: "Submit Entry", message: "Upload your entry and submit it before the deadline." };
+}

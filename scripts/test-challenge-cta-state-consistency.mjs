@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const api = read("app/api/challenges/[id]/route.ts");
+const detail = read("app/challenges/[id]/page.tsx");
+const join = read("app/challenges/[id]/join/page.tsx");
+assert(api.includes("viewerState") && api.includes("submissionAccess") && api.includes("participationState"), "API must provide normalized viewer, participation, and submission-access state");
+for (const label of ["Join Challenge", "Pay & Enroll", "Confirming Payment", "Submit Now", "View My Entry", "Waiting for submissions", "Registration Closed"]) assert(detail.includes(label), `detail page must include CTA state ${label}`);
+assert(join.includes("SubmissionAccessCard") && join.includes("access.action"), "join page must derive blocked CTAs from submissionAccess action");
+assert(!detail.includes("Enroll Now"), "legacy Enroll Now CTA must stay removed");
+console.log("challenge CTA state consistency checks passed");

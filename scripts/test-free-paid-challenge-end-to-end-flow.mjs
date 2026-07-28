@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const status = read("lib/challenge-status.ts");
+const detail = read("app/challenges/[id]/page.tsx");
+const join = read("app/challenges/[id]/join/page.tsx");
+const joinApi = read("app/api/challenges/[id]/join/route.ts");
+const checkout = read("app/api/challenges/[id]/entry-checkout/route.ts");
+const payments = read("lib/server/monetization-payments.ts");
+assert(joinApi.includes("PAID_ENTRY_PAYMENT_REQUIRED") && joinApi.includes("isChallengeJoinable"), "free join route must not bypass paid-entry or registration checks");
+assert(checkout.includes("price_data") || payments.includes("price_data"), "paid entry must use dynamic checkout price_data");
+assert(payments.includes("pendingReservationOnly: true") && payments.includes("reservationStatus: \"converted_to_participant\""), "paid entry must reserve before webhook and enroll after confirmation");
+assert(detail.includes("Pay & Enroll") && detail.includes("Confirming Payment") && detail.includes("Submit Now"), "detail CTAs must cover paid states");
+assert(join.includes("SubmissionAccessCard") && join.includes("canSubmitNow"), "submission page must be backend-state driven");
+assert(status.includes("resolveSubmissionStatus") && status.includes("resolveVotingStatus"), "timeline must separate registration, submission, and voting");
+assert(!detail.includes("mock payment") && !join.includes("mock payment"), "UI must not add mock payment copy");
+console.log("free and paid challenge end-to-end flow checks passed");

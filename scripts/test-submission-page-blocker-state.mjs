@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { read, includes } from "./production-flow-test-utils.mjs";
+const api = read("app/api/challenges/[id]/route.ts");
+const page = read("app/challenges/[id]/join/page.tsx");
+const helper = read("lib/server/challenge-viewer-state.ts");
+const submissions = read("app/api/submissions/route.ts");
+includes("lib/server/challenge-viewer-state.ts", "resolveChallengeSubmissionAccess", "normalized submission access resolver must exist");
+assert(api.includes("submissionAccess") && api.includes("resolveChallengeSubmissionAccess"), "challenge details API must expose normalized submissionAccess");
+for (const marker of ["registration_open", "submission_not_open", "payment_required", "payment_pending", "not_enrolled", "self_entry_not_allowed", "sponsor_blocked", "already_submitted", "submission_closed", "ineligible"]) assert(helper.includes(marker), `submissionAccess must handle ${marker}`);
+assert(page.includes("SubmissionAccessCard") && page.includes("submissionAccess") && page.includes("canSubmitNow"), "join page must consume backend submissionAccess state");
+assert(page.includes("Pay Entry Fee") && page.includes("Refresh Status") && page.includes("Join Challenge") && page.includes("Back to Challenge"), "blocked states must render direct next actions");
+assert(page.includes("{canSubmitNow ? (") && page.includes("disabled={!auth.user || !canSubmitNow"), "Submit Entry form/button must render only when canSubmitNow is true");
+for (const code of ["NOT_ENROLLED_FOR_SUBMISSION", "PAID_ENTRY_PAYMENT_REQUIRED", "SELF_ENTRY_NOT_ALLOWED", "SPONSOR_ACCOUNT_BLOCKED", "DUPLICATE_SUBMISSION"]) assert(submissions.includes(code), `submission API must reject ${code}`);
+assert(submissions.includes("mediaStoragePath") && submissions.includes("Submission media must be uploaded to your authenticated challenge submission path."), "submission API must validate authenticated media storage paths");
+console.log("submission page blocker state checks passed");

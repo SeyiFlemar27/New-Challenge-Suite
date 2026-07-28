@@ -19,6 +19,7 @@ const cancelPage = read("app/checkout/cancel/page.tsx");
 const builder = read("components/challenge-builder.tsx");
 const challengeApi = read("app/api/challenges/route.ts");
 const challengeDetailApi = read("app/api/challenges/[id]/route.ts");
+const viewerState = read("lib/server/challenge-viewer-state.ts");
 const publicChallenge = read("lib/server/public-challenge.ts");
 
 assert(exists("app/api/challenges/[id]/entry-checkout/route.ts"), "paid entry checkout API must exist.");
@@ -34,11 +35,11 @@ assert(detailPage.includes("Sponsor accounts cannot join or submit entries"), "s
 assert(challengeDetailApi.includes("paidEntryState") && challengeDetailApi.includes("challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry:"), "challenge detail API must expose normalized paid-entry state with sanitized public challenge data.");
 assert(challengeDetailApi.includes("canPay") && challengeDetailApi.includes("canSubmit") && challengeDetailApi.includes("paymentStatus"), "challenge detail API must expose payment-state flags for paid-entry UI.");
 assert(publicChallenge.includes("publicChallengeFields") && !publicChallenge.includes("\"monetization\""), "raw monetization remains omitted from public challenge fields, so paid-entry state must be explicit.");
-assert(submissionPage.includes("Entry fee required"), "submission page must show an actionable paid-entry gate.");
+assert(viewerState.includes("Entry fee required") && submissionPage.includes("Pay Entry Fee"), "submission page must show an actionable paid-entry gate.");
 assert(submissionPage.includes("challengePaidEntry") && submissionPage.includes("userPaidEntry"), "submission page must read normalized paid-entry state from the backend payload.");
 assert(submissionPage.includes("Pay Entry Fee") && submissionPage.includes("entry-checkout"), "unpaid users on submission page must get Pay Entry Fee action.");
-assert(submissionPage.includes("paidEntryRequired && !paidEntryEnrolled") && submissionPage.includes("Pay Entry Fee First"), "submission form must remain blocked until webhook-confirmed enrollment.");
-assert(submissionPage.includes("Sponsor accounts cannot Pay & Enroll or submit entries"), "sponsor accounts must be blocked from paid-entry submission flow.");
+assert(submissionPage.includes("submissionAccess") && submissionPage.includes("canSubmitNow") && submissionPage.includes("SubmissionAccessCard"), "submission form must remain hidden until backend submissionAccess.canSubmit is true.");
+assert(viewerState.includes("Sponsors cannot submit entries") && submissionPage.includes("SubmissionAccessCard"), "sponsor accounts must be blocked from paid-entry submission flow.");
 
 assert(entryCheckoutRoute.includes("requireRequestUser"), "paid-entry checkout must require authentication.");
 assert(entryCheckoutRoute.includes("isSponsorProfile(profile)") && entryCheckoutRoute.includes("SPONSOR_ACCOUNT_BLOCKED"), "sponsors must not be able to Pay & Enroll.");

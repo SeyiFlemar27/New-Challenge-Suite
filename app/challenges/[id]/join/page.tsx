@@ -16,7 +16,25 @@ import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-u
 import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
+type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
 
+function SubmissionAccessCard({ access, entryFeeLabel, challengeId, submissionId, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; entryFeeLabel: string; challengeId: string; submissionId?: string | null; onPay: () => void; onJoin: () => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
+  if (access.canSubmit) return null;
+  const action = access.action;
+  return (
+    <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">
+      <h3 className="font-black">{access.title}</h3>
+      <p className="mt-2 text-slate-200">{access.reason === "payment_required" ? `Pay the ${entryFeeLabel} entry fee before submitting.` : access.message}</p>
+      {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button> : null}
+      {action === "join" ? <Button className="mt-4 w-full" onClick={onJoin} disabled={joinLoading}>{joinLoading ? "Joining..." : "Join Challenge"}</Button> : null}
+      {action === "refresh_status" ? <Button className="mt-4 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button> : null}
+      {action === "view_entry" && submissionId ? <LinkButton href={`/submissions/${submissionId}`} className="mt-4 w-full">View My Entry</LinkButton> : null}
+      {action === "manage_challenge" ? <LinkButton href="/challenges" className="mt-4 w-full">Manage Challenge</LinkButton> : null}
+      {action === "sign_in" ? <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/join`)}`} className="mt-4 w-full">Sign In</LinkButton> : null}
+      {action === "back_to_challenge" || !action ? <LinkButton href={`/challenges/${challengeId}`} className="mt-4 w-full" variant="secondary">Back to Challenge</LinkButton> : null}
+    </Card>
+  );
+}
 function SubmissionUploadField({ challengeId, userId, acceptedSubmissionTypes, value, disabled, onStatusChange, onUploaded }: { challengeId: string; userId: string; acceptedSubmissionTypes: string[]; value: string; disabled: boolean; onStatusChange: (status: MediaUploadStage) => void; onUploaded: (media: UploadedSubmissionMedia | null) => void }) {
   const mediaKind: MediaUploadKind = acceptedSubmissionTypes.length > 1 ? "media" : acceptedSubmissionTypes[0] === "video" ? "video" : "image";
   const pathMediaType = mediaKind === "video" ? "video" : "image";
@@ -82,6 +100,7 @@ export default function JoinChallengePage() {
   const isPrivate = currentChallenge?.type === "Private / Exclusive" && !details?.userState.joined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, unknown> : {};
   const userState = details?.userState as Record<string, unknown> | undefined;
+  const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, unknown> : {};
   const userPaidEntry = userState?.paidEntry && typeof userState.paidEntry === "object" ? userState.paidEntry as Record<string, unknown> : {};
   const entryFeeCents = Number(userPaidEntry.amountCents ?? challengePaidEntry.amountCents ?? monetization.entryFeeAmountCents ?? rawChallenge?.entryFeeAmountCents ?? rawChallenge?.entryFeeCents ?? 0);
@@ -95,6 +114,7 @@ export default function JoinChallengePage() {
   const alreadyJoined = Boolean(userState?.joined);
   const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
   const submitUnavailable = !submissionOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
+  const canSubmitNow = Boolean(submissionAccess?.canSubmit);
 
 
   async function startPaidEntryCheckout() {
@@ -290,21 +310,29 @@ export default function JoinChallengePage() {
         </Card>
         <Card className="p-5 sm:p-8">
           <h2 className="text-xl font-black sm:text-2xl">Upload Submission</h2>
-          {!auth.user ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">Sign in before joining this challenge. <LinkButton href="/auth/login" variant="ghost" className="mt-4 w-full sm:w-auto">Sign In</LinkButton></Card> : null}
-          {!joinOpen && !submissionOpen ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">{lifecycle?.disabledReason ?? lifecycle?.userFacingMessage ?? `This challenge is not open for entries. Current status: ${displayStatus}.`}</Card> : null}
-          {isPrivate ? <Card className="mt-5 border-yellow-500/30 bg-yellow-950/10 p-4 text-[var(--gold)]">This private challenge requires invite or approval before entry.</Card> : null}
-          {isFull ? <Card className="mt-5 border-slate-600 bg-slate-900/60 p-4 text-slate-300">This challenge is full.</Card> : null}
-          {paidEntryRequired && !paidEntryEnrolled ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Entry fee required</h3><p className="mt-2 text-slate-200">Pay the {entryFeeLabel} entry fee before submitting your entry. Checkout success does not unlock submission until Stripe webhook confirmation updates your enrollment.</p>{paymentReturnProcessing ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-slate-200">We are confirming your enrollment from the webhook. Refresh if this state does not update shortly.</p> : null}{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot Pay & Enroll or submit entries.</p> : paidEntryPending ? <><Button className="mt-4 w-full" disabled>Payment Processing...</Button><Button className="mt-3 w-full" variant="secondary" onClick={() => void refetch()}>Refresh Payment Status</Button></> : <Button className="mt-4 w-full" onClick={() => void startPaidEntryCheckout()} disabled={!auth.user || joinUnavailable || entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button>}</Card> : null}
-          {!paidEntryRequired && !alreadyJoined ? <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50"><h3 className="font-black">Enrollment required</h3><p className="mt-2 text-slate-200">Join during registration to reserve your participant spot. Submissions open after the enrollment window.</p>{sponsorAccount ? <p className="mt-3 rounded-[8px] bg-black/30 p-3 text-red-200">Sponsor accounts cannot join or submit entries.</p> : <Button className="mt-4 w-full" onClick={() => void startFreeJoin()} disabled={!auth.user || joinUnavailable || joinLoading}>{joinLoading ? "Joining..." : "Join Challenge"}</Button>}</Card> : null}
-          {alreadyJoined && !submissionOpen ? <Card className="mt-5 border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100"><h3 className="font-black">You're enrolled</h3><p className="mt-2 text-slate-300">Submissions are not open yet. Return when the submission window begins.</p></Card> : null}
-          <form className="mt-6 space-y-5" onSubmit={submit}>
-            <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
-            <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
-            <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
-            <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms. I accept the challenge rules, voting policy, and prize terms.</span></label>
-            {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="w-full" disabled={!auth.user || submitUnavailable || (!alreadyJoined && !paidEntryEnrolled) || (paidEntryRequired && !paidEntryEnrolled) || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : paidEntryRequired && !paidEntryEnrolled ? "Pay Entry Fee First" : !alreadyJoined && !paidEntryEnrolled ? "Join Before Submitting" : !submissionOpen ? "Submissions Not Open" : "Submit Entry"}</Button>
-          </form>
+          {submissionAccess && !canSubmitNow ? (
+            <SubmissionAccessCard
+              access={submissionAccess}
+              entryFeeLabel={entryFeeLabel}
+              challengeId={currentChallenge.id}
+              submissionId={typeof userState?.submissionId === "string" ? userState.submissionId : null}
+              onPay={() => void startPaidEntryCheckout()}
+              onJoin={() => void startFreeJoin()}
+              onRefresh={() => void refetch()}
+              entryCheckoutLoading={entryCheckoutLoading}
+              joinLoading={joinLoading}
+            />
+          ) : null}
+          {canSubmitNow ? (
+            <form className="mt-6 space-y-5" onSubmit={submit}>
+              <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
+              <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
+              <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
+              <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label>
+              {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
+              <Button className="w-full" disabled={!auth.user || !canSubmitNow || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus)}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : "Submit Entry"}</Button>
+            </form>
+          ) : null}
         </Card>
       </div>
     </AppShell>

@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
@@ -9,7 +9,7 @@ import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
-import { resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
+import { resolveChallengeSubmissionAccess, resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -122,6 +122,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         : null
   };
   const viewerState = resolveChallengeViewerState({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, entryRequest: entryRequestData, hasPrivateAccess, participantCount: publicParticipantsSnap.size });
+  const submissionAccess = resolveChallengeSubmissionAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid ?? null, profile: requestProfile, participant: participantData, submission: userSubmissionSnap?.exists ? userSubmissionSnap.data() ?? {} : null, entryPayment, hasPrivateAccess, participantCount: publicParticipantsSnap.size });
   const participationState = {
     phase: lifecycle.primaryStatus,
     participationStatus: lifecycle.participationStatus,
@@ -153,6 +154,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       paidEntryEnrolled,
       paidEntry: paidEntryState,
       viewerState,
+      submissionAccess,
       participation: participationState,
       submitted,
       submissionId: userSubmissionSnap?.id ?? null,
@@ -166,6 +168,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       authenticated: false,
       joined: false,
       viewerState,
+      submissionAccess,
       participation: {
         phase: lifecycle.primaryStatus,
         participationStatus: lifecycle.participationStatus,
