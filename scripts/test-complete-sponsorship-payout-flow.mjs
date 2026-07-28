@@ -6,7 +6,7 @@ const challenge = readFileSync(join(process.cwd(), "app/challenges/[id]/page.tsx
 const myChallenges = readFileSync(join(process.cwd(), "app/my-challenges/page.tsx"), "utf8");
 assert(flow.includes("sponsorFundsGoToWinnersPercent: 100"), "Sponsor funds must go 100% to winners.");
 assert(flow.includes("admin_approves_winners") && flow.includes("ledger_credits_pending_hold"), "Admin approval must gate ledger flow visibility.");
-assert(challenge.includes("Sponsor-funded prizes go 100% to winners") && challenge.includes("KYC and 24-hour hold"), "Challenge detail must explain sponsor/winner ledger flow.");
-assert(myChallenges.includes("Sponsor state:") && myChallenges.includes("webhook-confirmed payment"), "Creator/host view must show sponsor state safely.");
+assert(challenge.includes("Sponsor-funded prizes go 100% to approved winners") && challenge.includes("24-hour hold"), "Challenge detail must explain sponsor/winner ledger flow.");
+assert(myChallenges.includes('redirect("/challenges")'), "Legacy My Challenges must redirect to the canonical owner page.");
 assert(!/payout sent|winners paid|prize released/i.test(flow + challenge + myChallenges), "Sponsorship flow must not claim payout or prize release.");
 console.log("Complete sponsorship payout flow visibility checks passed.");

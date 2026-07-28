@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { normalizeAccountType } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
+import { buildSponsorReportingSummary } from "@/lib/server/sponsor-reporting";
 import { forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ async function loadSponsor(db: FirebaseFirestore.Firestore, uid: string): Promis
   if (normalizeAccountType({ ...profileData, ...userData }) !== "sponsor") return null;
   return { ...profileData, ...userData, ...sponsorData, userId: uid };
 }
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -25,13 +27,32 @@ export async function GET(request: Request) {
   try {
     const sponsor = await loadSponsor(db, user.uid);
     if (!sponsor) return forbidden("A sponsor account is required.");
-    const [activitySnap, notificationsSnap] = await Promise.all([
+    const [activitySnap, notificationsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap] = await Promise.all([
       db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
-      db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get()
+      db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
+      db.collection("sponsorCampaignBriefs").where("sponsorId", "==", user.uid).limit(100).get(),
+      db.collection("sponsorProposals").where("sponsorId", "==", user.uid).limit(100).get(),
+      db.collection("sponsorContributions").where("sponsorId", "==", user.uid).limit(100).get(),
+      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", user.uid).limit(100).get()
     ]);
+    const campaigns = campaignsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const proposals = proposalsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const contributions: Array<Record<string, unknown> & { id: string }> = contributionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const challengeIds = [...new Set(contributions.map((item) => String(item.challengeId ?? "")).filter(Boolean))].slice(0, 100);
+    const challengeSnaps = challengeIds.length ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id))) : [];
+    const challenges = new Map(challengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
+    const reporting = buildSponsorReportingSummary({
+      campaigns,
+      proposals,
+      contributions,
+      deliverables: deliverablesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      challenges
+    });
     return ok({
       sponsorProfile: sponsor,
-      metrics: { activeCampaigns: 0, proposalsAwaitingReview: 0, totalSponsorshipSpendCents: 0, walletBalanceCents: 0, totalCampaignReach: 0, totalParticipants: 0, pendingApprovals: 0 },
+      campaigns,
+      proposals,
+      ...reporting,
       activity: activitySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
       notifications: notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
     }, "Sponsor dashboard loaded.");
