@@ -24,6 +24,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             <LinkButton href={`/tournaments/${id}/join`}>Join / Apply</LinkButton>
             <LinkButton href={`/tournaments/${id}/lobby`} variant="secondary">Lobby</LinkButton>
             <LinkButton href={`/tournaments/${id}/me`} variant="ghost">My Tournament</LinkButton>
+            {bundle.placements.length ? <LinkButton href={`/tournaments/${id}/results`} variant="secondary">Results</LinkButton> : null}
           </div>
           <div className="mt-8 grid gap-5 lg:grid-cols-2">
             <Card className="p-5"><h2 className="text-xl font-black">Schedule</h2><Info label="Registration closes" value={tournament.registrationClosesAt} /><Info label="Tournament starts" value={tournament.tournamentStartsAt} /><Info label="Expected end" value={tournament.expectedEndAt} /></Card>

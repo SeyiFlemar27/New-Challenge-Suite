@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { predictionStakeFoundation } from "@/lib/server/revenue-sharing";
@@ -47,12 +48,12 @@ export async function GET(request: Request) {
   return ok({
     feature: {
       name: "Prediction Arena",
-      realMoneyFoundation: true,
+      realMoneyEnabled: featureEnabled() && providerState() === "stripe_approved",
       predictionPaymentsProvider: providerState(),
       providerApprovalRequired: true,
       featureFlagEnabled: featureEnabled(),
       platformFeePercent: 7,
-      feeTiming: "deducted_from_stake_pending_client_confirmation",
+      feeTiming: "calculated_from_server_amount_before_provider_checkout",
       settlementRequiresAdminReview: true,
       automaticSettlementEnabled: false,
       automaticPayoutsEnabled: false,
@@ -75,6 +76,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
+  const rateLimit = consumeRateLimit(`prediction:${user.uid}`, { limit: 10, windowMs: 60_000 });
+  if (!rateLimit.allowed) return fail("Too many prediction attempts. Please wait before trying again.", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, "RATE_LIMITED");
   const db = getAdminDb();
   if (!db) return serverUnavailable("Prediction Arena");
   const parsed = await readJson(request);
@@ -135,11 +138,11 @@ export async function POST(request: Request) {
     challengeId,
     predictedParticipantId,
     ...fee,
-    predictionStatus: "pending_payment",
-    paymentStatus: "provider_approval_required",
+    predictionStatus: "payment_review_required",
+    paymentStatus: "provider_checkout_not_created",
     settlementStatus: "admin_review_required",
     refundStatus: "not_applicable",
-    marketStatus: "active",
+    marketStatus: "review",
     eligibilityStatus: status,
     predictionPaymentsProvider: provider,
     acceptedTermsAt: now,
@@ -152,7 +155,8 @@ export async function POST(request: Request) {
     automaticSettlementEnabled: false,
     automaticPayoutsEnabled: false,
     automaticRefundsEnabled: false,
-    moneyMovementEnabled: false
+    moneyMovementEnabled: false,
+    dorocoinStakingAllowed: false
   };
   try {
     await ref.set(record);
@@ -161,7 +165,7 @@ export async function POST(request: Request) {
       predictionId: ref.id,
       challengeId,
       userId: user.uid,
-      status: "pending_payment",
+      status: "payment_review_required",
       settlementStatus: "admin_review_required",
       refundStatus: "not_applicable",
       automaticSettlementEnabled: false,
@@ -169,7 +173,7 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now
     });
-    return ok({ prediction: record }, "Prediction Arena record created as a payment/escrow foundation. No settlement or payout was executed.");
+    return ok({ prediction: record }, "Prediction Arena intent recorded for payment review. No stake, settlement, or payout was executed.");
   } catch (error) {
     return serverError("Prediction could not be recorded.", error instanceof Error ? error.message : error);
   }

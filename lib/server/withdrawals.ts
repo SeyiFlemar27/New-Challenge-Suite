@@ -1,4 +1,4 @@
-import type { Firestore, Transaction } from "firebase-admin/firestore";
+﻿import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createCashWalletDefaults } from "@/lib/server/cash-wallet";
 import { WITHDRAWAL_ARCHITECTURE_CONFIG, type WithdrawalRequestStatus } from "@/lib/server/wallet-architecture";
@@ -24,7 +24,7 @@ export type PlannedWithdrawalStatus = WithdrawalRequestStatus;
 
 export function maskAccount(accountNumber: string) {
   const digits = accountNumber.replace(/\D/g, "");
-  return digits ? `•••• ${digits.slice(-4).padStart(4, "•")}` : "Not provided";
+  return digits ? `â€¢â€¢â€¢â€¢ ${digits.slice(-4).padStart(4, "â€¢")}` : "Not provided";
 }
 
 export function createWithdrawalLedgerRecord(input: {
@@ -71,6 +71,7 @@ export async function createWithdrawalRequest(
     accountHolderName: string;
     bankName: string;
     country: string;
+    kycStatusAtRequest: string;
     idempotencyKey: string;
     now: string;
   }
@@ -105,7 +106,7 @@ export async function createWithdrawalRequest(
     status: "pending_review" as WithdrawalStatus,
     adminReviewStatus: "pending_review",
     riskStatus: "pending_review",
-    kycStatus: "not_started",
+    kycStatus: input.kycStatusAtRequest,
     transferEnabled: false,
     payoutExecuted: false,
     requestedBy: input.userId,

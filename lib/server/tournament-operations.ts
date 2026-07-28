@@ -35,11 +35,14 @@ export function evaluateTournamentJoinEligibility(params: {
   profileComplete?: boolean;
   kycApproved?: boolean;
   rulesAccepted?: boolean;
+  paymentConfirmed?: boolean;
   now?: Date;
 }): TournamentOperationResult & { outcome?: TournamentParticipantStatus } {
   const now = params.now ?? new Date();
   if (!params.actor) return { allowed: false, code: "AUTH_REQUIRED", message: "Sign in before joining this tournament." };
   if (isSponsor(params.actor)) return { allowed: false, code: "SPONSOR_CANNOT_JOIN", message: "Sponsors cannot compete in tournaments." };
+  if (params.tournament.hostId === params.actor.uid) return { allowed: false, code: "OWNER_CANNOT_JOIN", message: "Tournament hosts cannot compete in their own tournament." };
+  if (params.tournament.entryType !== "free" && !params.paymentConfirmed) return { allowed: false, code: "PAYMENT_CONFIRMATION_REQUIRED", message: "Confirmed tournament entry payment is required." };
   if (params.participants.some((item) => item.userId === params.actor?.uid && item.status !== "withdrawn")) return { allowed: false, code: "DUPLICATE_PARTICIPANT", message: "You already have a tournament registration state." };
   if (params.tournament.status !== "registration_open") return { allowed: false, code: "REGISTRATION_NOT_OPEN", message: "Tournament registration is not open." };
   if (params.tournament.registrationClosesAt && now >= new Date(params.tournament.registrationClosesAt)) return { allowed: false, code: "REGISTRATION_CLOSED", message: "Registration has closed." };

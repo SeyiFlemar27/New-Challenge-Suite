@@ -37,7 +37,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const account = userSnap.exists ? userSnap.data() ?? {} : {};
   const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
   const currentPlan = getUserPlanAccess({ ...profile, ...account });
-  if (!currentPlan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
+  if ([event.userId, event.creatorId, event.hostId].includes(user.uid)) return forbidden("Event hosts cannot register as attendees for their own event.");
+  if (String(user.role ?? account.role ?? account.accountType ?? "").toLowerCase() === "sponsor") return forbidden("Sponsor accounts cannot register as event attendees.");
   const requiredPlanId = typeof event.requiredPlanId === "string" ? event.requiredPlanId : null;
   const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
   if (requiredPlan && getPlanRank(currentPlan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId)) {

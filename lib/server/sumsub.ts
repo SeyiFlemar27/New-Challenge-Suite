@@ -118,11 +118,10 @@ export function getSumsubClient() {
 
 export function verifySumsubWebhookSignature(rawBody: string, signatureHeader: string | null) {
   const secret = getSumsubConfig().webhookSecret;
-  if (!secret || !signatureHeader) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  const receivedBuffer = Buffer.from(signatureHeader, "hex");
-  if (expectedBuffer.length !== receivedBuffer.length) return false;
+  const signature = signatureHeader?.trim().toLowerCase() ?? "";
+  if (!secret || !/^[a-f0-9]{64}$/.test(signature)) return false;
+  const expectedBuffer = Buffer.from(createHmac("sha256", secret).update(rawBody).digest("hex"), "hex");
+  const receivedBuffer = Buffer.from(signature, "hex");
   return timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 

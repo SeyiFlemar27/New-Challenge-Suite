@@ -27,7 +27,8 @@ export function conflict(message: string, details?: unknown) {
 }
 
 export function serverError(message = "Unexpected server error.", details?: unknown) {
-  return fail(message, 500, details, "SERVER_ERROR");
+  const safeDetails = process.env.NODE_ENV === "development" ? details : undefined;
+  return fail(message, 500, safeDetails, "SERVER_ERROR");
 }
 
 export function serverUnavailable(feature: string) {

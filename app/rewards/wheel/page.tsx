@@ -43,45 +43,27 @@ type VisualSlice = {
   textColor: string;
 };
 
-const tierConfig: Record<RewardTier, { label: string; threshold: number; cost: number; accent: string; fallback: RewardPrize[] }> = {
+const tierConfig: Record<RewardTier, { label: string; threshold: number; cost: number; accent: string }> = {
   basic: {
     label: "Basic",
-    threshold: 150,
-    cost: 50,
+    threshold: 100,
+    cost: 100,
     accent: "#f6c64b",
-    fallback: [
-      { id: "basic-100-dorocoin", prizeName: "100 DoroCoin", rewardType: "dorocoin" },
-      { id: "basic-free-spin", prizeName: "Free Spin", rewardType: "spin" },
-      { id: "basic-250-dorocoin", prizeName: "250 DoroCoin", rewardType: "dorocoin" },
-      { id: "basic-bonus-vote", prizeName: "Bonus Vote", rewardType: "vote" },
-      { id: "basic-no-reward", prizeName: "No Reward", rewardType: "no_reward" }
-    ]
+
   },
   standard: {
     label: "Standard",
-    threshold: 270,
-    cost: 70,
+    threshold: 250,
+    cost: 250,
     accent: "#e0b94f",
-    fallback: [
-      { id: "standard-500-dorocoin", prizeName: "500 DoroCoin", rewardType: "dorocoin" },
-      { id: "standard-free-spin", prizeName: "Free Spin", rewardType: "spin" },
-      { id: "standard-1000-dorocoin", prizeName: "1000 DoroCoin", rewardType: "dorocoin" },
-      { id: "standard-bonus-votes", prizeName: "Bonus Votes", rewardType: "vote" },
-      { id: "standard-no-reward", prizeName: "No Reward", rewardType: "no_reward" }
-    ]
+
   },
   premium: {
     label: "Premium",
-    threshold: 390,
-    cost: 150,
+    threshold: 500,
+    cost: 500,
     accent: "#f1d98a",
-    fallback: [
-      { id: "premium-iphone-17", prizeName: "iPhone 17", rewardType: "physical", manualFulfillmentRequired: true },
-      { id: "premium-cash-1000", prizeName: "$1000 Cash", rewardType: "cash", manualFulfillmentRequired: true },
-      { id: "premium-free-spin", prizeName: "Free Spin", rewardType: "spin" },
-      { id: "premium-500-dorocoin", prizeName: "500 DoroCoin", rewardType: "dorocoin" },
-      { id: "premium-no-reward", prizeName: "No Reward", rewardType: "no_reward" }
-    ]
+
   }
 };
 
@@ -136,28 +118,9 @@ function shortPrizeName(name: string) {
   return trimmed;
 }
 
-function normalizeVisualPrizes(tier: RewardTier, configured: RewardPrize[]) {
-  const active = configured.filter((prize) => String(prize.status ?? "active").toLowerCase() !== "disabled");
-  if (!active.length) {
-    return Array.from({ length: 5 }, (_, index) => ({
-      id: `${tier}-visual-slot-${index + 1}`,
-      prizeName: `Slot ${index + 1}`,
-      rewardType: "visual_slot",
-      status: "visual_only"
-    }));
-  }
-  const source = active;
-  const merged = [...source];
-  for (const fallback of tierConfig[tier].fallback) {
-    if (merged.length >= 5) break;
-    if (!merged.some((item) => prizeKey(item) === prizeKey(fallback))) merged.push(fallback);
-  }
-  while (merged.length < 5) merged.push(tierConfig[tier].fallback[merged.length % tierConfig[tier].fallback.length]);
-  const five = merged.slice(0, 5);
-  if (!five.some((item) => prizeKey(item) === "no-reward")) five[4] = tierConfig[tier].fallback[4];
-  return five;
+function normalizeVisualPrizes(_tier: RewardTier, configured: RewardPrize[]) {
+  return configured.filter((prize) => String(prize.status ?? "active").toLowerCase() !== "disabled").slice(0, 12);
 }
-
 function buildVisualSlices(tier: RewardTier, prizes: RewardPrize[]) {
   return normalizeVisualPrizes(tier, prizes).map((prize, index) => {
     const fullLabel = fullPrizeName(prize, index);
@@ -390,7 +353,7 @@ export default function RewardWheelPage() {
                   <h3 className="mt-2 text-3xl font-black" style={{ color: tierConfig[tier].accent }}>{credits.toLocaleString()} Available Spin{credits === 1 ? "" : "s"}</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <Stat label="Unlock" value={`${tierConfig[tier].threshold} pts`} />
-                    <Stat label="Spin Cost" value={`${tierConfig[tier].cost} pts`} />
+                    <Stat label="Points per Spin Credit" value={`${tierConfig[tier].cost} pts`} />
                   </div>
                   <p className={`mt-4 rounded-[8px] border p-3 text-sm font-bold ${availability.state === "active" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-100" : "border-yellow-500/20 bg-yellow-500/5 text-yellow-100"}`}>{availability.message}</p>
                   {reducedMotion ? <p className="mt-3 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-300">Reduced motion enabled.</p> : null}
@@ -423,7 +386,7 @@ function WheelTierSelector({ data, points, tier, disabled, onSelect }: { data: S
           <button key={item} type="button" onClick={() => onSelect(item)} disabled={disabled || !enabled} className={`rounded-[8px] border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/70 ${tier === item ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10 bg-white/[0.03] hover:border-white/25"} ${!enabled ? "cursor-not-allowed opacity-60" : ""}`}>
             <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{unlocked ? "Unlocked" : "Locked"}</span>
             <span className="mt-2 block text-lg font-black">{tierConfig[item].label}</span>
-            <span className="mt-1 block text-sm text-slate-400">{tierConfig[item].threshold} pts unlock / {tierConfig[item].cost} pts spin</span>
+            <span className="mt-1 block text-sm text-slate-400">{tierConfig[item].threshold} pts unlock / {tierConfig[item].cost} pts per spin credit</span>
             <span className="mt-3 inline-flex rounded-full bg-black/35 px-3 py-1 text-xs font-black text-[var(--gold)]">{spinCreditLabel(credits)}</span>
           </button>
         );

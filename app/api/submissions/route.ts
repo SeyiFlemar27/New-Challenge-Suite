@@ -14,6 +14,7 @@ import {
 import { submissionCreateSchema, zodFieldErrors } from "@/lib/server/submission-validation";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -23,6 +24,8 @@ function initialsFromName(name: string) {
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
+  const rateLimit = consumeRateLimit(`submission:${user.uid}`, { limit: 8, windowMs: 60_000 });
+  if (!rateLimit.allowed) return fail("Too many submission attempts. Please wait before trying again.", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, "RATE_LIMITED");
   const db = getAdminDb();
   if (!db) return serverUnavailable("Submission creation");
 

@@ -63,16 +63,6 @@ export function revenueShareFoundation(input: { challengeId: string; creatorId: 
   };
 }
 
-export function predictionFee(stakeAmountDorocoin: number) {
-  const safeStake = Math.max(0, Math.floor(stakeAmountDorocoin));
-  const platformFeeDorocoin = Math.floor(safeStake * 0.07);
-  return {
-    stakeAmountDorocoin: safeStake,
-    platformFeeDorocoin,
-    netPoolDorocoin: Math.max(0, safeStake - platformFeeDorocoin)
-  };
-}
-
 export function predictionStakeFoundation(stakeAmountUsd: number) {
   const safeStake = Math.max(0, Math.round(stakeAmountUsd * 100) / 100);
   const platformFeeUsd = Math.round(safeStake * PREDICTION_PLATFORM_FEE_PERCENT) / 100;

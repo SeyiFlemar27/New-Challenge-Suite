@@ -29,9 +29,9 @@ export async function POST(request: Request) {
   try {
     const now = isoNow();
     const ref = context.db.collection("sponsorReports").doc();
-    const report = { id: ref.id, sponsorId: context.user.uid, ownerUid: context.user.uid, title: cleanText(body.title).slice(0, 180), type: normalizeReportType(body.type), status: normalizeReportStatus(body.status ?? "draft"), relatedCampaignId: cleanText(body.campaignId ?? body.relatedCampaignId).slice(0, 120) || null, dataSourceLabel: "not_tracked_yet", exportPdfStatus: "not_configured", exportCsvStatus: "not_configured", exportGenerated: false, createdAt: now, updatedAt: now, createdBy: context.user.uid, updatedBy: context.user.uid, version: 1 };
+    const report = { id: ref.id, sponsorId: context.user.uid, ownerUid: context.user.uid, title: cleanText(body.title).slice(0, 180), type: normalizeReportType(body.type), status: normalizeReportStatus(body.status ?? "draft"), relatedCampaignId: cleanText(body.campaignId ?? body.relatedCampaignId).slice(0, 120) || null, dataSourceLabel: "not_tracked_yet", exportPdfStatus: "not_available", exportCsvStatus: "not_available", exportGenerated: false, createdAt: now, updatedAt: now, createdBy: context.user.uid, updatedBy: context.user.uid, version: 1 };
     await Promise.all([ref.set(report), context.db.collection("sponsorReportJobs").add({ sponsorId: context.user.uid, reportId: ref.id, status: "draft", exportGenerated: false, createdAt: now, createdBy: context.user.uid })]);
-    return ok({ report }, "Report foundation saved. No PDF or CSV export was generated.");
+    return ok({ report }, "Report draft saved. No export was generated.");
   } catch (error) {
     console.error("[sponsor-reports:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor report could not be saved.");

@@ -1,0 +1,4 @@
+import fs from "node:fs";
+const auth=fs.readFileSync("lib/server/auth.ts","utf8"), stripe=fs.readFileSync("app/api/stripe/webhook/route.ts","utf8"), kyc=fs.readFileSync("app/api/kyc/sumsub/webhook/route.ts","utf8"), rate=fs.readFileSync("lib/server/rate-limit.ts","utf8");
+for(const [name,ok] of [["verified auth",auth.includes("verifyIdToken")],["Stripe signature",stripe.includes("constructEvent")],["Stripe idempotency",stripe.includes("stripeWebhookEvents")],["KYC signature",kyc.includes("verifySumsubWebhookSignature")],["KYC privacy",kyc.includes("rawIdentityStored: false")],["abuse throttle",rate.includes("consumeRateLimit")]]) if(!ok) throw new Error("Launch readiness check failed: "+name);
+console.log("phase10 production launch readiness: code gates ready; provider, rules, and live mobile QA remain manual");
