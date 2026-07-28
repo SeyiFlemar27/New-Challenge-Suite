@@ -32,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       db.collection("liveEvents").doc(id).get(),
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
-      db.collection("eventRegistrations").doc(`${id}_${user.uid}`).get()
+      db.collection("liveEventRegistrations").doc(`${id}_${user.uid}`).get()
     ]);
 
     if (!eventSnap.exists) {
@@ -43,7 +43,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
-    if (!plan.canHostLiveEvents) return forbidden("Live event tools require the Host plan.");
     const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
     const requiredPlan = requiredPlanId ? getUserPlanAccess({ planId: requiredPlanId }) : null;
     const planRequired = Boolean(requiredPlan && getPlanRank(plan.normalizedPlanId) < getPlanRank(requiredPlan.normalizedPlanId));
@@ -81,7 +80,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         fullCapacity: isFull,
         planRequired,
         registrationOpen,
-        canRegister: registrationOpen && !alreadyRegistered && !isFull && !planRequired
+        canRegister: registrationOpen && !alreadyRegistered && !isFull && !planRequired && ![data.userId, data.creatorId, data.hostId].includes(user.uid),
+        timezone: data.timezone ?? data.eventTimezone ?? "Africa/Lagos",
+        venueName: data.venueName ?? data.location ?? "",
+        venueAddress: data.eventAddress ?? data.address ?? "",
+        checkInCount: Number(data.checkInCount ?? data.checkedInCount ?? 0),
+        recap: data.status === "completed" ? { summary: data.recapSummary ?? null, media: Array.isArray(data.recapMedia) ? data.recapMedia : [] } : null
       },
       registration: registrationSnap.exists ? { id: registrationSnap.id, ...registrationSnap.data() } : null
     }, "Live event details loaded.");

@@ -22,7 +22,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const participants = participantsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentParticipantFoundation[];
   const invitationId = typeof body.invitationId === "string" ? body.invitationId : "";
   const invitationSnap = invitationId ? await db.collection("tournamentInvitations").doc(invitationId).get() : null;
-  const profileSnap = await db.collection("users").doc(user.uid).get();
+  const [profileSnap, paymentSnap] = await Promise.all([
+    db.collection("users").doc(user.uid).get(),
+    db.collection("tournamentEntryPayments").doc(`${id}_${user.uid}`).get()
+  ]);
   const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
   const eligibility = evaluateTournamentJoinEligibility({
     tournament,
@@ -31,7 +34,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     invitation: invitationSnap?.exists ? { id: invitationSnap.id, ...invitationSnap.data() } as any : null,
     profileComplete: Boolean(profile.displayName || profile.username),
     kycApproved: String(profile.kycStatus ?? "").toLowerCase() === "verified",
-    rulesAccepted: body.rulesAccepted === true
+    rulesAccepted: body.rulesAccepted === true,
+    paymentConfirmed: paymentSnap.exists && paymentSnap.data()?.status === "confirmed" && paymentSnap.data()?.webhookConfirmed === true
   });
   if (!eligibility.allowed) return fail(eligibility.message, 403, eligibility, eligibility.code);
   const participantId = `${id}_${user.uid}`;

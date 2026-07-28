@@ -1,0 +1,4 @@
+import assert from "node:assert/strict"; import { read } from "./production-flow-test-utils.mjs";
+for(const file of ["lib/server/tournament-operations.ts","app/api/events/[id]/registrations/route.ts","app/api/challenges/[id]/hybrid-stage/route.ts","app/tournaments/[id]/results/page.tsx"]){const text=read(file);assert(!/mock participant|fake match|fake result|fake attendee/i.test(text));}
+const join=read("app/api/tournaments/[id]/join/route.ts"); assert(join.includes('webhookConfirmed === true') && join.includes('tournamentEntryPayments'));
+console.log("Phase 8 no fake advanced competition data checks passed.");
