@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
-import { ExternalLink, Vote } from "lucide-react";
+import { ExternalLink, Sparkles, Vote } from "lucide-react";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { AvatarFrame, SubmissionMediaFrame } from "@/components/media-display";
 import { voteForSubmission } from "@/lib/api/services";
@@ -12,6 +12,16 @@ export interface PublicVotingAccess {
   authenticated: boolean;
   canVote: boolean;
   reason: string | null;
+  loginPath?: string;
+}
+
+export interface PublicPredictionAccess {
+  available: boolean;
+  windowOpen: boolean;
+  authenticated: boolean;
+  canPredict: boolean;
+  reason: string | null;
+  message: string;
   loginPath?: string;
 }
 
@@ -33,12 +43,14 @@ export function ChallengeParticipantCard({
   challengeId,
   participant,
   votingAccess,
+  predictionAccess,
   returnPath,
   onVoteRecorded
 }: {
   challengeId: string;
   participant: PublicChallengeParticipant;
   votingAccess: PublicVotingAccess;
+  predictionAccess?: PublicPredictionAccess;
   returnPath: string;
   onVoteRecorded?: () => void | Promise<void>;
 }) {
@@ -110,6 +122,19 @@ export function ChallengeParticipantCard({
             <Button className="w-full" variant="secondary" disabled><Vote size={16} /> {blockedVoteLabel(votingAccess.reason)}</Button>
           )}
         </div>
+        {predictionAccess?.available ? (
+          <div className="mt-3">
+            {!predictionAccess.authenticated ? (
+              <LinkButton href={predictionAccess.loginPath || `/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/prediction`)}`} variant="secondary" className="w-full">
+                <Sparkles size={16} /> Log in to Predict
+              </LinkButton>
+            ) : predictionAccess.canPredict ? (
+              <LinkButton href={`/challenges/${challengeId}/prediction?submissionId=${encodeURIComponent(participant.submissionId)}`} variant="secondary" className="w-full">
+                <Sparkles size={16} /> Predict Winner
+              </LinkButton>
+            ) : null}
+          </div>
+        ) : null}
         {votingAccess.authenticated && !votingAccess.canVote ? <p className="mt-3 text-sm text-slate-400">{blockedVoteMessage(votingAccess.reason)}</p> : null}
         {voteMutation.isSuccess ? <p className="mt-3 text-sm font-bold text-emerald-300">Vote recorded.</p> : null}
         {voteMutation.error ? <p className="mt-3 text-sm text-red-300">{voteMutation.error.message}</p> : null}

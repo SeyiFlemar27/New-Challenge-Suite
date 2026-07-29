@@ -1,76 +1,118 @@
+import { getStripe } from "@/lib/stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { getOptionalRequestUser, requireRequestUser } from "@/lib/server/auth";
+import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
+import { canAccessChallenge } from "@/lib/plan-access";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
-import { requireRequestUser } from "@/lib/server/auth";
-import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { predictionStakeFoundation } from "@/lib/server/revenue-sharing";
+import {
+  attachPredictionCheckoutSession,
+  createPendingPrediction,
+  findEligiblePredictionTarget,
+  predictionAccessForViewer,
+  predictionProviderState,
+  PREDICTION_PAYMENT_PURPOSE
+} from "@/lib/server/predictions";
 import { hasPrivateChallengeAccess } from "@/lib/server/private-invites";
+import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { checkoutLineItem } from "@/lib/server/monetization-payments";
 
 export const dynamic = "force-dynamic";
 
-type ProviderState = "disabled" | "stripe_pending_approval" | "stripe_approved";
-
-function featureEnabled() {
-  return process.env.REAL_MONEY_PREDICTION_ARENA_ENABLED === "true";
+function text(value: unknown, max = 500) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-function providerState(): ProviderState {
-  const value = process.env.PREDICTION_PAYMENTS_PROVIDER;
-  if (value === "stripe_approved") return "stripe_approved";
-  if (value === "stripe_pending_approval") return "stripe_pending_approval";
-  return "disabled";
+async function loadProfile(db: FirebaseFirestore.Firestore, userId: string) {
+  const [accountSnap, profileSnap, kycSnap] = await Promise.all([
+    db.collection("users").doc(userId).get(),
+    db.collection("profiles").doc(userId).get(),
+    db.collection("kycMetadata").doc(userId).get()
+  ]);
+  return {
+    ...(profileSnap.data() ?? {}),
+    ...(accountSnap.data() ?? {}),
+    kycStatus: kycSnap.data()?.kycStatus ?? accountSnap.data()?.kycStatus ?? profileSnap.data()?.kycStatus ?? "not_started"
+  } as Record<string, unknown>;
 }
 
-function eligibilityStatus(input: { enabled: boolean; provider: ProviderState; kycStatus: string; ageVerified: boolean; region: string; marketApproved: boolean; windowOpen: boolean; suspended: boolean }) {
-  if (input.suspended) return "suspended";
-  if (!input.enabled) return "not_available";
-  if (input.provider === "disabled") return "provider_not_configured";
-  if (input.provider !== "stripe_approved") return "provider_not_approved";
-  if (input.kycStatus !== "verified") return "kyc_required";
-  if (!input.ageVerified) return "age_verification_required";
-  if (input.region !== "US") return "region_not_supported";
-  if (!input.marketApproved) return "market_not_open";
-  if (!input.windowOpen) return "market_closed";
-  return "eligible";
+function publicPrediction(record: Record<string, unknown>) {
+  return {
+    id: record.id,
+    challengeId: record.challengeId,
+    predictedParticipantId: record.predictedParticipantId,
+    predictedSubmissionId: record.predictedSubmissionId,
+    stakeAmountCents: record.stakeAmountCents,
+    currency: record.currency,
+    status: record.status ?? record.predictionStatus,
+    predictionStatus: record.predictionStatus ?? record.status,
+    paymentStatus: record.paymentStatus,
+    predictionClosesAt: record.predictionClosesAt,
+    createdAt: record.createdAt,
+    activatedAt: record.activatedAt,
+    settledAt: record.settledAt,
+    rewardAmountCents: record.rewardAmountCents ?? null
+  };
 }
 
 export async function GET(request: Request) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Prediction Arena");
-  const [userSnap, kycSnap, predictionSnap] = await Promise.all([
-    db.collection("users").doc(user.uid).get(),
-    db.collection("kycMetadata").doc(user.uid).get(),
-    db.collection("predictionRecords").where("userId", "==", user.uid).limit(100).get()
-  ]);
-  const account = userSnap.data() ?? {};
-  const kyc = kycSnap.data() ?? {};
+  const user = await getOptionalRequestUser(request);
+  const challengeId = new URL(request.url).searchParams.get("challengeId");
+  if (!challengeId) {
+    if (!user) return fail("Authentication required.", 401, undefined, "AUTHENTICATION_REQUIRED");
+    const predictionSnap = await db.collection("predictionRecords").where("userId", "==", user.uid).limit(100).get();
+    return ok({
+      feature: {
+        name: "Prediction Arena",
+        predictionPaymentsProvider: predictionProviderState(),
+        platformFeeRate: 0.07,
+        externalPayoutsEnabled: false
+      },
+      predictions: predictionSnap.docs.map((doc) => publicPrediction({ id: doc.id, ...doc.data() }))
+    }, "Predictions loaded.");
+  }
+
+  const challengeSnap = await db.collection("challenges").doc(challengeId).get();
+  if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
+  const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  let profile: Record<string, unknown> = {};
+  if (user) {
+    profile = await loadProfile(db, user.uid);
+    const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
+    if (accessContext.privateOnly && !accessContext.hasAccessGrant) return fail("A valid challenge invite or approval is required.", 403, undefined, "PRIVATE_ACCESS_REQUIRED");
+    const planAccess = canAccessChallenge(profile, accessContext.challenge);
+    if (!planAccess.allowed) return fail("Plan access is required for this challenge.", 403, undefined, planAccess.code ?? "PLAN_ACCESS_DENIED");
+  } else if (!(String(challenge.visibility ?? "public").toLowerCase() === "public")) {
+    return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
+  }
+
+  const leaderboard = await buildChallengeLeaderboard(db, challengeId, { limit: 250, includeEligibleEntries: true });
+  const access = predictionAccessForViewer({
+    challengeId,
+    challenge,
+    userId: user?.uid ?? null,
+    user,
+    profile,
+    eligibleSubmissionCount: leaderboard.entries.length
+  });
+  const predictionSnap = user
+    ? await db.collection("predictionRecords").doc(`prediction_${challengeId}_${user.uid}`).get()
+    : null;
   return ok({
     feature: {
       name: "Prediction Arena",
-      realMoneyEnabled: featureEnabled() && providerState() === "stripe_approved",
-      predictionPaymentsProvider: providerState(),
-      providerApprovalRequired: true,
-      featureFlagEnabled: featureEnabled(),
-      platformFeePercent: 7,
-      feeTiming: "calculated_from_server_amount_before_provider_checkout",
-      settlementRequiresAdminReview: true,
-      automaticSettlementEnabled: false,
-      automaticPayoutsEnabled: false,
-      automaticRefundsEnabled: false,
-      minimumStakeUsd: 1,
-      defaultMaximumStakeUsd: 100,
-      verifiedMaximumStakeUsd: 500,
-      publicLabel: "Prediction Arena"
+      platformFeeRate: 0.07,
+      predictionPaymentsProvider: predictionProviderState(),
+      realMoneyOnly: true,
+      dorocoinAllowed: false,
+      externalPayoutsEnabled: false
     },
-    userEligibility: {
-      kycStatus: String(kyc.kycStatus ?? account.kycStatus ?? "not_started"),
-      ageVerified: account.ageVerified === true,
-      region: String(account.selfDeclaredRegion ?? account.region ?? "unknown"),
-      termsAccepted: account.predictionArenaTermsAccepted === true
-    },
-    predictions: predictionSnap.docs.map((doc) => ({ id: doc.id, ...doc.data(), automaticSettlementEnabled: false, automaticPayoutsEnabled: false }))
-  }, "Prediction Arena compliance foundation loaded.");
+    access,
+    prediction: predictionSnap?.exists ? publicPrediction({ id: predictionSnap.id, ...predictionSnap.data() }) : null
+  }, "Prediction Arena status loaded.");
 }
 
 export async function POST(request: Request) {
@@ -82,99 +124,99 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Prediction Arena");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const challengeId = String(parsed.body?.challengeId ?? "");
-  const predictedParticipantId = String(parsed.body?.predictedParticipantId ?? "");
-  const stake = Number(parsed.body?.stakeAmountUsd ?? 0);
-  const acceptedTerms = parsed.body?.acceptedTerms === true;
-  const acceptedRiskNotice = parsed.body?.acceptedRiskNotice === true;
-  if (!challengeId) return validationError({ challengeId: "Challenge is required." });
-  if (!predictedParticipantId) return validationError({ predictedParticipantId: "Predicted participant is required." });
-  if (!Number.isFinite(stake) || stake < 1) return validationError({ stakeAmountUsd: "Minimum Prediction Arena stake is $1." });
-  if (!acceptedTerms || !acceptedRiskNotice) return validationError({ acceptedTerms: "Terms and responsible-play notice must be accepted." });
 
-  const now = new Date().toISOString();
-  const provider = providerState();
-  const challengeSnap = await db.collection("challenges").doc(challengeId).get();
-  if (!challengeSnap.exists) return fail("Selected challenge is not eligible for Prediction Arena.", 404, undefined, "CHALLENGE_NOT_FOUND");
-  const challenge = challengeSnap.data() ?? {};
-  const visibility = String(challenge.visibility ?? challenge.type ?? "public").toLowerCase();
-  if ((visibility.includes("private") || visibility.includes("exclusive")) && !(await hasPrivateChallengeAccess(db, challengeId, user.uid))) {
-    return fail("Private challenge Prediction Arena access requires a valid invite/access record.", 403, undefined, "PRIVATE_ACCESS_REQUIRED");
+  const challengeId = text(parsed.body?.challengeId, 160);
+  const predictedSubmissionId = text(parsed.body?.predictedSubmissionId, 160);
+  const stakeAmountUsd = Number(parsed.body?.stakeAmountUsd ?? 0);
+  const currency = text(parsed.body?.currency ?? "usd", 12).toLowerCase();
+  if (!challengeId) return validationError({ challengeId: "Challenge is required." });
+  if (!predictedSubmissionId) return validationError({ predictedSubmissionId: "Select an eligible participant." });
+  if (!Number.isFinite(stakeAmountUsd) || stakeAmountUsd < 1 || stakeAmountUsd > 500) {
+    return validationError({ stakeAmountUsd: "Enter a prediction amount between $1 and $500." });
   }
-  const startsAt = challenge.startsAt ?? challenge.startDate;
-  const windowOpen = !startsAt || new Date(String(startsAt)).getTime() > Date.now();
-  const marketApproved = challenge.predictionMarketApproved === true || challenge.predictionMarketStatus === "approved";
-  const [participantSnap, userSnap, kycSnap] = await Promise.all([
-    db.collection("challengeParticipants").doc(predictedParticipantId).get(),
-    db.collection("users").doc(user.uid).get(),
-    db.collection("kycMetadata").doc(user.uid).get()
+  if (currency !== "usd") return validationError({ currency: "Prediction Arena currently supports USD only." });
+  if (parsed.body?.dorocoinAmount !== undefined || parsed.body?.paymentMethod === "dorocoin" || parsed.body?.currency === "DORO") {
+    return fail("DoroCoins cannot be used in Prediction Arena.", 400, undefined, "DOROCOIN_NOT_ALLOWED");
+  }
+  if (parsed.body?.acceptedTerms !== true) return validationError({ acceptedTerms: "Accept the Prediction Arena terms before continuing." });
+
+  const [challengeSnap, profile] = await Promise.all([
+    db.collection("challenges").doc(challengeId).get(),
+    loadProfile(db, user.uid)
   ]);
-  if (!participantSnap.exists || participantSnap.data()?.challengeId !== challengeId) return fail("Selected participant is not eligible for Prediction Arena.", 400, undefined, "PARTICIPANT_NOT_FOUND");
-  const participantStatus = String(participantSnap.data()?.status ?? "joined");
-  if (!["approved", "active", "joined", "checked_in", "submitted"].includes(participantStatus)) return fail("Selected participant is not eligible for Prediction Arena.", 400, undefined, "PARTICIPANT_NOT_ELIGIBLE");
-  const account = userSnap.data() ?? {};
-  const kyc = kycSnap.data() ?? {};
-  const kycStatus = String(kyc.kycStatus ?? account.kycStatus ?? "not_started");
-  const status = eligibilityStatus({
-    enabled: featureEnabled(),
-    provider,
-    kycStatus,
-    ageVerified: account.ageVerified === true,
-    region: String(account.selfDeclaredRegion ?? account.region ?? "unknown"),
-    marketApproved,
-    windowOpen,
-    suspended: account.suspended === true
-  });
-  if (status !== "eligible") {
-    return fail(status === "provider_not_approved" || status === "provider_not_configured" ? "Real-money Prediction Arena is not active yet. Payment provider approval is required." : "Prediction Arena eligibility is not complete for this user or challenge.", 403, { eligibilityStatus: status, predictionPaymentsProvider: provider }, status.toUpperCase());
+  if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
+  const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  const privateVisibility = ["private", "exclusive"].some((value) => String(challenge.visibility ?? challenge.type ?? "").toLowerCase().includes(value));
+  if (privateVisibility && !(await hasPrivateChallengeAccess(db, challengeId, user.uid))) {
+    return fail("A valid challenge invite or approval is required.", 403, undefined, "PRIVATE_ACCESS_REQUIRED");
   }
-  const maxStake = kycStatus === "verified" ? 500 : 100;
-  if (stake > maxStake) return fail(`Stake exceeds the current $${maxStake} limit.`, 409, { maxStakeUsd: maxStake }, "STAKE_LIMIT_EXCEEDED");
-  const fee = predictionStakeFoundation(stake);
-  const ref = db.collection("predictionRecords").doc();
-  const record = {
-    id: ref.id,
-    userId: user.uid,
+  const leaderboard = await buildChallengeLeaderboard(db, challengeId, { limit: 250, includeEligibleEntries: true });
+  const access = predictionAccessForViewer({
     challengeId,
-    predictedParticipantId,
-    ...fee,
-    predictionStatus: "payment_review_required",
-    paymentStatus: "provider_checkout_not_created",
-    settlementStatus: "admin_review_required",
-    refundStatus: "not_applicable",
-    marketStatus: "review",
-    eligibilityStatus: status,
-    predictionPaymentsProvider: provider,
-    acceptedTermsAt: now,
-    acceptedRiskNoticeAt: now,
-    createdAt: now,
-    lockedAt: null,
-    settledAt: null,
-    settlementRequiresAdminReview: true,
-    refundRequiresAdminReview: true,
-    automaticSettlementEnabled: false,
-    automaticPayoutsEnabled: false,
-    automaticRefundsEnabled: false,
-    moneyMovementEnabled: false,
-    dorocoinStakingAllowed: false
-  };
+    challenge,
+    userId: user.uid,
+    user,
+    profile,
+    eligibleSubmissionCount: leaderboard.entries.length
+  });
+  if (!access.canPredict) return fail(access.message, 403, { predictionAccess: access }, String(access.reason ?? "PREDICTION_BLOCKED").toUpperCase());
+  if (String(profile.kycStatus ?? "not_started") !== "verified") return fail("Identity verification is required before making a real-money prediction.", 403, undefined, "KYC_REQUIRED");
+  if (profile.ageVerified !== true) return fail("Age verification is required before making a real-money prediction.", 403, undefined, "AGE_VERIFICATION_REQUIRED");
+  if (profile.suspended === true || isSponsorProfile(profile)) return fail("This account cannot make predictions.", 403, undefined, "ACCOUNT_RESTRICTED");
+
+  const target = findEligiblePredictionTarget(leaderboard.entries, predictedSubmissionId);
+  if (!target) return fail("Selected participant is not eligible for Prediction Arena.", 400, undefined, "PREDICTION_TARGET_NOT_ELIGIBLE");
+  if (String(target.userId ?? "") === user.uid) return fail("You cannot predict yourself to win.", 403, undefined, "SELF_PREDICTION_NOT_ALLOWED");
+  const amountCents = Math.round(stakeAmountUsd * 100);
+  const pending = await createPendingPrediction(db, {
+    challengeId,
+    challenge,
+    predictorId: user.uid,
+    target,
+    amountCents,
+    predictionClosesAt: access.closesAt!,
+  });
+  const record = pending.record;
+  if (pending.existing) {
+    if (record.status === "active") return ok({ prediction: publicPrediction(record), existing: true }, "Your prediction is active.");
+    if (record.status !== "pending_payment" || record.providerSessionId) {
+      return ok({ prediction: publicPrediction(record), existing: true }, "Your existing prediction is shown.");
+    }
+  }
+
+  const stripe = getStripe();
+  if (!stripe) return fail("Prediction payment is not configured.", 503, { prediction: publicPrediction(record) }, "PAYMENT_CONFIGURATION_ERROR");
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   try {
-    await ref.set(record);
-    await db.collection("predictionSettlementReviews").doc(ref.id).set({
-      id: ref.id,
-      predictionId: ref.id,
-      challengeId,
-      userId: user.uid,
-      status: "payment_review_required",
-      settlementStatus: "admin_review_required",
-      refundStatus: "not_applicable",
-      automaticSettlementEnabled: false,
-      automaticPayoutsEnabled: false,
-      createdAt: now,
-      updatedAt: now
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [checkoutLineItem({
+        amountCents,
+        currency: "usd",
+        name: `Prediction Arena - ${text(challenge.title, 90) || "Challenge"}`
+      })],
+      success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/prediction?payment=processing`,
+      cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/prediction?payment=canceled`,
+      metadata: {
+        paymentPurpose: PREDICTION_PAYMENT_PURPOSE,
+        predictionId: String(record.id),
+        challengeId,
+        userId: user.uid,
+        amount: String(amountCents),
+        currency: "usd"
+      }
+    }, {
+      idempotencyKey: `prediction_checkout_${String(record.id)}_${String(record.createdAt ?? "")}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 240)
     });
-    return ok({ prediction: record }, "Prediction Arena intent recorded for payment review. No stake, settlement, or payout was executed.");
+    await attachPredictionCheckoutSession(db, String(record.id), session);
+    return ok({
+      url: session.url,
+      prediction: publicPrediction(record),
+      status: "pending_payment",
+      webhookConfirmationRequired: true,
+      successPageActivatesPrediction: false
+    }, "Prediction checkout created. Your prediction activates only after payment confirmation.");
   } catch (error) {
-    return serverError("Prediction could not be recorded.", error instanceof Error ? error.message : error);
+    return serverError("Prediction checkout could not be created.", error instanceof Error ? error.message : error);
   }
 }

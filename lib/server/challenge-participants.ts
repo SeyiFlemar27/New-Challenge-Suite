@@ -1,6 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { buildChallengeLeaderboard, type LeaderboardResult, type LeaderboardRow } from "@/lib/server/leaderboard";
 import { isQaDemoOrPlaceholderProfile } from "@/lib/server/public-challenge";
+import { predictionWindowState } from "@/lib/server/predictions";
 
 export type ParticipantSort = "highest_votes" | "newest";
 
@@ -26,10 +27,9 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function predictionRankingOnly(challenge: Record<string, unknown> | null) {
+function predictionRankingOnly(challenge: Record<string, unknown> | null, eligibleSubmissionCount: number) {
   if (!challenge) return false;
-  const status = text(challenge.predictionArenaStatus ?? challenge.predictionStatus).toLowerCase();
-  return challenge.predictionArenaOpen === true || challenge.predictionOpen === true || ["open", "active"].includes(status);
+  return predictionWindowState(challenge, new Date(), eligibleSubmissionCount).rankingOnly;
 }
 
 async function loadPublicProfiles(db: Firestore, rows: LeaderboardRow[]) {
@@ -55,7 +55,7 @@ export async function buildPublicChallengeParticipants(
 ) {
   const leaderboard = await buildChallengeLeaderboard(db, challengeId, { limit: 250, includeEligibleEntries: true });
   const profiles = await loadPublicProfiles(db, leaderboard.entries);
-  const exactVoteCountVisible = leaderboard.visible && !predictionRankingOnly(leaderboard.challenge);
+  const exactVoteCountVisible = leaderboard.visible && !predictionRankingOnly(leaderboard.challenge, leaderboard.entries.length);
   const search = text(options.search).toLowerCase();
   const sort = options.sort === "newest" ? "newest" : "highest_votes";
   const pageSize = Math.min(48, Math.max(1, Math.trunc(options.pageSize ?? 12)));

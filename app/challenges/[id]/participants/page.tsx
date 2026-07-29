@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { ChallengeParticipantCard, type PublicVotingAccess } from "@/components/challenge-participant-card";
+import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import { Card, EmptyState, inputClass, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
@@ -16,6 +16,7 @@ interface ParticipantsResponse {
   participants: PublicChallengeParticipant[];
   pagination: { page: number; pageSize: number; total: number; hasMore: boolean };
   votingAccess: PublicVotingAccess;
+  predictionAccess: PublicPredictionAccess;
 }
 
 export default function ChallengeParticipantsPage() {
@@ -84,6 +85,7 @@ export default function ChallengeParticipantsPage() {
                 challengeId={challengeId}
                 participant={participant}
                 votingAccess={payload.votingAccess}
+                predictionAccess={payload.predictionAccess}
                 returnPath={returnPath}
                 onVoteRecorded={() => queryClient.invalidateQueries({ queryKey: ["challenge-participants", challengeId] })}
               />

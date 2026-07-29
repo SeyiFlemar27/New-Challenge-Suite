@@ -7,6 +7,7 @@ import { canAccessChallenge } from "@/lib/plan-access";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
+import { predictionAccessForViewer } from "@/lib/server/predictions";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,6 +60,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           : result.eligibleTotal <= 0
             ? "no_eligible_submissions"
             : null;
+  const predictionAccess = predictionAccessForViewer({
+    challengeId: id,
+    challenge,
+    userId: user?.uid ?? null,
+    user,
+    profile,
+    eligibleSubmissionCount: result.eligibleTotal
+  });
 
   return ok({
     challenge: { id, ...publicChallengeFields(challenge) },
@@ -74,6 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       reason: votingReason,
       loginPath: `/auth/login?next=${encodeURIComponent(`/challenges/${id}/participants`)}`
     },
+    predictionAccess,
     exactVoteCountVisible: result.exactVoteCountVisible
   }, "Challenge participants loaded.");
 }

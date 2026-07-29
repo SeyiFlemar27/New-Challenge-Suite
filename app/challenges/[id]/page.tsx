@@ -16,7 +16,7 @@ import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
 import { ChallengeMediaFrame } from "@/components/media-display";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
-import { ChallengeParticipantCard, type PublicVotingAccess } from "@/components/challenge-participant-card";
+import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 
 export default function ChallengeDetailPage() {
@@ -190,7 +190,6 @@ export default function ChallengeDetailPage() {
   const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
-  const predictionEnabled = Boolean((challenge as any).predictionEnabled || (challenge as any).predictionArenaEnabled);
   const creatorSuiteUrl = String((challenge as any).creatorSuiteUrl ?? (challenge as any).livestreamUrl ?? (challenge as any).livestreamEmbedUrl ?? "");
   const topParticipants = ((details as { topParticipants?: PublicChallengeParticipant[] } | null)?.topParticipants ?? []).slice(0, 5);
   const rawChallenge = details?.challenge as Record<string, any> | undefined;
@@ -212,6 +211,7 @@ export default function ChallengeDetailPage() {
   const paidEntryCtaLabel = paidEntryPending || paidEntryReturnedPending ? "Confirming Payment" : `Pay & Enter - ${entryFeeLabel}`;
   const participantJourney = (userState as any)?.participantJourney;
   const votingAccess = (userState as any)?.votingAccess;
+  const predictionAccess = (userState as any)?.predictionAccess as PublicPredictionAccess | undefined;
   const eligibleSubmissionCount = Number(votingAccess?.eligibleSubmissionCount ?? phaseSummary?.eligibleSubmissionCount ?? challengeSubmissions.length);
   const challengeTimeZone = String(phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? "Africa/Lagos");
   const stageSupport = participantJourney?.step === "entered_waiting_submission"
@@ -277,6 +277,7 @@ export default function ChallengeDetailPage() {
                     challengeId={challenge.id}
                     participant={participant}
                     votingAccess={(votingAccess ?? { authenticated: Boolean(user), canVote: false, reason: "voting_closed" }) as PublicVotingAccess}
+                    predictionAccess={predictionAccess}
                     returnPath={`/challenges/${challenge.id}`}
                     onVoteRecorded={async () => { await refetch(); }}
                   />
@@ -322,9 +323,9 @@ export default function ChallengeDetailPage() {
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
           {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-slate-300">Visible jackpot: <b className="text-[var(--gold)]">{prizeValue}</b> / Status: <b className="capitalize">{prizePool.status.replaceAll("_", " ")}</b>. Funding and prize status require review before public release.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} / {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} expected</p></div>)}</div><p className="mt-4 text-xs text-slate-400">Prize details are shown when available for public viewing.</p></Card> : null}
-          {predictionEnabled ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
-            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Prediction Arena availability depends on verification, region, and provider approval.</p></div></div>
-            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Availability depends on verification, region, and provider approval.</p>
+          {predictionAccess?.available ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
+            <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Predict who you think will win before voting opens.</p></div></div>
+            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Predict Winner</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Predictions close when voting opens.</p>
           </Card> : null}
 
           {isLiveEvent ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7">

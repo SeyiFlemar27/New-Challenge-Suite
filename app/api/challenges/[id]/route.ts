@@ -14,6 +14,7 @@ import { getParticipantJourneyState } from "@/lib/server/participant-journey";
 import { isEnteredParticipantStatus } from "@/lib/server/submission-lifecycle";
 import { buildPublicChallengeParticipants } from "@/lib/server/challenge-participants";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { predictionAccessForViewer } from "@/lib/server/predictions";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -158,6 +159,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     activeSubmissionCount,
     loginPath: `/auth/login?next=${encodeURIComponent(`/challenges/${id}`)}`
   };
+  const predictionAccess = predictionAccessForViewer({
+    challengeId: id,
+    challenge: { id: challengeSnap.id, ...challengeData },
+    userId: user?.uid ?? null,
+    user,
+    profile: requestProfile,
+    eligibleSubmissionCount
+  });
   const participationState = {
     phase: phaseSummary.phase,
     participationStatus: lifecycle.participationStatus,
@@ -195,6 +204,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       submissionAccess,
       participantJourney,
       votingAccess,
+      predictionAccess,
       participation: participationState,
       submitted,
       submissionId: userSubmissionSnap?.id ?? null,
@@ -211,6 +221,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       submissionAccess,
       participantJourney,
       votingAccess,
+      predictionAccess,
       participation: {
         phase: phaseSummary.phase,
         participationStatus: lifecycle.participationStatus,

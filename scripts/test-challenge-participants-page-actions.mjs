@@ -5,5 +5,7 @@ assert(card.includes("profilePath"));
 assert(card.includes("View Submission"));
 assert(card.includes("voteForSubmission"));
 assert(card.includes("Log in to Vote"));
-assert(!card.includes("Predict Winner"));
+assert(card.includes("predictionAccess?.available"));
+assert(card.includes("Predict Winner"));
+assert(card.includes("voteForSubmission"), "Vote and Predict Winner must remain separate actions.");
 console.log("participants page action checks passed");
