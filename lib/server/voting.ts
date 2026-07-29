@@ -6,6 +6,7 @@ import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submis
 import { writeAuditLog } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
 import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
+import { userOwnsChallenge } from "@/lib/server/challenge-access";
 
 export type VoteMode = "free" | "dorocoin";
 
@@ -90,8 +91,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     if (!canVoteOnChallenge(challenge)) throw voteReject("Voting is closed for this challenge.", "VOTING_CLOSED");
-    const challengeOwnerId = String(challenge.ownerId ?? challenge.userId ?? challenge.creatorId ?? challenge.hostId ?? "");
-    if (challengeOwnerId && challengeOwnerId === input.userId) {
+    if (userOwnsChallenge(challenge, input.userId)) {
       throw voteReject("You cannot vote on your own challenge.", "CHALLENGE_OWNER_VOTING_BLOCKED");
     }
 
