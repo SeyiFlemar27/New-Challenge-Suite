@@ -21,7 +21,8 @@ export const SPONSOR_CONTRIBUTION_SPLIT = {
 
 export const DEFAULT_WINNER_SPLITS = {
   single: [{ position: 1, percent: 100 }],
-  topThree: [{ position: 1, percent: 70 }, { position: 2, percent: 20 }, { position: 3, percent: 10 }]
+  topTwo: [{ position: 1, percent: 70 }, { position: 2, percent: 30 }],
+  topThree: [{ position: 1, percent: 50 }, { position: 2, percent: 30 }, { position: 3, percent: 20 }]
 } as const;
 
 export const SPONSOR_BRAND_PLACEMENTS = [

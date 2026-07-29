@@ -36,15 +36,17 @@ export async function GET(request: Request) {
     const optionalResults = await Promise.allSettled([
       ensureCashWalletFoundation(db, user.uid).then((ref) => ref.get()),
       db.collection("cashTransactions").where("userId", "==", user.uid).limit(100).get(),
+      db.collection("cashLedger").where("userId", "==", user.uid).limit(100).get(),
       db.collection("sponsorships").where("userId", "==", user.uid).limit(100).get(),
       db.collection("winnerClaims").where("userId", "==", user.uid).limit(100).get()
     ]);
     const cashWalletSnap = optionalResults[0].status === "fulfilled" ? optionalResults[0].value : null;
     const cashTransactionsSnap = optionalResults[1].status === "fulfilled" ? optionalResults[1].value : null;
-    const sponsorshipsSnap = optionalResults[2].status === "fulfilled" ? optionalResults[2].value : null;
-    const winnerClaimsSnap = optionalResults[3].status === "fulfilled" ? optionalResults[3].value : null;
+    const cashLedgerSnap = optionalResults[2].status === "fulfilled" ? optionalResults[2].value : null;
+    const sponsorshipsSnap = optionalResults[3].status === "fulfilled" ? optionalResults[3].value : null;
+    const winnerClaimsSnap = optionalResults[4].status === "fulfilled" ? optionalResults[4].value : null;
     const warnings = optionalResults
-      .map((result, index) => result.status === "rejected" ? ["cash wallet review", "cash transactions", "sponsorship review", "winner claims"][index] : null)
+      .map((result, index) => result.status === "rejected" ? ["cash wallet review", "cash transactions", "cash earnings ledger", "sponsorship review", "winner claims"][index] : null)
       .filter(Boolean);
 
     const wallet = walletSnap.data() ?? {};
@@ -52,9 +54,9 @@ export async function GET(request: Request) {
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
     const cashTransactions = cashTransactionsSnap?.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)) ?? [];
-    const sumByType = (types: string[]) => cashTransactions
-      .filter((item) => types.includes(String(item.type ?? "")) && item.status !== "voided")
-      .reduce((sum, item) => sum + Number(item.amountCents ?? 0), 0);
+    const cashEarnings = (cashLedgerSnap?.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)) ?? [])
+      .filter((item) => item.direction === "credit")
+      .sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? "")));
     const sponsorshipSpendCents = sponsorshipsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().amountCents ?? 0), 0) ?? 0;
 
     return ok({
@@ -83,9 +85,10 @@ export async function GET(request: Request) {
       warnings,
       financialSummary: {
         status: "review_only",
-        pendingEarningsCents: sumByType(["prize_placeholder_created", "payout_review_created"]),
-        sponsorEarningsCents: sumByType(["sponsor_contribution_requested"]),
-        prizeWinningsCents: winnerClaimsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizeAmountCents ?? 0), 0) ?? 0,
+        pendingEarningsCents: cashEarnings.filter((item) => item.status === "pending_review" || item.status === "pending_hold").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0),
+        sponsorEarningsCents: cashEarnings.filter((item) => item.sourceType === "sponsor_prize").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0),
+        prizeWinningsCents: cashEarnings.filter((item) => item.sourceType === "challenge_winner_prize").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0)
+          || (winnerClaimsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizeAmountCents ?? 0), 0) ?? 0),
         campaignBudgetCents: 0,
         sponsorshipSpendCents,
         prizePoolContributionsCents: sponsorshipsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizePoolContributionCents ?? 0), 0) ?? 0,
@@ -93,6 +96,22 @@ export async function GET(request: Request) {
         withdrawalsEnabled: false,
         moneyMovementEnabled: false
       },
+      cashEarnings: cashEarnings.map((item) => ({
+        id: item.id,
+        challengeId: item.challengeId ?? null,
+        settlementId: item.settlementId ?? null,
+        sourceType: item.sourceType ?? "cash_earning",
+        grossAmountCents: Number(item.grossAmountCents ?? item.amountCents ?? 0),
+        feeRate: Number(item.feeRate ?? 0),
+        feeAmountCents: Number(item.feeAmountCents ?? 0),
+        netAmountCents: Number(item.netAmountCents ?? item.amountCents ?? 0),
+        currency: item.currency ?? "USD",
+        status: item.status ?? "pending_review",
+        holdUntil: toIso(item.holdUntil),
+        createdAt: toIso(item.createdAt),
+        payoutProviderCalled: false,
+        externalPayoutExecuted: false
+      })),
       cashTransactions: cashTransactions.map((item) => ({
         id: item.id,
         type: item.type ?? "placeholder",

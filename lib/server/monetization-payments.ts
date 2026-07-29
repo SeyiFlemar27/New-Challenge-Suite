@@ -565,7 +565,7 @@ export async function getPaymentStatus(db: Firestore, collection: string, id: st
 }
 
 async function sumConfirmed(db: Firestore, collection: string, challengeId: string, purpose: MonetizationPaymentPurpose) {
-  const snap = await db.collection(collection).where("challengeId", "==", challengeId).limit(500).get();
+  const snap = await db.collection(collection).where("challengeId", "==", challengeId).get();
   const records = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
     .filter((item) => item.paymentPurpose === purpose && item.webhookConfirmed === true && ["paid", "confirmed"].includes(String(item.status)));

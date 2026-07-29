@@ -61,7 +61,7 @@ assert(payout.includes("messagingEnabled: false") && payout.includes("fakeMessag
 assert(payout.includes("calculateWinnerPrizePool"), "winner prize pool helper must exist.");
 assert(payout.includes("sponsorContributionExcludedFromCreatorPlatformSplit: true"), "sponsor contribution must not enter creator/platform split.");
 assert(payout.includes("calculateWinnerDistribution"), "winner split helper must exist.");
-assert(payout.includes("topThree") && payout.includes("percent: 70") && payout.includes("percent: 20") && payout.includes("percent: 10"), "default top-three winner split must be 70/20/10.");
+assert(payout.includes("topThree") && payout.includes("percent: 50") && payout.includes("percent: 30") && payout.includes("percent: 20"), "default top-three winner split must be 50/30/20.");
 assert(payout.includes("totalPercent === 100"), "winner split must require total 100%.");
 
 assert(payout.includes("ledgerEntryFoundation"), "ledger foundation helper must exist.");
@@ -96,7 +96,7 @@ assert(!sponsorDiscovery.includes("Target audience foundation pending"), "sponso
 
 assert(planAccess.includes("PAID_ENTRY_DISABLED"), "existing challenge creation gate must keep paid entry disabled until backend is ready.");
 assert(!stripeWebhook.includes("sponsorContribution") && !stripeWebhook.includes("prizePoolCreditStatus"), "Stripe webhook must not release sponsor funds in this pass.");
-assert(withdrawalsRoute.includes("WITHDRAWALS_SETUP_REQUIRED"), "withdrawal request route must remain setup-safe.");
+assert(withdrawalsRoute.includes("adminReviewRequired") && withdrawalsRoute.includes("payoutExecuted: false"), "withdrawal requests must remain admin-reviewed and non-paying.");
 assert(!withdrawalsRoute.includes("stripe.transfers.create") && !withdrawalsRoute.includes("paystack.") && !withdrawalsRoute.includes("providerTransferId: \""), "withdrawal route must not execute provider payouts.");
 
 console.log("Payout structure foundation checks passed.");

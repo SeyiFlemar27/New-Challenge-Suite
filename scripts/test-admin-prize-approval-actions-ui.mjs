@@ -22,15 +22,15 @@ assert(detailRoute.includes("getAdminPrizeApprovalDetail"), "detail API route mu
 assert(detailPage.includes("Challenge Overview"), "detail page must show challenge overview.");
 assert(detailPage.includes("Proposal Summary"), "detail page must show proposal summary.");
 assert(detailPage.includes("Proposed winners"), "detail page must show proposed winners.");
-assert(detailPage.includes("Ledger preview"), "detail page must show ledger preview.");
+assert(detailPage.includes("Settlement Preview"), "detail page must show settlement preview.");
 assert(detailPage.includes("Readiness checklist"), "detail page must show readiness checklist.");
-assert(detailPage.includes("Approve Proposal"), "detail page must expose approve action.");
+assert(detailPage.includes("Approve winners & create settlement"), "detail page must expose approval and settlement action.");
 assert(detailPage.includes("Reject Proposal"), "detail page must expose reject action.");
 assert(detailPage.includes("Request Changes"), "detail page must expose request changes action.");
-assert(detailPage.includes("Finalize Ledger Foundation"), "detail page must expose setup-safe ledger finalization action.");
-assert(detailPage.includes("Confirmed revenue is currently unavailable or $0"), "detail page must show setup-safe zero revenue state.");
+assert(detailPage.includes("Retry Internal Settlement"), "detail page must expose an idempotent settlement retry action.");
+assert(detailPage.includes("No provider-confirmed challenge or sponsor payments are available"), "detail page must show safe zero-revenue state.");
 assert(detailPage.includes("Admin note is required"), "detail page must require admin note for reject/request changes.");
-assert(detailPage.includes("does not execute payouts") || detailPage.includes("non-paying"), "detail page must not imply payout execution.");
+assert(detailPage.includes("no bank transfer or payout provider is called"), "detail page must not imply payout execution.");
 assert(!detailPage.includes("Winners paid") && !detailPage.includes("Funds released") && !detailPage.includes("Payout sent"), "detail page must not claim payout completion.");
 
 assert(approveRoute.includes("requireAdminUser"), "approve route must require admin.");

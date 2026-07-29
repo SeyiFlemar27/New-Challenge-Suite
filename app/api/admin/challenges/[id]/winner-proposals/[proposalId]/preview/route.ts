@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminUser } from "@/lib/server/auth";
-import { buildPrizeApprovalPreview, getChallengeOrNull, getProposalOrNull, normalizeWinnerProposalWinners, validateWinnerProposalWinners } from "@/lib/server/prize-approvals";
+import { buildConfirmedSettlementPreview } from "@/lib/server/challenge-settlement";
+import { getChallengeOrNull, getProposalOrNull, normalizeWinnerProposalWinners, validateWinnerProposalWinners } from "@/lib/server/prize-approvals";
 import { fail, ok, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
@@ -20,6 +21,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const validation = validateWinnerProposalWinners(winners);
   if (!validation.valid) return validationError(validation.errors, "Winner proposal split is invalid.");
 
-  const preview = buildPrizeApprovalPreview({ challengeId, proposalId, challenge, winners });
-  return ok({ preview }, preview.ledgerFinalizationAvailable ? "Prize ledger preview prepared. No payout provider was called." : "Prize ledger preview is setup-safe because no confirmed payment sources are available.");
+  const preview = await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners });
+  return ok({ preview }, preview.status === "ready_for_admin_approval"
+    ? "Settlement preview prepared from confirmed payment records."
+    : "No confirmed payment records are available for settlement.");
 }

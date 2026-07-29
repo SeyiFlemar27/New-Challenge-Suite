@@ -1,4 +1,4 @@
-import { FieldValue, type DocumentData, type Firestore } from "firebase-admin/firestore";
+import { type DocumentData, type Firestore } from "firebase-admin/firestore";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import type { RequestUser } from "@/lib/server/auth";
 import {
@@ -10,6 +10,10 @@ import {
   calculateWinnerPrizePool,
   holdUntilFromApproval
 } from "@/lib/server/payout-structure";
+import {
+  buildConfirmedSettlementPreview,
+  createInternalChallengeSettlement
+} from "@/lib/server/challenge-settlement";
 
 export const WINNER_PROPOSAL_STATUSES = [
   "draft",
@@ -54,6 +58,7 @@ function status(value: unknown): string {
 
 export function defaultWinnerSplit(count: number) {
   if (count === 1) return DEFAULT_WINNER_SPLITS.single.map((item) => ({ position: item.position, percent: item.percent }));
+  if (count === 2) return DEFAULT_WINNER_SPLITS.topTwo.map((item) => ({ position: item.position, percent: item.percent }));
   if (count === 3) return DEFAULT_WINNER_SPLITS.topThree.map((item) => ({ position: item.position, percent: item.percent }));
   if (count <= 0) return [];
   const base = Math.floor(100 / count);
@@ -334,12 +339,15 @@ export async function getAdminPrizeApprovalDetail(db: Firestore, proposalId: str
   const challenge = challengeId ? await getChallengeOrNull(db, challengeId) : null;
   const winners = normalizeWinnerProposalWinners(proposal.winners);
   const validation = validateWinnerProposalWinners(winners);
-  const preview = challenge ? buildPrizeApprovalPreview({ challengeId, proposalId, challenge, winners, approvedAt: text(proposal.reviewedAt, 80) || undefined }) : null;
+  const preview = challenge ? await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners }) : null;
+  const settlementId = text(proposal.settlementId, 200) || `challenge_settlement_${challengeId}_${proposalId}`;
+  const settlementSnap = challengeId ? await db.collection("challengeSettlements").doc(settlementId).get() : null;
   return {
     proposal,
     challenge,
     validation,
     preview,
+    settlement: settlementSnap?.exists ? { id: settlementSnap.id, ...(settlementSnap.data() ?? {}) } : null,
     readiness: challenge ? winnerProposalLifecycleReadiness(challenge) : null,
     moneyMovementEnabled: false,
     payoutProviderCalled: false
@@ -351,152 +359,35 @@ export async function finalizeApprovedWinnerProposalLedger(db: Firestore, input:
   proposalId: string;
   adminId: string;
 }) {
-  const proposalRef = db.collection("winnerProposals").doc(input.proposalId);
-  const now = new Date().toISOString();
-  return db.runTransaction(async (transaction) => {
-    const [proposalSnap, challengeSnap] = await Promise.all([
-      transaction.get(proposalRef),
-      transaction.get(db.collection("challenges").doc(input.challengeId))
-    ]);
-    if (!proposalSnap.exists) return { finalized: false, status: "proposal_not_found", message: "Winner proposal not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    if (!challengeSnap.exists) return { finalized: false, status: "challenge_not_found", message: "Challenge not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    const proposal = { id: proposalSnap.id, ...(proposalSnap.data() ?? {}) } as Record<string, unknown> & { id: string };
-    const challenge = { id: challengeSnap.id, ...(challengeSnap.data() ?? {}) } as Record<string, unknown> & { id: string };
-    if (proposal.status !== "approved") return { finalized: false, status: "manual_review_required", message: "Admin approval is required before ledger finalization.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    if (proposal.ledgerFinalizationStatus === "finalized_pending_hold") return { finalized: true, status: "already_finalized", message: "Ledger finalization is already recorded for this proposal.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
-
-    const winners = normalizeWinnerProposalWinners(proposal.winners);
-    const validation = validateWinnerProposalWinners(winners);
-    const readiness = winnerProposalLifecycleReadiness(challenge);
-    const preview = buildPrizeApprovalPreview({ challengeId: input.challengeId, proposalId: input.proposalId, challenge, winners, approvedAt: text(proposal.reviewedAt, 80) || now });
-    if (!validation.valid) return { finalized: false, status: "manual_review_required", message: "Winner split requires manual review.", validation, ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    if (!readiness.ready) return { finalized: false, status: "manual_review_required", message: readiness.message, readiness, ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    if (!preview.ledgerFinalizationAvailable || preview.totalWinnerPrizePoolCents <= 0) {
-      transaction.set(proposalRef, { ledgerFinalizationStatus: "awaiting_confirmed_payments", ledgerFinalizationAttemptedAt: now, updatedAt: now }, { merge: true });
-      return { finalized: false, status: "awaiting_confirmed_payments", message: "No confirmed payment sources available for ledger finalization.", preview, ledgerEntriesCreated: 0, payoutProviderCalled: false };
-    }
-
-    const holdUntil = preview.holdUntil;
-    const createdEntries: Array<Record<string, unknown>> = [];
-    for (const winner of preview.winnerAmounts) {
-      if (winner.proposedAmountPreviewCents <= 0) continue;
-      const id = `${input.challengeId}_${input.proposalId}_winner_share_${winner.userId}_${winner.placement}`;
-      const ref = db.collection("cashLedger").doc(id);
-      const entry = {
-        id,
-        userId: winner.userId,
-        challengeId: input.challengeId,
-        proposalId: input.proposalId,
-        sourceType: "challenge_prize",
-        sourceId: input.proposalId,
-        direction: "credit",
-        amountCents: winner.proposedAmountPreviewCents,
-        currency: preview.currency,
-        status: "pending_hold",
-        balanceBucket: "pending",
-        revenueType: "sponsor_contribution",
-        shareType: "winner_share",
-        splitPercent: winner.splitPercent,
-        holdUntil,
-        idempotencyKey: id,
-        metadata: { placement: winner.placement, sourceConfirmedOnly: true, kycRequiredBeforeWithdrawal: true },
-        createdBy: "admin_prize_approval",
-        reviewedBy: input.adminId,
-        providerReference: null,
-        payoutProviderCalled: false,
-        paid: false,
-        withdrawn: false,
-        createdAt: now,
-        updatedAt: now
-      };
-      transaction.set(ref, entry);
-      createdEntries.push(entry);
-    }
-
-    const operatorId = operatorRecipientId(challenge);
-    if (operatorId && preview.creatorHostOperatorShareCents > 0) {
-      const id = `${input.challengeId}_${input.proposalId}_operator_share_${operatorId}`;
-      const ref = db.collection("cashLedger").doc(id);
-      const entry = {
-        id,
-        userId: operatorId,
-        challengeId: input.challengeId,
-        proposalId: input.proposalId,
-        sourceType: "challenge_revenue_share",
-        sourceId: input.proposalId,
-        direction: "credit",
-        amountCents: preview.creatorHostOperatorShareCents,
-        currency: preview.currency,
-        status: "pending_hold",
-        balanceBucket: "pending",
-        revenueType: "entry_fee",
-        shareType: "creator_host_share",
-        splitPercent: 20,
-        holdUntil,
-        idempotencyKey: id,
-        metadata: { sourceConfirmedOnly: true, kycRequiredBeforeWithdrawal: true },
-        createdBy: "admin_prize_approval",
-        reviewedBy: input.adminId,
-        providerReference: null,
-        payoutProviderCalled: false,
-        paid: false,
-        withdrawn: false,
-        createdAt: now,
-        updatedAt: now
-      };
-      transaction.set(ref, entry);
-      createdEntries.push(entry);
-    }
-
-    if (preview.platformAdminShareCents > 0 && challenge.platformShareRecordedAtPaymentConfirmation !== true) {
-      const id = `${input.challengeId}_${input.proposalId}_platform_share`;
-      const ref = db.collection("platformLedger").doc(id);
-      transaction.set(ref, {
-        id,
-        challengeId: input.challengeId,
-        proposalId: input.proposalId,
-        sourceType: "platform_revenue",
-        sourceId: input.proposalId,
-        amountCents: preview.platformAdminShareCents,
-        currency: preview.currency,
-        status: "recorded",
-        shareType: "platform_share",
-        idempotencyKey: id,
-        metadata: { sourceConfirmedOnly: true, reversibleForRefundOrDispute: true },
-        createdBy: "admin_prize_approval",
-        reviewedBy: input.adminId,
-        providerReference: null,
-        payoutProviderCalled: false,
-        paid: false,
-        withdrawn: false,
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-
-    transaction.set(proposalRef, {
-      ledgerFinalizationStatus: "finalized_pending_hold",
-      ledgerFinalizedAt: now,
-      ledgerFinalizedByAdminId: input.adminId,
-      ledgerEntriesCreated: createdEntries.length > 0,
-      ledgerEntryCount: FieldValue.increment(createdEntries.length),
-      payoutProviderCalled: false,
-      payoutMarkedPaid: false,
-      cashBalancesCredited: false,
-      holdUntil,
-      updatedAt: now
-    }, { merge: true });
-    return {
-      finalized: true,
-      status: "finalized_pending_hold",
-      message: "Ledger entries were finalized into pending hold. No payout provider was called.",
-      preview,
-      ledgerEntriesCreated: createdEntries.length,
-      holdUntil,
-      payoutProviderCalled: false,
-      marksPaidOrWithdrawn: false
-    };
+  const [proposal, challenge] = await Promise.all([
+    getProposalOrNull(db, input.proposalId),
+    getChallengeOrNull(db, input.challengeId)
+  ]);
+  if (!proposal) return { finalized: false, status: "proposal_not_found", message: "Winner proposal not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+  if (!challenge) return { finalized: false, status: "challenge_not_found", message: "Challenge not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+  if (proposal.status !== "approved") return { finalized: false, status: "manual_review_required", message: "Admin approval is required before settlement.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
+  const winners = normalizeWinnerProposalWinners(proposal.winners);
+  const validation = validateWinnerProposalWinners(winners);
+  if (!validation.valid) return { finalized: false, status: "manual_review_required", message: "Winner split requires manual review.", validation, ledgerEntriesCreated: 0, payoutProviderCalled: false };
+  const result = await createInternalChallengeSettlement(db, {
+    challengeId: input.challengeId,
+    proposalId: input.proposalId,
+    adminId: input.adminId,
+    challenge,
+    winners,
+    approvedAt: text(proposal.reviewedAt, 80) || undefined
   });
+  return {
+    ...result,
+    finalized: true,
+    status: String(result.settlement.status),
+    message: result.idempotent
+      ? "Internal settlement already exists. No duplicate credits were created."
+      : "Internal settlement credits were created pending review. No payout provider was called.",
+    ledgerEntriesCreated: result.walletCreditsCreated + result.platformLedgerEntriesCreated,
+    payoutProviderCalled: false,
+    marksPaidOrWithdrawn: false
+  };
 }
 
 export function serializeProposal(doc: { id: string; data(): DocumentData }): Record<string, unknown> & { id: string } {

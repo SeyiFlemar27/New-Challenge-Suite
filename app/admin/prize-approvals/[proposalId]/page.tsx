@@ -13,6 +13,7 @@ type DetailPayload = {
   challenge: Record<string, any> | null;
   validation: { valid: boolean; totalPercent: number; errors: Record<string, string> };
   preview: Record<string, any> | null;
+  settlement: Record<string, any> | null;
   readiness: { ready: boolean; message: string } | null;
 };
 
@@ -40,6 +41,7 @@ export default function AdminPrizeApprovalDetailPage() {
   const proposal = detail?.proposal;
   const challenge = detail?.challenge;
   const preview = detail?.preview;
+  const settlement = detail?.settlement;
   const challengeId = String(proposal?.challengeId ?? "");
 
   async function action(kind: "approve" | "reject" | "request-changes" | "finalize-ledger") {
@@ -62,7 +64,7 @@ export default function AdminPrizeApprovalDetailPage() {
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageTitle title="Prize Approval Detail" subtitle="Review proposed winners, payout preview, and ledger readiness. Actions remain server-authorized and non-paying." icon={<ClipboardCheck />} />
+        <PageTitle title="Prize Approval Detail" subtitle="Review confirmed revenue, approve winners, and prepare internal settlement credits." icon={<ClipboardCheck />} />
         <LinkButton href="/admin/prize-approvals" variant="secondary">Back to Queue</LinkButton>
       </div>
 
@@ -111,19 +113,38 @@ export default function AdminPrizeApprovalDetailPage() {
           </Card>
 
           <Card className="p-5 sm:p-6">
-            <h2 className="text-xl font-black">Ledger preview</h2>
+            <h2 className="text-xl font-black">Settlement Preview</h2>
             {preview ? <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Data label="Entry Fee Winner Share" value={money(preview.confirmedEntryFeeWinnerShareCents)} />
-              <Data label="Paid Vote Winner Share" value={money(preview.confirmedPaidVoteWinnerShareCents)} />
-              <Data label="Sponsor Winner Share" value={money(preview.confirmedSponsorContributionWinnerShareCents)} />
-              <Data label="Total Prize Pool" value={money(preview.totalWinnerPrizePoolCents)} />
-              <Data label="Creator / Host Share" value={money(preview.creatorHostOperatorShareCents)} />
-              <Data label="Platform / Admin Share" value={money(preview.platformAdminShareCents)} />
+              <Data label="Confirmed Challenge Revenue" value={money(preview.grossConfirmedChallengeRevenue)} />
+              <Data label="Winner Pool (65%)" value={money(preview.winnerPoolAmount)} />
+              <Data label="Creator / Host (20%)" value={money(preview.creatorHostAmount)} />
+              <Data label="Challenge Suite Fee (15%)" value={money(preview.platformChallengeFeeAmount)} />
+              <Data label="Confirmed Sponsor Prize" value={money(preview.grossConfirmedSponsorPrizeAmount)} />
+              <Data label="Sponsor Prize Fee (15%)" value={money(preview.sponsorPrizePlatformFeeAmount)} />
+              <Data label="Net Sponsor Prize to Winners" value={money(preview.netSponsorPrizeAmount)} />
               <Data label="Currency" value={preview.currency} />
-              <Data label="Hold Until" value={preview.holdUntil ?? "Not available"} />
             </div> : <p className="mt-4 text-sm text-slate-400">Confirmed revenue is currently unavailable or $0 until payment confirmation is connected.</p>}
-            {preview && !preview.ledgerFinalizationAvailable ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/[0.04] p-4 text-sm text-yellow-100">Confirmed revenue is currently unavailable or $0 until payment confirmation is connected.</p> : null}
+            {preview ? <div className="mt-5 space-y-3">
+              {Array.isArray(preview.winnerDistribution) ? preview.winnerDistribution.map((winner: any) => <div key={`challenge_${winner.userId}_${winner.placement}`} className="grid gap-3 rounded-[8px] bg-white/[0.03] p-4 sm:grid-cols-3"><Data label={`Place ${winner.placement}`} value={winner.userId} /><Data label="Challenge Prize" value={money(winner.netAmountCents)} /><Data label="Fee" value={money(0)} /></div>) : null}
+              {Array.isArray(preview.sponsorPrizeDistribution) ? preview.sponsorPrizeDistribution.map((winner: any) => <div key={`sponsor_${winner.userId}_${winner.placement}`} className="grid gap-3 rounded-[8px] bg-white/[0.03] p-4 sm:grid-cols-3"><Data label={`Sponsor Place ${winner.placement}`} value={winner.userId} /><Data label="Gross Sponsor Prize" value={money(winner.grossAmountCents)} /><Data label="Net Credited" value={money(winner.netAmountCents)} /></div>) : null}
+            </div> : null}
+            {preview?.status === "awaiting_confirmed_revenue" ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/[0.04] p-4 text-sm text-yellow-100">No provider-confirmed challenge or sponsor payments are available. Approval will not create money from estimates.</p> : null}
           </Card>
+
+          {settlement ? <Card className="border-emerald-400/20 p-5 sm:p-6">
+            <h2 className="text-xl font-black text-emerald-200">Settlement Created</h2>
+            <p className="mt-2 text-sm text-slate-300">Internal wallet and platform ledger records were prepared. No external payout was executed.</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Data label="Settlement Status" value={settlement.status} />
+              <Data label="Settlement ID" value={settlement.id} />
+              <Data label="Winner Prize Credits" value={money(settlement.winnerPoolAmount)} />
+              <Data label="Sponsor Prize Credits" value={money(settlement.netSponsorPrizeAmount)} />
+              <Data label="Creator / Host Credit" value={money(settlement.creatorHostAmount)} />
+              <Data label="Platform Challenge Fee" value={money(settlement.platformChallengeFeeAmount)} />
+              <Data label="Sponsor Prize Platform Fee" value={money(settlement.sponsorPrizePlatformFeeAmount)} />
+              <Data label="Audit Reference" value={settlement.auditLogId ?? "Not available"} />
+            </div>
+          </Card> : null}
         </div>
 
         <aside className="space-y-6">
@@ -134,9 +155,9 @@ export default function AdminPrizeApprovalDetailPage() {
               <Check label="Voting closed" ok={Boolean(detail.readiness?.ready)} />
               <Check label="Split equals 100%" ok={Boolean(detail.validation.valid)} />
               <Check label="No duplicate winners/placements" ok={Boolean(detail.validation.valid)} />
-              <Check label="Confirmed payment sources available" ok={Boolean(preview?.ledgerFinalizationAvailable)} />
+              <Check label="Confirmed payment sources only" ok={Boolean(preview?.confirmedOnly)} />
               <Check label="KYC required before withdrawal" ok={Boolean(preview?.kycRequiredBeforeWithdrawal)} />
-              <Check label="24-hour hold required" ok={Boolean(preview?.holdUntil)} />
+              <Check label="Internal settlement only" ok={Boolean(preview?.createsInternalCreditsOnly)} />
               <Check label="Payout provider inactive" ok={preview?.providerPayoutCalled === false || proposal.payoutProviderCalled === false} />
             </div>
           </Card>
@@ -146,13 +167,13 @@ export default function AdminPrizeApprovalDetailPage() {
               <textarea className={textareaClass} value={adminNote} onChange={(event) => setAdminNote(event.target.value)} placeholder="Required for reject or request changes." />
             </Field>
             <div className="mt-5 grid gap-3">
-              <Button onClick={() => void action("approve")} disabled={Boolean(submitting) || proposal.status === "approved"}><CheckCircle2 size={17} /> {submitting === "approve" ? "Approving..." : "Approve Proposal"}</Button>
+              <Button onClick={() => void action("approve")} disabled={Boolean(submitting) || Boolean(settlement)}><CheckCircle2 size={17} /> {submitting === "approve" ? "Creating Settlement..." : proposal.status === "approved" ? "Create Internal Settlement" : "Approve winners & create settlement"}</Button>
               <Button variant="secondary" onClick={() => void action("request-changes")} disabled={Boolean(submitting)}>{submitting === "request-changes" ? "Saving..." : "Request Changes"}</Button>
               <Button variant="secondary" onClick={() => void action("reject")} disabled={Boolean(submitting)}><XCircle size={17} /> {submitting === "reject" ? "Rejecting..." : "Reject Proposal"}</Button>
-              <Button variant="ghost" onClick={() => void action("finalize-ledger")} disabled={Boolean(submitting) || proposal.status !== "approved"}>{submitting === "finalize-ledger" ? "Checking..." : "Finalize Ledger Foundation"}</Button>
+              {proposal.status === "approved" && !settlement ? <Button variant="ghost" onClick={() => void action("finalize-ledger")} disabled={Boolean(submitting)}>{submitting === "finalize-ledger" ? "Checking..." : "Retry Internal Settlement"}</Button> : null}
             </div>
             {notice ? <p className="mt-4 text-sm leading-6 text-slate-300">{notice}</p> : null}
-            <p className="mt-5 text-xs leading-5 text-slate-500">Approving confirms the proposed winners for admin review. Funds remain subject to confirmed payment sources, ledger finalization, 24-hour hold, KYC, and payout provider setup.</p>
+            <p className="mt-5 text-xs leading-5 text-slate-500">Approval creates internal credits from provider-confirmed records only. Funds remain pending review and KYC; no bank transfer or payout provider is called.</p>
           </Card>
           {challengeId ? <Link href={`/challenges/${challengeId}`} className="block rounded-[8px] border border-white/10 p-4 text-sm font-bold text-[var(--gold)]">Open challenge reference</Link> : null}
         </aside>

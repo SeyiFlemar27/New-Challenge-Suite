@@ -173,6 +173,20 @@ export function fetchWallet() {
       withdrawalsEnabled: false;
       moneyMovementEnabled: false;
     };
+    cashEarnings?: Array<{
+      id: string;
+      challengeId?: string | null;
+      settlementId?: string | null;
+      sourceType: string;
+      grossAmountCents: number;
+      feeRate: number;
+      feeAmountCents: number;
+      netAmountCents: number;
+      currency: string;
+      status: string;
+      holdUntil?: string | null;
+      createdAt?: string | null;
+    }>;
     cashTransactions?: unknown[];
     transactions: unknown[];
     warnings?: string[];
