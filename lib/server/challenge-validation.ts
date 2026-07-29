@@ -172,9 +172,6 @@ export const serverChallengeCreateSchema = z.object({
   }).optional(),
   publish: z.coerce.boolean().default(false)
 }).superRefine((value, ctx) => {
-  if (value.votingStartsAt && new Date(value.votingStartsAt) < new Date(value.submissionDeadline)) {
-    ctx.addIssue({ code: "custom", path: ["votingStartsAt"], message: "Voting cannot start before the submission deadline." });
-  }
   if (value.timerEnabled && value.timerDuration <= 0) {
     ctx.addIssue({ code: "custom", path: ["timerDuration"], message: "Timer duration must be greater than zero." });
   }
@@ -354,20 +351,20 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const startsAt = dateValue(challenge.startsAt);
   const endsAt = dateValue(challenge.endsAt);
   const submissionDeadline = dateValue(challenge.submissionDeadline);
-  const submissionStartAt = dateValue(challenge.submissionStartAt ?? challenge.registrationDeadline);
+  const submissionStartAt = dateValue(challenge.submissionStartAt ?? challenge.startsAt);
   const votingStartsAt = dateValue(challenge.votingStartsAt ?? challenge.submissionDeadline);
   const votingDeadline = dateValue(challenge.votingDeadline);
-  const registrationDeadline = dateValue(challenge.registrationDeadline ?? challenge.submissionDeadline);
+  const registrationDeadline = dateValue(challenge.registrationDeadline);
   const externalLiveOpensAt = dateValue(challenge.externalLiveOpensAt);
 
   if (startsAt && startsAt <= now && !context.isAdmin) makeIssue(errors, "START_DATE_IN_PAST", "startsAt", "Schedule", "Newly published challenges must start in the future.");
   if (startsAt && endsAt && startsAt >= endsAt) makeIssue(errors, "START_AFTER_END", "startsAt", "Schedule", "Challenge start date must be before the end date.");
-  if (submissionDeadline && startsAt && submissionDeadline > startsAt) makeIssue(errors, "SUBMISSION_AFTER_START", "submissionDeadline", "Schedule", "Submission deadline must be before the challenge begins.");
   if (!submissionStartAt) makeIssue(errors, "REQUIRED_SUBMISSION_START", "submissionStartAt", "Schedule", "Please set when submissions open.");
-  if (submissionStartAt && submissionDeadline && submissionDeadline <= submissionStartAt) makeIssue(errors, "SUBMISSION_DEADLINE_NOT_AFTER_START", "submissionDeadline", "Schedule", "Please set a submission deadline after submissions open.");
+  if (submissionStartAt && submissionDeadline && submissionDeadline <= submissionStartAt) makeIssue(errors, "SUBMISSION_DEADLINE_NOT_AFTER_START", "submissionDeadline", "Schedule", "Submission deadline must be after the challenge/submission start time.");
+  if (submissionDeadline && votingDeadline && submissionDeadline > votingDeadline) makeIssue(errors, "SUBMISSION_AFTER_VOTING_CLOSE", "submissionDeadline", "Schedule", "Submission deadline must be before or at the voting/review close time.");
   if (votingStartsAt && votingDeadline && votingStartsAt >= votingDeadline) makeIssue(errors, "VOTING_START_AFTER_CLOSE", "votingStartsAt", "Schedule", "Voting must open before voting closes.");
-  if (votingDeadline && endsAt && votingDeadline > endsAt) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", "Voting must close before the challenge ends.");
-  if (registrationDeadline && startsAt && registrationDeadline > startsAt && !bool(challenge.lateRegistrationEnabled)) makeIssue(errors, "REGISTRATION_AFTER_START", "registrationDeadline", "Schedule", "Registration must close before the challenge begins unless late registration is enabled.");
+  if (votingDeadline && endsAt && votingDeadline >= endsAt) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", "Winner announcement must be after voting/review closes.");
+  if (registrationDeadline && submissionStartAt && registrationDeadline > submissionStartAt) makeIssue(errors, "REGISTRATION_AFTER_START", "registrationDeadline", "Schedule", "Registration or invite close must be before or at the challenge/submission start time.");
   if (kind.livestreamEnabled && externalLiveOpensAt && startsAt && externalLiveOpensAt > startsAt) makeIssue(errors, "LIVESTREAM_AFTER_START", "externalLiveOpensAt", "Schedule", "Livestream access should open before the live challenge begins.");
 
   const ownerId = text(challenge.creatorId) || context.userId || "";
