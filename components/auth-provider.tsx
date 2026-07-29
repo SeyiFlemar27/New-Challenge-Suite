@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "firebase/auth";
-import { demoAuthEnabled, getCurrentProfile, listenToAuth, type AuthProfile } from "@/lib/firebase/auth-service";
+import { demoAuthEnabled, getCurrentProfile, listenToAuth, syncServerSession, type AuthProfile } from "@/lib/firebase/auth-service";
 
 interface AuthContextValue {
   user: User | null;
@@ -35,7 +35,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = listenToAuth(async (nextUser) => {
       setUser(nextUser);
       if (nextUser) {
-        const nextProfile = await getCurrentProfile(nextUser.uid).catch(() => null);
+        const [, nextProfile] = await Promise.all([
+          syncServerSession(nextUser).catch(() => undefined),
+          getCurrentProfile(nextUser.uid).catch(() => null)
+        ]);
         setProfile(nextProfile);
       } else {
         setProfile(null);

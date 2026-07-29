@@ -2,7 +2,7 @@
 
 import {
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -44,13 +44,35 @@ interface BootstrapResponse {
 
 export const demoAuthEnabled = false;
 
+export async function syncServerSession(user: User) {
+  const response = await fetch("/api/auth/session", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await user.getIdToken()}`
+    }
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(body?.message || "Your session could not be restored.");
+  }
+}
+
+async function clearServerSession() {
+  await fetch("/api/auth/session", {
+    method: "DELETE",
+    credentials: "same-origin"
+  }).catch(() => undefined);
+}
+
 export function listenToAuth(callback: (user: User | null) => void) {
   if (!isFirebaseConfigured) {
     callback(null);
     return () => undefined;
   }
   if (!auth) throw new Error("Authentication is not configured yet.");
-  return onAuthStateChanged(auth, callback);
+  return onIdTokenChanged(auth, callback);
 }
 
 async function callProfileBootstrap(user: User, init: RequestInit = {}) {
@@ -71,6 +93,7 @@ export async function signUpWithProfile(input: SignupInput) {
   if (!auth) throw new Error("Authentication is not configured yet.");
 
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
+  await syncServerSession(credential.user);
   await callProfileBootstrap(credential.user, {
     method: "POST",
     body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role })
@@ -82,7 +105,10 @@ export async function loginWithEmail(email: string, password: string) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
   const credential = await signInWithEmailAndPassword(auth, email, password);
-  const profile = await getCurrentProfile(credential.user.uid).catch(() => null);
+  const [, profile] = await Promise.all([
+    syncServerSession(credential.user),
+    getCurrentProfile(credential.user.uid).catch(() => null)
+  ]);
   return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile?.verified || profile?.emailVerified || credential.user.emailVerified) };
 }
 
@@ -96,7 +122,11 @@ export async function sendResetEmail(email: string) {
 export async function logout() {
   if (!isFirebaseConfigured) return;
   if (!auth) throw new Error("Authentication is not configured yet.");
-  await signOut(auth);
+  try {
+    await clearServerSession();
+  } finally {
+    await signOut(auth);
+  }
 }
 
 export async function getCurrentProfile(uid: string) {

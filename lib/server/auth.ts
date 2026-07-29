@@ -1,6 +1,8 @@
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { forbidden, serverUnavailable, unauthorized } from "@/lib/server/responses";
 
+export const SESSION_COOKIE_NAME = "challenge_suite_session";
+
 export interface RequestUser {
   uid: string;
   email?: string;
@@ -14,14 +16,28 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
   const db = getAdminDb();
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const sessionCookie = cookieHeader
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(`${SESSION_COOKIE_NAME}=`))
+    ?.slice(SESSION_COOKIE_NAME.length + 1);
 
-  if (adminAuth && token) {
-    let decoded;
+  if (adminAuth && (token || sessionCookie)) {
+    let decoded = null;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      if (token) decoded = await adminAuth.verifyIdToken(token);
     } catch {
-      return null;
+      decoded = null;
     }
+    if (!decoded && sessionCookie) {
+      try {
+        decoded = await adminAuth.verifySessionCookie(decodeURIComponent(sessionCookie), true);
+      } catch {
+        decoded = null;
+      }
+    }
+    if (!decoded) return null;
     const profileSnap = db ? await db.collection("users").doc(decoded.uid).get() : null;
     const profile = profileSnap?.exists ? profileSnap.data() : {};
     const adminAllowlist = new Set(

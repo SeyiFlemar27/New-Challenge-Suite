@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -33,7 +33,13 @@ try {
 }
 
 export const firebaseApp: FirebaseApp | null = app;
-export const auth = firebaseApp ? getAuth(firebaseApp) : null;
+export const auth = firebaseApp ? (() => {
+  try {
+    return initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
+  } catch {
+    return getAuth(firebaseApp);
+  }
+})() : null;
 export const db = firebaseApp ? getFirestore(firebaseApp) : null;
 
 let initializedStorage: ReturnType<typeof getStorage> | null = null;

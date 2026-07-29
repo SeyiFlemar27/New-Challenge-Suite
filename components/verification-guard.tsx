@@ -34,7 +34,7 @@ export function VerificationGuard({ children }: { children: React.ReactNode }) {
 
   if (publicPage || !firebaseConfigured) return <>{children}</>;
   if (loading) return <LoadingGate />;
-  if (!user) return <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref="/auth/login" actionLabel="Sign In" />;
+  if (!user) return <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref={`/auth/login?next=${encodeURIComponent(pathname)}`} actionLabel="Sign In" />;
   if (!verified) return <Gate title="Check your email" body="Enter the 6-digit code we sent to continue into Challenge Suite." actionHref="/auth/verify-email" actionLabel="Enter Code" />;
   return <>{children}</>;
 }
@@ -44,7 +44,7 @@ function LoadingGate() {
     <main className="flex min-h-screen items-center justify-center bg-black px-6">
       <Card className="w-full max-w-md p-8 text-center">
         <BrandLogo className="mb-5" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
-        <h1 className="text-2xl font-black">Checking account status...</h1>
+        <h1 className="text-2xl font-black">Restoring your session...</h1>
       </Card>
     </main>
   );
