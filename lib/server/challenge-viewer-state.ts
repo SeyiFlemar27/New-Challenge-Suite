@@ -171,7 +171,7 @@ export function resolveChallengeViewerState(input: {
       canJoin: eligibility.eligible && !input.participant && !paidEntryRequired && phaseSummary.canJoin,
       canPay: eligibility.eligible && paidEntryRequired && !paymentPaid && phaseSummary.canJoin,
       canSubmit: Boolean(input.participant && phaseSummary.canSubmit && (!paidEntryRequired || paymentPaid) && !input.submission),
-      canVote: Boolean(phaseSummary.canVote && relationship !== "owner")
+      canVote: Boolean(authenticated && phaseSummary.canVote && relationship !== "owner" && !isSponsorProfile(input.profile ?? {}))
     },
     ranking: null,
     winner: null,

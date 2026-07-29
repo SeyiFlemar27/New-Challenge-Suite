@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
 const voting = read("lib/server/voting.ts");
-assert(voting.includes("freeVoteDailyGuards") && voting.includes("input.challengeId") && voting.includes("voteDateKey"));
 assert(voting.includes('deterministicId("free_vote", input.userId, input.challengeId, voteDateKey)'));
+assert(!voting.includes('deterministicId("free_vote", input.userId, input.challengeId, input.submissionId, voteDateKey)'));
+assert(voting.includes("You have used your free vote for this challenge today."));
 assert(voting.includes("FREE_CHALLENGE_DAILY_LIMIT_REACHED"));
-assert(!voting.includes("FREE_SUBMISSION_DAILY_LIMIT_REACHED"));
-console.log("phase4 per-challenge daily free vote checks passed");
+console.log("challenge-wide daily free vote checks passed");

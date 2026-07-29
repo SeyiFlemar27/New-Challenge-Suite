@@ -63,7 +63,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const leaderboardRef = db.collection("leaderboards").doc(input.challengeId);
     const voteRequestRef = voteRequestId ? db.collection("voteRequests").doc(voteRequestId) : null;
     const freeVoteGuardRef = input.voteMode === "free"
-      ? db.collection("freeVoteDailyGuards").doc(deterministicId("free_vote", input.userId, input.challengeId, input.submissionId, voteDateKey))
+      ? db.collection("freeVoteDailyGuards").doc(deterministicId("free_vote", input.userId, input.challengeId, voteDateKey))
       : null;
     const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap] = await Promise.all([
       transaction.get(challengeRef),
@@ -92,7 +92,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     if (!canVoteOnChallenge(challenge)) throw voteReject("Voting is closed for this challenge.", "VOTING_CLOSED");
     const challengeOwnerId = String(challenge.ownerId ?? challenge.userId ?? challenge.creatorId ?? challenge.hostId ?? "");
     if (challengeOwnerId && challengeOwnerId === input.userId) {
-      throw voteReject("Challenge owners cannot vote in their own challenge.", "CHALLENGE_OWNER_VOTING_BLOCKED");
+      throw voteReject("You cannot vote on your own challenge.", "CHALLENGE_OWNER_VOTING_BLOCKED");
     }
 
     const settings = votingSettings(challenge);
@@ -109,8 +109,8 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (input.voteMode === "free" && freeVoteGuardSnap?.exists) {
       throw voteReject(
-        "You already used your free vote for this submission today.",
-        "FREE_SUBMISSION_DAILY_LIMIT_REACHED"
+        "You have used your free vote for this challenge today.",
+        "FREE_CHALLENGE_DAILY_LIMIT_REACHED"
       );
     }
 
