@@ -461,48 +461,57 @@ function formatCents(value: number) {
 
 
 function MediaBrandingStep({ form, userId, updateMedia, track, mediaUploadDisabled, mediaUploadDisabledReason }: { form: FormState; userId: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string }) {
-  return <section><StepTitle title="Media & Branding" body="Add real visuals for cards, promotion, and participant context." />{mediaUploadDisabled ? <Card className="mt-5 border-yellow-500/25 bg-yellow-500/5 p-4 text-sm leading-6 text-yellow-50"><b className="text-white">Media uploads are temporarily unavailable while storage is being connected.</b><br />You can publish this challenge without media for now. A branded Challenge Suite placeholder will appear in feeds and challenge cards.</Card> : null}<UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-6" /></section>;
+  return <section>
+    <StepTitle title="Media & Branding" body="Add clear, original media that helps participants understand your challenge." />
+    <div className="mt-6 rounded-[8px] border border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-yellow-50">
+      <b className="text-white">Use media you own or have permission to publish.</b>
+      <p className="mt-1 text-yellow-100/80">Choose sharp images with readable subjects. Uploads are saved only after Storage confirms the file URL and path.</p>
+    </div>
+    {mediaUploadDisabled ? <div className="mt-4 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-4 text-sm leading-6 text-yellow-50"><b className="text-white">Media uploads are temporarily unavailable.</b><br />You can publish without media until storage is restored.</div> : null}
+    <UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-10" />
+  </section>;
 }
 
 function UploadGallery({ form, userId, updateMedia, track, mediaUploadDisabled, mediaUploadDisabledReason, className = "" }: { form: FormState; userId: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string; className?: string }) {
-  return <div className={`${className} space-y-7`}>
-    <div>
+  return <div className={`${className} space-y-12`}>
+    <section>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">{mediaUploadDisabled ? "Media skipped for now. Uploads can be restored after Firebase Storage is connected." : "Add up to 3 challenge images. At least one image is required."}</p></div><span className={`rounded-full px-3 py-1 text-xs font-black ${mediaUploadDisabled ? "bg-white/10 text-slate-300" : "bg-[var(--gold)] text-black"}`}>{mediaUploadDisabled ? "Optional now" : "1 required"}</span></div>
       {mediaUploadDisabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : !form.coverImageUrl || !form.coverImagePath ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
-      <div className="mt-4 grid gap-5 lg:grid-cols-3">
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" purpose="Primary cover image used on challenge cards and detail pages." required={!mediaUploadDisabled}><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "banner")} kind="image" buttonLabel="Browse cover image" required={!mediaUploadDisabled} disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("coverImageUrl")} /></UploadPanel>
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 2" purpose="Optional gallery / promo image for campaign surfaces when supported."><MediaUploadField label="Gallery / promo image" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Browse image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("promoImageUrl")} /></UploadPanel>
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 3" purpose="Optional gallery preview. Backend gallery display will be connected later."><MediaUploadField label="Gallery image" value={form.galleryImageUrl} onChange={(url, metadata) => updateMedia("galleryImageUrl", "galleryImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Browse gallery image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("galleryImageUrl")} /></UploadPanel>
+      <div className="mt-6 grid gap-6 md:grid-cols-3">
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" required={!mediaUploadDisabled}><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "banner")} kind="image" buttonLabel="Upload image" required={!mediaUploadDisabled} disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("coverImageUrl")} /></UploadPanel>
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 2"><MediaUploadField label="Gallery image" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("promoImageUrl")} /></UploadPanel>
+        <UploadPanel icon={<ImageIcon size={20} />} title="Image 3"><MediaUploadField label="Gallery image" value={form.galleryImageUrl} onChange={(url, metadata) => updateMedia("galleryImageUrl", "galleryImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("galleryImageUrl")} /></UploadPanel>
       </div>
-    </div>
-    <div>
+    </section>
+    <section className="border-t border-white/10 pt-10">
       <h3 className="text-xl font-black text-white">Video</h3>
       <p className="mt-1 text-sm text-slate-400">Optional intro video or trailer. You can continue without video.</p>
-      <div className="mt-4 max-w-md"><UploadPanel icon={<Video size={20} />} title="Intro video / trailer" purpose="Optional short video to explain the challenge."><MediaUploadField label="Intro video / trailer" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "video")} kind="video" buttonLabel="Browse trailer video" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
-    </div>
-    <div>
+      <div className="mt-6 max-w-2xl"><UploadPanel icon={<Video size={20} />} title="Intro video / trailer"><MediaUploadField label="Trailer video" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "video")} kind="video" buttonLabel="Upload video" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
+    </section>
+    <section className="border-t border-white/10 pt-10">
       <h3 className="text-xl font-black text-white">Documents</h3>
-      <p className="mt-1 text-sm text-slate-400">Add up to 2 optional documents. Challenge document persistence needs backend support.</p>
-      <div className="mt-4 grid gap-5 md:grid-cols-2">
+      <p className="mt-1 text-sm text-slate-400">Add up to 2 optional briefs, rules, or reference documents.</p>
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
         <DocumentSlot title="Document 1" value={form.documentOneUrl} onChange={(url, metadata) => updateMedia("documentOneUrl", "documentOnePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "documents")} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} onStatusChange={track("documentOneUrl")} />
         <DocumentSlot title="Document 2" value={form.documentTwoUrl} onChange={(url, metadata) => updateMedia("documentTwoUrl", "documentTwoPath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "documents")} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} onStatusChange={track("documentTwoUrl")} />
       </div>
-    </div>
+    </section>
   </div>;
 }
 
-function UploadPanel({ icon, title, purpose, required = false, children }: { icon: React.ReactNode; title: string; purpose: string; required?: boolean; children: React.ReactNode }) {
-  return <Card className="flex min-h-[320px] flex-col border-white/10 bg-[#141414] p-5">
-    <div className="flex items-start justify-between gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</div><span className={`rounded-full px-3 py-1 text-xs font-black ${required ? "bg-[var(--gold)] text-black" : "bg-white/10 text-slate-300"}`}>{required ? "Required" : "Optional"}</span></div>
-    <h3 className="mt-4 text-lg font-black text-white">{title}</h3>
-    <p className="mt-2 min-h-12 text-sm leading-6 text-slate-400">{purpose}</p>
-    <div className="mt-4 flex-1 rounded-[8px] border border-dashed border-white/15 bg-black/25 p-4">{children}</div>
-  </Card>;
+function UploadPanel({ icon, title, required = false, children }: { icon: React.ReactNode; title: string; required?: boolean; children: React.ReactNode }) {
+  return <div className="min-w-0">
+    <div className="mb-3 flex min-h-10 items-center justify-between gap-3">
+      <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</span><h3 className="font-black text-white">{title}</h3></div>
+      <span className={`rounded-full px-3 py-1 text-xs font-black ${required ? "bg-[var(--gold)] text-black" : "bg-white/10 text-slate-300"}`}>{required ? "Required" : "Optional"}</span>
+    </div>
+    {children}
+  </div>;
 }
 
 function DocumentSlot({ title, value, onChange, storagePath, mediaUploadDisabled = false, mediaUploadDisabledReason, onStatusChange }: { title: string; value: string; onChange: (url: string, metadata?: { path: string }) => void; storagePath: string; mediaUploadDisabled?: boolean; mediaUploadDisabledReason: string; onStatusChange: (status: MediaUploadStage) => void }) {
-  return <UploadPanel icon={<FileText size={20} />} title={title} purpose="Optional rules, brief, or reference document for participants when backend document storage is connected.">
-    <MediaUploadField label={title} value={value} onChange={onChange} storagePath={storagePath} kind="document" buttonLabel="Browse document" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={onStatusChange} helperText={mediaUploadDisabled ? "Documents are optional and no upload request will be attempted while storage is disabled." : "Documents are stored as optional challenge metadata. Public document display remains a future backend/UI step."} />
+  return <UploadPanel icon={<FileText size={20} />} title={title}>
+    <MediaUploadField label={title} value={value} onChange={onChange} storagePath={storagePath} kind="document" buttonLabel="Upload document" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={onStatusChange} />
   </UploadPanel>;
 }
 
