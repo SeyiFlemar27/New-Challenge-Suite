@@ -15,6 +15,9 @@ export interface LeaderboardRow {
   submissionId?: string;
   challengeId?: string;
   userId?: string;
+  username?: string;
+  avatarUrl?: string;
+  profilePath?: string;
   displayName: string;
   name?: string;
   initials?: string;
@@ -142,8 +145,11 @@ export function rankSubmissions(submissions: Record<string, unknown>[], limit?: 
         id: String(submission.id ?? submission.submissionId ?? ""),
         submissionId: String(submission.id ?? submission.submissionId ?? ""),
         challengeId: String(submission.challengeId ?? ""),
+        userId: String(submission.userId ?? submission.participantId ?? ""),
         displayName,
         name: displayName,
+        username: typeof submission.username === "string" ? submission.username : undefined,
+        avatarUrl: typeof submission.avatarUrl === "string" ? submission.avatarUrl : typeof submission.userAvatarUrl === "string" ? submission.userAvatarUrl : undefined,
         initials: String(submission.userInitials ?? displayName.slice(0, 2).toUpperCase()),
         title: String(submission.title ?? "Untitled Submission"),
         mediaUrl: typeof submission.mediaUrl === "string" ? submission.mediaUrl : undefined,
@@ -164,7 +170,7 @@ export function rankSubmissions(submissions: Record<string, unknown>[], limit?: 
   return typeof limit === "number" ? rows.slice(0, limit) : rows;
 }
 
-export async function buildChallengeLeaderboard(db: Firestore, challengeId: string, options: { limit?: number } = {}): Promise<LeaderboardResult & { challenge: Record<string, unknown> | null }> {
+export async function buildChallengeLeaderboard(db: Firestore, challengeId: string, options: { limit?: number; includeEligibleEntries?: boolean } = {}): Promise<LeaderboardResult & { challenge: Record<string, unknown> | null }> {
   const challengeSnap = await db.collection("challenges").doc(challengeId).get();
   if (!challengeSnap.exists) {
     return {
@@ -197,7 +203,7 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     return isPublicSubmission(doc.id, data) ? [{ id: doc.id, ...data } as Record<string, unknown>] : [];
   });
   const topLimit = visibilityMode === "top_10_only" ? 10 : options.limit;
-  const entries = visible ? rankSubmissions(rawSubmissions, topLimit) : [];
+  const entries = visible || options.includeEligibleEntries ? rankSubmissions(rawSubmissions, topLimit) : [];
   return {
     type: "challenge",
     board: challengeId,

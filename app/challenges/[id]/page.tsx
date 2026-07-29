@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, Coins, Rocket, Trophy, Users, Vote } from "lucide-react";
+import { Bookmark, Coins, Rocket, Users, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
@@ -11,14 +11,13 @@ import { apiRequest } from "@/lib/api/client";
 import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { getChallengeLifecycleState, statusClassName } from "@/lib/challenge-status";
-import type { Submission } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
-import { AvatarFrame, ChallengeMediaFrame, SubmissionMediaFrame } from "@/components/media-display";
+import { ChallengeMediaFrame } from "@/components/media-display";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
-
-type DetailSubmission = Submission & { userPlanId?: string };
+import { ChallengeParticipantCard, type PublicVotingAccess } from "@/components/challenge-participant-card";
+import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 
 export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
@@ -29,8 +28,6 @@ export default function ChallengeDetailPage() {
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
-  const [participantSearch, setParticipantSearch] = useState("");
-  const [participantLimit, setParticipantLimit] = useState(12);
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
   const [paymentReturnState, setPaymentReturnState] = useState<"" | "processing" | "canceled">("");
@@ -195,9 +192,7 @@ export default function ChallengeDetailPage() {
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
   const predictionEnabled = Boolean((challenge as any).predictionEnabled || (challenge as any).predictionArenaEnabled);
   const creatorSuiteUrl = String((challenge as any).creatorSuiteUrl ?? (challenge as any).livestreamUrl ?? (challenge as any).livestreamEmbedUrl ?? "");
-  const participants = ((details as { participants?: Array<{ id: string; displayName: string; username?: string | null; avatarUrl?: string | null; participantStatus?: string; entryStatus?: string | null; profilePath?: string }> } | null)?.participants ?? []);
-  const filteredParticipants = participants.filter((participant) => `${participant.displayName} ${participant.username ?? ""}`.toLowerCase().includes(participantSearch.toLowerCase()));
-  const visibleParticipants = filteredParticipants.slice(0, participantLimit);
+  const topParticipants = ((details as { topParticipants?: PublicChallengeParticipant[] } | null)?.topParticipants ?? []).slice(0, 5);
   const rawChallenge = details?.challenge as Record<string, any> | undefined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, any> : {};
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, any> : {};
@@ -269,29 +264,25 @@ export default function ChallengeDetailPage() {
           <section className="mt-12">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-black">Participants</h2>
-                <p className="mt-2 text-sm text-slate-400">{participants.length.toLocaleString()} participating. Public views only show approved or active participant profile details.</p>
+                <h2 className="text-2xl font-black">Leading Participants</h2>
+                <p className="mt-2 text-sm text-slate-400">Top eligible entries ranked by verified votes.</p>
               </div>
-              <input className="min-h-11 rounded-[8px] border border-white/10 bg-[#151515] px-4 text-sm font-bold text-white outline-none focus:border-[var(--gold)] sm:w-72" value={participantSearch} onChange={(event) => { setParticipantSearch(event.target.value); setParticipantLimit(12); }} placeholder="Search participants" />
+              <LinkButton href={`/challenges/${challenge.id}/participants`} variant="secondary">See all participants</LinkButton>
             </div>
-            {visibleParticipants.length ? (
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleParticipants.map((participant) => <a key={participant.id} href={participant.profilePath || "/profile"} className="rounded-[8px] border border-white/10 bg-[#151515] p-4 transition hover:border-[var(--gold)]/50"><div className="flex items-center gap-3"><AvatarFrame src={participant.avatarUrl} alt={participant.displayName} className="h-12 w-12 shrink-0 border-0" placeholder={String(participant.displayName ?? "CS").slice(0, 2).toUpperCase()} /><div className="min-w-0"><p className="truncate font-black">{participant.displayName}</p>{participant.username ? <p className="truncate text-xs text-slate-400">@{participant.username}</p> : null}</div></div><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em]"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{String(participant.participantStatus ?? "active").replaceAll("_", " ")}</span>{participant.entryStatus ? <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">{participant.entryStatus.replaceAll("_", " ")}</span> : null}</div></a>)}
+            {topParticipants.length ? (
+              <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {topParticipants.map((participant) => (
+                  <ChallengeParticipantCard
+                    key={participant.submissionId}
+                    challengeId={challenge.id}
+                    participant={participant}
+                    votingAccess={(votingAccess ?? { authenticated: Boolean(user), canVote: false, reason: "voting_closed" }) as PublicVotingAccess}
+                    returnPath={`/challenges/${challenge.id}`}
+                    onVoteRecorded={async () => { await refetch(); }}
+                  />
+                ))}
               </div>
-            ) : <Card className="mt-6 border-dashed p-6 text-center text-slate-400">No public participants match this view yet.</Card>}
-            {filteredParticipants.length > visibleParticipants.length ? <Button variant="secondary" className="mt-5" onClick={() => setParticipantLimit((value) => value + 24)}>Load More Participants</Button> : null}
-          </section>
-
-          <section className="mt-12">
-            <h2 className="text-2xl font-black">Community Submissions</h2>
-            {leaderboard?.message ? <Card className="mt-6 border-yellow-500/30 bg-yellow-950/10 p-5 text-[var(--gold)]">{leaderboard.message}</Card> : null}
-            {challengeSubmissions.length ? (
-              <div className="mt-6 grid gap-5 md:grid-cols-2">
-                {challengeSubmissions.map((entry, index) => <SubmissionVoteCard key={entry.id} rank={index + 1} submission={entry} votingOpen={votingOpen} />)}
-              </div>
-            ) : (
-              <p className="mt-6 text-slate-400">{leaderboard?.message ? "Rankings are not public right now." : "No eligible submissions yet. Join and upload an accepted media file to become the first entry."}</p>
-            )}
+            ) : <Card className="mt-6 border-dashed p-6 text-center text-slate-400">{leaderboard?.message ?? "No eligible submissions are available yet."}</Card>}
           </section>
 
           <section className="mt-12 border-t border-white/10 pt-10">
@@ -438,27 +429,4 @@ function ChallengeMediaPlaceholder() {
 
 function Info({ title, body }: { title: string; body: string }) {
   return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><h3 className="font-black text-[var(--gold)]">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></div>;
-}
-
-function SubmissionVoteCard({ submission, rank, votingOpen }: { submission: DetailSubmission; rank: number; votingOpen: boolean }) {
-  return (
-    <Card className="overflow-hidden bg-[#151515]">
-      <div className="relative h-48">
-        <SubmissionMediaFrame src={submission.mediaUrl} alt={submission.title} className="h-full rounded-none border-0" placeholder="Submission" />
-        <span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-xs font-black">Rank #{rank}</span>
-      </div>
-      <div className="p-5">
-        <h3 className="break-words text-lg font-black">{submission.title}</h3>
-        <p className="mt-2 text-sm text-slate-300">by @{submission.userName}</p>
-        <p className="mt-3 text-sm text-slate-300">{submission.description}</p>
-        <div className="mt-5 grid gap-3 sm:flex sm:items-center sm:justify-between">
-          <span className="flex items-center gap-2 font-black text-[var(--gold)]"><Trophy size={16} /> {submission.likes} votes</span>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            <LinkButton href={`/submissions/${submission.id}`} variant="secondary" className="w-full sm:w-auto">Preview</LinkButton>
-            <LinkButton href={`/challenges/${submission.challengeId}/votes`} variant="ghost" className="w-full sm:w-auto">{votingOpen ? "Vote" : "Closed"}</LinkButton>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
 }

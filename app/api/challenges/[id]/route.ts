@@ -12,6 +12,8 @@ import { getChallengeLifecycleState, getChallengePhaseSummary } from "@/lib/chal
 import { resolveChallengeSubmissionAccess, resolveChallengeViewerState } from "@/lib/server/challenge-viewer-state";
 import { getParticipantJourneyState } from "@/lib/server/participant-journey";
 import { isEnteredParticipantStatus } from "@/lib/server/submission-lifecycle";
+import { buildPublicChallengeParticipants } from "@/lib/server/challenge-participants";
+import { userOwnsChallenge } from "@/lib/server/challenge-access";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -91,6 +93,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
+  const topParticipants = await buildPublicChallengeParticipants(db, id, {
+    sort: "highest_votes",
+    page: 1,
+    pageSize: 5
+  });
 
   const publicChallenge = publicChallengeFields(challengeData);
   const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
@@ -106,6 +113,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const phaseSummary = getChallengePhaseSummary({ id: challengeSnap.id, ...challengeData }, new Date(), { eligibleSubmissionCount: leaderboard.entries.length });
   const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
+  const ownerAccount = Boolean(user && userOwnsChallenge({ id: challengeSnap.id, ...challengeData }, user.uid));
   const submitted = Boolean(userSubmissionSnap?.exists);
   const paymentPending = entryPaymentStatus === "pending";
   const paymentRequired = paidEntryRequired && !paidEntryEnrolled;
@@ -132,17 +140,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const approvedSubmissionCount = leaderboard.entries.filter((entry) => String(entry.status ?? "").toLowerCase() === "approved").length;
   const activeSubmissionCount = leaderboard.entries.filter((entry) => ["active", "winner"].includes(String(entry.status ?? "").toLowerCase())).length;
   const votingAccess = {
-    canVote: Boolean(phaseSummary.votingOpen && eligibleSubmissionCount > 0 && !sponsorAccount),
+    authenticated: Boolean(user),
+    canVote: Boolean(user && phaseSummary.votingOpen && eligibleSubmissionCount > 0 && !sponsorAccount && !ownerAccount),
     reason: eligibleSubmissionCount <= 0
       ? "no_eligible_submissions"
       : !phaseSummary.votingOpen
         ? "voting_not_open"
-        : sponsorAccount
-          ? "sponsor_blocked"
-          : null,
+        : !user
+          ? "auth_required"
+          : ownerAccount
+            ? "owner_blocked"
+            : sponsorAccount
+              ? "sponsor_blocked"
+              : null,
     eligibleSubmissionCount,
     approvedSubmissionCount,
-    activeSubmissionCount
+    activeSubmissionCount,
+    loginPath: `/auth/login?next=${encodeURIComponent(`/challenges/${id}`)}`
   };
   const participationState = {
     phase: phaseSummary.phase,
@@ -152,7 +166,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     canJoin: Boolean(phaseSummary.canJoin && !sponsorAccount && !participantSnap?.exists),
     canPay: paidEntryState.canPay,
     canSubmit: Boolean(participantJourney.canSubmit && paidEntryState.canSubmit),
-    canVote: Boolean(phaseSummary.canVote && !sponsorAccount),
+    canVote: Boolean(user && phaseSummary.canVote && !sponsorAccount && !ownerAccount),
     blockReason: baseBlockReason,
     message: phaseSummary.label
   };
@@ -161,6 +175,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     phaseSummary,
     challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
     submissions: leaderboard.entries,
+    topParticipants: topParticipants.entries,
     leaderboard: leaderboardPayload,
     sponsorships,
     participants,
@@ -204,7 +219,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         canJoin: phaseSummary.canJoin,
         canPay: false,
         canSubmit: false,
-        canVote: phaseSummary.canVote,
+        canVote: false,
         blockReason: lifecycle.disabledReason,
         message: phaseSummary.label
       },
