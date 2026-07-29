@@ -94,12 +94,60 @@ export function HostCompetitionWizard({ initialCompetitionType }: { initialCompe
     setCreatedId(((result.data?.challenge as { id?: string } | undefined)?.id) || "saved");
   }
   if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" /><h1 className="mt-5 text-3xl font-black">Competition saved</h1><p className="mt-3 text-slate-300">Advanced events, tournaments, sponsor settings, and prizes remain subject to review. No money movement was enabled.</p><div className="mt-6 flex justify-center gap-3"><LinkButton href={createdId === "saved" ? "/challenges" : `/challenges/${createdId}`}>View Competition</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Host Control Center</LinkButton></div></Card></AppShell>;
-  return <AppShell><div className="mx-auto max-w-6xl"><PageTitle title={form.competitionType === "Private Challenge" ? "Create Private Challenge" : form.competitionType === "Live Event" ? "Create Live Event" : form.competitionType === "Tournament" ? "Create Tournament Challenge" : "Create Challenge"} subtitle={form.competitionType === "Private Challenge" ? "Set invite access, participant approval, dates, media, and review-safe rules." : form.competitionType === "Live Event" ? "Build a physical-first event with venue, schedule, participant, media, and external livestream foundations." : form.competitionType === "Tournament" ? "Plan a multi-stage tournament with rounds, advancement rules, voting or judging, finals, and review-safe winner confirmation." : "Build a normal online challenge. Private, live, tournament, and hybrid builders now live in their own sections."} /><Card className="mt-6 p-4 sm:p-6">
+  const pageTitle = form.competitionType === "Private Challenge" ? "Create Private Challenge" : form.competitionType === "Live Event" ? "Create Live Event" : form.competitionType === "Tournament" ? "Create Tournament Challenge" : "Create Challenge";
+  const pageSubtitle = form.competitionType === "Private Challenge" ? "Set invite access, participant approval, dates, media, and review-safe rules." : form.competitionType === "Live Event" ? "Build a physical-first event with venue, schedule, registration, media, and livestream details." : form.competitionType === "Tournament" ? "Plan a multi-stage tournament with rounds, advancement rules, voting or judging, finals, and review-safe winner confirmation." : "Build a normal online challenge. Private, live, tournament, and hybrid builders now live in their own sections.";
+  const actions = <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+    <Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => value - 1)}>Back</Button>
+    <div className="grid gap-3 sm:flex">
+      <Button variant="secondary" onClick={() => submit(false)} disabled={saving}><Save size={17} /> Save Draft</Button>
+      {step < steps.length - 1 ? <Button onClick={() => { const problem = validate(); problem ? setError(problem) : setStep((value) => value + 1); }}>Continue</Button> : <Button onClick={() => submit(form.launchMode !== "draft")} disabled={saving}>{saving ? "Saving..." : form.launchMode === "schedule" ? "Schedule Launch" : "Publish Competition"}</Button>}
+    </div>
+  </div>;
+  if (form.competitionType === "Live Event") {
+    return <AppShell><div className="mx-auto max-w-[1440px]">
+      <PageTitle title={pageTitle} subtitle={pageSubtitle} />
+      <div className="mt-7 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)_280px]">
+        <aside className="lg:sticky lg:top-24"><HostVerticalStepper steps={steps} current={step} onSelect={setStep} /></aside>
+        <Card className="min-w-0 p-5 sm:p-7">
+          <div className="min-h-[470px]"><WizardStep step={step} form={form} update={update} userId={auth.user?.uid ?? "anonymous"} /></div>
+          {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
+          <LivePublishChecklist form={form} />
+          {actions}
+        </Card>
+        <LiveBuilderGuide step={step} />
+      </div>
+    </div></AppShell>;
+  }
+  return <AppShell><div className="mx-auto max-w-6xl"><PageTitle title={pageTitle} subtitle={pageSubtitle} /><Card className="mt-6 p-4 sm:p-6">
     <div className="flex gap-2 overflow-x-auto pb-2">{steps.map((label, index) => <button key={label} onClick={() => index <= step && setStep(index)} className={`min-h-11 min-w-40 rounded-[8px] px-3 text-left text-xs font-black ${index === step ? "bg-[var(--gold)] text-black" : "bg-[#191919] text-slate-300"}`}>{index + 1}. {label}</button>)}</div>
     <div className="mt-8 min-h-[470px]"><WizardStep step={step} form={form} update={update} userId={auth.user?.uid ?? "anonymous"} /></div>
     {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
-    <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-between"><Button variant="secondary" onClick={() => submit(false)} disabled={saving}><Save size={17} /> Save Draft</Button><div className="flex gap-3"><Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => value - 1)}>Back</Button>{step < 10 ? <Button onClick={() => { const problem = validate(); problem ? setError(problem) : setStep((value) => value + 1); }}>Next</Button> : <Button onClick={() => submit(form.launchMode !== "draft")} disabled={saving}>{saving ? "Saving..." : form.launchMode === "schedule" ? "Schedule Launch" : "Publish Competition"}</Button>}</div></div>
+    {actions}
   </Card></div></AppShell>;
+}
+
+function HostVerticalStepper({ steps, current, onSelect }: { steps: string[]; current: number; onSelect: (step: number) => void }) {
+  return <Card className="p-3"><div className="grid gap-2">{steps.map((label, index) => <button key={label} type="button" onClick={() => index <= current && onSelect(index)} className={`flex min-h-14 w-full items-center gap-3 rounded-[8px] border px-4 py-3 text-left text-sm font-black ${index === current ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < current ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-[#171717] text-slate-400"}`}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20">{index < current ? <CheckCircle2 size={16} /> : index + 1}</span><span className="min-w-0 break-words">{label}</span></button>)}</div></Card>;
+}
+
+function LiveBuilderGuide({ step }: { step: number }) {
+  const guidance = step === 0 ? ["Set the event identity", "Use a clear title and concise event description.", "Upload media you are authorized to publish."] : step === 3 ? ["Plan attendance", "Confirm the venue, city, country, and capacity.", "Use real livestream details only when available."] : step >= 8 ? ["Prepare to publish", "Review media, sponsor visibility, and launch settings.", "No ticket payment is created by this builder."] : ["Keep event details consistent", "Use the same dates and rules participants will see.", "Save a draft whenever details are still changing."];
+  return <Card className="h-fit p-5 lg:sticky lg:top-24"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Builder Guide</p><h2 className="mt-3 text-xl font-black text-white">{guidance[0]}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">{guidance.slice(1).map((item) => <li key={item} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--gold)]" /><span>{item}</span></li>)}</ul></Card>;
+}
+
+function LivePublishChecklist({ form }: { form: Form }) {
+  const checks = [
+    { label: "Event details", complete: form.title.trim().length >= 3 && form.description.trim().length >= 10 },
+    { label: "Venue and location", complete: Boolean(form.venueName.trim() && form.eventCity.trim() && form.eventCountry.trim()) },
+    { label: "Event timeline", complete: Boolean(form.startsAt && form.submissionDeadline && form.votingDeadline && form.endsAt) },
+    { label: "Participation settings", complete: Number(form.maxParticipants) >= 2 }
+  ];
+  const remaining = checks.filter((item) => !item.complete).length;
+  return <div className={`mt-7 rounded-[8px] border p-4 ${remaining ? "border-yellow-500/30 bg-yellow-500/5" : "border-emerald-500/25 bg-emerald-500/5"}`}>
+    <p className="text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Publish checklist</p>
+    <p className="mt-1 text-sm text-slate-300">{remaining ? `${remaining} section${remaining === 1 ? "" : "s"} still need attention.` : "Core event details are ready for server validation."}</p>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">{checks.map((item) => <div key={item.label} className="flex items-center gap-2 text-sm font-bold text-slate-200">{item.complete ? <CheckCircle2 size={16} className="text-emerald-300" /> : <span className="h-4 w-4 rounded-full border border-yellow-300/50" />}<span>{item.label}</span></div>)}</div>
+  </div>;
 }
 
 function WizardStep({ step, form, update, userId }: { step: number; form: Form; update: <K extends keyof Form>(key: K, value: Form[K]) => void; userId: string }) {
