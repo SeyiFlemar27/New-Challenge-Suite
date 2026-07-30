@@ -43,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sp
       db.collection("sponsorVerification").doc(sponsorId).set({ userId: sponsorId, ...update, safeReason: input.safeReason || null, rawDocumentsStored: false }, { merge: true }),
       db.collection("sponsorAuditLogs").add({ sponsorId, adminId: user.uid, action: "sponsor_verification_updated", businessVerificationStatus: input.verificationStatus, sponsorVerificationStatus, safeReason: input.safeReason || null, internalNote: input.internalNote || null, createdAt: now })
     ]);
-    return ok({ sponsorId, businessVerificationStatus: input.verificationStatus, sponsorVerificationStatus }, "Sponsor verification foundation updated.");
+    return ok({ sponsorId, businessVerificationStatus: input.verificationStatus, sponsorVerificationStatus }, "Sponsor verification updated.");
   } catch (error) {
     console.error("[admin-sponsor-verification:patch]", { adminId: user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor verification could not be updated.");

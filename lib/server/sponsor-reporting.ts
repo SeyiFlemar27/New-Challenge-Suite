@@ -25,6 +25,7 @@ export function buildSponsorReportingSummary(input: {
   contributions: SponsorRecord[];
   deliverables: SponsorRecord[];
   challenges?: Map<string, SponsorRecord>;
+  settlements?: Map<string, SponsorRecord>;
 }) {
   const confirmed = input.contributions.filter((item) => contributionState(item) === "confirmed");
   const pending = input.contributions.filter((item) => contributionState(item) === "pending");
@@ -35,6 +36,7 @@ export function buildSponsorReportingSummary(input: {
   const fundedChallenges = confirmed.map((contribution) => {
     const challengeId = text(contribution.challengeId);
     const challenge = input.challenges?.get(challengeId) ?? {};
+    const settlement = input.settlements?.get(challengeId) ?? {};
     const winnerAnnounced = Boolean(challenge.winnersAnnouncedAt || challenge.resultsPublishedAt || challenge.publicWinnersPublishedAt);
     const payoutStatus = text(challenge.payoutStatus ?? challenge.winnerPayoutStatus).toLowerCase();
     const payoutVerified = ["paid", "paid_out", "completed"].includes(payoutStatus);
@@ -43,6 +45,12 @@ export function buildSponsorReportingSummary(input: {
       challengeId,
       title: text(challenge.title) || "Sponsored challenge",
       amountCents: cents(contribution.amountCents ?? contribution.amount),
+      grossSponsorPrizeCents: cents(settlement.grossConfirmedSponsorPrizeAmount ?? contribution.amountCents ?? contribution.amount),
+      sponsorPrizePlatformFeeCents: cents(settlement.sponsorPrizePlatformFeeAmount),
+      netSponsorPrizeCents: cents(settlement.netSponsorPrizeAmount),
+      sponsorPrizeDistribution: Array.isArray(settlement.sponsorPrizeDistribution) ? settlement.sponsorPrizeDistribution : [],
+      settlementId: settlement.id ?? null,
+      settlementStatus: text(settlement.status) || "pending_winner_approval",
       currency: text(contribution.currency).toUpperCase() || "USD",
       contributionStatus: "confirmed",
       winnerAllocationStatus: winnerAnnounced ? "winner_announced" : "pending_winner_announcement",
@@ -68,6 +76,7 @@ export function buildSponsorReportingSummary(input: {
     fundedChallenges,
     dataQuality: {
       financial: confirmed.length ? "webhook_confirmed" : "not_tracked_yet",
+      settlement: input.settlements?.size ? "internal_settlement_records" : "not_tracked_yet",
       performance: "not_tracked_yet",
       roi: "not_tracked_yet"
     }

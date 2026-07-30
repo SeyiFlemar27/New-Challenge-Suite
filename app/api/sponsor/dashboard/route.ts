@@ -24,12 +24,25 @@ export async function GET(request: Request) {
     const challengeIds = [...new Set(contributions.map((item) => String(item.challengeId ?? "")).filter(Boolean))].slice(0, 100);
     const challengeSnaps = challengeIds.length ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id))) : [];
     const challenges = new Map(challengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
+    const settlementSnaps = await Promise.all(challengeIds.slice(0, 50).map((id) =>
+      db.collection("challengeSettlements").where("challengeId", "==", id).limit(5).get()
+    ));
+    const settlements = new Map<string, Record<string, unknown>>();
+    for (const snap of settlementSnaps) {
+      for (const doc of snap.docs) {
+        const data = { id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string };
+        const challengeId = String(data.challengeId ?? "");
+        const existing = settlements.get(challengeId);
+        if (!existing || String(data.createdAt ?? "") > String(existing.createdAt ?? "")) settlements.set(challengeId, data);
+      }
+    }
     const reporting = buildSponsorReportingSummary({
       campaigns,
       proposals,
       contributions,
       deliverables: deliverablesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      challenges
+      challenges,
+      settlements
     });
     return ok({
       sponsorProfile: sponsor,
