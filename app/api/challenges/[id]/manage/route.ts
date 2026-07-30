@@ -35,16 +35,31 @@ async function context(request: Request, challengeId: string) {
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const access = await context(request, id);
-  if (access.response || !access.db || !access.challenge) return access.response;
-  const [participants, entryRequests, submissions, reports, winnerProposals, audits] = await Promise.all([
+  if (access.response || !access.db || !access.challenge || !access.user) return access.response;
+  const [participants, entryRequests, submissions, reports, winnerProposals, settlements, directAudits, relatedAudits] = await Promise.all([
     rows(access.db, "challengeParticipants", id),
     rows(access.db, "challengeEntryRequests", id),
     rows(access.db, "submissions", id),
     rows(access.db, "challengeReports", id),
     rows(access.db, "winnerProposals", id, 50),
-    access.db.collection("auditLogs").where("targetId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => [])
+    rows(access.db, "challengeSettlements", id, 25),
+    access.db.collection("auditLogs").where("targetId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => []),
+    access.db.collection("auditLogs").where("metadata.challengeId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => [])
   ]);
-  return ok({ challenge: access.challenge, participants, entryRequests, submissions, reports, winnerProposals, audits, financialExecutionEnabled: false }, "Challenge management loaded.");
+  const audits = [...new Map([...directAudits, ...relatedAudits].map((item) => [String(item.id), item])).values()]
+    .sort((left, right) => String((right as Record<string, unknown>).createdAt ?? "").localeCompare(String((left as Record<string, unknown>).createdAt ?? "")));
+  return ok({
+    challenge: access.challenge,
+    participants,
+    entryRequests,
+    submissions,
+    reports,
+    winnerProposals,
+    settlements,
+    audits,
+    permissions: { isAdmin: Boolean(access.user?.isAdmin), canModerateSensitiveActions: Boolean(access.user?.isAdmin) },
+    financialExecutionEnabled: false
+  }, "Challenge management loaded.");
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -63,11 +78,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const statusMap: Record<string, Record<string, string>> = {
     participant: { mark_incomplete: "incomplete", restore: "approved", disqualify: "disqualified" },
     submission: { approve: "approved", reject: "rejected", request_changes: "needs_changes", flag: "flagged", disqualify: "disqualified" },
-    report: { review: "under_review", resolve: "resolved", dismiss: "dismissed", escalate: "escalated" }
+    report: { request_review: "pending_admin_review", review: "under_review", resolve: "resolved", dismiss: "dismissed", escalate: "escalated" }
   };
   const nextStatus = statusMap[targetType]?.[action];
   if (!nextStatus) return validationError({ action: "This moderation action is not supported." });
-  if (["reject", "request_changes", "flag", "disqualify", "escalate"].includes(action) && !reason) return validationError({ reason: "A reason is required for this action." });
+  if (!access.user.isAdmin && (targetType === "participant" || targetType === "submission")) {
+    return fail("Participant and submission moderation requires admin review.", 403, { adminReviewRequired: true }, "ADMIN_REVIEW_REQUIRED");
+  }
+  if (!access.user.isAdmin && (targetType !== "report" || action !== "request_review")) {
+    return fail("This management action requires an admin.", 403, { adminReviewRequired: true }, "ADMIN_REVIEW_REQUIRED");
+  }
+  if (["reject", "request_changes", "flag", "disqualify", "escalate", "request_review"].includes(action) && !reason) return validationError({ reason: "A reason is required for this action." });
 
   const lifecycle = String(access.challenge.status ?? access.challenge.lifecycleStatus ?? "").toLowerCase();
   const sensitiveAfterVoting = action === "disqualify" && ["voting_open", "voting_closed", "under_review", "winners_announced", "completed"].includes(lifecycle);

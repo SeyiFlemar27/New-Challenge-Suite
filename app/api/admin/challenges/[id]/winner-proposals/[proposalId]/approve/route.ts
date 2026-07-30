@@ -48,10 +48,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       submissionId: ineligibleWinner.submissionId
     }, "WINNER_NOT_ELIGIBLE");
   }
+  const adminNote = typeof parsed.body?.adminNote === "string" ? parsed.body.adminNote.trim().slice(0, 2000) : "";
+  const selectedIds = new Set(winners.map((winner) => winner.userId));
+  const selectedScores = candidates.filter((candidate) => selectedIds.has(candidate.userId)).map((candidate) => candidate.weightedVoteCount);
+  const unselectedScores = candidates.filter((candidate) => !selectedIds.has(candidate.userId)).map((candidate) => candidate.weightedVoteCount);
+  const tieAtWinnerBoundary = selectedScores.some((score) => unselectedScores.includes(score));
+  const configuredTieBreaker = Boolean(challenge.tieBreaker || challenge.tieBreakerRule || challenge.winnerTieBreaker);
+  if (tieAtWinnerBoundary && !configuredTieBreaker && !adminNote) {
+    return fail("Tied winner candidates require an explicit admin review note.", 409, {
+      tieRequiresAdminReview: true,
+      tiedScores: [...new Set(selectedScores.filter((score) => unselectedScores.includes(score)))]
+    }, "WINNER_TIE_REQUIRES_ADMIN_REVIEW");
+  }
 
   const now = new Date().toISOString();
   const preview = await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners });
-  const adminNote = typeof parsed.body?.adminNote === "string" ? parsed.body.adminNote.trim().slice(0, 2000) : "";
   const update = {
     status: "approved",
     reviewedAt: now,

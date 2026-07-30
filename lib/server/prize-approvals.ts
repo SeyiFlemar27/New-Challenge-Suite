@@ -310,10 +310,20 @@ export function buildLedgerFinalizationFoundation(input: {
 
 export async function getWinnerCandidates(db: Firestore, challengeId: string) {
   const snap = await db.collection("submissions").where("challengeId", "==", challengeId).limit(250).get();
-  const eligibleStatuses = new Set(["approved", "active", "winner", "submitted", "published"]);
+  const eligibleStatuses = new Set(["approved", "active", "winner"]);
   return snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
-    .filter((submission) => eligibleStatuses.has(status(submission.status)) && !["flagged", "removed", "rejected", "disqualified"].includes(status(submission.moderationStatus)))
+    .filter((submission) => {
+      const participantStatus = status(submission.participantStatus ?? submission.enrollmentStatus);
+      const paymentStatus = status(submission.paymentStatus ?? submission.entryPaymentStatus);
+      const moderationStatus = status(submission.moderationStatus);
+      const unresolvedFlag = moderationStatus === "flagged" && status(submission.flagResolutionStatus) !== "resolved";
+      return eligibleStatuses.has(status(submission.status))
+        && !["pending", "pending_review", "pending_payment", "rejected", "withdrawn", "disqualified", "incomplete"].includes(participantStatus)
+        && !["pending", "pending_payment", "failed", "cancelled", "refunded", "disputed"].includes(paymentStatus)
+        && !["removed", "rejected", "disqualified"].includes(moderationStatus)
+        && !unresolvedFlag;
+    })
     .map((submission) => ({
       id: submission.id,
       submissionId: submission.id,
