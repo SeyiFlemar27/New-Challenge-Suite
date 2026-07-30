@@ -10,12 +10,12 @@ import { fetchChallengeDetails } from "@/lib/api/services";
 import { apiRequest } from "@/lib/api/client";
 import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { getChallengeLifecycleState, statusClassName } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengeTimelineDisplay, statusClassName } from "@/lib/challenge-status";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
 import { ChallengeMediaFrame } from "@/components/media-display";
-import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 
@@ -169,7 +169,8 @@ export default function ChallengeDetailPage() {
 
   const lifecycle = getChallengeLifecycleState(challenge);
   const phaseSummary = (details as any)?.phaseSummary;
-  const displayStatus = String(phaseSummary?.label ?? lifecycle.primaryLabel);
+  const timelineDisplay = getChallengeTimelineDisplay((details?.challenge as Record<string, unknown> | undefined) ?? challenge);
+  const displayStatus = timelineDisplay.currentPhase || String(phaseSummary?.label ?? lifecycle.primaryLabel);
   const phase = String(phaseSummary?.phase ?? lifecycle.primaryStatus);
   const joinOpen = Boolean(phaseSummary?.canJoin ?? lifecycle.canJoin);
   const submissionOpen = Boolean(phaseSummary?.canSubmit ?? lifecycle.canSubmit);
@@ -213,7 +214,8 @@ export default function ChallengeDetailPage() {
   const votingAccess = (userState as any)?.votingAccess;
   const predictionAccess = (userState as any)?.predictionAccess as PublicPredictionAccess | undefined;
   const eligibleSubmissionCount = Number(votingAccess?.eligibleSubmissionCount ?? phaseSummary?.eligibleSubmissionCount ?? challengeSubmissions.length);
-  const challengeTimeZone = String(phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? "Africa/Lagos");
+  const challengeTimeZone = String(timelineDisplay.timeZone ?? phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE);
+  const nextImportantTime = timelineDisplay.nextLabel && timelineDisplay.nextAt ? `${timelineDisplay.nextLabel} ${formatChallengeDateTime(timelineDisplay.nextAt, challengeTimeZone)}` : null;
   const stageSupport = participantJourney?.step === "entered_waiting_submission"
     ? "Entered"
     : participantJourney?.step === "can_submit"
@@ -246,6 +248,18 @@ export default function ChallengeDetailPage() {
             <Metric value={displayStatus} label="Current stage" support={phase === "voting_pending" ? "No eligible submissions yet" : stageSupport} />
             <Metric value={totalVotes.toLocaleString()} label="Votes" support={votingOpen ? "Voting open" : "Voting unavailable"} />
           </div>
+          <Card className="mt-5 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Current phase</p>
+                <p className="mt-1 text-lg font-black text-white">{timelineDisplay.currentPhase}</p>
+              </div>
+              {nextImportantTime ? <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Next important time</p>
+                <p className="mt-1 text-lg font-black text-[var(--gold)]">{nextImportantTime}</p>
+              </div> : null}
+            </div>
+          </Card>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
 
           <Card className="mt-10 p-5 sm:p-7">
@@ -255,9 +269,8 @@ export default function ChallengeDetailPage() {
               <Info title="How to participate" body="Join the challenge, accept the rules, upload an approved image or video, then submit before the deadline." />
               <Info title="Submission requirements" body={`Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow community guidelines.`} />
               <Info title="Judging method" body="Rankings combine verified voting activity, rule compliance, and creator review when applicable." />
-              <Info title="Voting rules" body={votingOpen ? "Voting is open. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are platform points." : phase === "voting_pending" ? "No eligible submissions are available for voting yet." : lifecycle.votingStatus === "voting_not_open" ? `Voting opens ${formatChallengeDateTime(phaseSummary?.votingStartAt, challengeTimeZone) ?? "later"}.` : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
+              <Info title="Voting rules" body={votingOpen ? "Voting is open. Free users get 1 vote per challenge/day. Additional votes can use DoroCoins, which are platform points." : phase === "voting_pending" ? "No eligible submissions are available for voting yet." : lifecycle.votingStatus === "voting_not_open" ? "Voting opens at the Challenge/Submissions start time." : lifecycle.votingStatus === "voting_not_enabled" ? "Voting is not enabled for this challenge." : "Voting is closed for this challenge."} />
               <Info title="Prize and earnings" body="Winners are reviewed before earnings become available. Confirmed sponsor prizes are winner-directed after the sponsor-prize platform fee. KYC, admin review, and the 24-hour hold are required before withdrawal." />
-              <Info title="Timeline" body={`Registration closes ${formatChallengeDateTime(phaseSummary?.registrationEndAt, challengeTimeZone) ?? challenge.registrationDeadline}. Submissions ${submissionOpen ? "are open" : `open ${formatChallengeDateTime(phaseSummary?.submissionStartAt, challengeTimeZone) ?? "after registration"}`}.`} />
               <Info title="Eligibility" body={challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}` : "Open to eligible platform users in supported regions."} />
               {sponsored && !freeCompetitor ? <Info title="Sponsor information" body={`${sponsorships.length} sponsorship proposal${sponsorships.length === 1 ? "" : "s"} recorded for this challenge.`} /> : null}
             </div>

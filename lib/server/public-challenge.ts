@@ -99,8 +99,8 @@ export function isPublicSubmission(id: string, data: Record<string, unknown>) {
 export function publicChallengeFields(data: Record<string, unknown>) {
   return pick(data, [
     "title", "description", "category", "type", "visibility", "status", "lifecycleStatus",
-    "computedStatus", "startsAt", "endsAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
-    "votingStartsAt", "votingDeadline", "votingEndsAt", "acceptedSubmissionTypes",
+    "computedStatus", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
+    "votingStartsAt", "votingDeadline", "votingEndsAt", "winnerAnnouncementAt", "acceptedSubmissionTypes",
     "competitionFormat", "bestOf", "votingSettings", "rules", "standardRules",
     "challengeGuidelines", "prizeType", "prizeTitle", "prizeDescription", "publicPrizeStatus",
     "participantCount", "submissionCount", "voteCount", "weightedVoteCount", "coverImageUrl",

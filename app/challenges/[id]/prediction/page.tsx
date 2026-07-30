@@ -9,7 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
 import { SubmissionMediaFrame } from "@/components/media-display";
 import { apiRequest } from "@/lib/api/client";
-import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 import type { PublicPredictionAccess } from "@/components/challenge-participant-card";
 
@@ -87,7 +87,7 @@ export default function ChallengePredictionPage() {
   const amountCents = Math.round((Number(stake) || 0) * 100);
   const platformFeeCents = Math.round(amountCents * 0.07);
   const netPoolContributionCents = Math.max(0, amountCents - platformFeeCents);
-  const timeZone = participantPayload?.challenge.timezone ?? participantPayload?.challenge.timeZone ?? "Africa/Lagos";
+  const timeZone = participantPayload?.challenge.timezone ?? participantPayload?.challenge.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE;
 
   useEffect(() => {
     if (requestedSubmissionId) setSelectedSubmissionId(requestedSubmissionId);

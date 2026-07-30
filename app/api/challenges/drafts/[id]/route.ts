@@ -4,11 +4,12 @@ import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { calculateChallengeDraftProgress, editableDraftStatus, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 
 const allowedDraftFields = new Set([
   "title", "description", "category", "customCategory", "type", "visibility", "premiumOnly",
   "acceptedSubmissionTypes", "competitionFormat", "bestOf", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline",
-  "registrationDeadline", "votingDeadline", "votingStartsAt", "votingEndsAt", "timeZone", "lateRegistrationEnabled",
+  "registrationDeadline", "votingDeadline", "votingStartsAt", "votingEndsAt", "winnerAnnouncementAt", "timeZone", "timezone", "lateRegistrationEnabled",
   "standardRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
   "documentPaths", "mediaUploadStatus", "mediaStatus", "usesPlaceholderMedia", "mediaFallbackType", "prizeType",
@@ -64,9 +65,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const current = { id: snap.id, ...snap.data() } as Record<string, unknown>;
     if (!userOwnsChallenge(current, user.uid)) throw new Error("PERMISSION_DENIED");
     if (!editableDraftStatus(current)) throw new Error("CHALLENGE_NOT_EDITABLE");
-    const merged = { ...current, ...patch, updatedAt: now, lastAutosavedAt: now };
+    const normalizedPatch = normalizeChallengeTimelineForStorage(patch, current);
+    const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
     const progress = calculateChallengeDraftProgress(merged);
-    const finalPatch = { ...patch, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
+    const finalPatch = { ...normalizedPatch, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
     transaction.set(ref, finalPatch, { merge: true });
     return { ...merged, ...progress };
   });

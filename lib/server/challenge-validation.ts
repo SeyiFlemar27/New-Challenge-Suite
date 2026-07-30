@@ -1,5 +1,6 @@
 ﻿import { z } from "zod";
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
+import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 
 export const serverChallengeCreateSchema = z.object({
   title: z.string().trim().max(120, "Title must be 120 characters or fewer.").default(""),
@@ -20,7 +21,8 @@ export const serverChallengeCreateSchema = z.object({
   votingStartsAt: z.string().trim().optional(),
   registrationDeadline: z.string().trim().optional(),
   votingEndsAt: z.string().trim().optional(),
-  timeZone: z.string().trim().max(80).default("UTC"),
+  winnerAnnouncementAt: z.string().trim().optional(),
+  timeZone: z.string().trim().max(80).default(DEFAULT_CHALLENGE_TIME_ZONE),
   lateRegistrationEnabled: z.coerce.boolean().default(false),
   standardRules: z.string().trim().max(6000).default(""),
   policyTerms: z.string().trim().max(6000).default(""),

@@ -15,6 +15,7 @@ import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
+import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 
 export async function GET() {
   const db = getAdminDb();
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
 
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const validation = serverChallengeCreateSchema.safeParse(parsed.body);
+  const normalizedInput = normalizeChallengeTimelineForStorage((parsed.body ?? {}) as Record<string, unknown>);
+  const validation = serverChallengeCreateSchema.safeParse(normalizedInput);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
 
@@ -182,11 +184,14 @@ export async function POST(request: Request) {
     status: lifecycleStatus,
     lifecycleStatus,
     submissionDeadline: body.submissionDeadline,
+    submissionStartAt: body.submissionStartAt || body.startsAt,
     registrationDeadline: body.registrationDeadline || body.submissionDeadline,
     timeZone: body.timeZone,
+    timezone: body.timeZone,
     lateRegistrationEnabled: body.lateRegistrationEnabled,
     startsAt: body.startsAt,
     endsAt: body.endsAt,
+    winnerAnnouncementAt: body.winnerAnnouncementAt || body.endsAt,
     votingDeadline: body.votingDeadline,
     votingEndsAt: body.votingDeadline,
     acceptedSubmissionTypes: body.acceptedSubmissionTypes,
@@ -303,7 +308,7 @@ export async function POST(request: Request) {
       winnerPublishingEnabled: false,
       exportsEnabled: false
     } : null,
-    votingStartsAt: body.votingStartsAt || body.submissionDeadline,
+    votingStartsAt: body.submissionStartAt || body.startsAt,
     adminReviewRequired: lifecycleStatus === "pending_review",
     completionPercentage: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).completionPercentage,
     nextIncompleteSection: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).nextIncompleteSection,

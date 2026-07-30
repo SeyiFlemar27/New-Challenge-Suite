@@ -11,7 +11,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { challengeDraftMediaPath } from "@/lib/media-upload-paths";
 import { getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { validateChallengeForPublish, type ChallengeValidationResult } from "@/lib/server/challenge-validation";
-import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { CHALLENGE_TIME_ZONE_OPTIONS, DEFAULT_CHALLENGE_TIME_ZONE, challengeDateTimeForStorage, challengeDateTimeInputValue, formatChallengeLocalDateTime, resolveChallengeTimeZone } from "@/lib/challenge-date-time";
 
 type Mode = "public" | "private";
 const SPONSOR_PLACEMENTS = ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"] as const;
@@ -27,6 +27,7 @@ type FormState = {
   title: string; category: string; description: string; shortDescription: string;
   rules: string; terms: string; submission: string; access: string;
   submissionTypes: string[]; startsAt: string; registrationDeadline: string; submissionDeadline: string; votingDeadline: string; endsAt: string;
+  timeZone: string;
   coverImageUrl: string; coverImagePath: string; promoImageUrl: string; promoImagePath: string; galleryImageUrl: string; galleryImagePath: string; trailerVideoUrl: string; trailerVideoPath: string; documentOneUrl: string; documentOnePath: string; documentTwoUrl: string; documentTwoPath: string;
   paidEntryEnabled: boolean; entryFeeAmount: string; entryCurrency: string; sponsorReady: boolean; prizePoolEnabled: boolean; paidVotesEnabled: boolean;
   sponsorshipGoal: string; preferredSponsorCategory: string; sponsorNote: string; sponsorPlacementPreferences: string[];
@@ -37,13 +38,11 @@ const privateSteps = ["Overview", "Access & Invites", "Rules & Eligibility", "En
 const categories = ["Fitness", "Creative", "Photography", "Food", "Gaming", "Education", "Business", "Other"];
 
 function dateInput(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10) + "T12:00";
+  return challengeDateTimeInputValue(new Date(Date.now() + days * 24 * 60 * 60 * 1000), DEFAULT_CHALLENGE_TIME_ZONE);
 }
 
 function initialForm(): FormState {
-  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(5), votingDeadline: dateInput(6), endsAt: dateInput(9), coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
+  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
 }
 
 function formFromChallenge(challenge: Record<string, unknown>): FormState {
@@ -51,6 +50,7 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
   const docs = Array.isArray(challenge.documentUrls) ? challenge.documentUrls.map(String) : [];
   const docPaths = Array.isArray(challenge.documentPaths) ? challenge.documentPaths.map(String) : [];
   const description = String(challenge.description ?? "");
+  const timeZone = resolveChallengeTimeZone(challenge);
   return {
     ...initialForm(),
     title: String(challenge.title ?? ""),
@@ -62,11 +62,12 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
     submission: String(challenge.challengeGuidelines ?? ""),
     access: String(challenge.privateAccessInstructions ?? ""),
     submissionTypes: Array.isArray(challenge.acceptedSubmissionTypes) && challenge.acceptedSubmissionTypes.length ? challenge.acceptedSubmissionTypes.map(String) : ["image"],
-    startsAt: String(challenge.startsAt ?? challenge.submissionStartAt ?? dateInput(8)).slice(0, 16),
-    registrationDeadline: String(challenge.registrationDeadline ?? challenge.submissionStartAt ?? dateInput(4)).slice(0, 16),
-    submissionDeadline: String(challenge.submissionDeadline ?? dateInput(5)).slice(0, 16),
-    votingDeadline: String(challenge.votingDeadline ?? challenge.votingEndsAt ?? dateInput(6)).slice(0, 16),
-    endsAt: String(challenge.endsAt ?? dateInput(9)).slice(0, 16),
+    startsAt: challengeDateTimeInputValue(challenge.submissionStartAt ?? challenge.startsAt ?? dateInput(8), timeZone),
+    registrationDeadline: challengeDateTimeInputValue(challenge.registrationDeadline ?? dateInput(4), timeZone),
+    submissionDeadline: challengeDateTimeInputValue(challenge.submissionDeadline ?? dateInput(9), timeZone),
+    votingDeadline: challengeDateTimeInputValue(challenge.votingDeadline ?? challenge.votingEndsAt ?? dateInput(10), timeZone),
+    endsAt: challengeDateTimeInputValue(challenge.winnerAnnouncementAt ?? challenge.endsAt ?? dateInput(11), timeZone),
+    timeZone,
     coverImageUrl: String(challenge.coverImageUrl ?? ""),
     coverImagePath: String(challenge.coverImagePath ?? ""),
     promoImageUrl: String(challenge.promoImageUrl ?? ""),
@@ -220,6 +221,11 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
     const safePaidEntryRequested = Boolean(monetizationEligible && form.paidEntryEnabled);
     const safePrizePoolRequested = Boolean(monetizationEligible && form.prizePoolEnabled);
     const safePaidVotesRequested = Boolean(monetizationEligible && form.paidVotesEnabled);
+    const registrationCloseAt = challengeDateTimeForStorage(form.registrationDeadline, form.timeZone);
+    const challengeSubmissionStartAt = challengeDateTimeForStorage(form.startsAt, form.timeZone);
+    const submissionDeadline = challengeDateTimeForStorage(form.submissionDeadline, form.timeZone);
+    const votingReviewCloseAt = challengeDateTimeForStorage(form.votingDeadline, form.timeZone);
+    const winnerAnnouncementAt = challengeDateTimeForStorage(form.endsAt, form.timeZone);
     return {
       title: form.title.trim(),
       description: (form.shortDescription.trim() ? form.shortDescription.trim() + "\n\n" : "") + form.description.trim(),
@@ -238,15 +244,16 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
       prizePoolEnabled: false,
       prizePool: 0,
       cashPayoutsEnabled: false,
-      submissionDeadline: form.submissionDeadline,
-      submissionStartAt: form.startsAt,
-      registrationDeadline: form.registrationDeadline,
-      startsAt: form.startsAt,
-      endsAt: form.endsAt,
-      votingDeadline: form.votingDeadline,
-      votingEndsAt: form.votingDeadline,
-      votingStartsAt: form.submissionDeadline,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      submissionDeadline,
+      submissionStartAt: challengeSubmissionStartAt,
+      registrationDeadline: registrationCloseAt,
+      startsAt: challengeSubmissionStartAt,
+      endsAt: winnerAnnouncementAt,
+      winnerAnnouncementAt,
+      votingDeadline: votingReviewCloseAt,
+      votingEndsAt: votingReviewCloseAt,
+      votingStartsAt: challengeSubmissionStartAt,
+      timeZone: form.timeZone,
       coverImageUrl: mediaUploadDisabled ? "" : form.coverImageUrl,
       coverImagePath: mediaUploadDisabled ? "" : form.coverImagePath,
       promoImageUrl: form.promoImageUrl,
@@ -383,16 +390,32 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
   if (mode === "private" && step === 1) return <section><StepTitle title="Access & Invites" body="Control who can enter without creating fake invite records." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><input className={inputClass} value="Invite-only access" disabled /></Field><Field label="Invite code/link"><input className={inputClass} value="Created after private challenge setup" disabled /></Field></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(e) => update("access", e.target.value)} /></Field></div></section>;
   if (step === 1 + privateOffset) return <section><StepTitle title="Rules & Eligibility" body="Define fair participation terms before entries open." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Challenge rules"><textarea className={textareaClass} value={form.rules} onChange={(e) => update("rules", e.target.value)} /></Field><Field label="Eligibility terms"><textarea className={textareaClass} value={form.terms} onChange={(e) => update("terms", e.target.value)} /></Field><Card className="p-4 text-sm leading-6 text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /><b className="text-white">Upgrade required.</b><br />Paid entry, prize pools, sponsor tools, tournaments, live events, and advanced voting stay locked unless existing plan access allows them.</Card></div></section>;
   if (step === 2 + privateOffset) return <section><StepTitle title="Entry & Submission" body="Tell participants exactly what to submit." /><div className="mt-6 grid gap-3 sm:grid-cols-2">{["image", "video"].map((type) => <label key={type} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-[#181818] px-4 py-4 font-bold"><input type="checkbox" checked={form.submissionTypes.includes(type)} onChange={() => toggleType(type)} /> {type === "image" ? "Image upload" : "Video upload"}</label>)}</div><div className="mt-5"><Field label="Submission instructions"><textarea className={textareaClass} value={form.submission} onChange={(e) => update("submission", e.target.value)} /></Field></div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">Uploads use the existing media flow. No upload is marked successful until the upload component reports a saved URL and storage path.</Card></section>;
-  if (step === 3 + privateOffset) return <section><StepTitle title={mode === "private" ? "Timeline" : "Voting & Timeline"} body="Keep entry, voting, and announcement dates clear." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Registration or invite close"><input className={inputClass} type="datetime-local" value={form.registrationDeadline} onChange={(e) => update("registrationDeadline", e.target.value)} /></Field><Field label="Challenge/Submissions start"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(e) => update("startsAt", e.target.value)} /></Field><Field label="Submission deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(e) => update("submissionDeadline", e.target.value)} /></Field><Field label="Voting or review closes"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(e) => update("votingDeadline", e.target.value)} /></Field><Field label="Winner announcement"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(e) => update("endsAt", e.target.value)} /></Field></div></section>;
+  if (step === 3 + privateOffset) return <section>
+    <StepTitle title={mode === "private" ? "Timeline" : "Voting & Timeline"} body="Keep entry, voting, and announcement dates clear." />
+    <div className="mt-6 max-w-xl">
+      <Field label="Challenge timezone">
+        <select className={inputClass} value={form.timeZone} onChange={(event) => update("timeZone", event.target.value)}>
+          {CHALLENGE_TIME_ZONE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label} - {option.value}</option>)}
+        </select>
+        <p className="mt-2 text-xs text-slate-400">All challenge times will be shown in the selected timezone.</p>
+      </Field>
+    </div>
+    <div className="mt-6 grid gap-5 md:grid-cols-2">
+      <Field label="Registration or invite close"><input className={inputClass} type="datetime-local" value={form.registrationDeadline} onChange={(e) => update("registrationDeadline", e.target.value)} /></Field>
+      <Field label="Challenge/Submissions start"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(e) => update("startsAt", e.target.value)} /></Field>
+      <Field label="Submission deadline"><input className={inputClass} type="datetime-local" value={form.submissionDeadline} onChange={(e) => update("submissionDeadline", e.target.value)} /></Field>
+      <Field label="Voting or review closes"><input className={inputClass} type="datetime-local" value={form.votingDeadline} onChange={(e) => update("votingDeadline", e.target.value)} /></Field>
+      <Field label="Winner announcement"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(e) => update("endsAt", e.target.value)} /></Field>
+    </div>
+  </section>;
   if (step === (mode === "private" ? 5 : 4)) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} />;
   if (mode === "public" && step === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Lagos";
   const timelineSummary = {
-    "Registration Close": formatChallengeDateTime(form.registrationDeadline, timeZone) ?? "Not set",
-    "Challenge/Submissions Start": formatChallengeDateTime(form.startsAt, timeZone) ?? "Not set",
-    "Submission Deadline": formatChallengeDateTime(form.submissionDeadline, timeZone) ?? "Not set",
-    "Voting/Review Close": formatChallengeDateTime(form.votingDeadline, timeZone) ?? "Not set",
-    "Winner Announcement": formatChallengeDateTime(form.endsAt, timeZone) ?? "Not set"
+    "Registration Close": formatChallengeLocalDateTime(form.registrationDeadline, form.timeZone) ?? "Not set",
+    "Challenge/Submissions Start": formatChallengeLocalDateTime(form.startsAt, form.timeZone) ?? "Not set",
+    "Submission Deadline": formatChallengeLocalDateTime(form.submissionDeadline, form.timeZone) ?? "Not set",
+    "Voting/Review Close": formatChallengeLocalDateTime(form.votingDeadline, form.timeZone) ?? "Not set",
+    "Winner Announcement": formatChallengeLocalDateTime(form.endsAt, form.timeZone) ?? "Not set"
   };
   return <section><StepTitle title="Review & Publish" body="Check the challenge before creating a record." />{mode === "private" ? <div className="mt-6"><h3 className="text-lg font-black text-white">Media & Branding</h3><p className="mt-1 text-sm text-slate-400">Assets stay in the existing media flow and do not create invite records.</p><UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-4" /></div> : null}<div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? "Private / invite-only" : "Public", "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Publishing without media" : form.coverImageUrl ? "Uploaded" : "Required", "Paid Entry": form.paidEntryEnabled ? "Requested" : "Off", "Sponsor Ready": form.sponsorReady ? "Requested" : "Off", "Prize Pool": form.prizePoolEnabled ? "Starts at $0 until confirmed payments" : "Off" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Payment safety:</b> payments require secure confirmation. Winner allocation, cash prize release, and automatic payouts require admin approval.</Card></section>;
 }

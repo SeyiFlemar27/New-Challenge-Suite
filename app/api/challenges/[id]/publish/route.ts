@@ -14,6 +14,7 @@ import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { editableDraftStatus, calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
+import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -22,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!db) return serverUnavailable("Challenge publishing");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const rawBody = { ...((parsed.body ?? {}) as Record<string, unknown>), publish: true };
+  const rawBody = normalizeChallengeTimelineForStorage({ ...((parsed.body ?? {}) as Record<string, unknown>), publish: true });
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
@@ -104,8 +105,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     cashHoldHours: 24
   };
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
+  const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
   const update = {
     ...body,
+    submissionStartAt: body.submissionStartAt || body.startsAt,
+    votingStartsAt: simpleVotingStartAt,
+    winnerAnnouncementAt: body.winnerAnnouncementAt || body.endsAt,
+    timezone: body.timeZone,
     ...moneyLocks,
     id,
     creatorId: user.uid,

@@ -14,7 +14,7 @@ import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
-import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
@@ -103,7 +103,7 @@ export default function JoinChallengePage() {
   const userState = details?.userState as Record<string, unknown> | undefined;
   const phaseSummary = (details as any)?.phaseSummary as Record<string, unknown> | undefined;
   const joinOpen = Boolean(phaseSummary?.canJoin);
-  const challengeTimeZone = String(phaseSummary?.timeZone ?? rawChallenge?.timezone ?? rawChallenge?.timeZone ?? "Africa/Lagos");
+  const challengeTimeZone = String(phaseSummary?.timeZone ?? rawChallenge?.timezone ?? rawChallenge?.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE);
   const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
   const participantJourney = (userState?.participantJourney && typeof userState.participantJourney === "object" ? userState.participantJourney : null) as any;
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, unknown> : {};

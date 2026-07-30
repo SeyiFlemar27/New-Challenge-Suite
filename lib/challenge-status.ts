@@ -125,6 +125,13 @@ interface NormalizedTimeline {
   submissionDeadlineFallbackApplied: boolean;
 }
 
+export interface ChallengeTimelineDisplay {
+  currentPhase: string;
+  nextLabel: string | null;
+  nextAt: string | null;
+  timeZone: string;
+}
+
 export const challengeStatusLabels: Record<CanonicalChallengeStatus, ChallengeDisplayStatus> = {
   draft: "Draft",
   pending_review: "Pending Review",
@@ -482,6 +489,44 @@ export function getNextMilestone(challenge: Challenge | Record<string, unknown>,
   return milestones.find(([, date]) => date && date.getTime() > now.getTime()) ?? [null, null] as const;
 }
 
+export function getChallengeTimelineDisplay(challenge: Challenge | Record<string, unknown>, now = new Date()): ChallengeTimelineDisplay {
+  const record = challenge as Record<string, unknown>;
+  const timeline = normalizeTimeline(record);
+  const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
+  const result = (currentPhase: string, nextLabel: string | null = null, nextAt: Date | null = null): ChallengeTimelineDisplay => ({
+    currentPhase,
+    nextLabel,
+    nextAt: nextAt?.toISOString() ?? null,
+    timeZone: timeline.timezone
+  });
+
+  if (persisted === "cancelled") return result("Cancelled");
+  if (persisted === "draft") return result("Draft");
+  if (persisted === "pending_review") return result("Pending Review");
+  if (["winners_announced", "completed"].includes(persisted) || (timeline.winnersAnnouncedAt && now >= timeline.winnersAnnouncedAt)) {
+    return result("Winners Announced");
+  }
+  if (timeline.registrationClosesAt && now < timeline.registrationClosesAt) {
+    return result("Registration Open", "Registration closes", timeline.registrationClosesAt);
+  }
+  if (timeline.submissionOpensAt && now < timeline.submissionOpensAt) {
+    return result("Waiting to Start", "Challenge/Submissions start", timeline.submissionOpensAt);
+  }
+  if (timeline.submissionOpensAt && timeline.submissionClosesAt && now >= timeline.submissionOpensAt && now < timeline.submissionClosesAt) {
+    return result("Submissions Open", "Submission deadline", timeline.submissionClosesAt);
+  }
+  if (timeline.votingClosesAt && now < timeline.votingClosesAt) {
+    return result("Voting / Review Open", "Voting/review closes", timeline.votingClosesAt);
+  }
+  if (timeline.winnersAnnouncedAt && now < timeline.winnersAnnouncedAt) {
+    return result("Results Under Review", "Winner announcement", timeline.winnersAnnouncedAt);
+  }
+  if (!timeline.submissionOpensAt || !timeline.submissionClosesAt) {
+    return result("Timeline Needs Review");
+  }
+  return result("Results Under Review");
+}
+
 export function getChallengeLifecycleState(challenge: Challenge | Record<string, unknown>, now = new Date(), viewerContext: ChallengeLifecycleViewerContext = {}): ChallengeLifecycleState {
   const record = challenge as Record<string, unknown>;
   const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
@@ -646,8 +691,11 @@ export function statusClassName(status: ChallengeDisplayStatus | CanonicalChalle
 
 function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline {
   const timeLimitedUploads = isRecord(record.timeLimitedUploads) ? record.timeLimitedUploads : {};
+  const challengeType = String(record.type ?? record.challengeType ?? "").toLowerCase();
+  const tournamentType = String(record.tournamentType ?? "none").toLowerCase();
+  const specializedVotingTimeline = record.isLiveEvent === true || (tournamentType !== "" && tournamentType !== "none") || /tournament|live event/.test(challengeType);
   const registrationClosesAt = firstDate(record, ["registrationEndAt", "registrationClosesAt", "registrationDeadline", "registrationEndsAt", "registrationEndDate"], "end");
-  const submissionOpensAt = firstDate(record, ["submissionStartAt", "submissionOpensAt", "submissionStartsAt", "submissionOpensAt", "submissionsOpenAt", "submissionStartDate"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start") ?? registrationClosesAt;
+  const submissionOpensAt = firstDate(record, ["submissionStartAt", "submissionOpensAt", "submissionStartsAt", "submissionsOpenAt", "submissionStartDate", "challengeStartsAt", "startsAt"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start") ?? registrationClosesAt;
   const configuredSubmissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
   const persisted = normalizeChallengeLifecycleStatus(record.status ?? record.lifecycleStatus);
   const publishedRecord = Boolean(record.publishedAt) || !["draft", "pending_review"].includes(persisted);
@@ -659,7 +707,8 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
   const submissionClosesAt = needsDeadlineFallback && submissionOpensAt
     ? new Date(submissionOpensAt.getTime() + 24 * 60 * 60 * 1000)
     : configuredSubmissionClosesAt;
-  const votingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start") ?? submissionClosesAt;
+  const configuredVotingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start");
+  const votingOpensAt = specializedVotingTimeline ? configuredVotingOpensAt ?? submissionOpensAt : submissionOpensAt ?? configuredVotingOpensAt;
   return {
     timezone: resolveChallengeTimeZone(record),
     registrationOpensAt: firstDate(record, ["registrationStartAt", "registrationOpensAt", "registrationStartsAt", "registrationOpenAt", "registrationStartDate"], "start"),
@@ -672,7 +721,7 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
     votingClosesAt: firstDate(record, ["votingEndAt", "votingClosesAt", "votingDeadline", "votingEndsAt", "votingEndDate"], "end"),
     judgingStartsAt: firstDate(record, ["judgingStartsAt", "judgingStartDate"], "start"),
     judgingEndsAt: firstDate(record, ["judgingEndsAt", "judgingEndDate"], "end"),
-    winnersAnnouncedAt: firstDate(record, ["winnersAnnouncedAt", "winnerAnnouncementAt", "winnerAnnouncementDate"], "start"),
+    winnersAnnouncedAt: firstDate(record, ["winnersAnnouncedAt", "winnerAnnouncementAt", "winnerAnnouncementDate", "endsAt"], "start"),
     livestreamStartsAt: firstDate(record, ["livestreamStartsAt", "livestreamStartAt", "externalLiveOpensAt", "liveStartsAt"], "start"),
     livestreamEndsAt: firstDate(record, ["livestreamEndsAt", "livestreamEndAt", "liveEndsAt"], "end"),
     createdAt: firstDate(record, ["createdAt"], "start"),

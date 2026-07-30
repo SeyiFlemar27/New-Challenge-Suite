@@ -6,6 +6,7 @@ import { createNotification } from "@/lib/server/notifications";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { calculateChallengeDraftProgress, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
+import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
     lifecycleStatus: "draft",
     visibility: "public",
     type: "Public Challenge",
+    timeZone: DEFAULT_CHALLENGE_TIME_ZONE,
+    timezone: DEFAULT_CHALLENGE_TIME_ZONE,
     title: "",
     description: "",
     category: "",
