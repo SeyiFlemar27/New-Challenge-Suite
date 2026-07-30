@@ -357,7 +357,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-7xl" data-mobile-creator-builder>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={mode === "private" ? "Create Private Challenge" : "Create Challenge"} subtitle={mode === "private" ? "Create a private challenge." : "Create a public challenge."} icon={<Sparkles />} /><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="text-xs font-bold text-slate-400">{autosaveState === "saving" ? "Saving..." : autosaveState === "saved" ? "Saved" : autosaveState === "offline" ? "Offline - changes will sync" : autosaveState === "failed" ? "Save failed - retry" : draftId ? "Autosave on" : ""}</span><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={() => setPreview(true)}><Eye size={17} /> Preview</Button></div></div>
         <div className="mt-7 grid gap-7 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-24 lg:h-fit"><Stepper steps={steps} current={step} onSelect={setStep} /></aside>
@@ -379,7 +379,8 @@ function Locked({ title, body, primaryHref, primaryLabel, secondaryHref, seconda
 }
 
 function Stepper({ steps, current, onSelect }: { steps: string[]; current: number; onSelect: (step: number) => void }) {
-  return <Card className="p-3"><div className="grid gap-2">{steps.map((label, index) => <button key={label} type="button" onClick={() => onSelect(index)} className={(index === current ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < current ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-[#171717] text-slate-400") + " flex min-h-14 w-full items-center gap-3 rounded-[8px] border px-4 py-3 text-left text-sm font-black"}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20">{index < current ? "Done" : index + 1}</span><span className="min-w-0 break-words">{label}</span></button>)}</div></Card>;
+  const stepButtons = <div className="grid gap-2">{steps.map((label, index) => <button key={label} type="button" onClick={() => onSelect(index)} className={(index === current ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < current ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-[#171717] text-slate-400") + " flex min-h-14 w-full items-center gap-3 rounded-[8px] border px-4 py-3 text-left text-sm font-black"}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20">{index < current ? "Done" : index + 1}</span><span className="min-w-0 break-words">{label}</span></button>)}</div>;
+  return <><details className="rounded-[8px] border border-white/10 bg-[#111] p-3 lg:hidden" data-mobile-builder-stepper><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-black"><span>Step {current + 1} of {steps.length}</span><span className="min-w-0 text-right text-sm text-[var(--gold)]">{steps[current]}</span></summary><div className="mt-3">{stepButtons}</div></details><Card className="hidden p-3 lg:block">{stepButtons}</Card></>;
 }
 
 function StepTitle({ title, body }: { title: string; body: string }) { return <div><h2 className="text-2xl font-black text-white">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{body}</p></div>; }
@@ -568,7 +569,6 @@ function ChallengeSuitePlaceholder({ className = "", label = "Challenge Suite" }
     </div>
   </div>;
 }
-
 
 
 

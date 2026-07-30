@@ -21,10 +21,13 @@ import {
   Rocket,
   Settings,
   ShieldCheck,
+  LogIn,
+  LogOut,
   Star,
   Target,
   Trophy,
   User,
+  UserPlus,
   UsersRound,
   X
 } from "lucide-react";
@@ -34,6 +37,7 @@ import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { NotificationBell } from "@/components/notification-bell";
+import { logout } from "@/lib/firebase/auth-service";
 
 type NavIcon = typeof Home;
 type NavItem = { href: string; label: string; icon: NavIcon };
@@ -56,6 +60,35 @@ const competitorSections: NavSection[] = [
   { label: "Account", items: [
     { href: "/profile", label: "Profile", icon: User },
     { href: "/settings", label: "Settings", icon: Settings }
+  ] }
+];
+
+const guestSections: NavSection[] = [
+  { label: "Discover", items: [
+    { href: "/explore", label: "Explore", icon: LayoutGrid },
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/live-events", label: "Live Events", icon: Radio },
+    { href: "/tournaments", label: "Tournaments", icon: Award },
+    { href: "/hybrid", label: "Hybrid Competition", icon: Target },
+    { href: "/sponsor/onboarding", label: "Sponsors", icon: ShieldCheck }
+  ] },
+  { label: "Account", items: [
+    { href: "/auth/login", label: "Sign In", icon: LogIn },
+    { href: "/auth/register", label: "Join Challenge Suite", icon: UserPlus }
+  ] }
+];
+
+const adminSections: NavSection[] = [
+  { label: "Administration", items: [
+    { href: "/admin", label: "Admin Dashboard", icon: ShieldCheck },
+    { href: "/admin/challenges", label: "Challenges", icon: Medal },
+    { href: "/admin/users", label: "Users", icon: UsersRound },
+    { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+    { href: "/admin/prize-approvals", label: "Winners", icon: Trophy },
+    { href: "/admin/finance", label: "Settlements", icon: ReceiptText },
+    { href: "/admin/withdrawals", label: "Withdrawals", icon: Coins },
+    { href: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardCheck },
+    { href: "/admin/settings", label: "Settings", icon: Settings }
   ] }
 ];
 
@@ -96,6 +129,7 @@ const creatorSections: NavSection[] = [
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Creator Tools", items: [
+    { href: "/challenges/create", label: "Create Challenge", icon: Trophy },
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck },
     { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
     { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket },
@@ -120,6 +154,7 @@ const hostSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Competitions", items: [
+    { href: "/challenges/create", label: "Create Challenge", icon: Trophy },
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
     { href: "/host/live-events", label: "Live Events", icon: Radio },
@@ -139,7 +174,7 @@ const hostSections: NavSection[] = [
 ];
 const sponsorSections: NavSection[] = [
   { label: "Overview", items: [
-    { href: "/sponsor/dashboard", label: "Overview", icon: Home },
+    { href: "/sponsor/dashboard", label: "Sponsor Dashboard", icon: Home },
     { href: "/sponsor/campaigns", label: "Campaigns", icon: Target },
     { href: "/sponsor/proposals", label: "Proposals", icon: ClipboardCheck },
     { href: "/sponsor/messages", label: "Messages", icon: Bell }
@@ -150,6 +185,8 @@ const sponsorSections: NavSection[] = [
     { href: "/sponsor/saved", label: "Saved", icon: Star }
   ] },
   { label: "Billing", items: [
+    { href: "/sponsor/reports", label: "Sponsor Reports", icon: BarChart3 },
+    { href: "/sponsor/wallet", label: "Wallet & Payments", icon: Coins },
     { href: "/sponsor/plans", label: "Plans", icon: Diamond },
     { href: "/sponsor/billing", label: "Billing", icon: ReceiptText },
     { href: "/settings", label: "Settings", icon: Settings }
@@ -196,36 +233,10 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
-  const sections = sectionsForTier(effectiveTier.id, user?.accountType === "sponsor");
+  const sections = signedOut ? guestSections : user?.isAdmin ? adminSections : sectionsForTier(effectiveTier.id, user?.accountType === "sponsor");
   const activeHref = activeNavigationHref(pathname);
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
   const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;
-  const mobileItems = user?.accountType === "sponsor"
-    ? sponsorSections[0].items
-    : effectiveTier.id === "host" || effectiveTier.id === "enterprise"
-      ? [
-          { href: "/dashboard/host", label: "Home", icon: Home },
-          { href: "/challenges", label: "Challenges", icon: Medal },
-          { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
-          { href: "/rewards", label: "Rewards", icon: Gift },
-          { href: "/wallet", label: "Wallet", icon: Coins }
-        ]
-      : effectiveTier.id === "creator" || effectiveTier.id === "pro" || effectiveTier.id === "creator_starter"
-        ? [
-            { href: "/dashboard", label: "Home", icon: Home },
-            { href: "/explore", label: "Explore", icon: LayoutGrid },
-            { href: "/challenges", label: "Challenges", icon: Medal },
-            { href: "/creator/private-challenges", label: "Private", icon: LockKeyhole },
-            { href: "/rewards", label: "Rewards", icon: Gift }
-          ]
-        : [
-            { href: "/dashboard", label: "Home", icon: Home },
-            { href: "/explore", label: "Explore", icon: LayoutGrid },
-            { href: "/challenges", label: "Challenges", icon: Medal },
-            { href: "/rewards", label: "Rewards", icon: Gift },
-            { href: "/wallet", label: "Wallet", icon: Coins }
-          ];
-
   useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
     if (!drawerOpen) return;
@@ -237,20 +248,18 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <Link href={effectiveTier.id === "host" ? "/dashboard/host" : "/dashboard"} className="flex min-w-0 items-center gap-3">
-            <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" />
-            <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
-              <p className="truncate text-sm font-black text-white">{loading ? "Loading" : signedOut ? "Welcome" : effectiveTier.dashboardName}</p>
-            </div>
+      <header data-mobile-header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_56px] items-center gap-2">
+          <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={21} /></button>
+          <Link href={signedOut ? "/explore" : effectiveTier.id === "host" ? "/dashboard/host" : "/dashboard"} className="flex min-w-0 items-center justify-center gap-2 text-center">
+            <BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" />
+            <span className="truncate text-sm font-black uppercase tracking-[0.12em] text-white">Challenge Suite</span>
           </Link>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link href="/wallet" className="flex h-10 items-center gap-1 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-3 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
-            <NotificationBell compact />
-            <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={20} /></button>
-          </div>
+          {signedOut ? (
+            <Link href={`/auth/login?next=${encodeURIComponent(pathname)}`} className="flex min-h-11 items-center justify-center text-xs font-black text-[var(--gold)]">Login</Link>
+          ) : (
+            <Link href="/profile" aria-label="Open profile" className={cn("mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-xs font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</Link>
+          )}
         </div>
       </header>
 
@@ -259,7 +268,13 @@ export function Sidebar() {
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{effectiveTier.dashboardName}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} mobile />
-          <div className="mt-6 border-t border-white/10 pt-5"><Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div><p className="font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link>{!signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}</div>
+          <div className="mt-6 border-t border-white/10 pt-5">
+            {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
+              <Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div className="min-w-0"><p className="truncate font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link>
+              <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
+              {user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
+            </>}
+          </div>
         </aside>
       </div> : null}
 
@@ -286,16 +301,6 @@ export function Sidebar() {
           {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
-
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-yellow-500/20 bg-[#0b0b0b]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden" aria-label="Mobile navigation">
-        <div className={cn("mx-auto grid max-w-md gap-1 rounded-[8px] border border-white/10 bg-[#121212] p-1.5", mobileItems.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
-          {mobileItems.map((item) => {
-            const active = activeHref === item.href;
-            const Icon = item.icon;
-            return <Link key={item.href} href={item.href} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-[8px] px-1 text-[11px] font-black text-slate-400 transition", active && "bg-[var(--gold)] text-black")}><Icon size={18} /><span className="leading-none">{item.label}</span></Link>;
-          })}
-        </div>
-      </nav>
     </>
   );
 }
@@ -303,10 +308,11 @@ export function Sidebar() {
 function WorkspaceNavigationLoading() {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-3 backdrop-blur lg:hidden">
-        <div className="flex items-center gap-3">
-          <BrandLogo imageClassName="h-11 w-11 border border-[var(--gold)]" />
-          <div><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="text-sm font-black">Loading your workspace...</p></div>
+      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+          <div className="h-11 w-11 animate-pulse rounded-[8px] bg-white/5" />
+          <div className="flex items-center justify-center gap-2"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><p className="truncate text-sm font-black uppercase tracking-[0.12em]">Challenge Suite</p></div>
+          <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
         </div>
       </header>
       <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] p-6 lg:flex xl:w-[320px]">

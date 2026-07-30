@@ -14,6 +14,7 @@ import { Card, LinkButton } from "@/components/ui";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { apiRequest } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { MobileFooter } from "@/components/mobile-footer";
 
 type NavItem = { href: string; label: string; icon: typeof Home };
 type NavGroup = { label: string; items: NavItem[] };
@@ -111,10 +112,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   })}</nav>;
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--gold)]/20 bg-black/95 px-5 py-4 backdrop-blur lg:hidden">
-        <div className="flex items-center gap-3"><BrandLogo imageClassName="h-10 w-10 border border-[var(--gold)]" /><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Internal</p><p className="font-black">Admin Command Center</p></div></div>
-        <button type="button" onClick={() => setDrawer(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30" aria-label="Open admin navigation"><Menu /></button>
+    <div className="admin-mobile-shell min-h-screen overflow-x-hidden bg-black text-white">
+      <header className="sticky top-0 z-40 border-b border-[var(--gold)]/20 bg-black/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+          <button type="button" onClick={() => setDrawer(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open admin navigation"><Menu /></button>
+          <Link href="/admin" className="flex min-w-0 items-center justify-center gap-2 text-center"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><span className="truncate text-sm font-black">Admin Center</span></Link>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{String(user?.displayName || "A").slice(0, 2).toUpperCase()}</span>
+        </div>
       </header>
       {drawer ? <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawer(false)} aria-label="Close admin navigation" /><aside className="absolute inset-y-0 left-0 w-[min(90vw,370px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0c0c0c] p-5"><div className="flex items-center justify-between"><p className="font-black text-[var(--gold)]">Admin Navigation</p><button onClick={() => setDrawer(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close admin navigation"><X /></button></div>{navigation}</aside></div> : null}
       <aside className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[#0c0c0c] p-5 lg:block">
@@ -138,6 +142,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           {children}
+          <MobileFooter />
         </div>
       </main>
     </div>

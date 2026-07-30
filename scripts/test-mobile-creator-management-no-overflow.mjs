@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const builder = read("components/challenge-builder.tsx");
+const host = read("components/host/host-competition-wizard.tsx");
+const tools = read("app/host/[tool]/page.tsx");
+assert(builder.includes("data-mobile-creator-builder"));
+assert(builder.includes("data-mobile-builder-stepper"));
+assert(host.includes("data-mobile-builder-steps"));
+assert(tools.includes("data-mobile-creator-tabs"));
+assert(!tools.includes("overflow-x-auto pb-2"));
+console.log("mobile creator management overflow safeguards: ok");

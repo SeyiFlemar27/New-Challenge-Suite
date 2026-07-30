@@ -74,13 +74,13 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
         <Card className="overflow-hidden bg-[#111111]">
           <div className="h-32 bg-[radial-gradient(circle_at_top_left,rgba(246,198,75,.24),transparent_36%),linear-gradient(135deg,#1b1b1b,#090909)] bg-cover bg-center sm:h-48" style={profile.coverImageUrl ? { backgroundImage: `linear-gradient(135deg,rgba(0,0,0,.34),rgba(0,0,0,.7)),url(${profile.coverImageUrl})` } : undefined} />
           <div className="p-5 sm:p-8">
-            <div className="-mt-20 flex flex-col gap-5 sm:-mt-24 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end">
+            <div data-mobile-profile-hero className="-mt-20 flex flex-col items-center gap-5 text-center sm:-mt-24 sm:items-stretch sm:text-left lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row sm:items-end">
                 <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#101010] bg-[var(--gold)] text-2xl font-black text-black shadow-[0_18px_45px_rgba(0,0,0,.35)] sm:h-36 sm:w-36">
                   {profile.avatarUrl ? <img src={profile.avatarUrl} alt={displayName} className="h-full w-full object-cover" /> : profile.initials}
                 </div>
                 <div className="min-w-0 pb-1">
-                  <h1 className="flex flex-wrap items-center gap-2 break-words text-3xl font-black sm:text-4xl">{displayName}{profile.verified ? <BadgeCheck className="text-[var(--gold)]" aria-label="Verified profile" /> : null}</h1>
+                  <h1 className="flex flex-wrap items-center justify-center gap-2 break-words text-3xl font-black sm:justify-start sm:text-4xl">{displayName}{profile.verified ? <BadgeCheck className="text-[var(--gold)]" aria-label="Verified profile" /> : null}</h1>
                   <p className="mt-2 text-sm font-bold text-slate-300">@{profile.username || username}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2"><span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-xs font-black text-[var(--gold)]">{profile.effectiveTier?.displayName ?? "Free Competitor"}</span>{profile.role ? <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-black capitalize">{String(profile.role).replaceAll("_", " ")}</span> : null}<span className="rounded-full border border-white/10 px-3 py-1 text-xs font-black text-slate-300">{joinedDate}</span></div>
                 </div>
@@ -91,7 +91,7 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
             </div>
             {profile.bio ? <p className="mt-6 max-w-3xl leading-7 text-slate-200">{profile.bio}</p> : <p className="mt-6 max-w-3xl leading-7 text-slate-300">Competition activity, entries, wins, and achievements appear here as this member participates.</p>}
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-400">{profile.location ? <span className="flex items-center gap-1"><MapPin size={15} /> {profile.location}</span> : null}{profile.website ? <a className="text-[var(--gold)]" href={profile.website} target="_blank" rel="noreferrer">{profile.website}</a> : null}</div>
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div data-mobile-profile-stats className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <Stat label="Total Points" value={valueOf(stats, "totalPoints", "points")} />
               <Stat label="Submissions" value={valueOf(stats, "entryCount", "submissions")} />
               <Stat label="Wins" value={valueOf(stats, "winCount", "wins")} />

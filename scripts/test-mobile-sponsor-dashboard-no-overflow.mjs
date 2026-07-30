@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const shell = read("components/sponsor/sponsor-shell.tsx");
+const css = read("app/globals.css");
+const compare = read("app/sponsor/discover/creators/compare/page.tsx");
+assert(shell.includes("sponsor-mobile-shell"));
+assert(css.includes(".sponsor-mobile-shell table"));
+assert(compare.includes("data-mobile-sponsor-comparison"));
+assert(css.includes("[data-mobile-sponsor-comparison]"));
+console.log("mobile sponsor overflow safeguards: ok");

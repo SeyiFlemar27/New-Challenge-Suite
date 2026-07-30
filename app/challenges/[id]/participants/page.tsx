@@ -59,14 +59,14 @@ export default function ChallengeParticipantsPage() {
           </div>
         </div>
 
-        <div className="mt-7 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-          <form onSubmit={submitSearch} className="flex gap-3">
+        <div data-mobile-participant-tools className="mt-7 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+          <form onSubmit={submitSearch} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
             <label className="relative min-w-0 flex-1">
               <span className="sr-only">Search participants</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
               <input className={`${inputClass} pl-11`} value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search participants or entries" />
             </label>
-            <button type="submit" className="min-h-12 rounded-[8px] bg-[var(--gold)] px-5 font-black text-black">Search</button>
+            <button type="submit" className="min-h-12 w-full rounded-[8px] bg-[var(--gold)] px-5 font-black text-black sm:w-auto">Search</button>
           </form>
           <label>
             <span className="sr-only">Sort participants</span>
@@ -78,7 +78,7 @@ export default function ChallengeParticipantsPage() {
         </div>
 
         {payload.participants.length ? (
-          <div className="mt-7 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mobile-card-list mt-7 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {payload.participants.map((participant) => (
               <ChallengeParticipantCard
                 key={participant.submissionId}
@@ -96,7 +96,7 @@ export default function ChallengeParticipantsPage() {
         )}
 
         {payload.pagination.total > payload.pagination.pageSize ? (
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="min-h-11 rounded-[8px] border border-white/10 px-5 font-bold disabled:opacity-40">Previous</button>
             <span className="text-sm font-bold text-slate-400">Page {page}</span>
             <button type="button" disabled={!payload.pagination.hasMore} onClick={() => setPage((value) => value + 1)} className="min-h-11 rounded-[8px] border border-white/10 px-5 font-bold disabled:opacity-40">Next</button>

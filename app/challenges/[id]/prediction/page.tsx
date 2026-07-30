@@ -160,7 +160,7 @@ export default function ChallengePredictionPage() {
           </Card>
         ) : null}
 
-        <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div data-mobile-prediction-arena className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
           <section>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -176,7 +176,7 @@ export default function ChallengePredictionPage() {
             </div>
 
             {participants.length ? (
-              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mobile-card-list mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {participants.map((participant) => (
                   <Card key={participant.submissionId} className={`overflow-hidden ${selectedSubmissionId === participant.submissionId ? "border-[var(--gold)]" : ""}`}>
                     <SubmissionMediaFrame src={participant.submissionMediaUrl} alt={participant.submissionTitle} className="rounded-none border-0" placeholder="Challenge entry" />
@@ -215,7 +215,7 @@ export default function ChallengePredictionPage() {
           </section>
 
           <form onSubmit={submit}>
-            <Card className="sticky top-6 p-6">
+            <Card data-mobile-prediction-panel className="p-5 sm:p-6 xl:sticky xl:top-6">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-1 shrink-0 text-[var(--gold)]" />
                 <div><h2 className="text-xl font-black">Review prediction</h2><p className="mt-2 text-sm text-slate-400">Real money only. DoroCoins cannot be used.</p></div>
@@ -238,7 +238,7 @@ export default function ChallengePredictionPage() {
               {!access?.authenticated ? (
                 <LinkButton href={access?.loginPath || `/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/prediction`)}`} className="mt-6 w-full"><DollarSign size={16} /> Log in to Predict</LinkButton>
               ) : (
-                <Button className="mt-6 w-full" type="submit" disabled={!access?.canPredict || !selectedSubmissionId || amountCents < 100 || !acceptedTerms || submitting || prediction?.status === "active"}>
+                <Button data-mobile-prediction-confirm className="mobile-sticky-action sticky bottom-0 z-10 mt-6 w-full bg-[var(--gold)]" type="submit" disabled={!access?.canPredict || !selectedSubmissionId || amountCents < 100 || !acceptedTerms || submitting || prediction?.status === "active"}>
                   <DollarSign size={16} /> {prediction?.status === "active" ? "Prediction Active" : prediction?.status === "pending_payment" ? "Payment Pending" : submitting ? "Preparing Checkout..." : "Confirm Prediction"}
                 </Button>
               )}

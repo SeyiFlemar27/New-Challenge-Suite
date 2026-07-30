@@ -39,7 +39,7 @@ export default function HostOperationsPage() {
 
   return <PlanFeatureGate feature="host_control_center" requiredPlan="Host" title="Host tools are available on the Host Plan."><AppShell><div className="mx-auto max-w-7xl">
     <PageTitle title={config.title} subtitle={config.subtitle} />
-    <div className="mt-6 flex gap-2 overflow-x-auto pb-2">{config.tabs.map((label) => <Button key={label} variant={tab === label ? "primary" : "secondary"} onClick={() => setTab(label)}>{label}</Button>)}</div>
+    <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" data-mobile-creator-tabs>{config.tabs.map((label) => <Button key={label} variant={tab === label ? "primary" : "secondary"} onClick={() => setTab(label)}>{label}</Button>)}</div>
     {tool === "voting" ? <VotingSummary challenges={data?.challenges ?? []} /> : null}
     {error ? <Card className="mt-6 border-red-500/30 p-5 text-red-200">{error}</Card> : null}
     {!data && !error ? <Card className="mt-6 h-56 animate-pulse" /> : items.length ? <div className="mt-6 grid gap-4">{items.map((item) => <OperationRow key={item.id} item={item} tool={tool} />)}</div> : data ? <Card className="mt-6"><EmptyState icon={<config.icon />} title={config.empty} body={config.body} action={["participants", "submissions"].includes(tool) ? <LinkButton href="/challenges">View Hosted Competitions</LinkButton> : <LinkButton href="/challenges">Challenges</LinkButton>} /></Card> : null}

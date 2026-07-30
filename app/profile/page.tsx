@@ -148,20 +148,20 @@ export default function ProfilePage() {
       <Card className={cn("overflow-hidden bg-[#111111]", findCustomizationOption(profile.user.customization?.profileFrameId, "profileFrame")?.previewClass)}>
         <div className="h-28 bg-[radial-gradient(circle_at_top_left,rgba(246,198,75,.24),transparent_35%),linear-gradient(135deg,#171717,#0b0b0b)] sm:h-40" />
         <div className="p-5 sm:p-8 lg:p-10">
-          <div className="-mt-20 flex flex-col gap-6 lg:-mt-24 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-end sm:gap-7">
+          <div data-mobile-profile-hero className="-mt-20 flex flex-col items-center gap-6 text-center sm:items-stretch sm:text-left lg:-mt-24 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex min-w-0 flex-col items-center gap-5 sm:flex-row sm:items-end sm:gap-7">
               <div className={cn("flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#101010] bg-[var(--gold)] text-3xl font-black text-black shadow-[0_18px_45px_rgba(0,0,0,.35)] sm:h-36 sm:w-36 sm:text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
                 {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
               </div>
               <div className="min-w-0 pb-1">
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
                   <h1 className="break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}</h1>
                   <BadgeCheck className="text-[var(--gold)]" size={24} aria-label="Verified profile" />
                   <PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} labelOverride={profile.user.effectiveTier?.badgeLabel} />
                 </div>
                 <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.username ? `@${profile.user.username}` : "Username not set"}</p>
                 {profile.user.customization?.profileTagline ? <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-[var(--gold-2)]">{profile.user.customization.profileTagline}</p> : <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">Build your competition record through challenges, submissions, votes, and wins.</p>}
-                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.14em]">
+                <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-black uppercase tracking-[0.14em] sm:justify-start">
                   <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)] capitalize">{roleLabel(profile)}</span>
                   <span className="rounded-full border border-white/10 px-3 py-2 text-slate-300">{profile.user.effectiveTier?.memberLabel ?? planLabel(profile.user.planId)}</span>
                   <span className="rounded-full border border-white/10 px-3 py-2 text-slate-300">{joinedDate}</span>
@@ -177,7 +177,7 @@ export default function ProfilePage() {
           </div>
           {!profile.user.username ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm text-yellow-100">Add a username in settings to make your public profile easier to share.</p> : null}
           {shareMessage ? <p className="mt-4 text-sm text-slate-300">{shareMessage}</p> : null}
-          <div className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-5">
+          <div data-mobile-profile-stats className="mt-10 grid grid-cols-2 gap-3 border-t border-white/10 pt-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-5">
             {[ ["Total Points", profile.stats.totalPoints], ["Submissions", profile.stats.submissions], ["Wins", wins], ["Followers", profile.stats.followers], ["Following", profile.stats.following] ].map(([label, value]) => <Card key={String(label)} className="p-4 text-center sm:p-5"><div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</div><div className="mt-3 text-2xl font-black text-[var(--gold)] sm:text-3xl">{Number(value).toLocaleString()}</div></Card>)}
           </div>
         </div>

@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/api/client";
 import { getPlanExperience } from "@/lib/plan-access";
 import { calculateSponsorCompletion } from "@/lib/sponsor-foundation";
 import { canAccessSponsorFeature, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorStatusLabel, type SponsorFeatureKey } from "@/lib/sponsor-access";
+import { MobileFooter } from "@/components/mobile-footer";
 
 const sponsorNavGroups: Array<{ label: string; items: Array<{ label: string; icon: typeof LayoutDashboard; href: string; feature: SponsorFeatureKey }> }> = [
   { label: "Overview", items: [
@@ -79,7 +80,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
   const nav = <nav className="mt-6 grid gap-5">{sponsorNavGroups.map((group) => <div key={group.label}><p className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{group.label}</p><div className="mt-2 grid gap-1.5">{group.items.map(navLink)}</div></div>)}</nav>;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-black text-white">
+    <main className="sponsor-mobile-shell min-h-screen overflow-x-hidden bg-black text-white">
       <ProductWalkthrough />
       <div className="grid min-h-screen md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden h-screen overflow-y-auto border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:sticky md:top-0 md:block md:border-b-0 md:border-r">
@@ -102,14 +103,16 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
         </aside>
         <section className="min-w-0 px-5 pb-12 pt-6 sm:px-6 md:px-8 md:py-8 lg:px-10 xl:px-12">
           <div className="mb-8 md:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsor</p><h1 className="truncate text-lg font-black leading-tight">{brandName}</h1></div></div>
+            <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
               <button onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open sponsor navigation"><Menu /></button>
+              <Link href="/sponsor/dashboard" className="flex min-w-0 items-center justify-center gap-2 text-center"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><span className="truncate text-sm font-black">{brandName}</span></Link>
+              <Link href="/sponsor/profile" aria-label="Open sponsor profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{brandName.slice(0, 2).toUpperCase()}</Link>
             </div>
             <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3"><p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Brand Status</p><p className="mt-1 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)} / {completion}% complete</p></Card>
           </div>
           {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(90vw,380px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>{nav}<Link href="/landing" onClick={() => setDrawerOpen(false)} className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public site</Link></aside></div> : null}
           {children}
+          <MobileFooter />
         </section>
       </div>
     </main>

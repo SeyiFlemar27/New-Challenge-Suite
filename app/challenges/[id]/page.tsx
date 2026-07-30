@@ -221,17 +221,49 @@ export default function ChallengeDetailPage() {
     : participantJourney?.step === "can_submit"
       ? "Submit entry"
       : lifecycle.actionLabel;
+  const creatorDisplayName = String(rawChallenge?.creatorDisplayName ?? rawChallenge?.hostDisplayName ?? rawChallenge?.creatorName ?? "Challenge creator");
+  const creatorUsername = String(rawChallenge?.creatorUsername ?? rawChallenge?.hostUsername ?? "");
+  const mobileJourneyAction = String(participantJourney?.primaryAction ?? "");
+  const mobileJourneyActionVisible = ["pay_entry_fee", "refresh_payment", "wait_for_submission", "submit_entry", "register", "enter_challenge", "request_entry", "view_voting", "view_entry", "manage_challenge", "sign_in"].includes(mobileJourneyAction);
 
   return (
     <AppShell>
       <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
         <div className="min-w-0">
+          <div data-mobile-challenge-meta className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.12em]">
+            <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)]">{challenge.category || challenge.type}</span>
+            <span className={`rounded-full px-3 py-2 ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
+          </div>
           <div className="relative overflow-hidden rounded-[16px]">
-            <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="border-0" placeholder="Challenge Suite" />
+            <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="aspect-[16/10] h-auto border-0 sm:aspect-video" placeholder="Challenge Suite" />
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
             <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>
           <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
+          <div data-mobile-creator-row className="mt-4 flex min-h-12 items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{creatorDisplayName.slice(0, 2).toUpperCase()}</span>
+            <div className="min-w-0"><p className="text-xs font-bold text-slate-500">Created by</p>{creatorUsername ? <a href={`/profile/${creatorUsername}`} className="block truncate font-black hover:text-[var(--gold)]">{creatorDisplayName}</a> : <p className="truncate font-black">{creatorDisplayName}</p>}</div>
+          </div>
+          <Card className="mt-5 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Current phase</p><p className="mt-1 text-lg font-black text-white">{timelineDisplay.currentPhase}</p></div>
+              {nextImportantTime ? <div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Next important time</p><p className="mt-1 text-lg font-black text-[var(--gold)]">{nextImportantTime}</p></div> : null}
+            </div>
+          </Card>
+          <Card data-mobile-primary-action className="mt-5 p-5 xl:hidden">
+            <ParticipantJourneyPanel
+              journey={participantJourney}
+              phaseLabel={displayStatus}
+              challengeId={challenge.id}
+              entryFeeLabel={entryFeeLabel}
+              paidEntryRequired={paidEntryRequired}
+              entryCheckoutLoading={entryCheckoutLoading}
+              entryCheckoutMessage={entryCheckoutMessage}
+              onPay={() => void startPaidEntryCheckout()}
+              onRefresh={() => void refetch()}
+              timeZone={challengeTimeZone}
+            />
+          </Card>
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
             {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
@@ -248,18 +280,6 @@ export default function ChallengeDetailPage() {
             <Metric value={displayStatus} label="Current stage" support={phase === "voting_pending" ? "No eligible submissions yet" : stageSupport} />
             <Metric value={totalVotes.toLocaleString()} label="Votes" support={votingOpen ? "Voting open" : "Voting unavailable"} />
           </div>
-          <Card className="mt-5 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Current phase</p>
-                <p className="mt-1 text-lg font-black text-white">{timelineDisplay.currentPhase}</p>
-              </div>
-              {nextImportantTime ? <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Next important time</p>
-                <p className="mt-1 text-lg font-black text-[var(--gold)]">{nextImportantTime}</p>
-              </div> : null}
-            </div>
-          </Card>
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
 
           <Card className="mt-10 p-5 sm:p-7">
@@ -314,10 +334,15 @@ export default function ChallengeDetailPage() {
               </div>
             </Card>
           </section>
+          <section className="mt-12 border-t border-white/10 pt-10">
+            <h2 className="text-2xl font-black">Recommended Challenges</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">Browse current public challenges using real marketplace records.</p>
+            <LinkButton href="/explore" variant="secondary" className="mt-5 w-full sm:w-auto">Explore more challenges</LinkButton>
+          </section>
         </div>
 
         <aside className="space-y-5 xl:pt-[432px]">
-          <Card className="p-5 sm:p-8">
+          <Card className="hidden p-5 sm:p-8 xl:block">
             <ParticipantJourneyPanel
               journey={participantJourney}
               phaseLabel={displayStatus}
@@ -357,6 +382,9 @@ export default function ChallengeDetailPage() {
           </Card>
         </aside>
       </div>
+      {mobileJourneyActionVisible ? <><div className="h-24 lg:hidden" aria-hidden="true" /><div data-mobile-sticky-cta className="mobile-sticky-action fixed inset-x-0 bottom-0 z-40 border-t border-[var(--gold)]/25 bg-[#090909]/96 px-4 pt-3 backdrop-blur lg:hidden [&>*]:mt-0">
+        <JourneyAction action={mobileJourneyAction} href={participantJourney?.primaryHref} challengeId={challenge.id} entryFeeLabel={entryFeeLabel} loading={entryCheckoutLoading} onPay={() => void startPaidEntryCheckout()} onRefresh={() => void refetch()} waitLabel={participantJourney?.checklist?.submissionOpensAt ? `Submission opens at ${formatChallengeDateTime(participantJourney.checklist.submissionOpensAt, challengeTimeZone)}` : "Submission opens soon"} submissionOpensAt={participantJourney?.checklist?.submissionOpensAt} />
+      </div></> : null}
     </AppShell>
   );
 }
@@ -443,5 +471,5 @@ function ChallengeMediaPlaceholder() {
 }
 
 function Info({ title, body }: { title: string; body: string }) {
-  return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><h3 className="font-black text-[var(--gold)]">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></div>;
+  return <details open className="group rounded-[8px] border border-white/10 bg-black/30 p-4"><summary className="min-h-11 cursor-pointer list-none font-black text-[var(--gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{title}</summary><p className="mt-2 text-sm leading-6 text-slate-300">{body}</p></details>;
 }

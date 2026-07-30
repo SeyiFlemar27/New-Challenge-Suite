@@ -176,7 +176,7 @@ export default function WalletPage() {
         <LinkButton href="/wallet/withdraw" variant="secondary" className="w-full sm:w-auto">Withdraw</LinkButton>
       </Card> : null}
 
-      {!loading && !unauthenticated && !error ? <Card className="mt-8 p-6 sm:p-8">
+      {!loading && !unauthenticated && !error ? <Card data-mobile-wallet-summary className="mt-8 p-5 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-black">Cash Balance</h2>
@@ -194,13 +194,13 @@ export default function WalletPage() {
         <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-50/90">DoroCoins cannot be withdrawn or converted to cash. Reward points are not cash.</p>
       </Card> : null}
 
-      {!loading && !unauthenticated && !error && cashEarnings.length ? <Card className="mt-8 p-6 sm:p-8">
+      {!loading && !unauthenticated && !error && cashEarnings.length ? <Card data-mobile-wallet-source-lines className="mt-8 p-5 sm:p-8">
         <div>
           <h2 className="text-2xl font-black">Prize and challenge earnings</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">Internal credits remain pending until hold, KYC, and finance review requirements are satisfied.</p>
         </div>
         <div className="mt-6 space-y-3">
-          {cashEarnings.map((earning) => <div key={earning.id} className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 md:grid-cols-[1fr_repeat(3,minmax(120px,auto))] md:items-center">
+          {cashEarnings.map((earning) => <div key={earning.id} className="grid gap-4 rounded-[8px] border border-white/10 bg-black/25 p-4 sm:grid-cols-3 md:grid-cols-[1fr_repeat(3,minmax(120px,auto))] md:items-center">
             <div>
               <p className="font-black">{cashEarningLabel(earning.sourceType)}</p>
               <p className="mt-1 text-xs font-bold text-slate-500">{String(earning.status ?? "pending_review").replaceAll("_", " ")}</p>

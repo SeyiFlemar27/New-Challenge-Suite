@@ -126,6 +126,8 @@ export default function JoinChallengePage() {
     : existingSubmissionId
       ? "Edit Entry"
       : "Submit Entry";
+  const finalSubmitDisabled = !auth.user || !canSubmitNow || !agreed || !submissionMedia?.url || !submissionMedia.path || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus) || uploadStatus === "failed";
+  const finalSubmitLabel = submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : participantJourney?.step === "fix_and_resubmit" ? "Resubmit Entry" : "Submit Entry";
   const submitDisabledReason = !auth.user
     ? "Sign in to submit."
     : !agreed
@@ -380,18 +382,19 @@ export default function JoinChallengePage() {
             />
           ) : null}
           {canSubmitNow ? (
-            <form className="mt-6 space-y-5" onSubmit={submit}>
+            <form id="challenge-submission-form" className="mt-6 space-y-5" onSubmit={submit}>
               <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
               <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
               <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
               <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label>
               {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
               {submitDisabledReason && !error ? <p className="text-sm text-slate-400">{submitDisabledReason}</p> : null}
-              <Button className="w-full" disabled={!auth.user || !canSubmitNow || !agreed || !submissionMedia?.url || !submissionMedia.path || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus) || uploadStatus === "failed"}><UploadCloud size={17} /> {submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : participantJourney?.step === "fix_and_resubmit" ? "Resubmit Entry" : "Submit Entry"}</Button>
+              <Button className="w-full" disabled={finalSubmitDisabled}><UploadCloud size={17} /> {finalSubmitLabel}</Button>
             </form>
           ) : null}
         </Card>
       </div>
+      {canSubmitNow ? <><div className="h-24 lg:hidden" aria-hidden="true" /><div data-mobile-sticky-cta className="mobile-sticky-action fixed inset-x-0 bottom-0 z-40 border-t border-[var(--gold)]/25 bg-[#090909]/96 px-4 pt-3 backdrop-blur lg:hidden"><Button form="challenge-submission-form" className="w-full" disabled={finalSubmitDisabled}><UploadCloud size={17} /> {finalSubmitLabel}</Button></div></> : null}
     </AppShell>
   );
 }

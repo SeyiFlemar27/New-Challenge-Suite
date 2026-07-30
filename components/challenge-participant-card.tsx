@@ -73,11 +73,11 @@ export function ChallengeParticipantCard({
   const loginPath = `/auth/login?next=${encodeURIComponent(returnPath)}`;
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card data-mobile-participant-card className="flex h-full flex-col overflow-hidden">
       <SubmissionMediaFrame
         src={participant.submissionMediaUrl}
         alt={participant.submissionTitle}
-        className="rounded-none border-0"
+        className="aspect-[16/10] h-auto rounded-none border-0"
         placeholder="Challenge entry"
       />
       <div className="flex flex-1 flex-col p-5">

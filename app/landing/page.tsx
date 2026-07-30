@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, BarChart3, Check, ChevronRight, Menu, Play, ShieldCheck, Sparkles, Trophy, Vote, X } from "lucide-react";
+import { MobileFooter } from "@/components/mobile-footer";
 import { BrandLogo, PremiumBadge } from "@/components/brand";
 import { LinkButton } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
@@ -56,7 +57,12 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
       <header className={`fixed inset-x-0 top-0 z-50 px-5 py-3 transition duration-300 ${scrolled ? "border-b border-white/10 bg-black/80 backdrop-blur-xl" : "border-b border-transparent bg-transparent"}`}>
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5">
+        <div className="mx-auto grid max-w-7xl grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 lg:hidden" data-mobile-header>
+          <button type="button" onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-black/30 text-[var(--gold)]" aria-label="Open public navigation"><Menu /></button>
+          <a href="/landing" className="flex min-w-0 items-center justify-center gap-2"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><span className="truncate text-xs font-black uppercase tracking-[0.1em]">Challenge Suite</span></a>
+          <a href="/auth/register" className="flex min-h-11 items-center justify-center text-xs font-black text-[var(--gold)]">Join</a>
+        </div>
+        <div className="mx-auto hidden max-w-7xl items-center justify-between gap-5 lg:flex">
           <a href="/landing" className="flex items-center gap-3"><BrandLogo imageClassName="h-10 w-10 border border-[var(--gold)]" /><span className="text-sm font-black uppercase tracking-[0.16em]">Challenge Suite</span></a>
           <nav className="hidden items-center gap-1 lg:flex">
             <LinkButton href={internalHref("/challenges")} variant="ghost">Explore</LinkButton>
@@ -64,7 +70,6 @@ export default function LandingPage() {
             <LinkButton href="/auth/login" variant="ghost">Sign In</LinkButton>
             <LinkButton href="/auth/register" className="ml-2">Create Account</LinkButton>
           </nav>
-          <button type="button" onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-black/30 text-[var(--gold)] lg:hidden" aria-label="Open public navigation"><Menu /></button>
         </div>
       </header>
 
@@ -146,7 +151,8 @@ export default function LandingPage() {
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end"><div><p className="text-xs font-black uppercase tracking-[0.22em]">Your next challenge starts here</p><h2 className="mt-4 max-w-4xl text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">Compete. Create. Host. Partner.</h2><p className="mt-5 max-w-2xl text-lg font-bold text-black/70">Join a platform built to make serious competition clear, social, and worth following.</p></div><div className="flex flex-col gap-3 sm:flex-row lg:flex-col"><LinkButton href="/auth/register" className="min-h-14 border-black bg-black text-white hover:bg-[#171717]">Create Account</LinkButton><LinkButton href={internalHref("/challenges")} variant="secondary" className="min-h-14 border-black/30 bg-transparent text-black hover:bg-black hover:text-white">Explore Challenges</LinkButton></div></div>
         </div>
       </section>
-      <footer className="border-t border-white/10 px-5 py-10"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm text-slate-500"><span>Challenge Suite. Competition, made intentional.</span><div className="flex flex-wrap gap-x-5 gap-y-3"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/community-guidelines">Community Guidelines</a><a href="/refund-policy">Refund Policy</a><a href="/cookie-policy">Cookie Policy</a><a href="/auth/login">Sign In</a><a href="/auth/register">Create Account</a></div></div></footer>
+      <MobileFooter />
+      <footer className="hidden border-t border-white/10 px-5 py-10 lg:block"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm text-slate-500"><span>Challenge Suite. Competition, made intentional.</span><div className="flex flex-wrap gap-x-5 gap-y-3"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/community-guidelines">Community Guidelines</a><a href="/refund-policy">Refund Policy</a><a href="/cookie-policy">Cookie Policy</a><a href="/auth/login">Sign In</a><a href="/auth/register">Create Account</a></div></div></footer>
     </main>
   );
 }

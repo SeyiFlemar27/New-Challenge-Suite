@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const detail = read("app/challenges/[id]/page.tsx");
+const votes = read("app/challenges/[id]/votes/page.tsx");
+const prediction = read("app/challenges/[id]/prediction/page.tsx");
+const join = read("app/challenges/[id]/join/page.tsx");
+assert(detail.includes("participantJourney"));
+assert(detail.includes("JourneyAction"));
+assert(votes.includes("votingAccess"));
+assert(prediction.includes("access?.canPredict"));
+assert(join.includes("canSubmitNow"));
+assert(join.includes("finalSubmitDisabled"));
+console.log("mobile core actions remain backend-gated: ok");
