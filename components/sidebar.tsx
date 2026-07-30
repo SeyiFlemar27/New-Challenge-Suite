@@ -42,6 +42,7 @@ import { logout } from "@/lib/firebase/auth-service";
 type NavIcon = typeof Home;
 type NavItem = { href: string; label: string; icon: NavIcon };
 type NavSection = { label: string; items: NavItem[] };
+type WorkspaceNavigationContext = "admin" | "host" | "creator" | "sponsor" | "user";
 
 const competitorSections: NavSection[] = [
   { label: "Main", items: [
@@ -192,6 +193,15 @@ const sponsorSections: NavSection[] = [
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];
+
+export function workspaceNavigationContext(pathname: string): WorkspaceNavigationContext {
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
+  if (pathname === "/dashboard/host" || pathname.startsWith("/dashboard/host/") || pathname === "/host" || pathname.startsWith("/host/")) return "host";
+  if (pathname === "/creator" || pathname.startsWith("/creator/")) return "creator";
+  if (pathname === "/sponsor" || pathname.startsWith("/sponsor/")) return "sponsor";
+  return "user";
+}
+
 function activeNavigationHref(pathname: string) {
   if (pathname === "/challenges/create") return "/challenges";
   if (pathname === "/private/create") return "/creator/private-challenges";
@@ -221,6 +231,24 @@ function sectionsForTier(tierId: string, sponsor: boolean) {
   return competitorSections;
 }
 
+function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, tierId: string, sponsor: boolean) {
+  if (context === "admin") return isAdmin ? adminSections : [];
+  if (context === "host") return hostSections;
+  if (context === "creator") return creatorSections;
+  if (context === "sponsor") return sponsorSections;
+  return sectionsForTier(tierId, sponsor);
+}
+
+function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean, fallbackName: string) {
+  if (context === "admin") return isAdmin
+    ? { name: "Admin Command Center", homeHref: "/admin" }
+    : { name: "Challenge Suite", homeHref: "/dashboard" };
+  if (context === "host") return { name: "Host Control Center", homeHref: "/dashboard/host" };
+  if (context === "creator") return { name: "Creator Studio", homeHref: "/dashboard" };
+  if (context === "sponsor") return { name: "Sponsor Dashboard", homeHref: "/sponsor/dashboard" };
+  return { name: fallbackName, homeHref: "/dashboard" };
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -233,7 +261,11 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
-  const sections = signedOut ? guestSections : user?.isAdmin ? adminSections : sectionsForTier(effectiveTier.id, user?.accountType === "sponsor");
+  const workspaceContext = workspaceNavigationContext(pathname);
+  const sections = signedOut
+    ? guestSections
+    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, effectiveTier.id, user?.accountType === "sponsor");
+  const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName);
   const activeHref = activeNavigationHref(pathname);
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
   const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;
@@ -251,7 +283,7 @@ export function Sidebar() {
       <header data-mobile-header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_56px] items-center gap-2">
           <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={21} /></button>
-          <Link href={signedOut ? "/explore" : effectiveTier.id === "host" ? "/dashboard/host" : "/dashboard"} className="flex min-w-0 items-center justify-center gap-2 text-center">
+          <Link href={signedOut ? "/explore" : workspace.homeHref} className="flex min-w-0 items-center justify-center gap-2 text-center">
             <BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" />
             <span className="truncate text-sm font-black uppercase tracking-[0.12em] text-white">Challenge Suite</span>
           </Link>
@@ -266,7 +298,7 @@ export function Sidebar() {
       {drawerOpen ? <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
         <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
-          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{effectiveTier.dashboardName}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
+          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
             {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
@@ -281,7 +313,7 @@ export function Sidebar() {
       <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] shadow-2xl lg:flex xl:w-[320px]">
         <div className="flex h-28 items-center gap-4 border-b border-white/10 px-6">
           <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
-          <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{effectiveTier.dashboardName}</p></div>
+          <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{workspace.name}</p></div>
         </div>
         <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-white/10 px-5 py-4" aria-label="Primary navigation">
           <NavigationSections sections={sections} activeHref={activeHref} />
