@@ -15,6 +15,7 @@ type WithdrawalData = {
   disabledReasons: string[];
   policy?: { dorocoinNotCash?: string; rewardPointsNotCash?: string };
   accountType: string;
+  eligibleSources: Array<{ id: string; sourceType: string; challengeId?: string | null; settlementId?: string | null; grossAmountCents: number; feeAmountCents: number; netAmountCents: number; currency: string; status: string }>;
 };
 
 type Method = "bank_transfer" | "paypal";
@@ -25,6 +26,7 @@ export default function WithdrawPage() {
   const [notice, setNotice] = useState("");
   const [method, setMethod] = useState<Method>("bank_transfer");
   const [amount, setAmount] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -36,7 +38,9 @@ export default function WithdrawPage() {
     const result = await apiRequest<WithdrawalData>("/api/withdrawals");
     setLoading(false);
     if (!result.ok || !result.data) return setNotice(result.message);
-    setData(result.data);
+    const payload = result.data;
+    setData(payload);
+    setSourceId((current) => current || payload.eligibleSources?.[0]?.id || "");
   }
 
   useEffect(() => { void load(); }, []);
@@ -50,6 +54,7 @@ export default function WithdrawPage() {
       method: "POST",
       body: JSON.stringify({
         amountCents,
+        sourceId,
         method,
         methodDetails: method === "paypal"
           ? { accountHolderName, email: paypalEmail }
@@ -70,6 +75,7 @@ export default function WithdrawPage() {
 
   const min = (data?.minimumWithdrawalCents ?? 1000) / 100;
   const available = (data?.wallet.availableBalanceCents ?? 0) / 100;
+  const selectedSource = data?.eligibleSources?.find((source) => source.id === sourceId);
 
   return (
     <AppShell>
@@ -94,11 +100,18 @@ export default function WithdrawPage() {
               <h2 className="text-2xl font-black">Withdrawal request</h2>
               <p className="mt-3 text-sm leading-6 text-slate-400">Bank Transfer and PayPal requests are reviewed before payout. No automatic payout is executed.</p>
               <form className="mt-6 space-y-5" onSubmit={submitRequest}>
+                <Field label="Eligible earning">
+                  <select className={inputClass} value={sourceId} onChange={(event) => { const next = event.target.value; setSourceId(next); const source = data.eligibleSources.find((item) => item.id === next); setAmount(source ? (source.netAmountCents / 100).toFixed(2) : ""); }} required>
+                    <option value="">Choose an earning source</option>
+                    {(data.eligibleSources ?? []).map((source) => <option key={source.id} value={source.id}>{withdrawalSourceLabel(source.sourceType)} - ${(source.netAmountCents / 100).toFixed(2)}</option>)}
+                  </select>
+                </Field>
+                {selectedSource ? <div className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 sm:grid-cols-3"><BalanceDetail label="Gross" value={selectedSource.grossAmountCents} /><BalanceDetail label="Fees already deducted" value={selectedSource.feeAmountCents} /><BalanceDetail label="Net available" value={selectedSource.netAmountCents} /></div> : null}
                 <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option></select></Field>
                 <Field label="Amount"><input className={inputClass} type="number" min={min} max={available || undefined} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={`Available $${available.toFixed(2)}`} /></Field>
                 <Field label="Account holder name"><input className={inputClass} value={accountHolderName} onChange={(event) => setAccountHolderName(event.target.value)} /></Field>
                 {method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : <Field label="PayPal email"><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field>}
-                <Button className="w-full" disabled={submitting || available <= 0}>{submitting ? "Submitting..." : "Submit Withdrawal Request"}</Button>
+                <Button className="w-full" disabled={submitting || available <= 0 || !sourceId}>{submitting ? "Submitting..." : "Submit Withdrawal Request"}</Button>
               </form>
               <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-50/90">DoroCoins cannot be withdrawn or converted to cash.</p>
             </Card>
@@ -127,5 +140,17 @@ export default function WithdrawPage() {
 
 function Balance({ label, value }: { label: string; value: number }) {
   return <Card className="p-5"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-2xl font-black text-[var(--gold)]">${(Number(value || 0) / 100).toFixed(2)}</p></Card>;
+}
+
+function BalanceDetail({ label, value }: { label: string; value: number }) {
+  return <div><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 font-black">${(Number(value || 0) / 100).toFixed(2)}</p></div>;
+}
+
+function withdrawalSourceLabel(sourceType: string) {
+  if (sourceType === "challenge_winner_prize") return "Challenge winner prize";
+  if (sourceType === "sponsor_prize") return "Sponsor-funded prize";
+  if (sourceType === "prediction_reward") return "Prediction reward";
+  if (sourceType === "creator_challenge_earning") return "Creator challenge earning";
+  return "Cash earning";
 }
 

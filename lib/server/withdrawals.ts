@@ -80,8 +80,21 @@ export async function createWithdrawalRequest(
   const requestRef = db.collection("withdrawalRequests").doc(requestId);
   const walletRef = db.collection("cashWallets").doc(input.userId);
   const payoutMethodRef = db.collection("payoutMethods").doc(deterministicId(input.userId, input.payoutMethodType));
-  const [existing, walletSnap] = await Promise.all([transaction.get(requestRef), transaction.get(walletRef)]);
+  const sourceRefs = input.sourceIds.map((id) => db.collection("cashLedger").doc(id));
+  const [existing, walletSnap, ...sourceSnaps] = await Promise.all([
+    transaction.get(requestRef),
+    transaction.get(walletRef),
+    ...sourceRefs.map((ref) => transaction.get(ref))
+  ]);
   if (existing.exists) return { request: existing.data(), created: false };
+  const sourceTotal = sourceSnaps.reduce((sum, snap) => {
+    const source = snap.data() ?? {};
+    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit") {
+      throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+    }
+    return sum + Number(source.netAmountCents ?? source.amountCents ?? 0);
+  }, 0);
+  if (!sourceSnaps.length || sourceTotal !== input.amountCents) throw new Error("WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
 
   const defaults = createCashWalletDefaults(input.userId, input.now);
   const wallet = { ...defaults, ...(walletSnap.data() ?? {}) };
@@ -143,6 +156,13 @@ export async function createWithdrawalRequest(
     updatedAt: input.now,
     createdAt: input.now
   }, { merge: true });
+  for (const sourceRef of sourceRefs) {
+    transaction.set(sourceRef, {
+      status: "withdrawal_requested",
+      withdrawalRequestId: requestId,
+      updatedAt: input.now
+    }, { merge: true });
+  }
   transaction.create(requestRef, request);
   transaction.create(db.collection("cashLedger").doc(ledgerId), createWithdrawalLedgerRecord({
     id: ledgerId,

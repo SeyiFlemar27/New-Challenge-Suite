@@ -14,10 +14,11 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Withdrawals");
   const walletRef = await ensureCashWalletFoundation(db, user.uid);
-  const [walletSnap, requestSnap, accountSnap] = await Promise.all([
+  const [walletSnap, requestSnap, accountSnap, earningSnap] = await Promise.all([
     walletRef.get(),
     db.collection("withdrawalRequests").where("userId", "==", user.uid).limit(100).get(),
-    db.collection("users").doc(user.uid).get()
+    db.collection("users").doc(user.uid).get(),
+    db.collection("cashLedger").where("userId", "==", user.uid).limit(100).get()
   ]);
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
   const kyc = await loadKycMetadata(db, user.uid);
@@ -33,6 +34,21 @@ export async function GET(request: Request) {
   const requests = requestSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data(), payoutProviderReference: null } as Record<string, unknown> & { id: string }))
     .sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? "")));
+  const eligibleSourceTypes = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
+  const eligibleSources = earningSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
+    .filter((item) => item.direction === "credit" && item.status === "available" && eligibleSourceTypes.has(String(item.sourceType ?? "")))
+    .map((item) => ({
+      id: item.id,
+      sourceType: item.sourceType,
+      challengeId: item.challengeId ?? null,
+      settlementId: item.settlementId ?? null,
+      grossAmountCents: Number(item.grossAmountCents ?? item.amountCents ?? 0),
+      feeAmountCents: Number(item.feeAmountCents ?? 0),
+      netAmountCents: Number(item.netAmountCents ?? item.amountCents ?? 0),
+      currency: item.currency ?? "USD",
+      status: item.status
+    }));
   return ok({
     wallet,
     requests,
@@ -51,7 +67,8 @@ export async function GET(request: Request) {
     disabledReasons,
     policy: WALLET_POLICY_COPY,
     eligibilitySourceTypes: accountType === "host" ? ["prize_winnings", "host_earnings"] : accountType === "creator" ? ["prize_winnings", "creator_earnings"] : accountType === "sponsor" ? [] : ["prize_winnings"],
-    supportedPayoutMethods: ["bank_transfer", "paypal"]
+    supportedPayoutMethods: ["bank_transfer", "paypal"],
+    eligibleSources
   }, "Withdrawal review data loaded.");
 }
 
@@ -64,6 +81,7 @@ export async function POST(request: Request) {
   if (parsed.response) return parsed.response;
   const body = parsed.body ?? {};
   const method = String((body as any).method ?? "").toLowerCase();
+  const sourceId = String((body as any).sourceId ?? "").trim();
   const amountCents = Math.round(Number((body as any).amountCents ?? 0));
   const minimumWithdrawalCents = MIN_WITHDRAWAL_CENTS ?? 1000;
   const accountSnap = await db.collection("users").doc(user.uid).get();
@@ -71,6 +89,16 @@ export async function POST(request: Request) {
   if (accountType === "sponsor") return fail("Sponsor accounts do not use standard earnings withdrawals.", 403, undefined, "WITHDRAWAL_NOT_AVAILABLE");
   if (!["bank_transfer", "paypal"].includes(method)) return fail("Choose Bank Transfer or PayPal.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
   if (!Number.isInteger(amountCents) || amountCents < minimumWithdrawalCents) return fail(`Minimum withdrawal is ${(minimumWithdrawalCents / 100).toFixed(2)}.`, 400, undefined, "INVALID_WITHDRAWAL_AMOUNT");
+  if (!sourceId) return fail("Choose an eligible cash earning source.", 400, undefined, "WITHDRAWAL_SOURCE_REQUIRED");
+  const sourceSnap = await db.collection("cashLedger").doc(sourceId).get();
+  const source = sourceSnap.data() ?? {};
+  const eligibleSourceTypes = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
+  if (!sourceSnap.exists || source.userId !== user.uid || source.direction !== "credit" || source.status !== "available" || !eligibleSourceTypes.has(String(source.sourceType ?? ""))) {
+    return fail("Choose an available cash earning that belongs to your wallet.", 403, undefined, "WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+  }
+  if (amountCents !== Number(source.netAmountCents ?? source.amountCents ?? 0)) {
+    return fail("Request the full net amount available from the selected earning.", 400, undefined, "WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
+  }
   const kyc = await loadKycMetadata(db, user.uid);
   if (String(kyc.kycStatus) !== "verified") return fail("KYC verification is required before withdrawals.", 403, { kycStatus: kyc.kycStatus }, "KYC_REQUIRED");
   const now = new Date().toISOString();
@@ -87,8 +115,8 @@ export async function POST(request: Request) {
       userId: user.uid,
       amountCents,
       currency: "usd",
-      sourceType: "cash_balance",
-      sourceIds: [],
+      sourceType: String(source.sourceType),
+      sourceIds: [sourceId],
       payoutMethodType: method,
       payoutMethodLabel,
       payoutMethodLast4,
@@ -96,7 +124,7 @@ export async function POST(request: Request) {
       bankName,
       country: String(details.country ?? "US"),
       kycStatusAtRequest: String(kyc.kycStatus),
-      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${amountCents}-${method}-${now.slice(0, 10)}`),
+      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceId}-${amountCents}-${method}`),
       now
     }));
     return ok({ request: result.request, created: result.created, payoutExecuted: false }, "Withdrawal request submitted for review.");

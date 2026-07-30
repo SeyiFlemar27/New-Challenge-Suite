@@ -307,7 +307,7 @@ const allowedActions: Record<string, Set<string>> = {
   submission: new Set(["approve", "reject", "request_changes", "flag", "add_note"]),
   participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag", "add_note"]),
   winner: new Set(["approve", "hold", "request_review", "flag", "add_note"]),
-  withdrawal: new Set(["approve", "reject", "request_info", "add_note"])
+  withdrawal: new Set(["approve", "reject", "request_info", "mark_paid", "add_note"])
 };
 
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
@@ -320,7 +320,7 @@ function nextStatus(type: string, action: string) {
     submission: { approve: "approved", reject: "rejected", request_changes: "resubmission_requested", flag: "flagged" },
     participant: { approve: "approved", reject: "rejected", disqualify: "disqualified", reinstate: "approved", flag: "flagged" },
     winner: { approve: "approved", hold: "held", request_review: "pending_admin_review", flag: "flagged" },
-    withdrawal: { approve: "approved", reject: "rejected", request_info: "needs_kyc" }
+    withdrawal: { approve: "approved_for_manual_payout", reject: "rejected", request_info: "needs_kyc", mark_paid: "paid" }
   };
   return statuses[type]?.[action];
 }
@@ -382,34 +382,49 @@ export async function PATCH(request: Request) {
         if (!snap.exists) throw new Error("NOT_FOUND");
         const record = snap.data() ?? {};
         previousStatus = String(record.status ?? "pending_review");
-        if (!["pending_review", "needs_kyc"].includes(previousStatus)) throw new Error("INVALID_STATE");
+        const validTransition = action === "mark_paid"
+          ? previousStatus === "approved_for_manual_payout"
+          : ["pending_review", "needs_kyc"].includes(previousStatus);
+        if (!validTransition) throw new Error("INVALID_STATE");
         if (action === "approve" && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
         transaction.set(ref, {
           status,
           adminReviewStatus: status,
           reason: reason || null,
-          approvedAt: action === "approve" ? now : null,
+          approvedAt: action === "approve" ? now : record.approvedAt ?? null,
+          paidManuallyAt: action === "mark_paid" ? now : record.paidManuallyAt ?? null,
+          paidManuallyBy: action === "mark_paid" ? user.uid : record.paidManuallyBy ?? null,
           transferEnabled: false,
           payoutExecuted: false,
           updatedAt: now
         }, { merge: true });
-        if (action === "reject") {
+        if (action === "reject" || action === "mark_paid") {
           const walletRef = db.collection("cashWallets").doc(String(record.userId));
           const walletSnap = await transaction.get(walletRef);
           const wallet = walletSnap.data() ?? {};
           const amount = Number(record.amountCents ?? 0);
           const available = Number(wallet.availableBalanceCents ?? 0);
           const underReview = Math.max(0, Number(wallet.underReviewBalanceCents ?? wallet.lockedBalanceCents ?? 0) - amount);
-          transaction.set(walletRef, { availableBalanceCents: available + amount, underReviewBalanceCents: underReview, lockedBalanceCents: underReview, updatedAt: now }, { merge: true });
-          transaction.create(db.collection("cashLedger").doc(`${id}_rejected`), {
-            ledgerId: `${id}_rejected`, userId: record.userId, type: "withdrawal_reversed", sourceType: "withdrawal", sourceId: id,
-            amountCents: amount, currency: record.currency ?? "USD", direction: "credit_release", balanceBeforeCents: available,
-            balanceAfterCents: available + amount, status: "recorded", providerConnected: false, transferEnabled: false,
+          transaction.set(walletRef, action === "reject"
+            ? { availableBalanceCents: available + amount, underReviewBalanceCents: underReview, lockedBalanceCents: underReview, updatedAt: now }
+            : { underReviewBalanceCents: underReview, lockedBalanceCents: underReview, withdrawnBalanceCents: Number(wallet.withdrawnBalanceCents ?? 0) + amount, updatedAt: now }, { merge: true });
+          const ledgerSuffix = action === "reject" ? "rejected" : "paid_manual";
+          for (const sourceId of Array.isArray(record.sourceIds) ? record.sourceIds : []) {
+            transaction.set(db.collection("cashLedger").doc(String(sourceId)), {
+              status: action === "reject" ? "available" : "paid_out",
+              withdrawalRequestId: id,
+              updatedAt: now
+            }, { merge: true });
+          }
+          transaction.create(db.collection("cashLedger").doc(`${id}_${ledgerSuffix}`), {
+            ledgerId: `${id}_${ledgerSuffix}`, userId: record.userId, type: action === "reject" ? "withdrawal_reversed" : "withdrawal_paid_manually", sourceType: "withdrawal", sourceId: id,
+            amountCents: amount, currency: record.currency ?? "USD", direction: action === "reject" ? "credit_release" : "debit_payout", balanceBeforeCents: available,
+            balanceAfterCents: action === "reject" ? available + amount : available, status: action === "reject" ? "reversed" : "paid_out", providerConnected: false, transferEnabled: false,
             isQaSeed: record.isQaSeed === true,
             qaSeedBatchId: record.isQaSeed === true ? record.qaSeedBatchId : null,
             createdFor: record.isQaSeed === true ? "admin_qa" : null,
             createdByAdminId: record.isQaSeed === true ? record.createdByAdminId : null,
-            metadata: { reason, reviewOnly: true }, createdAt: now
+            metadata: { reason, reviewOnly: true, manualStatusUpdateOnly: true, externalPayoutExecuted: false }, createdAt: now
           });
         }
       });

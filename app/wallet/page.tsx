@@ -258,6 +258,8 @@ function CashMetric({ label, value }: { label: string; value: number }) {
 function cashEarningLabel(sourceType: unknown) {
   if (sourceType === "challenge_winner_prize") return "Challenge winner prize";
   if (sourceType === "sponsor_prize") return "Sponsor-funded prize";
+  if (sourceType === "prediction_reward") return "Prediction reward";
+  if (sourceType === "prediction_reward") return "Prediction reward";
   if (sourceType === "creator_challenge_earning") return "Creator earning";
   return "Cash earning";
 }
