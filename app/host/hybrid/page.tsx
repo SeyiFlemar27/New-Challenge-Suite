@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Target } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChallengeCard } from "@/components/domain-cards";
-import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Card, EmptyState, PageTitle } from "@/components/ui";
 import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 
@@ -34,13 +34,10 @@ export default function HostHybridCompetitionPage() {
   const errorMessage = !isLoading && data && !data.ok ? data.message : null;
 
   return <AppShell><div className="mx-auto max-w-7xl">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <PageTitle title="Hybrid Competition" subtitle="Manage online qualification, finalist, live final, judging, and results stages." icon={<Target />} />
-      <LinkButton href="/host/hybrid/create" className="w-full sm:w-auto">Create Hybrid Competition</LinkButton>
-    </div>
+    <PageTitle title="Archived Competition History" subtitle="Historical Hybrid Competition records remain available for reference. This format is no longer available for new competitions." icon={<Target />} />
     {isLoading ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-[390px] animate-pulse bg-[#151515]" />)}</div> : null}
     {errorMessage ? <Card className="mt-8 p-6"><h2 className="text-xl font-black text-[var(--gold-2)]">Hybrid competitions could not load</h2><p className="mt-2 text-slate-300">{errorMessage}</p></Card> : null}
     {!isLoading && !errorMessage && competitions.length ? <div className="mt-8 grid gap-7 sm:grid-cols-2 xl:grid-cols-3">{competitions.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div> : null}
-    {!isLoading && !errorMessage && !competitions.length ? <Card className="mt-8"><EmptyState icon={<Target className="text-[var(--gold)]" />} title="No hybrid competitions yet" body="Hybrid competitions you create or manage will appear here." action={<LinkButton href="/host/hybrid/create">Create Hybrid Competition</LinkButton>} /></Card> : null}
+    {!isLoading && !errorMessage && !competitions.length ? <Card className="mt-8"><EmptyState icon={<Target className="text-[var(--gold)]" />} title="No archived competitions" body="There are no historical Hybrid Competition records associated with this account." /></Card> : null}
   </div></AppShell>;
 }

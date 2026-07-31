@@ -16,6 +16,20 @@ function pick(source: Record<string, unknown>, keys: string[]) {
   return Object.fromEntries(keys.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
 }
 
+function normalized(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+export function isRetiredHybridCompetition(record: Record<string, unknown>) {
+  const operations = record.hostOperations && typeof record.hostOperations === "object"
+    ? record.hostOperations as Record<string, unknown>
+    : {};
+  return normalized(record.type).includes("hybrid competition")
+    || normalized(record.competitionType).includes("hybrid competition")
+    || normalized(record.competitionFormat).includes("hybrid qualification")
+    || operations.hybridCompetition === true;
+}
+
 function hasKnownNonProductionText(data: Record<string, unknown>) {
   const known = [
     "the ultimate showdown",
@@ -75,6 +89,7 @@ export function isQaDemoOrPlaceholderProfile(id: string, data: Record<string, un
 
 export function isPublicChallenge(id: string, data: Record<string, unknown>) {
   if (isQaOrDemoRecord(id, data)) return false;
+  if (isRetiredHybridCompetition(data)) return false;
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
   const type = String(data.type ?? "").toLowerCase();

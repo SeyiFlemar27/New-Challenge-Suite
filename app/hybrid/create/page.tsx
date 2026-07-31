@@ -1,5 +1,5 @@
-﻿import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
+import { redirect } from "next/navigation";
 
 export default function CreateRoutePage() {
-  return <HostCompetitionWizard initialCompetitionType="Hybrid Competition" />;
+  redirect("/hybrid");
 }

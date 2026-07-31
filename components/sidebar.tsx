@@ -68,7 +68,6 @@ const guestSections: NavSection[] = [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/live-events", label: "Live Events", icon: Radio },
     { href: "/tournaments", label: "Tournaments", icon: Award },
-    { href: "/hybrid", label: "Hybrid Competition", icon: Target },
     { href: "/sponsor/onboarding", label: "Sponsors", icon: ShieldCheck }
   ] },
   { label: "Account", items: [
@@ -128,7 +127,6 @@ const creatorSections: NavSection[] = [
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Creator Tools", items: [
-    { href: "/challenges/create", label: "Create Challenge", icon: Trophy },
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck },
     { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
     { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket },
@@ -153,12 +151,10 @@ const hostSections: NavSection[] = [
     { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Competitions", items: [
-    { href: "/challenges/create", label: "Create Challenge", icon: Trophy },
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
     { href: "/host/live-events", label: "Live Events", icon: Radio },
     { href: "/host/tournaments", label: "Tournaments", icon: Award },
-    { href: "/host/hybrid", label: "Hybrid Competition", icon: Target },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
   ] },
   { label: "Operations", items: [
@@ -208,7 +204,6 @@ function activeNavigationHref(pathname: string) {
   if (pathname.startsWith("/host/private/create")) return "/host/private";
   if (pathname.startsWith("/host/live/create")) return "/host/live-events";
   if (pathname.startsWith("/host/tournaments/create")) return "/host/tournaments";
-  if (pathname.startsWith("/host/hybrid/create")) return "/host/hybrid";
   if (pathname.startsWith("/host/")) return pathname;
   if (pathname.startsWith("/creator/")) return pathname;
   if (pathname === "/my-entries") return "/my-entries";

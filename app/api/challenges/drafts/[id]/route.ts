@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/server/audit";
 import { calculateChallengeDraftProgress, editableDraftStatus, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
+import { isRetiredHybridCompetition, retiredHybridCompetitionState } from "@/lib/server/retired-competitions";
 
 const allowedDraftFields = new Set([
   "title", "description", "category", "customCategory", "type", "visibility", "premiumOnly",
@@ -44,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
   if (!userOwnsChallenge(challenge, user.uid)) return fail("You can only edit your own challenge drafts.", 403, undefined, "PERMISSION_DENIED");
   const progress = calculateChallengeDraftProgress(challenge);
-  return ok({ challenge: { ...challenge, managementState: resolveChallengeManagementState(challenge), completionPercentage: Number(challenge.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: challenge.nextIncompleteSection ?? progress.nextIncompleteSection } }, "Challenge draft loaded.");
+  return ok({ challenge: { ...challenge, ...(retiredHybridCompetitionState(challenge) ?? {}), managementState: resolveChallengeManagementState(challenge), completionPercentage: Number(challenge.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: challenge.nextIncompleteSection ?? progress.nextIncompleteSection } }, "Challenge draft loaded.");
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -64,14 +65,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const current = { id: snap.id, ...snap.data() } as Record<string, unknown>;
     if (!userOwnsChallenge(current, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (isRetiredHybridCompetition(current) || isRetiredHybridCompetition({ ...current, ...patch })) {
+      return { ...current, ...calculateChallengeDraftProgress(current), retiredCompetition: true, archived: true };
+    }
     if (!editableDraftStatus(current)) throw new Error("CHALLENGE_NOT_EDITABLE");
     const normalizedPatch = normalizeChallengeTimelineForStorage(patch, current);
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
     const progress = calculateChallengeDraftProgress(merged);
     const finalPatch = { ...normalizedPatch, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
     transaction.set(ref, finalPatch, { merge: true });
-    return { ...merged, ...progress };
+    return { ...merged, ...progress, retiredCompetition: false, archived: false };
   });
+  if ("retiredCompetition" in updated && updated.retiredCompetition === true) {
+    return fail("Hybrid Competition has been discontinued. Historical records remain available in read-only mode.", 410, { archived: true, preserveHistoricalRecords: true }, "HYBRID_COMPETITION_RETIRED");
+  }
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.draft_updated", targetType: "challenge", targetId: id, after: { completionPercentage: updated.completionPercentage, nextIncompleteSection: updated.nextIncompleteSection }, metadata: { source: "api/challenges/drafts/[id]", autosave: true } }, db).catch(() => undefined);
   return ok({ challenge: updated }, "Challenge draft saved.");
 }
