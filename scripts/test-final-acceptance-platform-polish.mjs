@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+for (const route of ["app/messages/page.tsx", "app/notifications/page.tsx", "app/earnings/page.tsx", "app/dorocoins/page.tsx", "app/challenges/[id]/prediction/page.tsx"]) assert.equal(existsSync(new URL(`../${route}`, import.meta.url)), true, `${route} must exist`);
+const shell = read("components/app-shell.tsx");
+assert.doesNotMatch(shell, /Create Challenge/);
+assert.doesNotMatch(shell, /ADMINISTRATION/);
+assert.match(read("lib/server/voting.ts"), /DOROCOIN_COST_PER_VOTE = 5/);
+assert.match(read("lib/server/predictions.ts"), /PREDICTION_MIN_STAKE_CENTS = 500/);
+assert.match(read("lib/server/predictions.ts"), /PREDICTION_MAX_STAKE_CENTS = 50_000/);
+assert.match(read("lib/server/predictions.ts"), /PREDICTION_PLATFORM_FEE_RATE = 0\.07/);
+assert.match(read("lib/server/wallet-architecture.ts"), /minimumWithdrawalAmountCents: 5000/);
+assert.match(read("lib/server/wallet-architecture.ts"), /pendingClearanceDays: 3/);
+assert.match(read("lib/server/wallet-architecture.ts"), /minimumProcessingHours: 24/);
+assert.match(read("lib/server/retired-competitions.ts"), /preserveHistoricalRecords/);
+console.log("Final platform polish acceptance checks passed.");

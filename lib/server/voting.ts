@@ -199,6 +199,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       transaction.set(txnRef, {
         id: txnRef.id,
         userId: input.userId,
+        category: "dorocoin",
         amount: -coinCost,
         balanceAfter: balance - coinCost,
         type: "vote_spend",
@@ -206,6 +207,8 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         sourceId: input.submissionId,
         challengeId: input.challengeId,
         idempotencyKey: voteRequestId,
+        immutable: true,
+        cashOutEnabled: false,
         createdBy: input.userId,
         createdAt: now
       });
@@ -219,6 +222,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         : db.collection("votes").doc();
       const vote = {
         id: voteRef.id,
+        category: "vote",
         challengeId: input.challengeId,
         submissionId: input.submissionId,
         voterId: input.userId,
@@ -236,6 +240,8 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         status: "counted",
         walletTransactionId,
         requestIdempotencyKey: voteRequestId,
+        idempotencyKey: voteRequestId ?? voteRef.id,
+        immutable: true,
         ipHash: input.ipHash ?? null,
         userAgentHash: input.userAgentHash ?? null,
         createdAt: now
@@ -246,12 +252,14 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (freeVoteGuardRef) {
       transaction.create(freeVoteGuardRef, {
+        id: freeVoteGuardRef.id,
         userId: input.userId,
         challengeId: input.challengeId,
         submissionId: input.submissionId,
         voteDate: voteDateKey,
         timeZone: voteTimeZone,
         resetsAt: freeVoteResetAt,
+        consumedAt: now,
         eligibility: "eligible",
         voteMode: "free",
         createdAt: now

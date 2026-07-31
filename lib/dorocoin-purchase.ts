@@ -10,4 +10,3 @@ export function quoteCustomDoroCoinPurchase(rawAmountUsd: number) {
   const amountUsd = Number((coins / DOROCOINS_PER_USD).toFixed(2));
   return { amountUsd, coins, bonusCoins: 0, totalCoins: coins };
 }
-

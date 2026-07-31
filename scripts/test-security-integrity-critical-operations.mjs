@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const sources = ["lib/server/voting.ts", "lib/server/predictions.ts", "lib/server/withdrawals.ts", "lib/server/challenge-settlement.ts"].map(read).join("\n");
+for (const guard of ["runTransaction", "idempotency", "createdAt", "updatedAt"]) assert.ok(sources.includes(guard), `critical operations require ${guard}`);
+assert.match(read("app/api/votes/route.ts"), /consumeRateLimit/);
+assert.match(read("app/api/stripe/webhook/route.ts"), /constructEvent/);
+assert.match(read("lib/server/predictions.ts"), /event\.created \* 1000 >= closesAtMs/);
+assert.match(read("lib/server/voting.ts"), /userOwnsChallenge/);
+console.log("Security integrity checks passed.");

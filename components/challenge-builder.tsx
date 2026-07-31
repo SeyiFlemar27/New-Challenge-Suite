@@ -450,7 +450,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         <MonetizationCard title="Enable Prize Pool" enabled={form.prizePoolEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("prizePoolEnabled", enabled)} setupCopy="Prize pools start at $0 until confirmed payments or sponsor contributions are received.">
           <ul className="space-y-2 text-sm leading-6 text-slate-300">
             <li>- Platform fee is 15% of confirmed generated revenue only.</li>
-            <li>- Entry-fee and paid-vote net distribution remains a ledger finalization foundation.</li>
+            <li>- Confirmed entry fees and paid votes are distributed after results review.</li>
             <li>- 100% of confirmed sponsor contributions goes to winners.</li>
             <li>- Winner payout requires admin approval, KYC, and a 24-hour hold.</li>
           </ul>
@@ -464,7 +464,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
           <p><b className="text-white">Generated revenue:</b> platform fee is 15% of confirmed paid entry, paid vote, and boost revenue only.</p>
           <p><b className="text-white">Sponsor contributions:</b> excluded from platform fee and 100% goes to approved winners after provider confirmation.</p>
           <p><b className="text-white">Withdrawal rules:</b> admin approval, 24-hour hold, and KYC are required.</p>
-          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Gross paid-entry preview.</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Platform fee foundation: {formatCents(entryFeeEstimate.platform)}</p><p>Generated revenue after platform fee: {formatCents(entryFeeEstimate.generatedNet)}</p></div> : null}
+          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Paid-entry estimate</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Platform fee: {formatCents(entryFeeEstimate.platform)}</p><p>Estimated challenge revenue: {formatCents(entryFeeEstimate.generatedNet)}</p></div> : null}
           <p className="text-xs text-slate-500">Estimates are not saved as revenue and do not create ledger entries.</p>
         </div>
       </Card>
@@ -569,6 +569,5 @@ function ChallengeSuitePlaceholder({ className = "", label = "Challenge Suite" }
     </div>
   </div>;
 }
-
 
 

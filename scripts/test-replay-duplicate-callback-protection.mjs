@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const webhook = read("app/api/stripe/webhook/route.ts");
+const voting = read("lib/server/voting.ts");
+const rewards = read("lib/server/rewards.ts");
+const predictions = read("lib/server/predictions.ts");
+assert.match(webhook, /constructEvent/);
+assert.match(webhook, /duplicate: true/);
+assert.match(voting, /requestIdempotencyKey/);
+assert.match(rewards, /idempotencyKey/);
+assert.match(predictions, /lastIncreaseStripeEventId|stripeEventId/);
+for (const source of [voting, rewards, predictions]) assert.match(source, /runTransaction/);
+console.log("Replay and duplicate callback protection checks passed.");

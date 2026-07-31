@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const doro = read("lib/server/dorocoin.ts");
+const withdrawal = read("lib/server/withdrawals.ts");
+const payoutApi = read("app/api/withdrawals/route.ts");
+assert.match(doro, /if \(nextBalance < 0\)/);
+assert.match(withdrawal, /if \(input\.amountCents > available\)/);
+assert.match(withdrawal, /payoutExecuted: false/);
+assert.match(withdrawal, /automaticPayoutsEnabled\(\)/);
+assert.match(payoutApi, /requireRequestUser/);
+assert.doesNotMatch(payoutApi, /status:\s*body\.status/);
+console.log("Negative balance and payout-status forgery checks passed.");

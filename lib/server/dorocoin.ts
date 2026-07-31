@@ -53,12 +53,15 @@ export async function applyDoroCoinTransaction(
     const record = {
       id: txnRef.id,
       userId: input.userId,
+      category: "dorocoin",
       amount: input.amount,
       balanceAfter: nextBalance,
       type: input.type,
       description: input.description,
       sourceId: input.sourceId ?? null,
       idempotencyKey: input.idempotencyKey ?? input.transactionId ?? null,
+      immutable: true,
+      cashOutEnabled: false,
       createdBy: input.createdBy,
       createdAt: now
     };

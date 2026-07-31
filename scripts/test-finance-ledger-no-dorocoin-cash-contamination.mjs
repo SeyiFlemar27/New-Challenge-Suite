@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const models = read("lib/platform-models.ts");
+const wallet = read("lib/server/wallet-architecture.ts");
+const doro = read("lib/server/dorocoin.ts");
+assert.match(models, /category: "cash"/);
+assert.match(models, /category: "dorocoin"/);
+assert.match(models, /cashOutEnabled: false/);
+assert.match(wallet, /DoroCoins are internal platform credits/);
+assert.match(doro, /cashOutEnabled: false/);
+assert.doesNotMatch(doro, /availableBalanceCents|withdrawalRequests/);
+console.log("Finance and DoroCoin separation checks passed.");

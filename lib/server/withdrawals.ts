@@ -107,6 +107,7 @@ export async function createWithdrawalRequest(
   const request = {
     id: requestId,
     userId: input.userId,
+    category: "payout",
     amountCents: input.amountCents,
     currency: input.currency,
     sourceType: input.sourceType,
@@ -127,6 +128,7 @@ export async function createWithdrawalRequest(
     earliestProcessingAt: new Date(Date.parse(input.now) + MINIMUM_WITHDRAWAL_PROCESSING_HOURS * 60 * 60 * 1000).toISOString(),
     requestedBy: input.userId,
     idempotencyKey: input.idempotencyKey,
+    immutable: true,
     createdAt: input.now,
     updatedAt: input.now
   };

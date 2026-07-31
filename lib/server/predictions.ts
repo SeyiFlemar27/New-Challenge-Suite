@@ -271,6 +271,8 @@ export async function createPendingPrediction(
   const record = {
     id,
     predictionId: id,
+    category: "stake",
+    marketId: input.challengeId,
     challengeId: input.challengeId,
     predictorId: input.predictorId,
     userId: input.predictorId,
@@ -282,6 +284,8 @@ export async function createPendingPrediction(
     amountCents: amounts.grossPredictionPoolCents,
     currency: "usd",
     paymentPurpose: PREDICTION_PAYMENT_PURPOSE,
+    idempotencyKey: id,
+    immutable: true,
     status: "pending_payment" satisfies PredictionStatus,
     predictionStatus: "pending_payment",
     paymentStatus: "pending",

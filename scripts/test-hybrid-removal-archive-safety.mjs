@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const retired = read("lib/server/retired-competitions.ts");
+const route = read("app/api/challenges/[id]/hybrid-stage/route.ts");
+const create = read("app/hybrid/create/page.tsx");
+for (const requirement of ["preserveFinancialHistory", "preserveParticipantRecords", "preserveSubmissions", "preserveAuditLogs", "preserveOriginalRoute", "readOnly: true"]) assert.ok(retired.includes(requirement));
+assert.ok(route.includes("Historical records remain available in read-only mode"));
+assert.ok(create.includes('redirect("/hybrid")'));
+assert.ok(retired.includes("never delete or rewrite archived historical records"));
+console.log("Hybrid retirement archive-safety checks passed.");
