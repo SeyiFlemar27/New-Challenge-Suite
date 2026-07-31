@@ -68,6 +68,29 @@ export async function GET(request: Request) {
     ...participants.map((participant) => String(participant.challengeId ?? "")),
     ...submissions.map((submission) => String(submission.challengeId ?? ""))
   ]);
+  const relatedChallengeById = new Map(relatedChallengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data() ?? {}]));
+  const participantByChallenge = new Map(participants.map((participant) => [String(participant.challengeId ?? ""), participant]));
+  const submissionByChallenge = new Map(submissions.map((submission) => [String(submission.challengeId ?? ""), submission]));
+  const participantEntries = [...new Set([...participants, ...submissions].map((item) => String(item.challengeId ?? "")).filter(Boolean))].map((challengeId) => {
+    const challenge = relatedChallengeById.get(challengeId) ?? {};
+    const participant = participantByChallenge.get(challengeId) ?? {};
+    const submission = submissionByChallenge.get(challengeId) ?? {};
+    const status = String(challenge.status ?? challenge.lifecycleStatus ?? "");
+    const cancelled = ["cancelled", "canceled"].includes(status.toLowerCase());
+    return {
+      ...submission,
+      participantId: participant.id ?? null,
+      challengeId,
+      challengeTitle: challenge.title ?? submission.challengeTitle ?? "Challenge",
+      challengeStatus: status || "active",
+      participantStatus: participant.status ?? null,
+      paymentStatus: participant.paymentStatus ?? participant.entryPaymentStatus ?? "not_required",
+      refundStatus: participant.refundStatus ?? challenge.refundStatus ?? "not_applicable",
+      cancelled,
+      cancellationDate: challenge.cancelledAt ?? challenge.canceledAt ?? challenge.updatedAt ?? null,
+      cancellationReason: challenge.cancellationReason ?? challenge.cancelReason ?? null
+    };
+  });
 
   const personalChallenges = new Map<string, Record<string, unknown>>();
   for (const challenge of hostedChallenges) {
@@ -135,6 +158,7 @@ export async function GET(request: Request) {
     challenges,
     hostedChallenges,
     submissions,
+    participantEntries,
     wallet: walletSnap.exists ? { userId: user.uid, ...wallet } : null,
     badges,
     leaderboard: [],

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, inputClass, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
@@ -112,7 +113,7 @@ export default function ExplorePage() {
             </div>
           </header>
 
-          {trending.length ? <section className="mt-7"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black text-white">Trending Challenges</h2><p className="mt-1 text-sm text-slate-400">Popular challenges gaining activity across Challenge Suite.</p></div><span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">Real activity only</span></div><div className="flex gap-4 overflow-x-auto pb-2">{trending.map((item) => <TrendingCard key={String(item.id)} challenge={item} />)}</div></section> : null}
+          {trending.length ? <section className="mt-7" aria-labelledby="trending-challenges"><div className="mb-3"><h2 id="trending-challenges" className="text-xl font-black text-white">Trending Challenges</h2><p className="mt-1 text-sm text-slate-400">Challenges gaining meaningful activity across Challenge Suite.</p></div><div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3" role="list" aria-label="Trending challenges">{trending.map((item) => <TrendingCard key={String(item.id)} challenge={item} />)}</div></section> : null}
 
           <section className="mt-8">
             <div className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500"><SlidersHorizontal size={16} /> Browse</div>
@@ -130,10 +131,22 @@ function Select({ label, value, onChange, options }: { label: string; value: str
 }
 
 function TrendingCard({ challenge }: { challenge: ExploreChallenge }) {
-  return <LinkButton href={detailHref(challenge)} variant="secondary" className="min-h-0 w-[280px] shrink-0 border-white/10 bg-[#151515] p-0 text-white hover:bg-[#1d1d1d]"><div className="w-full text-left"><ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-32 rounded-b-none border-0" placeholder="Challenge Suite" /><div className="p-4"><p className="text-xs font-black uppercase text-[var(--gold)]">{challenge.phaseSummary?.label ?? "Challenge"}</p><h3 className="mt-2 line-clamp-2 font-black text-white">{challenge.title}</h3><p className="mt-2 text-xs font-bold text-slate-400">{Number(challenge.participantCount ?? 0).toLocaleString()} participants</p></div></div></LinkButton>;
+  const creator = challenge.creator ?? {};
+  return <Link href={detailHref(challenge)} role="listitem" className="group w-32 shrink-0 snap-start rounded-[8px] p-2 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] sm:w-36">
+    <div className="relative mx-auto h-24 w-24 rounded-full bg-[var(--gold)] p-[3px] transition group-hover:scale-[1.02] sm:h-28 sm:w-28">
+      <ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-full w-full rounded-full border-4 border-[#080808]" placeholder="CS" />
+      {challenge.isOwnedByViewer ? <span className="absolute -right-1 top-1 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase text-black">Yours</span> : null}
+      <span className="absolute -bottom-1 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-2 border-[#080808] bg-[var(--gold)] text-[10px] font-black text-black">{creator.avatarUrl ? <img src={String(creator.avatarUrl)} alt="" className="h-full w-full object-cover" /> : String(creator.displayName ?? "CS").slice(0, 2).toUpperCase()}</span>
+    </div>
+    <h3 className="mt-4 line-clamp-2 text-sm font-black leading-5 text-white">{challenge.title}</h3>
+    <p className="mt-1 truncate text-[11px] font-bold uppercase text-[var(--gold)]">{publicPhaseLabel(challenge.phaseSummary?.label)}</p>
+    <p className="mt-1 truncate text-[11px] text-slate-500">{challenge.activityLabel}</p>
+  </Link>;
 }
 
 function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
+  const [saved, setSaved] = useState(Boolean(challenge.saved));
+  const [saving, setSaving] = useState(false);
   const phase = challenge.phaseSummary ?? {};
   const paid = challenge.paidEntry?.required === true;
   const fee = paid ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(challenge.paidEntry.amountCents ?? 0) / 100) : "Free";
@@ -142,11 +155,24 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
   const creator = challenge.creator ?? {};
   const creatorHref = creator.username ? `/profile/${creator.username}` : "/profile";
   const openCard = () => { window.location.href = href; };
+  const interactionsDisabled = challenge.completedInteractionsDisabled === true;
+  async function toggleSaved(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (saving || interactionsDisabled) return;
+    setSaving(true);
+    const result = await apiRequest<{ enabled: boolean }>(`/api/challenges/${challenge.id}/engagement`, { method: "POST", body: JSON.stringify({ action: "save_challenge", enabled: !saved }) });
+    setSaving(false);
+    if (!result.ok) {
+      if (result.message.toLowerCase().includes("auth")) window.location.href = `/auth/login?next=${encodeURIComponent("/explore")}`;
+      return;
+    }
+    setSaved(!saved);
+  }
   return <article data-mobile-explore-card role="link" tabIndex={0} onClick={openCard} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } }} className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] shadow-lg shadow-black/20 transition hover:border-[var(--gold)]/50 hover:bg-[#1a1a1a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
     <div className="relative">
       <ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="aspect-[16/10] h-auto rounded-none border-0" placeholder="Challenge Suite" />
-      <span className="absolute left-3 top-3"><Badge>{phase.label ?? "Challenge"}</Badge></span>
-      <button type="button" onClick={(event) => event.stopPropagation()} className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white backdrop-blur transition hover:text-[var(--gold)]" aria-label="Save challenge"><Bookmark size={18} /></button>
+      <span className="absolute left-3 top-3 flex items-center gap-2"><Badge>{publicPhaseLabel(phase.label)}</Badge>{challenge.isOwnedByViewer ? <Badge>Yours</Badge> : null}</span>
+      {!interactionsDisabled ? <button type="button" onClick={toggleSaved} disabled={saving} className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white backdrop-blur transition hover:text-[var(--gold)] disabled:opacity-60" aria-label={saved ? "Remove saved challenge" : "Save challenge"} aria-pressed={saved}><Bookmark size={18} className={saved ? "fill-[var(--gold)] text-[var(--gold)]" : ""} /></button> : null}
     </div>
     <div className="flex flex-1 flex-col p-4">
       <a href={creatorHref} onClick={(event) => event.stopPropagation()} className="flex min-h-11 items-center gap-3 text-sm font-black hover:text-[var(--gold)]">
@@ -158,8 +184,9 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-slate-400">
         <span className="flex items-center gap-1"><Users size={14} /> {Number(challenge.participantCount ?? 0).toLocaleString()} joined</span>
         <span className="flex items-center gap-1"><Trophy size={14} /> {String(challenge.category ?? "General")}</span>
-        <span className="col-span-2 flex items-center gap-1"><CalendarDays size={14} /> {phase.label ?? "Challenge"} / {formatShortDate(challenge.submissionDeadline) ?? "Timeline on detail"}</span>
+        <span className="col-span-2 flex items-center gap-1"><CalendarDays size={14} /> {publicPhaseLabel(phase.label)} / {formatShortDate(challenge.submissionDeadline) ?? "Timeline on detail"}</span>
       </div>
+      {cta.reason ? <p className="mt-3 text-xs text-slate-500">{publicPhaseLabel(cta.reason)}</p> : null}
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4"><span className="text-sm font-black text-white">{paid ? fee : "Free entry"}</span>{cta.disabled ? <Button className="min-h-11 px-4 py-2" variant="secondary" disabled>{String(cta.label ?? "Voting Closed")}</Button> : <LinkButton href={String(cta.href ?? href)} onClick={(event: any) => event.stopPropagation()} className="min-h-11 px-4 py-2">{String(cta.label ?? "View Challenge")}</LinkButton>}</div>
     </div>
   </article>;
@@ -177,4 +204,9 @@ function formatShortDate(value: unknown) {
   if (!value) return null;
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function publicPhaseLabel(value: unknown) {
+  const label = String(value ?? "Challenge");
+  return label === "Timeline Needs Review" ? "Schedule pending" : label;
 }

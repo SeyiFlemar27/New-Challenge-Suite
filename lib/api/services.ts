@@ -44,6 +44,7 @@ export interface DashboardResponse {
   challenges: unknown[];
   hostedChallenges?: unknown[];
   submissions: unknown[];
+  participantEntries?: unknown[];
   wallet: unknown | null;
   badges: unknown[];
   leaderboard: unknown[];

@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { getChallengePhaseSummary } from "@/lib/challenge-status";
 
 const actions = new Set(["save_challenge", "watch_later", "interested"]);
 
@@ -30,6 +31,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const challengeRef = db.collection("challenges").doc(id);
     const [challengeSnap, engagementSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(ref)]);
     if (!challengeSnap.exists) return null;
+    const phase = getChallengePhaseSummary(challengeSnap.data() ?? {});
+    if (["completed", "winners_announced", "voting_closed"].includes(phase.phase)) return { blocked: true, interestedCount: Number(challengeSnap.data()?.interestedCount ?? 0) };
     const wasEnabled = Boolean(engagementSnap.data()?.[field]);
     transaction.set(ref, update, { merge: true });
     let interestedCount = Number(challengeSnap.data()?.interestedCount ?? 0);
@@ -37,9 +40,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       interestedCount = Math.max(0, interestedCount + (enabled ? 1 : -1));
       transaction.set(challengeRef, { interestedCount, updatedAt: now }, { merge: true });
     }
-    return { interestedCount };
+    return { blocked: false, interestedCount };
   });
   if (!result) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+  if (result.blocked) return fail("Saving and reminder actions are closed for completed challenges.", 409, undefined, "CHALLENGE_INTERACTIONS_CLOSED");
   const message = action === "save_challenge"
     ? enabled ? "Challenge saved to Favorites." : "Challenge removed from Favorites."
     : action === "watch_later"
