@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const shell = read("components/app-shell.tsx");
+const sidebar = read("components/sidebar.tsx");
+const topbar = read("components/authenticated-topbar.tsx");
+assert(shell.includes("<AuthenticatedTopbar"));
+assert(topbar.includes("<NotificationBell compact"));
+assert(!sidebar.includes("<NotificationBell"));
+assert(!sidebar.includes('label: "Alerts"'));
+console.log("topbar notification bell replaces sidebar alerts: ok");

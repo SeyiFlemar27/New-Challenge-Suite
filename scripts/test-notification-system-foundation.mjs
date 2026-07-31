@@ -11,7 +11,7 @@ const route = read("app/api/notifications/route.ts");
 const readRoute = read("app/api/notifications/[id]/read/route.ts");
 const page = read("app/notifications/page.tsx");
 const bell = read("components/notification-bell.tsx");
-const sidebar = read("components/sidebar.tsx");
+const topbar = read("components/authenticated-topbar.tsx");
 
 assert(exists("app/notifications/page.tsx"), "notifications page must exist.");
 assert(exists("components/notification-bell.tsx"), "notification bell component must exist.");
@@ -21,8 +21,8 @@ assert(!helper.includes("orderBy(\"createdAt\""), "notification listing should a
 assert(route.includes("requireRequestUser") && route.includes("unreadCount"), "notification API must require auth and return unread counts.");
 assert(readRoute.includes("requireRequestUser") && readRoute.includes("markNotificationRead"), "single notification read route must be auth-scoped.");
 assert(page.includes("V1 notifications are in-app only") && page.includes("No notifications yet"), "notifications UI must show clear in-app and empty states.");
-assert(bell.includes("/api/notifications") && bell.includes("unreadCount") && bell.includes("/notifications"), "sidebar bell must use notification API and link to full inbox.");
-assert(sidebar.includes("NotificationBell") && !sidebar.includes("Notification.requestPermission"), "sidebar must use in-app notifications, not browser push permission.");
+assert(bell.includes("/api/notifications") && bell.includes("unreadCount") && bell.includes("/notifications"), "topbar bell must use notification API and link to full inbox.");
+assert(topbar.includes("NotificationBell") && !topbar.includes("Notification.requestPermission"), "topbar must use in-app notifications, not browser push permission.");
 assert(!page.includes("fake") && !bell.includes("new Notification("), "notification UI must not fake notifications or trigger browser push.");
 
 console.log("Notification system foundation checks passed.");

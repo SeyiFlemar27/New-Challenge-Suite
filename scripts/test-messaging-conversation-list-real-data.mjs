@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const page = read("app/messages/page.tsx");
+const route = read("app/api/messages/route.ts");
+const server = read("lib/server/messages.ts");
+assert(page.includes('fetch("/api/messages"'));
+assert(route.includes("listConversations"));
+assert(server.includes('collection("conversations")'));
+assert(!page.includes("mockConversation"));
+console.log("messaging conversation list uses real backend data: ok");

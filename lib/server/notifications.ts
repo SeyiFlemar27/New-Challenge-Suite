@@ -41,6 +41,11 @@ function safeId(value: unknown) {
   return safeText(value, "", 160).replace(/[^a-zA-Z0-9_.:-]/g, "_");
 }
 
+function safeActionUrl(value: unknown) {
+  const path = safeText(value, "", 500);
+  return path.startsWith("/") && !path.startsWith("//") ? path : null;
+}
+
 export async function createNotification(db: Firestore, input: CreateNotificationInput) {
   const idempotencyKey = safeId(input.idempotencyKey);
   const ref = idempotencyKey ? db.collection("notifications").doc(idempotencyKey) : db.collection("notifications").doc();
@@ -59,7 +64,7 @@ export async function createNotification(db: Firestore, input: CreateNotificatio
     entityType: input.entityType ?? null,
     entityId: input.entityId ?? input.targetId ?? null,
     targetId: input.targetId ?? input.entityId ?? null,
-    actionUrl: input.actionUrl ?? null,
+    actionUrl: safeActionUrl(input.actionUrl),
     read: false,
     readAt: null,
     archivedAt: null,

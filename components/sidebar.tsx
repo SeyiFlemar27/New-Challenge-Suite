@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import {
   Award,
   BarChart3,
-  Bell,
   ClipboardCheck,
   Coins,
   Diamond,
@@ -33,10 +32,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { BrandLogo, planBadgeLabel, PremiumBadge } from "./brand";
+import { BrandLogo, planBadgeLabel } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier } from "@/lib/plan-access";
-import { NotificationBell } from "@/components/notification-bell";
 import { logout } from "@/lib/firebase/auth-service";
 
 type NavIcon = typeof Home;
@@ -177,8 +175,7 @@ const sponsorSections: NavSection[] = [
   { label: "Overview", items: [
     { href: "/sponsor/dashboard", label: "Sponsor Dashboard", icon: Home },
     { href: "/sponsor/campaigns", label: "Campaigns", icon: Target },
-    { href: "/sponsor/proposals", label: "Proposals", icon: ClipboardCheck },
-    { href: "/sponsor/messages", label: "Messages", icon: Bell }
+    { href: "/sponsor/proposals", label: "Proposals", icon: ClipboardCheck }
   ] },
   { label: "Discover", items: [
     { href: "/sponsor/discover/creators", label: "Creators", icon: UsersRound },
@@ -252,7 +249,7 @@ function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean
 export function Sidebar() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { user, loading, signedOut, error } = useCurrentUser();
+  const { user, loading, signedOut } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
   const effectiveTier = getEffectiveTier({
     planId: user?.planId,
@@ -302,7 +299,6 @@ export function Sidebar() {
           <NavigationSections sections={sections} activeHref={activeHref} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
             {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
-              <Link href="/profile" className="flex items-center gap-3 rounded-[8px] bg-white/5 p-4"><div className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-sm font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</div><div className="min-w-0"><p className="truncate font-black">{user?.displayName || "Profile"}</p><p className="text-xs text-slate-400">{effectiveTier.memberLabel}</p></div></Link>
               <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
               {user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
             </>}
@@ -319,17 +315,8 @@ export function Sidebar() {
           <NavigationSections sections={sections} activeHref={activeHref} />
         </nav>
         <div className="space-y-3 p-5">
-          <div className="grid grid-cols-2 gap-2">
-            <Link href="/wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0}</Link>
-            <NotificationBell />
-          </div>
+          <Link href="/wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
           <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#171717] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
-          <div className="flex items-center gap-3 pt-2">
-            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-black", avatarRingClass ?? "border-white/10")}>{loading ? "" : user?.initials || "?"}</div>
-            <div className="min-w-0 flex-1">
-              {loading ? <div className="font-bold text-slate-300">Loading profile</div> : signedOut ? <><div className="font-bold text-slate-300">Signed out</div><Link className="text-sm text-[var(--gold)]" href="/auth/login">Sign In</Link></> : error ? <><div className="font-bold text-slate-300">Profile unavailable</div><Link className="text-sm text-[var(--gold)]" href="/profile">Retry</Link></> : <><div className="flex min-w-0 items-center gap-2 font-bold"><span className="truncate">{user?.displayName}</span><PremiumBadge planId={user?.planId} badgeStyleId={user?.customization?.profileBadgeId} labelOverride={effectiveTier.badgeLabel} compact /></div><p className="mt-0.5 text-xs text-slate-400">{effectiveTier.memberLabel}</p></>}
-            </div>
-          </div>
           {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
