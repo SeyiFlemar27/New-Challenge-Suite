@@ -67,7 +67,10 @@ export async function GET(request: Request) {
     disabledReasons,
     policy: WALLET_POLICY_COPY,
     eligibilitySourceTypes: accountType === "host" ? ["prize_winnings", "host_earnings"] : accountType === "creator" ? ["prize_winnings", "creator_earnings"] : accountType === "sponsor" ? [] : ["prize_winnings"],
-    supportedPayoutMethods: ["bank_transfer", "paypal"],
+    supportedPayoutMethods: ["bank_transfer", "paypal", "payoneer"],
+    pendingClearanceDays: WITHDRAWAL_ARCHITECTURE_CONFIG.pendingClearanceDays,
+    minimumProcessingHours: WITHDRAWAL_ARCHITECTURE_CONFIG.minimumProcessingHours,
+    withdrawalFeeCents: WITHDRAWAL_ARCHITECTURE_CONFIG.withdrawalFeeCents,
     eligibleSources
   }, "Withdrawal review data loaded.");
 }
@@ -83,11 +86,11 @@ export async function POST(request: Request) {
   const method = String((body as any).method ?? "").toLowerCase();
   const sourceId = String((body as any).sourceId ?? "").trim();
   const amountCents = Math.round(Number((body as any).amountCents ?? 0));
-  const minimumWithdrawalCents = MIN_WITHDRAWAL_CENTS ?? 1000;
+  const minimumWithdrawalCents = MIN_WITHDRAWAL_CENTS;
   const accountSnap = await db.collection("users").doc(user.uid).get();
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
   if (accountType === "sponsor") return fail("Sponsor accounts do not use standard earnings withdrawals.", 403, undefined, "WITHDRAWAL_NOT_AVAILABLE");
-  if (!["bank_transfer", "paypal"].includes(method)) return fail("Choose Bank Transfer or PayPal.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
+  if (!["bank_transfer", "paypal", "payoneer"].includes(method)) return fail("Choose Bank Transfer, PayPal, or Payoneer.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
   if (!Number.isInteger(amountCents) || amountCents < minimumWithdrawalCents) return fail(`Minimum withdrawal is ${(minimumWithdrawalCents / 100).toFixed(2)}.`, 400, undefined, "INVALID_WITHDRAWAL_AMOUNT");
   if (!sourceId) return fail("Choose an eligible cash earning source.", 400, undefined, "WITHDRAWAL_SOURCE_REQUIRED");
   const sourceSnap = await db.collection("cashLedger").doc(sourceId).get();
@@ -104,12 +107,16 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
   const details = ((body as any).methodDetails ?? {}) as Record<string, unknown>;
   const accountHolderName = String(details.accountHolderName ?? details.name ?? "").trim();
-  const bankName = method === "bank_transfer" ? String(details.bankName ?? "").trim() : "PayPal";
+  const bankName = method === "bank_transfer" ? String(details.bankName ?? "").trim() : method === "payoneer" ? "Payoneer" : "PayPal";
   const accountNumber = String(details.accountNumber ?? details.email ?? "").trim();
   if (!accountHolderName || !accountNumber || (method === "bank_transfer" && !bankName)) return fail("Add payout method details.", 400, undefined, "PAYOUT_METHOD_REQUIRED");
   const paypalDomain = accountNumber.includes("@") ? accountNumber.slice(accountNumber.lastIndexOf("@")) : "";
-  const payoutMethodLabel = method === "paypal" ? `PayPal - ***${paypalDomain}` : `${bankName} ${maskAccount(accountNumber)}`;
-  const payoutMethodLast4 = method === "paypal" ? "paypal" : accountNumber.replace(/\D/g, "").slice(-4);
+  const payoutMethodLabel = method === "paypal"
+    ? `PayPal - ***${paypalDomain}`
+    : method === "payoneer"
+      ? `Payoneer - ***${paypalDomain}`
+      : `${bankName} ${maskAccount(accountNumber)}`;
+  const payoutMethodLast4 = method === "bank_transfer" ? accountNumber.replace(/\D/g, "").slice(-4) : method;
   try {
     const result = await db.runTransaction((transaction) => createWithdrawalRequest(db, transaction, {
       userId: user.uid,

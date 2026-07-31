@@ -5,6 +5,7 @@ import { WITHDRAWAL_ARCHITECTURE_CONFIG, type WithdrawalRequestStatus } from "@/
 
 export const MIN_WITHDRAWAL_CENTS = WITHDRAWAL_ARCHITECTURE_CONFIG.minimumWithdrawalAmountCents;
 export const MAX_DAILY_WITHDRAWAL_CENTS = null as number | null;
+export const MINIMUM_WITHDRAWAL_PROCESSING_HOURS = WITHDRAWAL_ARCHITECTURE_CONFIG.minimumProcessingHours;
 
 export type WithdrawalStatus =
   | "draft"
@@ -122,6 +123,8 @@ export async function createWithdrawalRequest(
     kycStatus: input.kycStatusAtRequest,
     transferEnabled: false,
     payoutExecuted: false,
+    feeAmountCents: 0,
+    earliestProcessingAt: new Date(Date.parse(input.now) + MINIMUM_WITHDRAWAL_PROCESSING_HOURS * 60 * 60 * 1000).toISOString(),
     requestedBy: input.userId,
     idempotencyKey: input.idempotencyKey,
     createdAt: input.now,

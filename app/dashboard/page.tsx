@@ -114,7 +114,7 @@ export default function DashboardPage() {
       ? [
           { title: "Creator Analytics", body: "Track submissions, challenge activity, and basic creator performance.", icon: BarChart3, active: true, href: "/creator/analytics" },
           { title: "Sponsor Ready", body: "Prepare eligible challenges for future sponsor interest.", icon: Rocket, active: true, href: "/creator/sponsor-ready" },
-          { title: "Creator Earnings", body: "View approved earnings status without treating DoroCoin as withdrawable cash.", icon: ShieldCheck, active: true, href: "/wallet" }
+          { title: "Creator Earnings", body: "View approved real-money earnings and payout status.", icon: ShieldCheck, active: true, href: "/earnings" }
         ]
       : planExperience.planId === "pro"
         ? [
@@ -157,7 +157,7 @@ export default function DashboardPage() {
         : [
             { href: "/dashboard/host", label: planExperience.planId === "enterprise" ? "Open Command Center" : "Open Host Controls", variant: "primary" as const },
             { href: "/challenges", label: "Challenges", variant: "secondary" as const },
-            { href: "/wallet", label: "Revenue Overview", variant: "ghost" as const }
+            { href: "/earnings", label: "Revenue Overview", variant: "ghost" as const }
           ];
   const tierStats = planExperience.planId === "free"
     ? [
@@ -195,7 +195,7 @@ export default function DashboardPage() {
     { title: "Invite Links", body: "Open private challenge access tools.", icon: ShieldCheck, href: "/creator/private-challenges" },
     { title: "Creator Analytics", body: "View analytics when real activity is available.", icon: BarChart3, href: "/creator/analytics" },
     { title: "Sponsor Readiness", body: "Review sponsor-ready setup states.", icon: Rocket, href: "/creator/sponsor-ready" },
-    { title: "Wallet & Rewards", body: "Open wallet and reward tools.", icon: Gift, href: "/wallet" },
+    { title: "DoroCoins & Rewards", body: "Open platform credit and reward tools.", icon: Gift, href: "/dorocoins" },
     { title: "Creator Profile", body: "Update public profile and settings.", icon: User, href: "/profile" },
     { title: "Settings", body: "Manage creator account preferences.", icon: Settings, href: "/settings" }
   ];

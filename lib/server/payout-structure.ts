@@ -4,7 +4,7 @@ import { WITHDRAWAL_ARCHITECTURE_CONFIG, type CashWalletBucket } from "@/lib/ser
 
 export const DEFAULT_CASH_CURRENCY = "USD";
 export const MINIMUM_ENTRY_FEE_CENTS = 500;
-export const CASH_EARNING_HOLD_HOURS = 24;
+export const CASH_EARNING_HOLD_HOURS = 72;
 
 export const PAID_REVENUE_SPLIT = {
   winnerSharePercent: 65,

@@ -168,7 +168,7 @@ function Billing({ settings, confirmCancel, setConfirmCancel, canceling, cancelS
 }
 
 function Wallet() {
-  return <div><h2 className="text-xl font-black">Wallet & DoroCoin</h2><p className="mt-3 leading-7 text-slate-300">DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash.</p><LinkButton href="/wallet" className="mt-6">Open Wallet & History</LinkButton></div>;
+  return <div><h2 className="text-xl font-black">DoroCoins</h2><p className="mt-3 leading-7 text-slate-300">DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/dorocoins">Open DoroCoins</LinkButton><LinkButton href="/earnings" variant="secondary">Open Earnings</LinkButton></div></div>;
 }
 
 function Preferences({ settings, update, list }: { settings: SettingsData; update: Update; list: (value: string) => string[] }) {

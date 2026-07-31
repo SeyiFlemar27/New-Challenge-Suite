@@ -85,7 +85,10 @@ export const WITHDRAWAL_ARCHITECTURE_CONFIG = {
   payoutMethodCollectionEnabled: true,
   adminReviewRequired: true,
   kycRequired: true,
-  minimumWithdrawalAmountCents: null as number | null
+  minimumWithdrawalAmountCents: 5000,
+  pendingClearanceDays: 3,
+  minimumProcessingHours: 24,
+  withdrawalFeeCents: 0
 };
 
 export const WALLET_POLICY_COPY = {

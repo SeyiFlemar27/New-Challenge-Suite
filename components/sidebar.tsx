@@ -47,7 +47,8 @@ const competitorSections: NavSection[] = [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/wallet", label: "Wallet", icon: Coins },
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Compete", items: [
@@ -95,7 +96,8 @@ const starterSections: NavSection[] = [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/wallet", label: "Wallet", icon: Coins },
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
@@ -118,7 +120,8 @@ const creatorSections: NavSection[] = [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/wallet", label: "Wallet", icon: Coins },
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
   { label: "Competitions", items: [
@@ -147,7 +150,8 @@ const hostSections: NavSection[] = [
     { href: "/dashboard/host", label: "Host Control Center", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
     { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/wallet", label: "Wallet & Revenue", icon: Coins },
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Competitions", items: [
@@ -211,6 +215,9 @@ function activeNavigationHref(pathname: string) {
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
   if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return "/rewards";
+  if (pathname === "/wallet" || pathname.startsWith("/wallet/")) return pathname.includes("withdraw") ? "/earnings" : "/dorocoins";
+  if (pathname === "/earnings" || pathname.startsWith("/earnings/")) return "/earnings";
+  if (pathname === "/dorocoins" || pathname.startsWith("/dorocoins/")) return "/dorocoins";
   if (pathname === "/settings" || pathname.startsWith("/settings/")) return "/settings";
   return pathname;
 }
@@ -310,7 +317,7 @@ export function Sidebar() {
           <NavigationSections sections={sections} activeHref={activeHref} />
         </nav>
         <div className="space-y-3 p-5">
-          <Link href="/wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
+          <Link href="/dorocoins" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
           <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#171717] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
           {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>

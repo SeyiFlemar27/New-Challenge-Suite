@@ -11,6 +11,9 @@ type WithdrawalData = {
   wallet: { availableBalanceCents: number; pendingBalanceCents: number; underReviewBalanceCents: number; withdrawnBalanceCents: number; failedWithdrawalBalanceCents: number; lifetimeEarningsCents: number; currency: string };
   requests: WithdrawalRecord[];
   minimumWithdrawalCents: number | null;
+  pendingClearanceDays: number;
+  minimumProcessingHours: number;
+  withdrawalFeeCents: number;
   kycStatus: string;
   disabledReasons: string[];
   policy?: { dorocoinNotCash?: string; rewardPointsNotCash?: string };
@@ -18,7 +21,7 @@ type WithdrawalData = {
   eligibleSources: Array<{ id: string; sourceType: string; challengeId?: string | null; settlementId?: string | null; grossAmountCents: number; feeAmountCents: number; netAmountCents: number; currency: string; status: string }>;
 };
 
-type Method = "bank_transfer" | "paypal";
+type Method = "bank_transfer" | "paypal" | "payoneer";
 
 export default function WithdrawPage() {
   const [data, setData] = useState<WithdrawalData | null>(null);
@@ -56,7 +59,7 @@ export default function WithdrawPage() {
         amountCents,
         sourceId,
         method,
-        methodDetails: method === "paypal"
+        methodDetails: method === "paypal" || method === "payoneer"
           ? { accountHolderName, email: paypalEmail }
           : { accountHolderName, bankName, accountNumber, country: "US" }
       })
@@ -73,14 +76,14 @@ export default function WithdrawPage() {
     }
   }
 
-  const min = (data?.minimumWithdrawalCents ?? 1000) / 100;
+  const min = (data?.minimumWithdrawalCents ?? 5000) / 100;
   const available = (data?.wallet.availableBalanceCents ?? 0) / 100;
   const selectedSource = data?.eligibleSources?.find((source) => source.id === sourceId);
 
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl">
-        <LinkButton href="/wallet" variant="ghost"><ArrowLeft size={17} /> Back to Wallet</LinkButton>
+        <LinkButton href="/earnings" variant="ghost"><ArrowLeft size={17} /> Back to Earnings</LinkButton>
         <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <PageTitle title="Withdraw" subtitle="Submit eligible cash earnings for review." icon={<Landmark />} />
           <span className="rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-4 py-2 text-xs font-black uppercase text-[var(--gold)]">Pending review</span>
@@ -98,7 +101,7 @@ export default function WithdrawPage() {
           <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
             <Card className="p-6 sm:p-8">
               <h2 className="text-2xl font-black">Withdrawal request</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">Bank Transfer and PayPal requests are reviewed before payout. No automatic payout is executed.</p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">Bank, PayPal, and Payoneer requests are reviewed before payout. Minimum withdrawal is $50 with no withdrawal fee.</p>
               <form className="mt-6 space-y-5" onSubmit={submitRequest}>
                 <Field label="Eligible earning">
                   <select className={inputClass} value={sourceId} onChange={(event) => { const next = event.target.value; setSourceId(next); const source = data.eligibleSources.find((item) => item.id === next); setAmount(source ? (source.netAmountCents / 100).toFixed(2) : ""); }} required>
@@ -107,19 +110,21 @@ export default function WithdrawPage() {
                   </select>
                 </Field>
                 {selectedSource ? <div className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 sm:grid-cols-3"><BalanceDetail label="Gross" value={selectedSource.grossAmountCents} /><BalanceDetail label="Fees already deducted" value={selectedSource.feeAmountCents} /><BalanceDetail label="Net available" value={selectedSource.netAmountCents} /></div> : null}
-                <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option></select></Field>
+                <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option><option value="payoneer">Payoneer</option></select></Field>
                 <Field label="Amount"><input className={inputClass} type="number" min={min} max={available || undefined} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={`Available $${available.toFixed(2)}`} /></Field>
                 <Field label="Account holder name"><input className={inputClass} value={accountHolderName} onChange={(event) => setAccountHolderName(event.target.value)} /></Field>
-                {method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : <Field label="PayPal email"><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field>}
+                {method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : <Field label={`${method === "payoneer" ? "Payoneer" : "PayPal"} email`}><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field>}
                 <Button className="w-full" disabled={submitting || available <= 0 || !sourceId}>{submitting ? "Submitting..." : "Submit Withdrawal Request"}</Button>
               </form>
-              <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-50/90">DoroCoins cannot be withdrawn or converted to cash.</p>
             </Card>
             <Card className="p-6 sm:p-8">
               <ShieldCheck className="text-[var(--gold)]" size={34} />
               <h2 className="mt-5 text-2xl font-black">Review checks</h2>
               <div className="mt-6 space-y-3 text-sm text-slate-400">
                 <p>KYC is required before withdrawal approval.</p>
+                <p>New earnings remain in pending clearance for at least {data.pendingClearanceDays} days.</p>
+                <p>Approved requests require at least {data.minimumProcessingHours} hours of processing.</p>
+                <p>Withdrawal fee: $0.00.</p>
                 <p>Requests are created as pending review.</p>
                 <p>No instant payout is available.</p>
                 <p><a className="font-bold text-[var(--gold)]" href="/kyc/status">Review KYC status</a></p>

@@ -45,7 +45,7 @@ export default function RewardsPage() {
         {points <= 0 && availableSpins <= 0 ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:p-8">
           <h2 className="flex items-center gap-2 text-2xl font-black"><Gift className="text-[var(--gold)]" /> No reward activity yet</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Your reward points and spin history will appear here after eligible activity.</p>
-          <div className="mt-5 flex flex-wrap gap-3"><LinkButton href="/wallet"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div>
+          <div className="mt-5 flex flex-wrap gap-3"><LinkButton href="/dorocoins"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div>
         </Card> : null}
 
         {setupRequired ? <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-6">
@@ -57,7 +57,7 @@ export default function RewardsPage() {
         <Card className="mt-8 p-6 sm:p-8">
           <h2 className="text-2xl font-black">Reward tiers</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">{[{ id: "basic", label: "Basic", threshold: 150, cost: 50 }, { id: "standard", label: "Standard", threshold: 270, cost: 70 }, { id: "premium", label: "Premium", threshold: 390, cost: 150 }].map((tier) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">Unlocks at {tier.threshold} points.</p><p className="mt-2 text-sm font-bold text-[var(--gold)]">{tier.cost} points per spin</p></Card>)}</div>
-          <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/wallet" variant="secondary"><ShoppingCart size={17} /> Earn More Points</LinkButton></div>
+          <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/dorocoins" variant="secondary"><ShoppingCart size={17} /> DoroCoin Activity</LinkButton></div>
         </Card>
       </> : null}
     </AppShell>

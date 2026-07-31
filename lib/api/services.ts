@@ -376,6 +376,10 @@ export function purchaseCustomDoroCoins(coins: number) {
   return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customCoins: coins }) });
 }
 
+export function purchaseCustomDoroCoinsByUsd(customAmountUsd: number) {
+  return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customAmountUsd }) });
+}
+
 export function recordDoroCoinTransaction(payload: unknown) {
   return apiRequest<{ transaction: unknown }>("/api/dorocoin/transactions", { method: "POST", body: JSON.stringify(payload) });
 }

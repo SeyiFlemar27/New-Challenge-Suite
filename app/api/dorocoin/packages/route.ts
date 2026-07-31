@@ -61,8 +61,11 @@ export async function GET() {
         id: doc.id,
         name: data.name,
         coins: Number(data.coins ?? 0),
+        baseCoins: Number(data.baseCoins ?? data.coins ?? 0),
+        bonusCoins: Number(data.bonusCoins ?? Math.max(0, Number(data.coins ?? 0) - Number(data.baseCoins ?? data.coins ?? 0))),
         price: Number(data.price ?? 0),
         bestFor: data.bestFor ?? data.description ?? "",
+        mostPopular: Boolean(data.mostPopular),
         status: data.status,
         sortOrder: Number(data.sortOrder ?? 0)
       };
