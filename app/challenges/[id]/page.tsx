@@ -238,7 +238,7 @@ export default function ChallengeDetailPage() {
           <div className="relative overflow-hidden rounded-[16px]">
             <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="aspect-[16/10] h-auto border-0 sm:aspect-video" placeholder="Challenge Suite" />
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
-            <span className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
+            <span data-status-badge className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>
           <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
           <div data-mobile-creator-row className="mt-4 flex min-h-12 items-center gap-3">

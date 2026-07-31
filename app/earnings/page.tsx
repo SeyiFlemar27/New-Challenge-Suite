@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { fetchWallet } from "@/lib/api/services";
+import { moneyFromCents } from "@/lib/utils";
 
 type CashWallet = {
   availableBalanceCents: number;
@@ -123,5 +124,5 @@ function sourceLabel(value: string) {
   return "Financial activity";
 }
 
-function formatMoney(value?: number) { return `$${(Number(value ?? 0) / 100).toFixed(2)}`; }
+function formatMoney(value?: number) { return moneyFromCents(Number(value ?? 0)); }
 function formatDate(value?: string | null) { return value ? new Date(value).toLocaleDateString() : "Pending"; }

@@ -39,6 +39,48 @@ textarea {
   font: inherit;
 }
 
+:where(h1, h2, h3, h4, p, span, a, button, label, dt, dd, th, td) {
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+[data-ui-button] {
+  text-wrap: balance;
+  text-transform: capitalize;
+}
+
+:where(h1, h2, h3) {
+  text-transform: capitalize;
+}
+
+[data-status-badge] {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-ui-card] > :first-child {
+  margin-top: 0;
+}
+
+table {
+  border-collapse: collapse;
+}
+
 .app-shell {
   min-height: 100vh;
   background:
@@ -175,7 +217,8 @@ textarea {
     min-height: 44px;
     border-top: 1px solid rgb(255 255 255 / 0.08);
     padding: 0.75rem 1rem;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   .mobile-dashboard-table td:first-child,

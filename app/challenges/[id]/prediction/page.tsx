@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/api/client";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 import type { PublicPredictionAccess } from "@/components/challenge-participant-card";
+import { moneyFromCents } from "@/lib/utils";
 
 type PredictionRecord = {
   id: string;
@@ -51,7 +52,7 @@ type ParticipantsResponse = {
 };
 
 function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.max(0, cents) / 100);
+  return moneyFromCents(Math.max(0, cents));
 }
 
 export default function ChallengePredictionPage() {
