@@ -37,6 +37,8 @@ export type ParticipantJourneyAction =
   | "fix_and_resubmit"
   | "view_entry"
   | "view_voting"
+  | "view_winners"
+  | "view_results"
   | "manage_challenge"
   | "wait_for_submission"
   | "back_to_challenge"
@@ -73,6 +75,7 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
     : primaryAction === "submit_entry" || primaryAction === "fix_and_resubmit" ? `/challenges/${challengeId}/join`
     : primaryAction === "view_entry" && submissionId ? `/submissions/${submissionId}`
     : primaryAction === "view_voting" ? `/challenges/${challengeId}/votes`
+    : primaryAction === "view_winners" || primaryAction === "view_results" ? "/winners"
     : primaryAction === "manage_challenge" ? "/challenges"
     : primaryAction === "wait_for_submission" ? null
     : primaryAction === "back_to_challenge" ? `/challenges/${challengeId}`
@@ -93,6 +96,7 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
       paymentConfirmed: flags.paymentConfirmed,
       entered: flags.entered,
       submissionOpen: flags.submissionOpen,
+      registrationClosesAt: input.phaseSummary.registrationEndAt,
       submissionOpensAt: input.phaseSummary.submissionStartAt,
       submissionDeadline: input.phaseSummary.submissionDeadline,
       timeZone: input.phaseSummary.timeZone,
@@ -117,6 +121,7 @@ export interface JourneyInput {
   payment?: Record<string, unknown> | null;
   submission?: Record<string, unknown> | null;
   phaseSummary: ChallengePhaseSummary;
+  participantCount?: number;
 }
 
 export function getParticipantJourneyState(input: JourneyInput) {
@@ -143,34 +148,40 @@ export function getParticipantJourneyState(input: JourneyInput) {
   const fee = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(paidEntryAmountCents(challenge) / 100);
   const submissionOpenAt = formatChallengeDateTime(phase.submissionStartAt, phase.timeZone);
   const submissionDeadline = formatChallengeDateTime(phase.submissionDeadline, phase.timeZone);
+  const registrationClosesAt = formatChallengeDateTime(phase.registrationEndAt, phase.timeZone);
+  const maxParticipants = Math.max(0, Math.trunc(Number(challenge.maxParticipants ?? challenge.participantLimit ?? 0) || 0));
+  const challengeFull = maxParticipants > 0 && Number(input.participantCount ?? challenge.participantCount ?? 0) >= maxParticipants;
 
-  if (!authenticated) return result("auth_required", "Sign in to continue", "Sign in before participating in this challenge.", "sign_in", input, flags, "auth_required");
   if (input.userId && userOwnsChallenge(challenge, input.userId)) return result("blocked_owner", "You created this challenge", "Creators cannot participate in their own challenge.", "manage_challenge", input, flags, "self_entry_not_allowed");
-  if (isSponsorProfile(profile)) return result("blocked_sponsor", "Sponsors cannot participate as competitors", "Use sponsor tools for funding, messaging, and campaign activity.", "back_to_challenge", input, flags, "sponsor_blocked");
-  if (phase.phase === "timeline_needs_review") return result("timeline_needs_review", "Timeline Needs Review", "This challenge timeline is being reviewed.", "back_to_challenge", input, flags, "timeline_needs_review");
+  if (phase.phase === "cancelled") return result("registration_closed", "Challenge cancelled", "Participation is no longer available.", null, input, flags, "challenge_cancelled");
+  if (phase.phase === "winners_announced") return result("completed", "Winners announced", "Results are available for this challenge.", "view_winners", input, flags, null);
+  if (phase.phase === "completed") return result("completed", "Challenge completed", "Final results are available.", "view_results", input, flags, null);
+  if (!authenticated) return result("auth_required", "Sign in to continue", "Sign in before participating in this challenge.", "sign_in", input, flags, "auth_required");
+  if (isSponsorProfile(profile)) return result("blocked_sponsor", "Sponsors cannot participate as competitors", "Use sponsor tools for funding, messaging, and campaign activity.", null, input, flags, "sponsor_blocked");
+  if (phase.phase === "timeline_needs_review") return result("timeline_needs_review", "Schedule pending", "The organizer is confirming the challenge schedule.", null, input, flags, "timeline_needs_review");
   if (submission && isRejectedSubmission(submission.status) && phase.canSubmit && entered) return result("fix_and_resubmit", "Fix and resubmit", `Update your entry before ${submissionDeadline ?? "the deadline"}.`, "fix_and_resubmit", input, flags, null);
   if (submission && isSubmitted(submission.status)) return result("already_submitted", "Entry submitted", "Your entry has been submitted for this challenge.", "view_entry", input, flags, "already_submitted");
-  if (requestStatus === "pending") return result("request_pending", "Request pending", "Your entry request is waiting for review.", null, input, flags, "request_pending");
+  if (requestStatus === "pending") return result("request_pending", "Approval pending", "The host is reviewing your registration.", null, input, flags, "request_pending");
   if (requestStatus === "rejected") return result("request_rejected", "Request rejected", "Your entry request was not approved.", "back_to_challenge", input, flags, "request_rejected");
   if (approvalRequired && !registered) return result("request_entry", "Request Entry", "This challenge requires approval before you can enter.", "request_entry", input, flags, null);
-  if (approvalRequired && !approvalGranted) return result("request_pending", "Request pending", "Your entry request is waiting for review.", null, input, flags, "request_pending");
+  if (approvalRequired && !approvalGranted) return result("request_pending", "Approval pending", "The host is reviewing your registration.", null, input, flags, "request_pending");
   if (paymentRequired && isPendingPayment(paymentStatus)) return result("payment_pending", "Payment processing", "We are confirming your payment. This page will update after confirmation.", "refresh_payment", input, flags, "payment_pending");
   if (paymentRequired && !paymentConfirmed) {
-    const canCompleteExisting = registered && phase.phase !== "completed" && phase.phase !== "cancelled" && phase.phase !== "submission_closed";
+    const canCompleteExisting = registered && phase.phase !== "submission_closed";
     if (!phase.canJoin && !canCompleteExisting) return result("registration_closed", "Registration closed", "Registration is closed for this challenge.", "back_to_challenge", input, flags, "registration_closed");
-    return result("payment_required", "Entry fee required", `Pay the ${fee} entry fee to enter this challenge.`, "pay_entry_fee", input, flags, null);
+    return result("payment_required", "Complete payment", "Your registration is incomplete until payment succeeds.", "pay_entry_fee", input, flags, null);
   }
   if (!registered) {
-    if (!phase.canJoin) return result("registration_closed", "Registration closed", "Registration is closed for this challenge.", "back_to_challenge", input, flags, "registration_closed");
-    return result("register", "Register for Challenge", "Register first, then enter this challenge when you are ready.", "register", input, flags, null);
+    if (challengeFull) return result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
+    if (!phase.canJoin) return result("registration_closed", "Registration closed", registrationClosesAt ? `Registration ended ${registrationClosesAt}.` : "Registration is closed for this challenge.", null, input, flags, "registration_closed");
+    return result("register", "Join Challenge", registrationClosesAt ? `Registration closes ${registrationClosesAt}.` : "Registration is open.", "register", input, flags, null);
   }
-  if (!entered) return result("registered_not_entered", "Registration complete", "You are registered. Enter the challenge to become eligible to submit.", "enter_challenge", input, flags, null);
+  if (!entered) return result("registered_not_entered", "Registration complete", submissionDeadline ? `Complete your submission before ${submissionDeadline}.` : "Complete your submission before the deadline.", "enter_challenge", input, flags, null);
   if (phase.canSubmit) return result("can_submit", "Ready to submit", "You can submit now.", "submit_entry", input, flags, null);
   if (phase.phase === "voting_pending") return result("submission_closed", "Voting unavailable", "No eligible submissions are available for voting yet.", null, input, flags, "no_eligible_submissions");
-  if (phase.votingOpen && Number(phase.eligibleSubmissionCount ?? 0) > 0) return result("voting_open", "Voting open", "Eligible submissions are available for voting.", "view_voting", input, flags, null);
-  if (phase.phase === "voting_closed") return result("submission_closed", "Submission closed", "The submission window has closed.", "back_to_challenge", input, flags, "submission_closed");
-  if (["under_review", "winners_announced"].includes(phase.phase)) return result("results_pending", "Results pending", "Entries are under review.", "back_to_challenge", input, flags, "results_pending");
-  if (phase.phase === "completed") return result("completed", "Challenge completed", "This challenge has ended.", "back_to_challenge", input, flags, "completed");
-  if (phase.phase === "submission_closed") return result("submission_closed", "Submission closed", "The submission deadline has passed.", "back_to_challenge", input, flags, "submission_closed");
+  if (phase.votingOpen && Number(phase.eligibleSubmissionCount ?? 0) > 0) return result("voting_open", "Voting open", "Registration has closed, but voting is now active.", "view_voting", input, flags, null);
+  if (phase.phase === "voting_closed") return result("submission_closed", "Submission closed", "New submissions are no longer accepted.", null, input, flags, "submission_closed");
+  if (phase.phase === "under_review") return result("results_pending", "Results pending", "Entries are under review.", null, input, flags, "results_pending");
+  if (phase.phase === "submission_closed") return result("submission_closed", "Submission closed", "New submissions are no longer accepted.", null, input, flags, "submission_closed");
   return result("entered_waiting_submission", "You're entered", submissionOpenAt ? `Submissions open at ${submissionOpenAt}.` : "Waiting for submissions to open.", "wait_for_submission", input, flags, "submission_not_open");
 }
