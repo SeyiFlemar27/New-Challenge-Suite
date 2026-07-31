@@ -8,7 +8,26 @@ import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
 export const PREDICTION_PLATFORM_FEE_RATE = 0.07;
 export const PREDICTION_PAYMENT_PURPOSE = "prediction_stake";
+export const PREDICTION_MIN_STAKE_CENTS = 500;
+export const PREDICTION_MAX_STAKE_CENTS = 50_000;
+export const DEFAULT_PREDICTION_LIQUIDITY_THRESHOLD_CENTS = 10_000;
+export const PREDICTION_SETTLEMENT_STATUSES = [
+  "open",
+  "closing_soon",
+  "locked",
+  "awaiting_results",
+  "under_review",
+  "settled",
+  "refunded",
+  "disputed"
+] as const;
 export const PREDICTION_STATUSES = [
+  "open",
+  "closing_soon",
+  "locked",
+  "awaiting_results",
+  "under_review",
+  "disputed",
   "pending_payment",
   "active",
   "lost",
@@ -28,6 +47,7 @@ export interface PredictionAccess {
   marketApproved: boolean;
   providerReady: boolean;
   available: boolean;
+  visible: boolean;
   windowOpen: boolean;
   closesAt: string | null;
   eligibleSubmissionCount: number;
@@ -151,6 +171,7 @@ export function predictionAccessForViewer(input: {
     marketApproved,
     providerReady,
     available: enabled && marketApproved && window.windowOpen && hasTargets && providerReady && (canPredict || reason === "auth_required"),
+    visible: enabled && marketApproved && hasTargets,
     windowOpen: window.windowOpen,
     closesAt: window.closesAt,
     eligibleSubmissionCount: input.eligibleSubmissionCount,
@@ -176,6 +197,55 @@ export function predictionStakeAmounts(amountCents: number) {
     platformFeeCents,
     netPredictionPoolCents: grossPredictionPoolCents - platformFeeCents
   };
+}
+
+export function predictionPoolEstimate(input: {
+  totalPoolCents: number;
+  participantPoolCents: number;
+  userStakeCents: number;
+}) {
+  const totalPoolCents = cents(input.totalPoolCents);
+  const participantPoolCents = cents(input.participantPoolCents);
+  const userStakeCents = cents(input.userStakeCents);
+  const netPoolCents = totalPoolCents - Math.round(totalPoolCents * PREDICTION_PLATFORM_FEE_RATE);
+  const estimatedReturnCents = participantPoolCents > 0
+    ? Math.floor(userStakeCents / participantPoolCents * netPoolCents)
+    : 0;
+  return {
+    currentPoolShare: totalPoolCents > 0 ? participantPoolCents / totalPoolCents : 0,
+    estimatedMultiplier: userStakeCents > 0 ? estimatedReturnCents / userStakeCents : 0,
+    estimatedReturnCents,
+    guaranteed: false
+  };
+}
+
+export async function preparePredictionStakeIncrease(db: Firestore, input: {
+  predictionId: string;
+  predictorId: string;
+  predictedSubmissionId: string;
+  amountCents: number;
+  predictionClosesAt: string;
+  now?: string;
+}) {
+  const now = input.now ?? new Date().toISOString();
+  const ref = db.collection("predictionRecords").doc(input.predictionId);
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    const record = { id: snap.id, ...(snap.data() ?? {}) } as Record<string, unknown>;
+    if (!snap.exists || record.predictorId !== input.predictorId || record.status !== "active") throw new Error("ACTIVE_PREDICTION_REQUIRED");
+    if (record.predictedSubmissionId !== input.predictedSubmissionId) throw new Error("PREDICTION_TARGET_LOCKED");
+    if (record.pendingIncreaseAmountCents) throw new Error("PREDICTION_INCREASE_PENDING");
+    const existingStakeCents = cents(record.stakeAmountCents);
+    if (existingStakeCents + input.amountCents > PREDICTION_MAX_STAKE_CENTS) throw new Error("PREDICTION_MAX_STAKE_EXCEEDED");
+    transaction.set(ref, {
+      amountCents: input.amountCents,
+      pendingIncreaseAmountCents: input.amountCents,
+      pendingIncreaseCreatedAt: now,
+      predictionClosesAt: input.predictionClosesAt,
+      updatedAt: now
+    }, { merge: true });
+    return { ...record, amountCents: input.amountCents, pendingIncreaseAmountCents: input.amountCents, increasing: true };
+  });
 }
 
 export function predictionRecordId(challengeId: string, predictorId: string) {
@@ -286,7 +356,11 @@ export async function confirmPredictionPayment(
     if (!snap.exists) throw new Error("Stored prediction record not found.");
     const record = { id: snap.id, ...(snap.data() ?? {}) } as Record<string, unknown>;
     assertPredictionSession(session, record);
-    if (record.webhookConfirmed === true && record.status === "active") {
+    const isIncrease = session.metadata?.predictionIncrease === "true";
+    if (!isIncrease && record.webhookConfirmed === true && record.status === "active") {
+      return { handled: true, kind: PREDICTION_PAYMENT_PURPOSE, id: predictionId, duplicate: true };
+    }
+    if (isIncrease && record.lastIncreaseStripeEventId === event.id) {
       return { handled: true, kind: PREDICTION_PAYMENT_PURPOSE, id: predictionId, duplicate: true };
     }
 
@@ -313,6 +387,26 @@ export async function confirmPredictionPayment(
         automaticRefundEnabled: false
       }, { merge: true });
       return { handled: true, kind: PREDICTION_PAYMENT_PURPOSE, id: predictionId, activated: false, requiresAdminReview: true };
+    }
+    if (isIncrease) {
+      const increaseCents = cents(record.pendingIncreaseAmountCents ?? record.amountCents);
+      transaction.set(predictionRef, {
+        ...common,
+        status: "active",
+        predictionStatus: "active",
+        stakeAmount: FieldValue.increment(increaseCents),
+        stakeAmountCents: FieldValue.increment(increaseCents),
+        stakeAmountUsd: FieldValue.increment(increaseCents / 100),
+        pendingIncreaseAmountCents: null,
+        pendingIncreaseCreatedAt: null,
+        lastIncreaseStripeEventId: event.id,
+        lastIncreaseConfirmedAt: now
+      }, { merge: true });
+      transaction.set(db.collection("challenges").doc(String(record.challengeId)), {
+        confirmedPredictionPoolCents: FieldValue.increment(increaseCents),
+        updatedAt: now
+      }, { merge: true });
+      return { handled: true, kind: PREDICTION_PAYMENT_PURPOSE, id: predictionId, increased: true, duplicate: false };
     }
     transaction.set(predictionRef, {
       ...common,
@@ -349,6 +443,19 @@ export async function expirePredictionPayment(db: Firestore, session: Stripe.Che
   const predictionId = text(session.metadata?.predictionId, 160);
   if (!predictionId) return { handled: false, reason: "prediction_id_missing" };
   const now = new Date().toISOString();
+  if (session.metadata?.predictionIncrease === "true") {
+    await db.collection("predictionRecords").doc(predictionId).set({
+      pendingIncreaseAmountCents: null,
+      pendingIncreaseCreatedAt: null,
+      providerSessionId: null,
+      paymentStatus: "confirmed",
+      status: "active",
+      predictionStatus: "active",
+      increasePaymentStatus: "expired",
+      updatedAt: now
+    }, { merge: true });
+    return { handled: true, kind: PREDICTION_PAYMENT_PURPOSE, id: predictionId, status: "active", increaseExpired: true };
+  }
   await db.collection("predictionRecords").doc(predictionId).set({
     status: "voided",
     predictionStatus: "voided",

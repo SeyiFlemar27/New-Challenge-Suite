@@ -17,7 +17,9 @@ export interface PublicVotingAccess {
 
 export interface PublicPredictionAccess {
   available: boolean;
+  visible?: boolean;
   windowOpen: boolean;
+  closesAt?: string | null;
   authenticated: boolean;
   canPredict: boolean;
   reason: string | null;

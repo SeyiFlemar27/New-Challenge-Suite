@@ -124,6 +124,8 @@ export function publicChallengeFields(data: Record<string, unknown>) {
     "eventCity", "eventState", "eventCountry", "eventCapacity", "tournamentType",
     "divisionFormat", "maxParticipants", "scoringMode", "sponsorEnabled", "creatorName",
     "creatorUsername", "creatorAvatarUrl", "resultsConfirmed", "settlementPrepared", "settlementStatus",
+    "predictionEnabled", "predictionArenaEnabled", "predictionMarketEnabled", "predictionMarketApproved", "predictionMarketStatus",
+    "confirmedPredictionPoolCents", "confirmedPredictionCount",
     "publishedAt", "createdAt", "updatedAt"
   ]);
 }

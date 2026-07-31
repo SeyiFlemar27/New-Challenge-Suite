@@ -205,6 +205,8 @@ export default function ChallengeDetailPage() {
   const participantJourney = (userState as any)?.participantJourney;
   const votingAccess = (userState as any)?.votingAccess;
   const predictionAccess = (userState as any)?.predictionAccess as PublicPredictionAccess | undefined;
+  const predictionPoolCents = Number(rawChallenge?.confirmedPredictionPoolCents ?? 0);
+  const predictionCount = Number(rawChallenge?.confirmedPredictionCount ?? 0);
   const eligibleSubmissionCount = Number(votingAccess?.eligibleSubmissionCount ?? phaseSummary?.eligibleSubmissionCount ?? challengeSubmissions.length);
   const challengeTimeZone = String(timelineDisplay.timeZone ?? phaseSummary?.timeZone ?? (details?.challenge as any)?.timezone ?? (details?.challenge as any)?.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE);
   const nextImportantTime = timelineDisplay.nextLabel && timelineDisplay.nextAt ? `${timelineDisplay.nextLabel} ${formatChallengeDateTime(timelineDisplay.nextAt, challengeTimeZone)}` : null;
@@ -215,6 +217,7 @@ export default function ChallengeDetailPage() {
   const leaderboardRelevant = Boolean(leaderboard?.visible && topParticipants.length > 0 && (votingOpen || ["voting_closed", "under_review", "winners_announced", "completed"].includes(phase)));
   const commentsClosed = ["completed", "winners_announced", "voting_closed"].includes(phase);
   const prizeStatusLabel = publicPrizeStatus(prizePool);
+  const prizeAmountKind = ["confirmed", "funded", "active", "locked"].includes(String(prizePool?.status ?? "").toLowerCase()) ? "Prize amount" : "Estimated prize";
   const guideSections: Array<{ id: ChallengeGuideSection; label: string; body: string }> = [
     { id: "overview", label: "Overview", body: challenge.description },
     { id: "rules", label: "Rules & Eligibility", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join(" ") : challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}.` : "Open to eligible platform users in supported regions." },
@@ -334,10 +337,12 @@ export default function ChallengeDetailPage() {
             <p className="mt-3">Submit a sponsor contribution request. Sponsor contributions are confirmed before any public funding status updates. No investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
-          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-sm font-bold text-slate-300">{prizeStatusLabel}</p>{prizePool.visibleJackpotCents > 0 ? <p className="mt-2 text-3xl font-black text-[var(--gold)]">{prizeValue}</p> : null}<div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st" : split.position === 2 ? "2nd" : "3rd"} / {split.percent}%</p><p className="mt-1 text-sm text-slate-400">${(split.expectedAmountCents / 100).toLocaleString()} calculated</p></div>)}</div></Card> : null}
-          {predictionAccess?.available ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
+          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-sm font-bold text-slate-300">{prizeStatusLabel}</p>{prizePool.visibleJackpotCents > 0 ? <><p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-slate-400">{prizeAmountKind}</p><p className="mt-1 text-3xl font-black text-[var(--gold)]">{prizeValue}</p></> : null}{String(prizePool.status).includes("pending_funding") ? <p className="mt-3 text-sm text-slate-300">Funding verification is pending. Prize distribution will occur after confirmation.</p> : null}<div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st place" : split.position === 2 ? "2nd place" : "3rd place"} - {split.percent}%</p><p className="mt-1 text-sm font-black text-[var(--gold)]">${(split.expectedAmountCents / 100).toLocaleString()}</p></div>)}</div></Card> : null}
+          {predictionAccess?.visible || predictionAccess?.available ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
             <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Predict who you think will win before voting opens.</p></div></div>
-            <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Predict Winner</LinkButton><p className="mt-3 text-xs leading-5 text-slate-500">Predictions close when voting opens.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><p className="text-slate-500">Total staked</p><p className="font-black">${(predictionPoolCents / 100).toLocaleString()}</p></div><div><p className="text-slate-500">Predictors</p><p className="font-black">{predictionCount.toLocaleString()}</p></div></div>
+            {predictionAccess.closesAt ? <p className="mt-3 text-xs leading-5 text-slate-400">Closes {formatChallengeDateTime(predictionAccess.closesAt, challengeTimeZone)}</p> : null}
+            {predictionAccess.windowOpen ? <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton> : <Button className="mt-5 w-full" disabled>Locked</Button>}<p className="mt-3 text-xs leading-5 text-slate-500">{predictionAccess.windowOpen ? "Predictions close when voting opens." : "New stakes and participant changes are closed. Awaiting official results."}</p>
           </Card> : null}
 
           {isLiveEvent ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7">
@@ -450,7 +455,7 @@ function publicChallengePhaseLabel(value: string) {
 function publicPrizeStatus(prizePool: { visibleJackpotCents?: number; status?: string } | null | undefined) {
   const status = String(prizePool?.status ?? "").toLowerCase();
   if (Number(prizePool?.visibleJackpotCents ?? 0) > 0 && ["confirmed", "funded", "active", "locked"].includes(status)) return "Prize pool confirmed";
-  if (status.includes("sponsor") && ["pending", "proposed", "awaiting_confirmation"].some((value) => status.includes(value))) return "Sponsor funding pending confirmation";
+  if (status === "pending_funding" || (status.includes("sponsor") && ["pending", "proposed", "awaiting_confirmation"].some((value) => status.includes(value)))) return `Sponsor-funded prize pool: $${(Number(prizePool?.visibleJackpotCents ?? 0) / 100).toLocaleString()}`;
   if (["review", "verification", "pending_confirmation"].some((value) => status.includes(value))) return "Prize under verification";
   return "Prize breakdown not published";
 }

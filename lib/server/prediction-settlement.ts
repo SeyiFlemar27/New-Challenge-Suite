@@ -1,7 +1,7 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { normalizeWinnerProposalWinners } from "@/lib/server/prize-approvals";
-import { predictionStakeAmounts } from "@/lib/server/predictions";
+import { DEFAULT_PREDICTION_LIQUIDITY_THRESHOLD_CENTS, predictionStakeAmounts } from "@/lib/server/predictions";
 
 type ConfirmedPrediction = {
   id: string;
@@ -44,6 +44,22 @@ export function calculatePredictionSettlement(predictions: ConfirmedPrediction[]
   };
 }
 
+export function predictionSettlementDisposition(input: {
+  challengeStatus: string;
+  grossPredictionPoolCents: number;
+  liquidityThresholdCents?: number;
+  officialWinnerSubmissionId?: string | null;
+  disputed?: boolean;
+}) {
+  if (input.disputed) return { status: "disputed", settle: false, refund: false, reason: "result_disputed" };
+  if (["cancelled", "deleted"].includes(input.challengeStatus.toLowerCase())) return { status: "refunded", settle: false, refund: true, reason: "challenge_cancelled" };
+  if (!input.officialWinnerSubmissionId) return { status: "under_review", settle: false, refund: false, reason: "official_result_required" };
+  if (input.grossPredictionPoolCents < (input.liquidityThresholdCents ?? DEFAULT_PREDICTION_LIQUIDITY_THRESHOLD_CENTS)) {
+    return { status: "refunded", settle: false, refund: true, reason: "minimum_liquidity_not_met" };
+  }
+  return { status: "settlement_pending", settle: true, refund: false, reason: null };
+}
+
 export async function settleApprovedPredictions(db: Firestore, input: {
   challengeId: string;
   proposalId: string;
@@ -51,14 +67,16 @@ export async function settleApprovedPredictions(db: Firestore, input: {
 }) {
   const settlementRef = db.collection("predictionSettlements").doc(input.challengeId);
   const proposalRef = db.collection("winnerProposals").doc(input.proposalId);
+  const challengeRef = db.collection("challenges").doc(input.challengeId);
   const predictionsQuery = db.collection("predictionRecords").where("challengeId", "==", input.challengeId).limit(500);
   const now = new Date().toISOString();
 
   return db.runTransaction(async (transaction) => {
-    const [settlementSnap, proposalSnap, predictionsSnap] = await Promise.all([
+    const [settlementSnap, proposalSnap, predictionsSnap, challengeSnap] = await Promise.all([
       transaction.get(settlementRef),
       transaction.get(proposalRef),
-      transaction.get(predictionsQuery)
+      transaction.get(predictionsQuery),
+      transaction.get(challengeRef)
     ]);
     if (settlementSnap.exists && settlementSnap.data()?.status === "settled") {
       return { settled: true, idempotent: true, ...(settlementSnap.data() ?? {}), payoutProviderCalled: false };
@@ -74,6 +92,17 @@ export async function settleApprovedPredictions(db: Firestore, input: {
     const active = predictionsSnap.docs.flatMap((doc) => {
       const data = doc.data() ?? {};
       if (data.status !== "active" || data.webhookConfirmed !== true || data.paymentStatus !== "confirmed") return [];
+      if (data.targetDisqualified === true || data.targetStatus === "disqualified") {
+        transaction.set(doc.ref, {
+          status: "refunded_review",
+          predictionStatus: "refunded_review",
+          settlementStatus: "refunded",
+          refundReason: "predicted_participant_disqualified",
+          automaticRefundEnabled: false,
+          updatedAt: now
+        }, { merge: true });
+        return [];
+      }
       return [{
         id: doc.id,
         predictorId: String(data.predictorId ?? data.userId ?? ""),
@@ -81,6 +110,54 @@ export async function settleApprovedPredictions(db: Firestore, input: {
         stakeAmountCents: cents(data.stakeAmountCents ?? data.amountCents)
       }];
     });
+    const grossActivePoolCents = active.reduce((sum, item) => sum + item.stakeAmountCents, 0);
+    const challenge = challengeSnap.data() ?? {};
+    const liquidityThresholdCents = Math.max(0, Number(challenge.predictionMinimumLiquidityCents ?? DEFAULT_PREDICTION_LIQUIDITY_THRESHOLD_CENTS));
+    const disposition = predictionSettlementDisposition({
+      challengeStatus: String(challenge.status ?? challenge.lifecycleStatus ?? ""),
+      grossPredictionPoolCents: grossActivePoolCents,
+      liquidityThresholdCents,
+      officialWinnerSubmissionId: winner.submissionId,
+      disputed: challenge.predictionDisputed === true
+    });
+    if (!disposition.settle) {
+      transaction.set(settlementRef, {
+        id: input.challengeId,
+        challengeId: input.challengeId,
+        proposalId: input.proposalId,
+        status: disposition.status,
+        reason: disposition.reason,
+        grossPredictionPoolCents: grossActivePoolCents,
+        liquidityThresholdCents,
+        automaticRefundEnabled: false,
+        providerRefundExecuted: false,
+        externalPayoutEnabled: false,
+        createdAt: settlementSnap.exists ? settlementSnap.data()?.createdAt ?? now : now,
+        updatedAt: now
+      }, { merge: true });
+      if (disposition.refund) {
+        for (const prediction of active) {
+          transaction.set(db.collection("predictionRecords").doc(prediction.id), {
+            status: "refunded_review",
+            predictionStatus: "refunded_review",
+            settlementStatus: "refunded",
+            refundReason: disposition.reason,
+            automaticRefundEnabled: false,
+            updatedAt: now
+          }, { merge: true });
+        }
+      }
+      transaction.set(db.collection("auditLogs").doc(deterministicId("prediction_settlement_disposition", input.challengeId, input.proposalId)), {
+        actorId: input.adminId,
+        actorType: "admin",
+        action: `prediction.${disposition.status}`,
+        targetType: "prediction_settlement",
+        targetId: input.challengeId,
+        metadata: { reason: disposition.reason, grossPredictionPoolCents: grossActivePoolCents, liquidityThresholdCents, providerRefundExecuted: false },
+        createdAt: now
+      });
+      return { settled: false, ...disposition, grossPredictionPoolCents: grossActivePoolCents, providerRefundExecuted: false, payoutProviderCalled: false };
+    }
     const result = calculatePredictionSettlement(active, winner.submissionId);
     if (result.requiresAdminReview) {
       transaction.set(settlementRef, {

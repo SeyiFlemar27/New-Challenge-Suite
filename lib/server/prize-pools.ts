@@ -153,12 +153,17 @@ export async function writeChallengePrizePoolFoundation(db: Firestore, input: Pa
 
 export function publicPrizePoolFields(pool: Partial<PrizePoolFoundation> | null | undefined) {
   const visibleJackpotCents = Number(pool?.visibleJackpotCents ?? pool?.amountCents ?? 0);
+  const configuredSplits = Array.isArray(pool?.winnerSplits) ? pool.winnerSplits : winnerSplit(visibleJackpotCents);
+  const normalizedSplits = configuredSplits.map((split) => ({
+    ...split,
+    expectedAmountCents: Math.max(0, Math.round(visibleJackpotCents * Number(split.percent ?? 0) / 100))
+  }));
   return {
     status: pool?.status ?? "disabled",
     visibleJackpotCents,
     currency: pool?.currency ?? "USD",
     payoutReviewStatus: pool?.payoutReviewStatus ?? "not_started",
-    winnerSplits: Array.isArray(pool?.winnerSplits) ? pool.winnerSplits : winnerSplit(visibleJackpotCents),
+    winnerSplits: normalizedSplits,
     transferEnabled: false,
     prizeReleaseEnabled: false
   };

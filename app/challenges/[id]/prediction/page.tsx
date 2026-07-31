@@ -22,6 +22,7 @@ type PredictionRecord = {
   paymentStatus: string;
   predictionClosesAt: string;
   rewardAmountCents?: number | null;
+  pendingIncreaseAmountCents?: number | null;
 };
 
 type PredictionStatusResponse = {
@@ -35,6 +36,11 @@ type PredictionStatusResponse = {
   };
   access: PublicPredictionAccess & { closesAt: string | null; eligibleSubmissionCount: number; rankingOnly: boolean };
   prediction: PredictionRecord | null;
+  pool: {
+    totalStakedCents: number;
+    predictorCount: number;
+    participants: Record<string, { amountStakedCents: number; predictorCount: number; currentPoolShare: number; estimatedMultiplier: number; estimatedReturnCents: number }>;
+  };
 };
 
 type ParticipantsResponse = {
@@ -85,13 +91,22 @@ export default function ChallengePredictionPage() {
   const participants = useMemo(() => participantPayload?.participants ?? [], [participantPayload?.participants]);
   const selected = participants.find((item) => item.submissionId === selectedSubmissionId);
   const amountCents = Math.round((Number(stake) || 0) * 100);
-  const platformFeeCents = Math.round(amountCents * 0.07);
-  const netPoolContributionCents = Math.max(0, amountCents - platformFeeCents);
+  const pool = statusPayload?.pool;
+  const selectedPool = pool?.participants?.[selectedSubmissionId];
+  const estimatedTotalPoolCents = Number(pool?.totalStakedCents ?? 0) + amountCents;
+  const estimatedSelectedPoolCents = Number(selectedPool?.amountStakedCents ?? 0) + amountCents;
+  const estimatedNetPoolCents = Math.max(0, estimatedTotalPoolCents - Math.round(estimatedTotalPoolCents * 0.07));
+  const estimatedReturnCents = estimatedSelectedPoolCents > 0 ? Math.floor(amountCents / estimatedSelectedPoolCents * estimatedNetPoolCents) : 0;
+  const estimatedMultiplier = amountCents > 0 ? estimatedReturnCents / amountCents : 0;
+  const currentPoolShare = estimatedTotalPoolCents > 0 ? estimatedSelectedPoolCents / estimatedTotalPoolCents : 0;
   const timeZone = participantPayload?.challenge.timezone ?? participantPayload?.challenge.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE;
 
   useEffect(() => {
     if (requestedSubmissionId) setSelectedSubmissionId(requestedSubmissionId);
   }, [requestedSubmissionId]);
+  useEffect(() => {
+    if (prediction?.predictedSubmissionId) setSelectedSubmissionId(prediction.predictedSubmissionId);
+  }, [prediction?.predictedSubmissionId]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -140,6 +155,7 @@ export default function ChallengePredictionPage() {
               <p className="font-black">{access?.message ?? "Prediction Arena status is unavailable."}</p>
               {access?.closesAt ? <p className="mt-2 text-sm text-slate-300">Predictions close {formatChallengeDateTime(access.closesAt, timeZone)}.</p> : null}
               <p className="mt-2 text-sm text-slate-400">Prediction rewards are settled after winners are approved.</p>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm font-bold"><span>{money(pool?.totalStakedCents ?? 0)} total staked</span><span>{pool?.predictorCount ?? 0} predictors</span><span>{access?.windowOpen ? "Open" : "Locked"}</span></div>
             </div>
           </div>
         </Card>
@@ -156,7 +172,7 @@ export default function ChallengePredictionPage() {
         {prediction?.status === "active" ? (
           <Card className="mt-6 border-emerald-500/30 bg-emerald-500/5 p-5">
             <h2 className="text-xl font-black text-emerald-200">Your prediction is active.</h2>
-            <p className="mt-2 text-sm text-slate-300">Prediction amount: {money(Number(prediction.stakeAmountCents ?? 0))}. Rewards are settled internally after winners are approved.</p>
+            <p className="mt-2 text-sm text-slate-300">Prediction amount: {money(Number(prediction.stakeAmountCents ?? 0))}. You may increase this amount on the same participant before the arena locks.</p>
           </Card>
         ) : null}
 
@@ -195,9 +211,15 @@ export default function ChallengePredictionPage() {
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <LinkButton href={participant.submissionPath} variant="ghost" className="w-full"><ExternalLink size={15} /> Entry</LinkButton>
-                        <Button type="button" variant={selectedSubmissionId === participant.submissionId ? "primary" : "secondary"} className="w-full" onClick={() => setSelectedSubmissionId(participant.submissionId)} disabled={!access?.windowOpen || prediction?.status === "active"}>
+                        <Button type="button" variant={selectedSubmissionId === participant.submissionId ? "primary" : "secondary"} className="w-full" onClick={() => setSelectedSubmissionId(participant.submissionId)} disabled={!access?.windowOpen || Boolean(prediction?.status === "active" && prediction.predictedSubmissionId !== participant.submissionId)}>
                           Select
                         </Button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
+                        <span>Pool share <b className="block text-white">{(((pool?.participants?.[participant.submissionId]?.currentPoolShare ?? 0) * 100)).toFixed(1)}%</b></span>
+                        <span>Staked <b className="block text-white">{money(pool?.participants?.[participant.submissionId]?.amountStakedCents ?? 0)}</b></span>
+                        <span>Predictors <b className="block text-white">{pool?.participants?.[participant.submissionId]?.predictorCount ?? 0}</b></span>
+                        <span>Estimated multiplier <b className="block text-white">{(pool?.participants?.[participant.submissionId]?.estimatedMultiplier ?? 0).toFixed(2)}x</b></span>
                       </div>
                     </div>
                   </Card>
@@ -222,14 +244,16 @@ export default function ChallengePredictionPage() {
               </div>
               <div className="mt-6 space-y-5">
                 <Field label="Selected participant"><input className={inputClass} value={selected?.displayName ?? "Select a participant"} readOnly /></Field>
-                <Field label="Prediction amount (USD)"><input className={inputClass} type="number" min="1" max="500" step="0.01" value={stake} onChange={(event) => setStake(event.target.value)} /></Field>
+                <Field label={prediction?.status === "active" ? "Increase amount (USD)" : "Prediction amount (USD)"}><input className={inputClass} type="number" min="5" max={prediction?.status === "active" ? Math.max(5, 500 - Number(prediction.stakeAmountCents ?? 0) / 100) : 500} step="0.01" value={stake} onChange={(event) => setStake(event.target.value)} /></Field>
               </div>
               <div className="mt-5 rounded-[8px] bg-black/30 p-4 text-sm leading-6 text-slate-300">
-                <p>Confirmed prediction amount: <strong>{money(amountCents)}</strong></p>
-                <p>Pool platform fee: <strong>{money(platformFeeCents)} (7%)</strong></p>
-                <p>Net pool contribution: <strong>{money(netPoolContributionCents)}</strong></p>
+                <p>Prediction amount: <strong>{money(amountCents)}</strong></p>
+                <p>Current Pool Share: <strong>{(currentPoolShare * 100).toFixed(1)}%</strong></p>
+                <p>Estimated Multiplier: <strong>{estimatedMultiplier.toFixed(2)}x</strong></p>
+                <p>Estimated Return: <strong>{money(estimatedReturnCents)}</strong></p>
+                <p>Settlement platform fee: <strong>7% of the confirmed pool</strong></p>
               </div>
-              <p className="mt-4 text-sm leading-6 text-slate-400">A 7% platform fee is deducted from the confirmed prediction pool before rewards are distributed. Correct predictors share the net pool proportionally to their confirmed prediction amount.</p>
+              <p className="mt-4 text-sm leading-6 text-slate-400">Estimates change as new stakes are placed. Final payouts are calculated after the arena closes and the result is confirmed. A 7% platform fee is deducted during settlement, not as a separate immediate fee.</p>
               <label className="mt-5 flex items-start gap-3 text-sm font-bold leading-6">
                 <input className="mt-1" type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} />
                 <span>I accept the Prediction Arena terms and understand rewards are credited internally after winner approval.</span>
@@ -238,8 +262,8 @@ export default function ChallengePredictionPage() {
               {!access?.authenticated ? (
                 <LinkButton href={access?.loginPath || `/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/prediction`)}`} className="mt-6 w-full"><DollarSign size={16} /> Log in to Predict</LinkButton>
               ) : (
-                <Button data-mobile-prediction-confirm className="mobile-sticky-action sticky bottom-0 z-10 mt-6 w-full bg-[var(--gold)]" type="submit" disabled={!access?.canPredict || !selectedSubmissionId || amountCents < 100 || !acceptedTerms || submitting || prediction?.status === "active"}>
-                  <DollarSign size={16} /> {prediction?.status === "active" ? "Prediction Active" : prediction?.status === "pending_payment" ? "Payment Pending" : submitting ? "Preparing Checkout..." : "Confirm Prediction"}
+                <Button data-mobile-prediction-confirm className="mobile-sticky-action sticky bottom-0 z-10 mt-6 w-full bg-[var(--gold)]" type="submit" disabled={!access?.canPredict || !selectedSubmissionId || amountCents < 500 || !acceptedTerms || submitting || Boolean(prediction?.pendingIncreaseAmountCents)}>
+                  <DollarSign size={16} /> {prediction?.pendingIncreaseAmountCents ? "Increase Payment Pending" : prediction?.status === "active" ? "Increase Stake" : prediction?.status === "pending_payment" ? "Payment Pending" : submitting ? "Preparing Checkout..." : "Confirm Prediction"}
                 </Button>
               )}
               {!access?.canPredict && access?.authenticated ? <p className="mt-3 text-sm text-slate-400">{access.message}</p> : null}

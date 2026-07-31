@@ -9,8 +9,13 @@ import {
   attachPredictionCheckoutSession,
   createPendingPrediction,
   findEligiblePredictionTarget,
+  PREDICTION_MAX_STAKE_CENTS,
+  PREDICTION_MIN_STAKE_CENTS,
   predictionAccessForViewer,
+  predictionPoolEstimate,
   predictionProviderState,
+  predictionRecordId,
+  preparePredictionStakeIncrease,
   PREDICTION_PAYMENT_PURPOSE
 } from "@/lib/server/predictions";
 import { hasPrivateChallengeAccess } from "@/lib/server/private-invites";
@@ -44,6 +49,7 @@ function publicPrediction(record: Record<string, unknown>) {
     predictedParticipantId: record.predictedParticipantId,
     predictedSubmissionId: record.predictedSubmissionId,
     stakeAmountCents: record.stakeAmountCents,
+    pendingIncreaseAmountCents: record.pendingIncreaseAmountCents ?? null,
     currency: record.currency,
     status: record.status ?? record.predictionStatus,
     predictionStatus: record.predictionStatus ?? record.status,
@@ -99,8 +105,21 @@ export async function GET(request: Request) {
     eligibleSubmissionCount: leaderboard.entries.length
   });
   const predictionSnap = user
-    ? await db.collection("predictionRecords").doc(`prediction_${challengeId}_${user.uid}`).get()
+    ? await db.collection("predictionRecords").doc(predictionRecordId(challengeId, user.uid)).get()
     : null;
+  const poolSnap = await db.collection("predictionRecords").where("challengeId", "==", challengeId).limit(500).get();
+  const confirmed = poolSnap.docs
+    .map((doc) => doc.data() ?? {})
+    .filter((record) => record.status === "active" && record.webhookConfirmed === true && record.paymentStatus === "confirmed");
+  const totalPoolCents = confirmed.reduce((sum, record) => sum + Number(record.stakeAmountCents ?? 0), 0);
+  const bySubmission = new Map<string, { amountStakedCents: number; predictorCount: number }>();
+  for (const record of confirmed) {
+    const submissionId = String(record.predictedSubmissionId ?? "");
+    const current = bySubmission.get(submissionId) ?? { amountStakedCents: 0, predictorCount: 0 };
+    current.amountStakedCents += Number(record.stakeAmountCents ?? 0);
+    current.predictorCount += 1;
+    bySubmission.set(submissionId, current);
+  }
   return ok({
     feature: {
       name: "Prediction Arena",
@@ -111,7 +130,22 @@ export async function GET(request: Request) {
       externalPayoutsEnabled: false
     },
     access,
-    prediction: predictionSnap?.exists ? publicPrediction({ id: predictionSnap.id, ...predictionSnap.data() }) : null
+    prediction: predictionSnap?.exists ? publicPrediction({ id: predictionSnap.id, ...predictionSnap.data() }) : null,
+    pool: {
+      totalStakedCents: totalPoolCents,
+      predictorCount: confirmed.length,
+      participants: Object.fromEntries([...bySubmission.entries()].map(([submissionId, value]) => [
+        submissionId,
+        {
+          ...value,
+          ...predictionPoolEstimate({
+            totalPoolCents,
+            participantPoolCents: value.amountStakedCents,
+            userStakeCents: 100
+          })
+        }
+      ]))
+    }
   }, "Prediction Arena status loaded.");
 }
 
@@ -131,8 +165,8 @@ export async function POST(request: Request) {
   const currency = text(parsed.body?.currency ?? "usd", 12).toLowerCase();
   if (!challengeId) return validationError({ challengeId: "Challenge is required." });
   if (!predictedSubmissionId) return validationError({ predictedSubmissionId: "Select an eligible participant." });
-  if (!Number.isFinite(stakeAmountUsd) || stakeAmountUsd < 1 || stakeAmountUsd > 500) {
-    return validationError({ stakeAmountUsd: "Enter a prediction amount between $1 and $500." });
+  if (!Number.isFinite(stakeAmountUsd) || Math.round(stakeAmountUsd * 100) < PREDICTION_MIN_STAKE_CENTS || Math.round(stakeAmountUsd * 100) > PREDICTION_MAX_STAKE_CENTS) {
+    return validationError({ stakeAmountUsd: "Enter a prediction amount between $5 and $500." });
   }
   if (currency !== "usd") return validationError({ currency: "Prediction Arena currently supports USD only." });
   if (parsed.body?.dorocoinAmount !== undefined || parsed.body?.paymentMethod === "dorocoin" || parsed.body?.currency === "DORO") {
@@ -168,14 +202,35 @@ export async function POST(request: Request) {
   if (!target) return fail("Selected participant is not eligible for Prediction Arena.", 400, undefined, "PREDICTION_TARGET_NOT_ELIGIBLE");
   if (String(target.userId ?? "") === user.uid) return fail("You cannot predict yourself to win.", 403, undefined, "SELF_PREDICTION_NOT_ALLOWED");
   const amountCents = Math.round(stakeAmountUsd * 100);
-  const pending = await createPendingPrediction(db, {
+  const predictionId = predictionRecordId(challengeId, user.uid);
+  const existingSnap = await db.collection("predictionRecords").doc(predictionId).get();
+  const existingRecord = existingSnap.exists ? { id: existingSnap.id, ...(existingSnap.data() ?? {}) } as Record<string, unknown> : null;
+  let pending: { record: Record<string, unknown>; existing: boolean; increasing?: boolean };
+  if (existingRecord?.status === "active") {
+    try {
+      const record = await preparePredictionStakeIncrease(db, {
+        predictionId,
+        predictorId: user.uid,
+        predictedSubmissionId,
+        amountCents,
+        predictionClosesAt: access.closesAt!
+      });
+      pending = { record: record as Record<string, unknown>, existing: false, increasing: true };
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "PREDICTION_INCREASE_REJECTED";
+      if (code === "PREDICTION_TARGET_LOCKED") return fail("You can increase your prediction only for the same participant.", 409, undefined, code);
+      if (code === "PREDICTION_INCREASE_PENDING") return fail("A prediction increase is already awaiting payment confirmation.", 409, undefined, code);
+      if (code === "PREDICTION_MAX_STAKE_EXCEEDED") return fail("Your total prediction amount cannot exceed $500.", 400, undefined, code);
+      return fail("Prediction amount could not be increased.", 400, undefined, code);
+    }
+  } else pending = await createPendingPrediction(db, {
     challengeId,
     challenge,
     predictorId: user.uid,
     target,
     amountCents,
     predictionClosesAt: access.closesAt!,
-  });
+  }) as { record: Record<string, unknown>; existing: boolean };
   const record = pending.record;
   if (pending.existing) {
     if (record.status === "active") return ok({ prediction: publicPrediction(record), existing: true }, "Your prediction is active.");
@@ -203,7 +258,8 @@ export async function POST(request: Request) {
         challengeId,
         userId: user.uid,
         amount: String(amountCents),
-        currency: "usd"
+        currency: "usd",
+        predictionIncrease: pending.increasing ? "true" : "false"
       }
     }, {
       idempotencyKey: `prediction_checkout_${String(record.id)}_${String(record.createdAt ?? "")}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 240)
