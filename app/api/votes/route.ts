@@ -7,6 +7,7 @@ import { voteRequestSchema, zodFieldErrors } from "@/lib/server/vote-validation"
 import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-signals";
 import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
   if (!voteInput.success) return validationError(zodFieldErrors(voteInput.error));
   const body = voteInput.data;
   const requestIdempotencyKey = getRequestIdempotencyKey(request, parsed.body);
+  const rateLimit = consumeRateLimit(`vote:${user.uid}`, { limit: 20, windowMs: 60_000 });
+  if (!rateLimit.allowed) return fail("Too many voting attempts. Please wait before trying again.", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, "RATE_LIMITED");
 
   const db = getAdminDb();
   if (!db) return serverUnavailable("Voting");
@@ -62,9 +65,11 @@ export async function POST(request: Request) {
       ipHash: signalHashes.ipHash,
       userAgentHash: signalHashes.userAgentHash,
       suspiciousSignals: signals,
-      requestIdempotencyKey
+      requestIdempotencyKey,
+      timeZone: String(profile.timeZone ?? profile.timezone ?? "UTC"),
+      confirmedLargeSpend: body.confirmedLargeSpend
     });
-    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, coinCost: result.coinCost, walletTransactionId: result.walletTransactionId }, body.voteMode === "dorocoin" ? `${result.quantity} DoroCoin vote${result.quantity === 1 ? "" : "s"} counted.` : "Free vote counted.");
+    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, coinCost: result.coinCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "dorocoin" ? `${result.quantity} DoroCoin vote${result.quantity === 1 ? "" : "s"} counted.` : "Free vote counted.");
   } catch (error) {
     const err = error as Error & { code?: string };
     const status = err.code === "NOT_FOUND"

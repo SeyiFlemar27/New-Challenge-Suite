@@ -1,5 +1,4 @@
 ﻿import type { Firestore } from "firebase-admin/firestore";
-import { todayKey } from "@/lib/utils";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { getVoteWeight } from "@/lib/plan-access";
 import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submission-lifecycle";
@@ -9,6 +8,9 @@ import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 
 export type VoteMode = "free" | "dorocoin";
+export const DOROCOIN_COST_PER_VOTE = 5;
+export const MAX_DOROCOIN_VOTES_PER_REQUEST = 100;
+export const LARGE_DOROCOIN_VOTE_QUANTITY = 50;
 
 export interface CastVoteInput {
   userId: string;
@@ -23,6 +25,58 @@ export interface CastVoteInput {
   userAgentHash?: string | null;
   suspiciousSignals?: string[];
   requestIdempotencyKey?: string | null;
+  timeZone?: string | null;
+  confirmedLargeSpend?: boolean;
+}
+
+export function validVotingTimeZone(value: unknown) {
+  const candidate = typeof value === "string" ? value.trim() : "";
+  if (!candidate) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return "UTC";
+  }
+}
+
+export function voteDateKeyForTimeZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: validVotingTimeZone(timeZone),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+function timeZoneOffsetMs(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const number = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return Date.UTC(number("year"), number("month") - 1, number("day"), number("hour"), number("minute"), number("second")) - date.getTime();
+}
+
+export function nextVoteResetAt(date: Date, timeZone: string) {
+  const zone = validVotingTimeZone(timeZone);
+  const [year, month, day] = voteDateKeyForTimeZone(date, zone).split("-").map(Number);
+  const localNextMidnight = Date.UTC(year, month - 1, day + 1);
+  let instant = new Date(localNextMidnight - timeZoneOffsetMs(new Date(localNextMidnight), zone));
+  instant = new Date(localNextMidnight - timeZoneOffsetMs(instant, zone));
+  return instant.toISOString();
+}
+
+export function freeVoteGuardId(userId: string, challengeId: string, voteDate: string) {
+  return deterministicId("free_vote", userId, challengeId, voteDate);
 }
 
 function votingSettings(challenge: Record<string, unknown>) {
@@ -44,8 +98,11 @@ function voteReject(message: string, code: string) {
 
 export async function castVote(db: Firestore, input: CastVoteInput) {
   const quantity = Math.max(1, Math.trunc(input.quantity || 1));
-  const now = new Date().toISOString();
-  const voteDateKey = todayKey();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
+  const voteTimeZone = validVotingTimeZone(input.timeZone);
+  const voteDateKey = voteDateKeyForTimeZone(nowDate, voteTimeZone);
+  const freeVoteResetAt = nextVoteResetAt(nowDate, voteTimeZone);
   const profile = { ...(input.profile ?? {}), planId: input.planId ?? input.profile?.planId ?? "free" };
   const voteRequestId = input.requestIdempotencyKey
     ? deterministicId("vote_request", input.userId, input.challengeId, input.submissionId, input.voteMode, input.requestIdempotencyKey)
@@ -57,6 +114,15 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
   if (input.voteMode === "free" && quantity !== 1) {
     throw voteReject("Free votes must be submitted one at a time.", "INVALID_FREE_VOTE_QUANTITY");
   }
+  if (input.voteMode === "dorocoin" && quantity > MAX_DOROCOIN_VOTES_PER_REQUEST) {
+    throw voteReject(`You can cast up to ${MAX_DOROCOIN_VOTES_PER_REQUEST} DoroCoin votes per transaction.`, "DOROCOIN_VOTE_QUANTITY_LIMIT");
+  }
+  if (input.voteMode === "dorocoin" && quantity >= LARGE_DOROCOIN_VOTE_QUANTITY && !input.confirmedLargeSpend) {
+    throw voteReject("Confirm this unusually large DoroCoin vote spend before continuing.", "LARGE_DOROCOIN_SPEND_CONFIRMATION_REQUIRED");
+  }
+  if (input.voteMode === "dorocoin" && !input.requestIdempotencyKey) {
+    throw voteReject("An idempotency key is required for DoroCoin voting.", "IDEMPOTENCY_KEY_REQUIRED");
+  }
 
   const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(input.challengeId);
@@ -64,7 +130,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const leaderboardRef = db.collection("leaderboards").doc(input.challengeId);
     const voteRequestRef = voteRequestId ? db.collection("voteRequests").doc(voteRequestId) : null;
     const freeVoteGuardRef = input.voteMode === "free"
-      ? db.collection("freeVoteDailyGuards").doc(deterministicId("free_vote", input.userId, input.challengeId, voteDateKey))
+      ? db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(input.userId, input.challengeId, voteDateKey))
       : null;
     const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap] = await Promise.all([
       transaction.get(challengeRef),
@@ -84,6 +150,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         coinCost: number;
         walletTransactionId: string | null;
         suspiciousSignals: string[];
+        voteDate?: string;
+        timeZone?: string;
+        freeVoteResetAt?: string;
         idempotentReplay?: boolean;
       };
     }
@@ -117,13 +186,11 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     let walletTransactionId: string | null = null;
     let coinCost = 0;
     if (input.voteMode === "dorocoin") {
-      coinCost = quantity;
+      coinCost = quantity * DOROCOIN_COST_PER_VOTE;
       const walletRef = db.collection("doroCoinWallets").doc(input.userId);
-      const userRef = db.collection("users").doc(input.userId);
       const walletSnap = await transaction.get(walletRef);
-      const userSnap = await transaction.get(userRef);
       const balance = Number(walletSnap.data()?.balance ?? 0);
-      if (balance < coinCost) throw voteReject("Insufficient DoroCoins. 1 DoroCoin equals 1 vote.", "INSUFFICIENT_DOROCOINS");
+      if (balance < coinCost) throw voteReject(`Insufficient DoroCoins. ${DOROCOIN_COST_PER_VOTE} DoroCoins equals 1 additional vote.`, "INSUFFICIENT_DOROCOINS");
       transaction.set(walletRef, { userId: input.userId, balance: balance - coinCost, lockedBalance: Number(walletSnap.data()?.lockedBalance ?? 0), updatedAt: now }, { merge: true });
       const txnRef = voteRequestId
         ? db.collection("doroCoinTransactions").doc(deterministicId("vote", voteRequestId, "dorocoin_spend"))
@@ -161,10 +228,11 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         voteMode: input.voteMode,
         voteWeight,
         weight: voteWeight,
-        coinCost: input.voteMode === "dorocoin" ? 1 : 0,
+        coinCost: input.voteMode === "dorocoin" ? DOROCOIN_COST_PER_VOTE : 0,
         planId: profile.planId ?? input.planId ?? "free",
         voteDateKey,
         voteDate: voteDateKey,
+        timeZone: voteTimeZone,
         status: "counted",
         walletTransactionId,
         requestIdempotencyKey: voteRequestId,
@@ -182,6 +250,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         challengeId: input.challengeId,
         submissionId: input.submissionId,
         voteDate: voteDateKey,
+        timeZone: voteTimeZone,
+        resetsAt: freeVoteResetAt,
+        eligibility: "eligible",
         voteMode: "free",
         createdAt: now
       });
@@ -218,6 +289,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       coinCost,
       walletTransactionId,
       suspiciousSignals: input.suspiciousSignals ?? [],
+      voteDate: voteDateKey,
+      timeZone: voteTimeZone,
+      freeVoteResetAt,
       idempotentReplay: false
     };
 

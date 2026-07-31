@@ -15,6 +15,7 @@ import { isEnteredParticipantStatus } from "@/lib/server/submission-lifecycle";
 import { buildPublicChallengeParticipants } from "@/lib/server/challenge-participants";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { predictionAccessForViewer } from "@/lib/server/predictions";
+import { freeVoteGuardId, nextVoteResetAt, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -93,6 +94,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }));
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
+  const voteTimeZone = validVotingTimeZone(requestProfile.timeZone ?? requestProfile.timezone ?? "UTC");
+  const voteDate = voteDateKeyForTimeZone(new Date(), voteTimeZone);
+  const freeVoteGuardSnap = user ? await db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(user.uid, id, voteDate)).get() : null;
   const { challenge: _challenge, ...leaderboardPayload } = leaderboard;
   const topParticipants = await buildPublicChallengeParticipants(db, id, {
     sort: "highest_votes",
@@ -157,6 +161,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     eligibleSubmissionCount,
     approvedSubmissionCount,
     activeSubmissionCount,
+    freeVote: {
+      available: Boolean(user && !freeVoteGuardSnap?.exists),
+      used: Boolean(freeVoteGuardSnap?.exists),
+      voteDate,
+      timeZone: voteTimeZone,
+      resetsAt: nextVoteResetAt(new Date(), voteTimeZone)
+    },
     loginPath: `/auth/login?next=${encodeURIComponent(`/challenges/${id}`)}`
   };
   const predictionAccess = predictionAccessForViewer({

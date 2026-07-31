@@ -21,7 +21,7 @@ assert(checkoutRoute.includes("requireRequestUser"), "paid vote checkout must re
 assert(checkoutRoute.includes("createPendingPaidVotePurchase"), "paid vote checkout must create pending purchase foundation.");
 assert(checkoutRoute.includes("paymentPurpose=paid_vote"), "checkout success URL must carry paid_vote purpose.");
 assert(checkoutRoute.includes("checkoutSuccessGrantsVotes: false"), "checkout route must not grant votes.");
-assert(votesPage.includes('voteMode: "free"') && votesPage.includes("Use Free Daily Vote"), "/votes must remain the normal voting page.");
+assert(votesPage.includes('voteMode: "free"') && votesPage.includes("Cast Free Vote"), "/votes must remain the normal voting page.");
 assert(votesPage.includes('/challenges/${challengeId}/bonus-votes') && !votesPage.includes("Confirm DoroCoin Votes"), "/votes must link to, not contain, DoroCoin bonus voting.");
 assert(bonusVotesPage.includes("DoroCoin Bonus Votes") && bonusVotesPage.includes('voteMode: mode'), "/bonus-votes must own DoroCoin additional voting.");
 assert(bonusVotesPage.includes("if (!votingOpen)") && bonusVotesPage.indexOf("if (!votingOpen)") < bonusVotesPage.indexOf("Confirm DoroCoin Votes"), "bonus vote tools must be gated before voting opens.");

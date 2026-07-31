@@ -23,9 +23,13 @@ export default function ChallengeVotingPage() {
   const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
   const submissions = useMemo(() => challenge ? (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id) : [], [challenge, details?.submissions]);
   const phaseSummary = (details as any)?.phaseSummary as { votingOpen?: boolean; eligibleSubmissionCount?: number | null } | undefined;
-  const votingAccess = (details as any)?.userState?.votingAccess as { authenticated?: boolean; canVote?: boolean; reason?: string | null; loginPath?: string } | undefined;
+  const votingAccess = (details as any)?.userState?.votingAccess as { authenticated?: boolean; canVote?: boolean; reason?: string | null; loginPath?: string; freeVote?: { available?: boolean; used?: boolean; voteDate?: string; timeZone?: string; resetsAt?: string } } | undefined;
   const votingOpen = Boolean(phaseSummary?.votingOpen);
   const eligibleSubmissionCount = Number(phaseSummary?.eligibleSubmissionCount ?? submissions.length);
+  const freeVoteUsed = Boolean(votingAccess?.freeVote?.used);
+  const freeVoteResetLabel = votingAccess?.freeVote?.resetsAt
+    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(votingAccess.freeVote.resetsAt))
+    : null;
   const voteMutation = useMutation({
     mutationFn: () => voteForSubmission({ challengeId, submissionId, voteMode: "free", quantity: 1, idempotencyKey: crypto.randomUUID() }),
     onSuccess: async (result) => { setMessage(result.message); await queryClient.invalidateQueries({ queryKey: ["challenge-details", challengeId] }); },
@@ -35,7 +39,8 @@ export default function ChallengeVotingPage() {
     const className = sticky ? "w-full" : "mt-5 w-full";
     if (!auth.user) return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/votes`)}`} className={className}>Log in to Vote</LinkButton>;
     if (votingAccess?.canVote === false) return <Button className={className} variant="secondary" disabled>{votingAccess.reason === "owner_blocked" ? "You cannot vote on your own challenge" : votingAccess.reason === "sponsor_blocked" ? "Voting unavailable for sponsor accounts" : "Voting unavailable"}</Button>;
-    return <Button className={className} disabled={!submissionId || voteMutation.isPending} onClick={() => voteMutation.mutate()}>{voteMutation.isPending ? "Recording Vote..." : "Use Free Daily Vote"}</Button>;
+    if (freeVoteUsed) return <Button className={className} variant="secondary" disabled>Free Vote Used Today</Button>;
+    return <Button className={className} disabled={!submissionId || voteMutation.isPending} onClick={() => voteMutation.mutate()}>{voteMutation.isPending ? "Recording Vote..." : "Cast Free Vote"}</Button>;
   }
 
   if (auth.loading || detailsQuery.isLoading) return <AppShell><Card className="mx-auto h-64 max-w-4xl animate-pulse" /></AppShell>;
@@ -47,6 +52,7 @@ export default function ChallengeVotingPage() {
         {!votingOpen ? <div className="mt-8"><h2 className="text-xl font-black">Voting is not open.</h2><p className="mt-2 text-slate-300">Return when the challenge voting window opens.</p></div>
           : eligibleSubmissionCount <= 0 || !submissions.length ? <div className="mt-8"><h2 className="text-xl font-black">Voting unavailable</h2><p className="mt-2 text-slate-300">No eligible submissions are available for voting yet.</p></div>
             : <div className="mt-8">
+              <div className="rounded-[8px] border border-white/10 bg-white/[0.04] p-4"><p className="font-black text-[var(--gold)]">{freeVoteUsed ? "Free vote used for today." : "Your free vote is available."}</p>{freeVoteUsed && freeVoteResetLabel ? <p className="mt-1 text-sm text-slate-400">Resets at {freeVoteResetLabel} in your saved timezone.</p> : <p className="mt-1 text-sm text-slate-400">One free vote total per challenge per local day.</p>}</div>
               <Field label="Choose an eligible submission">
                 <div className="mobile-card-list mt-3 grid gap-4 sm:grid-cols-2">
                   {submissions.map((submission) => <button type="button" key={submission.id} onClick={() => setSubmissionId(submission.id)} className={`overflow-hidden rounded-[8px] border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] ${submissionId === submission.id ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10 bg-[#171717]"}`}>
@@ -57,7 +63,7 @@ export default function ChallengeVotingPage() {
                 <select className="sr-only" tabIndex={-1} aria-hidden="true" value={submissionId} onChange={(event) => setSubmissionId(event.target.value)}><option value="">Select a submission</option>{submissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.title}</option>)}</select>
               </Field>
               {voteAction()}
-              <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">DoroCoin Bonus Votes</LinkButton>
+              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use DoroCoin Votes</LinkButton> : null}
             </div>}
         {message ? <p className="mt-4 rounded-[8px] bg-white/[0.05] p-3 text-sm text-slate-200">{message}</p> : null}
         <LinkButton href={`/challenges/${challengeId}`} className="mt-8" variant="secondary">Return to Challenge</LinkButton>
