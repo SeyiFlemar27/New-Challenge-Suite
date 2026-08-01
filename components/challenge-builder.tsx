@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Eye, FileText, ImageIcon, LockKeyhole, Save, Sparkles, Video, X } from "lucide-react";
+import { Eye, LockKeyhole, Save, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
@@ -353,20 +353,20 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
   if (loading || !draftLoaded) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Builder" subtitle="Loading builder..." /></Card></AppShell>;
   if (user?.accountType === "sponsor") return <Locked title="Use Brand Command Center" body="Sponsor accounts create and manage campaigns from the dedicated sponsor experience." primaryHref="/sponsor/dashboard" primaryLabel="Open Brand Command Center" />;
   if (privateLocked) return <Locked title="Private challenges are available on Creator Plan" body="Upgrade to create invite-only challenges and manage private competition access." primaryHref="/subscriptions" primaryLabel="View Plans" secondaryHref="/creator/private-challenges" secondaryLabel="Back to Private Challenges" />;
-  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400" /><h1 className="mt-6 text-3xl font-black">{mode === "private" ? "Private Challenge Submitted" : "Challenge Submitted"}</h1><p className="mt-3 text-slate-300">{mediaUploadDisabled ? "Challenge published successfully without media. A branded Challenge Suite placeholder will be shown until uploads are available." : "Your challenge was saved through the existing creation flow."}</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href={mode === "private" ? "/creator/private-challenges" : "/creator/challenges"} variant="secondary">Back to Challenges</LinkButton></div></Card></AppShell>;
+  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><h1 className="mt-6 text-3xl font-black">{mode === "private" ? "Private Challenge Submitted" : "Challenge Submitted"}</h1><p className="mt-3 text-slate-300">{mediaUploadDisabled ? "Challenge published successfully without media. A branded Challenge Suite placeholder will be shown until uploads are available." : "Your challenge was saved through the existing creation flow."}</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href={mode === "private" ? "/creator/private-challenges" : "/creator/challenges"} variant="secondary">Back to Challenges</LinkButton></div></Card></AppShell>;
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl" data-mobile-creator-builder>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={mode === "private" ? "Create Private Challenge" : "Create Challenge"} subtitle={mode === "private" ? "Create a private challenge." : "Create a public challenge."} icon={<Sparkles />} /><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="text-xs font-bold text-slate-400">{autosaveState === "saving" ? "Saving..." : autosaveState === "saved" ? "Saved" : autosaveState === "offline" ? "Offline - changes will sync" : autosaveState === "failed" ? "Save failed - retry" : draftId ? "Autosave on" : ""}</span><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={() => setPreview(true)}><Eye size={17} /> Preview</Button></div></div>
-        <div className="mt-7 grid gap-7 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="mx-auto max-w-[1440px]" data-mobile-creator-builder>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={mode === "private" ? "Create Private Challenge" : "Create Challenge"} subtitle={mode === "private" ? "Create a private challenge." : "Create a public challenge."} /><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="text-xs font-bold text-slate-400">{autosaveState === "saving" ? "Saving..." : autosaveState === "saved" ? "Saved" : autosaveState === "offline" ? "Offline - changes will sync" : autosaveState === "failed" ? "Save failed - retry" : draftId ? "Autosave on" : ""}</span><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={() => setPreview(true)}><Eye size={17} /> Preview</Button></div></div>
+        <div className="mt-7 grid gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-24 lg:h-fit"><Stepper steps={steps} current={step} onSelect={setStep} /></aside>
           <div className="min-w-0">
             {isFreePublic ? <Card className="mb-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-sm text-slate-300"><b className="text-white">Free Basic builder.</b> Public, non-monetized challenges are available up to three lifetime publishes. Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}.</Card> : null}
-            <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_320px]"><Card className="p-4 sm:p-6 lg:p-8"><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} /></Card><Helper mode={mode} step={step} /></div>
+            <div className="grid gap-7 2xl:grid-cols-[minmax(0,1fr)_280px]"><Card className="p-4 sm:p-6 lg:p-8"><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} /></Card><Helper mode={mode} step={step} /></div>
           </div>
         </div>
-        {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}<Checklist readiness={validation} uploadInProgress={uploadInProgress} uploadFailed={uploadFailed} requiredImageMissing={requiredImageMissing} mediaUploadDisabled={mediaUploadDisabled} className="mt-5" />
+        {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}{step === steps.length - 1 ? <Checklist readiness={validation} uploadInProgress={uploadInProgress} uploadFailed={uploadFailed} requiredImageMissing={requiredImageMissing} mediaUploadDisabled={mediaUploadDisabled} className="mt-5" /> : <Card className="mt-5 flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm font-black text-white">Step {step + 1} of {steps.length}</span><span className="text-sm text-slate-400">{validation.missingCount} requirement{validation.missingCount === 1 ? "" : "s"} remaining</span></Card>}
         <div className="mt-8 grid gap-3 border-t border-white/10 pt-6 sm:flex sm:items-center sm:justify-between"><Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button><div className="grid gap-3 sm:flex"><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>{step < steps.length - 1 ? <Button onClick={next}>Continue</Button> : <Button onClick={publish} disabled={saving || publishBlocked}>{saving ? "Publishing..." : publishLabel}</Button>}</div></div>
       </div>
       {preview ? <Preview mode={mode} form={form} publishLabel={publishLabel} publishDisabled={publishBlocked || saving} onClose={() => setPreview(false)} onPublish={publish} /> : null}
@@ -423,13 +423,14 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
 
 function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number }) {
   const entryFeeEstimate = form.paidEntryEnabled && entryFeeCents >= 500 ? {
-    platform: Math.floor(entryFeeCents * 0.15),
-    generatedNet: entryFeeCents - Math.floor(entryFeeCents * 0.15)
+    winnerPool: Math.floor(entryFeeCents * 0.65),
+    creator: Math.floor(entryFeeCents * 0.2),
+    platform: entryFeeCents - Math.floor(entryFeeCents * 0.65) - Math.floor(entryFeeCents * 0.2)
   } : null;
   return <section>
     <StepTitle title="Monetization & Prize Pool" body="Choose how this challenge can be funded. Paid features require payment setup, admin review, and payout rules before they can go live." />
     {!monetizationEligible ? <Card className="mt-6 border-yellow-500/25 bg-yellow-500/5 p-5 text-sm leading-6 text-yellow-50"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /><b>Monetized challenges are available to Creator, Host, and approved Enterprise accounts.</b><br />Free Basic challenges remain public, non-prize, and non-monetized.</Card> : <Card className="mt-6 border-white/10 bg-white/[0.03] p-5 text-sm leading-6 text-slate-300"><b className="text-white">{planName} monetization setup.</b><br />KYC is required before withdrawals. Payments are provider-confirmed only. Winner allocation requires admin approval and a 24-hour cash hold.</Card>}
-    <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="mt-6 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-5">
         <MonetizationCard title="Enable Paid Entry" enabled={form.paidEntryEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidEntryEnabled", enabled)} setupCopy="Paid entry checkout will activate only after payment setup and provider confirmation are complete.">
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
@@ -439,7 +440,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
           <p className="mt-2 text-xs font-bold text-slate-400">Minimum entry fee is $5. USD is used until multi-currency checkout is connected.</p>
           {form.paidEntryEnabled && entryFeeCents > 0 && entryFeeCents < 500 ? <p className="mt-2 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">Entry fee must be at least $5.</p> : null}
         </MonetizationCard>
-        <MonetizationCard title="Make this challenge Sponsor Ready" enabled={form.sponsorReady} disabled={!monetizationEligible} onChange={(enabled) => update("sponsorReady", enabled)} setupCopy="Sponsor-ready challenges can appear in Sponsor Discovery after publish. Confirmed sponsor contributions go 100% to winners.">
+        <MonetizationCard title="Make this challenge Sponsor Ready" enabled={form.sponsorReady} disabled={!monetizationEligible} onChange={(enabled) => update("sponsorReady", enabled)} setupCopy="Sponsor-ready challenges can appear in Sponsor Discovery after publish. Confirmed sponsor funds are separate from generated revenue; the net sponsor prize goes to winners after the single settlement fee.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Sponsorship goal"><input className={inputClass} value={form.sponsorshipGoal} disabled={!form.sponsorReady || !monetizationEligible} onChange={(event) => update("sponsorshipGoal", event.target.value)} placeholder="Increase the winner prize pool" /></Field>
             <Field label="Preferred sponsor category"><input className={inputClass} value={form.preferredSponsorCategory} disabled={!form.sponsorReady || !monetizationEligible} onChange={(event) => update("preferredSponsorCategory", event.target.value)} placeholder="Fitness, beauty, gaming..." /></Field>
@@ -447,12 +448,9 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
           <Field label="Sponsor note"><textarea className={textareaClass} value={form.sponsorNote} disabled={!form.sponsorReady || !monetizationEligible} onChange={(event) => update("sponsorNote", event.target.value)} placeholder="Tell sponsors what kind of brand fit makes sense." /></Field>
           <div><p className="text-sm font-bold text-slate-300">Sponsor visibility placements</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{SPONSOR_PLACEMENTS.map((surface) => <label key={surface} className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-black/25 p-3 text-sm font-bold text-slate-300"><input type="checkbox" disabled={!form.sponsorReady || !monetizationEligible} checked={form.sponsorPlacementPreferences.includes(surface)} onChange={() => togglePlacement(surface)} /> {sponsorPlacementLabels[surface]}</label>)}</div></div>
         </MonetizationCard>
-        <MonetizationCard title="Enable Prize Pool" enabled={form.prizePoolEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("prizePoolEnabled", enabled)} setupCopy="Prize pools start at $0 until confirmed payments or sponsor contributions are received.">
+        <MonetizationCard title="Enable Prize Pool" enabled={form.prizePoolEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("prizePoolEnabled", enabled)} setupCopy="Prize pools use creator funding, confirmed entry-fee allocations, confirmed sponsor contributions, or approved platform funding. Viewer contributions are not accepted.">
           <ul className="space-y-2 text-sm leading-6 text-slate-300">
-            <li>- Platform fee is 15% of confirmed generated revenue only.</li>
-            <li>- Confirmed entry fees and paid votes are distributed after results review.</li>
-            <li>- 100% of confirmed sponsor contributions goes to winners.</li>
-            <li>- Winner payout requires admin approval, KYC, and a 24-hour hold.</li>
+            <li>- Confirmed generated revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite.</li><li>- Confirmed sponsor funding stays separate and receives one 15% sponsor-prize fee at settlement.</li><li>- Creator guarantees must be fully provider-confirmed before publication.</li><li>- Prize release requires approved winners and the 24-hour dispute hold.</li>
           </ul>
         </MonetizationCard>
         <MonetizationCard title="Enable Paid Votes" enabled={form.paidVotesEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidVotesEnabled", enabled)} setupCopy="Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts, but checkout remains webhook-confirmed before credits are granted." />
@@ -461,10 +459,9 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Monetization Preview</p>
         <h3 className="mt-2 text-xl font-black text-white">Rules, not actual earnings</h3>
         <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-          <p><b className="text-white">Generated revenue:</b> platform fee is 15% of confirmed paid entry, paid vote, and boost revenue only.</p>
-          <p><b className="text-white">Sponsor contributions:</b> excluded from platform fee and 100% goes to approved winners after provider confirmation.</p>
+          <p><b className="text-white">Generated revenue:</b> confirmed revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite.</p><p><b className="text-white">Sponsor contributions:</b> excluded from the 65/20/15 split; the net sponsor prize goes to approved winners after one 15% settlement fee.</p>
           <p><b className="text-white">Withdrawal rules:</b> admin approval, 24-hour hold, and KYC are required.</p>
-          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Paid-entry estimate</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Platform fee: {formatCents(entryFeeEstimate.platform)}</p><p>Estimated challenge revenue: {formatCents(entryFeeEstimate.generatedNet)}</p></div> : null}
+          {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Paid-entry estimate</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Winner pool: {formatCents(entryFeeEstimate.winnerPool)}</p><p>Creator share: {formatCents(entryFeeEstimate.creator)}</p><p>Challenge Suite: {formatCents(entryFeeEstimate.platform)}</p></div> : null}
           <p className="text-xs text-slate-500">Estimates are not saved as revenue and do not create ledger entries.</p>
         </div>
       </Card>
@@ -475,7 +472,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
 function MonetizationCard({ title, enabled, disabled, setupCopy, onChange, children }: { title: string; enabled: boolean; disabled: boolean; setupCopy: string; onChange: (enabled: boolean) => void; children?: React.ReactNode }) {
   return <Card className="border-white/10 bg-[#141414] p-5">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-black text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{setupCopy}</p></div><label className={`flex min-w-28 items-center justify-between gap-3 rounded-[8px] border px-3 py-2 text-sm font-black ${disabled ? "border-white/10 text-slate-500" : "border-[var(--gold)]/30 text-white"}`}><span>{enabled ? "On" : disabled ? "Locked" : "Off"}</span><input type="checkbox" checked={enabled} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /></label></div>
-    {children ? <div className={`mt-5 space-y-4 ${disabled || !enabled ? "opacity-70" : ""}`}>{children}</div> : null}
+    {children && enabled && !disabled ? <div className="mt-5 space-y-4">{children}</div> : null}
   </Card>;
 }
 
@@ -502,15 +499,15 @@ function UploadGallery({ form, userId, updateMedia, track, mediaUploadDisabled, 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-xl font-black text-white">Images</h3><p className="mt-1 text-sm text-slate-400">{mediaUploadDisabled ? "Media skipped for now. Uploads can be restored after Firebase Storage is connected." : "Add up to 3 challenge images. At least one image is required."}</p></div><span className={`rounded-full px-3 py-1 text-xs font-black ${mediaUploadDisabled ? "bg-white/10 text-slate-300" : "bg-[var(--gold)] text-black"}`}>{mediaUploadDisabled ? "Optional now" : "1 required"}</span></div>
       {mediaUploadDisabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : !form.coverImageUrl || !form.coverImagePath ? <p className="mt-3 rounded-[8px] border border-yellow-500/25 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Add at least one challenge image to continue.</p> : null}
       <div className="mt-6 grid gap-6 md:grid-cols-3">
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 1" required={!mediaUploadDisabled}><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "banner")} kind="image" buttonLabel="Upload image" required={!mediaUploadDisabled} disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("coverImageUrl")} /></UploadPanel>
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 2"><MediaUploadField label="Gallery image" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("promoImageUrl")} /></UploadPanel>
-        <UploadPanel icon={<ImageIcon size={20} />} title="Image 3"><MediaUploadField label="Gallery image" value={form.galleryImageUrl} onChange={(url, metadata) => updateMedia("galleryImageUrl", "galleryImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("galleryImageUrl")} /></UploadPanel>
+        <UploadPanel title="Image 1" required={!mediaUploadDisabled}><MediaUploadField label="Cover image" value={form.coverImageUrl} onChange={(url, metadata) => updateMedia("coverImageUrl", "coverImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "banner")} kind="image" buttonLabel="Upload image" required={!mediaUploadDisabled} disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("coverImageUrl")} /></UploadPanel>
+        <UploadPanel title="Image 2"><MediaUploadField label="Gallery image" value={form.promoImageUrl} onChange={(url, metadata) => updateMedia("promoImageUrl", "promoImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("promoImageUrl")} /></UploadPanel>
+        <UploadPanel title="Image 3"><MediaUploadField label="Gallery image" value={form.galleryImageUrl} onChange={(url, metadata) => updateMedia("galleryImageUrl", "galleryImagePath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "gallery")} kind="image" buttonLabel="Upload image" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("galleryImageUrl")} /></UploadPanel>
       </div>
     </section>
     <section className="border-t border-white/10 pt-10">
       <h3 className="text-xl font-black text-white">Video</h3>
       <p className="mt-1 text-sm text-slate-400">Optional intro video or trailer. You can continue without video.</p>
-      <div className="mt-6 max-w-2xl"><UploadPanel icon={<Video size={20} />} title="Intro video / trailer"><MediaUploadField label="Trailer video" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "video")} kind="video" buttonLabel="Upload video" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
+      <div className="mt-6 max-w-2xl"><UploadPanel title="Intro video / trailer"><MediaUploadField label="Trailer video" value={form.trailerVideoUrl} onChange={(url, metadata) => updateMedia("trailerVideoUrl", "trailerVideoPath", url, metadata)} storagePath={challengeDraftMediaPath(userId, "video")} kind="video" buttonLabel="Upload video" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={track("trailerVideoUrl")} /></UploadPanel></div>
     </section>
     <section className="border-t border-white/10 pt-10">
       <h3 className="text-xl font-black text-white">Documents</h3>
@@ -523,10 +520,10 @@ function UploadGallery({ form, userId, updateMedia, track, mediaUploadDisabled, 
   </div>;
 }
 
-function UploadPanel({ icon, title, required = false, children }: { icon: React.ReactNode; title: string; required?: boolean; children: React.ReactNode }) {
+function UploadPanel({ title, required = false, children }: { title: string; required?: boolean; children: React.ReactNode }) {
   return <div className="min-w-0">
     <div className="mb-3 flex min-h-10 items-center justify-between gap-3">
-      <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[var(--gold)]/10 text-[var(--gold)]">{icon}</span><h3 className="font-black text-white">{title}</h3></div>
+      <h3 className="font-black text-white">{title}</h3>
       <span className={`rounded-full px-3 py-1 text-xs font-black ${required ? "bg-[var(--gold)] text-black" : "bg-white/10 text-slate-300"}`}>{required ? "Required" : "Optional"}</span>
     </div>
     {children}
@@ -534,7 +531,7 @@ function UploadPanel({ icon, title, required = false, children }: { icon: React.
 }
 
 function DocumentSlot({ title, value, onChange, storagePath, mediaUploadDisabled = false, mediaUploadDisabledReason, onStatusChange }: { title: string; value: string; onChange: (url: string, metadata?: { path: string }) => void; storagePath: string; mediaUploadDisabled?: boolean; mediaUploadDisabledReason: string; onStatusChange: (status: MediaUploadStage) => void }) {
-  return <UploadPanel icon={<FileText size={20} />} title={title}>
+  return <UploadPanel title={title}>
     <MediaUploadField label={title} value={value} onChange={onChange} storagePath={storagePath} kind="document" buttonLabel="Upload document" disabled={mediaUploadDisabled} disabledReason={mediaUploadDisabledReason} onStatusChange={onStatusChange} />
   </UploadPanel>;
 }

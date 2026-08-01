@@ -44,6 +44,7 @@ export function MediaUploadField({
   const retryFileRef = useRef<File | null>(null);
   const localPreviewRef = useRef("");
   const uploadTaskRef = useRef<UploadTask | null>(null);
+  const uploadCancelledRef = useRef(false);
   const uploadStartedAtRef = useRef(0);
   const lastProgressAtRef = useRef(0);
   const lastBytesTransferredRef = useRef(0);
@@ -231,6 +232,17 @@ export function MediaUploadField({
     }
   }
 
+  function cancelUpload() {
+    uploadCancelledRef.current = true;
+    uploadTaskRef.current?.cancel();
+    uploadTaskRef.current = null;
+    setStatus("idle");
+    setProgress(0);
+    setUploadSpeed("");
+    setError("");
+    setErrorCode("");
+  }
+
   function remove() {
     const shouldRemove = !hasUploadedValue || window.confirm("Are you sure you want to remove this media?");
     if (!shouldRemove) return;
@@ -293,6 +305,7 @@ export function MediaUploadField({
             </div>
           </div>
         ) : null}
+        {uploading && !disabled ? <Button type="button" variant="ghost" className="mt-3" onClick={cancelUpload}><XCircle size={16} /> Cancel Upload</Button> : null}
         {status === "complete" || value ? <p className="mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 size={16} /> Upload complete. Media URL and storage path are ready to save.</p> : null}
         {disabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : null}
         {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3">{!disabled ? <Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button> : null}<Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}

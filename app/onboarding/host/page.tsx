@@ -2,22 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, Check, ClipboardCheck, LockKeyhole, Radio, ShieldCheck, Trophy, UsersRound, Vote } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { OnboardingShell } from "@/components/onboarding-shell";
 import { Button, Card, Field, inputClass, LinkButton } from "@/components/ui";
+import { MediaUploadField } from "@/components/media-upload-field";
 import { apiRequest } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getEffectiveTier } from "@/lib/plan-access";
+import { profileMediaPath } from "@/lib/media-upload-paths";
 
 const hostTypes = ["Online challenges", "Live events", "Tournaments", "School competitions", "Talent shows", "Pageants", "Sports competitions", "Business pitch competitions", "Community contests", "Other"];
-const hostAccess = [
-  ["Competition builder", Trophy],
-  ["Participant management", UsersRound],
-  ["Submission review", ClipboardCheck],
-  ["Voting control", Vote],
-  ["Live event tools", Radio],
-  ["Reports and results", BarChart3]
-] as const;
+const hostAccess = ["Competition builder", "Participant management", "Submission review", "Voting control", "Live event tools", "Reports and results"] as const;
 
 export default function HostOnboardingPage() {
   const router = useRouter();
@@ -53,7 +48,7 @@ export default function HostOnboardingPage() {
       currentStep={step}
       totalSteps={5}
     >
-      {step === 1 ? <div className="grid gap-4 sm:grid-cols-2">{hostAccess.map(([title, Icon]) => <Card key={title} className="flex min-h-28 items-center gap-4 p-5"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-yellow-500/10 text-[var(--gold)]"><Icon size={20} /></span><h2 className="font-black">{title}</h2></Card>)}<Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:col-span-2"><p className="text-sm leading-6 text-slate-300">Team seats and revenue review are foundations. No payout, withdrawal, refund, sponsor release, or prize release is active.</p></Card></div> : null}
+      {step === 1 ? <div className="grid gap-4 sm:grid-cols-2">{hostAccess.map((title) => <Card key={title} className="flex min-h-24 items-center p-5"><h2 className="font-black">{title}</h2></Card>)}<Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:col-span-2"><p className="text-sm leading-6 text-slate-300">Financial activity stays pending until payment confirmation, identity checks, and platform review are complete.</p></Card></div> : null}
 
       {step === 2 ? <Card className="p-6 sm:p-8"><div className="grid gap-6 sm:grid-cols-2">
         <Field label="Host or organization name"><input className={inputClass} value={form.organizationName} onChange={(event) => update("organizationName", event.target.value)} /></Field>
@@ -61,7 +56,7 @@ export default function HostOnboardingPage() {
         <Field label="Country or location"><input className={inputClass} value={form.location} onChange={(event) => update("location", event.target.value)} /></Field>
         <Field label="Contact email"><input className={inputClass} type="email" value={form.contactEmail || user?.email || ""} onChange={(event) => update("contactEmail", event.target.value)} /></Field>
         <Field label="Public host profile URL"><input className={inputClass} value={form.publicProfileUrl} onChange={(event) => update("publicProfileUrl", event.target.value)} placeholder="https://..." /></Field>
-        <Field label="Logo or avatar URL"><input className={inputClass} value={form.logoUrl} onChange={(event) => update("logoUrl", event.target.value)} placeholder="https://..." /></Field>
+        <MediaUploadField label="Logo or avatar" value={form.logoUrl} onChange={(url) => update("logoUrl", url)} storagePath={profileMediaPath(user?.uid ?? "pending", "avatar")} kind="image" buttonLabel="Upload logo or avatar" helperText="Upload a clear square image. The saved Storage URL is added to your host profile." />
       </div></Card> : null}
 
       {step === 3 ? <Card className="p-6 sm:p-8"><div className="grid gap-6 sm:grid-cols-2">
@@ -71,7 +66,7 @@ export default function HostOnboardingPage() {
         <Field label="Event mode"><select className={inputClass} value={form.eventMode} onChange={(event) => update("eventMode", event.target.value)}><option value="online">Online only</option><option value="physical">Physical / in-person only</option><option value="hybrid">Hybrid</option><option value="unsure">Not sure yet</option></select></Field>
       </div></Card> : null}
 
-      {step === 4 ? <Card className="p-6 sm:p-8"><ShieldCheck className="text-[var(--gold)]" size={34} /><h2 className="mt-5 text-2xl font-black">Revenue review, without unsafe movement</h2><p className="mt-4 leading-7 text-slate-300">Challenge Suite can track entry activity, vote activity, sponsor interest, and event revenue foundations. Withdrawals, automatic payouts, refunds, sponsor releases, and prize-pool releases are not active.</p><label className="mt-7 flex items-start gap-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-slate-300"><input className="mt-1" type="checkbox" checked={form.revenueAcknowledged} onChange={(event) => update("revenueAcknowledged", event.target.checked)} /><span>I understand that these are review and tracking foundations only.</span></label></Card> : null}
+      {step === 4 ? <Card className="p-6 sm:p-8"><h2 className="mt-5 text-2xl font-black">How financial reviews work</h2><p className="mt-4 leading-7 text-slate-300">Challenge Suite tracks confirmed entry, vote, sponsor, and event activity. Withdrawal requests and prize releases remain subject to identity checks, eligibility review, and the applicable hold period.</p><label className="mt-7 flex items-start gap-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-slate-300"><input className="mt-1" type="checkbox" checked={form.revenueAcknowledged} onChange={(event) => update("revenueAcknowledged", event.target.checked)} /><span>I understand that financial activity remains subject to confirmation and platform review.</span></label></Card> : null}
 
       {step === 5 ? <div className="grid gap-4">
         <HostAction title="Build first competition" body="Open the Host competition builder." label="Build Competition" onChoose={() => void complete("/challenges/create")} />

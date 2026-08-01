@@ -1,0 +1,11 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+const builder = fs.readFileSync("components/challenge-builder.tsx", "utf8");
+const host = fs.readFileSync("app/onboarding/host/page.tsx", "utf8");
+const upload = fs.readFileSync("components/media-upload-field.tsx", "utf8");
+assert.ok(builder.includes("MediaUploadField"));
+assert.ok(host.includes("MediaUploadField"));
+assert.ok(!host.includes("Logo or avatar URL"));
+assert.ok(host.includes("profileMediaPath"));
+for (const capability of ["uploadBytesResumable", "progress", "Replace", "Remove", "Retry", "Cancel"]) assert.ok(upload.includes(capability), `missing ${capability}`);
+console.log("required media uses storage-backed upload components");
