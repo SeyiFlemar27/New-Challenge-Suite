@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const pool = readFileSync("lib/server/prize-pools.ts", "utf8");
+const builder = readFileSync("components/challenge-builder.tsx", "utf8");
+const publish = readFileSync("app/api/challenges/[id]/publish/route.ts", "utf8");
+for (const source of ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"]) assert(pool.includes(`"${source}"`), `missing approved source ${source}`);
+assert(builder.includes("Viewer contributions are not accepted."), "viewer/community funding must not be exposed");
+assert(builder.includes("Fund Guaranteed Prize"), "creator-funded pool needs a real funding action");
+assert(publish.includes("PRIZE_FUNDING_REQUIRED"), "publish must fail closed without an approved funding source");
+console.log("approved prize pool funding source checks passed");

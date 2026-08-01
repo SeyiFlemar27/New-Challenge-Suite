@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
@@ -6,7 +6,6 @@ import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, sho
 import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
-import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
@@ -76,6 +75,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
   if (requestedMonetization && !(monetizationAccess.canPreparePaidEntry || monetizationAccess.canPrepareSponsorReady || monetizationAccess.canPreparePrizePool || monetizationAccess.canPreparePaidVotes)) return fail("Monetized challenges are available to Creator, Host, and approved Enterprise accounts.", 403, undefined, "MONETIZATION_LOCKED");
   if (monetizationIntent.paidEntryRequested && (!monetizationAccess.canPreparePaidEntry || !paidEntryValidation.valid)) return fail(paidEntryValidation.message || "Paid entry setup is not available for this account.", 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
+  const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
+  const requiredCreatorFundingCents = Math.max(0, Number(currentMonetization.creatorPrizeFundingRequiredCents ?? 0));
+  const confirmedCreatorFundingCents = Math.max(0, Number(current.confirmedCreatorPrizeFundingCents ?? currentMonetization.confirmedCreatorPrizeFundingCents ?? 0));
+  const confirmedPlatformFundingCents = Math.max(0, Number(current.confirmedPlatformPromotionalPrizeCents ?? 0));
+  if (requiredCreatorFundingCents > confirmedCreatorFundingCents) return fail("Confirm the full creator-funded prize amount before publishing this challenge.", 409, { requiredCreatorFundingCents, confirmedCreatorFundingCents }, "PRIZE_FUNDING_REQUIRED");
+  if (monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady && confirmedCreatorFundingCents + confirmedPlatformFundingCents <= 0) return fail("Confirm an approved prize funding source before publishing this challenge.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
+  const kycStatus = String(planProfile.kycStatus ?? planProfile.sumsubKycStatus ?? "not_started").toLowerCase();
+  if ((monetizationIntent.paidEntryRequested || requiredCreatorFundingCents > 0) && !["verified", "approved"].includes(kycStatus)) return fail("Identity verification is required before publishing a paid challenge.", 403, { kycStatus, redirectTo: "/kyc" }, "KYC_REQUIRED");
 
   let lifecycleStatus = resolveInitialChallengeStatus({ publish: true, startsAt: body.startsAt, endsAt: body.endsAt, submissionDeadline: body.submissionDeadline, votingDeadline: body.votingDeadline, sponsorEnabled: body.sponsorEnabled, visibility: body.visibility, competitionFormat: body.competitionFormat, premiumOnly: body.premiumOnly });
   const advancedReviewRequired = body.prizeType === "money" || body.prizeType === "physical_product" || body.isLiveEvent || body.tournamentType !== "none" || body.competitionFormat.toLowerCase().includes("tournament");
@@ -86,6 +93,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
   const safeMonetization = {
+    ...currentMonetization,
     ...body.monetization,
     enabled: requestedMonetization,
     paidEntryRequested: Boolean(monetizationIntent.paidEntryRequested && monetizationAccess.canPreparePaidEntry),
@@ -97,12 +105,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status: requestedMonetization ? "setup_required" : "not_requested",
     paymentActive: false,
     checkoutActive: false,
-    ledgerCreationEnabled: false,
+    ledgerCreationEnabled: Boolean(requestedMonetization),
     prizeReleaseActive: false,
     payoutReleaseActive: false,
     adminApprovalRequired: Boolean(requestedMonetization),
     kycRequiredBeforeWithdrawal: Boolean(requestedMonetization),
-    cashHoldHours: 24
+    cashHoldHours: 24,
+    creatorPrizeFundingRequiredCents: requiredCreatorFundingCents,
+    confirmedCreatorPrizeFundingCents: confirmedCreatorFundingCents,
+    creatorPrizeFundingStatus: requiredCreatorFundingCents > 0 ? confirmedCreatorFundingCents >= requiredCreatorFundingCents ? "fully_funded" : "funding_required" : String(currentMonetization.creatorPrizeFundingStatus ?? "not_requested"),
+    prizePoolFundingSource: currentMonetization.prizePoolFundingSource ?? null
   };
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
   const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
@@ -140,8 +152,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     db.collection("challenges").doc(id).set(update, { merge: true }),
     (body.visibility === "private" || body.visibility === "exclusive") ? createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }) : Promise.resolve(null),
     db.collection("revenueShareLedgers").doc(`revenue_share_${id}`).set(revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
-    writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, now }),
-    writeCashTransactionPlaceholder(db, { id: `challenge_${id}_prize_placeholder`, userId: user.uid, type: "prize_placeholder_created", status: "recorded", amountCents: 0, currency: "USD", sourceType: "challenge", sourceId: id, challengeId: id, description: `Prize foundation placeholder created for challenge ${id}. No cash prize or payout movement is active.`, now })
+    writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now })
   ]);
   await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: lifecycleStatus === "pending_review" ? "Challenge submitted" : "Challenge scheduled", body: lifecycleStatus === "pending_review" ? "Your challenge is awaiting review." : "Your challenge is scheduled.", targetId: id });
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.published", targetType: "challenge", targetId: id, after: { status: lifecycleStatus, title: body.title }, reason: lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge published from draft.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true } }, db).catch(() => undefined);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, LockKeyhole, Save, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
@@ -30,6 +31,7 @@ type FormState = {
   timeZone: string;
   coverImageUrl: string; coverImagePath: string; promoImageUrl: string; promoImagePath: string; galleryImageUrl: string; galleryImagePath: string; trailerVideoUrl: string; trailerVideoPath: string; documentOneUrl: string; documentOnePath: string; documentTwoUrl: string; documentTwoPath: string;
   paidEntryEnabled: boolean; entryFeeAmount: string; entryCurrency: string; sponsorReady: boolean; prizePoolEnabled: boolean; paidVotesEnabled: boolean;
+  creatorPrizeFundingRequiredCents: number; confirmedCreatorPrizeFundingCents: number; creatorPrizeFundingStatus: string;
   sponsorshipGoal: string; preferredSponsorCategory: string; sponsorNote: string; sponsorPlacementPreferences: string[];
 };
 
@@ -42,7 +44,7 @@ function dateInput(days: number) {
 }
 
 function initialForm(): FormState {
-  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
+  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, creatorPrizeFundingRequiredCents: 0, confirmedCreatorPrizeFundingCents: 0, creatorPrizeFundingStatus: "not_requested", sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
 }
 
 function formFromChallenge(challenge: Record<string, unknown>): FormState {
@@ -84,6 +86,9 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
     sponsorReady: Boolean(monetization.sponsorReady ?? challenge.sponsorEnabled),
     prizePoolEnabled: Boolean(monetization.prizePoolRequested ?? challenge.prizePoolEnabled),
     paidVotesEnabled: Boolean(monetization.paidVotesRequested ?? challenge.paidVotesEnabled),
+    creatorPrizeFundingRequiredCents: Math.max(0, Number(monetization.creatorPrizeFundingRequiredCents ?? 0)),
+    confirmedCreatorPrizeFundingCents: Math.max(0, Number(challenge.confirmedCreatorPrizeFundingCents ?? monetization.confirmedCreatorPrizeFundingCents ?? 0)),
+    creatorPrizeFundingStatus: String(monetization.creatorPrizeFundingStatus ?? "not_requested"),
     sponsorshipGoal: String(monetization.sponsorshipGoal ?? ""),
     preferredSponsorCategory: String(monetization.preferredSponsorCategory ?? ""),
     sponsorNote: String(monetization.sponsorNote ?? ""),
@@ -125,6 +130,8 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
   const requiredImageMissing = !mediaUploadDisabled && (!form.coverImageUrl || !form.coverImagePath);
   const entryFeeCents = Math.max(0, Math.round(Number(form.entryFeeAmount || 0) * 100));
   const monetizedIntent = form.paidEntryEnabled || form.sponsorReady || form.prizePoolEnabled || form.paidVotesEnabled;
+  const creatorPrizeFundingRequired = form.prizePoolEnabled && !form.paidEntryEnabled && !form.sponsorReady;
+  const creatorPrizeFundingConfirmed = form.confirmedCreatorPrizeFundingCents > 0 && form.confirmedCreatorPrizeFundingCents >= form.creatorPrizeFundingRequiredCents;
   const monetizationProblem = !monetizationEligible && monetizedIntent
     ? "Monetized challenges are available to Creator, Host, and approved Enterprise accounts."
     : form.paidEntryEnabled && entryFeeCents < 500
@@ -144,7 +151,8 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
     void fetchChallengeDraft(draftId).then((result) => {
       if (result.ok && result.data?.challenge) {
         const serverDraft = result.data.challenge;
-        let nextForm = formFromChallenge(serverDraft);
+        const serverForm = formFromChallenge(serverDraft);
+        let nextForm = serverForm;
         try {
           const rawRecovery = window.localStorage.getItem(recoveryKey);
           if (rawRecovery) {
@@ -152,7 +160,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
             const localSaved = Date.parse(String(recovery.savedAt ?? ""));
             const serverSaved = Date.parse(String(serverDraft.lastAutosavedAt ?? serverDraft.updatedAt ?? ""));
             if (recovery.form && Number.isFinite(localSaved) && (!Number.isFinite(serverSaved) || localSaved > serverSaved)) {
-              nextForm = recovery.form;
+              nextForm = { ...recovery.form, creatorPrizeFundingRequiredCents: serverForm.creatorPrizeFundingRequiredCents, confirmedCreatorPrizeFundingCents: serverForm.confirmedCreatorPrizeFundingCents, creatorPrizeFundingStatus: serverForm.creatorPrizeFundingStatus };
               if (typeof recovery.step === "number") setStep(Math.max(0, Math.min(recovery.step, steps.length - 1)));
               setNotice("Recovered unsynced local changes.");
             }
@@ -363,7 +371,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
           <aside className="lg:sticky lg:top-24 lg:h-fit"><Stepper steps={steps} current={step} onSelect={setStep} /></aside>
           <div className="min-w-0">
             {isFreePublic ? <Card className="mb-6 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-sm text-slate-300"><b className="text-white">Free Basic builder.</b> Public, non-monetized challenges are available up to three lifetime publishes. Used: {freeUsage.loaded ? freeUsage.used : "..."} of {freeUsage.limit}.</Card> : null}
-            <div className="grid gap-7 2xl:grid-cols-[minmax(0,1fr)_280px]"><Card className="p-4 sm:p-6 lg:p-8"><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} /></Card><Helper mode={mode} step={step} /></div>
+            <div className="grid gap-7 2xl:grid-cols-[minmax(0,1fr)_280px]"><Card className="p-4 sm:p-6 lg:p-8"><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} draftId={draftId} /></Card><Helper mode={mode} step={step} /></div>
           </div>
         </div>
         {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}{step === steps.length - 1 ? <Checklist readiness={validation} uploadInProgress={uploadInProgress} uploadFailed={uploadFailed} requiredImageMissing={requiredImageMissing} mediaUploadDisabled={mediaUploadDisabled} className="mt-5" /> : <Card className="mt-5 flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm font-black text-white">Step {step + 1} of {steps.length}</span><span className="text-sm text-slate-400">{validation.missingCount} requirement{validation.missingCount === 1 ? "" : "s"} remaining</span></Card>}
@@ -385,7 +393,7 @@ function Stepper({ steps, current, onSelect }: { steps: string[]; current: numbe
 
 function StepTitle({ title, body }: { title: string; body: string }) { return <div><h2 className="text-2xl font-black text-white">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{body}</p></div>; }
 
-function StepContent({ mode, step, form, update, toggleType, togglePlacement, updateMedia, track, userId, planAccess, planName, monetizationEligible, entryFeeCents, mediaUploadDisabled, mediaUploadDisabledReason }: { mode: Mode; step: number; form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; toggleType: (type: string) => void; togglePlacement: (surface: string) => void; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; userId: string; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string }) {
+function StepContent({ mode, step, form, update, toggleType, togglePlacement, updateMedia, track, userId, planAccess, planName, monetizationEligible, entryFeeCents, mediaUploadDisabled, mediaUploadDisabledReason, draftId }: { mode: Mode; step: number; form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; toggleType: (type: string) => void; togglePlacement: (surface: string) => void; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; userId: string; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string; draftId?: string }) {
   const privateOffset = mode === "private" ? 1 : 0;
   if (step === 0) return <section><StepTitle title="Overview" body={mode === "private" ? "Set the private challenge brief and visibility." : "Set the public challenge brief and discovery details."} /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label={mode === "private" ? "Private challenge title" : "Challenge title"}><input className={inputClass} value={form.title} maxLength={120} onChange={(e) => update("title", e.target.value)} placeholder="Name the challenge" /></Field><Field label="Category"><select className={inputClass} value={form.category} onChange={(e) => update("category", e.target.value)}><option value="">Select category</option>{categories.map((c) => <option key={c}>{c}</option>)}</select></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Visibility"><input className={inputClass} value={mode === "private" ? "Private / invite-only" : "Public"} disabled /></Field><Field label="Short description"><input className={inputClass} value={form.shortDescription} maxLength={160} onChange={(e) => update("shortDescription", e.target.value)} /></Field></div><div className="mt-5"><Field label="Detailed description"><textarea className={textareaClass} value={form.description} maxLength={2000} onChange={(e) => update("description", e.target.value)} /></Field></div></section>;
   if (mode === "private" && step === 1) return <section><StepTitle title="Access & Invites" body="Control who can enter without creating fake invite records." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><input className={inputClass} value="Invite-only access" disabled /></Field><Field label="Invite code/link"><input className={inputClass} value="Created after private challenge setup" disabled /></Field></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(e) => update("access", e.target.value)} /></Field></div></section>;
@@ -409,7 +417,7 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
       <Field label="Winner announcement"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(e) => update("endsAt", e.target.value)} /></Field>
     </div>
   </section>;
-  if (step === (mode === "private" ? 5 : 4)) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} />;
+  if (step === (mode === "private" ? 5 : 4)) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
   if (mode === "public" && step === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   const timelineSummary = {
     "Registration Close": formatChallengeLocalDateTime(form.registrationDeadline, form.timeZone) ?? "Not set",
@@ -418,10 +426,10 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
     "Voting/Review Close": formatChallengeLocalDateTime(form.votingDeadline, form.timeZone) ?? "Not set",
     "Winner Announcement": formatChallengeLocalDateTime(form.endsAt, form.timeZone) ?? "Not set"
   };
-  return <section><StepTitle title="Review & Publish" body="Check the challenge before creating a record." />{mode === "private" ? <div className="mt-6"><h3 className="text-lg font-black text-white">Media & Branding</h3><p className="mt-1 text-sm text-slate-400">Assets stay in the existing media flow and do not create invite records.</p><UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-4" /></div> : null}<div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? "Private / invite-only" : "Public", "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Publishing without media" : form.coverImageUrl ? "Uploaded" : "Required", "Paid Entry": form.paidEntryEnabled ? "Requested" : "Off", "Sponsor Ready": form.sponsorReady ? "Requested" : "Off", "Prize Pool": form.prizePoolEnabled ? "Starts at $0 until confirmed payments" : "Off" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Payment safety:</b> payments require secure confirmation. Winner allocation, cash prize release, and automatic payouts require admin approval.</Card></section>;
+  return <section><StepTitle title="Review & Publish" body="Check the challenge before creating a record." />{mode === "private" ? <div className="mt-6"><h3 className="text-lg font-black text-white">Media & Branding</h3><p className="mt-1 text-sm text-slate-400">Assets stay in the existing media flow and do not create invite records.</p><UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-4" /></div> : null}<div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? "Private / invite-only" : "Public", "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Publishing without media" : form.coverImageUrl ? "Uploaded" : "Required", "Paid Entry": form.paidEntryEnabled ? "Requested" : "Off", "Sponsor Ready": form.sponsorReady ? "Requested" : "Off", "Prize Pool": form.prizePoolEnabled ? form.paidEntryEnabled || form.sponsorReady ? "Grows from confirmed revenue or sponsor funding" : form.confirmedCreatorPrizeFundingCents > 0 ? `${formatCents(form.confirmedCreatorPrizeFundingCents)} creator funding confirmed` : "Creator funding required before publish" : "Off" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Payment safety:</b> payments require secure confirmation. Winner allocation, cash prize release, and automatic payouts require admin approval.</Card></section>;
 }
 
-function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number }) {
+function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents, draftId }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; draftId?: string }) {
   const entryFeeEstimate = form.paidEntryEnabled && entryFeeCents >= 500 ? {
     winnerPool: Math.floor(entryFeeCents * 0.65),
     creator: Math.floor(entryFeeCents * 0.2),
@@ -450,8 +458,11 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         </MonetizationCard>
         <MonetizationCard title="Enable Prize Pool" enabled={form.prizePoolEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("prizePoolEnabled", enabled)} setupCopy="Prize pools use creator funding, confirmed entry-fee allocations, confirmed sponsor contributions, or approved platform funding. Viewer contributions are not accepted.">
           <ul className="space-y-2 text-sm leading-6 text-slate-300">
-            <li>- Confirmed generated revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite.</li><li>- Confirmed sponsor funding stays separate and receives one 15% sponsor-prize fee at settlement.</li><li>- Creator guarantees must be fully provider-confirmed before publication.</li><li>- Prize release requires approved winners and the 24-hour dispute hold.</li>
+            <li>- Approved sources: creator funding, confirmed entry-fee allocation, confirmed sponsor funding, or approved platform funding.</li><li>- Confirmed generated revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite.</li><li>- Confirmed sponsor funding stays separate and receives one 15% sponsor-prize fee at settlement.</li><li>- Prize release requires approved winners and the 24-hour dispute hold.</li>
           </ul>
+          {!form.paidEntryEnabled && !form.sponsorReady ? <div className="rounded-[8px] border border-white/10 bg-black/25 p-4 text-sm leading-6 text-slate-300">
+            {form.confirmedCreatorPrizeFundingCents > 0 ? <><p className="font-black text-emerald-200">Creator funding confirmed</p><p>{formatCents(form.confirmedCreatorPrizeFundingCents)} is reserved for the winner pool.</p></> : <><p className="font-black text-white">Creator-funded guarantee required</p><p>Save the draft, then complete provider checkout. Funding is confirmed only after the payment provider verifies it.</p>{draftId ? <LinkButton className="mt-3" href={"/challenges/" + draftId + "/prize-funding"}>Fund Guaranteed Prize</LinkButton> : <p className="mt-2 font-bold text-yellow-100">Save Draft to continue to prize funding.</p>}</>}
+          </div> : <p className="rounded-[8px] border border-white/10 bg-black/25 p-4 text-sm text-slate-300">This prize pool grows only from confirmed eligible revenue. Estimates do not create funds.</p>}
         </MonetizationCard>
         <MonetizationCard title="Enable Paid Votes" enabled={form.paidVotesEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidVotesEnabled", enabled)} setupCopy="Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts, but checkout remains webhook-confirmed before credits are granted." />
       </div>
@@ -481,7 +492,7 @@ function formatCents(value: number) {
 }
 
 
-function MediaBrandingStep({ form, userId, updateMedia, track, mediaUploadDisabled, mediaUploadDisabledReason }: { form: FormState; userId: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string }) {
+function MediaBrandingStep({ form, userId, updateMedia, track, mediaUploadDisabled, mediaUploadDisabledReason }: { form: FormState; userId: string; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string; draftId?: string }) {
   return <section>
     <StepTitle title="Media & Branding" body="Add clear, original media that helps participants understand your challenge." />
     <div className="mt-6 rounded-[8px] border border-[var(--gold)]/25 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-yellow-50">

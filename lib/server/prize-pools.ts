@@ -1,141 +1,73 @@
-﻿import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore } from "firebase-admin/firestore";
+import { DEFAULT_WINNER_SPLITS } from "@/lib/server/payout-structure";
 
-export type PrizePoolStatus =
-  | "disabled"
-  | "draft"
-  | "pending_funding"
-  | "pending_review"
-  | "sponsor_funded_pending"
-  | "funded"
-  | "held"
-  | "active"
-  | "under_review"
-  | "payout_review"
-  | "completed"
-  | "disputed"
-  | "locked"
-  | "cancelled";
-export type PrizePoolReleaseStatus = "not_active";
-export type PrizePoolFundingStatus = "not_active" | "pending_review" | "sponsor_intent_recorded";
+export type PrizePoolFundingSource = "creator_funded" | "entry_fee_allocated" | "sponsor_funded" | "platform_promotional";
+export type PrizePoolStatus = "disabled" | "not_funded" | "funding_required" | "partially_funded" | "fully_funded" | "growing_pool" | "locked" | "distribution_pending" | "processing_payouts" | "distributed" | "refunded" | "reversed" | "pending_review" | "sponsor_funded_pending";
 
 export type PrizePoolFoundation = {
   challengeId: string;
   status: PrizePoolStatus;
-  releaseStatus: PrizePoolReleaseStatus;
-  fundingStatus: PrizePoolFundingStatus;
-  paidEntryEnabled: false;
-  cashPayoutsEnabled: false;
-  transferEnabled: false;
-  sponsorFundingReleaseEnabled: false;
-  prizeReleaseEnabled: false;
+  fundingStatus: PrizePoolStatus;
+  currency: string;
   amountCents: number;
+  visibleJackpotCents: number;
+  totalConfirmedCents: number;
   totalCommittedCents: number;
   totalReleasedCents: number;
-  grossEntryRevenueCents: number;
-  visibleJackpotCents: number;
-  platformFeeCents: number;
-  platformFeePercent: 15;
-  jackpotPercent: 85;
-  paidEntryCount: number;
+  confirmedCreatorFundingCents: number;
+  confirmedEntryFeeAllocationCents: number;
+  confirmedSponsorContributionCents: number;
+  confirmedPlatformPromotionalCents: number;
+  fundingSources: PrizePoolFundingSource[];
+  paidEntryEnabled: boolean;
+  cashPayoutsEnabled: false;
+  transferEnabled: false;
+  prizeReleaseEnabled: false;
+  payoutExecutionEnabled: false;
+  disputeHoldHours: 24;
   payoutReviewStatus: "not_started" | "pending_review" | "under_review" | "completed" | "disputed";
-  winnerSplits: Array<{ position: 1 | 2 | 3; percent: 60 | 25 | 15; expectedAmountCents: number }>;
-  currency: string;
-  sourceType: "challenge" | "sponsorship";
-  sourceId: string;
+  winnerSplits: Array<{ position: number; percent: number; expectedAmountCents: number }>;
   createdAt: string;
   updatedAt: string;
 };
 
+function cents(value: unknown) { return Math.max(0, Math.trunc(Number(value) || 0)); }
+
+export function winnerSplit(poolCents: number, configured: Array<{ position: number; percent: number }> = DEFAULT_WINNER_SPLITS.topThree.map((item) => ({ ...item }))) {
+  const pool = cents(poolCents);
+  let allocated = 0;
+  return configured.map((split, index) => {
+    const expectedAmountCents = index === configured.length - 1 ? pool - allocated : Math.floor(pool * Number(split.percent) / 100);
+    allocated += expectedAmountCents;
+    return { position: Number(split.position), percent: Number(split.percent), expectedAmountCents };
+  });
+}
+
 export function createDisabledPrizePoolFoundation(challengeId: string, now = new Date().toISOString(), currency = "USD"): PrizePoolFoundation {
   return {
-    challengeId,
-    status: "disabled",
-    releaseStatus: "not_active",
-    fundingStatus: "not_active",
-    paidEntryEnabled: false,
-    cashPayoutsEnabled: false,
-    transferEnabled: false,
-    sponsorFundingReleaseEnabled: false,
-    prizeReleaseEnabled: false,
-    amountCents: 0,
-    totalCommittedCents: 0,
-    totalReleasedCents: 0,
-    grossEntryRevenueCents: 0,
-    visibleJackpotCents: 0,
-    platformFeeCents: 0,
-    platformFeePercent: 15,
-    jackpotPercent: 85,
-    paidEntryCount: 0,
-    payoutReviewStatus: "not_started",
-    winnerSplits: winnerSplit(0),
-    currency,
-    sourceType: "challenge",
-    sourceId: challengeId,
-    createdAt: now,
-    updatedAt: now
+    challengeId, status: "disabled", fundingStatus: "not_funded", currency, amountCents: 0, visibleJackpotCents: 0,
+    totalConfirmedCents: 0, totalCommittedCents: 0, totalReleasedCents: 0, confirmedCreatorFundingCents: 0,
+    confirmedEntryFeeAllocationCents: 0, confirmedSponsorContributionCents: 0, confirmedPlatformPromotionalCents: 0,
+    fundingSources: [], paidEntryEnabled: false, cashPayoutsEnabled: false, transferEnabled: false, prizeReleaseEnabled: false,
+    payoutExecutionEnabled: false, disputeHoldHours: 24, payoutReviewStatus: "not_started", winnerSplits: winnerSplit(0), createdAt: now, updatedAt: now
   };
 }
 
-export function createSponsorPrizePoolPlaceholder(input: { challengeId: string; sponsorshipId: string; contributionCents: number; currency?: string; now?: string }): PrizePoolFoundation {
+export function createSponsorPrizePoolPlaceholder(input: { challengeId: string; sponsorshipId: string; contributionCents: number; currency?: string; now?: string }): PrizePoolFoundation & { sourceType: "sponsorship"; sourceId: string } {
   const now = input.now ?? new Date().toISOString();
-  const amountCents = Math.max(0, Math.trunc(Number(input.contributionCents) || 0));
-  return {
-    challengeId: input.challengeId,
-    status: amountCents > 0 ? "pending_review" : "pending_review",
-    releaseStatus: "not_active",
-    fundingStatus: "sponsor_intent_recorded",
-    paidEntryEnabled: false,
-    cashPayoutsEnabled: false,
-    transferEnabled: false,
-    sponsorFundingReleaseEnabled: false,
-    prizeReleaseEnabled: false,
-    amountCents: 0,
-    totalCommittedCents: 0,
-    totalReleasedCents: 0,
-    grossEntryRevenueCents: 0,
-    visibleJackpotCents: 0,
-    platformFeeCents: 0,
-    platformFeePercent: 15,
-    jackpotPercent: 85,
-    paidEntryCount: 0,
-    payoutReviewStatus: "pending_review",
-    winnerSplits: winnerSplit(0),
-    currency: input.currency ?? "USD",
-    sourceType: "sponsorship",
-    sourceId: input.sponsorshipId,
-    createdAt: now,
-    updatedAt: now
-  };
+  return { ...createDisabledPrizePoolFoundation(input.challengeId, now, input.currency ?? "USD"), status: "pending_review", fundingStatus: "pending_review", payoutReviewStatus: "pending_review", sourceType: "sponsorship", sourceId: input.sponsorshipId };
 }
 
-export function winnerSplit(jackpotCents: number): PrizePoolFoundation["winnerSplits"] {
-  const amount = Math.max(0, Math.trunc(jackpotCents));
-  return [
-    { position: 1, percent: 60, expectedAmountCents: Math.floor(amount * 0.6) },
-    { position: 2, percent: 25, expectedAmountCents: Math.floor(amount * 0.25) },
-    { position: 3, percent: 15, expectedAmountCents: amount - Math.floor(amount * 0.6) - Math.floor(amount * 0.25) }
-  ];
-}
-
-export function createChallengePrizePoolFoundation(input: {
-  challengeId: string;
-  prizeType?: string;
-  prizeValueCents?: number;
-  sponsorEnabled?: boolean;
-  now?: string;
-}): PrizePoolFoundation {
+export function createChallengePrizePoolFoundation(input: { challengeId: string; prizeType?: string; prizeValueCents?: number; sponsorEnabled?: boolean; paidEntryEnabled?: boolean; now?: string }): PrizePoolFoundation {
   const base = createDisabledPrizePoolFoundation(input.challengeId, input.now);
-  const reviewRequired = !["none", "bragging_rights", ""].includes(String(input.prizeType ?? ""));
-  const visibleJackpotCents = Math.max(0, Math.trunc(input.prizeValueCents ?? 0));
+  const requested = !["none", "bragging_rights", ""].includes(String(input.prizeType ?? "")) || cents(input.prizeValueCents) > 0 || input.sponsorEnabled || input.paidEntryEnabled;
   return {
     ...base,
-    status: reviewRequired ? input.sponsorEnabled ? "pending_funding" : "pending_review" : "disabled",
-    fundingStatus: input.sponsorEnabled ? "pending_review" : "not_active",
-    amountCents: visibleJackpotCents,
-    visibleJackpotCents,
-    totalCommittedCents: 0,
-    payoutReviewStatus: reviewRequired ? "pending_review" : "not_started",
-    winnerSplits: winnerSplit(visibleJackpotCents)
+    status: requested ? "funding_required" : "disabled",
+    fundingStatus: requested ? "funding_required" : "not_funded",
+    paidEntryEnabled: Boolean(input.paidEntryEnabled),
+    payoutReviewStatus: requested ? "pending_review" : "not_started",
+    fundingSources: [input.paidEntryEnabled ? "entry_fee_allocated" : null, input.sponsorEnabled ? "sponsor_funded" : null].filter((item): item is PrizePoolFundingSource => Boolean(item))
   };
 }
 
@@ -146,27 +78,25 @@ export async function writeDisabledPrizePoolFoundation(db: Firestore, challengeI
 }
 
 export async function writeChallengePrizePoolFoundation(db: Firestore, input: Parameters<typeof createChallengePrizePoolFoundation>[0]) {
-  const record = createChallengePrizePoolFoundation(input);
-  await db.collection("prizePools").doc(input.challengeId).set(record, { merge: true });
+  const ref = db.collection("prizePools").doc(input.challengeId);
+  const existingSnap = await ref.get();
+  const existing = existingSnap.exists ? existingSnap.data() ?? {} : {};
+  const base = createChallengePrizePoolFoundation(input);
+  const creator = cents(existing.confirmedCreatorFundingCents);
+  const entry = cents(existing.confirmedEntryFeeAllocationCents);
+  const sponsor = cents(existing.confirmedSponsorContributionCents);
+  const platform = cents(existing.confirmedPlatformPromotionalCents);
+  const total = creator + entry + sponsor + platform;
+  const sources = new Set<PrizePoolFundingSource>(base.fundingSources);
+  if (creator) sources.add("creator_funded"); if (entry) sources.add("entry_fee_allocated"); if (sponsor) sources.add("sponsor_funded"); if (platform) sources.add("platform_promotional");
+  const record = { ...base, ...existing, confirmedCreatorFundingCents: creator, confirmedEntryFeeAllocationCents: entry, confirmedSponsorContributionCents: sponsor, confirmedPlatformPromotionalCents: platform, totalConfirmedCents: total, totalCommittedCents: Math.max(total, cents(existing.totalCommittedCents)), amountCents: total, visibleJackpotCents: total, fundingSources: [...sources], status: total > 0 ? String(existing.status ?? "fully_funded") : base.status, fundingStatus: total > 0 ? String(existing.fundingStatus ?? "fully_funded") : base.fundingStatus, winnerSplits: winnerSplit(total), updatedAt: input.now ?? new Date().toISOString() };
+  await ref.set(record, { merge: true });
   return record;
 }
 
 export function publicPrizePoolFields(pool: Partial<PrizePoolFoundation> | null | undefined) {
-  const visibleJackpotCents = Number(pool?.visibleJackpotCents ?? pool?.amountCents ?? 0);
-  const configuredSplits = Array.isArray(pool?.winnerSplits) ? pool.winnerSplits : winnerSplit(visibleJackpotCents);
-  const normalizedSplits = configuredSplits.map((split) => ({
-    ...split,
-    expectedAmountCents: Math.max(0, Math.round(visibleJackpotCents * Number(split.percent ?? 0) / 100))
-  }));
-  return {
-    status: pool?.status ?? "disabled",
-    visibleJackpotCents,
-    currency: pool?.currency ?? "USD",
-    payoutReviewStatus: pool?.payoutReviewStatus ?? "not_started",
-    winnerSplits: normalizedSplits,
-    transferEnabled: false,
-    prizeReleaseEnabled: false
-  };
+  const visibleJackpotCents = cents(pool?.visibleJackpotCents ?? pool?.totalConfirmedCents ?? pool?.amountCents);
+  return { status: pool?.status ?? "disabled", fundingStatus: pool?.fundingStatus ?? "not_funded", visibleJackpotCents, currency: pool?.currency ?? "USD", payoutReviewStatus: pool?.payoutReviewStatus ?? "not_started", winnerSplits: winnerSplit(visibleJackpotCents, Array.isArray(pool?.winnerSplits) && pool.winnerSplits.length ? pool.winnerSplits : undefined), fundingSources: pool?.fundingSources ?? [], transferEnabled: false, prizeReleaseEnabled: false, payoutExecutionEnabled: false };
 }
 
 export async function mergeSponsorPrizePoolPlaceholder(db: Firestore, input: { challengeId: string; sponsorshipId: string; contributionCents: number; currency?: string; now?: string }) {
@@ -175,6 +105,4 @@ export async function mergeSponsorPrizePoolPlaceholder(db: Firestore, input: { c
   return record;
 }
 
-export function isPrizePoolReleaseActive(pool: Pick<PrizePoolFoundation, "prizeReleaseEnabled"> | null | undefined) {
-  return Boolean(pool?.prizeReleaseEnabled) && false;
-}
+export function isPrizePoolReleaseActive() { return false; }

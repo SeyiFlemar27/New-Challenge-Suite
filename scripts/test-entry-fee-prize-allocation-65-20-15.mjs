@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const payout = readFileSync("lib/server/payout-structure.ts", "utf8");
+const payments = readFileSync("lib/server/monetization-payments.ts", "utf8");
+assert(payout.includes("winnerSharePercent: 65"), "winner split must be 65%");
+assert(payout.includes("creatorHostOperatorSharePercent: 20"), "creator split must be 20%");
+assert(payout.includes("platformAdminSharePercent: 15"), "platform split must be 15%");
+assert(payments.includes("calculatePaidRevenueSplit"), "confirmed paid revenue must use canonical split helper");
+assert(payments.includes("pendingEntryFeeWinnerShareCents"), "entry fee winner allocation must be ledger-backed");
+console.log("entry-fee 65/20/15 allocation checks passed");

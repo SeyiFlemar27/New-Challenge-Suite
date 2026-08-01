@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -7,7 +7,6 @@ import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/
 import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForDraft, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
-import { writeCashTransactionPlaceholder } from "@/lib/server/cash-transactions";
 import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
@@ -119,6 +118,9 @@ export async function POST(request: Request) {
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
+  const kycStatus = String(planProfile.kycStatus ?? planProfile.sumsubKycStatus ?? "not_started").toLowerCase();
+  if (body.publish && monetizationIntent.paidEntryRequested && !["verified", "approved"].includes(kycStatus)) return fail("Identity verification is required before publishing a paid challenge.", 403, { kycStatus, redirectTo: "/kyc" }, "KYC_REQUIRED");
+  if (body.publish && monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady) return fail("Save this challenge as a draft and confirm an approved prize funding source before publishing.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
   if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
     return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
   }
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
     status: requestedMonetization ? "setup_required" : "not_requested",
     paymentActive: false,
     checkoutActive: false,
-    ledgerCreationEnabled: false,
+    ledgerCreationEnabled: Boolean(requestedMonetization),
     prizeReleaseActive: false,
     payoutReleaseActive: false,
     adminApprovalRequired: Boolean(requestedMonetization),
@@ -217,7 +219,7 @@ export async function POST(request: Request) {
     prizeDeliveryNotes: body.prizeDeliveryNotes || null,
     prizeApprovalStatus: ["none", "bragging_rights"].includes(body.prizeType) ? "not_required" : "pending_admin_review",
     publicPrizeStatus: ["none", "bragging_rights"].includes(body.prizeType) ? "available" : "pending_review",
-    jackpotAllocationPercent: 85,
+    winnerPoolAllocationPercent: 65,
     publicJackpotEstimateCents: 0,
     platformFeePercent: 15,
     platformFeeVisibility: "admin_only",
@@ -339,19 +341,7 @@ export async function POST(request: Request) {
       prizeType: body.prizeType,
       prizeValueCents: Math.round(body.prizeValue * 100),
       sponsorEnabled,
-      now
-    }),
-    writeCashTransactionPlaceholder(db, {
-      id: `challenge_${ref.id}_prize_placeholder`,
-      userId: user.uid,
-      type: "prize_placeholder_created",
-      status: "recorded",
-      amountCents: 0,
-      currency: "USD",
-      sourceType: "challenge",
-      sourceId: ref.id,
-      challengeId: ref.id,
-      description: `Prize foundation placeholder created for challenge ${ref.id}. No cash prize or payout movement is active.`,
+      paidEntryEnabled: safeMonetization.paidEntryRequested,
       now
     })
   ]);

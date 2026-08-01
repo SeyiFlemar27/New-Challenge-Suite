@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -23,10 +23,15 @@ const allowedDraftFields = new Set([
   "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep"
 ]);
 
+const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
+
 function sanitizeDraftPatch(body: Record<string, unknown>) {
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
-    if (allowedDraftFields.has(key)) patch[key] = value;
+    if (!allowedDraftFields.has(key)) continue;
+    if (key === "monetization" && value && typeof value === "object") {
+      patch[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([field]) => allowedMonetizationFields.has(field)));
+    } else patch[key] = value;
   }
   if (patch.participantApprovalMode && !["automatic", "manual"].includes(String(patch.participantApprovalMode))) delete patch.participantApprovalMode;
   if (patch.maxParticipants !== undefined) patch.maxParticipants = Math.max(0, Math.trunc(Number(patch.maxParticipants) || 0));
@@ -70,6 +75,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (!editableDraftStatus(current)) throw new Error("CHALLENGE_NOT_EDITABLE");
     const normalizedPatch = normalizeChallengeTimelineForStorage(patch, current);
+    if (normalizedPatch.monetization && typeof normalizedPatch.monetization === "object") {
+      const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
+      normalizedPatch.monetization = { ...currentMonetization, ...normalizedPatch.monetization as Record<string, unknown> };
+    }
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
     const progress = calculateChallengeDraftProgress(merged);
     const finalPatch = { ...normalizedPatch, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };

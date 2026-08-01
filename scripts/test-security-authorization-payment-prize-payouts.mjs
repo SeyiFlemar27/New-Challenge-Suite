@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const checkout = readFileSync("app/api/challenges/[id]/prize-funding/checkout/route.ts", "utf8");
+const funding = readFileSync("lib/server/prize-funding.ts", "utf8");
+const publish = readFileSync("app/api/challenges/[id]/publish/route.ts", "utf8");
+assert(checkout.includes("requireRequestUser"), "prize funding checkout must require authentication");
+assert(checkout.includes("userOwnsChallenge"), "only the challenge owner may fund a guarantee");
+assert(checkout.includes("editableDraftStatus"), "funding must be completed before publication");
+assert(funding.includes("assertConfirmedSession"), "funding confirmation must validate provider metadata and amount");
+assert(funding.includes("db.runTransaction"), "funding confirmation must be atomic and idempotent");
+assert(funding.includes("payoutExecutionEnabled: false") && funding.includes("refundExecutionEnabled: false"), "funding must not execute payout or refund");
+assert(publish.includes("KYC_REQUIRED"), "paid or creator-funded publication must retain KYC lock");
+assert(!funding.includes("payouts.create") && !funding.includes("refunds.create"), "provider payout/refund execution must not be added");
+console.log("payment, prize, and payout authorization checks passed");

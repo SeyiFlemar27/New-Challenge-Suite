@@ -17,8 +17,9 @@ function CheckoutCancelContent() {
   const paymentPurpose = searchParams.get("paymentPurpose");
   const challengeId = searchParams.get("challengeId");
   const paidEntryReturn = paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry";
-  const href = paidEntryReturn && challengeId ? `/challenges/${challengeId}` : "/subscriptions";
-  const label = paidEntryReturn ? "Back to Challenge" : "Choose a Plan";
+  const prizeFundingReturn = paymentPurpose === "prize_pool_funding";
+  const href = prizeFundingReturn && challengeId ? `/challenges/${challengeId}/prize-funding` : paidEntryReturn && challengeId ? `/challenges/${challengeId}` : "/subscriptions";
+  const label = prizeFundingReturn ? "Back to Prize Funding" : paidEntryReturn ? "Back to Challenge" : "Choose a Plan";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-black px-5 py-12">

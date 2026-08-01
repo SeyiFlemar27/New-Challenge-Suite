@@ -8,7 +8,8 @@ const successPages = [
   "app/checkout/dorocoins/success/page.tsx",
   "app/challenges/[id]/registration-success/page.tsx",
   "app/challenges/[id]/paid-votes/success/page.tsx",
-  "app/sponsor/funding/[challengeId]/success/page.tsx"
+  "app/sponsor/funding/[challengeId]/success/page.tsx",
+  "app/challenges/[id]/prize-funding/success/page.tsx"
 ].map((file) => readFileSync(file, "utf8")).join("\n");
 
 assert(shared.includes("/api/payments/status"), "success journeys must query a server status endpoint");

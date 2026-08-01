@@ -54,6 +54,8 @@ export async function GET(request: Request) {
     record = await getPaymentStatus(db, "paidVotePurchases", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.sponsor && reference) {
     record = await getPaymentStatus(db, "sponsorContributions", reference, "sponsorId", user.uid);
+  } else if (purpose === PAYMENT_PURPOSES.prizePool && reference) {
+    record = await getPaymentStatus(db, "creatorPrizeFundingPayments", reference, "userId", user.uid);
   } else {
     return ok(summary(purpose, null), "Payment is awaiting a supported provider record.");
   }

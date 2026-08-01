@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const payments = readFileSync("lib/server/monetization-payments.ts", "utf8");
+const webhook = readFileSync("app/api/stripe/webhook/route.ts", "utf8");
+assert(payments.includes('status: "pending"'), "sponsor contribution must start pending");
+assert(payments.includes("assertStripeSessionMatchesRecord(session, contribution, \"sponsor_funding\")"), "provider session must match stored sponsor record");
+assert(payments.includes('status: "confirmed"') && payments.includes("webhookConfirmed: true"), "only webhook confirmation may confirm sponsor funding");
+assert(webhook.includes("confirmSponsorContribution"), "Stripe webhook must own sponsor confirmation");
+assert(!payments.includes("sponsorContributionConfirmedCount: 1"), "confirmed count must be incremented transactionally, not hardcoded");
+console.log("confirmed-only sponsor contribution checks passed");

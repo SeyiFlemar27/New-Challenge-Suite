@@ -20,6 +20,7 @@ import {
   subscriptionMetadataFromCheckout
 } from "@/lib/server/stripe-subscriptions";
 import { confirmPredictionPayment, expirePredictionPayment, PREDICTION_PAYMENT_PURPOSE } from "@/lib/server/predictions";
+import { confirmCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE, expireCreatorPrizeFunding } from "@/lib/server/prize-funding";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 const handledEventTypes = new Set<Stripe.Event.Type>([
@@ -164,6 +165,8 @@ export async function POST(request: Request) {
           outcome = await confirmSponsorContribution(db, event, session);
         } else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) {
           outcome = await confirmPredictionPayment(db, event, session);
+        } else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) {
+          outcome = await confirmCreatorPrizeFunding(db, event, session);
         } else if (session.metadata?.type === "dorocoin_purchase") {
           assertPaidPaymentSession(session);
           const transaction = await applyDoroCoinTransaction(db, {
@@ -190,6 +193,7 @@ export async function POST(request: Request) {
         else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
         else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
         else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) outcome = await expirePredictionPayment(db, session);
+        else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) outcome = await expireCreatorPrizeFunding(db, session);
         break;
       }
       case "invoice.payment_succeeded":
