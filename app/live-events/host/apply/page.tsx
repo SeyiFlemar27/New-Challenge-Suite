@@ -17,7 +17,7 @@ export default function HostAccessPage() {
         <Card className="mx-auto max-w-2xl p-8 text-center">
           <ShieldCheck className="mx-auto text-[var(--gold)]" size={46} />
           <h1 className="mt-5 text-3xl font-black">Host Plan active</h1>
-          <p className="mt-3 text-slate-300">Your Host tools are ready. Create an event foundation or return to Host Control Center.</p>
+          <p className="mt-3 text-slate-300">Your Host tools are ready. Create an event or return to Host Control Center.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3"><LinkButton href="/host/live/create">Create Live Event</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Host Control Center</LinkButton></div>
         </Card>
       </AppShell>

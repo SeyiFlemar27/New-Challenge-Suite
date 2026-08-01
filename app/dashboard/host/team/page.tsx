@@ -28,7 +28,7 @@ export default function HostTeamPage() {
             <LockKeyhole className="mt-0.5 shrink-0 text-[var(--gold)]" size={18} />
             Team invitations are being prepared. No additional account access has been granted yet.
           </div>
-          <div className="mt-6 flex flex-wrap justify-center gap-3"><Button disabled>Invite Member (Coming Soon)</Button><LinkButton href="/dashboard/host" variant="secondary">Back to Host Controls</LinkButton></div>
+          <div className="mt-6 flex flex-wrap justify-center gap-3"><LinkButton href="/dashboard/host" variant="secondary">Back to Host Controls</LinkButton></div>
         </Card>
       </AppShell>
     </PlanFeatureGate>

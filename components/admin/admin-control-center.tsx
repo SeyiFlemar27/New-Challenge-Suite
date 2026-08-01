@@ -243,7 +243,7 @@ function SearchResults({ data, query }: { data: AdminData; query: string }) {
 
 function Reports({ records }: { records: Record<string, unknown> }) {
   const reports = ["Challenge report", "Submission report", "Participant report", "Voting report", "Winner report", "Revenue review report", "Sponsor interest report", "Withdrawal report", "Safety report"];
-  return <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{reports.map((label) => { const key = label.split(" ")[0].toLowerCase() + "Count"; return <Card key={label} className="p-6"><BarChart3 className="text-[var(--gold)]" /><h2 className="mt-4 text-xl font-black">{label}</h2><p className="mt-3 text-3xl font-black">{String(records[key] ?? "—")}</p><p className="mt-2 text-sm text-slate-400">Current stored records where available.</p><Button className="mt-5" variant="secondary" disabled>Export coming soon</Button></Card>; })}</div>;
+  return <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{reports.map((label) => { const key = label.split(" ")[0].toLowerCase() + "Count"; return <Card key={label} className="p-6"><BarChart3 className="text-[var(--gold)]" /><h2 className="mt-4 text-xl font-black">{label}</h2><p className="mt-3 text-3xl font-black">{String(records[key] ?? "—")}</p><p className="mt-2 text-sm text-slate-400">Current stored records where available.</p><Button className="mt-5" variant="secondary" disabled>No data to export</Button></Card>; })}</div>;
 }
 
 function AuditLogs({ records }: { records: AdminRecord[] }) {

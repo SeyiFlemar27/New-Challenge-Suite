@@ -74,7 +74,7 @@ export default function CreatorToolPage() {
             />
           </Card>
           <Card className="mt-6 border-yellow-500/20 bg-yellow-500/5 p-5 text-sm leading-6 text-slate-300">
-            This is a production-safe workspace foundation. It does not activate payouts, withdrawals, sponsor money release, or automatic financial fulfillment.
+            Financial actions require verified records and platform review.
           </Card>
         </div>
       </AppShell>

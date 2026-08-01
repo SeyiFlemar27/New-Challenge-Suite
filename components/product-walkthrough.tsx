@@ -23,7 +23,7 @@ const creatorSteps: TourStep[] = [
   { title: "Grow with creator tools", body: "Use your profile, creator analytics, and challenge history to build a recognizable community.", icon: UserRound }
 ];
 const hostSteps: TourStep[] = [
-  { title: "Welcome to Host Control Center", body: "Run competitions with participant, submission, voting, and report foundations.", icon: LayoutDashboard },
+  { title: "Welcome to Host Control Center", body: "Run competitions with participant, submission, voting, and reporting tools.", icon: LayoutDashboard },
   { title: "Build competitions", body: "Configure formats, rounds, registration, voting, judging, media, and sponsor readiness.", icon: Trophy },
   { title: "Manage participants", body: "Review registration and participant status across the competitions you own.", icon: UserRound },
   { title: "Control voting", body: "Monitor voting windows, visibility, totals, and review-safe controls.", icon: WalletCards },
