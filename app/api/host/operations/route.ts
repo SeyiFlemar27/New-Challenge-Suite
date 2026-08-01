@@ -5,18 +5,26 @@ import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
-function serialize(document: FirebaseFirestore.QueryDocumentSnapshot) {
-  return { id: document.id, ...document.data() };
+type Item = Record<string, unknown> & { id: string };
+function serialize(document: FirebaseFirestore.QueryDocumentSnapshot): Item { return { id: document.id, ...document.data() }; }
+function ownerId(item: Record<string, unknown>) { return String(item.creatorId ?? item.hostId ?? item.ownerId ?? ""); }
+function unique(items: Item[]) { return [...new Map(items.map((item) => [item.id, item])).values()]; }
+
+async function ownedChallenges(db: FirebaseFirestore.Firestore, userId: string, admin: boolean) {
+  if (admin) return (await db.collection("challenges").limit(200).get()).docs.map(serialize);
+  const [creator, host] = await Promise.all([
+    db.collection("challenges").where("creatorId", "==", userId).limit(150).get(),
+    db.collection("challenges").where("hostId", "==", userId).limit(150).get().catch(() => null)
+  ]);
+  return unique([...creator.docs.map(serialize), ...(host?.docs.map(serialize) ?? [])]).filter((item) => ownerId(item) === userId);
 }
 
-async function readHostedRecords(db: FirebaseFirestore.Firestore, collection: string, challengeIds: string[]) {
-  if (!challengeIds.length) return [];
-  const batches: string[][] = [];
-  for (let index = 0; index < challengeIds.length; index += 30) batches.push(challengeIds.slice(index, index + 30));
-  const snapshots = await Promise.all(batches.map((ids) =>
-    db.collection(collection).where("challengeId", "in", ids).limit(300).get()
-  ));
-  return snapshots.flatMap((snapshot) => snapshot.docs.map(serialize));
+async function related(db: FirebaseFirestore.Firestore, collection: string, ids: string[]) {
+  if (!ids.length) return [];
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += 30) chunks.push(ids.slice(index, index + 30));
+  const snapshots = await Promise.all(chunks.map((chunk) => db.collection(collection).where("challengeId", "in", chunk).limit(500).get().catch(() => null)));
+  return snapshots.flatMap((snapshot) => snapshot?.docs.map(serialize) ?? []);
 }
 
 export async function GET(request: Request) {
@@ -24,39 +32,36 @@ export async function GET(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Host operations");
-
-  const [account, profile] = await Promise.all([
-    db.collection("users").doc(user.uid).get(),
-    db.collection("profiles").doc(user.uid).get()
-  ]);
+  const [account, profile] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
   const planProfile = { ...(profile.data() ?? {}), ...(account.data() ?? {}) };
-  if (getEffectiveTier(planProfile).id !== "host") {
-    return fail("Host tools are available on the Host Plan.", 403, undefined, "HOST_PLAN_REQUIRED");
-  }
+  const tier = getEffectiveTier(planProfile).id;
+  if (!user.isAdmin && !["host", "creator"].includes(tier)) return fail("Host tools are available to Creator and Host accounts.", 403, undefined, "HOST_PLAN_REQUIRED");
 
-  const challengeSnap = await db.collection("challenges").where("creatorId", "==", user.uid).limit(100).get();
-  const challenges = challengeSnap.docs.map(serialize);
-  const challengeIds = challenges.map((item) => String(item.id));
-  const [participants, submissions, winners, notificationSnap] = await Promise.all([
-    readHostedRecords(db, "participants", challengeIds),
-    readHostedRecords(db, "submissions", challengeIds),
-    readHostedRecords(db, "winners", challengeIds),
-    db.collection("notifications").where("userId", "==", user.uid).limit(50).get().catch(() => null)
+  const challenges = await ownedChallenges(db, user.uid, Boolean(user.isAdmin));
+  const challengeIds = challenges.map((item) => item.id);
+  const [challengeParticipants, legacyParticipants, submissions, winners, votes, attendance, sponsorInterest, notifications] = await Promise.all([
+    related(db, "challengeParticipants", challengeIds),
+    related(db, "participants", challengeIds),
+    related(db, "submissions", challengeIds),
+    related(db, "winners", challengeIds),
+    related(db, "votes", challengeIds),
+    related(db, "liveEventRegistrations", challengeIds),
+    related(db, "sponsorProposals", challengeIds),
+    db.collection("notifications").where("userId", "==", user.uid).limit(50).get().then((snap) => snap.docs.map(serialize)).catch(() => [])
   ]);
-  const notifications = notificationSnap?.docs.map(serialize) ?? [];
-
+  const participants = unique([...challengeParticipants, ...legacyParticipants]);
+  const completedStatuses = new Set(["completed", "winners_announced", "settled", "closed"]);
+  const completedChallenges = challenges.filter((item) => completedStatuses.has(String(item.status ?? item.lifecycleStatus ?? "").toLowerCase()));
   return ok({
     challenges,
+    completedChallenges,
     participants,
     submissions,
     winners,
+    votes,
+    attendance,
+    sponsorInterest,
     notifications,
-    controls: {
-      moderationMutationsEnabled: false,
-      votingStateMutationsEnabled: false,
-      winnerPublishingEnabled: false,
-      exportsEnabled: false,
-      financialExecutionEnabled: false
-    }
+    controls: { moderationMutationsEnabled: true, exportsEnabled: true, financialExecutionEnabled: false }
   }, "Host operations loaded.");
 }

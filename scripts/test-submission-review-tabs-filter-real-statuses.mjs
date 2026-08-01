@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const page = readFileSync("app/host/[tool]/page.tsx", "utf8");
+const api = readFileSync("app/api/challenges/[id]/manage/route.ts", "utf8");
+for (const label of ["Pending Review", "Approved", "Rejected", "Flagged", "Resubmission Requested"]) assert.match(page, new RegExp(label));
+assert.match(page, /data\.submissions\.filter/);
+assert.match(page, /Approve/);
+assert.match(page, /View Details/);
+assert.match(api, /context\(request/);
+assert.match(api, /A rejection reason is required/);
+assert.match(api, /A flag reason is required/);
+assert.match(api, /Requested changes are required/);
+assert.match(api, /future resubmission deadline/);
+assert.match(api, /writeAuditLog/);
+assert.match(api, /createNotification/);
+assert.match(api, /publicEligible: false/);
+assert.doesNotMatch(page, /Operational changes are disabled/i);
+console.log("submission review contract passed");

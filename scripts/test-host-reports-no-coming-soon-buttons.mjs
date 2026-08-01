@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const operations = readFileSync("app/api/host/operations/route.ts", "utf8");
+const report = readFileSync("app/api/host/reports/[challengeId]/route.ts", "utf8");
+const page = readFileSync("app/host/[tool]/page.tsx", "utf8");
+for (const tab of ["Participant", "Submission", "Vote", "Winner", "Attendance", "Sponsor Interest"]) assert.match(page, new RegExp(tab));
+assert.match(operations, /completedStatuses/);
+assert.match(operations, /creatorId/);
+assert.match(operations, /hostId/);
+assert.match(report, /requireRequestUser/);
+assert.match(report, /userOwnsChallenge/);
+assert.match(report, /Reports are available only for completed challenges/);
+assert.match(report, /Content-Disposition/);
+assert.match(report, /writeAuditLog/);
+assert.match(page, /No data to export/);
+assert.match(page, /View Competition/);
+assert.doesNotMatch(page, /Export Coming Soon|Operational changes are disabled/i);
+console.log("host reports contract passed");

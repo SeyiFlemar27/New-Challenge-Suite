@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
+import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -72,33 +73,66 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const targetType = String(body.targetType ?? "") as keyof typeof collections;
   const targetId = String(body.targetId ?? "");
   const action = String(body.action ?? "");
-  const reason = String(body.reason ?? "").trim().slice(0, 500);
+  const reason = String(body.reason ?? "").trim().slice(0, 1000);
+  const requestedChanges = String(body.requestedChanges ?? "").trim().slice(0, 2000);
+  const note = String(body.note ?? "").trim().slice(0, 1000);
+  const resubmissionDeadline = String(body.resubmissionDeadline ?? "").trim();
   if (!collections[targetType] || !targetId || !action) return validationError({ action: "A supported target and action are required." });
-
-  const statusMap: Record<string, Record<string, string>> = {
-    participant: { mark_incomplete: "incomplete", restore: "approved", disqualify: "disqualified" },
-    submission: { approve: "approved", reject: "rejected", request_changes: "needs_changes", flag: "flagged", disqualify: "disqualified" },
-    report: { request_review: "pending_admin_review", review: "under_review", resolve: "resolved", dismiss: "dismissed", escalate: "escalated" }
+  const allowed: Record<string, Set<string>> = {
+    submission: new Set(["approve", "reject", "flag", "request_resubmission"]),
+    participant: new Set(["approve", "reject", "request_info", "check_in", "request_disqualification"]),
+    report: new Set(["request_review"])
   };
-  const nextStatus = statusMap[targetType]?.[action];
-  if (!nextStatus) return validationError({ action: "This moderation action is not supported." });
-  if (!access.user.isAdmin && (targetType === "participant" || targetType === "submission")) {
-    return fail("Participant and submission moderation requires admin review.", 403, { adminReviewRequired: true }, "ADMIN_REVIEW_REQUIRED");
+  if (!allowed[targetType]?.has(action)) return validationError({ action: "This management action is not supported." });
+  if (["reject", "flag"].includes(action) && !reason) return validationError({ reason: action === "reject" ? "A rejection reason is required." : "A flag reason is required." });
+  if (action === "request_resubmission") {
+    if (!requestedChanges) return validationError({ requestedChanges: "Requested changes are required." });
+    const deadline = Date.parse(resubmissionDeadline);
+    if (!resubmissionDeadline || !Number.isFinite(deadline) || deadline <= Date.now()) return validationError({ resubmissionDeadline: "A future resubmission deadline is required." });
   }
-  if (!access.user.isAdmin && (targetType !== "report" || action !== "request_review")) {
-    return fail("This management action requires an admin.", 403, { adminReviewRequired: true }, "ADMIN_REVIEW_REQUIRED");
-  }
-  if (["reject", "request_changes", "flag", "disqualify", "escalate", "request_review"].includes(action) && !reason) return validationError({ reason: "A reason is required for this action." });
-
-  const lifecycle = String(access.challenge.status ?? access.challenge.lifecycleStatus ?? "").toLowerCase();
-  const sensitiveAfterVoting = action === "disqualify" && ["voting_open", "voting_closed", "under_review", "winners_announced", "completed"].includes(lifecycle);
-  if (sensitiveAfterVoting && !access.user.isAdmin) return fail("Admin review is required for disqualification after voting begins.", 403, { adminReviewRequired: true }, "ADMIN_REVIEW_REQUIRED");
+  if (action === "request_info" && !reason) return validationError({ reason: "Describe the information needed from the participant." });
+  if (action === "request_disqualification" && !reason) return validationError({ reason: "A disqualification reason is required for admin review." });
 
   const ref = access.db.collection(collections[targetType]).doc(targetId);
   const snap = await ref.get();
   if (!snap.exists || String(snap.data()?.challengeId ?? "") !== id) return fail("Management record not found.", 404, undefined, "NOT_FOUND");
+  const current = snap.data() ?? {};
   const now = new Date().toISOString();
-  await ref.set({ status: nextStatus, moderationStatus: targetType === "submission" ? nextStatus : snap.data()?.moderationStatus ?? null, moderationReason: reason || null, reviewedBy: access.user.uid, reviewedAt: now, updatedAt: now }, { merge: true });
-  await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: `${targetType}.${action}`, targetType, targetId, before: { status: snap.data()?.status ?? null }, after: { status: nextStatus }, reason: reason || null, metadata: { challengeId: id } }, access.db);
-  return ok({ targetId, targetType, status: nextStatus }, "Management action recorded.");
+  let nextStatus = String(current.status ?? "pending");
+  const update: Record<string, unknown> = { updatedAt: now };
+
+  if (targetType === "submission") {
+    nextStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : action === "flag" ? "flagged" : "resubmission_requested";
+    Object.assign(update, { status: nextStatus, moderationStatus: nextStatus, reviewedBy: access.user.uid, reviewedAt: now });
+    if (action === "reject") Object.assign(update, { rejectionReason: reason, rejectedAt: now });
+    if (action === "flag") Object.assign(update, { flagReason: reason, flaggedAt: now, publicEligible: false });
+    if (action === "request_resubmission") Object.assign(update, { requestedChanges, resubmissionDeadline, resubmissionNote: note || null, resubmissionRequestedAt: now, publicEligible: false });
+    if (action === "approve") Object.assign(update, { approvedAt: now, publicEligible: true, rejectionReason: null, flagReason: null });
+  } else if (targetType === "participant") {
+    if (action === "check_in") {
+      const type = String(access.challenge.type ?? access.challenge.competitionType ?? "").toLowerCase();
+      if (!access.challenge.isLiveEvent && !type.includes("live")) return fail("Check-in is available only for Live Events.", 409, undefined, "LIVE_EVENT_REQUIRED");
+      nextStatus = String(current.status ?? "approved");
+      Object.assign(update, { checkInStatus: "checked_in", checkedInAt: now, checkedInBy: access.user.uid });
+    } else if (action === "request_disqualification") {
+      nextStatus = String(current.status ?? "approved");
+      Object.assign(update, { disqualificationStatus: "pending_admin_review", disqualificationReason: reason, disqualificationRequestedAt: now, disqualificationRequestedBy: access.user.uid });
+    } else if (action === "request_info") {
+      Object.assign(update, { informationRequestStatus: "requested", informationRequestedAt: now, informationRequest: reason });
+    } else {
+      nextStatus = action === "approve" ? "approved" : "rejected";
+      Object.assign(update, { status: nextStatus, approvalStatus: nextStatus, reviewedBy: access.user.uid, reviewedAt: now, rejectionReason: action === "reject" ? reason : null });
+    }
+  } else {
+    nextStatus = "pending_admin_review";
+    Object.assign(update, { status: nextStatus, reason });
+  }
+
+  await ref.set(update, { merge: true });
+  const participantId = String(current.userId ?? current.participantId ?? "");
+  if (participantId && ["reject", "approve", "request_resubmission", "request_info", "request_disqualification"].includes(action)) {
+    await createNotification(access.db, { userId: participantId, type: `${targetType}_${action}`, title: action === "approve" ? "Entry approved" : action === "reject" ? "Review update" : action === "request_resubmission" ? "Submission changes requested" : action === "request_info" ? "Information requested" : "Disqualification review requested", body: requestedChanges || reason || note || "Your competition record was updated.", actionUrl: targetType === "submission" ? `/submissions/${targetId}` : `/challenges/${id}`, targetId, idempotencyKey: `${targetType}_${targetId}_${action}_${now.slice(0, 16)}` }).catch(() => undefined);
+  }
+  await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: `${targetType}.${action}`, targetType, targetId, before: { status: current.status ?? null }, after: { status: nextStatus, ...update }, reason: reason || requestedChanges || null, metadata: { challengeId: id, resubmissionDeadline: resubmissionDeadline || null, note: note || null, adminReviewRequired: action === "request_disqualification" } }, access.db);
+  return ok({ targetId, targetType, status: nextStatus, action, adminReviewRequired: action === "request_disqualification" }, action === "request_disqualification" ? "Disqualification request sent for admin review." : "Management action recorded.");
 }
