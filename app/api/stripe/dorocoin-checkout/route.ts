@@ -65,9 +65,9 @@ export async function POST(request: Request) {
     line_items: customCoins || customQuote
       ? [{ price_data: { currency: "usd", unit_amount: Math.round(amountUsd * 100), product_data: { name: `${coins} DoroCoins` } }, quantity: 1 }]
       : [{ price: priceConfig.priceId!, quantity: 1 }],
-    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/checkout/dorocoins/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel`,
-    metadata: { type: "dorocoin_purchase", packageId, customCoins: customCoins || customQuote ? "true" : "false", userId: user.uid, coins: String(coins) }
+    metadata: { type: "dorocoin_purchase", paymentPurpose: "dorocoin_purchase", packageId, customCoins: customCoins || customQuote ? "true" : "false", userId: user.uid, coins: String(coins) }
   });
   return ok({ url: session.url }, "Stripe DoroCoin checkout session created.");
 }

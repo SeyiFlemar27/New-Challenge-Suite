@@ -57,7 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [checkoutLineItem({ amountCents: contribution.amountCents, currency: "USD", name: `Sponsor funding - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&paymentPurpose=sponsor_funding&challengeId=${encodeURIComponent(challengeId)}`,
+    success_url: `${origin}/sponsor/funding/${encodeURIComponent(challengeId)}/success?sponsorContributionId=${encodeURIComponent(contribution.id)}`,
     cancel_url: `${origin}/checkout/cancel?paymentPurpose=sponsor_funding&challengeId=${encodeURIComponent(challengeId)}`,
     metadata: checkoutMetadataForPurpose("sponsor_funding", contribution)
   });

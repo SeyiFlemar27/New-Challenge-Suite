@@ -1,4 +1,4 @@
-﻿import { getStripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [checkoutLineItem({ amountCents: paidEntryAmountCents(challenge), currency: "usd", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=processing&entryPaymentId=${encodeURIComponent(record.id)}`,
+    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/registration-success?entryPaymentId=${encodeURIComponent(record.id)}`,
     cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=canceled`,
     metadata: checkoutMetadataForPurpose("challenge_entry_fee", record)
   });

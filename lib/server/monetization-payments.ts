@@ -1,4 +1,4 @@
-﻿import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
@@ -533,8 +533,10 @@ export async function expireSponsorContribution(db: Firestore, session: Stripe.C
 }
 
 export function checkoutMetadataForPurpose(purpose: MonetizationPaymentPurpose, record: Record<string, unknown>) {
+  const transactionPurpose = purpose === "challenge_entry_fee" || purpose === "challenge_entry" ? "challenge_entry_payment" : purpose === "paid_vote" ? "vote_purchase" : "sponsor_contribution";
   const base = {
     paymentPurpose: purpose,
+    transactionPurpose,
     userId: text(record.userId ?? record.sponsorId, 160),
     challengeId: text(record.challengeId, 160),
     amount: String(cents(record.amountCents ?? record.amount)),

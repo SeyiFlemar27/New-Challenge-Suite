@@ -166,12 +166,13 @@ export async function POST(request: Request) {
       planId: plan.id,
       planAudience: plan.audience,
       accountType,
-      billingCycle: "monthly"
+      billingCycle: "monthly",
+      paymentPurpose: "subscription_payment"
     };
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&plan=${encodeURIComponent(plan.id)}`,
+      success_url: `${origin}/checkout/subscription/success?session_id={CHECKOUT_SESSION_ID}&plan=${encodeURIComponent(plan.id)}`,
       cancel_url: `${origin}/checkout/cancel`,
       metadata,
       subscription_data: { metadata }
