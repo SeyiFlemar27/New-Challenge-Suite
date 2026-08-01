@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Rocket } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
@@ -54,6 +53,7 @@ function BoostChallengeContent() {
   const details = detailsQuery.data?.ok ? detailsQuery.data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
   const challenge = useMemo(() => rawChallenge ? normalizeChallenge(rawChallenge) : null, [rawChallenge]);
+  const boostAccess = (details?.userState as any)?.boostAccess as { allowed?: boolean; reason?: string | null } | undefined;
   const boostPackages = useMemo(() => {
     const records = packagesQuery.data?.ok ? packagesQuery.data.data?.packages ?? [] : [];
     return records.map((item) => item as BoostPackage).filter((item) => item.id && Number(item.coins ?? 0) > 0);
@@ -121,7 +121,7 @@ function BoostChallengeContent() {
     return (
       <AppShell>
         <Card className="max-w-3xl p-8">
-          <PageTitle title="Boost Challenge" subtitle="Challenge unavailable" icon={<Rocket className="text-[var(--gold)]" />} />
+          <PageTitle title="Boost Challenge" subtitle="Challenge unavailable" />
           <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">{detailsQuery.data.message}</p>
           <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
         </Card>
@@ -133,8 +133,20 @@ function BoostChallengeContent() {
     return (
       <AppShell>
         <Card className="max-w-3xl p-8">
-          <PageTitle title="Boost Challenge" subtitle="Challenge not found" icon={<Rocket className="text-[var(--gold)]" />} />
+          <PageTitle title="Boost Challenge" subtitle="Challenge not found" />
           <LinkButton href="/challenges" className="mt-8">Back to Challenges</LinkButton>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  if (!boostAccess?.allowed) {
+    return (
+      <AppShell>
+        <Card className="max-w-3xl p-8">
+          <PageTitle title="Boost Challenge" subtitle="Owner access required" />
+          <p className="mt-6 text-slate-300">Only an eligible creator, host, or enterprise owner can boost a publicly visible challenge.</p>
+          <LinkButton href={`/challenges/${challenge.id}`} className="mt-8">Back to Challenge</LinkButton>
         </Card>
       </AppShell>
     );
@@ -143,10 +155,9 @@ function BoostChallengeContent() {
   return (
     <AppShell>
       <div className="max-w-5xl">
-        <PageTitle title="Boost Challenge" subtitle={challenge.title} icon={<Rocket className="text-[var(--gold)]" />} />
+        <PageTitle title="Boost Challenge" subtitle={challenge.title} />
         {active ? (
           <Card className="mt-8 border-emerald-500/30 bg-emerald-950/20 p-8">
-            <CheckCircle2 className="h-14 w-14 text-emerald-300" />
             <h2 className="mt-5 text-3xl font-black">Boosting Active</h2>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               <Metric label="Status" value="Boost active" />

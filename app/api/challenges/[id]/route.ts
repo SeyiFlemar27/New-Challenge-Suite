@@ -16,6 +16,7 @@ import { buildPublicChallengeParticipants } from "@/lib/server/challenge-partici
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { predictionAccessForViewer } from "@/lib/server/predictions";
 import { freeVoteGuardId, nextVoteResetAt, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
+import { getChallengeBoostAccess } from "@/lib/server/boosts";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -119,6 +120,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
   const ownerAccount = Boolean(user && userOwnsChallenge({ id: challengeSnap.id, ...challengeData }, user.uid));
+  const boostAccess = getChallengeBoostAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid, profile: requestProfile });
   const submitted = Boolean(userSubmissionSnap?.exists);
   const paymentPending = entryPaymentStatus === "pending";
   const paymentRequired = paidEntryRequired && !paidEntryEnrolled;
@@ -214,6 +216,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       viewerState,
       submissionAccess,
       participantJourney,
+      ownerAccount,
+      boostAccess,
       votingAccess,
       predictionAccess,
       participation: participationState,

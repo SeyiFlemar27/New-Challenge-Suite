@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, ChevronDown, Coins, Rocket, Vote } from "lucide-react";
+import { Bookmark, ChevronDown, Coins, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
@@ -185,7 +185,8 @@ export default function ChallengeDetailPage() {
   const planExperience = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
   const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
-  const canBoost = planExperience.monthlyBoostLimit > 0 && (selectedAccountType === "creator" || selectedAccountType === "host");
+  const ownerAccount = Boolean((userState as any)?.ownerAccount);
+  const canBoost = Boolean(ownerAccount && (userState as any)?.boostAccess?.allowed);
   const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
@@ -266,8 +267,8 @@ export default function ChallengeDetailPage() {
               registrationClosesAt={phaseSummary?.registrationEndAt}
             />
           </Card>
+          {ownerAccount ? <Card className="mt-6 p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Owner Controls</p><div className="mt-4 grid gap-3 sm:flex sm:flex-wrap"><LinkButton href={`/challenges/${challenge.id}/manage`} className="w-full sm:w-auto">Manage Challenge</LinkButton>{canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto" variant="secondary">Boost Challenge</LinkButton> : null}<LinkButton href={`/challenges/${challenge.id}/participants`} className="w-full sm:w-auto" variant="secondary">Manage Participants</LinkButton></div></Card> : null}
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
-            {canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto"><Rocket size={17} /> Boost Challenge</LinkButton> : null}
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
           </div>
@@ -386,11 +387,11 @@ function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLab
   return <div className="text-left"><div className="grid gap-4 sm:grid-cols-3"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Current phase</p><p className="mt-1 text-lg font-black text-white">{phaseLabel}</p></div><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-lg font-black text-[var(--gold)]">{paidEntryRequired ? entryFeeLabel : "Free"}</p></div><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{registered ? "Next action" : "Registration deadline"}</p><p className="mt-1 text-sm font-black leading-6 text-white">{registered ? label : registrationClosesAt ? formatChallengeDateTime(registrationClosesAt, timeZone) : "Not published"}</p></div></div><div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h3 className="font-black text-white">{label}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div>{registered ? <div className="mt-5 grid gap-2 sm:grid-cols-2"><p className="col-span-full text-xs font-black uppercase tracking-[0.16em] text-slate-500">Participation progress</p>{progressItems.map(([name, value]) => <div key={name} className="flex min-w-0 items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="text-right font-black text-white">{value}</span></div>)}</div> : <div className="mt-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Eligibility</p><p className="mt-1 text-sm text-slate-300">{message}</p></div>}<JourneyAction action={action} blockerCode={journey?.blockerCode} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} registered={registered} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} submissionOpensAt={checklist.submissionOpensAt} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
 }
 function JourneyAction({ action, blockerCode, href, challengeId, entryFeeLabel, registered = false, loading, onPay, onRefresh, waitLabel, submissionOpensAt }: { action: string; blockerCode?: string | null; href?: string | null; challengeId: string; entryFeeLabel: string; registered?: boolean; loading: boolean; onPay: () => void; onRefresh: () => void; waitLabel?: string; submissionOpensAt?: string | null }) {
-  if (action === "pay_entry_fee") return <Button className="mt-5 w-full" onClick={onPay} disabled={loading}>{loading ? "Starting Checkout..." : registered ? "Complete Payment" : `Pay & Enter - ${entryFeeLabel}`}</Button>;
+  if (action === "pay_entry_fee") return <Button className="mt-5 w-full" onClick={onPay} disabled={loading}>{loading ? "Starting Checkout..." : registered ? "Retry Payment" : `Pay ${entryFeeLabel} & Join Challenge`}</Button>;
   if (action === "refresh_payment") return <Button className="mt-5 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button>;
   if (action === "wait_for_submission") return <SubmissionCountdown opensAt={submissionOpensAt} formattedOpenAt={waitLabel} onOpen={onRefresh} />;
   if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
-  if (action === "register" || action === "enter_challenge" || action === "request_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "register" ? "Join Challenge" : action === "enter_challenge" ? "Continue Challenge" : "Request Entry"}</LinkButton>;
+  if (action === "register" || action === "enter_challenge" || action === "request_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "register" ? "Join Challenge" : action === "enter_challenge" ? "Complete Entry Details" : "Request Entry"}</LinkButton>;
   if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">Vote Now</LinkButton>;
   if (action === "view_winners") return <LinkButton href="/winners" className="mt-5 w-full">View Winners</LinkButton>;
   if (action === "view_results") return <LinkButton href="/winners" className="mt-5 w-full">View Results</LinkButton>;

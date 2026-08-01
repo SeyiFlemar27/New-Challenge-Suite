@@ -1,11 +1,11 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { isChallengeEligibleForBoost } from "@/lib/challenge-status";
 import { requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { createNotification } from "@/lib/server/notifications";
 import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { getUserPlanAccess } from "@/lib/plan-access";
+import { getChallengeBoostAccess } from "@/lib/server/boosts";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,6 +29,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ...(profileSnap.exists ? profileSnap.data() ?? {} : {}),
     ...(accountSnap.exists ? accountSnap.data() ?? {} : {})
   });
+  if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
+  const challenge = challengeSnap.data() ?? {};
+  const boostAccess = getChallengeBoostAccess({ challenge, userId: user.uid, profile: {
+    ...(profileSnap.exists ? profileSnap.data() ?? {} : {}),
+    ...(accountSnap.exists ? accountSnap.data() ?? {} : {})
+  } });
+  if (boostAccess.reason === "owner_required") return forbidden("Only the challenge owner can boost this challenge.");
+  if (boostAccess.reason === "public_challenge_required") return fail("Publish this challenge publicly before boosting it.", 409, undefined, "BOOST_REJECTED");
+  if (boostAccess.reason === "status_not_eligible") return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");
   if (planAccess.accountType === "sponsor" || planAccess.monthlyBoostLimit <= 0) {
     return forbidden("Challenge boosts require the Creator plan or higher.");
   }
@@ -42,9 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (boostsThisMonth >= planAccess.monthlyBoostLimit) {
     return fail(`Your ${planAccess.planName} plan includes ${planAccess.monthlyBoostLimit} challenge boost${planAccess.monthlyBoostLimit === 1 ? "" : "s"} per month.`, 403, undefined, "PLAN_LIMIT_REACHED");
   }
-  if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
-  const challenge = challengeSnap.data() ?? {};
-  if (!isChallengeEligibleForBoost(challenge.status)) return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");
+  if (!boostAccess.allowed) return forbidden("Challenge boosts require an eligible creator, host, or enterprise owner account.");
   if (!packageSnap.exists || packageSnap.data()?.active !== true) return validationError({ packageId: "Select an active boost package." });
   const boostPackage = packageSnap.data()!;
   const coins = Number(boostPackage.coins);
