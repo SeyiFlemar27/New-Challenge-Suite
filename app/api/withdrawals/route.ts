@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/cash-wallet";
@@ -14,11 +14,12 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Withdrawals");
   const walletRef = await ensureCashWalletFoundation(db, user.uid);
-  const [walletSnap, requestSnap, accountSnap, earningSnap] = await Promise.all([
+  const [walletSnap, requestSnap, accountSnap, earningSnap, payoutMethodSnap] = await Promise.all([
     walletRef.get(),
     db.collection("withdrawalRequests").where("userId", "==", user.uid).limit(100).get(),
     db.collection("users").doc(user.uid).get(),
-    db.collection("cashLedger").where("userId", "==", user.uid).limit(100).get()
+    db.collection("cashLedger").where("userId", "==", user.uid).limit(100).get(),
+    db.collection("payoutMethods").where("userId", "==", user.uid).limit(20).get()
   ]);
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
   const kyc = await loadKycMetadata(db, user.uid);
@@ -28,12 +29,13 @@ export async function GET(request: Request) {
     accountType,
     availableBalanceCents: wallet.availableBalanceCents,
     kycStatus: String(kyc.kycStatus),
-    payoutMethodConfigured: false,
+    payoutMethodConfigured: !payoutMethodSnap.empty,
     hasCashEarnings
   });
   const requests = requestSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data(), payoutProviderReference: null } as Record<string, unknown> & { id: string }))
     .sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? "")));
+  const payoutMethods = payoutMethodSnap.docs.map((doc) => ({ id: doc.id, type: doc.data().type, label: doc.data().maskedAccount, verificationStatus: doc.data().verificationStatus, providerConnected: false, transferEnabled: false }));
   const eligibleSourceTypes = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
   const eligibleSources = earningSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
@@ -71,7 +73,8 @@ export async function GET(request: Request) {
     pendingClearanceDays: WITHDRAWAL_ARCHITECTURE_CONFIG.pendingClearanceDays,
     minimumProcessingHours: WITHDRAWAL_ARCHITECTURE_CONFIG.minimumProcessingHours,
     withdrawalFeeCents: WITHDRAWAL_ARCHITECTURE_CONFIG.withdrawalFeeCents,
-    eligibleSources
+    eligibleSources,
+    payoutMethods
   }, "Withdrawal review data loaded.");
 }
 
@@ -105,18 +108,23 @@ export async function POST(request: Request) {
   const kyc = await loadKycMetadata(db, user.uid);
   if (String(kyc.kycStatus) !== "verified") return fail("KYC verification is required before withdrawals.", 403, { kycStatus: kyc.kycStatus }, "KYC_REQUIRED");
   const now = new Date().toISOString();
+  const payoutMethodId = String((body as any).payoutMethodId ?? "").trim();
+  const savedMethodSnap = payoutMethodId ? await db.collection("payoutMethods").doc(payoutMethodId).get() : null;
+  const savedMethod = savedMethodSnap?.exists && savedMethodSnap.data()?.userId === user.uid ? savedMethodSnap.data() ?? {} : null;
+  if (payoutMethodId && !savedMethod) return fail("Choose a payout method that belongs to your account.", 403, undefined, "PAYOUT_METHOD_NOT_OWNED");
   const details = ((body as any).methodDetails ?? {}) as Record<string, unknown>;
-  const accountHolderName = String(details.accountHolderName ?? details.name ?? "").trim();
-  const bankName = method === "bank_transfer" ? String(details.bankName ?? "").trim() : method === "payoneer" ? "Payoneer" : "PayPal";
-  const accountNumber = String(details.accountNumber ?? details.email ?? "").trim();
-  if (!accountHolderName || !accountNumber || (method === "bank_transfer" && !bankName)) return fail("Add payout method details.", 400, undefined, "PAYOUT_METHOD_REQUIRED");
+  const resolvedMethod = String(savedMethod?.type ?? method).toLowerCase();
+  const accountHolderName = String(savedMethod?.accountHolderName ?? details.accountHolderName ?? details.name ?? "").trim();
+  const bankName = String(savedMethod?.bankName ?? (resolvedMethod === "bank_transfer" ? details.bankName ?? "" : resolvedMethod === "payoneer" ? "Payoneer" : "PayPal")).trim();
+  const accountNumber = String(savedMethod?.last4 ?? details.accountNumber ?? details.email ?? "").trim();
+  if (!accountHolderName || !accountNumber || (resolvedMethod === "bank_transfer" && !bankName)) return fail("Add payout method details.", 400, undefined, "PAYOUT_METHOD_REQUIRED");
   const paypalDomain = accountNumber.includes("@") ? accountNumber.slice(accountNumber.lastIndexOf("@")) : "";
-  const payoutMethodLabel = method === "paypal"
+  const payoutMethodLabel = savedMethod ? String(savedMethod.maskedAccount ?? "Saved payout method") : resolvedMethod === "paypal"
     ? `PayPal - ***${paypalDomain}`
-    : method === "payoneer"
+    : resolvedMethod === "payoneer"
       ? `Payoneer - ***${paypalDomain}`
       : `${bankName} ${maskAccount(accountNumber)}`;
-  const payoutMethodLast4 = method === "bank_transfer" ? accountNumber.replace(/\D/g, "").slice(-4) : method;
+  const payoutMethodLast4 = resolvedMethod === "bank_transfer" ? accountNumber.replace(/\D/g, "").slice(-4) : resolvedMethod;
   try {
     const result = await db.runTransaction((transaction) => createWithdrawalRequest(db, transaction, {
       userId: user.uid,
@@ -124,14 +132,14 @@ export async function POST(request: Request) {
       currency: "usd",
       sourceType: String(source.sourceType),
       sourceIds: [sourceId],
-      payoutMethodType: method,
+      payoutMethodType: resolvedMethod,
       payoutMethodLabel,
       payoutMethodLast4,
       accountHolderName,
       bankName,
       country: String(details.country ?? "US"),
       kycStatusAtRequest: String(kyc.kycStatus),
-      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceId}-${amountCents}-${method}`),
+      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceId}-${amountCents}-${resolvedMethod}`),
       now
     }));
     return ok({ request: result.request, created: result.created, payoutExecuted: false }, "Withdrawal request submitted for review.");

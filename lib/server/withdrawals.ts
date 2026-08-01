@@ -1,4 +1,4 @@
-﻿import type { Firestore, Transaction } from "firebase-admin/firestore";
+import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createCashWalletDefaults } from "@/lib/server/cash-wallet";
 import { WITHDRAWAL_ARCHITECTURE_CONFIG, type WithdrawalRequestStatus } from "@/lib/server/wallet-architecture";
@@ -80,7 +80,7 @@ export async function createWithdrawalRequest(
   const requestId = deterministicId("withdrawal", input.userId, input.idempotencyKey);
   const requestRef = db.collection("withdrawalRequests").doc(requestId);
   const walletRef = db.collection("cashWallets").doc(input.userId);
-  const payoutMethodRef = db.collection("payoutMethods").doc(deterministicId(input.userId, input.payoutMethodType));
+  const payoutMethodRef = db.collection("payoutMethods").doc(deterministicId("payout_method", input.userId, input.payoutMethodType));
   const sourceRefs = input.sourceIds.map((id) => db.collection("cashLedger").doc(id));
   const [existing, walletSnap, ...sourceSnaps] = await Promise.all([
     transaction.get(requestRef),

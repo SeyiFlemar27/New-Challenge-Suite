@@ -19,6 +19,7 @@ type WithdrawalData = {
   policy?: { dorocoinNotCash?: string; rewardPointsNotCash?: string };
   accountType: string;
   eligibleSources: Array<{ id: string; sourceType: string; challengeId?: string | null; settlementId?: string | null; grossAmountCents: number; feeAmountCents: number; netAmountCents: number; currency: string; status: string }>;
+  payoutMethods: Array<{ id: string; type: Method; label: string; verificationStatus: string; providerConnected: false; transferEnabled: false }>;
 };
 
 type Method = "bank_transfer" | "paypal" | "payoneer";
@@ -28,6 +29,7 @@ export default function WithdrawPage() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [method, setMethod] = useState<Method>("bank_transfer");
+  const [payoutMethodId, setPayoutMethodId] = useState("");
   const [amount, setAmount] = useState("");
   const [sourceId, setSourceId] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
@@ -44,6 +46,7 @@ export default function WithdrawPage() {
     const payload = result.data;
     setData(payload);
     setSourceId((current) => current || payload.eligibleSources?.[0]?.id || "");
+    setPayoutMethodId((current) => current || payload.payoutMethods?.[0]?.id || "");
   }
 
   useEffect(() => { void load(); }, []);
@@ -110,10 +113,11 @@ export default function WithdrawPage() {
                   </select>
                 </Field>
                 {selectedSource ? <div className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 sm:grid-cols-3"><BalanceDetail label="Gross" value={selectedSource.grossAmountCents} /><BalanceDetail label="Fees already deducted" value={selectedSource.feeAmountCents} /><BalanceDetail label="Net available" value={selectedSource.netAmountCents} /></div> : null}
-                <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option><option value="payoneer">Payoneer</option></select></Field>
+                {data.payoutMethods?.length ? <Field label="Saved payout method"><select className={inputClass} value={payoutMethodId} onChange={(event) => { const id = event.target.value; setPayoutMethodId(id); const saved = data.payoutMethods.find((item) => item.id === id); if (saved) setMethod(saved.type); }}><option value="">Choose a saved payout method</option>{data.payoutMethods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field> : <p className="rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Add a payout method from Earnings, or enter details below for this reviewed request.</p>}
+                {!payoutMethodId ? <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option><option value="payoneer">Payoneer</option></select></Field> : null}
                 <Field label="Amount"><input className={inputClass} type="number" min={min} max={available || undefined} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={`Available $${available.toFixed(2)}`} /></Field>
-                <Field label="Account holder name"><input className={inputClass} value={accountHolderName} onChange={(event) => setAccountHolderName(event.target.value)} /></Field>
-                {method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : <Field label={`${method === "payoneer" ? "Payoneer" : "PayPal"} email`}><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field>}
+                {!payoutMethodId ? <Field label="Account holder name"><input className={inputClass} value={accountHolderName} onChange={(event) => setAccountHolderName(event.target.value)} /></Field> : null}
+                {!payoutMethodId && method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : !payoutMethodId ? <Field label={`${method === "payoneer" ? "Payoneer" : "PayPal"} email`}><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field> : null}
                 <Button className="w-full" disabled={submitting || available <= 0 || !sourceId}>{submitting ? "Submitting..." : "Submit Withdrawal Request"}</Button>
               </form>
             </Card>
