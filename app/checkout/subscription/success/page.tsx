@@ -15,8 +15,8 @@ function Content() {
     confirmedTitle: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan activated`,
     pendingBody: "Your provider-confirmed subscription record is being synchronized.",
     confirmedBody: "Your membership is active. Continue setup now or finish later from your dashboard.",
-    primaryLabel: needsKyc ? "Continue Identity Verification" : "Continue to Dashboard",
-    primaryHref: needsKyc ? "/kyc/status" : "/dashboard",
+    primaryLabel: "Continue Setup",
+    primaryHref: "/onboarding/premium?plan=" + encodeURIComponent(plan) + (params.get("session_id") ? "&session_id=" + encodeURIComponent(params.get("session_id")!) : ""),
     secondaryLabel: "Finish Later",
     secondaryHref: "/dashboard"
   }} />;
