@@ -8,6 +8,7 @@ import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { Activity, Award, BarChart3, ClipboardCheck, Crown, Diamond, Gift, LockKeyhole, Medal, Radio, Rocket, Settings, ShieldCheck, Swords, Trophy, User, UsersRound, Vote } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { fetchDashboard } from "@/lib/api/services";
+import { apiRequest } from "@/lib/api/client";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,7 @@ export default function DashboardPage() {
     staleTime: 30_000
   });
 
+  const { data: usageData } = useQuery({ queryKey: ["challenge-usage"], queryFn: () => apiRequest<{ freeBasic: { used: number; limit: number; remaining: number; rule: "lifetime" } }>("/api/challenges/usage"), staleTime: 30_000 });
   const dashboard = data?.ok ? data.data : null;
   const redirectTo = (dashboard as DashboardRedirectData | null)?.redirectTo;
   const sponsorAccount = (dashboard as DashboardRedirectData | null)?.user?.accountType === "sponsor";
@@ -248,12 +250,9 @@ export default function DashboardPage() {
         ) : null}
 
         <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={String(stat.value)} label={stat.label} />)}
+          {tierStats.slice(0, 3).map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={String(stat.value)} label={stat.label} />)}
         </div>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {creatorTools.map((tool) => <CreatorToolCard key={tool.title} {...tool} />)}
-        </div>
 
         <Card className="mt-8 p-6 md:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -304,6 +303,7 @@ export default function DashboardPage() {
           <p className="mt-3 text-slate-300">{errorMessage}</p>
         </Card>
       ) : null}
+      {planExperience.planId === "free" ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-5 sm:p-6"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Free Basic Challenge allowance</p><p className="mt-2 text-2xl font-black">{usageData?.ok ? `${usageData.data?.freeBasic.remaining ?? 0} of ${usageData.data?.freeBasic.limit ?? 3} remaining` : "Loading allowance"}</p><p className="mt-2 text-sm text-slate-300">Free accounts can publish up to 3 Free Basic Challenges over the lifetime of the account.</p></Card> : null}
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tierStats.map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={isLoading ? "..." : String(stat.value)} label={stat.label} />)}
       </div>
