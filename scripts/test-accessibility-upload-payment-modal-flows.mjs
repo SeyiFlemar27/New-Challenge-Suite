@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const upload = readFileSync("components/media-upload-field.tsx", "utf8");
+const earnings = readFileSync("app/earnings/page.tsx", "utf8");
+const builder = readFileSync("components/challenge-builder.tsx", "utf8");
+const status = readFileSync("components/payment-status-journey.tsx", "utf8");
+assert(upload.includes('role="progressbar"') && upload.includes('aria-live="polite"') && upload.includes('role="alert"'), "upload must announce progress and failures");
+assert(earnings.includes('role="dialog"') && earnings.includes('aria-modal="true"') && earnings.includes('event.key === "Escape"') && earnings.includes("autoFocus"), "payout modal must be labelled, focused, and Escape-closeable");
+assert(builder.includes('aria-labelledby="challenge-preview-title"') && builder.includes('event.key === "Escape"') && builder.includes("autoFocus"), "builder preview must be labelled, focused, and Escape-closeable");
+assert(status.includes('aria-live="polite"'), "payment verification changes must be announced");
+console.log("upload and payment modal accessibility checks passed");

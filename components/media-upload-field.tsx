@@ -291,7 +291,7 @@ export function MediaUploadField({
         )}
         <input ref={inputRef} className="hidden" type="file" accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />
         {(uploading || status === "failed" || status === "complete" || value) ? (
-          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-4">
+          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-4" aria-live="polite">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="truncate text-sm font-black text-white">{displayFileName}</p>

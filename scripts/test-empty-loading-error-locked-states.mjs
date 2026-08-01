@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const prize = readFileSync("app/challenges/[id]/prize-funding/page.tsx", "utf8");
+const status = readFileSync("components/payment-status-journey.tsx", "utf8");
+const earnings = readFileSync("app/earnings/page.tsx", "utf8");
+const builder = readFileSync("components/challenge-builder.tsx", "utf8");
+assert(prize.includes("Loading prize funding") && prize.includes(">Retry</Button>"), "prize funding needs loading and retryable error states");
+assert(status.includes("Checking payment status") && status.includes("Payment needs attention") && status.includes("Refresh Status"), "payment journey needs processing, error, and retry states");
+assert(earnings.includes("Earnings unavailable") && earnings.includes("No earnings activity yet"), "earnings needs error and empty states");
+assert(builder.includes("function Locked") && builder.includes("Upgrade Required"), "builder needs explicit locked states");
+console.log("empty, loading, error, retry, and locked state checks passed");

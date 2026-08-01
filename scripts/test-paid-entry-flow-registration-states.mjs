@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const journey = readFileSync("lib/server/participant-journey.ts", "utf8");
+const payments = readFileSync("lib/server/monetization-payments.ts", "utf8");
+const submissions = readFileSync("app/api/submissions/route.ts", "utf8");
+for (const state of ["payment_required", "payment_pending", "registered_not_entered", "can_submit", "already_submitted", "blocked_owner", "blocked_sponsor"]) assert(journey.includes(`"${state}"`), `missing participant state ${state}`);
+assert(payments.includes("webhookConfirmed === true"), "paid registration must require webhook-confirmed payment");
+assert(payments.includes("enrollmentActivated: false") && payments.includes("enrollmentActivated: true"), "manual and confirmed enrollment states must remain distinct");
+assert(submissions.includes("duplicateBlockingStatuses"), "one-submission rule must remain server-enforced");
+console.log("paid entry registration state checks passed");

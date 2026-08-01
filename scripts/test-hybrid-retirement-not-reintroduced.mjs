@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const shell = readFileSync("components/app-shell.tsx", "utf8");
+const builder = readFileSync("components/challenge-builder.tsx", "utf8");
+const explore = readFileSync("app/explore/page.tsx", "utf8");
+assert(!shell.includes('href="/host/hybrid/create"'), "active Hybrid creation must stay out of navigation");
+assert(!builder.includes("Create Hybrid Competition"), "challenge builder must not reintroduce Hybrid creation");
+assert(!explore.includes('value="hybrid"'), "Explore must not reintroduce a Hybrid filter");
+assert(builder.includes('tournamentType: "none"'), "normal builder must remain on the supported challenge model");
+console.log("Hybrid retirement checks passed");
