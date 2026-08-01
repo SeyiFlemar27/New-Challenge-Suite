@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const page = readFileSync("app/earnings/page.tsx", "utf8");
+for (const label of ["Overview", "Transactions", "Payouts", "Financial Documents"]) assert.match(page, new RegExp(label));
+for (const label of ["Available funds", "Earnings & expenses", "Earnings to date", "Expenses to date", "Date range", "Activity", "Order / Reference"]) assert.match(page, new RegExp(label));
+assert.match(page, /Learn more about this page/);
+assert.match(page, /Your earnings will appear here/);
+assert.match(page, /cashEarnings/);
+assert.doesNotMatch(page, /doroBalance|DoroCoin.*\$|fake/i);
+console.log("earnings structure contract passed");
