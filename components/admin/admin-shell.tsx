@@ -25,12 +25,12 @@ const groups: NavGroup[] = [
   { label: "Dashboard", items: [{ href: "/admin", label: "Overview", icon: Home, permission: "admin.dashboard.view" }] },
   { label: "Action Centre", items: [{ href: "/admin/action-centre", label: "Tasks requiring action", icon: ListChecks, permission: "admin.actionCentre.view" }] },
   { label: "People", items: [
-    { href: "/admin/users", label: "All users", icon: UsersRound, permission: "users.view" },
+    { href: "/admin/people/users", label: "All users", icon: UsersRound, permission: "users.view" },
     { href: "/admin/creators", label: "Creators and hosts", icon: UserCog, permission: "users.view" },
     { href: "/admin/sponsor-brands", label: "Sponsors", icon: ShieldCheck, permission: "sponsors.view" },
     { href: "/admin/host-workspaces", label: "Host workspaces", icon: BriefcaseBusiness, permission: "users.view" },
     { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" },
-    { href: "/admin/roles", label: "Admin team", icon: Boxes, permission: "roles.manage" }
+    { href: "/admin/people/admin-team", label: "Admin team", icon: Boxes, permission: "roles.manage" }
   ] },
   { label: "Challenges", items: [
     { href: "/admin/challenges", label: "All challenges", icon: Trophy, permission: "challenges.view" },
@@ -51,10 +51,10 @@ const groups: NavGroup[] = [
     { href: "/admin/dorocoin", label: "Spin Credits", icon: Coins, permission: "finance.view" }
   ] },
   { label: "Safety & Support", items: [
-    { href: "/admin/support", label: "Support tickets", icon: LifeBuoy, permission: "tickets.view" },
-    { href: "/admin/disputes", label: "Formal disputes", icon: Flag, permission: "disputes.review" },
-    { href: "/admin/appeals", label: "Appeals", icon: FileClock, permission: "appeals.review" },
-    { href: "/admin/risk-safety", label: "Safety reports", icon: ShieldCheck, permission: "safetyReports.review" },
+    { href: "/admin/safety-support/support-tickets", label: "Support tickets", icon: LifeBuoy, permission: "tickets.view" },
+    { href: "/admin/safety-support/disputes", label: "Formal disputes", icon: Flag, permission: "disputes.review" },
+    { href: "/admin/safety-support/appeals", label: "Appeals", icon: FileClock, permission: "appeals.review" },
+    { href: "/admin/safety-support/safety-reports", label: "Safety reports", icon: ShieldCheck, permission: "safetyReports.review" },
     { href: "/admin/media-moderation", label: "Flagged media", icon: ClipboardCheck, permission: "submissions.review" }
   ] },
   { label: "Sponsors & Events", items: [
@@ -77,12 +77,15 @@ const groups: NavGroup[] = [
   ] },
   { label: "Settings", items: [
     { href: "/admin/settings", label: "General settings", icon: Settings, permission: "settings.view" },
+    { href: "/admin/help", label: "Help Centre", icon: LifeBuoy, permission: "admin.dashboard.view" },
     { href: "/admin/voting-rules", label: "Voting rules", icon: ListChecks, permission: "settings.editVoting" },
     { href: "/admin/revenue-rules", label: "Prize and revenue rules", icon: BookOpenCheck, permission: "settings.editFinancial" },
     { href: "/admin/roles", label: "Admin roles", icon: Boxes, permission: "roles.manage" }
   ] },
   { label: "Developer Tools", items: [
-    { href: "/admin/system-status", label: "System status", icon: Activity, permission: "systemDiagnostics.view", developerOnly: true },
+    { href: "/admin/developer-tools/system-status", label: "System status", icon: Activity, permission: "systemDiagnostics.view", developerOnly: true },
+    { href: "/admin/developer-tools/background-jobs", label: "Background jobs", icon: RefreshCw, permission: "jobs.view", developerOnly: true },
+    { href: "/admin/developer-tools/feature-readiness", label: "Feature readiness", icon: SlidersHorizontal, permission: "systemDiagnostics.view", developerOnly: true },
     { href: "/admin/feature-flags", label: "Feature controls", icon: SlidersHorizontal, permission: "featureControls.manage", developerOnly: true },
     { href: "/admin/audit-logs", label: "Technical audit logs", icon: FileClock, permission: "auditLogs.viewRaw", developerOnly: true },
     { href: "/admin/qa-data", label: "QA tools", icon: Database, permission: "qaTools.use", developerOnly: true }
@@ -154,7 +157,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   })}</nav>;
 
   return (
-    <div className="admin-mobile-shell min-h-screen overflow-x-hidden bg-[#f4f5f7] text-[#171717]">
+    <div className="admin-mobile-shell min-h-screen overflow-x-hidden bg-[#080808] text-slate-100">
       <a href="#admin-workspace" className="sr-only z-[120] rounded-[8px] bg-[var(--gold)] px-4 py-3 font-bold text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to admin workspace</a>
       <header className="sticky top-0 z-40 border-b border-[var(--gold)]/20 bg-black/95 px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
@@ -172,9 +175,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <main id="admin-workspace" className="admin-workspace px-5 py-7 sm:px-8 lg:ml-[330px] lg:px-10">
         <div className="mx-auto max-w-[1500px]">
           <div className="mb-8 grid gap-3 xl:grid-cols-[minmax(280px,1fr)_auto] xl:items-center">
-            <form onSubmit={search} className="flex min-w-0 items-center rounded-[8px] border border-black/10 bg-white px-4 shadow-sm focus-within:border-[var(--gold)]">
+            <form onSubmit={search} className="admin-surface flex min-w-0 items-center rounded-[8px] border border-white/10 bg-[#141414] px-4 shadow-sm focus-within:border-[var(--gold)]">
               <Search size={17} className="shrink-0 text-slate-500" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 min-w-0 flex-1 bg-transparent px-3 text-sm text-[#171717] outline-none" placeholder="Search users, sponsors, challenges..." aria-label="Search admin records" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 min-w-0 flex-1 bg-transparent px-3 text-sm text-current outline-none" placeholder="Search users, sponsors, challenges..." aria-label="Search admin records" />
               <button className="text-xs font-black text-[var(--gold)]">Search</button>
             </form>
             <div className="flex flex-wrap gap-2">

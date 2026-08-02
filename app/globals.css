@@ -17,6 +17,29 @@
   box-sizing: border-box;
 }
 
+html[data-app-theme="light"] .app-shell,
+html[data-app-theme="light"] .admin-mobile-shell {
+  --background: #f7f8fa;
+  --foreground: #171717;
+  --muted: #526076;
+  --panel: #ffffff;
+  --panel-2: #eef1f5;
+  background: #f7f8fa;
+  color: #171717;
+}
+
+html[data-app-theme="light"] .app-shell [data-ui-card],
+html[data-app-theme="light"] .admin-mobile-shell [data-ui-card],
+html[data-app-theme="light"] .admin-mobile-shell .admin-surface {
+  border-color: rgba(0, 0, 0, 0.12);
+  background-color: #ffffff;
+  color: #171717;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
 html {
   background: var(--background);
   scroll-behavior: smooth;

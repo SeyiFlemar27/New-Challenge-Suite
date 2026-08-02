@@ -9,6 +9,7 @@ import { MediaUploadField } from "@/components/media-upload-field";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { profileMediaPath } from "@/lib/media-upload-paths";
+import { setAppTheme } from "@/components/app-theme-provider";
 
 type SettingsData = {
   account: { displayName: string; username: string; email: string; phone: string; accountType: string; planId: string; subscriptionStatus: string; effectiveTier?: { id: string; displayName: string } };
@@ -107,8 +108,7 @@ export default function SettingsSectionPage() {
 
   function chooseAppearance(value: "system" | "light" | "dark") {
     update("preferences", "appearance", value);
-    document.documentElement.dataset.theme = value;
-    localStorage.setItem("challenge-suite-appearance", value);
+    setAppTheme(value);
   }
 
   if (loading) return <AppShell><Card className="h-[420px] animate-pulse bg-[#171717]" /></AppShell>;
@@ -149,7 +149,7 @@ function Profile({ settings, update, list, userId }: { settings: SettingsData; u
 }
 
 function Appearance({ value, choose }: { value: string; choose: (value: "system" | "light" | "dark") => void }) {
-  return <div><div className="flex items-center gap-3"><Palette className="text-[var(--gold)]" /><h2 className="text-xl font-black">Display Preference</h2></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{(["system", "light", "dark"] as const).map((option) => <button key={option} type="button" onClick={() => choose(option)} className={`min-h-14 rounded-[8px] border px-4 font-bold capitalize ${value === option ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-black/30"}`}>{option === "system" ? "System Default" : `${option} Mode`}</button>)}</div><p className="mt-5 text-sm text-slate-400">This preference is saved for your account. Full light-theme coverage is still being polished.</p></div>;
+  return <div><div className="flex items-center gap-3"><Palette className="text-[var(--gold)]" /><h2 className="text-xl font-black">Display Preference</h2></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{(["system", "light", "dark"] as const).map((option) => <button key={option} type="button" onClick={() => choose(option)} className={`min-h-14 rounded-[8px] border px-4 font-bold capitalize ${value === option ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-black/30"}`}>{option === "system" ? "System Default" : `${option} Mode`}</button>)}</div><p className="mt-5 text-sm text-slate-400">Applied to signed-in workspaces and saved to this browser and your Challenge Suite profile. Public marketing pages keep their own presentation.</p></div>;
 }
 
 function Privacy({ settings, update, setSettings }: { settings: SettingsData; update: Update; setSettings: React.Dispatch<React.SetStateAction<SettingsData>> }) {

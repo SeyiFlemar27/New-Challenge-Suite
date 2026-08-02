@@ -15,7 +15,11 @@ export const metadata: Metadata = {
   title: { default: "Challenge Suite", template: "%s | Challenge Suite" },
   description: "Create, enter, vote, and run structured challenges for competitors, creators, Hosts, and brands.",
   alternates: { canonical: "/" },
-  icons: { icon: "/icon", shortcut: "/icon", apple: "/icon" },
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" }, { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  },
   openGraph: {
     type: "website",
     url: "https://www.challengesuite.com",
@@ -32,7 +36,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-app-theme="dark" data-app-theme-preference="dark" suppressHydrationWarning>
       <body className={manrope.variable}>
         <Providers>{children}</Providers>
       </body>
