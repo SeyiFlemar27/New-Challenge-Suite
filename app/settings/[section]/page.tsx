@@ -29,7 +29,7 @@ const defaults: SettingsData = {
   profileVisibility: "public",
   privacy: { showFollowersFollowing: true, showActivity: true, showWins: true, showParticipatedChallenges: true, allowMessages: true, allowSponsorMessages: true, showEarnings: false },
   notifications: { challengeReminders: true, liveChallengeReminders: true, voteNotifications: true, commentsReplies: true, followerNotifications: true, sponsorRequestUpdates: true, billingAlerts: true, email: true, push: false, inApp: true },
-  preferences: { favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "system" }
+  preferences: { favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "light" }
 };
 
 const sections = new Set(["account", "profile", "appearance", "notifications", "privacy", "security", "billing", "wallet", "preferences", "danger"]);
@@ -49,7 +49,7 @@ export default function SettingsSectionPage() {
   useEffect(() => {
     void apiRequest<SettingsData>("/api/settings").then((result) => {
       if (result.ok && result.data) {
-        setSettings({
+        const nextSettings = {
           ...defaults,
           ...result.data,
           account: { ...defaults.account, ...result.data.account },
@@ -57,7 +57,9 @@ export default function SettingsSectionPage() {
           privacy: { ...defaults.privacy, ...result.data.privacy },
           notifications: { ...defaults.notifications, ...result.data.notifications },
           preferences: { ...defaults.preferences, ...result.data.preferences }
-        });
+        };
+        setSettings(nextSettings);
+        setAppTheme(nextSettings.preferences.appearance);
       } else setNotice(result.message);
       setLoading(false);
     });

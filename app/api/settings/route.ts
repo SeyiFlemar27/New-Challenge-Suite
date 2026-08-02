@@ -46,7 +46,7 @@ const settingsSchema = z.object({
     locationPreference: z.string().trim().max(120).default(""),
     contentLanguage: z.string().trim().max(40).default("English"),
     matureContent: z.boolean().default(false),
-    appearance: z.enum(["system", "light", "dark"]).default("system")
+    appearance: z.enum(["system", "light", "dark"]).default("light")
   }),
   sponsorDefaults: z.object({
     ctaButtonText: z.string().trim().max(40).default("Visit Website"),
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
       followerNotifications: true, sponsorRequestUpdates: true, billingAlerts: true, email: true, push: false, inApp: true
     },
     preferences: preferencesSnap.data() ?? {
-      favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "system"
+      favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "light"
     },
     sponsorDefaults: sponsorSnap.exists ? {
       ctaButtonText: sponsorSnap.data()?.ctaButtonText ?? "Visit Website",

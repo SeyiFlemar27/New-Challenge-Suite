@@ -36,7 +36,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-app-theme="dark" data-app-theme-preference="dark" suppressHydrationWarning>
+    <html lang="en" data-app-theme="light" data-app-theme-preference="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('challenge-suite-appearance');if(t!=='light'&&t!=='dark'&&t!=='system')t='light';var r=t==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.appThemePreference=t;document.documentElement.dataset.appTheme=r}catch(e){}})();` }} />
+      </head>
       <body className={manrope.variable}>
         <Providers>{children}</Providers>
       </body>

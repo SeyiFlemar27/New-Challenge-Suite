@@ -1,16 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --background: #000000;
-  --foreground: #f8fafc;
-  --muted: #90a4c4;
-  --panel: #101010;
-  --panel-2: #151515;
+  --background: #f7f8fa;
+  --foreground: #171717;
+  --muted: #526076;
+  --muted-soft: #778294;
+  --panel: #ffffff;
+  --panel-2: #f1f3f6;
+  --panel-3: #e7eaee;
+  --field: #ffffff;
+  --line: #d9dde3;
   --gold: #f5d90a;
   --gold-2: #d6b832;
+  --gold-strong: #8a7400;
   --purple: #765cf6;
   --content-max: 100rem;
   --page-gutter: clamp(1.25rem, 3vw, 3rem);
+}
+
+html[data-app-theme="dark"] {
+  --background: #000000;
+  --foreground: #f8fafc;
+  --muted: #90a4c4;
+  --muted-soft: #64748b;
+  --panel: #121212;
+  --panel-2: #1d1d1d;
+  --panel-3: #242424;
+  --field: #171717;
+  --line: rgba(255, 255, 255, 0.1);
+  --gold-strong: #f5d90a;
 }
 
 * {
@@ -18,18 +36,27 @@
 }
 
 html[data-app-theme="light"] .app-shell,
-html[data-app-theme="light"] .admin-mobile-shell {
+html[data-app-theme="light"] .admin-mobile-shell,
+html[data-app-theme="light"] .sponsor-mobile-shell,
+html[data-app-theme="light"] .auth-shell,
+html[data-app-theme="light"] .onboarding-shell {
   --background: #f7f8fa;
   --foreground: #171717;
   --muted: #526076;
   --panel: #ffffff;
   --panel-2: #eef1f5;
+  --field: #ffffff;
+  --line: #d9dde3;
+  --gold-strong: #8a7400;
   background: #f7f8fa;
   color: #171717;
 }
 
 html[data-app-theme="light"] .app-shell [data-ui-card],
 html[data-app-theme="light"] .admin-mobile-shell [data-ui-card],
+html[data-app-theme="light"] .sponsor-mobile-shell [data-ui-card],
+html[data-app-theme="light"] .auth-shell [data-ui-card],
+html[data-app-theme="light"] .onboarding-shell [data-ui-card],
 html[data-app-theme="light"] .admin-mobile-shell .admin-surface {
   border-color: rgba(0, 0, 0, 0.12);
   background-color: #ffffff;
@@ -48,8 +75,8 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 50% -20%, rgba(245, 217, 10, 0.08), transparent 28rem),
-    #000;
+    linear-gradient(180deg, rgba(245, 217, 10, 0.055), transparent 24rem),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   text-rendering: optimizeLegibility;
@@ -108,8 +135,8 @@ table {
 .app-shell {
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(245, 217, 10, 0.035), transparent 18rem),
-    #000;
+    linear-gradient(180deg, rgba(245, 217, 10, 0.045), transparent 18rem),
+    var(--background);
 }
 
 .premium-card {
@@ -120,6 +147,63 @@ table {
   border-color: rgba(245, 217, 10, 0.2);
 }
 
+/* Light is the product default. Explicit dark utilities remain available when Dark is selected. */
+html[data-app-theme="light"] .theme-workspace [class~="bg-black"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#080808]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#090909]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#0b0b0b]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#0c0c0c]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#0d0d0d]"] { background-color: #f7f8fa; }
+
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#101010]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#10151e]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#111111]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#11151d]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#121212]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#141414]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#151515]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#161616]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#171717]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#181818]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#191919]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#1a1a1a]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#1d1d1d]"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-[#222]"] { background-color: #ffffff; }
+
+html[data-app-theme="light"] .theme-workspace [class~="bg-black/20"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-black/25"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-black/30"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-black/35"],
+html[data-app-theme="light"] .theme-workspace [class~="bg-black/40"] { background-color: #f1f3f6; }
+
+html[data-app-theme="light"] .theme-workspace [class~="text-white"]:not([data-ui-button]),
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-100"],
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-200"] { color: #20242a; }
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-300"] { color: #465266; }
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-400"] { color: #5d6878; }
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-500"],
+html[data-app-theme="light"] .theme-workspace [class~="text-slate-600"] { color: #687386; }
+
+html[data-app-theme="light"] .theme-workspace [class~="text-[var(--gold)]"] { color: var(--gold-strong); }
+html[data-app-theme="light"] .theme-workspace [class~="text-yellow-50"],
+html[data-app-theme="light"] .theme-workspace [class~="text-yellow-100"],
+html[data-app-theme="light"] .theme-workspace [class~="text-yellow-200"] { color: #695800; }
+html[data-app-theme="light"] .theme-workspace [class~="text-red-100/70"],
+html[data-app-theme="light"] .theme-workspace [class~="text-red-100"],
+html[data-app-theme="light"] .theme-workspace [class~="text-red-200"],
+html[data-app-theme="light"] .theme-workspace [class~="text-red-300"] { color: #a61b1b; }
+html[data-app-theme="light"] .theme-workspace [class~="text-emerald-100"],
+html[data-app-theme="light"] .theme-workspace [class~="text-emerald-200"],
+html[data-app-theme="light"] .theme-workspace [class~="text-emerald-300"] { color: #0b6b46; }
+html[data-app-theme="light"] .theme-workspace [class~="border-white/5"],
+html[data-app-theme="light"] .theme-workspace [class~="border-white/10"],
+html[data-app-theme="light"] .theme-workspace [class~="border-white/15"],
+html[data-app-theme="light"] .theme-workspace [class~="border-white/20"],
+html[data-app-theme="light"] .theme-workspace [class~="border-white/25"] { border-color: #d9dde3; }
+
+html[data-app-theme="light"] .theme-workspace aside { box-shadow: 0 12px 34px rgb(24 32 45 / 0.08); }
+html[data-app-theme="light"] .theme-workspace table thead { background: #f1f3f6; color: #4b5565; }
+html[data-app-theme="light"] .theme-workspace table tr { border-color: #e1e4e8; }
 ::selection {
   background: var(--gold);
   color: #000;
@@ -261,29 +345,29 @@ table {
   }
 }
 
-/* Admin keeps a dark navigation rail while the working surface stays calm and readable. */
-.admin-workspace > div > h1,
-.admin-workspace h1.text-white {
+/* Admin follows the light workspace by default while explicit Dark remains available. */
+html[data-app-theme="light"] .admin-workspace > div > h1,
+html[data-app-theme="light"] .admin-workspace h1.text-white {
   color: #171717;
 }
 
-.admin-workspace > div > p.text-slate-400 {
+html[data-app-theme="light"] .admin-workspace > div > p.text-slate-400 {
   color: #5f6368;
 }
 
-.admin-workspace [data-ui-card] {
+html[data-app-theme="light"] .admin-workspace [data-ui-card] {
   border-color: #dedede;
   background: #ffffff;
   color: #171717;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
-.admin-workspace [data-ui-card] .text-white {
+html[data-app-theme="light"] .admin-workspace [data-ui-card] .text-white {
   color: #171717;
 }
 
-.admin-workspace [data-ui-card] .bg-white\/\[0\.025\],
-.admin-workspace [data-ui-card] .bg-white\/\[0\.03\] {
+html[data-app-theme="light"] .admin-workspace [data-ui-card] .bg-white\/\[0\.025\],
+html[data-app-theme="light"] .admin-workspace [data-ui-card] .bg-white\/\[0\.03\] {
   background: #f5f6f7;
 }
 .public-page{--public-ink:#181818;--public-muted:#626262;--public-line:#deded8;--public-accent:#f5d90a;min-height:100vh;overflow-x:clip;background:#fff;color:var(--public-ink)}

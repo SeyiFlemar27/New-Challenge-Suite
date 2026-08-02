@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { apiRequest } from "@/lib/api/client";
 
 export type AppTheme = "light" | "dark" | "system";
 
@@ -19,14 +21,31 @@ function applyTheme(theme: AppTheme) {
 }
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<AppTheme>("dark");
+  const { user, loading } = useAuth();
+  const [theme, setTheme] = useState<AppTheme>("light");
+  const [hasBrowserPreference, setHasBrowserPreference] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    const initial = isTheme(stored) ? stored : "dark";
+    const initial = isTheme(stored) ? stored : "light";
+    setHasBrowserPreference(isTheme(stored));
     setTheme(initial);
     applyTheme(initial);
   }, []);
+
+  useEffect(() => {
+    if (loading || !user || hasBrowserPreference || isTheme(localStorage.getItem(STORAGE_KEY))) return;
+    let active = true;
+    void apiRequest<{ preferences?: { appearance?: string } }>("/api/settings").then((result) => {
+      if (!active) return;
+      const appearance = result.data?.preferences?.appearance ?? null;
+      const saved: AppTheme = result.ok && isTheme(appearance) ? appearance : "light";
+      setTheme(saved);
+      localStorage.setItem(STORAGE_KEY, saved);
+      applyTheme(saved);
+    });
+    return () => { active = false; };
+  }, [hasBrowserPreference, loading, user]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: light)");
