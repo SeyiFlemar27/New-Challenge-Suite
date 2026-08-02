@@ -21,7 +21,7 @@ export function OnboardingShell({
   children
 }: OnboardingShellProps) {
   return (
-    <main className="relative min-h-[100dvh] overflow-x-hidden bg-black px-5 py-6 text-white sm:px-8 sm:py-8 lg:px-12 lg:py-10">
+    <main className="onboarding-shell theme-workspace relative min-h-[100dvh] overflow-x-hidden bg-[var(--background)] px-5 py-6 text-[var(--foreground)] sm:px-8 sm:py-8 lg:px-12 lg:py-10">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(245,217,10,.08),transparent)]" />
       <div className="relative mx-auto max-w-6xl">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 pb-6">

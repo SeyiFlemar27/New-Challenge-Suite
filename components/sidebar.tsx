@@ -279,7 +279,7 @@ export function Sidebar() {
 
   return (
     <>
-      <header data-mobile-header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-2.5 backdrop-blur lg:hidden">
+      <header data-mobile-header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[var(--panel)] px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_56px] items-center gap-2">
           <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={21} /></button>
           <Link href={signedOut ? "/explore" : workspace.homeHref} className="flex min-w-0 items-center justify-center gap-2 text-center">
@@ -296,7 +296,7 @@ export function Sidebar() {
 
       {drawerOpen ? <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
         <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
-        <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0b0b0b] p-5">
+        <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
@@ -308,7 +308,7 @@ export function Sidebar() {
         </aside>
       </div> : null}
 
-      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] shadow-2xl lg:flex xl:w-[320px]">
+      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] shadow-2xl lg:flex xl:w-[320px]">
         <div className="flex h-28 items-center gap-4 border-b border-white/10 px-6">
           <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
           <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{workspace.name}</p></div>
@@ -318,7 +318,7 @@ export function Sidebar() {
         </nav>
         <div className="space-y-3 p-5">
           <Link href="/dorocoins" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
-          <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[#171717] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
+          <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
           {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
@@ -329,14 +329,14 @@ export function Sidebar() {
 function WorkspaceNavigationLoading() {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[#0c0c0c]/95 px-4 py-2.5 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[var(--panel)] px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
           <div className="h-11 w-11 animate-pulse rounded-[8px] bg-white/5" />
           <div className="flex items-center justify-center gap-2"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><p className="truncate text-sm font-black uppercase tracking-[0.12em]">Challenge Suite</p></div>
           <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
         </div>
       </header>
-      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[#0d0d0d] p-6 lg:flex xl:w-[320px]">
+      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] p-6 lg:flex xl:w-[320px]">
         <div className="flex items-center gap-4"><BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" /><div className="h-5 w-36 animate-pulse rounded bg-white/10" /></div>
         <div className="mt-10 space-y-3">{[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="h-11 animate-pulse rounded-[8px] bg-white/5" />)}</div>
         <p className="mt-auto text-sm font-bold text-slate-400">Loading your workspace...</p>

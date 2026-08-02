@@ -13,7 +13,7 @@ const footerSections = [
 
 export function MobileFooter() {
   return (
-    <footer data-mobile-footer className="mt-14 border-t border-white/10 bg-[#080808] lg:hidden">
+    <footer data-mobile-footer className="mt-14 border-t border-white/10 bg-[var(--panel)] lg:hidden">
       <div className="mx-auto max-w-xl px-5 py-8">
         <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
         <p className="mt-2 text-sm leading-6 text-slate-400">Competition, made intentional.</p>

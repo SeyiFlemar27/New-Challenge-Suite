@@ -80,10 +80,10 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
   const nav = <nav className="mt-6 grid gap-5">{sponsorNavGroups.map((group) => <div key={group.label}><p className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{group.label}</p><div className="mt-2 grid gap-1.5">{group.items.map(navLink)}</div></div>)}</nav>;
 
   return (
-    <main className="sponsor-mobile-shell min-h-screen overflow-x-hidden bg-black text-white">
+    <main className="sponsor-mobile-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
       <ProductWalkthrough />
       <div className="grid min-h-screen md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="hidden h-screen overflow-y-auto border-b border-white/10 bg-[#0b0b0b] px-5 py-6 md:sticky md:top-0 md:block md:border-b-0 md:border-r">
+        <aside className="hidden h-screen overflow-y-auto border-b border-white/10 bg-[var(--panel)] px-5 py-6 md:sticky md:top-0 md:block md:border-b-0 md:border-r">
           <div className="flex items-center gap-4">
             <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
             <div>
@@ -110,7 +110,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
             </div>
             <Card className="mt-4 border-yellow-500/20 bg-yellow-500/5 p-3"><p className="text-[11px] font-black uppercase tracking-[0.16em] text-yellow-200">Brand Status</p><p className="mt-1 text-sm font-bold text-white">{sponsorStatusLabel(verificationStatus)} / {completion}% complete</p></Card>
           </div>
-          {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(90vw,380px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>{nav}<Link href="/landing" onClick={() => setDrawerOpen(false)} className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public site</Link></aside></div> : null}
+          {drawerOpen ? <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Sponsor navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close sponsor navigation" /><aside className="absolute bottom-0 right-0 top-0 w-[min(90vw,380px)] overflow-y-auto border-l border-[var(--gold)]/20 bg-[var(--panel)] p-5"><div className="flex items-center justify-between"><p className="text-lg font-black">{brandName}</p><button onClick={() => setDrawerOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>{nav}<Link href="/landing" onClick={() => setDrawerOpen(false)} className="mt-6 block rounded-[8px] border border-white/10 p-3 text-center font-bold">Public site</Link></aside></div> : null}
           {children}
           <MobileFooter />
         </section>

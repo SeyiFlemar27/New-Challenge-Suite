@@ -12,7 +12,7 @@ export function AuthenticatedTopbar() {
   const { user, loading, signedOut } = useCurrentUser();
   if (loading || signedOut || !user) return null;
   return (
-    <header className="sticky top-[69px] z-20 border-b border-white/10 bg-black/95 px-4 py-2.5 backdrop-blur sm:px-6 lg:top-0 lg:px-10" data-authenticated-topbar>
+    <header className="sticky top-[69px] z-20 border-b border-white/10 bg-[var(--panel)] px-4 py-2.5 backdrop-blur sm:px-6 lg:top-0 lg:px-10" data-authenticated-topbar>
       <div className="mx-auto flex min-h-11 max-w-[1600px] items-center justify-end gap-2">
         <Link href="/messages" className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 text-slate-300 hover:border-[var(--gold)]/40 hover:text-white" aria-label="Open messages">
           <MessageSquare size={18} />
@@ -34,7 +34,7 @@ function HelpMenu() {
       <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 text-slate-300 hover:border-[var(--gold)]/40 hover:text-white" aria-label="Open help menu" aria-expanded={open} aria-haspopup="menu">
         <CircleHelp size={18} />
       </button>
-      {open ? <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(88vw,280px)] rounded-[8px] border border-white/10 bg-[#111] p-2 shadow-2xl">
+      {open ? <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(88vw,280px)] rounded-[8px] border border-white/10 bg-[var(--panel)] p-2 shadow-2xl">
         <MenuLink href="/contact" label="Contact Support" onSelect={() => setOpen(false)} />
         <MenuLink href="/community-guidelines" label="Community Guidelines" onSelect={() => setOpen(false)} />
         <MenuLink href="/about" label="About Challenge Suite" onSelect={() => setOpen(false)} />
@@ -69,7 +69,7 @@ function AccountMenu() {
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{user.initials || "?"}</span>
         <span className="hidden max-w-36 truncate text-sm font-bold text-white sm:block">{user.displayName}</span>
       </button>
-      {open ? <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(92vw,330px)] overflow-hidden rounded-[8px] border border-white/10 bg-[#111] shadow-2xl">
+      {open ? <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(92vw,330px)] overflow-hidden rounded-[8px] border border-white/10 bg-[var(--panel)] shadow-2xl">
         <div className="border-b border-white/10 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0"><p className="truncate font-black text-white">{user.displayName}</p><p className="truncate text-xs text-slate-400">{user.email}</p><p className="mt-2 text-xs font-bold text-[var(--gold)]">{tier.memberLabel}</p></div>

@@ -5,7 +5,7 @@ import { AuthenticatedTopbar } from "./authenticated-topbar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="app-shell min-h-screen overflow-x-hidden bg-black">
+    <div className="app-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
       <a href="#main-content" className="sr-only z-[120] rounded-[8px] bg-[var(--gold)] px-4 py-3 font-black text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to Main Content</a>
       <Sidebar />
       <ProductWalkthrough />

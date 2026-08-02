@@ -140,8 +140,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (value) router.push(`/admin/search?q=${encodeURIComponent(value)}`);
   }
 
-  if (loading || access === "checking") return <main className="min-h-screen bg-black p-6 text-white"><div className="mx-auto max-w-7xl"><p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--gold)]">Challenge Suite Admin</p><h1 className="mt-4 text-3xl font-black">Verifying administrative access...</h1><div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div></div></main>;
-  if (access === "denied") return <main className="flex min-h-screen items-center justify-center bg-black px-5 text-white"><Card className="w-full max-w-xl border-red-500/20 p-8 text-center"><ShieldCheck className="mx-auto text-red-300" size={42} /><h1 className="mt-5 text-3xl font-black">Access denied</h1><p className="mt-4 leading-7 text-slate-300">This command center is restricted to authorized Challenge Suite administrators. Administrative data is also protected by server-side authorization.</p><LinkButton href={signedOut ? "/auth/login" : "/dashboard"} className="mt-7">{signedOut ? "Sign In" : "Return to Dashboard"}</LinkButton></Card></main>;
+  if (loading || access === "checking") return <main className="theme-workspace min-h-screen bg-[var(--background)] p-6 text-[var(--foreground)]"><div className="mx-auto max-w-7xl"><p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--gold)]">Challenge Suite Admin</p><h1 className="mt-4 text-3xl font-black">Verifying administrative access...</h1><div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div></div></main>;
+  if (access === "denied") return <main className="theme-workspace flex min-h-screen items-center justify-center bg-[var(--background)] px-5 text-[var(--foreground)]"><Card className="w-full max-w-xl border-red-500/20 p-8 text-center"><ShieldCheck className="mx-auto text-red-300" size={42} /><h1 className="mt-5 text-3xl font-black">Access denied</h1><p className="mt-4 leading-7 text-slate-300">This command center is restricted to authorized Challenge Suite administrators. Administrative data is also protected by server-side authorization.</p><LinkButton href={signedOut ? "/auth/login" : "/dashboard"} className="mt-7">{signedOut ? "Sign In" : "Return to Dashboard"}</LinkButton></Card></main>;
 
   const allowedGroups = groups.map((group) => ({
     ...group,
@@ -157,17 +157,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   })}</nav>;
 
   return (
-    <div className="admin-mobile-shell min-h-screen overflow-x-hidden bg-[#080808] text-slate-100">
+    <div className="admin-mobile-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
       <a href="#admin-workspace" className="sr-only z-[120] rounded-[8px] bg-[var(--gold)] px-4 py-3 font-bold text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to admin workspace</a>
-      <header className="sticky top-0 z-40 border-b border-[var(--gold)]/20 bg-black/95 px-4 py-2.5 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-40 border-b border-[var(--gold)]/20 bg-[var(--panel)] px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
           <button type="button" onClick={() => setDrawer(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open admin navigation"><Menu /></button>
           <Link href="/admin" className="flex min-w-0 items-center justify-center gap-2 text-center"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><span className="truncate text-sm font-black text-white">Admin Workspace</span></Link>
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{String(user?.displayName || "A").slice(0, 2).toUpperCase()}</span>
         </div>
       </header>
-      {drawer ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawer(false)} aria-label="Close admin navigation" /><aside ref={drawerRef} className="absolute inset-y-0 left-0 w-[min(90vw,370px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[#0c0c0c] p-5"><div className="flex items-center justify-between"><p className="font-black text-[var(--gold)]">Admin Navigation</p><button onClick={() => setDrawer(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close admin navigation"><X /></button></div>{navigation}</aside></div> : null}
-      <aside className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[#0c0c0c] p-5 lg:block">
+      {drawer ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawer(false)} aria-label="Close admin navigation" /><aside ref={drawerRef} className="absolute inset-y-0 left-0 w-[min(90vw,370px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5"><div className="flex items-center justify-between"><p className="font-black text-[var(--gold)]">Admin Navigation</p><button onClick={() => setDrawer(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close admin navigation"><X /></button></div>{navigation}</aside></div> : null}
+      <aside className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[var(--panel)] p-5 lg:block">
         <div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Internal</p><p className="font-black">Admin Workspace</p></div></div>
         {navigation}
         <div className="mt-8 border-t border-white/10 pt-5"><p className="text-sm font-bold">{user?.displayName || "Administrator"}</p><p className="mt-1 text-xs text-slate-500">Authorized administrator</p></div>
