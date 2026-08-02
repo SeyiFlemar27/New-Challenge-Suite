@@ -9,6 +9,15 @@ import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
 import { signUpWithProfile } from "@/lib/firebase/auth-service";
 
+function safeInternalPath(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : "";
+}
+
+function requestedReturnPath() {
+  if (typeof window === "undefined") return "";
+  return safeInternalPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [accepted, setAccepted] = useState({ terms: false, privacy: false, community: false });
@@ -51,7 +60,8 @@ export default function RegisterPage() {
       });
       localStorage.setItem("challenge_suite_signup_email", form.email);
       localStorage.setItem("challenge_suite_auth_mode", result.mode);
-      router.push("/auth/verify-email");
+      const returnPath = requestedReturnPath();
+      router.push(returnPath ? `/auth/verify-email?returnUrl=${encodeURIComponent(returnPath)}` : "/auth/verify-email");
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Could not create account." });
       setLoading(false);

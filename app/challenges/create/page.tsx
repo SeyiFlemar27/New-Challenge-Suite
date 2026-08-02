@@ -9,7 +9,15 @@ import { createChallengeDraft } from "@/lib/api/services";
 import { auth as firebaseAuth } from "@/lib/firebase/client";
 
 const createChallengePath = "/challenges/create";
-const loginContinuationPath = `/auth/login?next=${encodeURIComponent(createChallengePath)}`;
+
+function currentCreatePath() {
+  if (typeof window === "undefined") return createChallengePath;
+  return window.location.pathname === createChallengePath ? `${createChallengePath}${window.location.search}` : createChallengePath;
+}
+
+function loginContinuationPath() {
+  return `/auth/login?next=${encodeURIComponent(currentCreatePath())}`;
+}
 
 export default function CreateChallengePage() {
   const router = useRouter();
@@ -21,7 +29,7 @@ export default function CreateChallengePage() {
     if (authState.loading) return;
     const activeUser = authState.user ?? firebaseAuth?.currentUser ?? null;
     if (!activeUser) {
-      router.replace(loginContinuationPath);
+      router.replace(loginContinuationPath());
       return;
     }
     if (creatingDraftRef.current) return;
@@ -33,13 +41,15 @@ export default function CreateChallengePage() {
       if (cancelled) return;
       const id = result.data?.challenge?.id;
       if (result.ok && id) {
+        const calculator = new URLSearchParams(window.location.search).get("calculator");
+        if (calculator) window.sessionStorage.setItem(`challenge-calculator-prefill:${id}`, calculator);
         router.replace(`/challenges/create/${id}`);
         return;
       }
 
       creatingDraftRef.current = false;
       if ((result as { code?: string }).code === "UNAUTHENTICATED") {
-        router.replace(loginContinuationPath);
+        router.replace(loginContinuationPath());
         return;
       }
       setError(result.message || "Challenge draft could not be created.");

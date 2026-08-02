@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
   const category = text(url.searchParams.get("category")).slice(0, 80).toLowerCase();
   const phaseFilter = text(url.searchParams.get("phase")).slice(0, 40).toLowerCase();
   const entry = text(url.searchParams.get("entry")).slice(0, 20).toLowerCase();
+  const sponsorReady = url.searchParams.get("sponsorReady") === "true";
   const sort = text(url.searchParams.get("sort")).slice(0, 40).toLowerCase() || "recent";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
   const limit = Math.min(48, Math.max(8, Number(url.searchParams.get("limit") ?? 24) || 24));
@@ -129,6 +130,7 @@ export async function GET(request: NextRequest) {
       if (category && String(raw.category ?? "").toLowerCase() !== category) return [];
       if (entry === "free" && isPaidEntryChallenge(raw)) return [];
       if (entry === "paid" && !isPaidEntryChallenge(raw)) return [];
+      if (sponsorReady && !Boolean(raw.sponsorReady ?? raw.sponsorEnabled ?? (raw.monetization as Record<string, unknown> | undefined)?.sponsorReady)) return [];
       const searchable = [raw.title, raw.shortDescription, raw.description, raw.category, raw.creatorName, raw.creatorUsername, ...(Array.isArray(raw.keywords) ? raw.keywords : []), ...(Array.isArray(raw.tags) ? raw.tags : [])].map((value) => String(value ?? "").toLowerCase()).join(" ");
       if (query && !searchable.includes(query.toLowerCase())) return [];
       const publicFields = publicChallengeFields(raw);
@@ -171,7 +173,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => Number(b.trendingScore ?? 0) - Number(a.trendingScore ?? 0))
       .slice(0, 12);
     const categories = Array.from(new Set(all.map((item) => String(item.category ?? "")).filter(Boolean))).slice(0, 12);
-    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, sort }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
+    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
   } catch (error) {
     return serverError("Explore challenges could not be loaded.", error instanceof Error ? error.message : error);
   }

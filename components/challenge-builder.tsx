@@ -153,6 +153,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
         const serverDraft = result.data.challenge;
         const serverForm = formFromChallenge(serverDraft);
         let nextForm = serverForm;
+        const calculatorKey = `challenge-calculator-prefill:${draftId}`;
         try {
           const rawRecovery = window.localStorage.getItem(recoveryKey);
           if (rawRecovery) {
@@ -164,9 +165,25 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
               if (typeof recovery.step === "number") setStep(Math.max(0, Math.min(recovery.step, steps.length - 1)));
               setNotice("Recovered unsynced local changes.");
             }
+          } else {
+            const rawCalculator = window.sessionStorage.getItem(calculatorKey);
+            if (rawCalculator) {
+              const calculator = JSON.parse(rawCalculator) as Record<string, unknown>;
+              const type = String(calculator.type ?? "");
+              nextForm = {
+                ...nextForm,
+                paidEntryEnabled: type === "paid",
+                entryFeeAmount: type === "paid" ? String(Math.max(0, Number(calculator.entryFee ?? 0))) : nextForm.entryFeeAmount,
+                sponsorReady: type === "sponsored",
+                prizePoolEnabled: Math.max(0, Number(calculator.creatorContribution ?? 0) + Number(calculator.sponsorContribution ?? 0) + Number(calculator.adminContribution ?? 0)) > 0
+              };
+              window.sessionStorage.removeItem(calculatorKey);
+              setNotice("Calculator inputs were carried into this draft.");
+            }
           }
         } catch {
           window.localStorage.removeItem(recoveryKey);
+          window.sessionStorage.removeItem(calculatorKey);
         }
         setForm(nextForm);
         const draftStep = Number(serverDraft.creationStep ?? 0);
@@ -577,5 +594,4 @@ function ChallengeSuitePlaceholder({ className = "", label = "Challenge Suite" }
     </div>
   </div>;
 }
-
 
