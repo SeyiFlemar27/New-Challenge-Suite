@@ -1,0 +1,1 @@
+import {PublicContentEditor} from "@/components/admin/public-content-editor";export default function PublicContentPage(){return <PublicContentEditor/>}

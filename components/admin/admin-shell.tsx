@@ -60,6 +60,7 @@ const groups: NavGroup[] = [
     { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: BriefcaseBusiness }
   ] },
   { label: "Configuration", items: [
+    { href: "/admin/public-content", label: "Public Website", icon: Megaphone },
     { href: "/admin/categories", label: "Categories", icon: FolderCog },
     { href: "/admin/voting-rules", label: "Voting Rules", icon: ListChecks },
     { href: "/admin/revenue-rules", label: "Prize & Revenue Rules", icon: BookOpenCheck },

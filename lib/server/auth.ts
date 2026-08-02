@@ -7,6 +7,7 @@ export interface RequestUser {
   uid: string;
   email?: string;
   role?: string;
+  planId?: string;
   isAdmin?: boolean;
   emailVerified?: boolean;
 }
@@ -51,6 +52,7 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
       uid: decoded.uid,
       email: decoded.email,
       role: decoded.admin === true ? "admin" : profile?.role,
+      planId: typeof profile?.planId === "string" ? profile.planId : undefined,
       isAdmin: Boolean(decoded.admin === true || profile?.isAdmin || (email && adminAllowlist.has(email))),
       emailVerified: Boolean(decoded.email_verified || profile?.emailVerified || profile?.verificationStatus === "verified")
     };
