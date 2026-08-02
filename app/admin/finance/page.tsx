@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AdminShell } from "@/components/admin/admin-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { WalletCards } from "lucide-react";
 import { apiRequest } from "@/lib/api/client";
@@ -14,7 +13,7 @@ export default function AdminFinancePage() {
   });
   const payload = data?.ok ? data.data : null;
   const settlements = payload?.settlements ?? [];
-  return <AdminShell>
+  return <>
     <PageTitle title="Finance Review" subtitle="Review settlements, withdrawals, holds, refunds, sponsor funds, and ledger activity before any manual payout step." icon={<WalletCards />} />
     {isLoading ? <div className="mt-8 grid gap-5 md:grid-cols-2">{[0, 1].map((item) => <Card key={item} className="h-44 animate-pulse" />)}</div> : settlements.length ? <div className="mt-8 space-y-5">
       {settlements.map((settlement) => {
@@ -39,7 +38,7 @@ export default function AdminFinancePage() {
         </Card>;
       })}
     </div> : <Card className="mt-8"><EmptyState icon={<WalletCards />} title="No finance review items" body="Confirmed internal settlements will appear here after admin winner approval." action={<LinkButton href="/admin/prize-approvals" variant="secondary">Prize Approvals</LinkButton>} /></Card>}
-  </AdminShell>;
+  </>;
 }
 
 function Amount({ label, value }: { label: string; value: unknown }) {

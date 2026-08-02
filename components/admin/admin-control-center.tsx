@@ -24,7 +24,8 @@ type AdminData = {
 };
 
 const sectionMeta: Record<string, { title: string; description: string }> = {
-  overview: { title: "Admin Command Center", description: "Operational queues, platform safety, and the work that needs attention now." },
+  overview: { title: "Admin Dashboard", description: "A clear view of platform activity, risk, finances, and work requiring attention." },
+  "action-centre": { title: "Action Centre", description: "Review real operational records that need a decision, follow-up, or escalation." },
   sponsors: { title: "Sponsor Approvals", description: "Review brand applications without bypassing paid Sponsor plan requirements." },
   hosts: { title: "Host Verification", description: "Verify Host workspaces without bypassing active Host subscription requirements." },
   challenges: { title: "Challenge Moderation", description: "Review competition rules, visibility, deadlines, voting, sponsors, and prizes." },
@@ -39,7 +40,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   "sponsor-brands": { title: "Sponsor Brands", description: "Review brand profiles, subscriptions, campaigns, calls to action, and risk." },
   events: { title: "Events", description: "Review live-event records, registrations, status, and safety." },
   tournaments: { title: "Tournaments", description: "Review tournament plans and brackets from recorded competition data." },
-  dorocoin: { title: "DoroCoin Ledger", description: "Inspect internal-credit balances and transactions. Cash conversion is disabled." },
+  dorocoin: { title: "Spin Credits", description: "Inspect non-cash reward balances and transactions. Spin Credits cannot be withdrawn or converted to cash." },
   "cash-ledger": { title: "Cash Ledger", description: "Read-only immutable real-money balance events. No payout execution is available." },
   reports: { title: "Operational Reports", description: "Review current platform counts. Exports remain unavailable." },
   "audit-logs": { title: "Admin Audit Logs", description: "Append-only history for sensitive administrative and financial-review actions." },
@@ -57,6 +58,11 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   predictions: { title: "Prediction Arena Market Review", description: "Review compliance-gated Prediction Arena records. Payment provider approval, KYC, age, region, and admin market approval are required." },
   "prediction-settlements": { title: "Prediction Settlement & Refund Review", description: "Review settlements, cancellations, disputes, and refunds. No automatic payout or refund execution is available." },
   "risk-safety": { title: "Risk & Safety Dashboard", description: "Review suspicious votes, suspicious predictions, media risk, account risk, and safety queues." },
+  settlements: { title: "Settlements", description: "Review settlement preparation and approval records without triggering an external payout." },
+  refunds: { title: "Refunds", description: "Review refund requests and provider status. Refund execution requires the established protected workflow." },
+  appeals: { title: "Appeals", description: "Review appeals separately from formal disputes and safety reports." },
+  "sponsor-campaigns": { title: "Sponsor Campaigns", description: "Review real sponsor campaign records, approvals, and funding status." },
+  "system-status": { title: "System Status", description: "Review recorded service and job status. Missing provider telemetry is shown as not connected." },
   "media-moderation": { title: "Upload & Media Moderation", description: "Review uploaded media metadata and moderation status without exposing private files publicly." },
   "ad-rewards": { title: "Ad Reward Verification Logs", description: "Review ad vote reward attempts. Provider verification is required and fake client grants are blocked." },
   "enterprise-leads": { title: "Enterprise Leads", description: "Review Contact Sales inquiries and handoff status." },
@@ -72,10 +78,20 @@ const queueActions: Record<string, Array<{ action: string; label: string; danger
   submissions: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request resubmission" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
   participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }, { action: "add_note", label: "Add note" }],
   winners: [{ action: "approve", label: "Approve announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request review" }, { action: "flag", label: "Flag" }, { action: "add_note", label: "Add note" }],
-  withdrawals: [{ action: "approve", label: "Approve for manual payout" }, { action: "mark_paid", label: "Mark paid manually" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }]
+  withdrawals: [{ action: "approve", label: "First approval" }, { action: "second_approve", label: "Second approval" }, { action: "mark_paid", label: "Mark paid manually" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }]
 };
 const typeBySection: Record<string, string> = { sponsors: "sponsor", hosts: "host", challenges: "challenge", submissions: "submission", participants: "participant", winners: "winner", withdrawals: "withdrawal" };
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
+
+function availableQueueActions(section: string, status: string) {
+  return (queueActions[section] ?? []).filter((item) => {
+    if (section !== "withdrawals") return true;
+    if (item.action === "approve") return ["pending_review", "needs_kyc"].includes(status);
+    if (item.action === "second_approve") return status === "pending_second_approval";
+    if (item.action === "mark_paid") return status === "approved_for_manual_payout";
+    return true;
+  });
+}
 
 export function AdminControlCenter({ section = "overview" }: { section?: string }) {
   const normalizedSection = sectionMeta[section] ? section : "overview";
@@ -143,12 +159,13 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
       {notice ? <Card className="mt-6 border-yellow-500/20 p-4 text-sm text-slate-200">{notice}</Card> : null}
       {loading ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : null}
       {!loading && data && normalizedSection === "overview" ? <Overview data={data} /> : null}
+      {!loading && data && normalizedSection === "action-centre" ? <ActionCentre data={data} onSelect={setSelected} /> : null}
       {!loading && data && queueActions[normalizedSection] ? <Queue records={filteredRecords} allRecords={sourceRecords} statuses={statuses} filter={filter} setFilter={setFilter} section={normalizedSection} onSelect={setSelected} onAction={openAction} /> : null}
       {!loading && data && normalizedSection === "reports" ? <Reports records={data.reports} /> : null}
       {!loading && data && normalizedSection === "audit-logs" ? <AuditLogs records={data.auditLogs} /> : null}
       {!loading && data && normalizedSection === "search" ? <SearchResults data={data} query={searchQuery} /> : null}
       {!loading && data && ["categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) ? <Configuration section={normalizedSection} records={data.settings} /> : null}
-      {!loading && data && !["overview", "reports", "audit-logs", "search", "categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) && !queueActions[normalizedSection] ? <FoundationData section={normalizedSection} data={data} onSelect={setSelected} /> : null}
+      {!loading && data && !["overview", "action-centre", "reports", "audit-logs", "search", "categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) && !queueActions[normalizedSection] ? <RecordsWorkspace section={normalizedSection} data={data} onSelect={setSelected} /> : null}
       {selected ? <DetailDrawer record={selected} section={normalizedSection} onClose={() => setSelected(null)} onAction={queueActions[normalizedSection] ? openAction : undefined} /> : null}
       {pendingAction ? <ActionDialog action={pendingAction.action} reason={reason} note={note} setReason={setReason} setNote={setNote} submitting={submitting} onCancel={() => setPendingAction(null)} onConfirm={confirmAction} /> : null}
     </>
@@ -183,6 +200,19 @@ function Overview({ data }: { data: AdminData }) {
   </>;
 }
 
+function ActionCentre({ data, onSelect }: { data: AdminData; onSelect: (record: AdminRecord) => void }) {
+  const taskGroups = [
+    ["Sponsor applications", data.sponsors.filter((item) => ["pending", "pending_review", "needs_changes"].includes(recordStatus(item))), "/admin/sponsors"],
+    ["Challenge reviews", data.challenges.filter((item) => ["pending", "pending_review", "flagged"].includes(recordStatus(item))), "/admin/challenges"],
+    ["Submission reviews", data.submissions.filter((item) => ["pending", "pending_review", "flagged"].includes(recordStatus(item))), "/admin/submissions"],
+    ["Winner reviews", data.winners.filter((item) => ["pending", "pending_admin_review", "held"].includes(recordStatus(item))), "/admin/winners"],
+    ["Withdrawal reviews", data.withdrawals.filter((item) => ["pending", "pending_review", "needs_kyc"].includes(recordStatus(item))), "/admin/withdrawals"],
+    ["Open disputes", data.disputes.filter((item) => !["resolved", "closed", "rejected"].includes(recordStatus(item))), "/admin/disputes"]
+  ] as const;
+  const total = taskGroups.reduce((sum, [, records]) => sum + records.length, 0);
+  return <div className="mt-8 space-y-6"><Card className="p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold text-slate-400">Tasks requiring action</p><p className="mt-2 text-4xl font-black">{total}</p></div><p className="max-w-xl text-sm leading-6 text-slate-300">These tasks come from current stored records. Nothing is generated to fill an empty queue.</p></div></Card><div className="grid gap-5 lg:grid-cols-2">{taskGroups.map(([label, records, href]) => <Card key={label} className="p-5"><div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">{label}</h2><Status value={records.length ? "needs attention" : "clear"} /></div><p className="mt-3 text-3xl font-black">{records.length}</p>{records.length ? <div className="mt-5 space-y-2">{records.slice(0, 3).map((record) => <button key={record.id} type="button" onClick={() => onSelect(record)} className="flex w-full items-center justify-between rounded-[8px] border border-white/10 p-3 text-left text-sm font-bold"><span className="min-w-0 truncate">{recordTitle(record)}</span><ArrowRight size={16} /></button>)}</div> : <p className="mt-4 text-sm text-slate-400">No records currently need action.</p>}<LinkButton href={href} variant="secondary" className="mt-5">Open queue</LinkButton></Card>)}</div></div>;
+}
+
 function Queue({ records, allRecords, statuses, filter, setFilter, section, onSelect, onAction }: { records: AdminRecord[]; allRecords: AdminRecord[]; statuses: string[]; filter: string; setFilter: (value: string) => void; section: string; onSelect: (record: AdminRecord) => void; onAction: (record: AdminRecord, action: string) => void }) {
   return <><div className="scrollbar-dark mt-8 flex gap-2 overflow-x-auto pb-2"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All <span className="ml-1 opacity-70">{allRecords.length}</span></Button>{statuses.map((status) => <Button key={status} variant={filter === status ? "primary" : "secondary"} onClick={() => setFilter(status)}>{friendlyLabel(status)} <span className="ml-1 opacity-70">{allRecords.filter((item) => recordStatus(item) === status).length}</span></Button>)}</div><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record) => <RecordCard key={record.id} record={record} section={section} onSelect={onSelect} onAction={onAction} />) : <Card className="xl:col-span-2"><EmptyState icon={<ClipboardCheck />} title={`No ${friendlyLabel(filter === "all" ? section : filter).toLowerCase()} records`} body="The live Firestore queue is currently empty for this filter." /></Card>}</div></>;
 }
@@ -191,20 +221,21 @@ function RecordCard({ record, section, onSelect, onAction }: { record: AdminReco
   const title = recordTitle(record);
   const status = recordStatus(record);
   const details = displayEntries(record).slice(0, 8);
-  return <Card className="flex min-w-0 flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><Status value={status} /></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">KYC is required before approval. Marking a request paid records a manual status only and never calls a payout provider.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6"><Button variant="secondary" onClick={() => onSelect(record)}>View details</Button>{queueActions[section].filter((item) => item.action !== "mark_paid" || status === "approved_for_manual_payout").slice(0, 3).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
+  return <Card className="flex min-w-0 flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><Status value={status} /></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">KYC and two different administrator approvals are required. Marking a request paid records a manual status only and never calls a payout provider.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6"><Button variant="secondary" onClick={() => onSelect(record)}>View details</Button>{availableQueueActions(section, status).slice(0, 3).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
 }
 
 function DetailDrawer({ record, section, onClose, onAction }: { record: AdminRecord; section: string; onClose: () => void; onAction?: (record: AdminRecord, action: string) => void }) {
-  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`${recordTitle(record)} details`}><button className="absolute inset-0 bg-black/80" onClick={onClose} aria-label="Close details" /><aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 text-2xl font-black">{recordTitle(record)}</h2><div className="mt-3"><Status value={recordStatus(record)} /></div></div><button onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close details"><X /></button></div><div className="mt-8 grid gap-3 sm:grid-cols-2">{displayEntries(record, true).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</div><Card className="mt-8 p-5"><h3 className="font-black">Related operations</h3><div className="mt-4 flex flex-wrap gap-2">{relatedLinks(record, section).map((item) => <LinkButton key={item.href} href={item.href} variant="secondary">{item.label}</LinkButton>)}{!relatedLinks(record, section).length ? <p className="text-sm text-slate-400">Related records will appear as their data becomes available.</p> : null}</div></Card>{onAction ? <div className="mt-8 flex flex-wrap gap-2">{queueActions[section].map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div> : null}</aside></div>;
+  const technical = technicalEntries(record);
+  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`${recordTitle(record)} details`}><button className="absolute inset-0 bg-black/80" onClick={onClose} aria-label="Close details" /><aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6 text-white sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 text-2xl font-black">{recordTitle(record)}</h2><div className="mt-3"><Status value={recordStatus(record)} /></div></div><button onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close details"><X /></button></div><div className="mt-8 grid gap-3 sm:grid-cols-2">{displayEntries(record, true).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</div>{technical.length ? <details className="mt-6 rounded-[8px] border border-white/10 p-4"><summary className="cursor-pointer font-bold">Technical details</summary><dl className="mt-4 grid gap-3 sm:grid-cols-2">{technical.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl></details> : null}<Card className="mt-8 p-5"><h3 className="font-black">Related operations</h3><div className="mt-4 flex flex-wrap gap-2">{relatedLinks(record, section).map((item) => <LinkButton key={item.href} href={item.href} variant="secondary">{item.label}</LinkButton>)}{!relatedLinks(record, section).length ? <p className="text-sm text-slate-400">Related records will appear as their data becomes available.</p> : null}</div></Card>{onAction ? <div className="mt-8 flex flex-wrap gap-2">{availableQueueActions(section, recordStatus(record)).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div> : null}</aside></div>;
 }
 
 function ActionDialog({ action, reason, note, setReason, setNote, submitting, onCancel, onConfirm }: { action: string; reason: string; note: string; setReason: (value: string) => void; setNote: (value: string) => void; submitting: boolean; onCancel: () => void; onConfirm: () => void }) {
   const needsReason = reasonRequired.has(action);
   const noteOnly = action === "add_note";
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="Confirm admin action"><button className="absolute inset-0 bg-black/85" onClick={onCancel} aria-label="Cancel admin action" /><Card className="relative z-10 w-full max-w-xl border-[var(--gold)]/25 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Confirm administrative action</p><h2 className="mt-3 text-2xl font-black">{friendlyLabel(action)}</h2><p className="mt-3 leading-7 text-slate-300">This action is server-authorized and will create an audit event. It does not execute money movement.</p>{needsReason ? <label className="mt-6 block"><span className="mb-2 block text-sm font-bold">Reason required</span><textarea className={textareaClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this action is required." /></label> : null}<label className="mt-5 block"><span className="mb-2 block text-sm font-bold">{noteOnly ? "Internal note required" : "Internal note (optional)"}</span><textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Visible only to authorized administrators." /></label><div className="mt-6 grid gap-3 sm:grid-cols-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button onClick={onConfirm} disabled={submitting}>{submitting ? "Saving..." : `Confirm ${friendlyLabel(action)}`}</Button></div></Card></div>;
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="Confirm admin action"><button className="absolute inset-0 bg-black/85" onClick={onCancel} aria-label="Cancel admin action" /><Card className="relative z-10 w-full max-w-xl border-[var(--gold)]/25 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Review decision</p><h2 className="mt-3 text-2xl font-black">{friendlyLabel(action)}</h2><div className="mt-4 rounded-[8px] border border-white/10 p-4"><h3 className="font-black">What happens next</h3><p className="mt-2 text-sm leading-6 text-slate-300">The server will verify your permission and the record's current state, save the decision, and add an audit event. This control does not execute an external payment, payout, or refund.</p></div>{needsReason ? <label className="mt-6 block"><span className="mb-2 block text-sm font-bold">Reason required</span><textarea className={textareaClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this action is required." /></label> : null}<label className="mt-5 block"><span className="mb-2 block text-sm font-bold">{noteOnly ? "Internal note required" : "Internal note (optional)"}</span><textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Visible only to authorized administrators." /></label><div className="mt-6 grid gap-3 sm:grid-cols-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button onClick={onConfirm} disabled={submitting}>{submitting ? "Saving..." : `Confirm ${friendlyLabel(action)}`}</Button></div></Card></div>;
 }
 
-function FoundationData({ section, data, onSelect }: { section: string; data: AdminData; onSelect: (record: AdminRecord) => void }) {
+function RecordsWorkspace({ section, data, onSelect }: { section: string; data: AdminData; onSelect: (record: AdminRecord) => void }) {
   let records: AdminRecord[] = [];
   if (section === "dorocoin") records = [...data.doroCoin.wallets, ...data.doroCoin.transactions];
   else if (section === "host-workspaces") records = data.hostWorkspaces;
@@ -228,7 +259,7 @@ function FoundationData({ section, data, onSelect }: { section: string; data: Ad
     notifications: "No admin notifications are waiting.", support: "No support tickets are open.", announcements: "No announcements have been drafted.",
     predictions: "No Prediction Arena records are waiting.", "prediction-settlements": "No prediction settlement or refund reviews are waiting.", rewards: "No reward fulfillment records are waiting.", "prize-wheel": "No prize wheel prizes have been configured.", kyc: "No KYC metadata records are available.", "ad-rewards": "No ad reward logs are available.", "enterprise-leads": "No enterprise leads have been submitted.", "media-moderation": "No media uploads are queued for moderation.", "risk-safety": "No risk or safety records are queued."
   };
-  return <><Card className="mt-8 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300"><strong className="text-white">Operational status:</strong> this surface shows real stored records. Actions that require an unavailable delivery, payout, streaming, support, or notification provider remain disabled.</Card><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record, index) => <button key={`${section}_${record.id}_${String(record.type ?? index)}`} onClick={() => onSelect(record)} className="text-left"><Card className="h-full p-5 transition hover:border-[var(--gold)]/40"><div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-black">{recordTitle(record)}</h2><Status value={recordStatus(record)} /></div><dl className="mt-4 grid gap-3 sm:grid-cols-2">{displayEntries(record).slice(0, 6).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl><p className="mt-5 text-sm font-black text-[var(--gold)]">View details</p></Card></button>) : <Card className="xl:col-span-2"><EmptyState icon={sectionIcon(section)} title={emptyCopy[section] ?? "No records yet"} body="Real records will appear here when they are created." /></Card>}</div></>;
+  return <><Card className="mt-8 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300"><strong className="text-white">Current availability:</strong> this page shows real stored records only. Actions that depend on an unconfigured provider stay unavailable and explain what is needed.</Card><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record, index) => <button key={`${section}_${record.id}_${String(record.type ?? index)}`} onClick={() => onSelect(record)} className="text-left"><Card className="h-full p-5 transition hover:border-[var(--gold)]/40"><div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-black">{recordTitle(record)}</h2><Status value={recordStatus(record)} /></div><dl className="mt-4 grid gap-3 sm:grid-cols-2">{displayEntries(record).slice(0, 6).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl><p className="mt-5 text-sm font-black text-[var(--gold)]">View details</p></Card></button>) : <Card className="xl:col-span-2"><EmptyState icon={sectionIcon(section)} title={emptyCopy[section] ?? "No records yet"} body="Real records will appear here when they are created." /></Card>}</div></>;
 }
 
 function SearchResults({ data, query }: { data: AdminData; query: string }) {
@@ -261,7 +292,7 @@ function Configuration({ section, records }: { section: string; records: Record<
 }
 
 function DataPoint({ label, value }: { label: string; value: unknown }) {
-  return <div className="min-w-0 rounded-[8px] bg-white/[0.025] p-3"><dt className="text-xs font-bold text-slate-500">{friendlyLabel(label)}</dt><dd className="mt-1 break-words text-sm font-bold">{formatValue(value)}</dd></div>;
+  return <div className="min-w-0 rounded-[8px] bg-white/[0.025] p-3"><dt className="text-xs font-bold text-slate-500">{friendlyLabel(label)}</dt><dd className="mt-1 break-words text-sm font-bold">{formatValue(value, label)}</dd></div>;
 }
 function Status({ value }: { value: string }) {
   return <span className="inline-flex rounded-full border border-white/10 px-3 py-1.5 text-xs font-black text-slate-300">{friendlyLabel(value)}</span>;
@@ -274,11 +305,21 @@ function recordTitle(record: AdminRecord) {
 }
 function displayEntries(record: AdminRecord, all = false) {
   const hidden = new Set(["id", "brandName", "workspaceName", "organizationName", "title", "subject", "userName", "displayName", "challengeTitle", "payoutMethodLabel", "status", "sponsorStatus", "hostStatus", "verificationStatus", "mediaUrl", "adminNote", "internalNote"]);
-  return Object.entries(record).filter(([key, value]) => !hidden.has(key) && value !== null && value !== "" && typeof value !== "object").slice(0, all ? 30 : 10);
+  return Object.entries(record).filter(([key, value]) => !hidden.has(key) && !isTechnicalKey(key) && value !== null && value !== "" && typeof value !== "object").slice(0, all ? 30 : 10);
 }
-function formatValue(value: unknown) {
+function technicalEntries(record: AdminRecord) {
+  return Object.entries(record).filter(([key, value]) => isTechnicalKey(key) && value !== null && value !== "" && typeof value !== "object").slice(0, 24);
+}
+function isTechnicalKey(key: string) {
+  return key === "id" || /(?:Id|Ids|Reference)$/.test(key);
+}
+function formatValue(value: unknown, label = "") {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return value.toLocaleString();
+  if (/(?:At|Date|Time|Deadline)$/.test(label)) {
+    const date = new Date(String(value ?? ""));
+    if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(date);
+  }
   return friendlyLabel(String(value ?? "Not available"));
 }
 function friendlyLabel(value: string) {

@@ -237,6 +237,32 @@ table {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Admin keeps a dark navigation rail while the working surface stays calm and readable. */
+.admin-workspace > div > h1,
+.admin-workspace h1.text-white {
+  color: #171717;
+}
+
+.admin-workspace > div > p.text-slate-400 {
+  color: #5f6368;
+}
+
+.admin-workspace [data-ui-card] {
+  border-color: #dedede;
+  background: #ffffff;
+  color: #171717;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+
+.admin-workspace [data-ui-card] .text-white {
+  color: #171717;
+}
+
+.admin-workspace [data-ui-card] .bg-white\/\[0\.025\],
+.admin-workspace [data-ui-card] .bg-white\/\[0\.03\] {
+  background: #f5f6f7;
+}
 .public-page{--public-ink:#181818;--public-muted:#626262;--public-line:#deded8;--public-accent:#f5d90a;min-height:100vh;overflow-x:clip;background:#fff;color:var(--public-ink)}
 .public-page :where(h1,h2,h3){text-transform:none}
 .public-container{width:min(100% - 2rem,1280px);margin-inline:auto}
