@@ -1,4 +1,4 @@
-export const proposalStatuses = ["draft", "sent", "received", "under_review", "negotiating", "changes_requested", "accepted", "declined", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
+export const proposalStatuses = ["draft", "sent", "viewed", "received", "under_review", "negotiating", "changes_requested", "accepted", "declined", "admin_review", "funding_required", "funded", "live", "completed", "cancelled", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
 export const proposalRevisionStatuses = ["proposed", "countered", "changes_requested", "accepted", "declined", "withdrawn"] as const;
 export const deliverableStatuses = ["not_started", "pending", "in_progress", "active", "submitted", "under_review", "changes_requested", "approved", "completed", "blocked", "overdue", "cancelled"] as const;
 export const approvalStatuses = ["pending", "under_review", "approved", "changes_requested", "rejected", "overdue", "cancelled"] as const;

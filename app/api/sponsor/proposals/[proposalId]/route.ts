@@ -1,5 +1,7 @@
-﻿import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
+import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
 import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
+import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
+import { fail } from "@/lib/server/responses";
 import { cleanMoneyCents, cleanText, isoNow, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,7 @@ function patchPayload(body: Record<string, unknown>, sponsorId: string, now: str
     notesToCreator: cleanText(body.notesToCreator ?? existing.notesToCreator).slice(0, 1600),
     attachments: body.attachments === undefined ? Array.isArray(existing.attachments) ? existing.attachments : [] : safeArray(body.attachments),
     status,
-    pendingActionLabel: status === "accepted" ? "Accepted foundation only. Contract and funding are next phase." : status === "changes_requested" ? "Changes requested" : "Foundation workflow",
+    pendingActionLabel: status === "accepted" ? "Accepted; contract and funding eligibility review is next." : status === "changes_requested" ? "Changes requested" : "Review proposal status",
     contractStatus: "not_created",
     fundingStatus: "not_active",
     paymentReleaseStatus: "not_active",
@@ -68,6 +70,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
     if (owned.response) return owned.response;
     const now = isoNow();
     const existing = owned.snap.data() ?? {};
+    const requestedStatus = normalizeProposalStatus(body.status ?? existing.status);
+    const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
+    if (!["draft", "archived", "cancelled"].includes(requestedStatus) && !workspace.canSendProposal) return fail(workspace.lockedReason || "Sponsor approval and an active plan are required for this proposal action.", 403, { sponsorStatus: workspace.status }, "SPONSOR_PROPOSAL_LOCKED");
     const patch = patchPayload(body, context.user.uid, now, existing);
     await Promise.all([
       context.db.collection("sponsorProposals").doc(proposalId).set(patch, { merge: true }),

@@ -29,18 +29,18 @@ export const sponsorPlanCards: Array<{
     cta: "Start Sponsor Setup",
     checkout: "stripe",
     highlights: ["Verified brand profile eligibility", "Up to 5 active sponsored challenges per month", "Basic campaign briefs", "Logo placement and one CTA", "Basic campaign analytics", "One team member"],
-    comparison: ["Sponsor dashboard", "Browse creator marketplace foundation", "Browse challenge marketplace foundation", "Send sponsorship proposals foundation", "Receive creator proposals foundation", "Save creators and challenges foundation", "Brand asset uploads", "Email support"]
+    comparison: ["Sponsor dashboard", "Browse creator marketplace", "Browse challenge marketplace", "Send sponsorship proposals", "Receive creator proposals", "Save creators and challenges", "Brand asset uploads", "Email support"]
   },
   {
     id: "brand_partner",
     name: "Brand Partner",
-    positioning: "For growing brands that need richer targeting, collaboration, and reporting foundations.",
+    positioning: "For growing brands that need richer targeting, collaboration, and reportings.",
     summary: "Coordinate more campaigns, compare creators, and prepare advanced sponsor activations.",
     cta: "Choose Brand Partner",
     checkout: "stripe",
     featured: true,
-    highlights: ["Up to 20 active sponsored challenges per month", "Advanced campaign brief foundation", "Audience targeting foundation", "Direct creator messaging foundation", "Advanced analytics foundation", "Five team members"],
-    comparison: ["Creator comparison foundation", "Proposal negotiation foundation", "Campaign templates", "Multiple campaign CTA buttons", "Sponsor video uploads", "Leaderboard, voting, and winner announcement branding", "CSV/PDF report foundations", "UTM tracking foundation", "Priority support"]
+    highlights: ["Up to 20 active sponsored challenges per month", "Advanced campaign brief", "Audience targeting", "Direct creator messaging", "Advanced analytics", "Five team members"],
+    comparison: ["Creator comparison", "Proposal negotiation", "Campaign templates", "Multiple campaign CTA buttons", "Sponsor video uploads", "Leaderboard, voting, and winner announcement branding", "CSV/PDF reports", "UTM tracking", "Priority support"]
   },
   {
     id: "enterprise_partner",
@@ -49,8 +49,8 @@ export const sponsorPlanCards: Array<{
     summary: "Plan large-scale sponsor programs, premium placements, integrations, and custom reporting.",
     cta: "Contact Sales",
     checkout: "sales",
-    highlights: ["Unlimited active campaigns", "Premium homepage placements", "Tournament and event sponsorship", "Dedicated brand landing page", "Custom KPI dashboard foundation", "Dedicated account manager"],
-    comparison: ["Unlimited creator collaborations", "Unlimited proposals", "Challenge naming rights", "Exclusive category sponsorship", "Custom brand campaign URL", "API and webhook access foundation", "CRM integration foundation", "Unlimited team members", "Approval chains foundation", "Audit logs", "SSO readiness", "Custom onboarding"]
+    highlights: ["Unlimited active campaigns", "Premium homepage placements", "Tournament and event sponsorship", "Dedicated brand landing page", "Custom KPI dashboard", "Dedicated account manager"],
+    comparison: ["Unlimited creator collaborations", "Unlimited proposals", "Challenge naming rights", "Exclusive category sponsorship", "Custom brand campaign URL", "API and webhook access", "CRM integration", "Unlimited team members", "Approval chains", "Audit logs", "SSO readiness", "Custom onboarding"]
   }
 ];
 

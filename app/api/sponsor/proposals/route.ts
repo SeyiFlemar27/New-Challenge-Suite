@@ -1,5 +1,6 @@
-﻿import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
+import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
+import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 import { cleanMoneyCents, cleanText, isoNow, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: 
     attachments: safeArray(body.attachments ?? existing.attachments),
     status,
     unreadMessageCount: Number(existing.unreadMessageCount ?? 0),
-    pendingActionLabel: status === "draft" ? "Draft needs review" : status === "accepted" ? "Contract and funding pending next phase" : status === "changes_requested" ? "Changes requested" : "Foundation workflow",
+    pendingActionLabel: status === "draft" ? "Draft needs review" : status === "accepted" ? "Contract and funding eligibility review" : status === "changes_requested" ? "Changes requested" : "Review proposal status",
     contractStatus: "not_created",
     fundingStatus: "not_active",
     paymentReleaseStatus: "not_active",
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   if (cleanText(body.title ?? body.proposalTitle).length < 3) return validationError({ title: "Proposal title is required." });
+  const requestedStatus = normalizeProposalStatus(body.status ?? "draft");
+  const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
+  if (requestedStatus !== "draft" && !workspace.canSendProposal) return fail(workspace.lockedReason || "Sponsor approval and an active plan are required before sending proposals.", 403, { sponsorStatus: workspace.status }, "SPONSOR_PROPOSAL_LOCKED");
   try {
     const now = isoNow();
     const ref = context.db.collection("sponsorProposals").doc();
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
       context.db.collection("sponsorProposalActivity").add({ sponsorId: context.user.uid, proposalId: ref.id, action: proposal.status === "sent" ? "proposal_sent" : "proposal_draft_saved", status: proposal.status, createdAt: now, createdBy: context.user.uid }),
       context.db.collection("sponsorProposalRevisions").add({ sponsorId: context.user.uid, proposalId: ref.id, status: "proposed", revisionNumber: 1, budgetSnapshotCents: proposal.proposedBudgetCents, deliverablesSnapshot: proposal.deliverables, dateSnapshot: { startDate: proposal.startDate, endDate: proposal.endDate }, sponsorMessage: proposal.notesToCreator, creatorResponseFoundation: "", internalSponsorNote: "", createdAt: now, createdBy: context.user.uid })
     ]);
-    return ok({ proposal }, proposal.status === "sent" ? "Proposal sent foundation created. No contract, funding, or payment release was activated." : "Proposal draft saved.");
+    return ok({ proposal }, proposal.status === "sent" ? "Proposal sent. No contract, funding, or payment release was activated." : "Proposal draft saved.");
   } catch (error) {
     console.error("[sponsor-proposals:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Proposal could not be saved.");

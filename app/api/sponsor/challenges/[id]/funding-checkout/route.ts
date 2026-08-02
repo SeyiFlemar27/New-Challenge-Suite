@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return fail(error instanceof Error ? error.message : "Sponsor funding checkout could not be prepared.", 409, undefined, "SPONSOR_FUNDING_CHECKOUT_REJECTED");
   }
   const stripe = getStripe();
-  if (!stripe) return fail("Stripe sponsor funding checkout is not configured.", 503, { contribution, webhookConfirmationRequired: true, contributionConfirmed: false }, "PAYMENT_CONFIGURATION_ERROR");
+  if (!stripe) return fail("Sponsor funding checkout is temporarily unavailable. Try again later or contact support.", 503, { contribution, webhookConfirmationRequired: true, contributionConfirmed: false }, "PAYMENT_CONFIGURATION_ERROR");
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",

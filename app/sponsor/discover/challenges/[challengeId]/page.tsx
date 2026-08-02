@@ -91,12 +91,12 @@ export default function ChallengeOpportunityPage() {
   }
 
   return <SponsorShell profile={profile}>
-    {loading ? <Card className="h-96 animate-pulse bg-[#171717]" /> : error || !opportunity ? <Card className="border-red-500/20 bg-red-950/30 p-6 text-red-200">{error || "Opportunity could not be loaded."}</Card> : <div className="mx-auto max-w-6xl">
+    {loading ? <Card className="h-96 animate-pulse bg-slate-100" /> : error || !opportunity ? <Card className="border-red-500/20 border border-red-200 bg-red-50 p-6 text-red-800">{error || "Opportunity could not be loaded."}</Card> : <div className="mx-auto max-w-6xl">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Sponsor-Ready Challenge</p>
           <h1 className="mt-3 text-4xl font-black">{opportunity.title}</h1>
-          <p className="mt-3 max-w-3xl leading-7 text-slate-300">{opportunity.description}</p>
+          <p className="mt-3 max-w-3xl leading-7 text-slate-600">{opportunity.description}</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button>
@@ -108,8 +108,8 @@ export default function ChallengeOpportunityPage() {
       <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-5">
         <ShieldAlert className="text-[var(--gold)]" />
         <h2 className="mt-3 text-xl font-black">Funding setup required</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-300">Sponsor funding checkout can create a pending Stripe session when provider configuration and sponsor gates are satisfied. Contributions count toward the prize pool only after Stripe webhook confirmation.</p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">Sponsorship messaging uses a discussion-intent foundation only. No message, email, payment confirmation, brand placement approval, payout, or prize release is created from this page.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Sponsor funding checkout can create a pending Stripe session when provider configuration and sponsor gates are satisfied. Contributions count toward the prize pool only after Stripe webhook confirmation.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Starting a sponsorship discussion does not confirm payment, approve placement, release a payout, or award a prize.</p>
       </Card>
 
       <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -125,14 +125,14 @@ export default function ChallengeOpportunityPage() {
         <Store className="text-[var(--gold)]" />
         <h2 className="mt-3 text-2xl font-black">Available brand placements</h2>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          {(opportunity.placements ?? []).map((item: any) => <p key={typeof item === "string" ? item : item.surface} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{placementLabel(item)}</p>)}
+          {(opportunity.placements ?? []).map((item: any) => <p key={typeof item === "string" ? item : item.surface} className="rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">{placementLabel(item)}</p>)}
         </div>
       </Card>
 
       <Card id="funding-checkout" className="mt-8 p-6">
         <WalletCards className="text-[var(--gold)]" />
-        <h2 className="mt-3 text-2xl font-black">Sponsor funding checkout foundation</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-300">Confirmed sponsor contributions go 100% to winners. Branding remains pending review, and checkout success does not confirm funding.</p>
+        <h2 className="mt-3 text-2xl font-black">Sponsor funding checkout</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Confirmed sponsor contributions go 100% to winners. Branding remains pending review, and checkout success does not confirm funding.</p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <Field label="Funding amount (USD)">
             <input className={inputClass} type="number" min="5" step="1" value={fundingAmount} onChange={(event) => setFundingAmount(event.target.value)} placeholder="500" />
@@ -148,14 +148,14 @@ export default function ChallengeOpportunityPage() {
           </Field>
         </div>
         <Button className="mt-5 w-full sm:w-auto" onClick={() => void startFundingCheckout()} disabled={fundingLoading || !opportunity.fundingWindow?.allowed}>{fundingLoading ? "Starting Checkout..." : "Start Sponsor Funding Checkout"}</Button>
-        {fundingMessage ? <p className="mt-4 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{fundingMessage}</p> : null}
+        {fundingMessage ? <p className="mt-4 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-800">{fundingMessage}</p> : null}
         <p className="mt-4 text-xs leading-5 text-slate-500">Webhook confirmation is required. No sponsor money, prize pool growth, public brand placement, ledger entry, payout, or winner payment is created from this form.</p>
       </Card>
 
       <Card className="mt-8 p-6">
         <h2 className="text-2xl font-black">Admin and payout controls</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {["Confirmed sponsor payment required", "Winner approval required", "KYC and 24-hour hold required"].map((item) => <p key={item} className="rounded-[8px] bg-black/30 p-3 text-sm text-slate-300">{item}</p>)}
+          {["Confirmed sponsor payment required", "Winner approval required", "KYC and 24-hour hold required"].map((item) => <p key={item} className="rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">{item}</p>)}
         </div>
       </Card>
     </div>}
@@ -163,7 +163,7 @@ export default function ChallengeOpportunityPage() {
 }
 
 function Tile({ label, value }: { label: string; value: any }) {
-  return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.15em] text-[var(--gold)]">{label}</p><p className="mt-3 text-sm leading-6 text-slate-300">{value === 0 ? "0" : String(value || "-")}</p></Card>;
+  return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.15em] text-[var(--gold)]">{label}</p><p className="mt-3 text-sm leading-6 text-slate-600">{value === 0 ? "0" : String(value || "-")}</p></Card>;
 }
 
 function formatCents(value: unknown) {

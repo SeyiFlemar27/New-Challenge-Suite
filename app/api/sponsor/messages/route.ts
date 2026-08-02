@@ -1,4 +1,4 @@
-﻿import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
+import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       messageRef.set(message),
       context.db.collection("sponsorProposalActivity").add({ sponsorId: context.user.uid, proposalId: conversation.relatedProposalId, conversationId, action: "message_sent", status: "sent", createdAt: now, createdBy: context.user.uid })
     ]);
-    return ok({ conversation, message }, "Message saved. Delivery is foundation-only and no sponsorship agreement was created.");
+    return ok({ conversation, message }, "Message saved. No sponsorship agreement or funding record was created.");
   } catch (error) {
     console.error("[sponsor-messages:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor message could not be saved.");

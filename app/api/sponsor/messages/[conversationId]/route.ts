@@ -1,4 +1,4 @@
-﻿import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
+import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
 import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
@@ -62,7 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
     const attachments = safeAttachments(body.attachments, conversationId, context.user.uid);
     const message = { id: ref.id, sponsorId: context.user.uid, ownerUid: context.user.uid, conversationId, recipientId: conversation.recipientId ?? null, body: text, attachments, attachmentCount: attachments.length, visibility: "creator_visible", status: "sent", deliveryStatus: "delivery_foundation", readStatus: "not_tracked", internalOnly: false, createdAt: now, updatedAt: now, createdBy: context.user.uid };
     await Promise.all([ref.set(message), context.db.collection("sponsorConversations").doc(conversationId).set({ lastMessagePreview: text.slice(0, 180), updatedAt: now, updatedBy: context.user.uid }, { merge: true })]);
-    return ok({ message }, "Message saved. Delivery remains foundation-only.");
+    return ok({ message }, "Message saved. No funding or sponsorship status changed.");
   } catch (error) {
     console.error("[sponsor-conversation:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Message could not be saved.");

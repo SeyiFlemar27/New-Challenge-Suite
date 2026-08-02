@@ -42,7 +42,7 @@ export default function SponsorFundingCheckoutPage() {
     setNotice("");
     const dollars = Number(amount);
     if (!Number.isFinite(dollars) || dollars < 5) return setNotice("Sponsor funding amount must be at least $5.");
-    if (method === "wallet") return setNotice("Sponsor wallet spending is foundation-only. Use direct Stripe checkout until wallet debit rules are connected.");
+    if (method === "wallet") return setNotice("Sponsor wallet spending is not available yet. Use direct Stripe checkout.");
     setSubmitting(true);
     const result = await apiRequest<{ url?: string }>(`/api/sponsor/challenges/${params.challengeId}/funding-checkout`, {
       method: "POST",
@@ -69,7 +69,7 @@ export default function SponsorFundingCheckoutPage() {
           <h2 className="text-2xl font-black">Funding details</h2>
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <Field label="Funding amount (USD)"><input className={inputClass} type="number" min="5" step="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="500" /></Field>
-            <Field label="Payment method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as "stripe" | "wallet")}><option value="stripe">Direct Stripe checkout</option><option value="wallet">Sponsor wallet balance foundation</option></select></Field>
+            <Field label="Payment method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as "stripe" | "wallet")}><option value="stripe">Direct Stripe checkout</option><option value="wallet">Sponsor wallet balance (unavailable)</option></select></Field>
             <Field label="CTA text"><input className={inputClass} value={ctaText} onChange={(event) => setCtaText(event.target.value)} placeholder="Visit sponsor" /></Field>
             <Field label="CTA link"><input className={inputClass} value={ctaUrl} onChange={(event) => setCtaUrl(event.target.value)} placeholder="https://example.com" /></Field>
           </div>
@@ -88,7 +88,7 @@ export default function SponsorFundingCheckoutPage() {
           </div>
           <Button className="mt-6 w-full" onClick={() => void startCheckout()} disabled={submitting || !fundingAllowed}>{submitting ? "Starting Checkout..." : method === "wallet" ? "Use Wallet Balance" : <><CreditCard size={16} /> Secure Payment</>}</Button>
           {!fundingAllowed ? <p className="mt-3 text-xs text-slate-400">Funding is unavailable for this opportunity. Check challenge status and funding window.</p> : null}
-          {method === "wallet" ? <p className="mt-3 text-xs text-slate-400">Wallet spending is a foundation state until safe debit and reservation rules are connected.</p> : null}
+          {method === "wallet" ? <p className="mt-3 text-xs text-slate-400">Wallet spending is unavailable until safe debit and reservation rules are active.</p> : null}
           <LinkButton href="/sponsor/wallet" variant="ghost" className="mt-3 w-full"><WalletCards size={16} /> View Sponsor Wallet</LinkButton>
         </Card>
       </div>

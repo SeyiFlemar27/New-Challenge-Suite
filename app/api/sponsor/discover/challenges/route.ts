@@ -1,6 +1,7 @@
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { requireSponsorContext } from "@/lib/server/sponsor";
-import { ok, serverError } from "@/lib/server/responses";
+import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
+import { fail, ok, serverError } from "@/lib/server/responses";
 import { sponsorPlacementFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function GET(request: Request) {
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
+  if (!workspace.canDiscover) return fail(workspace.lockedReason || "Sponsor approval is required before discovering challenges.", 403, { sponsorStatus: workspace.status }, "SPONSOR_DISCOVERY_LOCKED");
   try {
     const search = new URL(request.url).searchParams.get("q")?.toLowerCase().trim() ?? "";
     const snap = await context.db.collection("challenges").limit(200).get();
