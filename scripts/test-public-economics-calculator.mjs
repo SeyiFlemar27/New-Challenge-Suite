@@ -1,0 +1,3 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const e=read("lib/public-site/economics.ts"),h=read("components/public-site/public-home.tsx"),c=read("lib/public-site/config.ts");assert(e.includes("creator:0.2"));assert(e.includes("platform:0.15"));assert(e.includes("winners:0.65"));assert(e.includes("guaranteed:false"));assert(h.includes("Projections are not guaranteed revenue"));assert(c.includes("challenge-calculator-prefill")||read("components/challenge-builder.tsx").includes("challenge-calculator-prefill"));assert(!h.includes("Hybrid Competition"));console.log("public economics calculator: ok");

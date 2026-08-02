@@ -1,0 +1,3 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const files=["components/public-site/public-home.tsx","components/public-site/public-shell.tsx","components/public-site/category-experience.tsx","components/public-site/for-talent-experience.tsx"];for(const file of files){const s=read(file);assert(!s.includes("@/components/app-shell"),file);assert(!s.includes("@/components/sidebar"),file);assert(!s.includes("@/components/admin/"),file)}assert(read("components/public-site/public-home.tsx").includes('preload="metadata"'));console.log("public components avoid dashboard bundle dependencies: ok");
