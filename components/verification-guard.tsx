@@ -5,10 +5,12 @@ import { Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 
-const publicPrefixes = ["/auth", "/mobile-preview"];
+const publicPrefixes = ["/auth", "/categories", "/mobile-preview"];
 const publicRoutes = new Set([
   "/",
   "/landing",
+  "/explore",
+  "/for-talent",
   "/subscriptions",
   "/challenges",
   "/leaderboards",
@@ -23,7 +25,7 @@ const publicRoutes = new Set([
 
 function isPublicRoute(pathname: string) {
   if (publicRoutes.has(pathname)) return true;
-  if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (publicPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;
   return /^\/challenges\/[^/]+$/.test(pathname);
 }
 
