@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api/client";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { DEFAULT_PUBLIC_CONTENT } from "@/lib/public-site/config";
+import { MediaUploadField } from "@/components/media-upload-field";
 
 type Config = typeof DEFAULT_PUBLIC_CONTENT;
 
@@ -133,12 +134,9 @@ export function PublicContentEditor() {
             <Field label="Supporting copy">
               <textarea className={`${inputClass} min-h-28`} value={form.hero.supportingCopy} onChange={(event) => setSection("hero", "supportingCopy", event.target.value)} />
             </Field>
-            <Field label="Video URL">
-              <input className={inputClass} value={form.hero.videoUrl} onChange={(event) => setSection("hero", "videoUrl", event.target.value)} />
-            </Field>
-            <Field label="Poster URL">
-              <input className={inputClass} value={form.hero.posterUrl} onChange={(event) => setSection("hero", "posterUrl", event.target.value)} />
-            </Field>
+            <MediaUploadField label="Hero video" value={form.hero.videoUrl} onChange={(url, metadata) => { setSection("hero", "videoUrl", url); setSection("hero", "videoPath", metadata?.path ?? ""); }} storagePath="admin/public-content/hero-video" kind="video" buttonLabel="Upload Hero Video" />
+            <MediaUploadField label="Hero poster" value={form.hero.posterUrl} onChange={(url, metadata) => { setSection("hero", "posterUrl", url); setSection("hero", "posterPath", metadata?.path ?? ""); }} storagePath="admin/public-content/hero-poster" kind="image" buttonLabel="Upload Hero Poster" />
+            <p className="text-sm text-slate-400">Website media must be uploaded through Challenge Suite storage. External media URL-only fields are not available.</p>
           </div>
         </Card>
 
