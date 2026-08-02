@@ -19,8 +19,8 @@ assert(challengeList.includes("statusLabel(challenge.fundingWindow?.reason)"), "
 assert(challengeDetail.includes("discussSponsorship") && challengeDetail.includes("router.push(`/sponsor/messages/"), "Opportunity detail should open a real conversation.");
 assert(challengeDetail.includes("Start Sponsor Funding Checkout") && challengeDetail.includes("webhook confirmation"), "Opportunity detail should preserve webhook-only funding copy.");
 assert(exists("app/sponsor/funding/[challengeId]/checkout/page.tsx"), "Sponsor funding checkout route should exist.");
-assert(fundingCheckout.includes("Direct Stripe checkout") && fundingCheckout.includes("Sponsor wallet balance foundation"), "Funding checkout should support direct checkout and wallet foundation options.");
-assert(fundingCheckout.includes("Sponsor wallet spending is foundation-only"), "Wallet spending gap should be setup-safe.");
+assert(fundingCheckout.includes("Direct Stripe checkout") && fundingCheckout.includes("Sponsor wallet balance (unavailable)"), "Funding checkout should support direct checkout and wallet foundation options.");
+assert(fundingCheckout.includes("Sponsor wallet spending is not available yet"), "Wallet spending gap should be setup-safe.");
 assert(walletApi.includes("availableBalanceCents") && walletApi.includes("reservedFundsCents") && walletApi.includes("pendingTransactionsCents"), "Sponsor wallet foundation should expose balance buckets.");
 assert(!/fake sponsor money|fake funding|prize released|payout sent/i.test(challengeList + challengeDetail + fundingCheckout), "Sponsor flow must not fake funding or payouts.");
 

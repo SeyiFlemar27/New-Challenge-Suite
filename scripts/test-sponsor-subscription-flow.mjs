@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
@@ -43,21 +43,21 @@ assertIncludes(subscriptions, "Need Enterprise access?", "/subscriptions support
 assertIncludes(sidebar, "Become a Sponsor", "account/profile navigation includes Become a Sponsor");
 assertIncludes(sidebar, "/sponsor/onboarding", "Become a Sponsor routes to sponsor onboarding");
 
-assertIncludes(onboarding, "Use my existing account", "sponsor onboarding offers existing account option");
-assertIncludes(onboarding, "Create a separate sponsor account", "sponsor onboarding offers separate sponsor account option");
+assertIncludes(onboarding, "Brand Profile", "sponsor onboarding starts with brand profile step");
+assertIncludes(onboarding, "Review & Submit", "sponsor onboarding includes review and submit step");
 assertIncludes(onboarding, "Brand / organization name", "sponsor onboarding has brand organization field");
-assertIncludes(onboarding, "Work email", "sponsor onboarding has work email field");
+assertIncludes(onboarding, "Business email", "sponsor onboarding has business email field");
 assertIncludes(onboarding, "Website", "sponsor onboarding has website field");
 assertIncludes(onboarding, "Industry", "sponsor onboarding has industry field");
-assertIncludes(onboarding, "Country / region", "sponsor onboarding has country region field");
+assertIncludes(onboarding, "Location", "sponsor onboarding has location field");
 assertIncludes(onboarding, "Contact person", "sponsor onboarding has contact person field");
-assertIncludes(onboarding, "Sponsor goal", "sponsor onboarding has sponsor goal field");
+assertIncludes(onboarding, "Sponsorship goal", "sponsor onboarding has sponsor goal field");
 assertIncludes(onboarding, "Preferred sponsorship type", "sponsor onboarding has sponsorship type field");
 assertIncludes(onboarding, "Brand description", "sponsor onboarding has brand description field");
-assertIncludes(onboarding, "limited access", "sponsor onboarding explains limited access");
-assertIncludes(onboarding, "brand approval", "sponsor onboarding explains brand approval");
-assertIncludes(onboarding, "plan activation", "sponsor onboarding explains plan activation");
-assertIncludes(onboarding, "does not approve brands, charge payment, send email, or unlock sponsor tools", "onboarding does not claim fake automation");
+assertIncludes(onboarding, "Save & Finish Later", "sponsor onboarding supports saving progress");
+assertIncludes(onboarding, "Submit for Review", "sponsor onboarding explains review submission");
+assertIncludes(onboarding, "activate a plan", "sponsor onboarding does not imply plan activation");
+assertIncludes(onboarding, "It does not approve the brand, activate a plan, or enable funding.", "onboarding does not claim fake automation");
 assertNotIncludes(onboarding, "Payment completed", "onboarding does not claim payment completed");
 assertNotIncludes(onboarding, "Brand approved", "onboarding does not claim brand approved");
 assertNotIncludes(onboarding, "Email sent", "onboarding does not claim email sent");
@@ -67,8 +67,8 @@ assertIncludes(sponsorPlans, "sponsorPlanCards", "/sponsor/plans renders sponsor
 assertIncludes(sponsorFoundation, "Sponsor Starter", "sponsor plan source keeps Sponsor Starter");
 assertIncludes(sponsorFoundation, "Brand Partner", "sponsor plan source keeps Brand Partner");
 assertIncludes(sponsorFoundation, "Enterprise Partner", "sponsor plan source keeps Enterprise Partner");
-assertIncludes(sponsorDashboard, "review, plan, and safety checks", "sponsor dashboard indicates limited access until review and plan checks");
-assertIncludes(sponsorDashboard, "/sponsor/plans", "sponsor dashboard points sponsor plan actions to sponsor plans");
+assertIncludes(sponsorDashboard, "Locked until requirements are met", "sponsor dashboard explains locked payment readiness");
+assertIncludes(sponsorDashboard, "workspace.nextActionHref", "sponsor dashboard uses canonical next action routing");
 assertIncludes(sponsorFeature, "href=\"/sponsor/plans\"", "sponsor feature gates point plan CTAs to sponsor plans");
 assertNotIncludes(sponsorFeature, "href=\"/subscriptions\"", "sponsor feature gates do not route sponsor plan locks to normal subscriptions");
 
