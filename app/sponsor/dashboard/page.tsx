@@ -1,101 +1,64 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Megaphone, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Card, LinkButton } from "@/components/ui";
-import { SponsorPlaceholder, SponsorShell } from "@/components/sponsor/sponsor-shell";
+import { ArrowRight, CalendarClock, Handshake, Megaphone, MessageSquare, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
+import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
+import { SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
 import { getPlanExperience } from "@/lib/plan-access";
-import { businessVerificationLabel, calculateSponsorCompletion, normalizeBusinessVerificationStatus, sponsorPlanLimitLabel } from "@/lib/sponsor-foundation";
-import { hasActiveSponsorSubscription, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorIsApproved, sponsorStatusLabel, type SponsorReviewStatus, type SponsorSubscriptionStatus } from "@/lib/sponsor-access";
+import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 
-type SponsorProfile = Record<string, any>;
-interface SponsorDashboardResponse { sponsorProfile: SponsorProfile; campaigns: SponsorProfile[]; proposals: SponsorProfile[]; fundedChallenges: SponsorProfile[]; metrics: Record<string, number | null>; dataQuality: Record<string, string>; }
+type Item = Record<string, any>;
+type DashboardResponse = {
+  sponsorProfile: Item;
+  campaigns: Item[];
+  proposals: Item[];
+  fundedChallenges: Item[];
+  metrics: Record<string, number | null>;
+  workspaceSignals?: { hasConversations: boolean; conversationCount: number; unreadMessageCount: number; hasReportableData: boolean };
+};
 
 export default function SponsorDashboardPage() {
-  const [profile, setProfile] = useState<SponsorProfile | null>(null);
-  const [dashboard, setDashboard] = useState<SponsorDashboardResponse | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [unauthorized, setUnauthorized] = useState(false);
-  const [approvalNoticeVisible, setApprovalNoticeVisible] = useState(false);
+  const [error, setError] = useState("");
 
-  async function loadProfile() {
-    setLoading(true); setError(null); setUnauthorized(false);
-    const result = await apiRequest<SponsorDashboardResponse>("/api/sponsor/dashboard");
-    if (!result.ok || !result.data) { const code = (result as any).code; setUnauthorized(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED"); setError(result.message || "Sponsor profile could not be loaded."); setLoading(false); return; }
-    setProfile(result.data.sponsorProfile); setDashboard(result.data); setLoading(false);
+  async function load() {
+    setLoading(true); setError("");
+    const result = await apiRequest<DashboardResponse>("/api/sponsor/dashboard");
+    if (result.ok && result.data) setDashboard(result.data);
+    else setError(result.message || "Sponsor workspace could not be loaded.");
+    setLoading(false);
   }
+  useEffect(() => { void load(); }, []);
 
-  useEffect(() => { void loadProfile(); }, []);
-
+  const profile = useMemo<Item | null>(() => dashboard ? ({ ...dashboard.sponsorProfile, hasSponsorConversations: dashboard.workspaceSignals?.hasConversations, sponsorConversationCount: dashboard.workspaceSignals?.conversationCount, hasSponsorReportableData: dashboard.workspaceSignals?.hasReportableData }) : null, [dashboard]);
+  const workspace = resolveSponsorWorkspaceState(profile ?? {});
   const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
-  const verificationStatus = normalizeSponsorReviewStatus(profile?.sponsorVerificationStatus);
-  const businessStatus = normalizeBusinessVerificationStatus(profile?.businessVerificationStatus ?? profile?.sponsorVerificationStatus);
-  const sponsorApproved = sponsorIsApproved(verificationStatus);
-  const subscriptionStatus = normalizeSponsorSubscriptionStatus(profile?.subscriptionStatus ?? profile?.planStatus ?? profile?.stripeStatus);
-  const subscriptionActive = hasActiveSponsorSubscription(subscriptionStatus);
-  const sponsorToolsUnlocked = sponsorApproved && subscriptionActive;
-  const completion = calculateSponsorCompletion(profile ?? {});
-  const categories = useMemo(() => profile?.preferredChallengeCategories ?? [], [profile]);
+  const activeCampaigns = dashboard?.campaigns.filter((item) => ["approved", "matching", "proposal_sent", "negotiating", "accepted", "funding_required", "funded", "live", "active"].includes(String(item.status ?? "").toLowerCase())) ?? [];
+  const openProposals = dashboard?.proposals.filter((item) => !["declined", "completed", "cancelled", "archived"].includes(String(item.status ?? "").toLowerCase())) ?? [];
+  const deadlines = (dashboard?.campaigns ?? []).flatMap((campaign) => [campaign.startDate ? { label: `${campaign.campaignTitle || "Campaign"} starts`, value: campaign.startDate } : null, campaign.endDate ? { label: `${campaign.campaignTitle || "Campaign"} ends`, value: campaign.endDate } : null]).filter(Boolean).slice(0, 4) as Array<{ label: string; value: string }>;
 
-  useEffect(() => {
-    if (!profile || !sponsorApproved) return;
-    const noticeKey = `sponsor_approval_seen_${profile.brandName ?? "brand"}_${profile.updatedAt ?? "latest"}`;
-    if (localStorage.getItem(noticeKey)) return;
-    setApprovalNoticeVisible(true);
-    const timer = window.setTimeout(() => { localStorage.setItem(noticeKey, "true"); setApprovalNoticeVisible(false); }, 5000);
-    return () => window.clearTimeout(timer);
-  }, [profile, sponsorApproved]);
+  if (loading) return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl space-y-6"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <Card key={item} className="h-28 animate-pulse" />)}</div><Card className="h-72 animate-pulse" /></div></SponsorShell>;
 
-  if (loading) return <SponsorShell profile={profile}><div className="space-y-8"><div className="h-12 w-96 max-w-full animate-pulse rounded bg-white/10" /><div className="grid gap-6 md:grid-cols-4">{[0,1,2,3].map((item)=><Card key={item} className="h-32 animate-pulse bg-[#171717]" />)}</div><Card className="h-80 animate-pulse bg-[#171717]" /></div></SponsorShell>;
-  if (unauthorized) return <SponsorShell profile={profile}><Card className="mx-auto mt-16 max-w-2xl p-8 text-center"><ShieldCheck className="mx-auto h-12 w-12 text-[var(--gold)]" /><h1 className="mt-5 text-3xl font-black">Sponsor access required</h1><p className="mt-3 text-slate-300">{error ?? "Sign in with a verified sponsor account to access the Brand Command Center."}</p><LinkButton href="/auth/login" className="mt-6">Sign In</LinkButton></Card></SponsorShell>;
+  return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl">
+    <section className="rounded-[8px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">Sponsor Workspace</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">Welcome, {profile?.brandName || "Sponsor"}</h1><div className="mt-4 flex flex-wrap gap-2 text-sm"><Status label={workspace.statusLabel} tone={workspace.approved ? "success" : "pending"} /><Status label={experience.badgeLabel} tone="brand" /><Status label={workspace.subscriptionStatus.replaceAll("_", " ")} tone={workspace.subscriptionStatus === "active" ? "success" : "neutral"} /></div><p className="mt-5 max-w-2xl text-base leading-7 text-slate-600"><strong className="text-slate-950">Next step:</strong> {workspace.nextActionLabel}. {workspace.lockedReason || "Your sponsor workspace is ready for campaign planning and discovery."}</p></div><div className="flex flex-wrap gap-3"><LinkButton href={workspace.nextActionHref}>{workspace.nextActionLabel}<ArrowRight size={16} /></LinkButton>{workspace.canDiscover ? <><LinkButton href="/sponsor/discover?tab=creators" variant="secondary">Discover Creators</LinkButton><LinkButton href="/sponsor/discover?tab=challenges" variant="secondary">Discover Challenges</LinkButton></> : <LinkButton href="/sponsor/onboarding" variant="secondary">Review Brand Profile</LinkButton>}</div></div></section>
 
-  return <SponsorShell profile={profile}>
-    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-      <div><p className="text-sm font-black uppercase tracking-[0.22em] text-[var(--gold)]">{experience.badgeLabel} / Brand Command Center</p><h1 className="mt-2 text-4xl font-black md:text-5xl">Welcome, {profile?.brandName || "Sponsor"}</h1><p className="mt-3 max-w-3xl text-slate-300">A complete sponsor operating center for campaigns, discovery, proposals, messages, deliverables, approvals, contracts, wallet readiness, billing, analytics, reports, assets, team, and notifications.</p></div>
-      <div className="flex flex-wrap gap-3"><LinkButton href="/sponsor/campaigns/new">Create Campaign</LinkButton><LinkButton href="/sponsor/discover/creators" variant="secondary">Browse Creators</LinkButton><LinkButton href="/sponsor/discover/challenges" variant="secondary">Browse Challenges</LinkButton></div>
-    </div>
+    {error ? <Card className="mt-6 border-red-200 bg-red-50 p-5"><p className="font-bold text-red-800">Sponsor overview is temporarily unavailable.</p><p className="mt-2 text-sm text-red-700">{error}</p><Button className="mt-4" variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Retry overview</Button></Card> : null}
 
-    {error ? <Card className="mt-8 border-red-500/20 bg-red-950/30 p-5 text-red-200">{error}</Card> : null}
-    {approvalNoticeVisible ? <Card className="mt-8 border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-100"><ShieldCheck className="text-emerald-300" /><h2 className="mt-3 text-xl font-black">Sponsor profile approved</h2><p className="mt-2 text-sm leading-6">Your brand review is approved. This notice closes automatically and remains available through notification history.</p></Card> : null}
-    {!sponsorToolsUnlocked ? <SponsorAccessNotice verificationStatus={verificationStatus} subscriptionStatus={subscriptionStatus} completion={completion} /> : null}
+    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sponsor overview metrics"><Metric icon={<Megaphone />} title="Active Campaigns" value={String(activeCampaigns.length)} detail="Campaigns currently moving through the pipeline" /><Metric icon={<Handshake />} title="Open Proposals" value={String(openProposals.length)} detail="Proposals that still have a next action" /><Metric icon={<MessageSquare />} title="Unread Messages" value={String(dashboard?.workspaceSignals?.unreadMessageCount ?? 0)} detail="Owned sponsor conversations only" /><Metric icon={<WalletCards />} title="Available Sponsor Funds" value={formatMoney(dashboard?.metrics.confirmedSponsorFundsCents)} detail="Provider-confirmed sponsor funding records" /></section>
 
-    <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-      <Metric title="Verification" value={businessVerificationLabel(businessStatus)} label={businessStatus === "verified" ? "Business verification complete" : "Restricted tools remain gated"} />
-      <Metric title="Sponsor Plan" value={experience.badgeLabel} label={sponsorPlanLimitLabel(profile?.planId)} />
-      <Metric title="Onboarding" value={`${completion}%`} label="Brand profile completion" />
-      <Metric title="Active Campaigns" value={`${dashboard?.metrics.activeCampaigns ?? 0}`} label="Real campaign records" />
-    </div>
+    <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]"><div className="space-y-6"><Card className="p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Campaign pipeline</p><h2 className="mt-2 text-2xl font-black text-slate-950">Recent campaign briefs</h2></div>{workspace.canCreateCampaignBrief ? <LinkButton href="/sponsor/campaigns/new" variant="secondary">Create Brief</LinkButton> : null}</div>{dashboard?.campaigns.length ? <div className="mt-5 divide-y divide-slate-200">{dashboard.campaigns.slice(0, 5).map((campaign) => <div key={campaign.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="truncate font-black text-slate-950">{campaign.campaignTitle || "Untitled campaign"}</p><p className="mt-1 text-sm text-slate-600">{label(campaign.status)} / Updated {formatDate(campaign.updatedAt)}</p></div><LinkButton href={`/sponsor/campaigns/${campaign.id}`} variant="ghost">View</LinkButton></div>)}</div> : <EmptyState icon={<Megaphone />} title="No active campaigns yet" body="Create your first campaign brief to start finding creators and challenge opportunities." action={workspace.canCreateCampaignBrief ? <LinkButton href="/sponsor/campaigns/new">Create Campaign Brief</LinkButton> : <LinkButton href={workspace.nextActionHref}>Complete Required Step</LinkButton>} />}</Card>
 
-    <div className="mt-8 overflow-hidden rounded-[8px] border border-white/10 bg-[#111]"><div className="h-44 bg-cover bg-center" style={{ backgroundImage: profile?.bannerUrl ? `url(${profile.bannerUrl})` : "linear-gradient(135deg, rgba(245,197,66,.18), rgba(255,255,255,.04))" }} /><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6"><div className="flex items-end gap-4"><div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-[var(--gold)]/40 bg-black text-2xl font-black text-[var(--gold)]">{profile?.logoUrl ? <img src={profile.logoUrl} alt={profile?.brandName || "Sponsor logo"} className="h-full w-full object-cover" /> : (profile?.brandName || "S").slice(0, 1)}</div><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Brand identity</p><h2 className="mt-1 text-2xl font-black">{profile?.brandName || "Sponsor Brand"}</h2><p className="mt-1 text-sm text-slate-400">{profile?.industry || "Industry pending"} / {profile?.website || "Website pending"}</p></div></div><LinkButton href="/sponsor/profile/edit" variant="secondary">Edit Brand Profile</LinkButton></div></div>
-
-    <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_.9fr]"><Card className="p-6 md:p-8"><h2 className="text-2xl font-black">Campaign performance</h2><p className="mt-2 text-sm leading-6 text-slate-400">Only verified campaign and payment records are shown.</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Info label="Confirmed sponsor funds" value={formatMoney(dashboard?.metrics.confirmedSponsorFundsCents)} /><Info label="Pending sponsor funds" value={formatMoney(dashboard?.metrics.pendingSponsorFundsCents)} /><Info label="Proposals awaiting review" value={`${dashboard?.metrics.proposalsAwaitingReview ?? 0}`} /><Info label="Impressions" value="Not tracked yet" /><Info label="Clicks" value="Not tracked yet" /><Info label="ROI" value="Not tracked yet" /></div></Card><Card className="p-6 md:p-8"><h2 className="text-2xl font-black">Action Center</h2><div className="mt-5 space-y-3">{actionItems(verificationStatus, subscriptionStatus, completion).map((item) => <div key={item} className="flex items-start gap-3 rounded-[8px] bg-[#1a1a1a] p-4 text-sm text-slate-300"><ShieldAlert size={17} className="mt-0.5 text-[var(--gold)]" />{item}</div>)}</div></Card></div>
-
-    <div className="mt-8 grid gap-8 xl:grid-cols-3"><Card className="p-6 md:p-8 xl:col-span-2"><h2 className="text-2xl font-black">Sponsored challenges</h2>{dashboard?.fundedChallenges?.length ? <div className="mt-6 grid gap-4">{dashboard.fundedChallenges.map((item) => <div key={item.contributionId} className="rounded-[8px] border border-white/10 bg-black/30 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-black">{item.title}</h3><p className="mt-1 text-sm text-slate-400">Confirmed sponsor funds: {formatMoney(item.amountCents)}</p></div><LinkButton href={`/challenges/${item.challengeId}`} variant="secondary">View Challenge</LinkButton></div><div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-3"><Info label="Gross sponsor prize" value={formatMoney(item.grossSponsorPrizeCents)} /><Info label="Platform fee (15%)" value={item.settlementId ? formatMoney(item.sponsorPrizePlatformFeeCents) : "Pending winner approval"} /><Info label="Net prize to winners" value={item.settlementId ? formatMoney(item.netSponsorPrizeCents) : "Pending winner approval"} /></div><div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2"><p>Winner allocation: {statusLabel(item.winnerAllocationStatus)}</p><p>Settlement: {statusLabel(item.settlementStatus)}</p></div></div>)}</div> : <div className="mt-6 rounded-[8px] border border-dashed border-white/15 p-8 text-center"><Megaphone className="mx-auto text-[var(--gold)]" /><h3 className="mt-4 text-xl font-black">No confirmed sponsored challenges yet</h3><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Confirmed contributions will appear after secure payment verification.</p><div className="mt-5 flex flex-wrap justify-center gap-3"><LinkButton href="/sponsor/campaigns/new">Create Campaign Brief</LinkButton><LinkButton href="/sponsor/discover/challenges" variant="secondary">Discover Challenges</LinkButton></div></div>}</Card><Card className="p-6 md:p-8"><h2 className="text-2xl font-black">Upcoming Calendar</h2><div className="mt-5 space-y-3 text-sm text-slate-300">{["Campaign launch dates", "Voting dates", "Submission deadlines", "Approval deadlines", "Payment milestones", "Winner announcement dates"].map((item) => <p key={item} className="rounded-[8px] bg-[#1a1a1a] p-3">{item}: No data yet</p>)}</div></Card></div>
-
-    <div className="mt-8 grid gap-6 xl:grid-cols-4">{commandSections.map((section) => <SponsorPlaceholder key={section.title} title={section.title} body={sponsorToolsUnlocked ? section.body : `${section.body} Brand approval and an active sponsor subscription are required for full access.`} />)}</div>
-  </SponsorShell>;
+      <div className="grid gap-6 md:grid-cols-2"><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Recommended creators</h2><p className="mt-2 text-sm leading-6 text-slate-600">Browse real sponsor-ready creator profiles matched through the discovery workspace.</p><LinkButton href={workspace.canDiscover ? "/sponsor/discover?tab=creators" : workspace.nextActionHref} variant="secondary" className="mt-5">{workspace.canDiscover ? "Discover Creators" : "Unlock Discovery"}</LinkButton></Card><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Recommended challenges</h2><p className="mt-2 text-sm leading-6 text-slate-600">Review published sponsor-ready challenges and their real funding eligibility.</p><LinkButton href={workspace.canDiscover ? "/sponsor/discover?tab=challenges" : workspace.nextActionHref} variant="secondary" className="mt-5">{workspace.canDiscover ? "Discover Challenges" : "Unlock Discovery"}</LinkButton></Card></div>
+    </div><aside className="space-y-6"><Card className="p-6"><ShieldCheck className="text-amber-700" /><h2 className="mt-3 text-xl font-black text-slate-950">Next steps</h2><ol className="mt-4 space-y-3 text-sm text-slate-600"><Step done={workspace.profileReady}>Complete brand profile</Step><Step done={workspace.approved}>Receive sponsor approval</Step><Step done={workspace.canCreateCampaignBrief}>Create a campaign brief</Step><Step done={openProposals.length > 0}>Open a proposal conversation</Step><Step done={Boolean(dashboard?.metrics.confirmedSponsorFundsCents)}>Confirm eligible campaign funding</Step></ol></Card><Card className="p-6"><CalendarClock className="text-amber-700" /><h2 className="mt-3 text-xl font-black text-slate-950">Upcoming deadlines</h2>{deadlines.length ? <div className="mt-4 space-y-3">{deadlines.map((item) => <div key={`${item.label}-${item.value}`} className="rounded-[8px] bg-slate-50 p-3"><p className="text-sm font-bold text-slate-900">{item.label}</p><p className="mt-1 text-xs text-slate-600">{formatDate(item.value)}</p></div>)}</div> : <p className="mt-4 text-sm leading-6 text-slate-600">No campaign deadlines yet. Dates will appear after a campaign brief is saved.</p>}</Card><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Sponsor status</h2><dl className="mt-4 space-y-3 text-sm"><Row label="Brand profile" value={`${workspace.completionPercent}% complete`} /><Row label="Verification" value={workspace.statusLabel} /><Row label="Plan" value={experience.badgeLabel} /><Row label="Payment readiness" value={workspace.canFund ? "Eligible when proposal terms allow" : "Locked until requirements are met"} /></dl></Card></aside></div>
+  </div></SponsorShell>;
 }
 
-const commandSections = [
-  { title: "Campaigns", body: "Campaign briefs, proposals, deliverables, and safe next milestones are connected as workspaces." },
-  { title: "Discover", body: "Creator, challenge, event, and tournament discovery tools are ready when opportunities are available." },
-  { title: "Collaboration", body: "Proposals, messages, approvals, and deliverables stay organized without activating contracts or funding automatically." },
-  { title: "Legal", body: "Contracts and templates provide organized review tools; signing remains unavailable until legal workflows are connected." },
-  { title: "Finance", body: "Wallet, billing, invoices, milestones, and transactions are visible as setup records only." },
-  { title: "Growth", body: "Analytics and reports use clear data-quality labels without presenting unverified performance metrics." },
-  { title: "Brand Operations", body: "Brand assets, team roles, notification preferences, settings, and activity history is organized." }
-];
-
-function SponsorAccessNotice({ verificationStatus, subscriptionStatus, completion }: { verificationStatus: SponsorReviewStatus; subscriptionStatus: SponsorSubscriptionStatus; completion: number }) {
-  const approved = sponsorIsApproved(verificationStatus); const paid = hasActiveSponsorSubscription(subscriptionStatus);
-  const title = approved && !paid ? "Choose a sponsor plan" : paid && !approved ? "Brand approval still required" : verificationStatus === "suspended" || verificationStatus === "flagged" ? "Sponsor access restricted" : verificationStatus === "rejected" || verificationStatus === "needs_changes" || verificationStatus === "additional_information_required" ? "Brand profile changes required" : completion < 80 ? "Complete sponsor onboarding" : "Sponsor verification pending";
-  return <Card className="mt-8 border-yellow-500/30 bg-yellow-500/5 p-6"><ShieldCheck className="text-[var(--gold)]" /><p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{sponsorStatusLabel(verificationStatus)} / Subscription {subscriptionStatus.replaceAll("_", " ")}</p><h2 className="mt-2 text-xl font-black">{title}</h2><p className="mt-2 leading-7 text-slate-300">Sponsors can explore the dashboard while pending. Funding campaigns, verified badges, high-value sponsorship tools, payment release actions, and enterprise tools remain restricted until review, plan, and safety checks pass.</p><div className="mt-5 flex flex-wrap gap-3"><LinkButton href={approved && !paid ? "/sponsor/plans" : "/sponsor/onboarding"}>{approved && !paid ? "Choose Sponsor Plan" : "Continue Onboarding"}</LinkButton><LinkButton href="/sponsor/plans" variant="secondary">View Sponsor Plans</LinkButton></div></Card>;
-}
-function actionItems(status: SponsorReviewStatus, subscription: SponsorSubscriptionStatus, completion: number) { const items = []; if (completion < 100) items.push("Complete remaining onboarding fields."); if (!sponsorIsApproved(status)) items.push("Business verification is not fully approved yet."); if (!hasActiveSponsorSubscription(subscription)) items.push("Choose or activate a sponsor plan."); items.push("Review proposals, messages, deliverables, and approval queues from the sponsor collaboration workspace."); items.push("Review contracts, billing, invoices, wallet readiness, and milestones before campaign funding."); items.push("Campaign funding and payment release stay disabled until secure provider setup is complete."); items.push("Analytics, reports, assets, team, and notification preferences are ready to use when data is available."); return items; }
-function formatMoney(value: unknown) { return typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100) : "Not tracked yet"; }
-function statusLabel(value: unknown) { return String(value ?? "Not tracked yet").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-function Metric({ title, value, label }: { title: string; value: string; label: string }) { return <Card className="p-6"><p className="text-sm font-bold text-slate-400">{title}</p><p className="mt-2 text-2xl font-black capitalize text-[var(--gold-2)]">{value}</p><p className="mt-1 text-sm text-slate-300">{label}</p></Card>; }
-function Info({ label, value }: { label: string; value?: string | null }) { return <div className="rounded-[8px] bg-[#1a1a1a] p-4"><p className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">{label}</p><p className="mt-2 break-words font-bold text-white">{value || "Not provided"}</p></div>; }
-
+function Metric({ icon, title, value, detail }: { icon: React.ReactNode; title: string; value: string; detail: string }) { return <Card className="p-5"><div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-amber-50 text-amber-800">{icon}</div><p className="mt-4 text-sm font-bold text-slate-600">{title}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p></Card>; }
+function Status({ label: text, tone }: { label: string; tone: "success" | "pending" | "brand" | "neutral" }) { const styles = tone === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : tone === "pending" ? "bg-amber-50 text-amber-800 border-amber-200" : tone === "brand" ? "bg-yellow-50 text-yellow-900 border-yellow-200" : "bg-slate-50 text-slate-700 border-slate-200"; return <span className={`rounded-full border px-3 py-1 font-bold capitalize ${styles}`}>{text}</span>; }
+function Step({ done, children }: { done: boolean; children: React.ReactNode }) { return <li className="flex gap-3"><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${done ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>{done ? "OK" : ""}</span><span>{children}</span></li>; }
+function Row({ label: name, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0"><dt className="text-slate-500">{name}</dt><dd className="text-right font-bold text-slate-900">{value}</dd></div>; }
+function label(value: unknown) { return String(value || "Draft").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function formatMoney(value: unknown) { return typeof value === "number" && value > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100) : "No confirmed funds"; }
+function formatDate(value: unknown) { const date = new Date(String(value || "")); return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date) : "Date pending"; }

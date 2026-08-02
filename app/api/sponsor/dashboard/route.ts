@@ -10,13 +10,14 @@ export async function GET(request: Request) {
   if (!context) return serverError("Sponsor access could not be verified.");
   const { db, user, sponsorProfile: sponsor } = context;
   try {
-    const [activitySnap, notificationsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap] = await Promise.all([
+    const [activitySnap, notificationsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap, conversationsSnap] = await Promise.all([
       db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorCampaignBriefs").where("sponsorId", "==", user.uid).limit(100).get(),
       db.collection("sponsorProposals").where("sponsorId", "==", user.uid).limit(100).get(),
       db.collection("sponsorContributions").where("sponsorId", "==", user.uid).limit(100).get(),
-      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", user.uid).limit(100).get()
+      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", user.uid).limit(100).get(),
+      db.collection("sponsorConversations").where("sponsorId", "==", user.uid).limit(100).get()
     ]);
     const campaigns = campaignsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const proposals = proposalsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -50,7 +51,13 @@ export async function GET(request: Request) {
       proposals,
       ...reporting,
       activity: activitySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      notifications: notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      notifications: notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      workspaceSignals: {
+        hasConversations: !conversationsSnap.empty,
+        conversationCount: conversationsSnap.size,
+        unreadMessageCount: conversationsSnap.docs.reduce((total, doc) => total + Number(doc.data().unreadCount ?? 0), 0),
+        hasReportableData: campaigns.length > 0 || proposals.length > 0 || contributions.length > 0
+      }
     }, "Sponsor dashboard loaded.");
   } catch (error) {
     console.error("[sponsor-dashboard:get]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });

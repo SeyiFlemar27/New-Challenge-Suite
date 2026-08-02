@@ -1,3 +1,5 @@
+import { calculateSponsorCompletion } from "@/lib/sponsor-foundation";
+
 export const sponsorReviewStatuses = [
   "not_submitted",
   "draft",
@@ -129,5 +131,73 @@ export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus:
     description: "Complete and submit your brand profile for review before using this feature.",
     primaryActionLabel: "Complete Brand Profile",
     primaryActionHref: "/sponsor/onboarding"
+  };
+}
+export type CanonicalSponsorState = "draft" | "submitted" | "pending_review" | "needs_changes" | "approved" | "rejected" | "suspended";
+
+export type SponsorWorkspaceState = {
+  status: CanonicalSponsorState;
+  statusLabel: string;
+  completionPercent: number;
+  subscriptionStatus: SponsorSubscriptionStatus;
+  approved: boolean;
+  profileReady: boolean;
+  hasConversations: boolean;
+  hasReportableData: boolean;
+  canCreateCampaignBrief: boolean;
+  canDiscover: boolean;
+  canSendProposal: boolean;
+  canFund: boolean;
+  nextActionLabel: string;
+  nextActionHref: string;
+  lockedReason: string | null;
+};
+
+export function resolveSponsorWorkspaceState(profile: Record<string, unknown> = {}): SponsorWorkspaceState {
+  const review = normalizeSponsorReviewStatus(profile.sponsorVerificationStatus ?? profile.businessVerificationStatus);
+  const completionPercent = calculateSponsorCompletion(profile);
+  const subscriptionStatus = normalizeSponsorSubscriptionStatus(profile.subscriptionStatus ?? profile.planStatus ?? profile.stripeStatus);
+  const approved = sponsorIsApproved(review);
+  const profileReady = completionPercent >= 80;
+  const hasConversations = Boolean(profile.hasSponsorConversations || Number(profile.sponsorConversationCount ?? 0) > 0);
+  const hasReportableData = Boolean(profile.hasSponsorReportableData || Number(profile.reportableSponsorRecordCount ?? 0) > 0);
+  let status: CanonicalSponsorState;
+  if (review === "suspended" || review === "flagged") status = "suspended";
+  else if (review === "approved" || review === "verified") status = "approved";
+  else if (review === "rejected") status = "rejected";
+  else if (["needs_changes", "additional_information_required"].includes(review)) status = "needs_changes";
+  else if (["submitted", "pending_review", "under_review"].includes(review)) status = review === "submitted" ? "submitted" : "pending_review";
+  else status = "draft";
+
+  const canCreateCampaignBrief = profileReady && !["rejected", "suspended"].includes(status);
+  const canDiscover = approved;
+  const canSendProposal = approved && hasActiveSponsorSubscription(subscriptionStatus);
+  const canFund = canSendProposal;
+  let nextActionLabel = "Complete Brand Profile";
+  let nextActionHref = "/sponsor/onboarding";
+  let lockedReason: string | null = "Complete the required brand profile fields before sponsor tools unlock.";
+  if (status === "needs_changes") lockedReason = "Update the requested brand details and resubmit for review.";
+  else if (status === "rejected") { nextActionLabel = "Review Decision"; lockedReason = "Review the decision and contact support before resubmitting."; }
+  else if (status === "suspended") { nextActionLabel = "Contact Support"; nextActionHref = "/sponsor/support"; lockedReason = "Sponsor access is suspended. Contact support for the next step."; }
+  else if (status === "submitted" || status === "pending_review") { nextActionLabel = "View Review Status"; lockedReason = "Your brand profile is being reviewed. Funding and proposal actions remain locked."; }
+  else if (approved && !hasActiveSponsorSubscription(subscriptionStatus)) { nextActionLabel = "Choose Sponsor Plan"; nextActionHref = "/sponsor/billing"; lockedReason = "Activate an eligible sponsor plan before sending proposals or funding campaigns."; }
+  else if (approved) { nextActionLabel = "Create Campaign Brief"; nextActionHref = "/sponsor/campaigns/new"; lockedReason = null; }
+
+  return {
+    status,
+    statusLabel: status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    completionPercent,
+    subscriptionStatus,
+    approved,
+    profileReady,
+    hasConversations,
+    hasReportableData,
+    canCreateCampaignBrief,
+    canDiscover,
+    canSendProposal,
+    canFund,
+    nextActionLabel,
+    nextActionHref,
+    lockedReason
   };
 }
