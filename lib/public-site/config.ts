@@ -1,5 +1,5 @@
 import { BriefcaseBusiness, Camera, Code2, Dumbbell, Gamepad2, GraduationCap, Music2, Palette, Shirt, UtensilsCrossed, type LucideIcon } from "lucide-react";
-export const PUBLIC_LOGO_URL = "https://res.cloudinary.com/drefcs4o2/image/upload/v1777874432/1663858817367_1_w7mmz0.avif";
+export const PUBLIC_LOGO_URL = "https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg";
 export const PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o2/video/upload/v1785625901/14999510_1920_1080_25fps_vvlpn9.mp4";
 export const PUBLIC_HERO_POSTER_URL = "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=82";
 export type PublicCategory = { slug: string; name: string; icon: LucideIcon; description: string; specialties: string[] };
