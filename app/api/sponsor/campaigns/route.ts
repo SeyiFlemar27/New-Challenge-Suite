@@ -1,6 +1,7 @@
 import { normalizeSponsorCampaignStatus, safeArray } from "@/lib/sponsor-campaigns";
 import { requireSponsorContext } from "@/lib/server/sponsor";
-import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
+import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
+import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,8 @@ export async function POST(request: Request) {
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   if (cleanText(body.campaignTitle || body.title).length < 3) return validationError({ campaignTitle: "Campaign title is required." });
+  const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
+  if (!workspace.canCreateCampaignBrief) return fail(workspace.lockedReason || "Complete the sponsor profile before creating a campaign brief.", 403, { sponsorStatus: workspace.status }, "SPONSOR_CAMPAIGN_LOCKED");
   try {
     const now = new Date().toISOString();
     const ref = context.db.collection("sponsorCampaignBriefs").doc();

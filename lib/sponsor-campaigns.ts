@@ -1,6 +1,14 @@
-﻿export const sponsorCampaignStatuses = [
+export const sponsorCampaignStatuses = [
   "draft",
   "ready_for_review",
+  "submitted_for_review",
+  "approved",
+  "matching",
+  "proposal_sent",
+  "accepted",
+  "funding_required",
+  "funded",
+  "live",
   "published",
   "inviting_creators",
   "proposal_open",
@@ -18,14 +26,11 @@
 export type SponsorCampaignStatus = typeof sponsorCampaignStatuses[number];
 
 export const sponsorCampaignBuilderSteps = [
-  { id: "basics", title: "Campaign Basics", description: "Define the objective, category, dates, visibility, and internal reference." },
-  { id: "audience", title: "Audience", description: "Describe where the campaign should reach and who should participate." },
-  { id: "creator", title: "Creator Requirements", description: "Capture niche, experience, verification, and collaboration expectations." },
-  { id: "deliverables", title: "Campaign Deliverables", description: "List placements, posts, reports, and approval requirements." },
-  { id: "budget", title: "Budget", description: "Plan budget ranges without processing sponsor funds." },
-  { id: "payment", title: "Payment Structure", description: "Record payment preference only; no funding or release is active." },
-  { id: "brand", title: "Brand Requirements", description: "Document logos, voice, disclaimers, hashtags, and approval rules." },
-  { id: "review", title: "Review and Save", description: "Review the brief and choose the next safe action." }
+  { id: "basics", title: "Campaign Basics", description: "Define the campaign, objective, category, and timeline." },
+  { id: "audience_goals", title: "Audience & Goals", description: "Describe the audience, creator fit, and intended outcome." },
+  { id: "budget_type", title: "Budget & Sponsorship Type", description: "Plan the budget and sponsorship structure without moving funds." },
+  { id: "deliverables_rules", title: "Deliverables & Brand Rules", description: "Set deliverables, media requirements, brand rules, and approval expectations." },
+  { id: "review", title: "Review & Submit", description: "Review the brief, save a draft, or submit it for review." }
 ] as const;
 
 export const sponsorCampaignObjectives = ["Brand awareness", "Product launch", "App installs", "Lead generation", "Sales", "Community growth", "Audience engagement", "Event promotion", "Creator collaboration", "User acquisition"];

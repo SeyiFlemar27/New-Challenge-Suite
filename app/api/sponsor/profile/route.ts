@@ -186,7 +186,7 @@ function assertSponsorAccount(userData: Record<string, unknown>, profileData: Re
 function toSponsorProfile(uid: string, email: string | undefined, userData: Record<string, unknown>, profileData: Record<string, unknown>, sponsorData: Record<string, unknown>) {
   const fallback = defaultSponsorProfile(uid, email);
   const merged = { ...fallback, ...profileData, ...userData, ...sponsorData };
-  const completion = Number(merged.onboardingCompletionPercent ?? calculateSponsorCompletion(merged));
+  const completion = calculateSponsorCompletion(merged);
   return {
     ...merged,
     userId: uid,
@@ -215,7 +215,20 @@ export async function GET(request: Request) {
     const context = await loadSponsorContext(db, user.uid);
     const sponsorError = assertSponsorAccount(context.userData, context.profileData);
     if (sponsorError) return sponsorError;
-    return ok({ profileExists: context.sponsorExists, sponsorProfile: toSponsorProfile(user.uid, user.email, context.userData, context.profileData, context.sponsorData) }, "Sponsor profile loaded.");
+    const [conversationSnap, campaignSnap, proposalSnap, contributionSnap] = await Promise.all([
+      db.collection("sponsorConversations").where("sponsorId", "==", user.uid).limit(1).get(),
+      db.collection("sponsorCampaignBriefs").where("sponsorId", "==", user.uid).limit(1).get(),
+      db.collection("sponsorProposals").where("sponsorId", "==", user.uid).limit(1).get(),
+      db.collection("sponsorContributions").where("sponsorId", "==", user.uid).limit(1).get()
+    ]);
+    const sponsorProfile = {
+      ...toSponsorProfile(user.uid, user.email, context.userData, context.profileData, context.sponsorData),
+      hasSponsorConversations: !conversationSnap.empty,
+      sponsorConversationCount: conversationSnap.size,
+      hasSponsorReportableData: !campaignSnap.empty || !proposalSnap.empty || !contributionSnap.empty,
+      reportableSponsorRecordCount: campaignSnap.size + proposalSnap.size + contributionSnap.size
+    };
+    return ok({ profileExists: context.sponsorExists, sponsorProfile }, "Sponsor profile loaded.");
   } catch (error) {
     console.error("[sponsor-profile:get]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor profile could not be loaded.", { stage: "sponsor-profile:get" });
@@ -257,8 +270,8 @@ async function persistSponsorProfile(request: Request) {
       userId: user.uid,
       accountType: "sponsor",
       dashboardType: "sponsor_dashboard",
-      sponsorOnboardingStatus: "complete",
-      sponsorOnboardingComplete: true,
+      sponsorOnboardingStatus: input.reviewAction === "submit" ? "submitted" : "in_progress",
+      sponsorOnboardingComplete: input.reviewAction === "submit",
       hasSponsorProfile: true,
       sponsorVerificationStatus,
       businessVerificationStatus,
@@ -314,7 +327,7 @@ async function persistSponsorProfile(request: Request) {
       publicProfile: input.publicProfile,
       notificationPreferences: input.notificationPreferences,
       restrictedActions: ["funding_campaigns", "verified_badge", "high_value_sponsorship_tools", "payment_release_actions", "enterprise_sponsorship_tools"],
-      brandProfileCompletedAt: context.sponsorData.brandProfileCompletedAt ?? now,
+      brandProfileCompletedAt: input.reviewAction === "submit" ? context.sponsorData.brandProfileCompletedAt ?? now : context.sponsorData.brandProfileCompletedAt ?? null,
       updatedAt: now,
       updatedBy: user.uid,
       version: Number(context.sponsorData.version ?? 0) + 1
@@ -325,8 +338,8 @@ async function persistSponsorProfile(request: Request) {
     const accountStatusFields = {
       accountType: "sponsor",
       dashboardType: "sponsor_dashboard",
-      sponsorOnboardingStatus: "complete",
-      sponsorOnboardingComplete: true,
+      sponsorOnboardingStatus: input.reviewAction === "submit" ? "submitted" : "in_progress",
+      sponsorOnboardingComplete: input.reviewAction === "submit",
       onboardingCompletionPercent,
       hasSponsorProfile: true,
       sponsorVerificationStatus: finalSponsorProfile.sponsorVerificationStatus,
@@ -339,7 +352,7 @@ async function persistSponsorProfile(request: Request) {
 
     await Promise.all([
       db.collection("sponsorProfiles").doc(user.uid).set(finalSponsorProfile, { merge: true }),
-      db.collection("sponsorOnboarding").doc(user.uid).set({ userId: user.uid, status: "complete", completionPercent: onboardingCompletionPercent, updatedAt: now, updatedBy: user.uid }, { merge: true }),
+      db.collection("sponsorOnboarding").doc(user.uid).set({ userId: user.uid, status: input.reviewAction === "submit" ? "submitted" : "in_progress", completionPercent: onboardingCompletionPercent, updatedAt: now, updatedBy: user.uid }, { merge: true }),
       db.collection("sponsorSettings").doc(user.uid).set({ userId: user.uid, notificationPreferences: input.notificationPreferences, publicProfile: input.publicProfile, updatedAt: now, updatedBy: user.uid }, { merge: true }),
       db.collection("sponsorBrandAssets").doc(user.uid).set({ userId: user.uid, logoUrl: finalSponsorProfile.logoUrl, logoPath: finalSponsorProfile.logoPath, alternateLogoUrl: finalSponsorProfile.alternateLogoUrl, alternateLogoPath: finalSponsorProfile.alternateLogoPath, squareIconUrl: finalSponsorProfile.squareIconUrl, squareIconPath: finalSponsorProfile.squareIconPath, bannerUrl: finalSponsorProfile.bannerUrl, bannerPath: finalSponsorProfile.bannerPath, coverImageUrl: finalSponsorProfile.coverImageUrl, coverImagePath: finalSponsorProfile.coverImagePath, brandColors: finalSponsorProfile.brandColors, brandFonts: finalSponsorProfile.brandFonts, updatedAt: now, updatedBy: user.uid }, { merge: true }),
       db.collection("users").doc(user.uid).set(accountStatusFields, { merge: true }),
