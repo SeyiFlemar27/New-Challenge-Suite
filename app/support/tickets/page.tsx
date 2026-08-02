@@ -1,0 +1,7 @@
+"use client";
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { LifeBuoy } from "lucide-react";
+import { apiRequest } from "@/lib/api/client";
+export default function Page() { const [tickets, setTickets] = useState<Array<Record<string, unknown> & { id: string }>>([]); useEffect(() => { void apiRequest<{ tickets: Array<Record<string, unknown> & { id: string }> }>("/api/support/tickets").then((result) => result.data && setTickets(result.data.tickets)); }, []); return <AppShell><PageTitle title="My Support Tickets" subtitle="Track acknowledgement, assignment, provider waits, and resolution." icon={<LifeBuoy className="text-[var(--gold)]" />} /><div className="mt-7 grid gap-4 md:grid-cols-2">{tickets.map((ticket) => <Card key={ticket.id} className="p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">{String(ticket.status ?? "submitted").replaceAll("_", " ")}</p><h2 className="mt-2 text-lg font-black">{String(ticket.subject)}</h2><p className="mt-3 text-sm text-slate-400">{String(ticket.category).replaceAll("_", " ")}</p></Card>)}{!tickets.length ? <Card className="md:col-span-2"><EmptyState icon={<LifeBuoy />} title="No support tickets" body="Tickets you create will appear here without invented conversations." /><LinkButton href="/support/new" className="mt-5">Create Ticket</LinkButton></Card> : null}</div></AppShell>; }

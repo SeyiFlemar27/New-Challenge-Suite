@@ -60,9 +60,12 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
     ].filter(isAdminRole);
     const allowlisted = Boolean(email && adminAllowlist.has(email));
     const legacyAdmin = Boolean(decoded.admin === true || profile?.isAdmin || allowlisted);
-    const adminRoles: AdminRole[] = profileRoles.length
+    const accessStatus = typeof profile?.adminAccessStatus === "string" ? profile.adminAccessStatus : "legacy_active";
+    const securityReady = profile?.adminSecuritySetupComplete !== false && !["pending_invitation", "pending_security_setup", "suspended", "deactivated", "removed"].includes(accessStatus);
+    const candidateRoles: AdminRole[] = profileRoles.length
       ? [...new Set(profileRoles)]
       : legacyAdmin ? [allowlisted ? "platform_owner" : "super_admin"] : [];
+    const adminRoles = securityReady ? candidateRoles : [];
     const explicitPermissions = Array.isArray(profile?.adminPermissions)
       ? profile.adminPermissions.filter((permission): permission is string => typeof permission === "string")
       : [];
