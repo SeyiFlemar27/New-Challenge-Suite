@@ -1,11 +1,11 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { buildConfirmedSettlementPreview } from "@/lib/server/challenge-settlement";
 import { getChallengeOrNull, getProposalOrNull, normalizeWinnerProposalWinners, validateWinnerProposalWinners } from "@/lib/server/prize-approvals";
 import { fail, ok, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
-  const { response } = await requireAdminUser(request);
+  const { response } = await requireAdminPermission(request, "finance.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin prize approval preview");

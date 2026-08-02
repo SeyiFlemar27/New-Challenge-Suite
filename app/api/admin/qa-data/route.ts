@@ -1,9 +1,15 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { writeAuditLog } from "@/lib/server/audit";
-import { requireAdminUser } from "@/lib/server/auth";
-import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { requireAdminPermission } from "@/lib/server/auth";
+import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
+
+function productionQaBlocked() {
+  return process.env.NODE_ENV === "production"
+    ? fail("QA seed tools are unavailable in production.", 403, undefined, "QA_TOOLS_DISABLED")
+    : null;
+}
 
 const QA_COLLECTIONS = [
   "qaSeedBatches",
@@ -41,7 +47,9 @@ async function loadBatches(db: FirebaseFirestore.Firestore) {
 }
 
 export async function GET(request: Request) {
-  const { response } = await requireAdminUser(request);
+  const blocked = productionQaBlocked();
+  if (blocked) return blocked;
+  const { response } = await requireAdminPermission(request, "qaTools.use");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin QA data");
@@ -54,7 +62,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { user, response } = await requireAdminUser(request);
+  const blocked = productionQaBlocked();
+  if (blocked) return blocked;
+  const { user, response } = await requireAdminPermission(request, "qaTools.use");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin QA data");
@@ -356,7 +366,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { user, response } = await requireAdminUser(request);
+  const blocked = productionQaBlocked();
+  if (blocked) return blocked;
+  const { user, response } = await requireAdminPermission(request, "qaTools.use");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin QA data");

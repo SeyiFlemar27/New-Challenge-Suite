@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const auth = read("lib/server/auth.ts");
+const permissions = read("lib/server/admin-permissions.ts");
+const operations = read("app/api/admin/operations/route.ts");
+const access = read("app/api/admin/access/route.ts");
+assert(auth.includes("requireAdminPermission") && auth.includes("hasAdminPermission"));
+assert(operations.includes("permissionForAction") && operations.includes("requireRecentAdminAuthentication"));
+assert(operations.includes("hasAdminPermission(user.adminPermissions"), "sensitive datasets must be minimized by permission");
+assert(access.includes("permissions: user.adminPermissions"));
+assert(permissions.includes("explicitPermissions") && permissions.includes("ADMIN_PERMISSIONS"));
+console.log("admin permissions are enforced server-side: ok");

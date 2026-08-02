@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const api = read("app/api/admin/operations/route.ts");
+const ui = read("components/admin/admin-control-center.tsx");
+assert(api.includes('second_approve: "approved_for_manual_payout"'));
+assert(api.includes('previousStatus === "pending_second_approval"'));
+assert(api.includes("record.firstApprovedBy === user.uid"));
+assert(api.includes('"withdrawals.secondApprove"'));
+assert(api.includes("requireRecentAdminAuthentication"));
+assert(ui.includes("two different administrator approvals"));
+console.log("withdrawal two-person approval: ok");

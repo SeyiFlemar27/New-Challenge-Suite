@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const auth = read("lib/server/auth.ts");
+const access = read("app/api/admin/access/route.ts");
+const shell = read("components/admin/admin-shell.tsx");
+assert(auth.includes("adminSecondFactorRequired") && auth.includes("sign_in_second_factor"));
+assert(auth.includes("Recent authentication is required") && auth.includes("A verified second factor is required"));
+assert(access.includes("secondFactorRequired") && access.includes("secondFactorVerified"));
+assert(shell.includes("Sensitive finance, role, and system actions remain blocked"));
+console.log("admin second-factor readiness and reauthentication: ok");

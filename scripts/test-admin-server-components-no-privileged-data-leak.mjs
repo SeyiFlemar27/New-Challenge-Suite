@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+const list = read("app/admin/tournaments/page.tsx");
+const detail = read("app/admin/tournaments/[id]/page.tsx");
+const component = read("components/admin/admin-tournament-workspace.tsx");
+const api = read("app/api/admin/tournaments/[id]/route.ts");
+assert(!list.includes("getAdminDb") && !detail.includes("getTournamentBundle"));
+assert(component.includes("/api/admin/tournaments"));
+assert(api.includes('requireAdminPermission(request, "challenges.view")'));
+console.log("admin server components do not preload privileged tournament data: ok");

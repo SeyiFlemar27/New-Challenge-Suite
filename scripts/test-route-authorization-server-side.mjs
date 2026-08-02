@@ -7,7 +7,8 @@ const routes = {
   management: read("app/api/challenges/[id]/manage/route.ts"),
   sponsor: read("app/api/sponsor/dashboard/route.ts")
 };
-assert(routes.admin.includes("requireAdminUser"));
+assert(routes.admin.includes("requireAdminPermission"));
+assert(routes.admin.includes('"admin.dashboard.view"'));
 assert(routes.withdrawal.includes("requireRequestUser"));
 assert(routes.management.includes("requireRequestUser"));
 assert(routes.management.includes("ownsChallenge"));

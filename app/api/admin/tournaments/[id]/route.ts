@@ -1,12 +1,12 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { adminTournamentActionFoundation } from "@/lib/server/tournament-operations";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { response } = await requireAdminUser(request);
+  const { response } = await requireAdminPermission(request, "challenges.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin tournament detail");
@@ -31,7 +31,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireAdminUser(request);
+  const { user, response } = await requireAdminPermission(request, "challenges.review");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin tournament action");

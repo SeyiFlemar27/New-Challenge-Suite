@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
 import {
   buildConfirmedSettlementPreview,
@@ -16,7 +16,7 @@ import {
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
-  const { user, response } = await requireAdminUser(request);
+  const { user, response } = await requireRecentAdminAuthentication(request, "settlements.approve");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin prize approval");

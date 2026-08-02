@@ -2,7 +2,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
+import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ function safeUser(record: RecordData, doroBalance = 0, cashBalanceCents = 0) {
 }
 
 export async function GET(request: Request) {
-  const { response } = await requireAdminUser(request);
+  const { user, response } = await requireAdminPermission(request, "admin.dashboard.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin operations");
@@ -189,13 +190,13 @@ export async function GET(request: Request) {
     };
     const cashLedger = records(cashLedgerSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, type: item.type ?? "unknown", sourceType: item.sourceType ?? "", sourceId: item.sourceId ?? "", amountCents: Number(item.amountCents ?? 0), currency: item.currency ?? "USD", direction: item.direction ?? "", status: item.status ?? "recorded", createdAt: item.createdAt ?? null, transferEnabled: false }));
     const events = records(liveEventSnap).map((item) => ({ id: item.id, title: item.title ?? "Live event", hostId: item.hostId ?? item.creatorId ?? null, startsAt: item.startsAt ?? null, status: item.status ?? "draft", registrationCount: Number(item.registrationCount ?? 0), riskFlags: item.riskFlags ?? [] }));
-    const tournaments = records(tournamentSnap).map((item) => ({ id: item.id, title: item.title ?? "Tournament", hostId: item.hostId ?? null, format: item.format ?? "foundation", participantCount: Number(item.participantCount ?? 0), status: item.status ?? "draft", bracketExecutionEnabled: false }));
+    const tournaments = records(tournamentSnap).map((item) => ({ id: item.id, title: item.title ?? "Tournament", hostId: item.hostId ?? null, format: item.format ?? "not_configured", participantCount: Number(item.participantCount ?? 0), status: item.status ?? "draft", bracketExecutionEnabled: false }));
     const adminNotifications = records(notificationSnap).filter((item) => item.audience === "admin" || item.adminOnly === true || ["sponsor_application", "host_verification", "flagged_submission", "withdrawal_request", "winner_review", "support_ticket"].includes(String(item.type)));
     const support = records(supportSnap).map((item) => ({ id: item.id, category: item.category ?? "other", subject: item.subject ?? "Support request", userId: item.userId ?? null, status: item.status ?? "open", createdAt: item.createdAt ?? null }));
     const announcements = records(announcementSnap).map((item) => ({ id: item.id, type: item.type ?? "platform_announcement", title: item.title ?? "Announcement", status: item.status ?? "draft", createdAt: item.createdAt ?? null, deliveryActive: false }));
     const predictions = records(predictionSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, predictedParticipantId: item.predictedParticipantId ?? null, stakeAmountUsd: Number(item.stakeAmountUsd ?? 0), platformFeeUsd: Number(item.platformFeeUsd ?? 0), netStakeUsd: Number(item.netStakeUsd ?? 0), predictionStatus: item.predictionStatus ?? item.status ?? "pending_payment", paymentStatus: item.paymentStatus ?? "provider_approval_required", settlementStatus: item.settlementStatus ?? "admin_review_required", eligibilityStatus: item.eligibilityStatus ?? "not_available", status: item.settlementStatus ?? item.predictionStatus ?? item.status ?? "pending_payment", settlementRequiresAdminReview: true, automaticPayoutsEnabled: false, automaticSettlementEnabled: false }));
-    const rewards = records(rewardSpinSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, prizeName: item.prizeName ?? "Reward", prizeType: item.prizeType ?? "manual_foundation", status: item.status ?? "pending_admin_fulfillment", manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, createdAt: item.createdAt ?? null }));
-    const prizeWheel = records(prizeWheelSnap).map((item) => ({ id: item.id, prizeName: item.prizeName ?? item.name ?? "Prize", prizeType: item.prizeType ?? "manual_prize", tier: item.tier ?? "standard", enabled: item.enabled !== false, quantity: Number(item.quantity ?? 0), probabilityWeight: Number(item.probabilityWeight ?? item.weight ?? 0), manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, status: item.status ?? "foundation" }));
+    const rewards = records(rewardSpinSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, prizeName: item.prizeName ?? "Reward", prizeType: item.prizeType ?? "manual_review", status: item.status ?? "pending_admin_fulfillment", manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, createdAt: item.createdAt ?? null }));
+    const prizeWheel = records(prizeWheelSnap).map((item) => ({ id: item.id, prizeName: item.prizeName ?? item.name ?? "Prize", prizeType: item.prizeType ?? "manual_prize", tier: item.tier ?? "standard", enabled: item.enabled !== false, quantity: Number(item.quantity ?? 0), probabilityWeight: Number(item.probabilityWeight ?? item.weight ?? 0), manualFulfillmentRequired: item.manualFulfillmentRequired !== false, cashOutEnabled: false, status: item.status ?? "not_configured" }));
     const kyc = records(kycSnap).map((item) => ({ id: item.id, userId: item.userId ?? item.id, planId: item.planId ?? item.subscriptionPlanId ?? null, kycRequired: item.kycRequired === true, kycStatus: item.kycStatus ?? "not_started", kycProvider: item.kycProvider ?? "not_configured", sumsubApplicantId: item.sumsubApplicantId ?? null, sumsubProviderStatus: item.sumsubProviderStatus ?? null, sumsubReviewAnswer: item.sumsubReviewAnswer ?? null, sumsubReviewRejectType: item.sumsubReviewRejectType ?? null, submittedAt: item.kycSubmittedAt ?? null, verifiedAt: item.kycVerifiedAt ?? null, rejectedAt: item.kycRejectedAt ?? null, failureReason: item.kycFailureReason ?? null, kycSessionId: item.kycSessionId ?? null, rawIdentityStored: false, status: item.kycStatus ?? "not_started", updatedAt: item.updatedAt ?? item.kycLastCheckedAt ?? null }));
     const predictionSettlements = records(predictionSettlementSnap).map((item) => ({ id: item.id, predictionId: item.predictionId ?? item.id, challengeId: item.challengeId ?? null, userId: item.userId ?? null, status: item.settlementStatus ?? item.refundStatus ?? item.status ?? "admin_review_required", refundStatus: item.refundStatus ?? "not_applicable", automaticPayoutsEnabled: false, automaticRefundsEnabled: false, createdAt: item.createdAt ?? null }));
     const adRewards = records(adRewardSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, adProvider: item.adProvider ?? "disabled", status: item.adRewardStatus ?? "not_available", voteGranted: item.voteGranted === true, providerVerificationRequired: true, clientGrantBlocked: item.clientGrantBlocked !== false, createdAt: item.createdAt ?? null }));
@@ -221,14 +222,14 @@ export async function GET(request: Request) {
         recentAuditEvents: auditLogs.slice(0, 8),
         safety: { automaticPayouts: "Disabled", withdrawals: "Review only", sponsorRelease: "Disabled", prizePoolRelease: "Disabled", kycProcessing: "Not active", doroCoinConversion: "Disabled", adRewards: "Verification required" }
       },
-      sponsors,
-      hosts: hosts.map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), organizationName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "", ownerName: item.displayName ?? item.name ?? "", location: item.location ?? item.country ?? "", eventType: item.hostType ?? "", competitionSize: item.competitionSize ?? "", riskFlags: item.riskFlags ?? [] })),
+      sponsors: hasAdminPermission(user.adminPermissions, "sponsors.view") ? sponsors : [],
+      hosts: hasAdminPermission(user.adminPermissions, "users.view") ? hosts.map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), organizationName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "", ownerName: item.displayName ?? item.name ?? "", location: item.location ?? item.country ?? "", eventType: item.hostType ?? "", competitionSize: item.competitionSize ?? "", riskFlags: item.riskFlags ?? [] })) : [],
       challenges,
-      submissions,
-      participants,
-      winners,
-      withdrawals,
-      disputes,
+      submissions: hasAdminPermission(user.adminPermissions, "submissions.view") ? submissions : [],
+      participants: hasAdminPermission(user.adminPermissions, "participants.review") ? participants : [],
+      winners: hasAdminPermission(user.adminPermissions, "winners.review") ? winners : [],
+      withdrawals: hasAdminPermission(user.adminPermissions, "finance.view") ? withdrawals : [],
+      disputes: hasAdminPermission(user.adminPermissions, "disputes.review") ? disputes : [],
       reports: {
         challengeCount: challenges.length,
         submissionCount: submissions.length,
@@ -241,14 +242,14 @@ export async function GET(request: Request) {
         tournamentCount: tournaments.length,
         exportsEnabled: false
       },
-      users: users.map((item) => safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0))),
-      creators: users.filter((item) => item.accountType === "creator" || item.role === "creator" || item.planId === "creator").map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), createdChallengeCount: Number(item.createdChallengeCount ?? 0), submissionVolume: Number(item.submissionCount ?? 0), boostsUsed: Number(item.boostsUsed ?? 0), sponsorReadyCount: Number(item.sponsorReadyCount ?? 0), riskFlags: item.riskFlags ?? [] })),
-      hostWorkspaces: hosts.map((item) => ({ id: item.id, workspaceName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "Host workspace", ownerName: item.displayName ?? item.name ?? "", verificationStatus: item.hostVerificationStatus ?? "not_submitted", planStatus: item.subscriptionStatus ?? item.planStatus ?? "none", events: Number(item.eventCount ?? 0), tournaments: Number(item.tournamentCount ?? 0), participants: Number(item.participantCount ?? 0), teamSeats: Number(item.teamSeats ?? 1), reports: Number(item.reportCount ?? 0), riskFlags: item.riskFlags ?? [] })),
-      sponsorBrands: sponsors,
+      users: hasAdminPermission(user.adminPermissions, "users.view") ? users.map((item) => safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0))) : [],
+      creators: hasAdminPermission(user.adminPermissions, "users.view") ? users.filter((item) => item.accountType === "creator" || item.role === "creator" || item.planId === "creator").map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), createdChallengeCount: Number(item.createdChallengeCount ?? 0), submissionVolume: Number(item.submissionCount ?? 0), boostsUsed: Number(item.boostsUsed ?? 0), sponsorReadyCount: Number(item.sponsorReadyCount ?? 0), riskFlags: item.riskFlags ?? [] })) : [],
+      hostWorkspaces: hasAdminPermission(user.adminPermissions, "users.view") ? hosts.map((item) => ({ id: item.id, workspaceName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "Host workspace", ownerName: item.displayName ?? item.name ?? "", verificationStatus: item.hostVerificationStatus ?? "not_submitted", planStatus: item.subscriptionStatus ?? item.planStatus ?? "none", events: Number(item.eventCount ?? 0), tournaments: Number(item.tournamentCount ?? 0), participants: Number(item.participantCount ?? 0), teamSeats: Number(item.teamSeats ?? 1), reports: Number(item.reportCount ?? 0), riskFlags: item.riskFlags ?? [] })) : [],
+      sponsorBrands: hasAdminPermission(user.adminPermissions, "sponsors.view") ? sponsors : [],
       events,
       tournaments,
-      doroCoin,
-      cashLedger,
+      doroCoin: hasAdminPermission(user.adminPermissions, "finance.view") ? doroCoin : { wallets: [], transactions: [], conversionEnabled: false, adjustmentsEnabled: false },
+      cashLedger: hasAdminPermission(user.adminPermissions, "finance.view") ? cashLedger : [],
       adminNotifications,
       support,
       announcements,
@@ -256,20 +257,20 @@ export async function GET(request: Request) {
       predictionSettlements,
       rewards,
       prizeWheel,
-      kyc,
+      kyc: hasAdminPermission(user.adminPermissions, "users.requireVerification") ? kyc : [],
       adRewards,
       enterpriseLeads,
       mediaModeration,
       riskSafety,
-      auditLogs,
+      auditLogs: hasAdminPermission(user.adminPermissions, "auditLogs.viewRaw") ? auditLogs : [],
       settings: {
-        adminRoles: "Firebase custom claim, users.isAdmin, or server-only allowlist",
+        adminRoles: "Server-verified granular administrator roles and permissions",
         reviewRulesConfigured: true,
         payoutProvider: "manual_review",
         automaticMoneyMovement: false,
         categories: ["challenge", "submission", "event", "sponsor", "risk"],
-        votingRules: { freeVotesPerDay: 1, doroCoinCostConfigurable: true, suspiciousVoteReview: "foundation" },
-        revenueRules: { generatedRevenueSplit: { winners: 65, host: 15, sponsor: 10, platform: 10 }, initialPrizePoolRule: "100_percent_to_winners", challengerVoteRevenueBonusPercent: 10, minimumWithdrawalCents: 2500, moneyMovementEnabled: false },
+        votingRules: { freeVotesPerDay: 1, doroCoinCostConfigurable: true, suspiciousVoteReview: "manual_review" },
+        revenueRules: { generatedRevenueSplit: { winners: 65, creatorHost: 20, platform: 15 }, sponsorFundingIncluded: false, initialPrizePoolRule: "100_percent_to_winners", challengerVoteRevenueBonusPercent: 10, minimumWithdrawalCents: 2500, moneyMovementEnabled: false },
         featureFlags: {
           adRewards: "disabled",
           withdrawals: "review_only",
@@ -279,9 +280,9 @@ export async function GET(request: Request) {
           kycVerification: "not_connected",
           liveStreaming: "disabled",
           realExports: "disabled",
-          teamInvitations: "foundation",
-          emailNotifications: "foundation",
-          pushNotifications: "foundation",
+          teamInvitations: "not_configured",
+          emailNotifications: "not_configured",
+          pushNotifications: "not_configured",
           realMoneyPredictionArenaEnabled: false,
           predictionPaymentsProvider: "disabled_or_pending_approval",
           adVotesEnabled: false,
@@ -289,12 +290,12 @@ export async function GET(request: Request) {
           uploadsEnabled: "rules_pending_publication",
           privateChallengesEnabled: true,
           revenueShareVisible: true,
-          predictionArena: "compliance_gated_foundation",
-          voterRewardsWheel: "server_selected_foundation"
+          predictionArena: "compliance_review_required",
+          voterRewardsWheel: "server_selected"
         },
-        roles: ["Owner", "Admin", "Reviewer", "Finance Reviewer", "Support", "Moderator", "Read-only Auditor"]
+        roles: ["Platform Owner", "Super Admin", "Operations Admin", "Finance Admin", "Moderation Admin", "Safety Admin", "Support Admin", "Sponsor Manager", "Event and Tournament Admin", "Content Admin", "Marketing and Communications Admin", "Analyst", "Read-only Auditor", "Technical Admin", "Developer Support"]
       }
-    }, "Admin command data loaded.");
+    }, "Admin operations data loaded.");
   } catch (error) {
     return serverError("Admin operations could not be loaded.", error instanceof Error ? error.message : error);
   }
@@ -307,10 +308,27 @@ const allowedActions: Record<string, Set<string>> = {
   submission: new Set(["approve", "reject", "request_changes", "flag", "add_note"]),
   participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag", "add_note"]),
   winner: new Set(["approve", "hold", "request_review", "flag", "add_note"]),
-  withdrawal: new Set(["approve", "reject", "request_info", "mark_paid", "add_note"])
+  withdrawal: new Set(["approve", "second_approve", "reject", "request_info", "mark_paid", "add_note"])
 };
 
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
+
+function permissionForAction(type: string, action: string): AdminPermission {
+  if (action === "add_note") return type === "withdrawal" ? "withdrawals.review" : type === "sponsor" ? "sponsors.review" : "challenges.review";
+  if (type === "sponsor") return action === "suspend" ? "sponsors.suspend" : "sponsors.approve";
+  if (type === "host") return "users.requireVerification";
+  if (type === "challenge") return action === "archive" ? "challenges.archive" : "challenges.review";
+  if (type === "submission") return "submissions.review";
+  if (type === "participant") return action === "disqualify" ? "participants.disqualify" : "participants.review";
+  if (type === "winner") return action === "approve" ? "winners.confirm" : "winners.review";
+  if (type === "withdrawal") {
+    if (action === "mark_paid") return "withdrawals.markPaid";
+    if (action === "second_approve") return "withdrawals.secondApprove";
+    if (action === "approve") return "withdrawals.approve";
+    return "withdrawals.review";
+  }
+  return "admin.dashboard.view";
+}
 
 function nextStatus(type: string, action: string) {
   const statuses: Record<string, Record<string, string>> = {
@@ -320,14 +338,12 @@ function nextStatus(type: string, action: string) {
     submission: { approve: "approved", reject: "rejected", request_changes: "resubmission_requested", flag: "flagged" },
     participant: { approve: "approved", reject: "rejected", disqualify: "disqualified", reinstate: "approved", flag: "flagged" },
     winner: { approve: "approved", hold: "held", request_review: "pending_admin_review", flag: "flagged" },
-    withdrawal: { approve: "approved_for_manual_payout", reject: "rejected", request_info: "needs_kyc", mark_paid: "paid" }
+    withdrawal: { approve: "pending_second_approval", second_approve: "approved_for_manual_payout", reject: "rejected", request_info: "needs_kyc", mark_paid: "paid" }
   };
   return statuses[type]?.[action];
 }
 
 export async function PATCH(request: Request) {
-  const { user, response } = await requireAdminUser(request);
-  if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin operations");
   const parsed = await readJson(request);
@@ -338,6 +354,12 @@ export async function PATCH(request: Request) {
   const reason = String(parsed.body?.reason ?? "").trim().slice(0, 500);
   const note = String(parsed.body?.note ?? "").trim().slice(0, 1000);
   if (!allowedActions[type]?.has(action)) return validationError({ action: "Select a valid admin action." });
+  const permission = permissionForAction(type, action);
+  const authorization = action === "mark_paid" || action === "second_approve"
+    ? await requireRecentAdminAuthentication(request, permission)
+    : await requireAdminPermission(request, permission);
+  if (authorization.response) return authorization.response;
+  const user = authorization.user;
   if (!id) return validationError({ id: "Target ID is required." });
   if (reasonRequired.has(action) && !reason) return validationError({ reason: "A reason is required for this action." });
   if (action === "add_note" && !note) return validationError({ note: "Enter an internal admin note." });
@@ -384,14 +406,20 @@ export async function PATCH(request: Request) {
         previousStatus = String(record.status ?? "pending_review");
         const validTransition = action === "mark_paid"
           ? previousStatus === "approved_for_manual_payout"
-          : ["pending_review", "needs_kyc"].includes(previousStatus);
+          : action === "second_approve"
+            ? previousStatus === "pending_second_approval"
+            : ["pending_review", "needs_kyc"].includes(previousStatus);
         if (!validTransition) throw new Error("INVALID_STATE");
-        if (action === "approve" && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
+        if (["approve", "second_approve"].includes(action) && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
+        if (action === "second_approve" && record.firstApprovedBy === user.uid) throw new Error("SECOND_APPROVER_REQUIRED");
         transaction.set(ref, {
           status,
           adminReviewStatus: status,
           reason: reason || null,
-          approvedAt: action === "approve" ? now : record.approvedAt ?? null,
+          firstApprovedAt: action === "approve" ? now : record.firstApprovedAt ?? null,
+          firstApprovedBy: action === "approve" ? user.uid : record.firstApprovedBy ?? null,
+          approvedAt: action === "second_approve" ? now : record.approvedAt ?? null,
+          approvedBy: action === "second_approve" ? user.uid : record.approvedBy ?? null,
           paidManuallyAt: action === "mark_paid" ? now : record.paidManuallyAt ?? null,
           paidManuallyBy: action === "mark_paid" ? user.uid : record.paidManuallyBy ?? null,
           transferEnabled: false,
@@ -524,6 +552,7 @@ export async function PATCH(request: Request) {
     if (error instanceof Error && error.message === "NOT_FOUND") return fail("Record not found.", 404, undefined, "NOT_FOUND");
     if (error instanceof Error && error.message === "INVALID_STATE") return fail("This record is no longer eligible for that action.", 409, undefined, "INVALID_STATE");
     if (error instanceof Error && error.message === "KYC_REQUIRED") return fail("Identity verification must be verified before approval. KYC processing is not active yet.", 409, undefined, "KYC_REQUIRED");
+    if (error instanceof Error && error.message === "SECOND_APPROVER_REQUIRED") return fail("A different authorized administrator must complete the second approval.", 409, undefined, "SECOND_APPROVER_REQUIRED");
     return serverError("Admin decision could not be saved.", error instanceof Error ? error.message : error);
   }
 }
