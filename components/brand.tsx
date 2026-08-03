@@ -2,16 +2,16 @@
 import { cn } from "@/lib/utils";
 import type { UserPlanId } from "@/lib/types";
 import { findCustomizationOption } from "@/lib/customization/options";
+import { CHALLENGE_SUITE_LOGO_URL } from "@/lib/brand-config";
+import { ChallengeSuiteLogo } from "@/components/brand/challenge-suite-logo";
 
-export const logoUrl = "https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg";
+export const logoUrl = CHALLENGE_SUITE_LOGO_URL;
 
 export function BrandLogo({ className, imageClassName }: { className?: string; imageClassName?: string }) {
-  return (
-    <div className={cn("flex items-center justify-center", className)}>
-      <img src={logoUrl} alt="Challenge Suite" className={cn("h-20 w-20 rounded-full object-cover", imageClassName)} />
-    </div>
-  );
+  return <ChallengeSuiteLogo clickable={false} className={className} imageClassName={cn("object-contain", imageClassName)} />;
 }
+
+export { ChallengeSuiteLogo } from "@/components/brand/challenge-suite-logo";
 
 export function planBadgeLabel(planId?: UserPlanId | string | null) {
   switch (planId) {

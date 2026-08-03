@@ -1,3 +1,5 @@
+import { CHALLENGE_SUITE_LOGO_URL, brandConfig } from "@/lib/brand-config";
+
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -118,6 +120,18 @@ export function logEmailDeliveryError(context: string, error: unknown, extra: Re
   });
 }
 
+export function withChallengeSuiteEmailBranding(content: string) {
+  if (content.includes("data-challenge-suite-email-logo")) return content;
+  return `<div style="background:#f7f7f4;color:#171717;font-family:Arial,sans-serif;padding:32px 16px">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e8e5dc;border-radius:12px;overflow:hidden">
+      <div style="padding:24px 28px;border-bottom:1px solid #eee9da">
+        <img data-challenge-suite-email-logo src="${CHALLENGE_SUITE_LOGO_URL}" width="160" alt="${brandConfig.name}" style="display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%" />
+      </div>
+      <div style="padding:28px">${content}</div>
+    </div>
+  </div>`;
+}
+
 export async function sendEmail(message: EmailMessage) {
   const status = getEmailConfigStatus();
   if (status.invalid.length) {
@@ -142,7 +156,7 @@ export async function sendEmail(message: EmailMessage) {
         from: process.env.EMAIL_FROM,
         to: message.to,
         subject: message.subject,
-        html: message.html,
+        html: withChallengeSuiteEmailBranding(message.html),
         text: message.text
       })
     });

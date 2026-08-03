@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { brandConfig } from "@/lib/brand-config";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -13,24 +14,27 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.challengesuite.com"),
   title: { default: "Challenge Suite", template: "%s | Challenge Suite" },
-  description: "Create, enter, vote, and run structured challenges for competitors, creators, Hosts, and brands.",
+  description: brandConfig.description,
   alternates: { canonical: "/" },
-  manifest: "/site.webmanifest",
+  manifest: brandConfig.manifest,
   icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" }, { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+    icon: [{ url: brandConfig.logo.faviconSvg, type: "image/svg+xml" }, { url: brandConfig.logo.favicon, sizes: "any" }, { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" }],
+    shortcut: brandConfig.logo.favicon,
+    apple: [{ url: brandConfig.logo.appleTouchIcon, sizes: "180x180", type: "image/png" }]
   },
   openGraph: {
     type: "website",
     url: "https://www.challengesuite.com",
     siteName: "Challenge Suite",
     title: "Challenge Suite",
-    description: "Competition, made intentional."
+    description: "Competition, made intentional.",
+    images: [{ url: brandConfig.logo.socialCard, width: 1200, height: 630, alt: brandConfig.name }]
   },
   twitter: {
     card: "summary_large_image",
     title: "Challenge Suite",
-    description: "Competition, made intentional."
+    description: "Competition, made intentional.",
+    images: [brandConfig.logo.socialCard]
   }
 };
 

@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { ChevronDown, ChevronRight, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { PUBLIC_LOGO_URL, PUBLIC_MENU } from "@/lib/public-site/config";
+import { PUBLIC_MENU } from "@/lib/public-site/config";
+import { ChallengeSuiteLogo } from "@/components/brand/challenge-suite-logo";
 import { trackPublicEvent } from "@/lib/public-site/analytics";
 type Announcement={message:string;ctaLabel:string;ctaRoute:string}|null;
 const footerGroups=[
@@ -16,7 +16,7 @@ const footerGroups=[
  {label:"Company",items:[["About","/about"],["Terms","/terms"],["Privacy","/privacy"],["Cookies","/cookie-policy"],["Sitemap","/sitemap.xml"]]}
 ] as const;
 function dashboardHref(user:ReturnType<typeof useCurrentUser>["user"]){if(!user)return"/dashboard";if(user.isAdmin)return"/admin";if(user.isSponsor)return"/sponsor/dashboard";if(user.hostOnboardingComplete||user.planId==="host"||user.planId==="enterprise")return"/dashboard/host";return"/dashboard"}
-function PublicLogo({size=40}:{size?:number}){return <Image src={PUBLIC_LOGO_URL} alt="" width={size} height={size} className="shrink-0 rounded-[8px] object-contain" style={{width:size,height:size}}/>}
+function PublicLogo({size=40}:{size?:number}){const named=size<=36?"xs":size<=44?"sm":"md";return <ChallengeSuiteLogo clickable={false} size={named} priority={size>=40} imageClassName="object-contain"/>}
 export function PublicHeader({announcement}: {announcement?:Announcement}){
  const {user}=useCurrentUser(); const [open,setOpen]=useState<string|null>(null);const [drawer,setDrawer]=useState(false);const [expanded,setExpanded]=useState<string|null>(null);const drawerRef=useRef<HTMLDivElement>(null);const signInHref=user?dashboardHref(user):"/auth/login";const signUpHref=user?"/onboarding/account-type":"/auth/register";
  useEffect(()=>{if(!drawer)return;document.body.style.overflow="hidden";const prior=document.activeElement as HTMLElement|null;const node=drawerRef.current;const focusable=()=>Array.from(node?.querySelectorAll<HTMLElement>('button,a[href]')??[]);focusable()[0]?.focus();const key=(event:KeyboardEvent)=>{if(event.key==="Escape")setDrawer(false);if(event.key==="Tab"){const items=focusable(),first=items[0],last=items.at(-1);if(!first||!last)return;if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}};document.addEventListener("keydown",key);return()=>{document.body.style.overflow="";document.removeEventListener("keydown",key);prior?.focus()}},[drawer]);

@@ -5,7 +5,9 @@ import { ArrowLeft, Bell, ChevronRight, Home, Compass, PlusCircle, Wallet, User,
 import type { MobileScreen, MobileTab } from "@/lib/mobile-preview/data";
 import { cn } from "@/lib/utils";
 
-export const logoUrl = "https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg";
+import { brandConfig } from "@/lib/brand-config";
+
+export const logoUrl = brandConfig.logo.local;
 export type SheetState = null | { title: string; body: string; action: string };
 
 export function tabToScreen(tab: MobileTab): MobileScreen {

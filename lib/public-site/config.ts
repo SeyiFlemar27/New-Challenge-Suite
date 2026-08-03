@@ -1,5 +1,6 @@
 import { BriefcaseBusiness, Camera, Code2, Dumbbell, Gamepad2, GraduationCap, Music2, Palette, Shirt, UtensilsCrossed, type LucideIcon } from "lucide-react";
-export const PUBLIC_LOGO_URL = "https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg";
+import { brandConfig } from "@/lib/brand-config";
+export const PUBLIC_LOGO_URL = brandConfig.logo.local;
 export const PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o2/video/upload/v1785625901/14999510_1920_1080_25fps_vvlpn9.mp4";
 export const PUBLIC_HERO_POSTER_URL = "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=82";
 export type PublicCategory = { slug: string; name: string; icon: LucideIcon; description: string; specialties: string[] };
@@ -20,7 +21,7 @@ export const PUBLIC_MENU = [
 {label:"Compete",items:[["How Competing Works","/for-talent#how-it-works"],["Free Challenges","/explore?entry=free"],["Paid-Entry Challenges","/explore?entry=paid"],["Tournaments","/tournaments"],["Live Events","/live-events"],["Private Challenges","/private-exclusive"],["Competition Guidelines","/community-guidelines"]]},
 {label:"Create",items:[["Create Public Challenge","/challenges/create"],["Create Private Challenge","/host/private/create"],["Create Tournament","/host/tournaments/create"],["Create Live Event","/host/live/create"],["Creator Earnings","/earnings"],["Prize Funding","/challenges/create"],["Creator Plans","/subscriptions"]]},
 {label:"Host",items:[["Host Dashboard","/dashboard/host"],["Tournament Management","/host/tournaments"],["Live Event Management","/host/live-events"],["Private Competitions","/host/private"],["Host Plans","/subscriptions"],["Host Resources","/community-guidelines"]]},
-{label:"Sponsors",items:[["Sponsorship Opportunities","/explore?sponsorReady=true"],["Sponsor a Challenge","/sponsor/campaigns"],["Brand Campaigns","/sponsor/dashboard"],["Sponsor Plans","/sponsor/plans"],["Sponsor Guidelines","/community-guidelines"],["Sponsor Onboarding","/sponsor/onboarding"]]}
+{label:"Sponsors",items:[["Sponsorship Opportunities","/explore?sponsorReady=true"],["Sponsor a Challenge","/sponsor/start"],["Brand Campaigns","/sponsor/start"],["Sponsor Plans","/sponsor/plans"],["Sponsor Guidelines","/community-guidelines"],["Sponsor Onboarding","/sponsor/start"]]}
 ] as const;
 export const DEFAULT_PUBLIC_CONTENT = {
 announcement:{enabled:true,message:"You've got skills, compete with other talents and monetize it.",ctaLabel:"Get Started",ctaRoute:"/for-talent",status:"published",priority:0,startAt:null as string|null,endAt:null as string|null,audience:"all",loggedInState:"all",roles:[] as string[],plans:[] as string[]},

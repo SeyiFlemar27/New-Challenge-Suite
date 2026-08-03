@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
 const config=read("lib/public-site/config.ts");
-assert(config.includes("v1775267495/logo-gold_chstxw.jpg"));
+const brand=read("lib/brand-config.ts");
+assert(config.includes("brandConfig.logo.local"));
+assert(brand.includes("challenge-suite-logo-transparent_oq72ds.png"));
+assert(brand.includes("/brand/challenge-suite-logo.png"));
+assert(!brand.includes("v1775267495/logo-gold_chstxw.jpg"));
 assert(!config.includes("v1777874432/1663858817367_1_w7mmz0.avif"));
 console.log("public logo uses approved gold asset: ok");
