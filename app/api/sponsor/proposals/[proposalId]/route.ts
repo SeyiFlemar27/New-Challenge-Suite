@@ -2,7 +2,7 @@ import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/spons
 import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 import { fail } from "@/lib/server/responses";
-import { cleanMoneyCents, cleanText, isoNow, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
+import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ function patchPayload(body: Record<string, unknown>, sponsorId: string, now: str
     currency: cleanText(body.currency ?? existing.currency, "USD").slice(0, 12),
     startDate: cleanText(body.startDate ?? existing.startDate).slice(0, 40),
     endDate: cleanText(body.endDate ?? existing.endDate).slice(0, 40),
-    deliverables: body.deliverables === undefined ? Array.isArray(existing.deliverables) ? existing.deliverables : [] : safeArray(body.deliverables),
+    deliverables: body.deliverables === undefined ? normalizeProposalDeliverables(existing.deliverables) : normalizeProposalDeliverables(body.deliverables),
     paymentPreference: cleanText(body.paymentPreference ?? existing.paymentPreference, "milestone_payment").slice(0, 120),
     brandRequirements: cleanText(body.brandRequirements ?? existing.brandRequirements).slice(0, 1200),
     notesToCreator: cleanText(body.notesToCreator ?? existing.notesToCreator).slice(0, 1600),

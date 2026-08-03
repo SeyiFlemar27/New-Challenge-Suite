@@ -115,7 +115,7 @@ export function sponsorGateCopy(status: SponsorReviewStatus, subscriptionStatus:
       title: "Sponsor access is restricted",
       description: "Your sponsor access is restricted. Contact support before using sponsor tools.",
       primaryActionLabel: "Contact Support",
-      primaryActionHref: "/sponsor/messages"
+      primaryActionHref: "/sponsor/support"
     };
   }
   if (sponsorIsApproved(status) && !hasActiveSponsorSubscription(subscriptionStatus)) {

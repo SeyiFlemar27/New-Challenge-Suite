@@ -35,7 +35,10 @@ export async function POST(request: Request) {
       recipientId,
       source,
       body,
-      relatedChallengeId: String(parsed.body?.challengeId ?? "").slice(0, 160) || null
+      relatedChallengeId: String(parsed.body?.challengeId ?? "").slice(0, 160) || null,
+      relatedProposalId: String(parsed.body?.proposalId ?? "").slice(0, 160) || null,
+      relatedCampaignId: String(parsed.body?.campaignId ?? "").slice(0, 160) || null,
+      attachments: parsed.body?.attachments
     });
     return ok(result, body ? "Message sent." : "Conversation ready.");
   } catch (error) {

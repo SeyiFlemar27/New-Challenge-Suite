@@ -69,7 +69,7 @@ const guestSections: NavSection[] = [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/live-events", label: "Live Events", icon: Radio },
     { href: "/tournaments", label: "Tournaments", icon: Award },
-    { href: "/sponsor/onboarding", label: "Sponsors", icon: ShieldCheck }
+    { href: "/sponsor/start", label: "Sponsors", icon: ShieldCheck }
   ] },
   { label: "Account", items: [
     { href: "/auth/login", label: "Sign In", icon: LogIn },
@@ -302,7 +302,7 @@ export function Sidebar() {
           <div className="mt-6 border-t border-white/10 pt-5">
             {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
               <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
-              {user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
+              {user?.accountType !== "sponsor" ? <Link href="/sponsor/start" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
             </>}
           </div>
         </aside>
@@ -319,7 +319,7 @@ export function Sidebar() {
         <div className="space-y-3 p-5">
           <Link href="/dorocoins" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
           <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
-          {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/onboarding" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
+          {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
     </>

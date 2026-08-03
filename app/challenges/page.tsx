@@ -10,6 +10,7 @@ import { fetchDashboard } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
+import { OwnedChallengeActionsMenu } from "@/components/challenge/owned-challenge-actions-menu";
 
 type ManagementState = "active" | "pending_review" | "requires_changes" | "scheduled" | "draft" | "completed" | "cancelled";
 const tabs: Array<{ id: ManagementState; label: string; empty: string }> = [
@@ -99,9 +100,9 @@ function OwnedChallengeCard({ challenge, state }: { challenge: Record<string, un
         <h2 className="mt-4 line-clamp-2 text-xl font-black">{String(challenge.title ?? "") || "Untitled Challenge"}</h2>
         <p className="mt-2 line-clamp-2 flex-1 text-sm leading-6 text-slate-300">{String(challenge.description ?? "") || (state === "draft" ? "Draft details are still being completed." : "")}</p>
         {state === "draft" ? <div className="mt-5 rounded-[8px] bg-black/30 p-4"><div className="flex items-center justify-between text-sm font-bold"><span>Progress</span><span>{progress}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--gold)]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-xs text-slate-400">Next: {nextIncomplete}</p>{lastEdited ? <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Clock3 size={13} /> Last edited {new Date(lastEdited).toLocaleDateString()}</p> : null}</div> : <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2"><span className="flex items-center gap-2"><Users size={16} className="text-[var(--gold)]" /> {participants.toLocaleString()} participants</span><span className="flex items-center gap-2"><CalendarDays size={16} className="text-[var(--gold)]" /> {submissions.toLocaleString()} entries</span></div>}
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {state === "draft" ? <LinkButton href={`/challenges/create/${id}`} className="w-full"><PencilLine size={16} /> Continue Editing</LinkButton> : <LinkButton href={`/challenges/${id}`} className="w-full">View Challenge</LinkButton>}
-          {state === "draft" ? <LinkButton href={`/challenges/${id}`} variant="secondary" className="w-full">Preview Draft</LinkButton> : <div className="grid gap-3"><LinkButton href={`/challenges/${id}/entry-requests`} variant="secondary" className="w-full">Entry Requests</LinkButton><LinkButton href={`/challenges/${id}/propose-winners`} variant="secondary" className="w-full">Propose Winners</LinkButton></div>}
+        <div className="mt-5 flex items-center gap-3">
+          {state === "draft" ? <LinkButton href={`/challenges/create/${id}`} className="min-w-0 flex-1"><PencilLine size={16} /> Continue Editing</LinkButton> : <LinkButton href={`/challenges/${id}`} className="min-w-0 flex-1">View Challenge</LinkButton>}
+          <OwnedChallengeActionsMenu challengeId={id} draft={state === "draft"} />
         </div>
       </div>
     </Card>

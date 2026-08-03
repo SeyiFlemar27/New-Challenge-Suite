@@ -6,6 +6,7 @@ export const MESSAGE_START_SOURCES = ["profile", "challenge", "opportunity", "in
 export type MessageStartSource = (typeof MESSAGE_START_SOURCES)[number];
 
 type StoredRecord = Record<string, unknown> & { id: string };
+type MessageAttachment = { url: string; path: string; fileName: string | null; contentType: string; size: number | null };
 
 function cleanText(value: unknown, max = 2000) {
   if (typeof value !== "string") return "";
@@ -15,6 +16,20 @@ function cleanText(value: unknown, max = 2000) {
 function stringList(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim());
+}
+
+function safeAttachments(value: unknown): MessageAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 4).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const url = cleanText(record.url, 800);
+    const path = cleanText(record.path, 500);
+    const contentType = cleanText(record.contentType, 120).toLowerCase();
+    const supported = contentType.startsWith("image/") || ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"].includes(contentType);
+    if (!url.startsWith("https://") || !path || !supported) return [];
+    return [{ url, path, contentType, fileName: cleanText(record.fileName, 180) || null, size: Number.isFinite(Number(record.size)) ? Number(record.size) : null }];
+  });
 }
 
 function blockedIds(profile: Record<string, unknown>) {
@@ -99,6 +114,9 @@ export async function startConversation(db: Firestore, input: {
   source: MessageStartSource;
   body: string;
   relatedChallengeId?: string | null;
+  relatedProposalId?: string | null;
+  relatedCampaignId?: string | null;
+  attachments?: unknown;
 }) {
   if (!MESSAGE_START_SOURCES.includes(input.source) || input.source === "existing_conversation") {
     throw messageError("INVALID_MESSAGE_SOURCE", "Open messaging from a member profile, challenge, invite, or discovery page.");
@@ -114,6 +132,8 @@ export async function startConversation(db: Firestore, input: {
       participantIds: [input.senderId, input.recipientId].sort(),
       source: input.source,
       relatedChallengeId: cleanText(input.relatedChallengeId, 160) || null,
+      relatedProposalId: cleanText(input.relatedProposalId, 160) || null,
+      relatedCampaignId: cleanText(input.relatedCampaignId, 160) || null,
       status: "active",
       unreadUserIds: [],
       createdAt: now,
@@ -121,11 +141,11 @@ export async function startConversation(db: Firestore, input: {
       createdBy: input.senderId
     });
   }
-  const message = input.body ? await sendMessage(db, { conversationId, senderId: input.senderId, body: input.body }) : null;
+  const message = input.body ? await sendMessage(db, { conversationId, senderId: input.senderId, body: input.body, attachments: input.attachments }) : null;
   return { conversationId, participants, message };
 }
 
-export async function sendMessage(db: Firestore, input: { conversationId: string; senderId: string; body: string; idempotencyKey?: string | null }) {
+export async function sendMessage(db: Firestore, input: { conversationId: string; senderId: string; body: string; attachments?: unknown; idempotencyKey?: string | null }) {
   const body = cleanText(input.body, 2000);
   if (body.length < 1) throw messageError("MESSAGE_REQUIRED", "Write a message before sending.");
   const conversation = await getConversation(db, input.conversationId, input.senderId);
@@ -139,12 +159,14 @@ export async function sendMessage(db: Firestore, input: { conversationId: string
   const messageRef = db.collection("messages").doc(messageId);
   const conversationRef = db.collection("conversations").doc(input.conversationId);
   const now = new Date().toISOString();
+  const attachments = safeAttachments(input.attachments);
   const message = {
     id: messageId,
     conversationId: input.conversationId,
     senderId: input.senderId,
     recipientId,
     body,
+    attachments,
     status: "sent",
     readBy: [input.senderId],
     createdAt: now,

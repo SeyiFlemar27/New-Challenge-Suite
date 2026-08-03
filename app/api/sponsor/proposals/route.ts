@@ -1,13 +1,13 @@
 import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
-import { cleanMoneyCents, cleanText, isoNow, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
+import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
 
 function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: string, existing: Record<string, unknown> = {}) {
   const status = normalizeProposalStatus(body.status ?? existing.status ?? "draft");
-  const deliverables = safeArray(body.deliverables).length ? safeArray(body.deliverables) : Array.isArray(existing.deliverables) ? existing.deliverables : [];
+  const deliverables = body.deliverables === undefined ? normalizeProposalDeliverables(existing.deliverables) : normalizeProposalDeliverables(body.deliverables);
   return {
     sponsorId,
     ownerUid: sponsorId,
@@ -62,6 +62,11 @@ export async function POST(request: Request) {
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   if (cleanText(body.title ?? body.proposalTitle).length < 3) return validationError({ title: "Proposal title is required." });
   const requestedStatus = normalizeProposalStatus(body.status ?? "draft");
+  if (requestedStatus !== "draft") {
+    if (!cleanText(body.creatorId ?? body.linkedCreatorId) && !cleanText(body.challengeId ?? body.linkedChallengeId)) return validationError({ recipient: "Select an eligible creator or challenge opportunity." });
+    if (cleanMoneyCents(body.budget ?? body.proposedBudget) <= 0) return validationError({ budget: "Enter a valid proposed budget." });
+    if (!normalizeProposalDeliverables(body.deliverables).length) return validationError({ deliverables: "Add at least one deliverable." });
+  }
   const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
   if (requestedStatus !== "draft" && !workspace.canSendProposal) return fail(workspace.lockedReason || "Sponsor approval and an active plan are required before sending proposals.", 403, { sponsorStatus: workspace.status }, "SPONSOR_PROPOSAL_LOCKED");
   try {

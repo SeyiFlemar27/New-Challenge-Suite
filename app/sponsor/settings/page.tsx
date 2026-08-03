@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Bell, CreditCard, LockKeyhole, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
+import { AlertTriangle, Bell, CreditCard, LockKeyhole, Palette, Settings, ShieldCheck, Users } from "lucide-react";
 import { Card, LinkButton } from "@/components/ui";
 import { SponsorShell } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
@@ -25,6 +25,7 @@ const sections = [
   { title: "Billing & Payment", body: "Review your current plan, payment readiness, sponsor funds, invoices, and billing history.", icon: CreditCard, href: "/sponsor/billing" },
   { title: "Team", body: "Manage team access only when the active sponsor plan supports team seats.", icon: Users, href: "/sponsor/team" },
   { title: "Notifications", body: "Choose campaign, proposal, review, billing, and support notification preferences.", icon: Bell, href: "/sponsor/notifications" },
+  { title: "Appearance", body: "Choose the system, light, or dark display preference for signed-in workspaces.", icon: Palette, href: "/settings/appearance" },
   { title: "Security", body: "Review account protection and access controls for sensitive sponsor actions.", icon: LockKeyhole },
   { title: "Privacy", body: "Control sponsor profile and brand asset visibility without exposing private records.", icon: ShieldCheck }
 ];

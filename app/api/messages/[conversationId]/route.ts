@@ -35,6 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
       conversationId,
       senderId: user.uid,
       body: String(parsed.body?.body ?? ""),
+      attachments: parsed.body?.attachments,
       idempotencyKey: request.headers.get("idempotency-key")
     });
     return ok({ message }, message.duplicate ? "Message already recorded." : "Message sent.");

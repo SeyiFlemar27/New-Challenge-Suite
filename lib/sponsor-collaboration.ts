@@ -15,5 +15,20 @@ export function normalizeDeliverableStatus(value: unknown): DeliverableStatus { 
 export function normalizeApprovalStatus(value: unknown): ApprovalStatus { return approvalStatuses.includes(value as ApprovalStatus) ? value as ApprovalStatus : "pending"; }
 export function cleanText(value: unknown, fallback = "") { return String(value ?? fallback).trim().slice(0, 2400); }
 export function safeArray(value: unknown) { if (Array.isArray(value)) return value.map((item) => cleanText(item).slice(0, 180)).filter(Boolean).slice(0, 30); if (typeof value === "string") return value.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 30); return []; }
+export function normalizeProposalDeliverables(value: unknown) {
+  if (!Array.isArray(value)) return typeof value === "string" ? safeArray(value).map((title, index) => ({ id: `deliverable_${index + 1}`, title, description: "", dueDate: "", required: true, attachment: null })) : [];
+  return value.slice(0, 20).flatMap((item, index) => {
+    if (typeof item === "string") return item.trim() ? [{ id: `deliverable_${index + 1}`, title: cleanText(item).slice(0, 180), description: "", dueDate: "", required: true, attachment: null }] : [];
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const title = cleanText(record.title ?? record.name).slice(0, 180);
+    if (!title) return [];
+    const attachmentRecord = record.attachment && typeof record.attachment === "object" ? record.attachment as Record<string, unknown> : null;
+    const attachment = attachmentRecord && cleanText(attachmentRecord.url).startsWith("https://") && cleanText(attachmentRecord.path)
+      ? { url: cleanText(attachmentRecord.url).slice(0, 800), path: cleanText(attachmentRecord.path).slice(0, 500), fileName: cleanText(attachmentRecord.fileName).slice(0, 180) || null, contentType: cleanText(attachmentRecord.contentType).slice(0, 120) || null }
+      : null;
+    return [{ id: cleanText(record.id, `deliverable_${index + 1}`).slice(0, 80), title, description: cleanText(record.description).slice(0, 800), dueDate: cleanText(record.dueDate).slice(0, 40), required: record.required !== false, attachment }];
+  });
+}
 export function cleanMoneyCents(value: unknown) { const numeric = Number(value ?? 0); return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 100) : 0; }
 export function isoNow() { return new Date().toISOString(); }

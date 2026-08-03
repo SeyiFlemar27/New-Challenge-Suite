@@ -41,7 +41,8 @@ export function runSponsorWorkspaceContract(name) {
       for (const route of ["app/sponsor/dashboard/page.tsx", "app/sponsor/onboarding/page.tsx", "app/sponsor/campaigns/page.tsx", "app/sponsor/discover/page.tsx", "app/sponsor/proposals/page.tsx", "app/sponsor/billing/page.tsx", "app/sponsor/reports/page.tsx", "app/sponsor/settings/page.tsx", "app/sponsor/support/page.tsx"]) assert(exists(route), `Missing sponsor route: ${route}`);
       break;
     case "sidebar-simplified":
-      hasAll(source.shell, ["Overview", "Campaigns", "Discover", "Proposals", "Inbox", "Billing & Plan", "Reports", "Settings", "Support", "Complete Profile"], "Sponsor navigation missing item");
+      hasAll(source.shell, ["Overview", "Campaigns", "Discover", "Proposals", "Billing & Plan", "Reports", "Settings", "Support", "Complete Profile"], "Sponsor navigation missing item");
+      assert(!source.shell.includes('label: "Inbox"'), "Sponsor navigation must use the global message entry point instead of a separate Inbox item.");
       assert(!source.shell.includes('label: "Assets"') && !source.shell.includes('label: "Team"'), "Primary sponsor navigation must stay simplified.");
       break;
     case "no-dorocoin-navigation":

@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if (!context) return serverError("Sponsor access could not be verified.");
   const { db, user, sponsorProfile: sponsor } = context;
   try {
-    const [activitySnap, notificationsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap, conversationsSnap] = await Promise.all([
+    const widgetNames = ["activity", "notifications", "campaigns", "proposals", "funding", "deliverables", "messages"] as const;
+    const results = await Promise.allSettled([
       db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorCampaignBriefs").where("sponsorId", "==", user.uid).limit(100).get(),
@@ -19,15 +20,34 @@ export async function GET(request: Request) {
       db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", user.uid).limit(100).get(),
       db.collection("sponsorConversations").where("sponsorId", "==", user.uid).limit(100).get()
     ]);
-    const campaigns = campaignsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const proposals = proposalsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const contributions: Array<Record<string, unknown> & { id: string }> = contributionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const widgetErrors: Record<string, string> = {};
+    const docs = (index: number) => {
+      const result = results[index];
+      if (result.status === "fulfilled") return result.value.docs;
+      widgetErrors[widgetNames[index]] = "This section could not be loaded. Retry the overview to check again.";
+      console.error("[sponsor-dashboard:widget]", { userId: user.uid, widget: widgetNames[index], message: result.reason instanceof Error ? result.reason.message : String(result.reason) });
+      return [];
+    };
+    const activityDocs = docs(0);
+    const notificationDocs = docs(1);
+    const campaignDocs = docs(2);
+    const proposalDocs = docs(3);
+    const contributionDocs = docs(4);
+    const deliverableDocs = docs(5);
+    const conversationDocs = docs(6);
+    const campaigns = campaignDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const proposals = proposalDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const contributions: Array<Record<string, unknown> & { id: string }> = contributionDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const challengeIds = [...new Set(contributions.map((item) => String(item.challengeId ?? "")).filter(Boolean))].slice(0, 100);
-    const challengeSnaps = challengeIds.length ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id))) : [];
+    const challengeSnaps = challengeIds.length ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id))).catch((error) => {
+      widgetErrors.funding = "Funding context could not be loaded. Retry the overview to check again.";
+      console.error("[sponsor-dashboard:funding-context]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
+      return [];
+    }) : [];
     const challenges = new Map(challengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
-    const settlementSnaps = await Promise.all(challengeIds.slice(0, 50).map((id) =>
-      db.collection("challengeSettlements").where("challengeId", "==", id).limit(5).get()
-    ));
+    const settlementResults = await Promise.allSettled(challengeIds.slice(0, 50).map((id) => db.collection("challengeSettlements").where("challengeId", "==", id).limit(5).get()));
+    const settlementSnaps = settlementResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    if (settlementResults.some((result) => result.status === "rejected")) widgetErrors.funding = "Some funding details could not be loaded. Retry the overview to check again.";
     const settlements = new Map<string, Record<string, unknown>>();
     for (const snap of settlementSnaps) {
       for (const doc of snap.docs) {
@@ -41,7 +61,7 @@ export async function GET(request: Request) {
       campaigns,
       proposals,
       contributions,
-      deliverables: deliverablesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      deliverables: deliverableDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
       challenges,
       settlements
     });
@@ -50,12 +70,13 @@ export async function GET(request: Request) {
       campaigns,
       proposals,
       ...reporting,
-      activity: activitySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      notifications: notificationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      activity: activityDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      notifications: notificationDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      widgetErrors,
       workspaceSignals: {
-        hasConversations: !conversationsSnap.empty,
-        conversationCount: conversationsSnap.size,
-        unreadMessageCount: conversationsSnap.docs.reduce((total, doc) => total + Number(doc.data().unreadCount ?? 0), 0),
+        hasConversations: conversationDocs.length > 0,
+        conversationCount: conversationDocs.length,
+        unreadMessageCount: conversationDocs.reduce((total, doc) => total + Number(doc.data().unreadCount ?? 0), 0),
         hasReportableData: campaigns.length > 0 || proposals.length > 0 || contributions.length > 0
       }
     }, "Sponsor dashboard loaded.");

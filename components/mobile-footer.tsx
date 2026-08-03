@@ -5,7 +5,7 @@ const footerSections = [
   { title: "Explore", links: [["Explore challenges", "/explore"], ["Live events", "/live-events"], ["Tournaments", "/tournaments"]] },
   { title: "Challenges", links: [["All challenges", "/challenges"], ["My entries", "/my-entries"], ["Winners", "/winners"]] },
   { title: "Creators", links: [["Profiles", "/profile"], ["Leaderboards", "/leaderboards"], ["Create a challenge", "/challenges/create"]] },
-  { title: "Sponsors", links: [["Sponsor onboarding", "/sponsor/onboarding"], ["Discover challenges", "/sponsor/discover/challenges"], ["Sponsor plans", "/sponsor/plans"]] },
+  { title: "Sponsors", links: [["Become a sponsor", "/sponsor/start"], ["Discover challenges", "/sponsor/discover/challenges"], ["Sponsor plans", "/sponsor/plans"]] },
   { title: "Company", links: [["About", "/about"], ["Contact", "/contact"], ["Enterprise", "/enterprise"]] },
   { title: "Support", links: [["Contact support", "/contact"], ["Community guidelines", "/community-guidelines"], ["Refund policy", "/refund-policy"]] },
   { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookie policy", "/cookie-policy"]] }

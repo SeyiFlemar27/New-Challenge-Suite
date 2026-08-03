@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { BarChart3, CreditCard, Handshake, LayoutDashboard, LifeBuoy, LockKeyhole, Megaphone, Menu, MessageSquare, Search, Settings, UserRoundCheck, X } from "lucide-react";
+import { BarChart3, CreditCard, Handshake, LayoutDashboard, LifeBuoy, LockKeyhole, Megaphone, Menu, Search, Settings, UserRoundCheck, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { ProductWalkthrough } from "@/components/product-walkthrough";
 import { Card } from "@/components/ui";
@@ -54,7 +54,6 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
 
   const items = useMemo<NavItem[]>(() => {
     if (!workspace.approved) return [
-      { label: "Overview", href: "/sponsor/dashboard", icon: LayoutDashboard, available: true },
       { label: "Complete Profile", href: "/sponsor/onboarding", icon: UserRoundCheck, available: true },
       { label: "Billing & Plan", href: "/sponsor/billing", icon: CreditCard, available: true },
       { label: "Support", href: "/sponsor/support", icon: LifeBuoy, available: true },
@@ -66,9 +65,8 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
       { label: "Discover", href: "/sponsor/discover", icon: Search, available: workspace.canDiscover, lockedReason: workspace.lockedReason },
       { label: "Proposals", href: "/sponsor/proposals", icon: Handshake, available: workspace.canSendProposal, lockedReason: workspace.lockedReason }
     ];
-    if (workspace.hasConversations) approvedItems.push({ label: "Inbox", href: "/sponsor/messages", icon: MessageSquare, available: true });
     approvedItems.push({ label: "Billing & Plan", href: "/sponsor/billing", icon: CreditCard, available: true });
-    if (workspace.hasReportableData) approvedItems.push({ label: "Reports", href: "/sponsor/reports", icon: BarChart3, available: true });
+    approvedItems.push({ label: "Reports", href: "/sponsor/reports", icon: BarChart3, available: true });
     approvedItems.push(
       { label: "Settings", href: "/sponsor/settings", icon: Settings, available: true },
       { label: "Support", href: "/sponsor/support", icon: LifeBuoy, available: true }
