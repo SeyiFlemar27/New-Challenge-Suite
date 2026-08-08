@@ -317,7 +317,7 @@ export function Sidebar() {
           <NavigationSections sections={sections} activeHref={activeHref} />
         </nav>
         <div className="space-y-3 p-5">
-          <Link href="/dorocoins" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-2 text-xs font-black text-[var(--gold)]"><Coins size={15} /> {loading ? "..." : user?.doroBalance ?? 0} DoroCoins</Link>
+          <Link href="/dorocoins" aria-label="Open DoroCoin wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins</Link>
           <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
           {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
