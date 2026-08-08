@@ -1,7 +1,9 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser, requireRequestUser } from "@/lib/server/auth";
+import { requireRecentAdminAuthentication, requireRequestUser } from "@/lib/server/auth";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { fail, ok, serverError, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
+import { writeAuditLog } from "@/lib/server/audit";
+import { ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
 
 type TransactionQueryError = Error & {
   queryName?: "transactions";
@@ -81,11 +83,8 @@ export async function POST(request: Request) {
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body;
-  const type = body.type ?? "adjustment";
-  const validTypes = ["purchase", "admin_grant", "vote_spend", "boost_spend", "reward", "adjustment"];
-  if (!validTypes.includes(type)) return validationError({ type: `Type must be one of: ${validTypes.join(", ")}.` });
-  const isAdminGrant = type === "admin_grant";
-  const authResult = isAdminGrant ? await requireAdminUser(request) : await requireRequestUser(request);
+  const type = body.type === "reversal" ? "reversal" : "adjustment";
+  const authResult = await requireRecentAdminAuthentication(request, "wallet.adjust");
   if (authResult.response) return authResult.response;
 
   const user = authResult.user!;
@@ -95,19 +94,27 @@ export async function POST(request: Request) {
   const fieldErrors: Record<string, string> = {};
   const amount = Number(body.amount);
   if (!Number.isFinite(amount) || amount === 0) fieldErrors.amount = "Amount must be a non-zero number.";
-  if (isAdminGrant && !body.userId) fieldErrors.userId = "Target user ID is required for admin grants.";
+  const reason = String(body.reason ?? body.description ?? "").trim();
+  if (!body.userId) fieldErrors.userId = "Target user ID is required for an admin adjustment.";
+  if (reason.length < 8) fieldErrors.reason = "A meaningful adjustment reason of at least 8 characters is required.";
   if (Object.keys(fieldErrors).length) return validationError(fieldErrors);
 
-  const targetUserId = isAdminGrant ? body.userId : user.uid;
+  const targetUserId = String(body.userId);
   try {
     const record = await applyDoroCoinTransaction(db, {
       userId: targetUserId,
       amount,
       type,
-      description: body.description ?? "DoroCoin transaction",
+      description: reason,
       sourceId: body.sourceId,
-      createdBy: user.uid
+      createdBy: user.uid,
+      sourceType: type === "reversal" ? "admin_reversal" : amount > 0 ? "admin_credit" : "admin_debit",
+      relatedUserId: targetUserId,
+      ruleVersion: ECONOMY_V1_RULE_VERSION,
+      idempotencyKey: String(body.idempotencyKey ?? `admin_dorocoin_${user.uid}_${targetUserId}_${Date.now()}`),
+      auditMetadata: { relatedAdminId: user.uid, reason }
     });
+    await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "economy.dorocoin_adjusted", targetType: "account", targetId: targetUserId, reason, after: { amount, transactionId: record.id, ruleVersion: ECONOMY_V1_RULE_VERSION } }, db);
     return ok({ transaction: record }, "DoroCoin transaction recorded.");
   } catch (error) {
     return fail(error instanceof Error ? error.message : "DoroCoin transaction could not be recorded.", 409, undefined, "WALLET_TRANSACTION_REJECTED");

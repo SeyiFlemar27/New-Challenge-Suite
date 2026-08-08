@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
+import { applyChallengeCreditTransaction } from "@/lib/server/challenge-credits";
 import { deterministicId } from "@/lib/server/idempotency";
 import { awardDoroCoinPurchaseRewards } from "@/lib/server/rewards";
 import {
@@ -177,10 +178,19 @@ export async function POST(request: Request) {
             sourceId: session.id,
             transactionId: deterministicId("stripe_session", session.id, "dorocoin_purchase"),
             idempotencyKey: event.id,
-            createdBy: "stripe"
+            createdBy: "stripe",
+            sourceType: "purchase",
+            ruleVersion: session.metadata.ruleVersion
           });
+          await db.collection("doroCoinPurchases").doc(deterministicId("dorocoin_purchase", session.id)).set({ status: "confirmed", balanceCredited: true, providerPaymentIntentId: objectId(session.payment_intent), confirmedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ledgerTransactionId: transaction.id }, { merge: true });
           const reward = await awardDoroCoinPurchaseRewards(db, { userId: session.metadata.userId, coins: Number(session.metadata.coins), sourceId: session.id, eventId: event.id });
           outcome = { handled: true, kind: "dorocoin_purchase", transactionId: transaction.id, rewardPointsAwarded: reward.pointsAwarded, rewardSpinCreditsAwarded: reward.spinCreditsAwarded };
+        } else if (session.metadata?.type === "challenge_credit_purchase") {
+          if (session.mode !== "payment" || session.payment_status !== "paid" || !session.metadata.userId || !session.metadata.credits) throw new Error("Stripe Challenge Credit purchase is not provider-confirmed.");
+          const purchaseId = deterministicId("challenge_credit_purchase", session.id);
+          const transaction = await applyChallengeCreditTransaction(db, { userId: session.metadata.userId, amount: Number(session.metadata.credits), sourceType: "purchase", reason: `Purchased ${session.metadata.credits} Challenge Credits`, createdBy: "stripe", idempotencyKey: purchaseId, relatedPaymentId: session.id, ruleVersion: session.metadata.ruleVersion });
+          await db.collection("challengeCreditPurchases").doc(purchaseId).set({ status: "confirmed", balanceCredited: true, providerPaymentIntentId: objectId(session.payment_intent), confirmedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ledgerTransactionId: transaction.id }, { merge: true });
+          outcome = { handled: true, kind: "challenge_credit_purchase", purchaseId, transactionId: transaction.id };
         } else if (session.mode === "subscription") {
           outcome = await processSubscriptionCheckout(stripe, db, event, session);
         }

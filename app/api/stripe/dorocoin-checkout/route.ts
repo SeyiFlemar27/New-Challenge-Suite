@@ -2,8 +2,9 @@ import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
-import { isStripeDevMockEnabled, stripeDevMockCheckout } from "@/lib/server/stripe-dev";
 import { quoteCustomDoroCoinPurchase } from "@/lib/dorocoin-purchase";
+import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { deterministicId } from "@/lib/server/idempotency";
 
 function getDoroCoinPriceEnvCandidates(pack: Record<string, unknown>, packageId: string, coins: number) {
   return [
@@ -53,12 +54,9 @@ export async function POST(request: Request) {
   const missing = !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID";
   if (!stripe || (!customCoins && !priceConfig.priceId)) {
     const details = { missing, acceptedPriceEnvs: priceConfig.envCandidates, configuredPriceEnv: priceConfig.configuredEnv };
-    if (isStripeDevMockEnabled()) {
-      const payload = stripeDevMockCheckout({ kind: "dorocoin", targetUrl: `/dorocoins?checkout=mock-success&coins=${encodeURIComponent(String(coins))}`, label: `${coins} DoroCoins` });
-      return ok({ ...payload, packageId: packageId || null, coins, amountUsd, ...details }, payload.message);
-    }
     return fail("Stripe DoroCoin checkout is not configured.", 503, details, "PAYMENT_CONFIGURATION_ERROR");
   }
+  const economyRules = await getActiveEconomyRules(db);
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -67,7 +65,9 @@ export async function POST(request: Request) {
       : [{ price: priceConfig.priceId!, quantity: 1 }],
     success_url: `${origin}/checkout/dorocoins/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel`,
-    metadata: { type: "dorocoin_purchase", paymentPurpose: "dorocoin_purchase", packageId, customCoins: customCoins || customQuote ? "true" : "false", userId: user.uid, coins: String(coins) }
+    metadata: { type: "dorocoin_purchase", paymentPurpose: "dorocoin_purchase", packageId, customCoins: customCoins || customQuote ? "true" : "false", userId: user.uid, coins: String(coins), ruleVersion: economyRules.version }
   });
-  return ok({ url: session.url }, "Stripe DoroCoin checkout session created.");
+  const purchaseId = deterministicId("dorocoin_purchase", session.id);
+  await db.collection("doroCoinPurchases").doc(purchaseId).set({ id: purchaseId, userId: user.uid, packageId: packageId || null, coins, amountCents: Math.round(amountUsd * 100), currency: "USD", provider: "stripe", providerSessionId: session.id, status: "pending_payment", ruleVersion: economyRules.version, balanceCredited: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  return ok({ url: session.url, purchaseId, status: "pending_payment" }, "Stripe DoroCoin checkout session created. DoroCoins are credited only after provider confirmation.");
 }
