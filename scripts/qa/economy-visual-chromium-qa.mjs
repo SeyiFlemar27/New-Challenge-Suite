@@ -9,7 +9,7 @@ const authenticatedRoutes = {
   sponsor: { vars: ["ECONOMY_QA_SPONSOR_EMAIL", "ECONOMY_QA_SPONSOR_PASSWORD"], routes: ["/sponsor/dashboard", "/sponsor/campaigns"] },
   admin: { vars: ["ECONOMY_QA_ADMIN_EMAIL", "ECONOMY_QA_ADMIN_PASSWORD"], routes: ["/admin/developer-tools/economy-rules"] }
 };
-const viewports = [{ name: "mobile", width: 390, height: 844 }, { name: "desktop", width: 1440, height: 900 }];
+const viewports = [{ name: "mobile", width: 390, height: 844 }, { name: "tablet", width: 768, height: 1024 }, { name: "desktop", width: 1440, height: 900 }];
 const results = [];
 const systemChromiumCandidates = [process.env.ECONOMY_QA_CHROMIUM_EXECUTABLE, "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", "/usr/bin/chromium", "/usr/bin/google-chrome"].filter(Boolean);
 const executablePath = systemChromiumCandidates.find((path) => existsSync(path));
@@ -22,7 +22,8 @@ async function inspect(context, route, viewport, authState = "public") {
   page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("/_next/webpack-hmr")) issues.push(`console:${message.text().slice(0, 180)}`); });
   page.on("pageerror", (error) => issues.push(`pageerror:${error.message.slice(0, 180)}`));
   page.on("requestfailed", (request) => issues.push(`network:${new URL(request.url()).pathname}`));
-  const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle" });
+  const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.waitForTimeout(1_500);
   const body = await page.locator("body").innerText();
   const authRequired = /Restoring your session|Log in to continue|Sign in to continue/i.test(body) || new URL(page.url()).pathname.startsWith("/auth/login");
   if (!response || response.status() >= 500 || /Internal Server Error|Application error|__next_error__/i.test(body)) issues.push("server-error-marker");
