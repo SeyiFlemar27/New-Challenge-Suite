@@ -21,7 +21,7 @@ function requestedReturnPath() {
 export default function RegisterPage() {
   const router = useRouter();
   const [accepted, setAccepted] = useState({ terms: false, privacy: false, community: false });
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "", referralCode: typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("ref") ?? "" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -56,7 +56,8 @@ export default function RegisterPage() {
         lastName: form.lastName,
         email: form.email,
         password: form.password,
-        role: "user"
+        role: "user",
+        referralCode: form.referralCode.trim() || undefined
       });
       localStorage.setItem("challenge_suite_signup_email", form.email);
       localStorage.setItem("challenge_suite_auth_mode", result.mode);
@@ -80,6 +81,7 @@ export default function RegisterPage() {
             <Field label="Last Name"><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder="Last name" /></Field>
           </div>
           <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
+          <Field label="Referral code (optional)"><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder="Referral code" autoComplete="off" /></Field>
           <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.</Card>
           <PasswordField label="Password" shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
           <PasswordField label="Confirm Password" shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />

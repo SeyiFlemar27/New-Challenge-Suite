@@ -14,13 +14,18 @@ const rewardDailyCaps: Partial<Record<DoroCoinRewardSource, number>> = {
   sponsored_ad_watch: ECONOMY_V1_RULES.doroCoin.caps.sponsoredAdMax
 };
 
-export async function awardDoroCoinEngagement(db: Firestore, input: { userId: string; sourceType: DoroCoinRewardSource; actionId: string; challengeId?: string; challengeOwnerId?: string; providerVerified?: boolean; watchedSeconds?: number; requiredWatchSeconds?: number; timeZone?: string; suspiciousSignals?: string[] }) {
+const oncePerActionSources = new Set<DoroCoinRewardSource>(["like_challenge", "referral_signup", "create_free_challenge", "join_free_challenge", "win_free_challenge", "top_10_finish", "profile_verification"]);
+
+export async function awardDoroCoinEngagement(db: Firestore, input: { userId: string; sourceType: DoroCoinRewardSource; actionId: string; challengeId?: string; challengeOwnerId?: string; providerVerified?: boolean; watchedSeconds?: number; requiredWatchSeconds?: number; timeZone?: string; suspiciousSignals?: string[]; rewardAmount?: number }) {
   if (input.challengeOwnerId && input.challengeOwnerId === input.userId && ["watch_challenge_video", "like_challenge", "comment_challenge", "share_challenge"].includes(input.sourceType)) throw new Error("Self-farming activity is not eligible for DoroCoins.");
   if (input.sourceType === "watch_challenge_video" && Number(input.watchedSeconds ?? 0) < Number(input.requiredWatchSeconds ?? 30)) throw new Error("Minimum watch time has not been reached.");
   if (input.sourceType === "sponsored_ad_watch" && !input.providerVerified) throw new Error("Sponsored advertisement rewards require provider verification.");
+  const rules = await getActiveEconomyRules(db);
   const localDay = voteDateKeyForTimeZone(new Date(), validVotingTimeZone(input.timeZone));
-  const idempotencyKey = deterministicId("doro_reward", input.userId, input.sourceType, input.actionId, localDay);
-  const cap = rewardDailyCaps[input.sourceType];
+  const cadenceKey = oncePerActionSources.has(input.sourceType) ? "once" : localDay;
+  const idempotencyKey = deterministicId("doro_reward", input.userId, input.sourceType, input.actionId, cadenceKey);
+  const dynamicCaps: Partial<Record<DoroCoinRewardSource, number>> = { watch_challenge_video: rules.doroCoin.caps.videoPerDay, like_challenge: rules.doroCoin.caps.likesPerDay, comment_challenge: rules.doroCoin.caps.commentsPerDay, share_challenge: rules.doroCoin.caps.sharesPerDay, sponsored_ad_watch: rules.doroCoin.caps.sponsoredAdMax };
+  const cap = dynamicCaps[input.sourceType] ?? rewardDailyCaps[input.sourceType];
   if (cap) {
     const guardId = deterministicId("doro_reward_guard", input.userId, input.sourceType, localDay);
     const actionId = deterministicId("doro_reward_action", idempotencyKey);
@@ -39,7 +44,25 @@ export async function awardDoroCoinEngagement(db: Firestore, input: { userId: st
   if (input.suspiciousSignals?.length) {
     await db.collection("adminActionTasks").doc(deterministicId("doro_review", idempotencyKey)).set({ type: "suspicious_dorocoin_activity", userId: input.userId, sourceType: input.sourceType, challengeId: input.challengeId ?? null, signals: input.suspiciousSignals, status: "open", ruleVersion: ECONOMY_V1_RULE_VERSION, createdAt: new Date().toISOString() }, { merge: true });
   }
-  return applyDoroCoinTransaction(db, { userId: input.userId, amount: calculateDoroCoinReward(input.sourceType), type: "reward", sourceType: input.sourceType, description: `DoroCoin reward: ${input.sourceType.replaceAll("_", " ")}`, createdBy: "system", sourceId: input.actionId, idempotencyKey, relatedChallengeId: input.challengeId, ruleVersion: ECONOMY_V1_RULE_VERSION, auditMetadata: { localDay, providerVerified: Boolean(input.providerVerified), suspiciousSignals: input.suspiciousSignals ?? [] } });
+  const configuredReward = calculateDoroCoinReward(input.sourceType, rules);
+  const amount = input.sourceType === "sponsored_ad_watch" ? Math.min(10, Math.max(5, Number(input.rewardAmount ?? configuredReward))) : configuredReward;
+  return applyDoroCoinTransaction(db, { userId: input.userId, amount, type: "reward", sourceType: input.sourceType, description: `DoroCoin reward: ${input.sourceType.replaceAll("_", " ")}`, createdBy: "system", sourceId: input.actionId, idempotencyKey, relatedChallengeId: input.challengeId, ruleVersion: rules.version, auditMetadata: { localDay, cadenceKey, providerVerified: Boolean(input.providerVerified), suspiciousSignals: input.suspiciousSignals ?? [] } });
+}
+
+export async function reverseDoroCoinRewardForAction(db: Firestore, input: { userId: string; sourceType: DoroCoinRewardSource; actionId: string; reversedBy: string; reason: string }) {
+  const matches = await db.collection("doroCoinTransactions").where("sourceId", "==", input.actionId).limit(20).get();
+  const original = matches.docs.find((doc) => doc.data().userId === input.userId && doc.data().sourceType === input.sourceType && Number(doc.data().signedAmount ?? doc.data().amount ?? 0) > 0 && doc.data().status !== "reversed");
+  if (!original) return { reversed: false, reason: "No active reward transaction found." };
+  const reversal = await reverseDoroCoinReward(db, { transactionId: original.id, reversedBy: input.reversedBy, reason: input.reason });
+  return { reversed: true, reversal };
+}
+
+export async function awardDoroCoinEngagementSafely(db: Firestore, input: Parameters<typeof awardDoroCoinEngagement>[1]) {
+  try {
+    return { status: "credited" as const, transaction: await awardDoroCoinEngagement(db, input) };
+  } catch (error) {
+    return { status: "blocked" as const, message: error instanceof Error ? error.message : "This activity is not eligible for a DoroCoin reward." };
+  }
 }
 
 export async function reverseDoroCoinReward(db: Firestore, input: { transactionId: string; reversedBy: string; reason: string }) {

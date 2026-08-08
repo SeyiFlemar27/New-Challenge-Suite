@@ -5,6 +5,8 @@ import { fail, ok, readJson, serverError, serverUnavailable, validationError } f
 import { getUserPlanAccess, normalizeAccountType, planFieldsFor } from "@/lib/plan-access";
 import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
+import { deterministicId } from "@/lib/server/idempotency";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,8 @@ const roleSchema = z.enum(["user", "creator", "host", "sponsor"]);
 const bootstrapSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(60, "First name must be 60 characters or fewer."),
   lastName: z.string().trim().min(1, "Last name is required.").max(60, "Last name must be 60 characters or fewer."),
-  role: roleSchema
+  role: roleSchema,
+  referralCode: z.string().trim().min(4).max(64).optional()
 });
 
 const accountTypeSelectionSchema = z.object({
@@ -202,6 +205,22 @@ export async function POST(request: Request) {
       }, { merge: true }),
       ensureWallet(db, user.uid)
     ]);
+
+    if (parsed.data.referralCode) {
+      const code = parsed.data.referralCode.toUpperCase();
+      const referralCodes = await db.collection("referralCodes").where("codeNormalized", "==", code).limit(1).get();
+      const referrerId = String(referralCodes.docs[0]?.data().userId ?? "");
+      if (referrerId && referrerId !== user.uid) {
+        const referralRef = db.collection("userReferrals").doc(deterministicId("referral", user.uid));
+        const existing = await referralRef.get();
+        if (!existing.exists) {
+          await referralRef.create({ id: referralRef.id, referrerId, referredUserId: user.uid, referralCodeId: referralCodes.docs[0].id, status: user.emailVerified ? "qualified" : "pending_email_verification", suspiciousSignals: [], createdAt: now, updatedAt: now });
+          if (user.emailVerified) await awardDoroCoinEngagement(db, { userId: referrerId, sourceType: "referral_signup", actionId: user.uid });
+        }
+      } else if (referrerId === user.uid) {
+        await db.collection("adminActionTasks").doc(deterministicId("referral_self", user.uid)).set({ type: "dorocoin_referral_review", userId: user.uid, status: "open", signals: ["self_referral_attempt"], createdAt: now }, { merge: true });
+      }
+    }
 
     const walletRef = await ensureWallet(db, user.uid);
     const [accountSnap, profileSnap, walletSnap] = await Promise.all([

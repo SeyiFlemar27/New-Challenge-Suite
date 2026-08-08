@@ -14,6 +14,9 @@ import {
   winnerProposalLifecycleReadiness
 } from "@/lib/server/prize-approvals";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
+import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { deterministicId } from "@/lib/server/idempotency";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
   const { user, response } = await requireRecentAdminAuthentication(request, "settlements.approve");
@@ -107,6 +110,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       kycStillRequiredBeforeWithdrawal: true
     }
   }, db);
+
+  if (!isPaidEntryChallenge(challenge)) {
+    const winnerIds = new Set(winners.map((winner) => winner.userId));
+    const rewardJobs = [
+      ...winners.map((winner) => awardDoroCoinEngagement(db, { userId: winner.userId, sourceType: "win_free_challenge" as const, actionId: challengeId, challengeId })),
+      ...candidates.slice(0, 10).map((candidate) => awardDoroCoinEngagement(db, { userId: candidate.userId, sourceType: "top_10_finish" as const, actionId: challengeId, challengeId, suspiciousSignals: winnerIds.has(candidate.userId) ? ["winner_and_top_10_rewards_are_separate_rules"] : [] }))
+    ];
+    const rewardResults = await Promise.allSettled(rewardJobs);
+    if (rewardResults.some((result) => result.status === "rejected")) {
+      await db.collection("adminActionTasks").doc(deterministicId("doro_results_failure", challengeId, proposalId)).set({ type: "dorocoin_reward_delivery_failure", sourceType: "approved_free_challenge_results", challengeId, proposalId, status: "open", failureCount: rewardResults.filter((result) => result.status === "rejected").length, createdAt: now }, { merge: true });
+    }
+  }
 
   return ok({
     proposal: { ...proposal, ...update, settlementId: settlement.settlement.id, settlementStatus: settlement.settlement.status },

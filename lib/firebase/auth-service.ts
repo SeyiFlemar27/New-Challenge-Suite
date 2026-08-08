@@ -17,6 +17,7 @@ export interface SignupInput {
   email: string;
   password: string;
   role: AppRole;
+  referralCode?: string;
 }
 
 export interface AuthProfile {
@@ -96,7 +97,7 @@ export async function signUpWithProfile(input: SignupInput) {
   await syncServerSession(credential.user);
   await callProfileBootstrap(credential.user, {
     method: "POST",
-    body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role })
+    body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role, referralCode: input.referralCode || undefined })
   });
   return { mode: "firebase" as const, user: credential.user };
 }

@@ -11,6 +11,7 @@ import {
   normalizeParticipantStatus
 } from "@/lib/server/submission-lifecycle";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return validationError({ entryAgreementAccepted: "Accept the challenge rules and entry agreement before joining." });
   }
 
-  let result: { alreadyJoined: boolean; participant: Record<string, unknown> };
+  let result: { alreadyJoined: boolean; participant: Record<string, unknown>; rewardEligible?: boolean; challengeOwnerId?: string };
   try {
     const [accountSnap, profileSnap] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
@@ -83,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         };
         transaction.set(participantRef, participant, { merge: true });
         if (entering && !alreadyEntered) transaction.set(challengeRef, { participantCount: Number(challenge.participantCount ?? 0) + 1, updatedAt: now }, { merge: true });
-        return { alreadyJoined: alreadyEntered, participant };
+        return { alreadyJoined: alreadyEntered, participant, rewardEligible: entering && !alreadyEntered, challengeOwnerId: String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "") };
       }
 
       const participant = {
@@ -105,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       };
       transaction.set(participantRef, participant);
       transaction.set(challengeRef, { registrationCount: Number(challenge.registrationCount ?? 0) + 1, updatedAt: now }, { merge: true });
-      return { alreadyJoined: false, participant };
+      return { alreadyJoined: false, participant, rewardEligible: false, challengeOwnerId: String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "") };
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Challenge could not be joined.";
@@ -130,6 +131,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }, db).catch((error) => console.warn("[audit] challenge join audit failed", { challengeId: id, userId: user.uid, error: error instanceof Error ? error.message : "unknown" }));
 
   await createNotification(db, { userId: user.uid, type: "challenge_joined", title: result.participant.status === "active" ? "Challenge entered" : "Challenge registered", body: result.participant.status === "active" ? "You entered the challenge." : "You registered for the challenge.", targetId: id });
+  if (result.rewardEligible) {
+    await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "join_free_challenge", actionId: id, challengeId: id, challengeOwnerId: result.challengeOwnerId }).catch(async (error) => {
+      await db.collection("adminActionTasks").doc(`doro_join_${id}_${user.uid}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "join_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: new Date().toISOString() }, { merge: true });
+    });
+  }
   return ok(result, result.participant.status === "active" ? "Challenge entered successfully." : "Challenge registration saved.");
 }
 

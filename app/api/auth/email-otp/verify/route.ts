@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { fail, forbidden, ok, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
 const MAX_ATTEMPTS = 5;
 
@@ -60,6 +61,12 @@ export async function POST(request: Request) {
       db.collection("users").doc(user.uid).set({ emailVerified: true, emailVerifiedAt: now, verificationStatus: "verified", updatedAt: now }, { merge: true }),
       adminAuth.updateUser(user.uid, { emailVerified: true })
     ]);
+    const pendingReferrals = await db.collection("userReferrals").where("referredUserId", "==", user.uid).limit(5).get();
+    for (const referral of pendingReferrals.docs) {
+      if (referral.data().status !== "pending_email_verification") continue;
+      await awardDoroCoinEngagement(db, { userId: String(referral.data().referrerId), sourceType: "referral_signup", actionId: user.uid });
+      await referral.ref.set({ status: "qualified", qualifiedAt: now, updatedAt: now }, { merge: true });
+    }
     return ok({ verified: true }, "Email verified.");
   } catch (error) {
     return serverError("Email verification could not be completed.", error instanceof Error ? error.message : error);

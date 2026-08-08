@@ -3,6 +3,7 @@ import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses
 import { normalizeKycStatus } from "@/lib/server/kyc";
 import { normalizeSumsubKycStatus, safeSumsubApplicantId, safeSumsubExternalUserId, sumsubWebhookSignature, verifySumsubWebhookSignature } from "@/lib/server/sumsub";
 import { deterministicId } from "@/lib/server/idempotency";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,12 @@ export async function POST(request: Request) {
       transaction.set(eventRef, { status: "processed", processedAt: now, userId: resolvedUserId, applicantId, previousStatus, newStatus: normalized.status }, { merge: true });
       transaction.set(auditRef, { id: auditRef.id, userId: resolvedUserId, applicantId, action: "sumsub_kyc_status_update", source: "sumsub_webhook", eventId: id, previousStatus, newStatus: normalized.status, safeReason: normalized.reason, createdAt: now, rawIdentityStored: false });
     });
+
+    if (normalized.status === "verified") {
+      await awardDoroCoinEngagement(db, { userId: resolvedUserId, sourceType: "profile_verification", actionId: resolvedUserId, providerVerified: true }).catch(async (error) => {
+        await db.collection("adminActionTasks").doc(deterministicId("doro_verification_failure", resolvedUserId)).set({ type: "dorocoin_reward_delivery_failure", sourceType: "profile_verification", userId: resolvedUserId, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
+      });
+    }
 
     return ok({ received: true, handled: true }, "Sumsub webhook processed.");
   } catch (error) {

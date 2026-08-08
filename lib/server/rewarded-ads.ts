@@ -1,4 +1,4 @@
-export const REWARDED_AD_DOROCOINS = 3;
+export const REWARDED_AD_DOROCOINS = 5;
 export const REWARDED_AD_CYCLE_LIMIT = 10;
 export const REWARDED_AD_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 

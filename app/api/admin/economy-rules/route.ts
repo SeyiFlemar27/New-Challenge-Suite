@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Economy Rules");
-  const [snapshots, doroTransactions, creditTransactions, growthTransactions, paidVoteHolds, unresolvedAllocations, creatorProfiles, actionTasks] = await Promise.all([
+  const [snapshots, doroTransactions, creditTransactions, growthTransactions, paidVoteHolds, unresolvedAllocations, creatorProfiles, actionTasks, growthAllocations, expiryJobs, rewardGuards] = await Promise.all([
     db.collection("economyRuleVersions").limit(25).get(),
     db.collection("doroCoinTransactions").limit(500).get(),
     db.collection("challengeCreditTransactions").limit(500).get(),
@@ -18,13 +18,19 @@ export async function GET(request: Request) {
     db.collection("paidVoteEconomyHolds").limit(250).get(),
     db.collection("settlementUnresolvedAllocations").limit(250).get(),
     db.collection("profiles").limit(500).get(),
-    db.collection("adminActionTasks").limit(250).get()
+    db.collection("adminActionTasks").limit(250).get(),
+    db.collection("creatorGrowthWalletAllocations").limit(500).get(),
+    db.collection("backgroundJobs").where("type", "==", "growth_wallet_expiry").limit(25).get(),
+    db.collection("doroCoinRewardDailyGuards").limit(500).get()
   ]);
   const versions = snapshots.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   versions.sort((a, b) => Date.parse(String(b.createdAt ?? "")) - Date.parse(String(a.createdAt ?? "")));
   const sum = (docs: FirebaseFirestore.QueryDocumentSnapshot[], field: string) => docs.reduce((total, doc) => total + Math.abs(Number(doc.data()[field] ?? 0)), 0);
   const creatorLevelDistribution = creatorProfiles.docs.reduce<Record<string, number>>((counts, doc) => { const level = String(doc.data().manualCreatorLevelId ?? "calculated"); counts[level] = (counts[level] ?? 0) + 1; return counts; }, {});
-  return ok({ activeRules: ECONOMY_V1_RULES, versions, monitoring: { doroCoinTransactionCount: doroTransactions.size, doroCoinVolume: sum(doroTransactions.docs, "signedAmount"), challengeCreditTransactionCount: creditTransactions.size, challengeCreditVolume: sum(creditTransactions.docs, "signedAmount"), growthWalletTransactionCount: growthTransactions.size, growthWalletVolumeCents: sum(growthTransactions.docs, "signedAmountCents"), paidVoteHoldCount: paidVoteHolds.size, unresolvedHostSponsorAllocationCount: unresolvedAllocations.docs.filter((doc) => doc.data().status === "requires_admin_resolution").length, creatorLevelDistribution, openEconomyActionTaskCount: actionTasks.docs.filter((doc) => doc.data().status === "open" && String(doc.data().type ?? "").match(/economy|dorocoin|credit|growth|paid_entry|paid_vote/)).length } }, "Economy rules loaded.");
+  const now = Date.now();
+  const jobs = expiryJobs.docs.map((doc) => doc.data()).sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
+  const topEarners = Object.entries(doroTransactions.docs.filter((doc) => Number(doc.data().signedAmount ?? 0) > 0).reduce<Record<string, number>>((totals, doc) => { const userId = String(doc.data().userId ?? "unknown"); totals[userId] = (totals[userId] ?? 0) + Number(doc.data().signedAmount ?? 0); return totals; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([userId, amount]) => ({ userId, amount }));
+  return ok({ activeRules: ECONOMY_V1_RULES, versions, monitoring: { doroCoinTransactionCount: doroTransactions.size, doroCoinVolume: sum(doroTransactions.docs, "signedAmount"), doroCoinReversalCount: doroTransactions.docs.filter((doc) => doc.data().type === "reversal" || doc.data().status === "reversed").length, doroCoinCapHitCount: rewardGuards.docs.filter((doc) => Number(doc.data().count ?? 0) >= Number(doc.data().cap ?? Number.MAX_SAFE_INTEGER)).length, topDoroCoinEarners: topEarners, suspiciousDoroCoinTaskCount: actionTasks.docs.filter((doc) => doc.data().type === "suspicious_dorocoin_activity" && doc.data().status === "open").length, pendingAdWatchConfirmationCount: actionTasks.docs.filter((doc) => doc.data().type === "sponsored_ad_confirmation" && doc.data().status === "open").length, referralReviewCount: actionTasks.docs.filter((doc) => doc.data().type === "dorocoin_referral_review" && doc.data().status === "open").length, challengeCreditTransactionCount: creditTransactions.size, challengeCreditVolume: sum(creditTransactions.docs, "signedAmount"), growthWalletTransactionCount: growthTransactions.size, growthWalletVolumeCents: sum(growthTransactions.docs, "signedAmountCents"), growthWalletExpiredAllocationCount: growthAllocations.docs.filter((doc) => doc.data().status === "expired").length, growthWalletUpcomingExpiryCount: growthAllocations.docs.filter((doc) => doc.data().status === "active" && Date.parse(String(doc.data().expiresAt ?? "")) > now).length, lastGrowthWalletExpiryRun: jobs[0] ?? null, failedGrowthWalletExpiryRunCount: jobs.filter((job) => job.status === "needs_attention" || job.status === "failed").length, paidVoteHoldCount: paidVoteHolds.size, unresolvedHostSponsorAllocationCount: unresolvedAllocations.docs.filter((doc) => doc.data().status === "requires_admin_resolution").length, creatorLevelDistribution, openEconomyActionTaskCount: actionTasks.docs.filter((doc) => doc.data().status === "open" && String(doc.data().type ?? "").match(/economy|dorocoin|credit|growth|paid_entry|paid_vote/)).length } }, "Economy rules loaded.");
 }
 
 export async function POST(request: Request) {

@@ -15,6 +15,7 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -164,5 +165,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: lifecycleStatus === "pending_review" ? "Challenge submitted" : "Challenge scheduled", body: lifecycleStatus === "pending_review" ? "Your challenge is awaiting review." : "Your challenge is scheduled.", targetId: id });
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.published", targetType: "challenge", targetId: id, after: { status: lifecycleStatus, title: body.title }, reason: lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge published from draft.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true } }, db).catch(() => undefined);
+  if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
+    await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {
+      await db.collection("adminActionTasks").doc(`doro_create_${id}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "create_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
+    });
+  }
   return ok({ challenge: update }, lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.");
 }
