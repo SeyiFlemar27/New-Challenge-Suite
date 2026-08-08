@@ -48,7 +48,8 @@ export async function POST(request: Request) {
   if (packageId && pack.status !== "active") return validationError({ packageId: "This DoroCoin package is not available." });
   const coins = customQuote?.totalCoins || customCoins || Number(pack.coins);
   if (!Number.isFinite(coins) || coins <= 0) return validationError({ packageId: "DoroCoin package is missing a valid coin amount." });
-  const amountUsd = customQuote?.amountUsd ?? (customCoins ? Number((coins / 50).toFixed(2)) : Number(pack.price ?? 0));
+  const economyRules = await getActiveEconomyRules(db);
+  const amountUsd = customQuote?.amountUsd ?? (customCoins ? Number((coins / economyRules.doroCoin.coinsPerUsd).toFixed(2)) : Number(pack.price ?? 0));
   const stripe = getStripe();
   const priceConfig = !customCoins ? resolveDoroCoinStripePriceId(pack, packageId, coins) : { priceId: null, configuredEnv: null, envCandidates: [] as string[] };
   const missing = !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID";
@@ -56,7 +57,6 @@ export async function POST(request: Request) {
     const details = { missing, acceptedPriceEnvs: priceConfig.envCandidates, configuredPriceEnv: priceConfig.configuredEnv };
     return fail("Stripe DoroCoin checkout is not configured.", 503, details, "PAYMENT_CONFIGURATION_ERROR");
   }
-  const economyRules = await getActiveEconomyRules(db);
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",

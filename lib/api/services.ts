@@ -303,7 +303,7 @@ export function updateProfileCustomization(customization: ProfileCustomization) 
 }
 
 export function fetchDoroCoinPackages() {
-  return apiRequest<{ packages: unknown[] }>("/api/dorocoin/packages");
+  return apiRequest<{ packages: unknown[]; coinsPerUsd?: number }>("/api/dorocoin/packages");
 }
 
 export function fetchBoostPackages() {

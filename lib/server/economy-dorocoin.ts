@@ -122,7 +122,8 @@ export async function transferDoroCoins(db: Firestore, input: { senderId: string
     const receiverRef = db.collection("doroCoinWallets").doc(input.receiverId);
     const receiverUserRef = db.collection("users").doc(input.receiverId);
     const [sender, receiver, receiverUser] = await Promise.all([transaction.get(senderRef), transaction.get(receiverRef), transaction.get(receiverUserRef)]);
-    if (!receiverUser.exists || receiverUser.data()?.accountStatus === "disabled") throw new Error("The receiving account is not available.");
+    const receiverStatus = String(receiverUser.data()?.accountStatus ?? "active");
+    if (!receiverUser.exists || receiverUser.data()?.suspended === true || !["active", "verified"].includes(receiverStatus)) throw new Error("The receiving account is not available.");
     const senderBalance = Number(sender.data()?.balance ?? 0);
     const receiverBalance = Number(receiver.data()?.balance ?? 0);
     if (senderBalance < input.amount) throw new Error("Insufficient DoroCoin balance.");

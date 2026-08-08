@@ -2,8 +2,33 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { writeAuditLog } from "@/lib/server/audit";
 import { requireRequestUser } from "@/lib/server/auth";
 import { transferDoroCoins } from "@/lib/server/economy-dorocoin";
-import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
+import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+
+export async function GET(request: Request) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("DoroCoin transfer");
+  const rules = await getActiveEconomyRules(db);
+  const transferDay = new Date().toISOString().slice(0, 10);
+  const [wallet, dailyGuard] = await Promise.all([
+    db.collection("doroCoinWallets").doc(user.uid).get(),
+    db.collection("doroCoinTransferDailyGuards").doc(deterministicId(user.uid, transferDay)).get()
+  ]);
+  const transferredToday = Number(dailyGuard.data()?.amount ?? 0);
+  return ok({
+    balance: Number(wallet.data()?.balance ?? 0),
+    minimum: rules.doroCoin.transfer.minimum,
+    maximum: rules.doroCoin.transfer.maximum,
+    dailyMaximum: rules.doroCoin.transfer.dailyMaximum,
+    transferredToday,
+    remainingToday: Math.max(0, rules.doroCoin.transfer.dailyMaximum - transferredToday),
+    withdrawable: false,
+    cashConvertible: false
+  }, "DoroCoin transfer limits loaded.");
+}
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);

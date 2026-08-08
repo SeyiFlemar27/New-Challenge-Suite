@@ -6,6 +6,7 @@ export const ECONOMY_V1_RULES = {
   version: ECONOMY_V1_RULE_VERSION,
   status: "active",
   doroCoin: {
+    coinsPerUsd: 100,
     rewards: {
       daily_login: 10,
       watch_challenge_video: 2,

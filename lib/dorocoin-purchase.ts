@@ -1,4 +1,4 @@
-export const DOROCOINS_PER_USD = 50;
+export const DOROCOINS_PER_USD = 100;
 export const MIN_CUSTOM_DOROCOIN_USD = 1;
 export const MAX_CUSTOM_DOROCOIN_USD = 200;
 

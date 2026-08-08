@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -54,24 +55,32 @@ export async function GET() {
   if (!db) return serverUnavailable("DoroCoin packages");
 
   try {
-    const snap = await runPackageQuery(db.collection("doroCoinPackages").where("status", "==", "active").limit(50).get());
+    const [snap, rules] = await Promise.all([
+      runPackageQuery(db.collection("doroCoinPackages").where("status", "==", "active").limit(50).get()),
+      getActiveEconomyRules(db)
+    ]);
     const packages = snap.docs.map((doc) => {
       const data = doc.data();
+      const price = Number(data.price ?? 0);
+      const coins = Number(data.coins ?? 0);
+      const baseCoins = Number(data.baseCoins ?? data.coins ?? 0);
+      const minimumBaseCoins = Math.round(price * rules.doroCoin.coinsPerUsd);
       return {
         id: doc.id,
         name: data.name,
-        coins: Number(data.coins ?? 0),
-        baseCoins: Number(data.baseCoins ?? data.coins ?? 0),
-        bonusCoins: Number(data.bonusCoins ?? Math.max(0, Number(data.coins ?? 0) - Number(data.baseCoins ?? data.coins ?? 0))),
-        price: Number(data.price ?? 0),
+        coins,
+        baseCoins,
+        bonusCoins: Number(data.bonusCoins ?? Math.max(0, coins - baseCoins)),
+        price,
         bestFor: data.bestFor ?? data.description ?? "",
         mostPopular: Boolean(data.mostPopular),
         status: data.status,
-        sortOrder: Number(data.sortOrder ?? 0)
+        sortOrder: Number(data.sortOrder ?? 0),
+        pricingConsistent: price > 0 && baseCoins >= minimumBaseCoins
       };
-    }).sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 20);
+    }).filter((item) => item.pricingConsistent).sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 20);
 
-    return ok({ packages }, packages.length ? "DoroCoin packages loaded." : "No active DoroCoin packages are configured.");
+    return ok({ packages, coinsPerUsd: rules.doroCoin.coinsPerUsd }, packages.length ? "DoroCoin packages loaded." : "No consistently priced DoroCoin packages are currently available.");
   } catch (error) {
     const details = packageErrorDetails(error);
     console.error("[dorocoin-packages] load failed", details);
