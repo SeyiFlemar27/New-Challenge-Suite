@@ -94,6 +94,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       profilePath: typeof item.username === "string" ? `/profile/${item.username}` : typeof item.userName === "string" ? `/profile/${item.userName}` : "/profile"
     }));
   const votes: Array<Record<string, unknown>> = votesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const freeVoteCount = votes.reduce((sum, vote) => sum + (String(vote.voteMode ?? vote.voteType ?? "free") === "free" ? Number(vote.quantity ?? 1) : 0), 0);
+  const paidVoteCount = votes.reduce((sum, vote) => sum + (["credits", "paid"].includes(String(vote.voteMode ?? vote.voteType ?? "")) ? Number(vote.quantity ?? 1) : 0), 0);
   const userVotes = user ? votes.filter((vote) => vote.userId === user.uid || vote.voterId === user.uid) : [];
   const voteTimeZone = validVotingTimeZone(requestProfile.timeZone ?? requestProfile.timezone ?? "UTC");
   const voteDate = voteDateKeyForTimeZone(new Date(), voteTimeZone);
@@ -203,6 +205,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     participants,
     prizePool: publicPrizePoolFields(prizePoolSnap.exists ? prizePoolSnap.data() : null),
     voteCount: votes.length,
+    voteBreakdown: { freeVoteCount, paidVoteCount, paidVoteCurrency: "challenge_credits", paidVoteCostCredits: 10 },
     userState: user ? {
       authenticated: true,
       joined: participantEntered,

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       timeZone: String(profile.timeZone ?? profile.timezone ?? "UTC"),
       confirmedLargeSpend: body.confirmedLargeSpend
     });
-    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, coinCost: result.coinCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "dorocoin" ? `${result.quantity} DoroCoin vote${result.quantity === 1 ? "" : "s"} counted.` : "Free vote counted.");
+    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, creditCost: result.creditCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "credits" ? `${result.quantity} additional vote${result.quantity === 1 ? "" : "s"} counted using Challenge Credits.` : "Free vote counted.");
   } catch (error) {
     const err = error as Error & { code?: string };
     const status = err.code === "NOT_FOUND"

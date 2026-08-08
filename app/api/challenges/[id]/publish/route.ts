@@ -14,6 +14,7 @@ import { editableDraftStatus, calculateChallengeDraftProgress } from "@/lib/serv
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
+import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -117,6 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     prizePoolFundingSource: currentMonetization.prizePoolFundingSource ?? null
   };
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
+  const economyRules = await getActiveEconomyRules(db);
   const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
   const update = {
     ...body,
@@ -130,6 +132,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ownerId: user.uid,
     status: lifecycleStatus,
     lifecycleStatus,
+    economyRuleVersion: current.economyRuleVersion ?? economyRules.version,
+    votingSettings: {
+      ...body.votingSettings,
+      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes,
+      allowDoroCoinVotes: undefined
+    },
     monetization: safeMonetization,
     sponsorEnabled,
     participantApprovalMode: body.requiresParticipantApproval ? "manual" : "automatic",

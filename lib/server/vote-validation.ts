@@ -3,7 +3,7 @@ import { z } from "zod";
 export const voteRequestSchema = z.object({
   challengeId: z.string().trim().min(1, "Challenge ID is required."),
   submissionId: z.string().trim().min(1, "Submission ID is required."),
-  voteMode: z.enum(["free", "dorocoin"], { message: "Vote mode must be free or dorocoin." }),
+  voteMode: z.enum(["free", "credits"], { message: "Vote mode must be free or credits." }),
   quantity: z.coerce.number().int("Quantity must be a whole number.").min(1, "Quantity must be at least 1.").max(100, "Vote quantity is too large.").default(1),
   confirmedLargeSpend: z.boolean().optional().default(false)
 });

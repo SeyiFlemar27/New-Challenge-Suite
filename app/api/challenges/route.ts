@@ -16,6 +16,7 @@ import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/p
 import { calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
+import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 
 export async function GET() {
   const db = getAdminDb();
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
   }
 
   const ref = db.collection("challenges").doc();
+  const economyRules = await getActiveEconomyRules(db);
   const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
   const safeMonetization = {
     enabled: Boolean(monetizationIntent.paidEntryRequested || sponsorEnabled || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested),
@@ -189,6 +191,7 @@ export async function POST(request: Request) {
     planRequired: body.premiumOnly ? "pro" : null,
     status: lifecycleStatus,
     lifecycleStatus,
+    economyRuleVersion: economyRules.version,
     submissionDeadline: body.submissionDeadline,
     submissionStartAt: body.submissionStartAt || body.startsAt,
     registrationDeadline: body.registrationDeadline || body.submissionDeadline,
@@ -205,7 +208,11 @@ export async function POST(request: Request) {
     bestOf: body.bestOf,
     numberOfWinners: body.numberOfWinners,
     winnerSelection: body.winnerSelection,
-    votingSettings: body.votingSettings,
+    votingSettings: {
+      ...body.votingSettings,
+      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes,
+      allowDoroCoinVotes: undefined
+    },
     rules: body.standardRules
       ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
       : [],

@@ -364,8 +364,8 @@ export function fetchLeaderboards(board = "global", options: { type?: "global" |
   return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; visibilityMode?: string; visible?: boolean; message?: string | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
-export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {
-  return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; walletTransactionId?: string | null; voteDate?: string; timeZone?: string; freeVoteResetAt?: string }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
+export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "credits"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {
+  return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; creditCost?: number; walletTransactionId?: string | null; voteDate?: string; timeZone?: string; freeVoteResetAt?: string }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function purchaseDoroCoins(packageId: string) {

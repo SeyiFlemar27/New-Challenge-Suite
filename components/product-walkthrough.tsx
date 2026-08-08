@@ -13,7 +13,7 @@ const competitorSteps: TourStep[] = [
   { title: "Welcome to Challenge Suite", body: "Your home for structured challenges, community voting, rankings, and achievement.", icon: LayoutDashboard },
   { title: "Explore challenges", body: "Discover active competitions, follow creators, and save challenges you want to revisit.", icon: Compass },
   { title: "Compete and vote", body: "Join eligible challenges, submit entries, vote, and follow your progress from My Entries.", icon: Trophy },
-  { title: "DoroCoin wallet", body: "Use internal platform credits for eligible votes and promotional features. DoroCoins are not cash.", icon: WalletCards },
+  { title: "DoroCoin wallet", body: "Earn and use engagement currency for eligible community and promotional features. DoroCoins are not cash.", icon: WalletCards },
   { title: "Build your profile", body: "Show your entries, wins, badges, and community identity from your public profile.", icon: UserRound }
 ];
 const creatorSteps: TourStep[] = [

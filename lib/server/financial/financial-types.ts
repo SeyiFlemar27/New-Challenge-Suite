@@ -30,7 +30,7 @@ export type FinancialLedgerEntryFoundation = {
   bucket: LedgerBucket;
   status: "pending_hold" | "posted" | "reserved" | "reversed";
   transactionId: string;
-  sourceType: "challenge_prize" | "challenge_winner_prize" | "sponsor_prize" | "creator_share" | "creator_challenge_earning" | "paid_vote_participant_share" | "sponsor_funding" | "platform_fee" | "platform_challenge_fee" | "sponsor_prize_platform_fee" | "refund" | "chargeback" | "payout" | "adjustment" | "prediction_arena" | "prediction_reward" | "prediction_platform_fee";
+  sourceType: "challenge_prize" | "challenge_winner_prize" | "sponsor_prize" | "creator_share" | "creator_challenge_earning" | "host_sponsor_entry_share" | "paid_vote_participant_share" | "sponsor_funding" | "platform_fee" | "platform_challenge_fee" | "sponsor_prize_platform_fee" | "refund" | "chargeback" | "payout" | "adjustment" | "prediction_arena" | "prediction_reward" | "prediction_platform_fee";
   sourceId: string;
   idempotencyKey: string;
   holdUntil: string | null;

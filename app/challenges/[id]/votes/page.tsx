@@ -63,7 +63,7 @@ export default function ChallengeVotingPage() {
                 <select className="sr-only" tabIndex={-1} aria-hidden="true" value={submissionId} onChange={(event) => setSubmissionId(event.target.value)}><option value="">Select a submission</option>{submissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.title}</option>)}</select>
               </Field>
               {voteAction()}
-              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use DoroCoin Votes</LinkButton> : null}
+              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use Challenge Credits for Additional Votes</LinkButton> : null}
             </div>}
         {message ? <p className="mt-4 rounded-[8px] bg-white/[0.05] p-3 text-sm text-slate-200">{message}</p> : null}
         <LinkButton href={`/challenges/${challengeId}`} className="mt-8" variant="secondary">Return to Challenge</LinkButton>

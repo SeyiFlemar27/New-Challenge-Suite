@@ -14,7 +14,7 @@ export type DoroCoinTransactionRecord = ImmutableRecord & { id: string; userId: 
 export type DoroCoinPurchasePackage = { id: string; baseCoins: number; bonusCoins: number; priceCents: number; currency: CurrencyCode; active: boolean; providerPriceReference: string | null };
 export type AdRewardCycleRecord = ImmutableRecord & { id: string; userId: string; category: "dorocoin"; verifiedAdCount: number; awardedCoins: number; providerVerified: true; cooldownUntil: IsoTimestamp | null; createdAt: IsoTimestamp };
 
-export type VoteRecord = ImmutableRecord & { id: string; category: "vote"; challengeId: string; submissionId: string; voterId: string; voteMode: "free" | "dorocoin"; voteDate: string; timeZone: string; status: "counted" | "reversed" | "invalidated"; createdAt: IsoTimestamp };
+export type VoteRecord = ImmutableRecord & { id: string; category: "vote"; challengeId: string; submissionId: string; voterId: string; voteMode: "free" | "credits"; voteDate: string; timeZone: string; status: "counted" | "reversed" | "invalidated"; createdAt: IsoTimestamp };
 export type DailyFreeVoteEligibilityRecord = { id: string; userId: string; challengeId: string; voteDate: string; timeZone: string; resetsAt: IsoTimestamp; consumedAt: IsoTimestamp };
 
 export type PredictionMarketRecord = { id: string; challengeId: string; status: "open" | "locked" | "under_review" | "settled" | "refunded" | "disputed"; opensAt: IsoTimestamp | null; closesAt: IsoTimestamp; currency: CurrencyCode; platformFeeRate: 0.07; createdAt: IsoTimestamp; updatedAt: IsoTimestamp };

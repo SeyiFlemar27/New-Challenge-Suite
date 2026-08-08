@@ -52,9 +52,10 @@ export const serverChallengeCreateSchema = z.object({
   accessCode: z.string().trim().max(80).default(""),
   votingSettings: z.object({
     allowFreeVotes: z.coerce.boolean().default(true),
-    allowDoroCoinVotes: z.coerce.boolean().default(true),
+    allowPaidVotes: z.coerce.boolean().optional(),
+    allowDoroCoinVotes: z.coerce.boolean().optional(),
     weightedVotes: z.coerce.boolean().default(true)
-  }).default({ allowFreeVotes: true, allowDoroCoinVotes: true, weightedVotes: true }),
+  }).default({ allowFreeVotes: true, allowPaidVotes: true, weightedVotes: true }),
   requiresSubmissionApproval: z.coerce.boolean().default(false),
   requiresParticipantApproval: z.coerce.boolean().default(false),
   participantApprovalMode: z.enum(["automatic", "manual"]).default("automatic"),
@@ -416,4 +417,3 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   errors.push(...draftResult.errors);
   return validationResult(errors);
 }
-

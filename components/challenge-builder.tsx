@@ -323,7 +323,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
       },
       isLiveEvent: false,
       tournamentType: "none",
-      votingSettings: { allowFreeVotes: true, allowDoroCoinVotes: true, weightedVotes: false },
+      votingSettings: { allowFreeVotes: true, allowPaidVotes: true, weightedVotes: false },
       publish
     };
   }
@@ -594,4 +594,3 @@ function ChallengeSuitePlaceholder({ className = "", label = "Challenge Suite" }
     </div>
   </div>;
 }
-

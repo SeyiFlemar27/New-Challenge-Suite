@@ -6,11 +6,11 @@ import { writeAuditLog } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
 import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { calculatePaidVoteCost, ECONOMY_V1_RULES, getActiveEconomyRules } from "@/lib/server/economy-rules";
 
-export type VoteMode = "free" | "dorocoin";
-export const DOROCOIN_COST_PER_VOTE = 5;
-export const MAX_DOROCOIN_VOTES_PER_REQUEST = 100;
-export const LARGE_DOROCOIN_VOTE_QUANTITY = 50;
+export type VoteMode = "free" | "credits";
+export const CHALLENGE_CREDIT_COST_PER_VOTE = 10;
+export const MAX_PAID_VOTES_PER_DAY = 10;
 
 export interface CastVoteInput {
   userId: string;
@@ -85,7 +85,7 @@ function votingSettings(challenge: Record<string, unknown>) {
     : {};
   return {
     allowFreeVotes: settings.allowFreeVotes !== false,
-    allowDoroCoinVotes: settings.allowDoroCoinVotes !== false,
+    allowPaidVotes: settings.allowPaidVotes === undefined ? settings.allowDoroCoinVotes !== false : settings.allowPaidVotes !== false,
     weightedVotes: settings.weightedVotes !== false
   };
 }
@@ -97,6 +97,9 @@ function voteReject(message: string, code: string) {
 }
 
 export async function castVote(db: Firestore, input: CastVoteInput) {
+  const economyRules = await getActiveEconomyRules(db);
+  const paidVoteDailyLimit = economyRules.voting.paidVoteDailyLimit;
+  const paidVoteCostCredits = economyRules.voting.paidVoteCostCredits;
   const quantity = Math.max(1, Math.trunc(input.quantity || 1));
   const nowDate = new Date();
   const now = nowDate.toISOString();
@@ -114,14 +117,11 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
   if (input.voteMode === "free" && quantity !== 1) {
     throw voteReject("Free votes must be submitted one at a time.", "INVALID_FREE_VOTE_QUANTITY");
   }
-  if (input.voteMode === "dorocoin" && quantity > MAX_DOROCOIN_VOTES_PER_REQUEST) {
-    throw voteReject(`You can cast up to ${MAX_DOROCOIN_VOTES_PER_REQUEST} DoroCoin votes per transaction.`, "DOROCOIN_VOTE_QUANTITY_LIMIT");
+  if (input.voteMode === "credits" && quantity > paidVoteDailyLimit) {
+    throw voteReject(`You can cast up to ${paidVoteDailyLimit} additional votes per challenge each day.`, "PAID_VOTE_DAILY_LIMIT");
   }
-  if (input.voteMode === "dorocoin" && quantity >= LARGE_DOROCOIN_VOTE_QUANTITY && !input.confirmedLargeSpend) {
-    throw voteReject("Confirm this unusually large DoroCoin vote spend before continuing.", "LARGE_DOROCOIN_SPEND_CONFIRMATION_REQUIRED");
-  }
-  if (input.voteMode === "dorocoin" && !input.requestIdempotencyKey) {
-    throw voteReject("An idempotency key is required for DoroCoin voting.", "IDEMPOTENCY_KEY_REQUIRED");
+  if (input.voteMode === "credits" && !input.requestIdempotencyKey) {
+    throw voteReject("An idempotency key is required for Challenge Credit voting.", "IDEMPOTENCY_KEY_REQUIRED");
   }
 
   const result = await db.runTransaction(async (transaction) => {
@@ -132,12 +132,16 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const freeVoteGuardRef = input.voteMode === "free"
       ? db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(input.userId, input.challengeId, voteDateKey))
       : null;
-    const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap] = await Promise.all([
+    const paidVoteGuardRef = input.voteMode === "credits"
+      ? db.collection("paidVoteDailyGuards").doc(deterministicId("paid_vote", input.userId, input.challengeId, voteDateKey))
+      : null;
+    const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap, paidVoteGuardSnap] = await Promise.all([
       transaction.get(challengeRef),
       transaction.get(submissionRef),
       transaction.get(leaderboardRef),
       voteRequestRef ? transaction.get(voteRequestRef) : Promise.resolve(null),
-      freeVoteGuardRef ? transaction.get(freeVoteGuardRef) : Promise.resolve(null)
+      freeVoteGuardRef ? transaction.get(freeVoteGuardRef) : Promise.resolve(null),
+      paidVoteGuardRef ? transaction.get(paidVoteGuardRef) : Promise.resolve(null)
     ]);
 
     if (voteRequestSnap?.exists) {
@@ -148,6 +152,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         voteWeight: number;
         weightedVoteCount: number;
         coinCost: number;
+        creditCost: number;
         walletTransactionId: string | null;
         suspiciousSignals: string[];
         voteDate?: string;
@@ -165,8 +170,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     }
 
     const settings = votingSettings(challenge);
+    if (input.voteMode === "credits" && (!economyRules.voting.paidVotingEnabled || challenge.paidVotingDisabledByAdmin === true)) throw voteReject("Additional Challenge Credit voting is disabled.", "PAID_VOTING_DISABLED");
     if (input.voteMode === "free" && !settings.allowFreeVotes) throw voteReject("Free voting is not enabled for this challenge.", "FREE_VOTING_DISABLED");
-    if (input.voteMode === "dorocoin" && !settings.allowDoroCoinVotes) throw voteReject("DoroCoin voting is not enabled for this challenge.", "DOROCOIN_VOTING_DISABLED");
+    if (input.voteMode === "credits" && (!settings.allowPaidVotes || !ECONOMY_V1_RULES.voting.paidVotingEnabled)) throw voteReject("Additional voting is not enabled for this challenge.", "PAID_VOTING_DISABLED");
 
     if (!submissionSnap.exists) throw voteReject("Submission not found.", "NOT_FOUND");
     const submission = { id: submissionSnap.id, ...submissionSnap.data() } as Record<string, unknown>;
@@ -185,33 +191,45 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     let walletTransactionId: string | null = null;
     let coinCost = 0;
-    if (input.voteMode === "dorocoin") {
-      coinCost = quantity * DOROCOIN_COST_PER_VOTE;
-      const walletRef = db.collection("doroCoinWallets").doc(input.userId);
+    let creditCost = 0;
+    if (input.voteMode === "credits") {
+      const alreadyUsed = Number(paidVoteGuardSnap?.data()?.quantity ?? 0);
+      if (alreadyUsed + quantity > paidVoteDailyLimit) throw voteReject(`You can cast up to ${paidVoteDailyLimit} additional votes per challenge each day.`, "PAID_VOTE_DAILY_LIMIT");
+      creditCost = calculatePaidVoteCost(quantity, economyRules);
+      const walletRef = db.collection("challengeCreditWallets").doc(input.userId);
       const walletSnap = await transaction.get(walletRef);
       const balance = Number(walletSnap.data()?.balance ?? 0);
-      if (balance < coinCost) throw voteReject(`Insufficient DoroCoins. ${DOROCOIN_COST_PER_VOTE} DoroCoins equals 1 additional vote.`, "INSUFFICIENT_DOROCOINS");
-      transaction.set(walletRef, { userId: input.userId, balance: balance - coinCost, lockedBalance: Number(walletSnap.data()?.lockedBalance ?? 0), updatedAt: now }, { merge: true });
+      if (balance < creditCost) throw voteReject(`Insufficient Challenge Credits. ${paidVoteCostCredits} Credits equals 1 additional vote.`, "INSUFFICIENT_CHALLENGE_CREDITS");
+      transaction.set(walletRef, { userId: input.userId, balance: balance - creditCost, withdrawable: false, updatedAt: now }, { merge: true });
       const txnRef = voteRequestId
-        ? db.collection("doroCoinTransactions").doc(deterministicId("vote", voteRequestId, "dorocoin_spend"))
-        : db.collection("doroCoinTransactions").doc();
+        ? db.collection("challengeCreditTransactions").doc(deterministicId("vote", voteRequestId, "credit_spend"))
+        : db.collection("challengeCreditTransactions").doc();
       walletTransactionId = txnRef.id;
       transaction.set(txnRef, {
         id: txnRef.id,
         userId: input.userId,
-        category: "dorocoin",
-        amount: -coinCost,
-        balanceAfter: balance - coinCost,
-        type: "vote_spend",
+        category: "challenge_credit",
+        amount: creditCost,
+        signedAmount: -creditCost,
+        direction: "debit",
+        balanceBefore: balance,
+        balanceAfter: balance - creditCost,
+        type: "paid_vote_spend",
+        sourceType: "paid_vote_spend",
         description: `${quantity} vote${quantity === 1 ? "" : "s"} on submission ${input.submissionId}`,
         sourceId: input.submissionId,
         challengeId: input.challengeId,
         idempotencyKey: voteRequestId,
         immutable: true,
         cashOutEnabled: false,
+        withdrawable: false,
+        ruleVersion: economyRules.version,
         createdBy: input.userId,
         createdAt: now
       });
+      transaction.set(paidVoteGuardRef!, { userId: input.userId, challengeId: input.challengeId, voteDate: voteDateKey, timeZone: voteTimeZone, quantity: alreadyUsed + quantity, maximum: paidVoteDailyLimit, updatedAt: now }, { merge: true });
+      const holdRef = db.collection("paidVoteEconomyHolds").doc(deterministicId("credit_votes", voteRequestId ?? `${input.userId}_${input.challengeId}_${input.submissionId}_${voteDateKey}`));
+      transaction.set(holdRef, { id: holdRef.id, userId: input.userId, challengeId: input.challengeId, submissionId: input.submissionId, quantity, challengeCreditsSpent: creditCost, status: "held_pending_challenge_completion", releaseRequiresChallengeCompletion: true, releaseRequiresFraudClearance: true, releaseRequiresDisputeClearance: true, releaseRequiresVoteIntegrityClearance: true, cashEquivalentAmountCents: null, distributionStatus: "awaiting_confirmed_rule_and_value_attribution", ruleVersion: economyRules.version, createdAt: now, updatedAt: now }, { merge: true });
     }
 
     const voteWeight = getVoteWeight(profile, settings.weightedVotes);
@@ -232,7 +250,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
         voteMode: input.voteMode,
         voteWeight,
         weight: voteWeight,
-        coinCost: input.voteMode === "dorocoin" ? DOROCOIN_COST_PER_VOTE : 0,
+        coinCost: 0,
+        creditCost: input.voteMode === "credits" ? paidVoteCostCredits : 0,
+        ruleVersion: economyRules.version,
         planId: profile.planId ?? input.planId ?? "free",
         voteDateKey,
         voteDate: voteDateKey,
@@ -295,6 +315,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       voteWeight,
       weightedVoteCount: weightedIncrement,
       coinCost,
+      creditCost,
       walletTransactionId,
       suspiciousSignals: input.suspiciousSignals ?? [],
       voteDate: voteDateKey,
@@ -333,6 +354,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       voteMode: input.voteMode,
       quantity,
       coinCost: result.coinCost,
+      creditCost: result.creditCost,
       voteWeight: result.voteWeight,
       suspiciousSignals: input.suspiciousSignals ?? [],
       idempotentReplay: Boolean(result.idempotentReplay)

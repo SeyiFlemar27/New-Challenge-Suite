@@ -134,7 +134,7 @@ export const challenges: Challenge[] = [
     rules: [
       { id: "community", label: "Community guidelines apply", enabled: true, editableText: "Standard platform policies apply." },
       { id: "vote-limit", label: "Free vote limit", enabled: true, editableText: "Free users get 1 vote per challenge/day." },
-      { id: "purchase", label: "Additional votes", enabled: true, editableText: "Users may purchase additional DoroCoin votes after accepting the DoroCoin voting agreement." }
+      { id: "purchase", label: "Additional votes", enabled: true, editableText: "Users may use Challenge Credits for additional votes after accepting the voting policy." }
     ],
     ageRestriction: { enabled: false },
     timeLimitedUploads: { enabled: false },
