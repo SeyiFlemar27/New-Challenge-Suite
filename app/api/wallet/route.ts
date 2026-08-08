@@ -38,15 +38,23 @@ export async function GET(request: Request) {
       db.collection("cashTransactions").where("userId", "==", user.uid).limit(100).get(),
       db.collection("cashLedger").where("userId", "==", user.uid).limit(100).get(),
       db.collection("sponsorships").where("userId", "==", user.uid).limit(100).get(),
-      db.collection("winnerClaims").where("userId", "==", user.uid).limit(100).get()
+      db.collection("winnerClaims").where("userId", "==", user.uid).limit(100).get(),
+      db.collection("challengeCreditWallets").doc(user.uid).get(),
+      db.collection("challengeCreditTransactions").where("userId", "==", user.uid).limit(100).get(),
+      db.collection("creatorGrowthWallets").doc(user.uid).get(),
+      db.collection("creatorGrowthWalletTransactions").where("userId", "==", user.uid).limit(100).get()
     ]);
     const cashWalletSnap = optionalResults[0].status === "fulfilled" ? optionalResults[0].value : null;
     const cashTransactionsSnap = optionalResults[1].status === "fulfilled" ? optionalResults[1].value : null;
     const cashLedgerSnap = optionalResults[2].status === "fulfilled" ? optionalResults[2].value : null;
     const sponsorshipsSnap = optionalResults[3].status === "fulfilled" ? optionalResults[3].value : null;
     const winnerClaimsSnap = optionalResults[4].status === "fulfilled" ? optionalResults[4].value : null;
+    const challengeCreditWalletSnap = optionalResults[5].status === "fulfilled" ? optionalResults[5].value : null;
+    const challengeCreditTransactionsSnap = optionalResults[6].status === "fulfilled" ? optionalResults[6].value : null;
+    const growthWalletSnap = optionalResults[7].status === "fulfilled" ? optionalResults[7].value : null;
+    const growthTransactionsSnap = optionalResults[8].status === "fulfilled" ? optionalResults[8].value : null;
     const warnings = optionalResults
-      .map((result, index) => result.status === "rejected" ? ["cash wallet review", "cash transactions", "cash earnings ledger", "sponsorship review", "winner claims"][index] : null)
+      .map((result, index) => result.status === "rejected" ? ["cash wallet review", "cash transactions", "cash earnings ledger", "sponsorship review", "winner claims", "Challenge Credit wallet", "Challenge Credit history", "Creator Growth Wallet", "Creator Growth Wallet history"][index] : null)
       .filter(Boolean);
 
     const wallet = walletSnap.data() ?? {};
@@ -79,6 +87,22 @@ export async function GET(request: Request) {
         updatedAt: toIso(wallet.updatedAt)
       },
       cashWallet: normalizeCashWallet(user.uid, cashWalletSnap?.data()),
+      challengeCreditWallet: {
+        userId: user.uid,
+        balance: Number(challengeCreditWalletSnap?.data()?.balance ?? 0),
+        creditType: "challenge_credit",
+        withdrawable: false,
+        cashConvertible: false,
+        updatedAt: toIso(challengeCreditWalletSnap?.data()?.updatedAt)
+      },
+      creatorGrowthWallet: {
+        userId: user.uid,
+        balanceCents: Number(growthWalletSnap?.data()?.balanceCents ?? 0),
+        allocationPercent: Number(growthWalletSnap?.data()?.allocationPercent ?? 0),
+        withdrawable: false,
+        restrictedUseOnly: true,
+        updatedAt: toIso(growthWalletSnap?.data()?.updatedAt)
+      },
       walletPolicy: WALLET_POLICY_COPY,
       withdrawalArchitecture: WITHDRAWAL_ARCHITECTURE_CONFIG,
       platformFeeConfig: PLATFORM_FEE_CONFIG,
@@ -129,7 +153,9 @@ export async function GET(request: Request) {
           id: doc.id,
           createdAt: toIso(data.createdAt)
         };
-      }).sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? ""))).slice(0, 50)
+      }).sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? ""))).slice(0, 50),
+      challengeCreditTransactions: challengeCreditTransactionsSnap?.docs.map((doc) => ({ id: doc.id, ...doc.data(), createdAt: toIso(doc.data().createdAt) })).sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? ""))).slice(0, 50) ?? [],
+      creatorGrowthWalletTransactions: growthTransactionsSnap?.docs.map((doc) => ({ id: doc.id, ...doc.data(), createdAt: toIso(doc.data().createdAt) })).sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? ""))).slice(0, 50) ?? []
     }, "Wallet loaded.");
   } catch (error) {
     return serverError("Wallet could not be loaded.", error instanceof Error ? error.message : error);

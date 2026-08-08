@@ -2,6 +2,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { toPublicProfile } from "@/lib/server/public-profile";
 import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { calculateCreatorLevel } from "@/lib/server/economy-rules";
 
 export async function findProfileByUsername(db: Firestore, username: string) {
   const normalized = username.replace(/^@/, "").trim().toLowerCase();
@@ -51,6 +52,8 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
   const wins = privacy.showWins === false ? [] : winnersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const storedBadges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const badges = derivedBadges(merged, storedBadges);
+  const completedChallenges = created.filter((item) => ["completed", "winners_announced", "settled"].includes(String(item.status ?? item.lifecycleStatus ?? ""))).length;
+  const creatorLevel = calculateCreatorLevel({ completedChallenges, participantCount: participantsSnap.size, revenueCents: Number(merged.creatorRevenueCents ?? 0), completionRate: created.length ? completedChallenges / created.length : 0, disputeRate: Number(merged.creatorDisputeRate ?? 0), verified: Boolean(merged.verified || merged.verificationStatus === "verified" || merged.kycStatus === "verified") });
   const activity = privacy.showActivity === false ? [] : [
     ...created.slice(0, 10).map((item) => ({ id: `created_${item.id}`, type: "challenge_created", title: item.title, createdAt: item.createdAt })),
     ...entries.slice(0, 10).map((item) => ({ id: `entry_${item.id}`, type: "entry_submitted", title: item.title ?? item.challengeTitle, createdAt: item.createdAt ?? item.submittedAt })),
@@ -71,7 +74,8 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
       profileVisibility: merged.profileVisibility ?? "public",
       allowMessages: privacy.allowMessages !== false,
       isOwner: viewerId === userId,
-      isFollowing: Boolean(viewerFollowSnap?.exists)
+      isFollowing: Boolean(viewerFollowSnap?.exists),
+      creatorLevel
     },
     stats: {
       followerCount: followersSnap.size,

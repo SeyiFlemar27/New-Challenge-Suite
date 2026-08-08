@@ -48,7 +48,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   support: { title: "Support Inbox", description: "Review account, payment, challenge, voting, and safety support tickets." },
   announcements: { title: "Announcements", description: "Draft platform, maintenance, policy, and feature announcements. Delivery is inactive." },
   categories: { title: "Categories", description: "Review challenge, submission, event, Sponsor, and risk categories." },
-  "voting-rules": { title: "Voting Rules", description: "Review daily free votes, DoroCoin voting, multipliers, and suspicious-vote thresholds." },
+  "voting-rules": { title: "Voting Rules", description: "Review daily free votes, Challenge Credit additional votes, multipliers, and suspicious-vote thresholds." },
   "revenue-rules": { title: "Prize & Revenue Rules", description: "Review platform fees, winner splits, and withdrawal requirements without moving money." },
   "feature-flags": { title: "Feature Flags", description: "Read-only safety state for sensitive and incomplete platform systems." },
   roles: { title: "Admin Roles", description: "Review roles and permissions. Self-promotion and owner grants are unavailable." },

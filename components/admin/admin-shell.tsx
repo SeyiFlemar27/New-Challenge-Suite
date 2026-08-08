@@ -83,6 +83,7 @@ const groups: NavGroup[] = [
     { href: "/admin/roles", label: "Admin roles", icon: Boxes, permission: "roles.manage" }
   ] },
   { label: "Developer Tools", items: [
+    { href: "/admin/developer-tools/economy-rules", label: "Economy Rules", icon: Coins, permission: "developerTools.view", developerOnly: true },
     { href: "/admin/developer-tools/system-status", label: "System status", icon: Activity, permission: "systemDiagnostics.view", developerOnly: true },
     { href: "/admin/developer-tools/background-jobs", label: "Background jobs", icon: RefreshCw, permission: "jobs.view", developerOnly: true },
     { href: "/admin/developer-tools/feature-readiness", label: "Feature readiness", icon: SlidersHorizontal, permission: "systemDiagnostics.view", developerOnly: true },
