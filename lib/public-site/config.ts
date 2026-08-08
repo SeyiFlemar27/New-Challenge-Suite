@@ -1,8 +1,20 @@
 import { BriefcaseBusiness, Camera, Code2, Dumbbell, Gamepad2, GraduationCap, Music2, Palette, Shirt, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import { brandConfig } from "@/lib/brand-config";
 export const PUBLIC_LOGO_URL = brandConfig.logo.local;
-export const PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o2/video/upload/v1785625901/14999510_1920_1080_25fps_vvlpn9.mp4";
+export const PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o2/video/upload/v1786226703/8368664-uhd_4096_2160_25fps_jd1ymz.mp4";
+export const LEGACY_PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o2/video/upload/v1785625901/14999510_1920_1080_25fps_vvlpn9.mp4";
 export const PUBLIC_HERO_POSTER_URL = "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=82";
+export type AmbassadorVideoItem = { id: string; title: string; subtitle: string; videoUrl?: string; posterUrl?: string; status: "placeholder" | "active"; ctaLabel?: string; ctaHref?: string };
+export const PUBLIC_AMBASSADOR_VIDEOS: AmbassadorVideoItem[] = [
+  { id: "ambassador-coming-soon", title: "Ambassador Video Coming Soon", subtitle: "A featured community message will appear here.", status: "placeholder" },
+  { id: "creator-message", title: "Creator Message Coming Soon", subtitle: "Hear from creators building challenges and communities.", status: "placeholder" },
+  { id: "app-message", title: "Download App Message Coming Soon", subtitle: "App launch updates will be shared in this slot.", status: "placeholder" },
+  { id: "featured-slot", title: "Featured Ambassador Slot", subtitle: "An approved ambassador story will appear here.", status: "placeholder" },
+  { id: "community-drop", title: "Community Video Drop Coming Soon", subtitle: "More short community messages are on the way.", status: "placeholder" }
+];
+export const PUBLIC_APP_STORE_URL: string | null = null;
+export const PUBLIC_GOOGLE_PLAY_URL: string | null = null;
+export function resolvePublicHeroVideoUrl(value: unknown) { const url = typeof value === "string" ? value.trim() : ""; return !url || url === LEGACY_PUBLIC_HERO_VIDEO_URL ? PUBLIC_HERO_VIDEO_URL : url; }
 export type PublicCategory = { slug: string; name: string; icon: LucideIcon; description: string; specialties: string[] };
 export const PUBLIC_CATEGORIES: PublicCategory[] = [
 ["fitness","Fitness",Dumbbell,"Fitness challenges for training, performance, wellness and movement.",["Strength","Endurance","Wellness","Movement","Coaching"]],
