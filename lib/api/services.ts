@@ -224,10 +224,14 @@ export function fetchMyProfile() {
       submissions: number;
       totalLikes: number;
       followers: number;
+      wins?: number;
       following: number;
     };
     badges: unknown[];
     submissions: unknown[];
+    challenges: Array<{ id: string; title?: string; status?: string; lifecycleStatus?: string }>;
+    wins: Array<{ id: string; challengeId?: string; challengeTitle?: string; placement?: number }>;
+    activity: Array<{ id: string; type: string; title?: string; createdAt?: string | null }>;
   }>("/api/profile/me");
 }
 

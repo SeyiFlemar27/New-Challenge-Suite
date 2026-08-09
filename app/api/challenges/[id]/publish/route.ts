@@ -14,6 +14,7 @@ import { editableDraftStatus, calculateChallengeDraftProgress } from "@/lib/serv
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
+import { imageLessChallengePublishingAllowed } from "@/lib/server/provider-readiness";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
@@ -28,6 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
+  if (body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return fail("Challenge media uploads are not available yet. Add a storage-confirmed challenge image before publishing.", 503, { provider: "firebase_storage", setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   const { id } = await params;
   const now = new Date().toISOString();
 

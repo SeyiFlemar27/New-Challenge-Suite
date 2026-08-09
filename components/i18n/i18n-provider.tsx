@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, normalizeLanguage, translate, translateFirstPartyText, type LanguageCode } from "@/lib/i18n/config";
+import { DEFAULT_LANGUAGE, normalizeLanguage, readBrowserLanguagePreference, translate, translateFirstPartyText, type LanguageCode } from "@/lib/i18n/config";
 
 const textOriginals = new WeakMap<Text, string>();
 const attributeOriginals = new WeakMap<Element, Map<string, string>>();
@@ -44,12 +44,17 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const admin = pathname.startsWith("/admin");
 
   useEffect(() => {
-    const stored = normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY));
+    const stored = readBrowserLanguagePreference();
     setLanguage(stored);
     const change = (event: Event) => setLanguage(normalizeLanguage((event as CustomEvent).detail));
     window.addEventListener("challenge-suite-language-change", change);
     return () => window.removeEventListener("challenge-suite-language-change", change);
   }, []);
+
+  useEffect(() => {
+    const stored = readBrowserLanguagePreference();
+    setLanguage((current) => current === stored ? current : stored);
+  }, [pathname]);
 
   useEffect(() => {
     if (admin) { applyLanguage(DEFAULT_LANGUAGE); return; }

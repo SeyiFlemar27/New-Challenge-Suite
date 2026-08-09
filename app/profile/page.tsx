@@ -23,6 +23,7 @@ interface ProfileState {
     accountType?: string | null;
     selectedAccountType?: string | null;
     planId?: string | null;
+    verified?: boolean;
     effectiveTier?: {
       displayName: string;
       badgeLabel: string;
@@ -42,6 +43,9 @@ interface ProfileState {
   };
   badges: Array<{ id?: string; name?: string; title?: string; description?: string }>;
   submissions: Array<{ id?: string; title?: string; challengeTitle?: string }>;
+  challenges: Array<{ id: string; title?: string; status?: string; lifecycleStatus?: string }>;
+  wins: Array<{ id: string; challengeId?: string; challengeTitle?: string; placement?: number }>;
+  activity: Array<{ id: string; type: string; title?: string; createdAt?: string | null }>;
 }
 
 function planLabel(planId?: string | null) {
@@ -157,7 +161,7 @@ export default function ProfilePage() {
               <div className="min-w-0 pb-1">
                 <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
                   <h1 data-user-content className="break-words text-3xl font-black sm:text-4xl">{profile.user.displayName}</h1>
-                  <BadgeCheck className="text-[var(--gold)]" size={24} aria-label="Verified profile" />
+                  {profile.user.verified === true ? <BadgeCheck className="text-[var(--gold)]" size={24} aria-label="Verified profile" /> : null}
                   <PremiumBadge planId={profile.user.planId as UserPlanId} badgeStyleId={profile.user.customization?.profileBadgeId} labelOverride={profile.user.effectiveTier?.badgeLabel} />
                 </div>
                 <p className="mt-2 text-sm font-bold text-slate-300">{profile.user.username ? `@${profile.user.username}` : "Username not set"}</p>
@@ -203,9 +207,13 @@ export default function ProfilePage() {
         </div>
         {profile.submissions.length ? <div className="mt-6 grid gap-4">{profile.submissions.map((submission) => <Card key={submission.id ?? submission.title} className="p-5"><div data-user-content className="font-black">{submission.title ?? "Untitled Submission"}</div><p data-user-content className="mt-2 text-sm text-slate-400">{submission.challengeTitle ?? "Challenge entry"}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center text-slate-400"><h3 className="text-2xl font-black text-white">No submissions yet</h3><p className="mt-3">Entries submitted to challenges will appear here.</p><LinkButton href="/my-entries" className="mt-5">View My Entries</LinkButton></Card>}
       </section> : null}
-      {activeTab === "activity" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">No public activity yet</h2><p className="mt-3 text-slate-400">Recorded profile activity will appear here. Challenge Suite does not generate placeholder activity.</p></Card> : null}
-      {activeTab === "challenges" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">Challenge history</h2><p className="mt-3 text-slate-400">Owned and joined challenges appear through their dedicated challenge lists. No placeholder challenges are added here.</p><LinkButton href="/my-challenges" className="mt-5">View Challenges</LinkButton></Card> : null}
-      {activeTab === "wins" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">Confirmed wins</h2><p className="mt-3 text-slate-400">Admin-confirmed results will appear in your winner history.</p><LinkButton href="/winners" className="mt-5">View Results</LinkButton></Card> : null}
+      {activeTab === "activity" ? <ProfileRecordSection title="Activity" emptyTitle="No public activity yet" emptyBody="Real submissions, wins, and verified achievements will appear here as they are recorded." items={profile.activity.map((item) => ({ id: item.id, title: item.title ?? "Profile activity", detail: item.type.replaceAll("_", " ") }))} /> : null}
+      {activeTab === "challenges" ? <ProfileRecordSection title="Challenges" emptyTitle="No challenges yet" emptyBody="Created challenge records will appear here after you save or publish them." items={profile.challenges.map((item) => ({ id: item.id, title: item.title ?? "Untitled challenge", detail: String(item.lifecycleStatus ?? item.status ?? "draft").replaceAll("_", " "), href: `/challenges/${item.id}` }))} /> : null}
+      {activeTab === "wins" ? <ProfileRecordSection title="Confirmed wins" emptyTitle="No confirmed wins yet" emptyBody="Admin-confirmed winner records will appear here after results are approved." items={profile.wins.map((item) => ({ id: item.id, title: item.challengeTitle ?? "Challenge result", detail: item.placement ? `Placement ${item.placement}` : "Winner confirmed", href: item.challengeId ? `/challenges/${item.challengeId}` : undefined }))} /> : null}
     </AppShell>
   );
+}
+
+function ProfileRecordSection({ title, emptyTitle, emptyBody, items }: { title: string; emptyTitle: string; emptyBody: string; items: Array<{ id: string; title: string; detail: string; href?: string }> }) {
+  return <section className="mt-12"><h2 className="text-3xl font-black">{title}</h2>{items.length ? <div className="mt-6 grid gap-4 sm:grid-cols-2">{items.map((item) => <Card key={item.id} className="p-5"><h3 data-user-content className="break-words text-lg font-black">{item.title}</h3><p className="mt-2 text-sm capitalize text-slate-400">{item.detail}</p>{item.href ? <LinkButton href={item.href} variant="secondary" className="mt-4">View</LinkButton> : null}</Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center"><h3 className="text-2xl font-black">{emptyTitle}</h3><p className="mt-3 text-slate-400">{emptyBody}</p></Card>}</section>;
 }

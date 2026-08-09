@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     },
     notifications: notificationsSnap.data() ?? {
       challengeReminders: true, liveChallengeReminders: true, voteNotifications: true, commentsReplies: true,
-      followerNotifications: true, sponsorRequestUpdates: true, billingAlerts: true, email: true, push: false, inApp: true
+      followerNotifications: true, sponsorRequestUpdates: true, billingAlerts: true, email: false, push: false, inApp: true
     },
     preferences: preferencesSnap.data() ?? {
       favoriteCategories: [], preferredChallengeTypes: [], locationPreference: "", contentLanguage: "English", matureContent: false, appearance: "light"
@@ -157,7 +157,7 @@ export async function PATCH(request: Request) {
   const writes: Promise<unknown>[] = [
     db.collection("profiles").doc(user.uid).set(profileUpdate, { merge: true }),
     db.collection("users").doc(user.uid).set({ displayName: input.displayName, username: input.username, usernameNormalized, updatedAt: now }, { merge: true }),
-    db.collection("notificationPreferences").doc(user.uid).set({ userId: user.uid, ...input.notifications, updatedAt: now }, { merge: true }),
+    db.collection("notificationPreferences").doc(user.uid).set({ userId: user.uid, ...input.notifications, email: false, push: false, inApp: true, deliveryMode: "in_app_only", updatedAt: now }, { merge: true }),
     db.collection("userPreferences").doc(user.uid).set({ userId: user.uid, ...input.preferences, updatedAt: now }, { merge: true })
   ];
   if (input.sponsorDefaults) {

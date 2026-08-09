@@ -37,14 +37,14 @@ export default function RegisterPage() {
 
   function validate() {
     const next: Record<string, string> = {};
-    if (!form.firstName.trim()) next.firstName = "First name is required.";
-    if (!form.lastName.trim()) next.lastName = "Last name is required.";
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) next.email = "Enter a valid email address.";
+    if (!form.firstName.trim()) next.firstName = t("First name is required.");
+    if (!form.lastName.trim()) next.lastName = t("Last name is required.");
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) next.email = t("Enter a valid email address.");
     if (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password)) {
-      next.password = "Use at least 8 characters with a number and uppercase letter.";
+      next.password = t("Use at least 8 characters with a number and uppercase letter.");
     }
-    if (form.confirmPassword !== form.password) next.confirmPassword = "Passwords do not match.";
-    if (!accepted.terms || !accepted.privacy || !accepted.community) next.agreements = "Accept all account agreements to continue.";
+    if (form.confirmPassword !== form.password) next.confirmPassword = t("Passwords do not match.");
+    if (!accepted.terms || !accepted.privacy || !accepted.community) next.agreements = t("Accept all account agreements to continue.");
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -76,26 +76,26 @@ export default function RegisterPage() {
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
       <Card className="w-full max-w-[600px] rounded-[12px] p-6 sm:p-8 lg:p-10">
         <div className="mb-7 flex items-center justify-between gap-4"><span className="w-28" /><BrandLogo imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" /><div className="flex w-28 justify-end"><LanguageSelector compact /></div></div>
-        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{t("createAccount")}</h1>
-        <p className="mx-auto mt-3 max-w-md text-center text-base leading-7 text-slate-300 sm:text-lg">Join the Challenge Suite community today</p>
+        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{t("Create Account")}</h1>
+        <p className="mx-auto mt-3 max-w-md text-center text-base leading-7 text-slate-300 sm:text-lg">{t("Join the Challenge Suite community today")}</p>
         <form className="mt-8 space-y-6" onSubmit={submit}>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="First Name"><input className={inputClass} value={form.firstName} onChange={(event) => update("firstName", event.target.value)} placeholder="First name" /></Field>
-            <Field label="Last Name"><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder="Last name" /></Field>
+            <Field label={t("First Name")}><input className={inputClass} value={form.firstName} onChange={(event) => update("firstName", event.target.value)} placeholder={t("First name")} /></Field>
+            <Field label={t("Last Name")}><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder={t("Last name")} /></Field>
           </div>
-          <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
-          <Field label="Referral code (optional)"><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder="Referral code" autoComplete="off" /></Field>
-          <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.</Card>
-          <PasswordField label="Password" shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
-          <PasswordField label="Confirm Password" shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />
+          <Field label={t("Email Address")}><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
+          <Field label={t("Referral code (optional)")}><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder={t("Referral code")} autoComplete="off" /></Field>
+          <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">{t("After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.")}</Card>
+          <PasswordField label={t("Password")} shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
+          <PasswordField label={t("Confirm Password")} shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />
           {Object.values(errors).filter(Boolean).map((error) => <p key={error} className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p>)}
-          <Agreement checked={accepted.terms} onChange={(terms) => setAccepted((current) => ({ ...current, terms }))} text="I accept the Terms of Service" />
-          <Agreement checked={accepted.privacy} onChange={(privacy) => setAccepted((current) => ({ ...current, privacy }))} text="I accept the Privacy Policy" />
-          <Agreement checked={accepted.community} onChange={(community) => setAccepted((current) => ({ ...current, community }))} text="I accept the Community Guidelines" />
+          <Agreement checked={accepted.terms} onChange={(terms) => setAccepted((current) => ({ ...current, terms }))} text={t("I accept the Terms of Service")} />
+          <Agreement checked={accepted.privacy} onChange={(privacy) => setAccepted((current) => ({ ...current, privacy }))} text={t("I accept the Privacy Policy")} />
+          <Agreement checked={accepted.community} onChange={(community) => setAccepted((current) => ({ ...current, community }))} text={t("I accept the Community Guidelines")} />
           <p className="rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-slate-300">{legalDocuments.master_account.body}</p>
-          <Button className="mt-3 w-full" disabled={loading}>{loading ? "Creating account..." : t("signUp")}</Button>
+          <Button className="mt-3 w-full" disabled={loading}>{t(loading ? "Creating account..." : "Sign Up")}</Button>
         </form>
-        <div className="mt-8 border-t border-white/10 pt-6 text-center text-slate-300">Already have an account? <Link href="/auth/login" className="font-bold text-[var(--gold)]">Sign In</Link></div>
+        <div className="mt-8 border-t border-white/10 pt-6 text-center text-slate-300">{t("Already have an account?")} <Link href="/auth/login" className="font-bold text-[var(--gold)]">{t("Sign In")}</Link></div>
       </Card>
     </main>
   );

@@ -9,6 +9,8 @@ import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { loginWithEmail } from "@/lib/firebase/auth-service";
+import { LanguageSelector } from "@/components/i18n/language-selector";
+import { useLanguage } from "@/lib/i18n/use-language";
 
 function safeInternalPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
@@ -22,6 +24,7 @@ function getNextPath() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -44,11 +47,11 @@ export default function LoginPage() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(form.email)) {
-      setError("Enter a valid email address.");
+      setError(t("Enter a valid email address."));
       return;
     }
     if (!form.password) {
-      setError("Password is required.");
+      setError(t("Password is required."));
       return;
     }
     setError("");
@@ -71,12 +74,12 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
       <Card className="w-full max-w-[450px] rounded-[12px] p-6 sm:p-8 lg:p-10">
-        <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" />
-        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{nextPath ? "Sign in to continue" : "Sign In"}</h1>
-        <p className="mx-auto mt-3 max-w-sm text-center text-base leading-7 text-slate-300 sm:text-lg">{nextPath ? "Continue to Challenge Suite." : "Welcome back to Challenge Suite"}</p>
+        <div className="mb-7 flex items-center justify-between gap-4"><span className="w-24" /><BrandLogo imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" /><div className="flex w-24 justify-end"><LanguageSelector compact /></div></div>
+        <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{t(nextPath ? "Sign in to continue" : "Sign In")}</h1>
+        <p className="mx-auto mt-3 max-w-sm text-center text-base leading-7 text-slate-300 sm:text-lg">{t(nextPath ? "Continue to Challenge Suite." : "Welcome back to Challenge Suite")}</p>
         <form className="mt-8 space-y-6 sm:mt-10" onSubmit={submit}>
-          <Field label="Email Address"><input className={inputClass} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" type="email" /></Field>
-          <Field label="Password">
+          <Field label={t("Email Address")}><input className={inputClass} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" type="email" /></Field>
+          <Field label={t("Password")}>
             <div className="relative">
               <input className={`${inputClass} pr-12`} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder="Password" type={showPassword ? "text" : "password"} />
               <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" aria-label={showPassword ? "Hide password" : "Show password"}>
@@ -85,11 +88,11 @@ export default function LoginPage() {
             </div>
           </Field>
           {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
-          <Button className="w-full" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
+          <Button className="w-full" disabled={loading}>{t(loading ? "Signing in..." : "Sign In")}</Button>
         </form>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center text-sm sm:flex-row sm:justify-between">
-          <Link href="/auth/forgot-password" className="text-[var(--gold)]">Forgot password?</Link>
-          <Link href="/auth/register" className="font-bold text-[var(--gold)]">Create account</Link>
+          <Link href="/auth/forgot-password" className="text-[var(--gold)]">{t("Forgot password?")}</Link>
+          <Link href="/auth/register" className="font-bold text-[var(--gold)]">{t("Create account")}</Link>
         </div>
       </Card>
     </main>

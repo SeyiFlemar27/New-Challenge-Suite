@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getOptionalRequestUser } from "@/lib/server/auth";
-import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { ok, serverError } from "@/lib/server/responses";
 import { getChallengePhaseSummary } from "@/lib/challenge-status";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
@@ -103,7 +103,7 @@ function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary
 
 export async function GET(request: NextRequest) {
   const db = getAdminDb();
-  if (!db) return serverUnavailable("Explore is not connected yet.");
+  if (!db) return ok({ challenges: [], featured: [], trending: [], categories: [], page: 1, limit: 24, total: 0, hasMore: false, filters: {}, privateFieldsExcluded: true, realDataOnly: true, backendAvailable: false, reason: "backend_not_configured" }, "Explore is temporarily unavailable while the challenge service is being connected.");
   const user = await getOptionalRequestUser(request);
   const sponsor = isSponsorProfile(user ? { role: user.role } : {});
   const url = new URL(request.url);

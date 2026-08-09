@@ -14,6 +14,7 @@ import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
+import { imageLessChallengePublishingAllowed } from "@/lib/server/provider-readiness";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
   const validation = serverChallengeCreateSchema.safeParse(normalizedInput);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
+  if (body.publish && body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return fail("Challenge media uploads are not available yet. Add a storage-confirmed challenge image before publishing.", 503, { provider: "firebase_storage", setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   if (isRetiredHybridCompetition(body as unknown as Record<string, unknown>)) {
     return fail("Hybrid Competition has been discontinued. Create a Challenge, Live Event, or Tournament instead.", 410, undefined, "HYBRID_COMPETITION_RETIRED");
   }

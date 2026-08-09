@@ -2,15 +2,20 @@
 
 import { Languages } from "lucide-react";
 import { useEffect, useState } from "react";
-import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, normalizeLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from "@/lib/i18n/config";
+import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, normalizeLanguage, readBrowserLanguagePreference, SUPPORTED_LANGUAGES, type LanguageCode } from "@/lib/i18n/config";
 
 export function LanguageSelector({ compact = false, persistAccount = false }: { compact?: boolean; persistAccount?: boolean }) {
   const [language, setLanguage] = useState<LanguageCode>(DEFAULT_LANGUAGE);
   useEffect(() => {
-    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (saved || !persistAccount) {
-      setLanguage(normalizeLanguage(saved));
-      return;
+    const saved = readBrowserLanguagePreference();
+    if (saved !== DEFAULT_LANGUAGE || !persistAccount) {
+      const next = saved;
+      setLanguage(next);
+      document.documentElement.lang = next;
+      const frame = window.requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: next }));
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
     fetch("/api/profile/language", { cache: "no-store" }).then((response) => response.json()).then((body) => {
       if (!body?.ok || !body?.data?.language) return;

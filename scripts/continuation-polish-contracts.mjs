@@ -20,7 +20,7 @@ export function run(name) {
     assert(source.selector.includes("localStorage.setItem") && source.selector.includes("document.cookie"));
     assert(source.languageApi.includes("export async function GET") && source.languageApi.includes("export async function PATCH"));
     assert(!source.provider.includes("/fr/") && !source.provider.includes("/es/") && !source.provider.includes("/pt/"));
-    assert(source.config.includes("?? key"));
+    assert(source.config.includes("readableFallback(key)"));
     assert(!source.config.includes("exchangeRate") && !source.config.includes("convertCurrency"));
   }
   if (name.startsWith("creator-analytics-")) {

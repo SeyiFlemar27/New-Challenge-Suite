@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   const challenges = await ownedChallenges(db, user.uid, Boolean(user.isAdmin));
   const challengeIds = challenges.map((item) => item.id);
-  const [challengeParticipants, legacyParticipants, submissions, winners, votes, attendance, sponsorInterest, notifications] = await Promise.all([
+  const [challengeParticipants, legacyParticipants, submissions, winners, votes, attendance, sponsorInterest, boosts, notifications] = await Promise.all([
     related(db, "challengeParticipants", challengeIds),
     related(db, "participants", challengeIds),
     related(db, "submissions", challengeIds),
@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     related(db, "votes", challengeIds),
     related(db, "liveEventRegistrations", challengeIds),
     related(db, "sponsorProposals", challengeIds),
+    related(db, "challengeBoosts", challengeIds),
     db.collection("notifications").where("userId", "==", user.uid).limit(50).get().then((snap) => snap.docs.map(serialize)).catch(() => [])
   ]);
   const participants = unique([...challengeParticipants, ...legacyParticipants]);
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
     completedChallenges,
     participants,
     submissions,
+    boosts,
     winners,
     votes,
     attendance,

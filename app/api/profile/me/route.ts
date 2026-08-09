@@ -118,9 +118,12 @@ export async function GET(request: Request) {
       profile = { ...baseProfile, ...profile };
     }
 
-    const [submissionsSnap, badgesSnap] = await Promise.all([
+    const [submissionsSnap, badgesSnap, creatorChallengesSnap, hostChallengesSnap, winsSnap] = await Promise.all([
       runOptionalProfileRead("submissions where userId == uid orderBy createdAt desc", user.uid, null, () => db.collection("submissions").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(50).get()),
-      runOptionalProfileRead("badges where userId == uid", user.uid, null, () => db.collection("badges").where("userId", "==", user.uid).limit(50).get())
+      runOptionalProfileRead("badges where userId == uid", user.uid, null, () => db.collection("badges").where("userId", "==", user.uid).limit(50).get()),
+      runOptionalProfileRead("challenges where creatorId == uid", user.uid, null, () => db.collection("challenges").where("creatorId", "==", user.uid).limit(50).get()),
+      runOptionalProfileRead("challenges where hostId == uid", user.uid, null, () => db.collection("challenges").where("hostId", "==", user.uid).limit(50).get()),
+      runOptionalProfileRead("winners where userId == uid", user.uid, null, () => db.collection("winners").where("userId", "==", user.uid).limit(50).get())
     ]);
 
     const identity = resolveProfileIdentity({ ...account, ...profile }, String(user.email ?? ""));
@@ -138,7 +141,7 @@ export async function GET(request: Request) {
         submittedAt: toIso(data.submittedAt)
       };
     }) : [];
-    const badges = badgesSnap ? badgesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()) && !isDemoProfileContent(doc.data().title ?? doc.data().name) && !isDemoProfileContent(doc.data().description)).map((doc) => {
+    const badges: Array<Record<string, unknown> & { id: string; earnedAt: string | null }> = badgesSnap ? badgesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()) && !isDemoProfileContent(doc.data().title ?? doc.data().name) && !isDemoProfileContent(doc.data().description)).map((doc) => {
       const data = doc.data();
       return {
         ...data,
@@ -146,6 +149,18 @@ export async function GET(request: Request) {
         earnedAt: toIso(data.earnedAt ?? data.createdAt)
       };
     }) : [];
+    const challenges: Array<Record<string, unknown> & { id: string }> = [...new Map([...(creatorChallengesSnap?.docs ?? []), ...(hostChallengesSnap?.docs ?? [])].map((doc) => [doc.id, { id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }])).values()]
+      .filter((item) => !isQaOrDemoRecord(item.id, item))
+      .map((item) => ({ ...item, createdAt: toIso(item.createdAt), updatedAt: toIso(item.updatedAt) }));
+    const wins: Array<Record<string, unknown> & { id: string; createdAt: string | null; approvedAt: string | null }> = (winsSnap?.docs ?? []).filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => {
+      const data = doc.data();
+      return { ...data, id: doc.id, createdAt: toIso(data.createdAt), approvedAt: toIso(data.approvedAt) };
+    });
+    const activity = [
+      ...submissions.map((item) => ({ id: `submission_${item.id}`, type: "submission", title: item.title ?? "Challenge entry submitted", createdAt: item.submittedAt ?? item.createdAt ?? null })),
+      ...badges.map((item) => ({ id: `badge_${item.id}`, type: "achievement", title: item.title ?? item.name ?? "Achievement earned", createdAt: item.earnedAt ?? null })),
+      ...wins.map((item) => ({ id: `win_${item.id}`, type: "win", title: item.challengeTitle ?? "Confirmed challenge win", createdAt: item.approvedAt ?? item.createdAt ?? null }))
+    ].filter((item) => item.createdAt).sort((a, b) => Date.parse(String(b.createdAt)) - Date.parse(String(a.createdAt))).slice(0, 20);
     const totalLikes = submissions.reduce((sum, submission) => sum + Number(submission.likes ?? submission.voteCount ?? submission.weightedVoteCount ?? 0), 0);
 
     return ok({
@@ -174,11 +189,15 @@ export async function GET(request: Request) {
         totalPoints: Number(profile.totalPoints ?? account.totalPoints ?? 0),
         submissions: submissions.length,
         totalLikes: Number(profile.totalLikes ?? totalLikes),
+        wins: wins.length,
         followers: Number(profile.followers ?? 0),
         following: Number(profile.following ?? 0)
       },
       badges,
-      submissions
+      submissions,
+      challenges,
+      wins,
+      activity
     }, "Profile loaded.");
   } catch (error) {
     return serverError("Profile could not be loaded.", error instanceof Error ? error.message : error);
