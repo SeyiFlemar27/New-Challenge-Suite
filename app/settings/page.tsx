@@ -20,6 +20,7 @@ import { Card, PageTitle } from "@/components/ui";
 import Link from "next/link";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getEffectiveTier } from "@/lib/plan-access";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 
 const categories = [
   { href: "/settings/account", title: "Account", body: "Name, username, email, phone, and account type.", icon: CircleUserRound },
@@ -41,6 +42,7 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <PageTitle title="Settings" subtitle="Choose a category to manage one focused part of your Challenge Suite account." icon={<SettingsIcon className="text-[var(--gold)]" />} />
+      <Card className="mt-6 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-black">Language</h2><p className="mt-1 text-sm text-slate-400">Choose the interface language. Challenge content and currency values are not automatically translated or converted.</p></div><LanguageSelector persistAccount /></Card>
       <div className="mt-8 grid gap-3 lg:grid-cols-2">
         {categories.map(({ href, title, body, icon: Icon, danger }) => {
           const displayTitle = href === "/settings/wallet" && tier.id === "host" ? "Wallet & Revenue" : title;

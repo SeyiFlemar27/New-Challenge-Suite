@@ -62,6 +62,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "challenges" | "entries" | "wins" | "achievements" | "activity">("overview");
 
   async function loadProfile() {
     setLoading(true);
@@ -183,21 +184,26 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      <section className="mt-12">
+      <nav className="mt-8 flex gap-2 overflow-x-auto border-b border-white/10 pb-3" aria-label="Profile sections">{(["overview", "challenges", "entries", "wins", "achievements", "activity"] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 rounded-[8px] px-4 py-2 text-sm font-black capitalize ${activeTab === tab ? "bg-[var(--gold)] text-black" : "bg-white/5 text-slate-300"}`}>{tab}</button>)}</nav>
+
+      {activeTab === "overview" || activeTab === "achievements" ? <section className="mt-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-3xl font-black">Achievements</h2>
           <span className="rounded-full border border-white/10 px-4 py-1 text-sm text-slate-300">{profile.badges.length} badges</span>
         </div>
         {profile.badges.length ? <div className="mt-6 grid gap-4 md:grid-cols-3">{profile.badges.map((badge) => <Card key={badge.id ?? badge.name ?? badge.title} className="p-5"><div className="flex items-center gap-3 text-xl font-black"><Award className="text-[var(--gold)]" size={20} />{badge.title ?? badge.name}</div><p className="mt-2 text-sm leading-6 text-[#8fa6ca]">{badge.description ?? "Earned through Challenge Suite activity."}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center text-[#8fa6ca]"><Trophy className="mx-auto text-[var(--gold)]" size={36} /><h3 className="mt-4 text-2xl font-black text-white">No achievements yet</h3><p className="mt-3">Badges will appear as you compete, vote, and win challenges.</p></Card>}
-      </section>
+      </section> : null}
 
-      <section className="mt-12">
+      {activeTab === "overview" || activeTab === "entries" ? <section className="mt-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-3xl font-black">Submissions</h2>
           <LinkButton href="/my-entries" variant="secondary">View My Entries</LinkButton>
         </div>
         {profile.submissions.length ? <div className="mt-6 grid gap-4">{profile.submissions.map((submission) => <Card key={submission.id ?? submission.title} className="p-5"><div className="font-black">{submission.title ?? "Untitled Submission"}</div><p className="mt-2 text-sm text-slate-400">{submission.challengeTitle ?? "Challenge entry"}</p></Card>)}</div> : <Card className="mt-6 border-dashed p-8 text-center text-slate-400"><h3 className="text-2xl font-black text-white">No submissions yet</h3><p className="mt-3">Entries submitted to challenges will appear here.</p><LinkButton href="/my-entries" className="mt-5">View My Entries</LinkButton></Card>}
-      </section>
+      </section> : null}
+      {activeTab === "activity" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">No public activity yet</h2><p className="mt-3 text-slate-400">Recorded profile activity will appear here. Challenge Suite does not generate placeholder activity.</p></Card> : null}
+      {activeTab === "challenges" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">Challenge history</h2><p className="mt-3 text-slate-400">Owned and joined challenges appear through their dedicated challenge lists. No placeholder challenges are added here.</p><LinkButton href="/my-challenges" className="mt-5">View Challenges</LinkButton></Card> : null}
+      {activeTab === "wins" ? <Card className="mt-12 border-dashed p-8 text-center"><h2 className="text-2xl font-black">Confirmed wins</h2><p className="mt-3 text-slate-400">Admin-confirmed results will appear in your winner history.</p><LinkButton href="/winners" className="mt-5">View Results</LinkButton></Card> : null}
     </AppShell>
   );
 }
