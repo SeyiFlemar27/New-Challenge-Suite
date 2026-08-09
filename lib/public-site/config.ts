@@ -6,11 +6,11 @@ export const LEGACY_PUBLIC_HERO_VIDEO_URL = "https://res.cloudinary.com/drefcs4o
 export const PUBLIC_HERO_POSTER_URL = "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=82";
 export type AmbassadorVideoItem = { id: string; title: string; subtitle: string; videoUrl?: string; posterUrl?: string; status: "placeholder" | "active"; ctaLabel?: string; ctaHref?: string };
 export const PUBLIC_AMBASSADOR_VIDEOS: AmbassadorVideoItem[] = [
-  { id: "ambassador-coming-soon", title: "Ambassador Video Coming Soon", subtitle: "A featured community message will appear here.", status: "placeholder" },
-  { id: "creator-message", title: "Creator Message Coming Soon", subtitle: "Hear from creators building challenges and communities.", status: "placeholder" },
-  { id: "app-message", title: "Download App Message Coming Soon", subtitle: "App launch updates will be shared in this slot.", status: "placeholder" },
-  { id: "featured-slot", title: "Featured Ambassador Slot", subtitle: "An approved ambassador story will appear here.", status: "placeholder" },
-  { id: "community-drop", title: "Community Video Drop Coming Soon", subtitle: "More short community messages are on the way.", status: "placeholder" }
+  { id: "ambassador-coming-soon", title: "Ambassador Video Coming Soon", subtitle: "A short message will appear here soon.", status: "placeholder" },
+  { id: "creator-message", title: "Creator Message Coming Soon", subtitle: "Featured voices will invite the community to join.", status: "placeholder" },
+  { id: "app-message", title: "Download App Message Coming Soon", subtitle: "App download messages will appear here.", status: "placeholder" },
+  { id: "featured-slot", title: "Featured Ambassador Slot", subtitle: "Ambassador videos are being prepared.", status: "placeholder" },
+  { id: "community-drop", title: "Community Video Drop Coming Soon", subtitle: "More video drops are coming soon.", status: "placeholder" }
 ];
 export const PUBLIC_APP_STORE_URL: string | null = null;
 export const PUBLIC_GOOGLE_PLAY_URL: string | null = null;
