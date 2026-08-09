@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth-provider";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import type { AccountType, AppRole, UserPlanId } from "@/lib/types";
 import type { ProfileCustomization } from "@/lib/customization/options";
+import { resolveProfileIdentity } from "@/lib/profile-identity";
 
 export interface CurrentUserProfile {
   uid: string;
@@ -83,7 +84,8 @@ export function useCurrentUser() {
 
         const profile = result.data.user;
         const profileRecord = profile as Record<string, unknown>;
-        const displayName = String(profile.displayName || auth.user.displayName || auth.user.email || "");
+        const identity = resolveProfileIdentity(profileRecord, String(auth.user.email || profile.email || ""), String(auth.user.displayName || ""));
+        const displayName = identity.displayName;
         const planId = typeof profile.planId === "string" ? profile.planId as UserPlanId : undefined;
         const accountType = accountTypeFromProfile(profileRecord);
 
@@ -91,7 +93,7 @@ export function useCurrentUser() {
           uid: auth.user.uid,
           email: String(auth.user.email || profile.email || ""),
           displayName,
-          initials: profile.initials || initialsFromName(displayName || auth.user.email || ""),
+          initials: identity.initials,
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           accountType,
           dashboardType: typeof profile.dashboardType === "string" ? profile.dashboardType : undefined,

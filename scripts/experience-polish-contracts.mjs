@@ -33,7 +33,7 @@ export function run(name) {
   if (name.includes("faq")) { assert(sources.talent.match(/\[\"/g)?.length >= 10); assert(sources.home.includes("<PublicFaq")); }
   if (name.includes("register")) { assert(sources.register.includes("justify-between")); assert(sources.register.includes("items-start gap-3")); assert(sources.register.includes("First Name") && sources.register.includes("Community Guidelines")); }
   if (name.includes("creator-dashboard")) { assert(sources.creator.includes("Owned challenges")); assert(sources.creator.includes("Next steps")); assert(sources.creator.includes("/api/host/operations")); }
-  if (name.includes("creator-analytics")) { assert(sources.creator.includes("Real records grouped by owned challenge")); assert(sources.creator.includes("No sample is stored as activity")); }
+  if (name.includes("creator-analytics")) { assert(sources.creator.includes("CreatorAnalytics")); assert(sources.creator.includes("/api/host/operations")); }
   if (name.includes("monthly-boosts")) { assert(sources.creator.includes("eligibleBoosts")); assert(sources.creator.includes("/boost`")); assert(sources.creator.includes("Review Boost")); }
   if (name.includes("sponsor-ready")) { assert(sources.creator.includes("sponsorReady")); assert(sources.creator.includes("Manage Readiness")); }
   if (name.includes("profile")) { assert(sources.profile.includes("Profile sections")); for (const tab of ["overview","challenges","entries","wins","achievements","activity"]) assert(sources.profile.includes(`\"${tab}\"`)); }

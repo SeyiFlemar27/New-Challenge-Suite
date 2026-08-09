@@ -1,7 +1,8 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { toPublicProfile } from "@/lib/server/public-profile";
-import { publicChallengeFields } from "@/lib/server/public-challenge";
+import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
+import { isDemoProfileContent, isExplicitDemoEnvironment } from "@/lib/profile-identity";
 import { calculateCreatorLevel } from "@/lib/server/economy-rules";
 
 export async function findProfileByUsername(db: Firestore, username: string) {
@@ -44,13 +45,14 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
     viewerId ? db.collection("follows").doc(`${viewerId}_${userId}`).get() : Promise.resolve(null)
   ]);
   const merged = { ...(accountSnap.data() ?? {}), ...(profileSnap.data() ?? {}) };
+  if (!isExplicitDemoEnvironment() && isQaDemoOrPlaceholderProfile(profileSnap.id, merged)) return null;
   const privacy = (merged.privacySettings && typeof merged.privacySettings === "object" ? merged.privacySettings : {}) as Record<string, unknown>;
   const profile = toPublicProfile(userId, merged);
-  const created = challengesSnap.docs.map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) } as Record<string, unknown>));
-  const participating = privacy.showParticipatedChallenges === false ? [] : participantsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
-  const entries = submissionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
-  const wins = privacy.showWins === false ? [] : winnersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
-  const storedBadges = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const created = challengesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) } as Record<string, unknown>));
+  const participating = privacy.showParticipatedChallenges === false ? [] : participantsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const entries = submissionsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const wins = privacy.showWins === false ? [] : winnersSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const storedBadges = badgesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()) && !isDemoProfileContent(doc.data().title ?? doc.data().name) && !isDemoProfileContent(doc.data().description)).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const badges = derivedBadges(merged, storedBadges);
   const completedChallenges = created.filter((item) => ["completed", "winners_announced", "settled"].includes(String(item.status ?? item.lifecycleStatus ?? ""))).length;
   const creatorLevel = calculateCreatorLevel({ completedChallenges, participantCount: participantsSnap.size, revenueCents: Number(merged.creatorRevenueCents ?? 0), completionRate: created.length ? completedChallenges / created.length : 0, disputeRate: Number(merged.creatorDisputeRate ?? 0), verified: Boolean(merged.verified || merged.verificationStatus === "verified" || merged.kycStatus === "verified") });

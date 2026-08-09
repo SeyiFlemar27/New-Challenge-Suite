@@ -7,6 +7,7 @@ import { sanitizeCustomization } from "@/lib/customization/access";
 import { z } from "zod";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
+import { resolveProfileIdentity } from "@/lib/profile-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,8 @@ function initialsFromName(name: string) {
 }
 
 function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>) {
-  const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
+  const identity = resolveProfileIdentity({ ...profile, ...account }, String(user.email ?? ""));
+  const displayName = identity.displayName;
   const merged = { ...profile, ...account };
   const isAdmin = Boolean(account.isAdmin || profile.isAdmin);
   const planAccess = getUserPlanAccess(merged);
@@ -62,7 +64,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     legacyPlanId: planAccess.planId,
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
     customization: sanitizeCustomization((profile.customization ?? account.customization) as any),
-    initials: String(profile.initials ?? initialsFromName(displayName || String(user.email ?? ""))),
+    initials: identity.initials,
     premium: planAccess.isPremium,
     verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),

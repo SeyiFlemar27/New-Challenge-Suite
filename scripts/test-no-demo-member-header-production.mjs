@@ -1,2 +1,2 @@
 import { run } from "./continuation-polish-contracts.mjs";
-run("i18n-user-generated-content-not-translated");
+run("no-demo-member-header-production");

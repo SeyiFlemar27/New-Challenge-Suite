@@ -1,9 +1,11 @@
 import { sanitizeCustomization } from "@/lib/customization/access";
+import { resolveProfileIdentity } from "@/lib/profile-identity";
 
 type ProfileData = Record<string, unknown>;
 
 export function toPublicProfile(userId: string, profile: ProfileData = {}) {
-  const displayName = String(profile.displayName ?? profile.name ?? "Challenge Suite Member");
+  const identity = resolveProfileIdentity(profile, String(profile.email ?? ""));
+  const displayName = identity.displayName;
   const customization = sanitizeCustomization(profile.customization as never);
   const role = ["user", "creator", "sponsor"].includes(String(profile.role))
     ? String(profile.role)
@@ -14,7 +16,7 @@ export function toPublicProfile(userId: string, profile: ProfileData = {}) {
     uid: userId,
     displayName,
     username: typeof profile.username === "string" ? profile.username : null,
-    initials: String(profile.initials ?? displayName.slice(0, 2).toUpperCase()),
+    initials: identity.initials,
     avatarUrl: typeof profile.avatarUrl === "string"
       ? profile.avatarUrl
       : typeof profile.photoURL === "string"

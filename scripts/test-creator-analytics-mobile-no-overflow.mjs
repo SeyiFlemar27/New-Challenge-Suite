@@ -1,2 +1,2 @@
-import { run } from "./experience-polish-contracts.mjs";
-run("test-creator-analytics-mobile-no-overflow.mjs");
+import { run } from "./continuation-polish-contracts.mjs";
+run("creator-analytics-mobile-no-overflow");

@@ -6,7 +6,21 @@ import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, normalizeLanguage, SUPPORTED_LA
 
 export function LanguageSelector({ compact = false, persistAccount = false }: { compact?: boolean; persistAccount?: boolean }) {
   const [language, setLanguage] = useState<LanguageCode>(DEFAULT_LANGUAGE);
-  useEffect(() => setLanguage(normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY))), []);
+  useEffect(() => {
+    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (saved || !persistAccount) {
+      setLanguage(normalizeLanguage(saved));
+      return;
+    }
+    fetch("/api/profile/language", { cache: "no-store" }).then((response) => response.json()).then((body) => {
+      if (!body?.ok || !body?.data?.language) return;
+      const next = normalizeLanguage(body.data.language);
+      setLanguage(next);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+      document.cookie = `${LANGUAGE_STORAGE_KEY}=${next};path=/;max-age=31536000;samesite=lax`;
+      window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: next }));
+    }).catch(() => undefined);
+  }, [persistAccount]);
 
   async function change(value: string) {
     const next = normalizeLanguage(value);

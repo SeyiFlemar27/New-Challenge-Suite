@@ -5,6 +5,20 @@ import { ok, readJson, serverUnavailable, validationError } from "@/lib/server/r
 
 const schema = z.object({ language: z.enum(["en", "fr", "es", "pt"]) });
 
+export async function GET(request: Request) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Language preference");
+  const [profile, account] = await Promise.all([
+    db.collection("profiles").doc(user.uid).get(),
+    db.collection("users").doc(user.uid).get()
+  ]);
+  const candidate = profile.data()?.language ?? account.data()?.language ?? "en";
+  const parsed = schema.shape.language.safeParse(candidate);
+  return ok({ language: parsed.success ? parsed.data : "en" }, "Language preference loaded.");
+}
+
 export async function PATCH(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;

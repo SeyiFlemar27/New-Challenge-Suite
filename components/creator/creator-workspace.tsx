@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, CheckCircle2, ClipboardCheck, Rocket, Search, ShieldCheck, Sparkles, Trophy, UsersRound } from "lucide-react";
+import { Activity, BarChart3, CheckCircle2, ClipboardCheck, Search, ShieldCheck, Sparkles, Trophy, UsersRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { CreatorAnalytics } from "@/components/creator/creator-analytics";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 
 type RecordItem = Record<string, unknown> & { id: string };
@@ -17,7 +18,7 @@ async function loadCreatorData(): Promise<CreatorData> {
   return body.data;
 }
 
-const labels = { dashboard: ["Creator Studio", "Your real challenge activity, next actions, and growth tools in one place."], analytics: ["Creator Analytics", "Measure participation, submissions, votes, results, and sponsor interest from recorded activity."], boosts: ["Monthly Boosts", "Choose an eligible challenge, then review and confirm the boost through the existing protected flow."], "sponsor-ready": ["Sponsor-Ready Challenges", "Prepare owned challenges for sponsor discovery and monitor real interest."], submissions: ["Creator Submissions", "Review entries attached to challenges you own."] } as const;
+const labels = { dashboard: ["Creator Studio", "Your real challenge activity, next actions, and growth tools in one place."], analytics: ["Creator Analytics", "Measure participation, submissions, votes, revenue, and sponsor interest from your recorded challenge activity."], boosts: ["Monthly Boosts", "Choose an eligible challenge, then review and confirm the boost through the existing protected flow."], "sponsor-ready": ["Sponsor-Ready Challenges", "Prepare owned challenges for sponsor discovery and monitor real interest."], submissions: ["Creator Submissions", "Review entries attached to challenges you own."] } as const;
 
 export function CreatorWorkspace({ mode = "dashboard" }: { mode?: keyof typeof labels }) {
   const query = useQuery({ queryKey: ["creator-workspace"], queryFn: loadCreatorData, staleTime: 30_000 });
@@ -33,7 +34,7 @@ export function CreatorWorkspace({ mode = "dashboard" }: { mode?: keyof typeof l
   return <AppShell><div className="mx-auto max-w-7xl"><div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><PageTitle title={title[0]} subtitle={title[1]} /><div className="flex flex-wrap gap-2"><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/my-challenges" variant="secondary">Manage Challenges</LinkButton></div></div><nav className="mt-7 flex gap-2 overflow-x-auto border-b border-white/10 pb-3" aria-label="Creator tools">{Object.entries(labels).map(([key, value]) => <Link key={key} href={key === "dashboard" ? "/creator" : `/creator/${key}`} className={`shrink-0 rounded-[8px] px-4 py-2 text-sm font-black ${mode === key ? "bg-[var(--gold)] text-black" : "bg-white/5 text-slate-300"}`}>{value[0]}</Link>)}</nav>
     {query.isLoading ? <div className="mt-8 grid gap-4 md:grid-cols-3">{[0,1,2].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : query.error ? <Card className="mt-8"><EmptyState icon={<Activity />} title="Creator workspace unavailable" body={query.error.message} /></Card> : null}
     {data && mode === "dashboard" ? <Dashboard data={data} /> : null}
-    {data && mode === "analytics" ? <Analytics data={data} /> : null}
+    {data && mode === "analytics" ? <CreatorAnalytics data={data} /> : null}
     {data && mode === "boosts" ? <section className="mt-8"><ToolSearch value={search} onChange={setSearch} placeholder="Search your challenges"/><div className="mt-6 grid gap-5 md:grid-cols-2">{eligibleBoosts.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} note="Eligible for boost review" action={`/challenges/${challenge.id}/boost`} actionLabel="Review Boost" />)}</div>{!eligibleBoosts.length ? <EmptyCard title="No eligible challenges" body="Publish a public challenge before applying a boost. Ineligible records stay unchanged." /> : null}</section> : null}
     {data && mode === "sponsor-ready" ? <section className="mt-8"><ToolSearch value={search} onChange={setSearch} placeholder="Search sponsor-ready challenges"/><div className="mt-6 grid gap-5 md:grid-cols-2">{sponsorReady.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} note={`${data.sponsorInterest.filter((item) => String(item.challengeId) === challenge.id).length} recorded sponsor inquiries`} action={`/challenges/${challenge.id}/manage`} actionLabel="Manage Readiness" />)}</div>{!sponsorReady.length ? <EmptyCard title="No sponsor-ready challenges yet" body="Enable sponsor readiness on an eligible challenge. No sponsorship or funding record is created by this page." /> : null}</section> : null}
     {data && mode === "submissions" ? <section className="mt-8 grid gap-4">{data.submissions.map((submission) => <Card key={submission.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">{String(submission.title ?? "Untitled entry")}</p><p className="mt-1 text-sm text-slate-400">{String(submission.status ?? "submitted").replaceAll("_", " ")}</p></div><LinkButton href={`/submissions/${submission.id}`} variant="secondary">Review Entry</LinkButton></Card>)}{!data.submissions.length ? <EmptyCard title="No creator submissions yet" body="Entries will appear when people submit to your owned challenges." /> : null}</section> : null}

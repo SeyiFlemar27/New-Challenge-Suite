@@ -4,6 +4,8 @@ import { ensureWallet } from "@/lib/server/dorocoin";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { getEffectiveTier, getUserPlanAccess, planFieldsFor } from "@/lib/plan-access";
 import { sanitizeCustomization } from "@/lib/customization/access";
+import { resolveProfileIdentity, isDemoProfileContent } from "@/lib/profile-identity";
+import { isQaOrDemoRecord } from "@/lib/server/public-challenge";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -82,8 +84,9 @@ export async function GET(request: Request) {
     let profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const wallet = walletSnap.exists ? walletSnap.data() ?? {} : {};
     const now = new Date().toISOString();
-    const fallbackDisplayName = String(profile.displayName ?? account.displayName ?? user.email ?? "Challenge Suite Member");
-    const fallbackInitials = initialsFromName(fallbackDisplayName || String(user.email ?? ""));
+    const fallbackIdentity = resolveProfileIdentity({ ...account, ...profile }, String(user.email ?? ""));
+    const fallbackDisplayName = fallbackIdentity.displayName;
+    const fallbackInitials = fallbackIdentity.initials;
 
     if (!accountSnap.exists || !profileSnap.exists) {
       const baseProfile = {
@@ -120,7 +123,8 @@ export async function GET(request: Request) {
       runOptionalProfileRead("badges where userId == uid", user.uid, null, () => db.collection("badges").where("userId", "==", user.uid).limit(50).get())
     ]);
 
-    const displayName = String(profile.displayName ?? account.displayName ?? user.email ?? "");
+    const identity = resolveProfileIdentity({ ...account, ...profile }, String(user.email ?? ""));
+    const displayName = identity.displayName;
     const planProfile = { ...profile, ...account };
     const planAccess = getUserPlanAccess(planProfile);
     const effectiveTier = getEffectiveTier(planProfile);
@@ -134,7 +138,7 @@ export async function GET(request: Request) {
         submittedAt: toIso(data.submittedAt)
       };
     }) : [];
-    const badges = badgesSnap ? badgesSnap.docs.map((doc) => {
+    const badges = badgesSnap ? badgesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()) && !isDemoProfileContent(doc.data().title ?? doc.data().name) && !isDemoProfileContent(doc.data().description)).map((doc) => {
       const data = doc.data();
       return {
         ...data,
@@ -151,7 +155,7 @@ export async function GET(request: Request) {
         email: user.email ?? profile.email ?? account.email ?? "",
         displayName,
         username: profile.username ?? profile.handle ?? account.username ?? null,
-        initials: profile.initials ?? initialsFromName(displayName || String(user.email ?? "")),
+        initials: identity.initials,
         avatarUrl: profile.avatarUrl ?? profile.photoURL ?? account.avatarUrl ?? null,
         role: account.role ?? profile.role ?? null,
         selectedAccountType: account.account_type ?? profile.account_type ?? account.role ?? profile.role ?? "user",
