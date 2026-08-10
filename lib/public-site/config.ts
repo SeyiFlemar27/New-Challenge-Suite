@@ -36,7 +36,7 @@ export const PUBLIC_MENU = [
 {label:"Sponsors",items:[["Sponsorship Opportunities","/explore?sponsorReady=true"],["Sponsor a Challenge","/sponsor/start"],["Brand Campaigns","/sponsor/start"],["Sponsor Plans","/sponsor/plans"],["Sponsor Guidelines","/community-guidelines"],["Sponsor Onboarding","/sponsor/start"]]}
 ] as const;
 export const DEFAULT_PUBLIC_CONTENT = {
-announcement:{enabled:true,message:"You've got skills, compete with other talents and monetize it.",ctaLabel:"Get Started",ctaRoute:"/for-talent",status:"published",priority:0,startAt:null as string|null,endAt:null as string|null,audience:"all",loggedInState:"all",roles:[] as string[],plans:[] as string[]},
+announcement:{enabled:true,message:"Every Challenge Starts Here. Battle. Compete. Dominate. Create.",ctaLabel:"Get Started",ctaRoute:"/for-talent",status:"published",priority:0,startAt:null as string|null,endAt:null as string|null,audience:"all",loggedInState:"all",roles:[] as string[],plans:[] as string[]},
 hero:{eyebrow:"Competition, built around what you can do",headline:"Turn your talent into\nsomething worth winning.",supportingCopy:"Discover challenges, showcase what you can do, build your audience and earn through competitions created by people, communities and brands.",videoUrl:PUBLIC_HERO_VIDEO_URL,posterUrl:PUBLIC_HERO_POSTER_URL},
 finalCta:{headline:"Find a challenge worth showing up for.",body:"Discover competitions, showcase your skills and build a reputation through challenges created by people, communities and brands.",label:"Compete now"},
 assurances:["Transparent prize funding","Secure challenge payments","Verified withdrawal process","Moderated submissions","Sponsor approval process","Reporting and dispute support"],

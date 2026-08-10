@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CreditCard, LockKeyhole, Palette, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -10,6 +10,7 @@ import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass }
 import { apiRequest } from "@/lib/api/client";
 import { profileMediaPath } from "@/lib/media-upload-paths";
 import { setAppTheme } from "@/components/app-theme-provider";
+import { logout } from "@/lib/firebase/auth-service";
 
 type SettingsData = {
   account: { displayName: string; username: string; email: string; phone: string; accountType: string; planId: string; subscriptionStatus: string; effectiveTier?: { id: string; displayName: string } };
@@ -37,6 +38,7 @@ const sections = new Set(["account", "profile", "appearance", "notifications", "
 export default function SettingsSectionPage() {
   const params = useParams<{ section: string }>();
   const auth = useAuth();
+  const router = useRouter();
   const section = sections.has(params.section) ? params.section : "account";
   const [settings, setSettings] = useState<SettingsData>(defaults);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,7 @@ export default function SettingsSectionPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     void apiRequest<SettingsData>("/api/settings").then((result) => {
@@ -108,6 +111,22 @@ export default function SettingsSectionPage() {
     if (result.ok) setConfirmCancel(false);
   }
 
+  async function deleteAccount() {
+    if (deleteText !== "DELETE") return;
+    setDeleting(true);
+    setNotice("");
+    const result = await apiRequest<{ status: string; directDeletion: boolean }>("/api/account/delete", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: deleteText })
+    });
+    setNotice(result.message);
+    setDeleting(false);
+    if (result.ok) {
+      await logout().catch(() => undefined);
+      router.replace(`/auth/login?account=${encodeURIComponent(result.data?.status ?? "deactivated")}`);
+    }
+  }
+
   function chooseAppearance(value: "system" | "light" | "dark") {
     update("preferences", "appearance", value);
     setAppTheme(value);
@@ -135,7 +154,7 @@ export default function SettingsSectionPage() {
           {section === "billing" ? <Billing settings={settings} confirmCancel={confirmCancel} setConfirmCancel={setConfirmCancel} canceling={canceling} cancelSubscription={cancelSubscription} /> : null}
           {section === "wallet" ? <Wallet /> : null}
           {section === "preferences" ? <Preferences settings={settings} update={update} list={list} /> : null}
-          {section === "danger" ? <Danger deleteText={deleteText} setDeleteText={setDeleteText} /> : null}
+          {section === "danger" ? <Danger deleteText={deleteText} setDeleteText={setDeleteText} deleting={deleting} onDelete={deleteAccount} /> : null}
         </Card>
       </div>
     </AppShell>
@@ -159,7 +178,7 @@ function Privacy({ settings, update, setSettings }: { settings: SettingsData; up
 }
 
 function Security() {
-  return <div><div className="flex items-center gap-3"><LockKeyhole className="text-[var(--gold)]" /><h2 className="text-xl font-black">Security Controls</h2></div><div className="mt-6 grid gap-3"><LinkButton href="/auth/forgot-password" variant="secondary">Change Password</LinkButton><Button variant="secondary" disabled>Two-Factor Authentication (Coming Later)</Button><Button variant="secondary" disabled>Login Sessions (Coming Later)</Button></div></div>;
+  return <div><div className="flex items-center gap-3"><LockKeyhole className="text-[var(--gold)]" /><h2 className="text-xl font-black">Security Controls</h2></div><div className="mt-6 grid gap-3"><LinkButton href="/auth/forgot-password" variant="secondary">Change Password</LinkButton><p className="rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm leading-6 text-slate-300">Sensitive account and administrator actions require a recent sign-in and server-side permission checks.</p></div></div>;
 }
 
 function Billing({ settings, confirmCancel, setConfirmCancel, canceling, cancelSubscription }: { settings: SettingsData; confirmCancel: boolean; setConfirmCancel: (value: boolean) => void; canceling: boolean; cancelSubscription: () => Promise<void> }) {
@@ -177,8 +196,8 @@ function Preferences({ settings, update, list }: { settings: SettingsData; updat
   return <div className="space-y-6"><Field label="Favorite Categories"><input className={inputClass} value={settings.preferences.favoriteCategories.join(", ")} onChange={(event) => update("preferences", "favoriteCategories", list(event.target.value))} /></Field><Field label="Preferred Challenge Types"><input className={inputClass} value={settings.preferences.preferredChallengeTypes.join(", ")} onChange={(event) => update("preferences", "preferredChallengeTypes", list(event.target.value))} /></Field><Field label="Location Preference"><input className={inputClass} value={settings.preferences.locationPreference} onChange={(event) => update("preferences", "locationPreference", event.target.value)} /></Field><Field label="Content Language"><input className={inputClass} value={settings.preferences.contentLanguage} onChange={(event) => update("preferences", "contentLanguage", event.target.value)} /></Field><Toggle label="Show mature or age-restricted content" checked={settings.preferences.matureContent} onChange={(value) => update("preferences", "matureContent", value)} /></div>;
 }
 
-function Danger({ deleteText, setDeleteText }: { deleteText: string; setDeleteText: (value: string) => void }) {
-  return <div><div className="flex items-center gap-3 text-red-300"><TriangleAlert /><h2 className="text-xl font-black">Danger Zone</h2></div><div className="mt-6 grid gap-6"><div className="rounded-[8px] border border-red-500/20 p-5"><h3 className="font-black">Deactivate Account</h3><p className="mt-2 text-sm text-slate-400">Temporary account deactivation is not connected yet.</p><Button className="mt-4" variant="secondary" disabled>Deactivate (Coming Later)</Button></div><div className="rounded-[8px] border border-red-500/20 p-5"><h3 className="font-black">Delete Account</h3><p className="mt-2 text-sm leading-6 text-slate-400">Type DELETE to confirm your intent. Permanent deletion remains disabled until a protected server-side deletion and retention workflow is implemented.</p><div className="mt-4"><Field label="Confirmation"><input className={inputClass} value={deleteText} onChange={(event) => setDeleteText(event.target.value)} placeholder="DELETE" /></Field></div><Button className="mt-4" disabled>{deleteText === "DELETE" ? "Deletion Not Available Yet" : "Type DELETE to Continue"}</Button></div></div></div>;
+function Danger({ deleteText, setDeleteText, deleting, onDelete }: { deleteText: string; setDeleteText: (value: string) => void; deleting: boolean; onDelete: () => Promise<void> }) {
+  return <div><div className="flex items-center gap-3 text-red-300"><TriangleAlert /><h2 className="text-xl font-black">Danger Zone</h2></div><div className="mt-6 rounded-[8px] border border-red-500/20 p-5"><h3 className="font-black">Delete Account</h3><p className="mt-2 text-sm leading-6 text-slate-400">Type DELETE to confirm. A recent sign-in is required. Accounts without retained history can be deleted directly; accounts with payment, wallet, challenge, KYC, withdrawal, settlement, provider, or audit history are deactivated and queued for privacy review. Required financial and legal records are preserved.</p><div className="mt-4"><Field label="Type DELETE to confirm"><input className={inputClass} value={deleteText} onChange={(event) => setDeleteText(event.target.value)} placeholder="DELETE" autoComplete="off" /></Field></div><div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button onClick={() => void onDelete()} disabled={deleteText !== "DELETE" || deleting}>{deleting ? "Processing..." : deleteText === "DELETE" ? "Delete Account" : "Type DELETE to Continue"}</Button><LinkButton href="/contact" variant="secondary">Get deletion help</LinkButton></div></div></div>;
 }
 
 function ToggleList({ values, onChange }: { values: Record<string, boolean>; onChange: (key: string, value: boolean) => void }) {

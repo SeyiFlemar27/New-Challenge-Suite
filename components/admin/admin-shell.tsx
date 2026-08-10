@@ -187,7 +187,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <span className="inline-flex min-h-11 items-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold"><Activity size={15} className="mr-2 text-amber-600" /> {user?.displayName || "Admin"}</span>
             </div>
           </div>
-          {accessDetails?.secondFactorRequired && !accessDetails.secondFactorVerified ? <div role="status" className="mb-6 rounded-[8px] border border-amber-400/40 bg-amber-50 p-4 text-sm text-amber-950"><strong>Second-factor setup required.</strong> Sensitive finance, role, and system actions remain blocked until the administrator signs in with a verified second factor.</div> : null}
           {children}
           <MobileFooter />
         </div>

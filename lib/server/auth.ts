@@ -70,9 +70,6 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
       ? profile.adminPermissions.filter((permission): permission is string => typeof permission === "string")
       : [];
     const adminPermissions = resolveAdminPermissions(adminRoles, explicitPermissions);
-    const firebaseClaims = decoded.firebase as { sign_in_second_factor?: string } | undefined;
-    const adminSecondFactorRequired = adminRoles.some((role) => ["platform_owner", "super_admin", "finance_admin", "technical_admin"].includes(role))
-      || adminPermissions.some((permission) => ["withdrawals.approve", "withdrawals.secondApprove", "withdrawals.markPaid", "refunds.approve"].includes(permission));
     return {
       uid: decoded.uid,
       email: decoded.email,
@@ -82,8 +79,8 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
       adminRoles,
       adminPermissions,
       authTime: typeof decoded.auth_time === "number" ? decoded.auth_time : undefined,
-      adminSecondFactorVerified: Boolean(firebaseClaims?.sign_in_second_factor),
-      adminSecondFactorRequired,
+      adminSecondFactorVerified: false,
+      adminSecondFactorRequired: false,
       emailVerified: Boolean(decoded.email_verified || profile?.emailVerified || profile?.verificationStatus === "verified")
     };
   }
@@ -140,9 +137,6 @@ export async function requireRecentAdminAuthentication(request: Request, permiss
   const age = Math.floor(Date.now() / 1000) - Number(result.user?.authTime ?? 0);
   if (!result.user?.authTime || age > maximumAgeSeconds) {
     return { user: null, response: forbidden("Recent authentication is required before this sensitive action.") };
-  }
-  if (result.user.adminSecondFactorRequired && !result.user.adminSecondFactorVerified) {
-    return { user: null, response: forbidden("A verified second factor is required before this sensitive action.") };
   }
   return result;
 }

@@ -80,7 +80,7 @@ export default function VerifyEmailPage() {
     if (!result.ok || !result.data) {
       const retryAfter = (result as any).details?.retryAfterSeconds;
       if (typeof retryAfter === "number") setSeconds(retryAfter);
-      setError(result.message || "We couldn't send a code right now. Please try again.");
+      setError(`${result.message || "We couldn't send a code right now."} Your account was created, but we could not send the verification code. Please resend verification or contact support.`);
       return;
     }
 
@@ -169,7 +169,7 @@ export default function VerifyEmailPage() {
               <Link href="/auth/register" className="inline-flex h-11 items-center justify-center rounded-[8px] border border-white/10 bg-[#1d1d1d] px-5 text-sm font-bold text-white transition hover:bg-[#242424]">Change Email</Link>
             </div>
             <div className="mt-7 flex items-center justify-center gap-2 border-t border-white/10 pt-6 text-xs font-bold text-slate-500">
-              <ShieldCheck size={14} /> Didn't receive it? Check spam or request a new code.
+              <ShieldCheck size={14} /> Didn't receive it? Check spam, request a new code, or <Link href="/contact" className="text-[var(--gold)] underline">contact support</Link>.
             </div>
           </>
         )}

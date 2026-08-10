@@ -8,9 +8,10 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import { getDefaultRouteForAccount } from "@/lib/account-routing";
-import { loginWithEmail } from "@/lib/firebase/auth-service";
+import { loginWithEmail, logout } from "@/lib/firebase/auth-service";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/lib/i18n/use-language";
+import { useAuth } from "@/components/auth-provider";
 
 function safeInternalPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
@@ -25,6 +26,7 @@ function getNextPath() {
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useLanguage();
+  const authState = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +71,24 @@ export default function LoginPage() {
       setError(error instanceof Error ? error.message : "Could not sign in.");
       setLoading(false);
     }
+  }
+
+  if (!authState.loading && authState.user) {
+    const identity = authState.profile?.displayName || authState.user.displayName || authState.user.email || "Account";
+    const accountProfile = (authState.profile ?? {}) as unknown as Record<string, unknown>;
+    const destination = nextPath || (authState.profile?.isAdmin ? "/dashboard" : getDefaultRouteForAccount(accountProfile));
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+        <Card className="w-full max-w-[480px] rounded-[12px] p-6 text-center sm:p-9">
+          <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
+          <p className="text-xs font-black uppercase text-[var(--gold)]">Already signed in</p>
+          <h1 className="mt-3 break-words text-3xl font-black">{identity}</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-300">Continue with this account or sign out to use a different one.</p>
+          <Button className="mt-7 w-full" onClick={() => router.replace(destination)}>Continue to dashboard</Button>
+          <Button className="mt-3 w-full" variant="secondary" onClick={() => void logout().then(() => window.location.reload())}>Switch account / Sign out</Button>
+        </Card>
+      </main>
+    );
   }
 
   return (

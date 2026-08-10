@@ -6,7 +6,6 @@ import { CircleHelp, LogOut, MessageSquare, Settings, UserRound, WalletCards, X 
 import { NotificationBell } from "@/components/notification-bell";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { logout } from "@/lib/firebase/auth-service";
-import { getEffectiveTier } from "@/lib/plan-access";
 
 export function AuthenticatedTopbar() {
   const { user, loading, signedOut } = useCurrentUser();
@@ -49,19 +48,14 @@ function AccountMenu() {
   const { user } = useCurrentUser();
   useDismissibleMenu(open, setOpen, ref);
   if (!user) return null;
-  const tier = getEffectiveTier({
-    planId: user.planId,
-    planStatus: user.planStatus,
-    accountType: user.accountType,
-    selectedAccountType: user.selectedAccountType,
-    role: user.role
-  });
+  const sponsorHref = user.sponsorOnboardingComplete
+    ? "/sponsor/dashboard"
+    : user.hasSponsorProfile || user.sponsorOnboardingStatus
+      ? "/sponsor/onboarding"
+      : "/sponsor/start";
   const roleLinks = [
     { href: "/dashboard", label: "User Dashboard" },
-    ...(tier.id === "host" || tier.id === "enterprise" || user.hostOnboardingComplete ? [{ href: "/dashboard/host", label: "Host Control Center" }] : []),
-    ...(tier.id === "creator" || tier.id === "pro" || user.creatorOnboardingComplete ? [{ href: "/dashboard", label: "Creator Studio" }] : []),
-    ...(user.isSponsor ? [{ href: "/sponsor/dashboard", label: "Sponsor Dashboard" }] : []),
-    ...(user.isAdmin ? [{ href: "/admin", label: "Admin Command Center" }] : [])
+    ...(user.isSponsor || user.hasSponsorProfile ? [{ href: sponsorHref, label: "Sponsor" }] : [])
   ];
   return (
     <div className="relative" ref={ref}>
@@ -72,7 +66,7 @@ function AccountMenu() {
       {open ? <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(92vw,330px)] overflow-hidden rounded-[8px] border border-white/10 bg-[var(--panel)] shadow-2xl">
         <div className="border-b border-white/10 p-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0"><p className="truncate font-black text-white">{user.displayName}</p><p className="truncate text-xs text-slate-400">{user.email}</p><p className="mt-2 text-xs font-bold text-[var(--gold)]">{tier.memberLabel}</p></div>
+            <div className="min-w-0"><p className="truncate font-black text-white">{user.displayName}</p><p className="truncate text-xs text-slate-400">{user.email}</p><p className="mt-2 text-xs font-bold text-[var(--gold)]">{user.isSponsor ? "User and Sponsor access" : "User access"}</p></div>
             <button type="button" onClick={() => setOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-[8px] text-slate-400 hover:bg-white/5" aria-label="Close account menu"><X size={17} /></button>
           </div>
         </div>

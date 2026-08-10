@@ -33,15 +33,15 @@ export async function POST(request: Request) {
     if (uid) {
       const ref = db.collection("users").doc(uid); const existing = await ref.get();
       if (existing.data()?.adminAccessStatus === "active") return conflict("This Firebase identity already has active administrator access.");
-      await ref.set({ adminRoles: roles, adminAccessStatus: "pending_security_setup", adminSecuritySetupComplete: false, adminAppointedAt: now, adminAppointedBy: user!.uid, adminAppointmentReason: parsed.data.reason, updatedAt: now }, { merge: true });
-      await writeAuditLog({ actorId: user!.uid, actorType: "admin", action: "admin.appointed_pending_security", targetType: "account", targetId: uid, reason: parsed.data.reason, after: { roles, status: "pending_security_setup" } }, db);
-      return ok({ uid, status: "pending_security_setup" }, "Administrator appointed. Security setup is required before access is activated.");
+      await ref.set({ adminRoles: roles, adminAccessStatus: "active", adminSecuritySetupComplete: true, adminAppointedAt: now, adminAppointedBy: user!.uid, adminAppointmentReason: parsed.data.reason, updatedAt: now }, { merge: true });
+      await writeAuditLog({ actorId: user!.uid, actorType: "admin", action: "admin.appointed", targetType: "account", targetId: uid, reason: parsed.data.reason, after: { roles, status: "active", delivery: "not_applicable" } }, db);
+      return ok({ uid, status: "active", delivery: "not_applicable" }, "Administrator access assigned directly. No invitation email was sent.");
     }
     const duplicate = await db.collection("adminInvitations").where("email", "==", email).where("status", "in", ["pending_invitation", "pending_security_setup"]).limit(1).get();
     if (!duplicate.empty) return conflict("A pending administrator invitation already exists for this email.");
     const ref = db.collection("adminInvitations").doc(); const token = invitationToken();
     await ref.set({ id: ref.id, email, roles, status: "pending_invitation", tokenHash: token.tokenHash, adminSecuritySetupComplete: false, appointedBy: user!.uid, reason: parsed.data.reason, createdAt: now, updatedAt: now, expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
     await writeAuditLog({ actorId: user!.uid, actorType: "admin", action: "admin.invitation_created", targetType: "account", targetId: ref.id, reason: parsed.data.reason, after: { email, roles, status: "pending_invitation" } }, db);
-    return ok({ invitationId: ref.id, status: "pending_invitation", delivery: "email_delivery_configuration_required" }, "Invitation recorded. Email delivery must be configured before it can be sent.");
+    return ok({ invitationId: ref.id, status: "pending_invitation", delivery: "not_sent_setup_required" }, "Pending invitation recorded. Email delivery is not configured for administrator invitations, so no email was sent and access was not granted.");
   } catch (error) { return serverError("Administrator appointment failed.", error instanceof Error ? error.message : error); }
 }
