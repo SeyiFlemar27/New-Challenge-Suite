@@ -1,2 +1,2 @@
-import { run } from "./production-readiness-fixes-contracts.mjs";
+import { run } from "./full-non-admin-i18n-contracts.mjs";
 run("test-i18n-missing-key-readable-english-fallback.mjs");

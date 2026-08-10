@@ -1,3 +1,5 @@
+import { COMPLETE_UI_TRANSLATIONS } from "@/lib/i18n/complete-dictionary";
+
 export const SUPPORTED_LANGUAGES = [
   { code: "en", label: "English" },
   { code: "fr", label: "Français" },
@@ -17,7 +19,7 @@ const phrases: Phrase[] = [
   ["Discover public challenges", "Decouvrir les defis publics", "Descubrir desafios publicos", "Descobrir desafios publicos"], ["Enter free or paid competitions", "Participer a des competitions gratuites ou payantes", "Participar en competiciones gratuitas o de pago", "Participar em competicoes gratuitas ou pagas"],
   ["Upload eligible submissions", "Importer des participations admissibles", "Subir participaciones elegibles", "Carregar participacoes elegiveis"], ["Build public credibility", "Renforcer votre credibilite publique", "Crear credibilidad publica", "Construir credibilidade publica"],
   ["Follow voting and results", "Suivre les votes et les resultats", "Seguir las votaciones y los resultados", "Acompanhar votacoes e resultados"], ["Receive approved prize credits", "Recevoir les credits de prix approuves", "Recibir creditos de premios aprobados", "Receber creditos de premios aprovados"],
-  ["Community voices", "Voix de la communaute", "Voces de la comunidad", "Vozes da comunidade"], ["Follow the result", "Suivre le resultat", "Seguir el resultado", "Acompanhar o resultado"],
+  ["Follow the result", "Suivre le resultat", "Seguir el resultado", "Acompanhar o resultado"],
   ["Search public challenges by category, format, timeline and entry type.", "Recherchez les defis publics par categorie, format, calendrier et type de participation.", "Busca desafios publicos por categoria, formato, calendario y tipo de participacion.", "Pesquise desafios publicos por categoria, formato, calendario e tipo de participacao."],
   ["Follow the official registration, payment and submission steps for the challenge.", "Suivez les etapes officielles d'inscription, de paiement et de soumission du defi.", "Sigue los pasos oficiales de registro, pago y envio del desafio.", "Siga os passos oficiais de registo, pagamento e envio do desafio."],
   ["Track eligible voting, rankings and confirmed winner announcements.", "Suivez les votes admissibles, les classements et les annonces de gagnants confirmees.", "Sigue las votaciones elegibles, las clasificaciones y los anuncios de ganadores confirmados.", "Acompanhe votacoes elegiveis, classificacoes e anuncios de vencedores confirmados."],
@@ -63,7 +65,10 @@ const phrases: Phrase[] = [
   ["Complete verification", "Terminer la v?rification", "Completar verificaci?n", "Concluir verifica??o"], ["Verified profile", "Profil v?rifi?", "Perfil verificado", "Perfil verificado"],
 ];
 
-export const UI_TRANSLATIONS = Object.fromEntries(phrases.map(([en, fr, es, pt]) => [en, { en, fr, es, pt }])) as Record<string, Record<LanguageCode, string>>;
+export const UI_TRANSLATIONS = {
+  ...Object.fromEntries(phrases.map(([en, fr, es, pt]) => [en, { en, fr, es, pt }])),
+  ...COMPLETE_UI_TRANSLATIONS
+} as Record<string, Record<LanguageCode, string>>;
 export type TranslationKey = keyof typeof UI_TRANSLATIONS;
 
 export function normalizeLanguage(value: unknown): LanguageCode {
@@ -95,5 +100,13 @@ export function translateFirstPartyText(language: LanguageCode, value: string) {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const core = value.trim();
-  return core ? `${leading}${translate(language, core)}${trailing}` : value;
+  if (!core) return value;
+  const direct = UI_TRANSLATIONS[core];
+  if (direct) return `${leading}${direct[language] ?? direct.en}${trailing}`;
+  const punctuation = core.match(/^(.+?)([.!?:])$/);
+  if (punctuation && UI_TRANSLATIONS[punctuation[1]]) {
+    const translated = UI_TRANSLATIONS[punctuation[1]][language] ?? UI_TRANSLATIONS[punctuation[1]].en;
+    return `${leading}${translated}${punctuation[2]}${trailing}`;
+  }
+  return `${leading}${translate(language, core)}${trailing}`;
 }

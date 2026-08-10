@@ -1,2 +1,2 @@
 import { run } from "./full-non-admin-i18n-contracts.mjs";
-run("test-i18n-register-french-visible-translations.mjs");
+run("test-i18n-language-persists-after-refresh.mjs");

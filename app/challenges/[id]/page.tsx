@@ -18,6 +18,8 @@ import { ChallengeMediaFrame } from "@/components/media-display";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
+import { DynamicTranslatedText } from "@/components/i18n/dynamic-translated-text";
+import type { DynamicTranslations } from "@/lib/i18n/dynamic-content";
 
 type ChallengeGuideSection = "overview" | "rules" | "submission" | "voting" | "prizes" | "leaderboard";
 
@@ -44,6 +46,7 @@ export default function ChallengeDetailPage() {
 
   const details = data?.ok ? data.data : null;
   const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challengeTranslations = ((details?.challenge as Record<string, unknown> | undefined)?.translations ?? {}) as { title?: DynamicTranslations; description?: DynamicTranslations };
   const challengeSubmissions = useMemo(() => {
     if (!challenge) return [];
     return (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id);
@@ -241,7 +244,7 @@ export default function ChallengeDetailPage() {
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
             <span data-status-badge className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>
-          <h1 className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl">{challenge.title}</h1>
+          <DynamicTranslatedText as="h1" className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl" text={challenge.title} translations={challengeTranslations.title} contentType="challenge_title" />
           <div data-mobile-creator-row className="mt-4 flex min-h-12 items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{creatorDisplayName.slice(0, 2).toUpperCase()}</span>
             <div className="min-w-0"><p className="text-xs font-bold text-slate-500">Created by</p>{creatorUsername ? <a href={`/profile/${creatorUsername}`} className="block truncate font-black hover:text-[var(--gold)]">{creatorDisplayName}</a> : <p className="truncate font-black">{creatorDisplayName}</p>}</div>
@@ -276,7 +279,7 @@ export default function ChallengeDetailPage() {
           {paidEntryReturnedPending ? <Card className="mt-4 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">Payment received. We are confirming your enrollment.</Card> : null}
           {paidEntryCanceled ? <Card className="mt-4 border-slate-600 bg-slate-900/60 p-4 text-sm text-slate-300">Payment canceled. You remain unenrolled.</Card> : null}
           {(details?.challenge as any)?.resultsConfirmed ? <Card className="mt-4 border-emerald-400/20 bg-emerald-950/20 p-4"><p className="font-black text-emerald-200">Results confirmed</p><p className="mt-1 text-sm text-slate-300">{(details?.challenge as any)?.settlementPrepared ? "Settlement prepared. Internal prize allocations remain subject to review." : "Winner results were approved."}</p></Card> : null}
-          <p className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl">{challenge.description}</p>
+          <DynamicTranslatedText as="p" className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl" text={challenge.description} translations={challengeTranslations.description} contentType="challenge_description" showUnavailable />
           {challenge.trailerUrl ? <video className="mt-10 w-full rounded-[8px]" controls src={challenge.trailerUrl} /> : null}
 
           <Card className="mt-10 p-5 sm:p-7">
