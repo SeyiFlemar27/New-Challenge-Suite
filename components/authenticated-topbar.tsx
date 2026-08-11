@@ -55,9 +55,10 @@ function AccountMenu() {
     : user.hasSponsorProfile || user.sponsorOnboardingStatus
       ? "/sponsor/onboarding"
       : "/sponsor/start";
+  const canSwitchSponsorRole = !user.isAdmin && Boolean(user.isSponsor || user.hasSponsorProfile || user.sponsorOnboardingStatus);
   const roleLinks = [
     { href: "/dashboard", label: "User Dashboard" },
-    ...(user.isSponsor || user.hasSponsorProfile ? [{ href: sponsorHref, label: "Sponsor" }] : [])
+    ...(canSwitchSponsorRole ? [{ href: sponsorHref, label: "Sponsor" }] : [])
   ];
   return (
     <div className="relative" ref={ref}>
@@ -76,10 +77,10 @@ function AccountMenu() {
           <MenuLink href="/profile" label="View Profile" icon={<UserRound size={16} />} onSelect={() => setOpen(false)} />
           <MenuLink href="/settings" label="Account Settings" icon={<Settings size={16} />} onSelect={() => setOpen(false)} />
           <MenuLink href="/subscriptions" label="Subscription / Plan" onSelect={() => setOpen(false)} />
-          <details className="group">
+          {canSwitchSponsorRole ? <details className="group">
             <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-[8px] px-3 text-sm font-bold text-slate-300 hover:bg-white/5 hover:text-white">Switch Role</summary>
             <div className="ml-3 border-l border-white/10 pl-2">{roleLinks.map((item) => <MenuLink key={`${item.href}-${item.label}`} href={item.href} label={item.label} onSelect={() => setOpen(false)} />)}</div>
-          </details>
+          </details> : null}
           <MenuLink href="/settings/payouts" label="Payout Settings" icon={<WalletCards size={16} />} onSelect={() => setOpen(false)} />
           <MenuLink href="/contact" label="Help Center" icon={<CircleHelp size={16} />} onSelect={() => setOpen(false)} />
           <button type="button" role="menuitem" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 hover:bg-white/5 hover:text-white"><LogOut size={16} /> Log Out</button>

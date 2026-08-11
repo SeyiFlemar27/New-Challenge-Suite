@@ -48,6 +48,7 @@ export function PaymentStatusJourney({
   const [loading, setLoading] = useState(true);
   const [attempts, setAttempts] = useState(0);
   const [message, setMessage] = useState("");
+  const [timedOut, setTimedOut] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ purpose });
@@ -57,7 +58,7 @@ export function PaymentStatusJourney({
   }, [purpose, reference, resourceId]);
 
   async function refresh() {
-    const result = await apiRequest<PaymentStatus>(query);
+    const result = await apiRequest<PaymentStatus>(`${query}&verify=1`);
     setAttempts((value) => value + 1);
     if (result.ok && result.data) {
       setStatus(result.data);
@@ -71,14 +72,18 @@ export function PaymentStatusJourney({
   useEffect(() => {
     let cancelled = false;
     let timer: number | undefined;
+    const startedAt = Date.now();
+    let firstCheck = true;
     const poll = async () => {
-      const result = await apiRequest<PaymentStatus>(query);
+      const result = await apiRequest<PaymentStatus>(firstCheck ? `${query}&verify=1` : query);
+      firstCheck = false;
       if (cancelled) return;
       setAttempts((value) => value + 1);
       if (result.ok && result.data) {
         setStatus(result.data);
         setMessage("");
-        if (result.data.state === "processing") timer = window.setTimeout(poll, 2500);
+        if (result.data.state === "processing" && Date.now() - startedAt < 90_000) timer = window.setTimeout(poll, 4000);
+        else if (result.data.state === "processing") setTimedOut(true);
       } else {
         setMessage(result.message || "Payment status could not be loaded.");
       }
@@ -93,14 +98,16 @@ export function PaymentStatusJourney({
 
   const confirmed = status?.state === "confirmed" && status.webhookConfirmed;
   const terminalFailure = status && ["failed", "refunded", "reversed"].includes(status.state);
-  const title = loading ? "Checking payment status" : confirmed ? copy.confirmedTitle : terminalFailure ? "Payment needs attention" : copy.pendingTitle;
+  const title = loading ? "Checking payment status" : confirmed ? copy.confirmedTitle : terminalFailure ? "Payment needs attention" : timedOut ? "Activation is still processing" : copy.pendingTitle;
   const body = loading
     ? "Loading the verified provider record."
     : confirmed
       ? copy.confirmedBody
       : terminalFailure
         ? "The provider record is not active. Review the status below before trying again."
-        : copy.pendingBody;
+        : timedOut
+          ? "Your access will update automatically after the payment provider confirms the subscription. You can finish later and return from Billing."
+          : copy.pendingBody;
 
   return <AppShell>
     <div className="mx-auto max-w-3xl">
@@ -108,7 +115,10 @@ export function PaymentStatusJourney({
       <h1 className="mt-3 text-3xl font-black text-white sm:text-4xl">{title}</h1>
       <p className="mt-4 max-w-2xl leading-7 text-slate-300">{body}</p>
 
-      <Card className="mt-8 p-5 sm:p-7" aria-live="polite">
+      <Card className="mt-8 border-yellow-300 bg-white p-5 text-slate-950 shadow-xl sm:p-7" aria-live="polite">
+        <div className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="Membership activation progress">
+          {["Payment received", "Activating Host plan", "Host plan active"].map((label, index) => <div key={label} className={`rounded-[8px] border p-3 text-sm font-black ${confirmed || index === 0 ? "border-emerald-300 bg-emerald-50 text-emerald-800" : index === 1 ? "border-yellow-300 bg-yellow-50 text-yellow-900" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{label}</div>)}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <StatusItem label="Status" value={loading ? "Loading" : labelState(status?.state)} />
           <StatusItem label="Verification" value={confirmed ? "Provider confirmed" : "Awaiting provider confirmation"} />
@@ -116,13 +126,13 @@ export function PaymentStatusJourney({
           {status?.units ? <StatusItem label="Credits" value={status.units.toLocaleString()} /> : null}
           {status?.planId ? <StatusItem label="Plan" value={status.planId} /> : null}
           {status?.billingCycle ? <StatusItem label="Billing cycle" value={status.billingCycle} /> : null}
-          <StatusItem label="Payment reference" value={status?.providerReference || reference || "Pending"} />
           <StatusItem label="Confirmed" value={status?.confirmedAt ? new Date(status.confirmedAt).toLocaleString() : "Pending"} />
           {status?.currentPeriodEnd ? <StatusItem label="Next renewal" value={new Date(status.currentPeriodEnd).toLocaleDateString()} /> : null}
         </div>
-        {message ? <p className="mt-5 rounded-[8px] border border-red-500/20 bg-red-950/30 p-3 text-sm text-red-200">{message}</p> : null}
+        <details className="mt-5 rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm"><summary className="cursor-pointer font-black">Technical details</summary><p className="mt-2 break-all text-slate-600">Support reference: {status?.providerReference || reference || "Pending"}</p></details>
+        {message ? <p className="mt-5 rounded-[8px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">{message}</p> : null}
         {!confirmed ? <Button className="mt-6" variant="secondary" onClick={() => void refresh()} disabled={loading}>Refresh Status</Button> : null}
-        {attempts >= 12 && !confirmed ? <p className="mt-4 text-sm text-slate-400">Confirmation is taking longer than usual. You can leave this page and return later.</p> : null}
+        {timedOut && !confirmed ? <p className="mt-4 text-sm text-slate-600">Confirmation is taking longer than usual. No entitlement has been granted from this page.</p> : null}
       </Card>
 
       <div className="mt-6 flex flex-wrap gap-3">
@@ -134,7 +144,7 @@ export function PaymentStatusJourney({
 }
 
 function StatusItem({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-[8px] border border-white/10 bg-black/25 p-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-2 break-words font-black text-white">{value}</p></div>;
+  return <div className="rounded-[8px] border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-2 break-words font-black text-slate-950">{value}</p></div>;
 }
 
 function labelState(state?: VerifiedPaymentState) {

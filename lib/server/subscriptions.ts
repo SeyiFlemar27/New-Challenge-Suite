@@ -56,7 +56,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     priceMonthlyLabel: "$119/month",
     stripePriceEnv: "STRIPE_PRICE_HOST",
     legacyStripePriceEnvs: ["STRIPE_PRICE_EXECUTIVE_HOST", "STRIPE_HOST_PRICE_ID"],
-    features: ["Host Control Center", "Unlimited public/private challenges", "Tournament, 1v1, and live-event foundations", "Participant, submission, and voting controls", "Sponsor proposals, reports, and exports", "Team foundation for up to 3 members"],
+    features: ["Host Control Center", "Unlimited public/private challenges", "10 Challenge Boosts/month", "Tournament, 1v1, and live-event foundations", "Participant, submission, and voting controls", "Sponsor proposals, reports, and exports", "Team foundation for up to 3 members"],
     canHostLiveEvents: true,
     liveEventCapacity: 15,
     canManageTournaments: true,

@@ -33,6 +33,18 @@ function hasResults(challenge: Record<string, unknown>) {
   return Boolean(challenge.winnersAnnounced || challenge.resultsPublished || Number(challenge.winnerCount ?? 0) > 0 || Number(challenge.placementCount ?? 0) > 0);
 }
 
+function challengeType(challenge: Record<string, unknown>) {
+  const type = text(challenge.type ?? challenge.competitionType).toLowerCase();
+  if (challenge.isLiveEvent === true || type.includes("live event")) return "live_event";
+  if (text(challenge.tournamentType).toLowerCase() !== "none" || type.includes("tournament")) return "tournament";
+  if (text(challenge.visibility).toLowerCase() === "private" || type.includes("private")) return "private";
+  return "standard";
+}
+
+function typeLabel(type: string) {
+  return type === "private" ? "Private Challenge" : type === "live_event" ? "Live Event" : type === "tournament" ? "Tournament" : "Standard Challenge";
+}
+
 function completedWithinExploreWindow(challenge: Record<string, unknown>, phase: PhaseSummary) {
   if (!["completed", "winners_announced", "voting_closed"].includes(phase.phase) || !hasResults(challenge)) return false;
   const confirmedAt = Date.parse(String(challenge.resultsPublishedAt ?? challenge.winnersAnnouncedAt ?? challenge.completedAt ?? challenge.winnerAnnouncementAt ?? ""));
@@ -85,8 +97,20 @@ function sortChallenges(items: Array<Record<string, unknown>>, sort: string) {
 
 function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary; userId: string | null; sponsor: boolean; participant?: Record<string, unknown> }) {
   const detailHref = `/challenges/${input.challenge.id}`;
+  const kind = challengeType(input.challenge);
   if (input.userId && ownedBy(input.challenge, input.userId)) return { label: "Manage Challenge", href: "/challenges", action: "manage" };
   if (input.sponsor) return { label: "View Challenge", href: detailHref, action: "view" };
+  if (kind === "private") return { label: "Enter Access Code", href: detailHref, action: "access_code" };
+  if (kind === "live_event") {
+    if (["completed", "winners_announced"].includes(input.phase.phase)) return { label: "Event Completed", href: detailHref, action: "view" };
+    if (!input.phase.registrationOpen) return { label: "View Event", href: detailHref, action: "view" };
+    return isPaidEntryChallenge(input.challenge) ? { label: "Buy Ticket", href: detailHref, action: "ticket" } : { label: "Register for Event", href: detailHref, action: "register" };
+  }
+  if (kind === "tournament") {
+    if (Boolean(input.challenge.bracketGeneratedAt)) return { label: "View Bracket", href: `/tournaments/${input.challenge.id}`, action: "bracket" };
+    if (input.phase.registrationOpen) return { label: "Register", href: detailHref, action: "register" };
+    return { label: "View Tournament", href: `/tournaments/${input.challenge.id}`, action: "view" };
+  }
   if (input.phase.phase === "winners_announced") return { label: "View Winners", href: detailHref, action: "winners" };
   if (input.phase.phase === "completed") return { label: "View Results", href: detailHref, action: "results" };
   if (input.phase.phase === "voting_closed") return hasResults(input.challenge) ? { label: "View Results", href: detailHref, action: "results" } : { label: "Voting Closed", href: detailHref, action: "closed", disabled: true };
@@ -111,6 +135,7 @@ export async function GET(request: NextRequest) {
   const category = text(url.searchParams.get("category")).slice(0, 80).toLowerCase();
   const phaseFilter = text(url.searchParams.get("phase")).slice(0, 40).toLowerCase();
   const entry = text(url.searchParams.get("entry")).slice(0, 20).toLowerCase();
+  const typeFilter = text(url.searchParams.get("type")).slice(0, 24).toLowerCase();
   const sponsorReady = url.searchParams.get("sponsorReady") === "true";
   const sort = text(url.searchParams.get("sort")).slice(0, 40).toLowerCase() || "recent";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
@@ -130,6 +155,8 @@ export async function GET(request: NextRequest) {
       if (category && String(raw.category ?? "").toLowerCase() !== category) return [];
       if (entry === "free" && isPaidEntryChallenge(raw)) return [];
       if (entry === "paid" && !isPaidEntryChallenge(raw)) return [];
+      const kind = challengeType(raw);
+      if (typeFilter && kind !== typeFilter) return [];
       if (sponsorReady && !Boolean(raw.sponsorReady ?? raw.sponsorEnabled ?? (raw.monetization as Record<string, unknown> | undefined)?.sponsorReady)) return [];
       const searchable = [raw.title, raw.shortDescription, raw.description, raw.category, raw.creatorName, raw.creatorUsername, ...(Array.isArray(raw.keywords) ? raw.keywords : []), ...(Array.isArray(raw.tags) ? raw.tags : [])].map((value) => String(value ?? "").toLowerCase()).join(" ");
       if (query && !searchable.includes(query.toLowerCase())) return [];
@@ -141,6 +168,8 @@ export async function GET(request: NextRequest) {
       const challenge = {
         ...publicFields,
         id: doc.id,
+        challengeType: kind,
+        typeLabel: typeLabel(kind),
         detailHref: `/challenges/${doc.id}`,
         title: text(publicFields.title ?? raw.title) || "Untitled challenge",
         shortDescription: text(raw.shortDescription ?? raw.summary),
@@ -173,7 +202,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => Number(b.trendingScore ?? 0) - Number(a.trendingScore ?? 0))
       .slice(0, 12);
     const categories = Array.from(new Set(all.map((item) => String(item.category ?? "")).filter(Boolean))).slice(0, 12);
-    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
+    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
   } catch (error) {
     return serverError("Explore challenges could not be loaded.", error instanceof Error ? error.message : error);
   }

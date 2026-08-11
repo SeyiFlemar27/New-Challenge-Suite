@@ -2,6 +2,7 @@
 
 import {
   createUserWithEmailAndPassword,
+  deleteUser as deleteFirebaseUser,
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -36,6 +37,8 @@ export interface AuthProfile {
   verified: boolean;
   emailVerified?: boolean;
   isAdmin: boolean;
+  accountStatus?: string;
+  deletionStatus?: string;
 }
 
 interface BootstrapResponse {
@@ -93,19 +96,34 @@ export async function signUpWithProfile(input: SignupInput) {
   if (!isFirebaseConfigured) throw new Error("Account creation is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
 
+  const availability = await fetch("/api/auth/account-availability", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: input.email }) });
+  const availabilityBody = await availability.json().catch(() => null) as { message?: string } | null;
+  if (!availability.ok) throw new Error(availabilityBody?.message || "Account availability could not be confirmed.");
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
-  await syncServerSession(credential.user);
-  await callProfileBootstrap(credential.user, {
-    method: "POST",
-    body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role, referralCode: input.referralCode || undefined })
-  });
+  try {
+    await syncServerSession(credential.user);
+    await callProfileBootstrap(credential.user, {
+      method: "POST",
+      body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, role: input.role, referralCode: input.referralCode || undefined })
+    });
+  } catch (error) {
+    await deleteFirebaseUser(credential.user).catch(() => undefined);
+    throw error;
+  }
   return { mode: "firebase" as const, user: credential.user };
 }
 
 export async function loginWithEmail(email: string, password: string) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
-  const credential = await signInWithEmailAndPassword(auth, email, password);
+  let credential;
+  try {
+    credential = await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    const code = String((error as { code?: string })?.code ?? "");
+    if (["auth/user-not-found", "auth/invalid-credential"].includes(code)) throw new Error("No active account was found for this email. Create a new account or contact support.");
+    throw error;
+  }
   const [, profile] = await Promise.all([
     syncServerSession(credential.user),
     getCurrentProfile(credential.user.uid).catch(() => null)

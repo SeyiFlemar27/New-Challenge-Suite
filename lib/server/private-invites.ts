@@ -11,8 +11,8 @@ export function generateInviteCode(length = 8) {
   return value;
 }
 
-export async function createPrivateChallengeInvite(db: Firestore, input: { challengeId: string; creatorId: string; now: string }) {
-  let code = generateInviteCode();
+export async function createPrivateChallengeInvite(db: Firestore, input: { challengeId: string; creatorId: string; now: string; code?: string; expiresAt?: string | null; maxUses?: number | null }) {
+  let code = input.code && /^[A-HJ-NP-Z2-9]{5}$/.test(input.code) ? input.code : generateInviteCode(5);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const existing = await db.collection("privateChallengeInvites").where("code", "==", code).limit(1).get();
     if (existing.empty) break;
@@ -26,9 +26,9 @@ export async function createPrivateChallengeInvite(db: Firestore, input: { chall
     code,
     status: "active",
     enabled: true,
-    maxUses: 100,
+    maxUses: input.maxUses ?? 100,
     currentUses: 0,
-    expiresAt: null,
+    expiresAt: input.expiresAt ?? null,
     joinApprovalRequired: false,
     allowedEmails: [],
     allowedUserIds: [],
@@ -43,7 +43,7 @@ export async function createPrivateChallengeInvite(db: Firestore, input: { chall
     action: "private_invite.created",
     targetType: "private_invite",
     targetId: ref.id,
-    after: { challengeId: input.challengeId, code, enabled: true },
+    after: { challengeId: input.challengeId, enabled: true, codeConfigured: true },
     reason: "Private challenge invite foundation created.",
     metadata: { moneyMovementEnabled: false }
   }, db).catch(() => undefined);

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
+import { FINAL_ACCOUNT_DELETION_STATUSES, PENDING_ACCOUNT_DELETION_STATUSES, normalizedEmailHash, normalizeAccountDeletionStatus } from "@/lib/server/account-deletion";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,9 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     hostOnboardingComplete: Boolean(merged.hostOnboardingComplete),
     walkthroughCompleted: merged.walkthroughCompleted === undefined ? true : Boolean(merged.walkthroughCompleted),
     hasSponsorProfile,
-    sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null
+    sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null,
+    accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
+    deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };
 }
 
@@ -88,12 +91,14 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Profile bootstrap");
 
   try {
-    const walletRef = await ensureWallet(db, user.uid);
     const [accountSnap, profileSnap, walletSnap] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
-      walletRef.get()
+      db.collection("doroCoinWallets").doc(user.uid).get()
     ]);
+    const accountStatus = normalizeAccountDeletionStatus(accountSnap.data()?.accountStatus ?? profileSnap.data()?.accountStatus);
+    if (FINAL_ACCOUNT_DELETION_STATUSES.has(accountStatus)) return fail("No active account was found for this email.", 410, { createAccountHref: "/auth/register", supportHref: "/contact" }, "ACCOUNT_DELETED");
+    if (!PENDING_ACCOUNT_DELETION_STATUSES.has(accountStatus) && !walletSnap.exists) await ensureWallet(db, user.uid);
 
     return ok({
       profileExists: profileSnap.exists,
@@ -131,6 +136,13 @@ export async function POST(request: Request) {
   try {
     const now = new Date().toISOString();
     const email = user.email ?? "";
+    const deletedReference = email ? await db.collection("deletedAccountReferences").doc(normalizedEmailHash(email)).get() : null;
+    if (deletedReference?.exists) {
+      const deleted = deletedReference.data() ?? {};
+      const status = normalizeAccountDeletionStatus(deleted.status);
+      if (PENDING_ACCOUNT_DELETION_STATUSES.has(status)) return fail("This email is linked to an account deletion in progress.", 409, { supportHref: "/contact" }, "ACCOUNT_DELETION_PENDING");
+      if (deleted.enforcementReviewRequired === true || deleted.emailReuseAllowed === false) return fail("Account creation with this email requires support review.", 403, { supportHref: "/contact" }, "ACCOUNT_REUSE_REVIEW_REQUIRED");
+    }
     const displayName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
     const adminEmails = (process.env.NEXT_PUBLIC_INITIAL_ADMIN_EMAILS || "")
       .split(",")

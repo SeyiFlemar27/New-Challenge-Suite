@@ -20,6 +20,7 @@ const phaseOptions = [
   ["completed", "Completed"]
 ];
 const entryOptions = [["", "Any entry"], ["free", "Free"], ["paid", "Paid entry"]];
+const typeOptions = [["", "All types"], ["standard", "Standard"], ["private", "Private"], ["live_event", "Live Events"], ["tournament", "Tournaments"]];
 const sortOptions = [["recent", "Newest"], ["participants", "Most joined"], ["ending_soon", "Ending soon"]];
 
 export default function ExplorePage() {
@@ -27,6 +28,7 @@ export default function ExplorePage() {
   const [category, setCategory] = useState("");
   const [phase, setPhase] = useState("");
   const [entry, setEntry] = useState("");
+  const [type, setType] = useState("");
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ExploreResponse | null>(null);
@@ -41,6 +43,7 @@ export default function ExplorePage() {
     setCategory(params.get("category") ?? "");
     setPhase(params.get("phase") ?? "");
     setEntry(params.get("entry") ?? "");
+    setType(params.get("type") ?? "");
     setSort(params.get("sort") ?? "recent");
     setPage(Math.max(1, Number(params.get("page") ?? 1) || 1));
   }, []);
@@ -51,11 +54,12 @@ export default function ExplorePage() {
     if (category) params.set("category", category);
     if (phase) params.set("phase", phase);
     if (entry) params.set("entry", entry);
+    if (type) params.set("type", type);
     if (sort !== "recent") params.set("sort", sort);
     params.set("page", String(page));
     params.set("limit", "24");
     return `/api/explore/challenges?${params.toString()}`;
-  }, [category, entry, page, phase, query, sort]);
+  }, [category, entry, page, phase, query, sort, type]);
 
   useEffect(() => {
     let active = true;
@@ -105,7 +109,8 @@ export default function ExplorePage() {
               <Button type="button" variant="secondary" onClick={() => setFiltersOpen((value) => !value)}><Filter size={17} /> Filters</Button>
               <Button type="button" variant="secondary" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17} /> Sort</Button>
             </div>
-            <div className={`${filtersOpen ? "grid" : "hidden"} mt-4 gap-3 md:grid md:grid-cols-4`}>
+            <div className={`${filtersOpen ? "grid" : "hidden"} mt-4 gap-3 md:grid md:grid-cols-5`}>
+              <Select label="Type" value={type} onChange={(value) => { setType(value); setPage(1); }} options={typeOptions as [string, string][]} />
               <Select label="Category" value={category} onChange={(value) => { setCategory(value); setPage(1); }} options={[["", "All categories"], ...categories.map((item) => [item, item] as [string, string])]} />
               <Select label="Stage" value={phase} onChange={(value) => { setPhase(value); setPage(1); }} options={phaseOptions as [string, string][]} />
               <Select label="Entry" value={entry} onChange={(value) => { setEntry(value); setPage(1); }} options={entryOptions as [string, string][]} />
@@ -171,7 +176,7 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
   return <article data-mobile-explore-card role="link" tabIndex={0} onClick={openCard} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } }} className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] shadow-lg shadow-black/20 transition hover:border-[var(--gold)]/50 hover:bg-[#1a1a1a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
     <div className="relative">
       <ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="aspect-[16/10] h-auto rounded-none border-0" placeholder="Challenge Suite" />
-      <span className="absolute left-3 top-3 flex items-center gap-2"><Badge>{publicPhaseLabel(phase.label)}</Badge>{challenge.isOwnedByViewer ? <Badge>Yours</Badge> : null}</span>
+      <span className="absolute left-3 top-3 flex flex-wrap items-center gap-2"><Badge>{String(challenge.typeLabel ?? "Standard Challenge")}</Badge><Badge>{publicPhaseLabel(phase.label)}</Badge>{challenge.isOwnedByViewer ? <Badge>Yours</Badge> : null}</span>
       {!interactionsDisabled ? <button type="button" onClick={toggleSaved} disabled={saving} className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white backdrop-blur transition hover:text-[var(--gold)] disabled:opacity-60" aria-label={saved ? "Remove saved challenge" : "Save challenge"} aria-pressed={saved}><Bookmark size={18} className={saved ? "fill-[var(--gold)] text-[var(--gold)]" : ""} /></button> : null}
     </div>
     <div className="flex flex-1 flex-col p-4">

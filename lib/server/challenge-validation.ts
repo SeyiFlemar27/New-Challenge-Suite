@@ -50,6 +50,12 @@ export const serverChallengeCreateSchema = z.object({
   winnerSelection: z.enum(["highest_votes", "judge_selection", "hybrid", "manual"]).default("highest_votes"),
   inviteCode: z.string().trim().max(80).default(""),
   accessCode: z.string().trim().max(80).default(""),
+  privateAccessCode: z.string().trim().regex(/^[A-HJ-NP-Z2-9]{5}$/, "Private access code must be five unambiguous uppercase characters.").optional().or(z.literal("")),
+  privateAccessCodeExpiresAt: z.string().trim().optional().nullable(),
+  privateAccessCodeMaxUses: z.coerce.number().int().min(1).max(100000).optional().nullable(),
+  privateAccessInstructions: z.string().trim().max(1200).default(""),
+  privateAccessMethod: z.enum(["", "access_code"]).default(""),
+  publicPreviewEnabled: z.coerce.boolean().default(false),
   votingSettings: z.object({
     allowFreeVotes: z.coerce.boolean().default(true),
     allowPaidVotes: z.coerce.boolean().optional(),

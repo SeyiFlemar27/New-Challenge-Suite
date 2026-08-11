@@ -164,7 +164,8 @@ const hostSections: NavSection[] = [
   { label: "Operations", items: [
     { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
     { href: "/host/participants", label: "Participants", icon: UsersRound },
-    { href: "/host/reports", label: "Reports", icon: BarChart3 }
+    { href: "/host/reports", label: "Reports", icon: BarChart3 },
+    { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket }
   ] },
   { label: "Account", items: [
     { href: "/settings/billing", label: "Billing", icon: ReceiptText },

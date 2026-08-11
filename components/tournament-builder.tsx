@@ -9,15 +9,15 @@ import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/api/client";
 import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { tournamentDraftMediaPath } from "@/lib/media-upload-paths";
-import { buildRoundPlan, defaultPrizeDistribution, singleEliminationMatchCount, singleEliminationStageCount } from "@/lib/server/tournaments";
+import { buildRoundPlan, buildRoundRobinPlan, defaultPrizeDistribution, singleEliminationMatchCount, singleEliminationStageCount } from "@/lib/server/tournaments";
 
-const steps = ["Basics", "Format", "Registration", "Rounds", "Rules & Scoring", "Prize & Sponsorship", "Review & Launch"];
+const steps = ["Tournament Basics", "Format & Capacity", "Registration", "Rounds & Schedule", "Rules & Scoring", "Prize & Sponsorship", "Media & Branding", "Review & Launch"];
 const capacities = [8, 16, 32, 64];
 
 type BuilderForm = {
   title: string; shortDescription: string; description: string; category: string;
   coverImageUrl: string; coverImagePath: string; trailerUrl: string; trailerPath: string;
-  format: "single_elimination"; participantCapacity: number; privacy: "public" | "private" | "invite_only"; registrationType: "open" | "approval_required" | "invite_only";
+  format: "single_elimination" | "round_robin"; participantCapacity: number; privacy: "public" | "private" | "invite_only"; registrationType: "open" | "approval_required" | "invite_only";
   registrationOpensAt: string; registrationClosesAt: string; tournamentStartsAt: string; expectedEndAt: string;
   eligibilityRules: string; profileRequirements: string; ageRestriction: string; requiresCheckIn: boolean;
   seedingMethod: "manual" | "random"; resultMethod: "votes" | "judges" | "hybrid"; audiencePercent: number; judgesPercent: number; scoreVisibility: "live" | "hidden" | "final_only"; tieBreaker: string; thirdPlaceMethod: "none" | "bronze_match";
@@ -44,7 +44,7 @@ export function TournamentBuilder() {
   const [createdId, setCreatedId] = useState("");
   const [saving, setSaving] = useState(false);
   const mediaDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
-  const roundPlan = useMemo(() => buildRoundPlan(form.participantCapacity, form.resultMethod, form.thirdPlaceMethod), [form.participantCapacity, form.resultMethod, form.thirdPlaceMethod]);
+  const roundPlan = useMemo(() => form.format === "round_robin" ? buildRoundRobinPlan(form.participantCapacity, form.resultMethod) : buildRoundPlan(form.participantCapacity, form.resultMethod, form.thirdPlaceMethod), [form.format, form.participantCapacity, form.resultMethod, form.thirdPlaceMethod]);
   const readiness = useMemo(() => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -106,7 +106,8 @@ export function TournamentBuilder() {
             {step === 3 ? <RoundsStep roundPlan={roundPlan} /> : null}
             {step === 4 ? <RulesStep form={form} update={update} /> : null}
             {step === 5 ? <PrizeStep form={form} update={update} /> : null}
-            {step === 6 ? <ReviewStep form={form} readiness={readiness} roundPlan={roundPlan} /> : null}
+            {step === 6 ? <MediaStep form={form} update={update} mediaDisabled={mediaDisabled} userId={userId} setCoverStatus={setCoverStatus} setTrailerStatus={setTrailerStatus} /> : null}
+            {step === 7 ? <ReviewStep form={form} readiness={readiness} roundPlan={roundPlan} /> : null}
             {notice ? <Card className="mt-5 border-yellow-500/20 bg-yellow-500/[0.03] p-4 text-sm text-yellow-100">{notice}</Card> : null}
             {createdId ? <LinkButton href={`/tournaments/${createdId}`} className="mt-5" variant="secondary">View tournament draft</LinkButton> : null}
             <div className="mt-7 flex flex-wrap justify-between gap-3">
@@ -127,8 +128,12 @@ function Basics({ form, update, mediaDisabled, userId, setCoverStatus, setTraile
   return <section><StepTitle title="Basics" body="Name the tournament and upload real media when Storage is available." /><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Tournament name"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Category"><input className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)} /></Field><Field label="Short description"><input className={inputClass} value={form.shortDescription} onChange={(event) => update("shortDescription", event.target.value)} /></Field><Field label="Full description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><MediaUploadField label="Cover media" value={form.coverImageUrl} storagePath={tournamentDraftMediaPath(userId, "cover")} required disabled={mediaDisabled} onStatusChange={setCoverStatus} onChange={(url, meta) => { update("coverImageUrl", url); update("coverImagePath", meta?.path ?? ""); }} /><MediaUploadField label="Optional trailer" value={form.trailerUrl} kind="video" storagePath={tournamentDraftMediaPath(userId, "trailer")} disabled={mediaDisabled} onStatusChange={setTrailerStatus} onChange={(url, meta) => { update("trailerUrl", url); update("trailerPath", meta?.path ?? ""); }} /></div>{mediaDisabled ? <p className="mt-4 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Media uploads are temporarily unavailable. The draft may be saved with storage-disabled media metadata; real upload mode resumes when Storage is configured.</p> : null}</section>;
 }
 
+function MediaStep({ form, update, mediaDisabled, userId, setCoverStatus, setTrailerStatus }: { form: BuilderForm; update: <K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) => void; mediaDisabled: boolean; userId: string; setCoverStatus: (status: MediaUploadStage) => void; setTrailerStatus: (status: MediaUploadStage) => void }) {
+  return <section><StepTitle title="Media & Branding" body="Use storage-confirmed tournament media. No external URL or fake upload state is accepted." /><div className="mt-5 grid gap-5 md:grid-cols-2"><MediaUploadField label="Cover media" value={form.coverImageUrl} storagePath={tournamentDraftMediaPath(userId, "cover")} required disabled={mediaDisabled} onStatusChange={setCoverStatus} onChange={(url, meta) => { update("coverImageUrl", url); update("coverImagePath", meta?.path ?? ""); }} /><MediaUploadField label="Optional trailer" value={form.trailerUrl} kind="video" storagePath={tournamentDraftMediaPath(userId, "trailer")} disabled={mediaDisabled} onStatusChange={setTrailerStatus} onChange={(url, meta) => { update("trailerUrl", url); update("trailerPath", meta?.path ?? ""); }} /></div>{mediaDisabled ? <p className="mt-4 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-100">Media uploads are temporarily unavailable. Real upload mode resumes when Storage is configured.</p> : null}</section>;
+}
+
 function FormatStep({ form, update }: { form: BuilderForm; update: <K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) => void }) {
-  return <section><StepTitle title="Format" body="V1 supports single elimination only." /><div className="mt-5 grid gap-4 md:grid-cols-2"><Card className="border-[var(--gold)]/30 p-4"><p className="font-black">Single Elimination</p><p className="mt-2 text-sm text-slate-400">Bracket truth is generated server-side after registration closes.</p></Card><Field label="Capacity"><select className={inputClass} value={form.participantCapacity} onChange={(event) => update("participantCapacity", Number(event.target.value))}>{capacities.map((capacity) => <option key={capacity} value={capacity}>{capacity} participants</option>)}</select></Field></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Participants" value={form.participantCapacity} /><Metric label="Stages" value={singleEliminationStageCount(form.participantCapacity)} /><Metric label="Knockout matches" value={singleEliminationMatchCount(form.participantCapacity)} /></div></section>;
+  return <section><StepTitle title="Format & Capacity" body="Choose single elimination or round robin. Advanced formats remain unavailable until their progression engines are production-ready." /><div className="mt-5 grid gap-4 md:grid-cols-2">{(["single_elimination", "round_robin"] as const).map((format) => <button type="button" key={format} onClick={() => update("format", format)} className={`rounded-[8px] border p-4 text-left ${form.format === format ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10"}`}><p className="font-black">{format === "single_elimination" ? "Single Elimination" : "Round Robin"}</p><p className="mt-2 text-sm text-slate-400">{format === "single_elimination" ? "Bracket generated from confirmed registrations after registration closes." : "Every participant competes across a points table generated after registration closes."}</p></button>)}</div><Field label="Capacity"><select className={inputClass} value={form.participantCapacity} onChange={(event) => update("participantCapacity", Number(event.target.value))}>{capacities.map((capacity) => <option key={capacity} value={capacity}>{capacity} participants</option>)}</select></Field><div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Participants" value={form.participantCapacity} /><Metric label="Rounds" value={form.format === "round_robin" ? form.participantCapacity - 1 : singleEliminationStageCount(form.participantCapacity)} /><Metric label={form.format === "round_robin" ? "Pairings" : "Knockout matches"} value={form.format === "round_robin" ? form.participantCapacity * (form.participantCapacity - 1) / 2 : singleEliminationMatchCount(form.participantCapacity)} /></div><p className="mt-4 text-sm text-slate-400">Double elimination and group stage + knockout are not available yet.</p></section>;
 }
 
 function RegistrationStep({ form, update }: { form: BuilderForm; update: <K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) => void }) {

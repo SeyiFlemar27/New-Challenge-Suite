@@ -47,6 +47,7 @@ export default function SettingsSectionPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [deleteText, setDeleteText] = useState("");
+  const [deleteEmail, setDeleteEmail] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -112,18 +113,20 @@ export default function SettingsSectionPage() {
   }
 
   async function deleteAccount() {
-    if (deleteText !== "DELETE") return;
+    if (deleteText !== "DELETE" || deleteEmail.trim().toLowerCase() !== settings.account.email.trim().toLowerCase()) return;
     setDeleting(true);
     setNotice("");
     const result = await apiRequest<{ status: string; directDeletion: boolean }>("/api/account/delete", {
       method: "POST",
-      body: JSON.stringify({ confirmation: deleteText })
+      body: JSON.stringify({ confirmation: deleteText, email: deleteEmail })
     });
     setNotice(result.message);
     setDeleting(false);
     if (result.ok) {
-      await logout().catch(() => undefined);
-      router.replace(`/auth/login?account=${encodeURIComponent(result.data?.status ?? "deactivated")}`);
+      if (result.data?.directDeletion) {
+        await logout().catch(() => undefined);
+        router.replace("/auth/login?account=deleted");
+      } else router.replace("/account/deletion-status");
     }
   }
 
@@ -154,7 +157,7 @@ export default function SettingsSectionPage() {
           {section === "billing" ? <Billing settings={settings} confirmCancel={confirmCancel} setConfirmCancel={setConfirmCancel} canceling={canceling} cancelSubscription={cancelSubscription} /> : null}
           {section === "wallet" ? <Wallet /> : null}
           {section === "preferences" ? <Preferences settings={settings} update={update} list={list} /> : null}
-          {section === "danger" ? <Danger deleteText={deleteText} setDeleteText={setDeleteText} deleting={deleting} onDelete={deleteAccount} /> : null}
+          {section === "danger" ? <Danger deleteText={deleteText} setDeleteText={setDeleteText} deleteEmail={deleteEmail} setDeleteEmail={setDeleteEmail} accountEmail={settings.account.email} deleting={deleting} onDelete={deleteAccount} /> : null}
         </Card>
       </div>
     </AppShell>
@@ -196,8 +199,9 @@ function Preferences({ settings, update, list }: { settings: SettingsData; updat
   return <div className="space-y-6"><Field label="Favorite Categories"><input className={inputClass} value={settings.preferences.favoriteCategories.join(", ")} onChange={(event) => update("preferences", "favoriteCategories", list(event.target.value))} /></Field><Field label="Preferred Challenge Types"><input className={inputClass} value={settings.preferences.preferredChallengeTypes.join(", ")} onChange={(event) => update("preferences", "preferredChallengeTypes", list(event.target.value))} /></Field><Field label="Location Preference"><input className={inputClass} value={settings.preferences.locationPreference} onChange={(event) => update("preferences", "locationPreference", event.target.value)} /></Field><Field label="Content Language"><input className={inputClass} value={settings.preferences.contentLanguage} onChange={(event) => update("preferences", "contentLanguage", event.target.value)} /></Field><Toggle label="Show mature or age-restricted content" checked={settings.preferences.matureContent} onChange={(value) => update("preferences", "matureContent", value)} /></div>;
 }
 
-function Danger({ deleteText, setDeleteText, deleting, onDelete }: { deleteText: string; setDeleteText: (value: string) => void; deleting: boolean; onDelete: () => Promise<void> }) {
-  return <div><div className="flex items-center gap-3 text-red-300"><TriangleAlert /><h2 className="text-xl font-black">Danger Zone</h2></div><div className="mt-6 rounded-[8px] border border-red-500/20 p-5"><h3 className="font-black">Delete Account</h3><p className="mt-2 text-sm leading-6 text-slate-400">Type DELETE to confirm. A recent sign-in is required. Accounts without retained history can be deleted directly; accounts with payment, wallet, challenge, KYC, withdrawal, settlement, provider, or audit history are deactivated and queued for privacy review. Required financial and legal records are preserved.</p><div className="mt-4"><Field label="Type DELETE to confirm"><input className={inputClass} value={deleteText} onChange={(event) => setDeleteText(event.target.value)} placeholder="DELETE" autoComplete="off" /></Field></div><div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button onClick={() => void onDelete()} disabled={deleteText !== "DELETE" || deleting}>{deleting ? "Processing..." : deleteText === "DELETE" ? "Delete Account" : "Type DELETE to Continue"}</Button><LinkButton href="/contact" variant="secondary">Get deletion help</LinkButton></div></div></div>;
+function Danger({ deleteText, setDeleteText, deleteEmail, setDeleteEmail, accountEmail, deleting, onDelete }: { deleteText: string; setDeleteText: (value: string) => void; deleteEmail: string; setDeleteEmail: (value: string) => void; accountEmail: string; deleting: boolean; onDelete: () => Promise<void> }) {
+  const confirmed = deleteText === "DELETE" && deleteEmail.trim().toLowerCase() === accountEmail.trim().toLowerCase();
+  return <div><div className="flex items-center gap-3 text-red-300"><TriangleAlert /><h2 className="text-xl font-black">Danger Zone</h2></div><div className="mt-6 rounded-[8px] border border-red-500/20 p-5"><h3 className="font-black">Delete Account</h3><p className="mt-2 text-sm leading-6 text-slate-400">Type DELETE and your account email to confirm. A recent sign-in is required. Clean accounts can be deleted directly. Accounts with payment, wallet, challenge, KYC, withdrawal, settlement, provider, safety, or audit history enter privacy review while required records remain immutable.</p><div className="mt-4 grid gap-4"><Field label="Type DELETE to confirm"><input className={inputClass} value={deleteText} onChange={(event) => setDeleteText(event.target.value)} placeholder="DELETE" autoComplete="off" /></Field><Field label="Confirm account email"><input className={inputClass} value={deleteEmail} onChange={(event) => setDeleteEmail(event.target.value)} placeholder={accountEmail} type="email" autoComplete="off" /></Field></div><div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button onClick={() => void onDelete()} disabled={!confirmed || deleting}>{deleting ? "Processing..." : confirmed ? "Delete Account" : "Complete Both Confirmations"}</Button><LinkButton href="/contact" variant="secondary">Get deletion help</LinkButton></div></div></div>;
 }
 
 function ToggleList({ values, onChange }: { values: Record<string, boolean>; onChange: (key: string, value: boolean) => void }) {

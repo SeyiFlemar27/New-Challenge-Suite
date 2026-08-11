@@ -2,9 +2,11 @@ import { Sidebar } from "./sidebar";
 import { ProductWalkthrough } from "./product-walkthrough";
 import { MobileFooter } from "./mobile-footer";
 import { AuthenticatedTopbar } from "./authenticated-topbar";
+import { AccountDeletionGuard } from "./account-deletion-guard";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
+    <AccountDeletionGuard>
     <div className="app-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]" data-i18n-ui>
       <a href="#main-content" className="sr-only z-[120] rounded-[8px] bg-[var(--gold)] px-4 py-3 font-black text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to Main Content</a>
       <Sidebar />
@@ -17,5 +19,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MobileFooter />
       </main>
     </div>
+    </AccountDeletionGuard>
   );
 }

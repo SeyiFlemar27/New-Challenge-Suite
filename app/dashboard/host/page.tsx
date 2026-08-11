@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CalendarClock, CheckCircle2, ClipboardCheck, Trophy, UsersRound } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, ClipboardCheck, Rocket, Trophy, UsersRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlanFeatureGate } from "@/components/plan-feature-gate";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
@@ -10,6 +10,7 @@ import { fetchDashboard } from "@/lib/api/services";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { getChallengePhaseSummary } from "@/lib/challenge-status";
+import { getUserPlanAccess } from "@/lib/plan-access";
 
 type RecordRow = Record<string, unknown>;
 type CompetitionTab = "active" | "upcoming" | "drafts" | "completed";
@@ -64,6 +65,7 @@ function nextDeadline(challenge: RecordRow) {
 
 export default function HostControlCenterPage() {
   const { user } = useCurrentUser();
+  const hostPlan = getUserPlanAccess({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
   const { data, isLoading } = useQuery({ queryKey: ["dashboard", "host"], queryFn: fetchDashboard, staleTime: 30_000 });
   const [activeTab, setActiveTab] = useState<CompetitionTab>("active");
   const dashboard = data?.ok ? data.data : null;
@@ -115,6 +117,13 @@ export default function HostControlCenterPage() {
           <Metric title="Pending Reviews" value={pendingReviews} icon={<ClipboardCheck />} />
           <Metric title="Upcoming Deadlines" value={deadlines.length} icon={<CalendarClock />} />
         </div>
+
+        <Card className="mt-7 border-yellow-400/30 bg-yellow-50 p-5 text-slate-950 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3"><span className="rounded-[8px] bg-yellow-200 p-2 text-yellow-950"><Rocket size={20} /></span><div><h2 className="font-black">Monthly challenge boosts</h2><p className="mt-1 text-sm text-slate-600">Your Host plan includes {hostPlan.monthlyBoostLimit} boosts each month. Usage and remaining allocation come from recorded boost activity.</p></div></div>
+            <LinkButton href="/creator/boosts">Manage boosts</LinkButton>
+          </div>
+        </Card>
 
         {attention.length ? <Card className="mt-7 p-5 sm:p-6">
           <div className="flex items-center gap-3"><AlertCircle className="text-[var(--gold)]" /><h2 className="text-xl font-black">Needs Attention</h2></div>

@@ -4,6 +4,9 @@ import { deterministicId } from "@/lib/server/idempotency";
 import { getPaymentStatus } from "@/lib/server/monetization-payments";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { PAYMENT_PURPOSES, normalizeVerifiedPaymentState, type PaymentPurpose } from "@/lib/payment-purposes";
+import { getStripe } from "@/lib/stripe";
+import { persistStripeSubscriptionLifecycle, subscriptionMetadataFromCheckout } from "@/lib/server/stripe-subscriptions";
+import type Stripe from "stripe";
 
 const allowedPurposes = new Set<PaymentPurpose>(Object.values(PAYMENT_PURPOSES));
 
@@ -27,6 +30,25 @@ function summary(purpose: PaymentPurpose, record: Record<string, unknown> | null
   };
 }
 
+async function verifySubscriptionCheckout(db: FirebaseFirestore.Firestore, reference: string, userId: string) {
+  const stripe = getStripe();
+  if (!stripe || !reference.startsWith("cs_")) return;
+  const session = await stripe.checkout.sessions.retrieve(reference, { expand: ["subscription"] });
+  const ownerId = String(session.metadata?.userId ?? session.client_reference_id ?? "");
+  if (ownerId !== userId || session.mode !== "subscription" || session.status !== "complete") return;
+  const subscription = session.subscription;
+  if (!subscription || typeof subscription === "string" || !["active", "trialing"].includes(subscription.status)) return;
+  const subscriptionWithMetadata = { ...subscription, metadata: { ...subscription.metadata, ...subscriptionMetadataFromCheckout(session) } } as Stripe.Subscription;
+  await persistStripeSubscriptionLifecycle(db, subscriptionWithMetadata, {
+    eventId: `server_verify_${session.id}`,
+    eventType: "checkout.session.server_verified",
+    eventCreated: Math.floor(Date.now() / 1000),
+    trustedMetadataPlan: true,
+    latestInvoiceId: typeof session.invoice === "string" ? session.invoice : session.invoice?.id ?? null,
+    latestPaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null
+  });
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -36,12 +58,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const purpose = url.searchParams.get("purpose") as PaymentPurpose | null;
   const reference = url.searchParams.get("reference") ?? "";
+  const verify = url.searchParams.get("verify") === "1";
   if (!purpose || !allowedPurposes.has(purpose)) return fail("Payment purpose is not supported.", 400, undefined, "VALIDATION_ERROR");
 
   let record: Record<string, unknown> | null = null;
   if (purpose === PAYMENT_PURPOSES.subscription) {
-    const account = await db.collection("users").doc(user.uid).get();
+    let account = await db.collection("users").doc(user.uid).get();
     record = account.exists ? { id: account.id, ...account.data() } : null;
+    if (verify && reference && !(record?.entitlementActive === true || ["active", "payment_warning_1", "payment_warning_2"].includes(String(record?.subscriptionStatus ?? record?.planStatus ?? "")))) {
+      await verifySubscriptionCheckout(db, reference, user.uid).catch(() => undefined);
+      account = await db.collection("users").doc(user.uid).get();
+      record = account.exists ? { id: account.id, ...account.data() } : null;
+    }
   } else if (purpose === PAYMENT_PURPOSES.dorocoin && reference) {
     const id = deterministicId("stripe_session", reference, "dorocoin_purchase");
     const transaction = await db.collection("doroCoinTransactions").doc(id).get();

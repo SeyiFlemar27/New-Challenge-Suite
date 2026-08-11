@@ -57,6 +57,21 @@ export function buildRoundPlan(capacity: number, resultMethod: TournamentResultM
   return base;
 }
 
+export function buildRoundRobinPlan(capacity: number, resultMethod: TournamentResultMethod = "votes"): TournamentRoundPlanItem[] {
+  return Array.from({ length: Math.max(1, capacity - 1) }, (_, index) => ({
+    roundNumber: index + 1,
+    title: `Round ${index + 1}`,
+    brief: "Round-robin pairings are generated from confirmed registrations after registration closes.",
+    submissionOpensAt: null,
+    submissionDeadlineAt: null,
+    votingOpensAt: null,
+    votingClosesAt: null,
+    acceptedMedia: ["image", "video"] as ("image" | "video")[],
+    resultMethod,
+    advancementRule: "points_table_after_confirmed_results"
+  }));
+}
+
 export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
   return [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }];
 }
@@ -76,7 +91,9 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     participantCount: 0,
     privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
     registrationType: text(input.registrationType, "open") as TournamentFoundation["registrationType"],
-    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
+    roundPlan: text(input.format, "single_elimination") === "round_robin"
+      ? buildRoundRobinPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod)
+      : buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
     registrationOpensAt: text(input.registrationOpensAt) || null,
     registrationClosesAt: text(input.registrationClosesAt) || null,
     tournamentStartsAt: text(input.tournamentStartsAt) || null,
@@ -136,8 +153,8 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
   if (!text(tournament.description)) errors.push("Full description is required.");
   if (!text(tournament.category)) errors.push("Category is required.");
   if (text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded" && text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "storage_disabled") errors.push("Cover media must be uploaded unless storage-disabled mode is active.");
-  if (text(tournament.format) !== "single_elimination") errors.push("V1 tournaments support single elimination only.");
-  if (![8, 16, 32, 64].includes(Number(tournament.participantCapacity))) errors.push("Capacity must be 8, 16, 32, or 64.");
+  if (!["single_elimination", "round_robin"].includes(text(tournament.format))) errors.push("Choose single elimination or round robin.");
+  if (text(tournament.format) === "single_elimination" && ![8, 16, 32, 64].includes(Number(tournament.participantCapacity))) errors.push("Single elimination capacity must be 8, 16, 32, or 64.");
   if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Registration and tournament dates are required.");
   if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
   if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");

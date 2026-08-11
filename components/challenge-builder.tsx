@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, LockKeyhole, Save, X } from "lucide-react";
+import { Eye, LockKeyhole, RefreshCw, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
@@ -13,6 +13,7 @@ import { challengeDraftMediaPath } from "@/lib/media-upload-paths";
 import { getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { validateChallengeForPublish, type ChallengeValidationResult } from "@/lib/server/challenge-validation";
 import { CHALLENGE_TIME_ZONE_OPTIONS, DEFAULT_CHALLENGE_TIME_ZONE, challengeDateTimeForStorage, challengeDateTimeInputValue, formatChallengeLocalDateTime, resolveChallengeTimeZone } from "@/lib/challenge-date-time";
+import { generatePrivateChallengeAccessCode } from "@/lib/private-challenge-access";
 
 type Mode = "public" | "private";
 const SPONSOR_PLACEMENTS = ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"] as const;
@@ -26,7 +27,7 @@ const sponsorPlacementLabels: Record<string, string> = {
 
 type FormState = {
   title: string; category: string; description: string; shortDescription: string;
-  rules: string; terms: string; submission: string; access: string;
+  rules: string; terms: string; submission: string; access: string; accessCode: string; accessCodeExpiresAt: string; accessCodeMaxUses: string; publicPreviewEnabled: boolean;
   submissionTypes: string[]; startsAt: string; registrationDeadline: string; submissionDeadline: string; votingDeadline: string; endsAt: string;
   timeZone: string;
   coverImageUrl: string; coverImagePath: string; promoImageUrl: string; promoImagePath: string; galleryImageUrl: string; galleryImagePath: string; trailerVideoUrl: string; trailerVideoPath: string; documentOneUrl: string; documentOnePath: string; documentTwoUrl: string; documentTwoPath: string;
@@ -36,7 +37,7 @@ type FormState = {
 };
 
 const publicSteps = ["Overview", "Rules & Eligibility", "Entry & Submission", "Voting & Timeline", "Monetization & Prize Pool", "Media & Branding", "Review & Publish"];
-const privateSteps = ["Overview", "Access & Invites", "Rules & Eligibility", "Entry & Submission", "Timeline", "Monetization & Prize Pool", "Review & Publish"];
+const privateSteps = ["Basics", "Access Code", "Entry & Eligibility", "Submissions", "Timeline", "Voting / Judging", "Prize & Monetization", "Media & Branding", "Review & Submit"];
 const categories = ["Fitness", "Creative", "Photography", "Food", "Gaming", "Education", "Business", "Other"];
 
 function dateInput(days: number) {
@@ -44,7 +45,7 @@ function dateInput(days: number) {
 }
 
 function initialForm(): FormState {
-  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, creatorPrizeFundingRequiredCents: 0, confirmedCreatorPrizeFundingCents: 0, creatorPrizeFundingStatus: "not_requested", sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
+  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", accessCode: generatePrivateChallengeAccessCode(), accessCodeExpiresAt: "", accessCodeMaxUses: "", publicPreviewEnabled: false, submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, creatorPrizeFundingRequiredCents: 0, confirmedCreatorPrizeFundingCents: 0, creatorPrizeFundingStatus: "not_requested", sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
 }
 
 function formFromChallenge(challenge: Record<string, unknown>): FormState {
@@ -63,6 +64,10 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
     terms: String(challenge.policyTerms ?? ""),
     submission: String(challenge.challengeGuidelines ?? ""),
     access: String(challenge.privateAccessInstructions ?? ""),
+    accessCode: String(challenge.privateAccessCode ?? generatePrivateChallengeAccessCode()),
+    accessCodeExpiresAt: challengeDateTimeInputValue(challenge.privateAccessCodeExpiresAt ?? "", timeZone),
+    accessCodeMaxUses: String(challenge.privateAccessCodeMaxUses ?? ""),
+    publicPreviewEnabled: Boolean(challenge.publicPreviewEnabled),
     submissionTypes: Array.isArray(challenge.acceptedSubmissionTypes) && challenge.acceptedSubmissionTypes.length ? challenge.acceptedSubmissionTypes.map(String) : ["image"],
     startsAt: challengeDateTimeInputValue(challenge.submissionStartAt ?? challenge.startsAt ?? dateInput(8), timeZone),
     registrationDeadline: challengeDateTimeInputValue(challenge.registrationDeadline ?? dateInput(4), timeZone),
@@ -297,7 +302,11 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
       policyTerms: form.terms,
       challengeGuidelines: form.submission,
       privateAccessInstructions: privateMode ? form.access : "",
-      privateAccessMethod: privateMode ? "Invite-only access" : "",
+      privateAccessMethod: privateMode ? "access_code" : "",
+      privateAccessCode: privateMode ? form.accessCode : "",
+      privateAccessCodeExpiresAt: privateMode && form.accessCodeExpiresAt ? challengeDateTimeForStorage(form.accessCodeExpiresAt, form.timeZone) : null,
+      privateAccessCodeMaxUses: privateMode && form.accessCodeMaxUses ? Math.max(1, Number(form.accessCodeMaxUses)) : null,
+      publicPreviewEnabled: privateMode && form.publicPreviewEnabled,
       requiresSubmissionApproval: privateMode,
       sponsorEnabled: safeSponsorReady,
       sponsorSlots: safeSponsorReady ? 4 : 0,
@@ -337,11 +346,11 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
 
   function validateStep() {
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
-    if (mode === "private" && step === 1 && !form.access.trim()) return "Add private access instructions.";
+    if (mode === "private" && step === 1 && (!/^[A-HJ-NP-Z2-9]{5}$/.test(form.accessCode) || !form.access.trim())) return "Generate an access code and add access instructions.";
     if (step === (mode === "private" ? 2 : 1) && (!form.rules.trim() || !form.terms.trim())) return "Rules and eligibility terms are required.";
     if (step === (mode === "private" ? 3 : 2) && (!form.submissionTypes.length || !form.submission.trim())) return "Submission type and instructions are required.";
-    if (step === (mode === "private" ? 5 : 4) && monetizationProblem) return monetizationProblem;
-    if (step === (mode === "private" ? 6 : 5) && requiredImageMissing) return "Add at least one challenge image to continue.";
+    if (step === (mode === "private" ? 6 : 4) && monetizationProblem) return monetizationProblem;
+    if (step === (mode === "private" ? 7 : 5) && requiredImageMissing) return "Add at least one challenge image to continue.";
     return "";
   }
 
@@ -415,7 +424,7 @@ function StepTitle({ title, body }: { title: string; body: string }) { return <d
 function StepContent({ mode, step, form, update, toggleType, togglePlacement, updateMedia, track, userId, planAccess, planName, monetizationEligible, entryFeeCents, mediaUploadDisabled, mediaUploadDisabledReason, draftId }: { mode: Mode; step: number; form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; toggleType: (type: string) => void; togglePlacement: (surface: string) => void; updateMedia: (urlField: keyof FormState, pathField: keyof FormState, url: string, metadata?: { path: string }) => void; track: (field: string) => (status: MediaUploadStage) => void; userId: string; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; mediaUploadDisabled: boolean; mediaUploadDisabledReason: string; draftId?: string }) {
   const privateOffset = mode === "private" ? 1 : 0;
   if (step === 0) return <section><StepTitle title="Overview" body={mode === "private" ? "Set the private challenge brief and visibility." : "Set the public challenge brief and discovery details."} /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label={mode === "private" ? "Private challenge title" : "Challenge title"}><input className={inputClass} value={form.title} maxLength={120} onChange={(e) => update("title", e.target.value)} placeholder="Name the challenge" /></Field><Field label="Category"><select className={inputClass} value={form.category} onChange={(e) => update("category", e.target.value)}><option value="">Select category</option>{categories.map((c) => <option key={c}>{c}</option>)}</select></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Visibility"><input className={inputClass} value={mode === "private" ? "Private / invite-only" : "Public"} disabled /></Field><Field label="Short description"><input className={inputClass} value={form.shortDescription} maxLength={160} onChange={(e) => update("shortDescription", e.target.value)} /></Field></div><div className="mt-5"><Field label="Detailed description"><textarea className={textareaClass} value={form.description} maxLength={2000} onChange={(e) => update("description", e.target.value)} /></Field></div></section>;
-  if (mode === "private" && step === 1) return <section><StepTitle title="Access & Invites" body="Control who can enter without creating fake invite records." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><input className={inputClass} value="Invite-only access" disabled /></Field><Field label="Invite code/link"><input className={inputClass} value="Created after private challenge setup" disabled /></Field></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(e) => update("access", e.target.value)} /></Field></div></section>;
+  if (mode === "private" && step === 1) return <section><StepTitle title="Access Code" body="Challenge Suite generates the code. Share it only with people you want to admit." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Generated access code"><div className="flex gap-3"><input className={inputClass} value={form.accessCode} readOnly aria-label="Generated private challenge access code" /><Button type="button" variant="secondary" onClick={() => update("accessCode", generatePrivateChallengeAccessCode())}><RefreshCw size={16} /> Regenerate</Button></div></Field><Field label="Code expires (optional)"><input className={inputClass} type="datetime-local" value={form.accessCodeExpiresAt} onChange={(e) => update("accessCodeExpiresAt", e.target.value)} /></Field><Field label="Maximum uses (optional)"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(e) => update("accessCodeMaxUses", e.target.value)} /></Field><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-white/10 px-4"><input type="checkbox" checked={form.publicPreviewEnabled} onChange={(e) => update("publicPreviewEnabled", e.target.checked)} /><span><b>Public preview</b><small className="block text-slate-400">Show safe challenge details on Explore without exposing the code.</small></span></label></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(e) => update("access", e.target.value)} /></Field></div></section>;
   if (step === 1 + privateOffset) return <section><StepTitle title="Rules & Eligibility" body="Define fair participation terms before entries open." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Challenge rules"><textarea className={textareaClass} value={form.rules} onChange={(e) => update("rules", e.target.value)} /></Field><Field label="Eligibility terms"><textarea className={textareaClass} value={form.terms} onChange={(e) => update("terms", e.target.value)} /></Field><Card className="p-4 text-sm leading-6 text-slate-300"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /><b className="text-white">Upgrade required.</b><br />Paid entry, prize pools, sponsor tools, tournaments, live events, and advanced voting stay locked unless existing plan access allows them.</Card></div></section>;
   if (step === 2 + privateOffset) return <section><StepTitle title="Entry & Submission" body="Tell participants exactly what to submit." /><div className="mt-6 grid gap-3 sm:grid-cols-2">{["image", "video"].map((type) => <label key={type} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-[#181818] px-4 py-4 font-bold"><input type="checkbox" checked={form.submissionTypes.includes(type)} onChange={() => toggleType(type)} /> {type === "image" ? "Image upload" : "Video upload"}</label>)}</div><div className="mt-5"><Field label="Submission instructions"><textarea className={textareaClass} value={form.submission} onChange={(e) => update("submission", e.target.value)} /></Field></div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">Uploads use the existing media flow. No upload is marked successful until the upload component reports a saved URL and storage path.</Card></section>;
   if (step === 3 + privateOffset) return <section>
@@ -436,7 +445,9 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
       <Field label="Winner announcement"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(e) => update("endsAt", e.target.value)} /></Field>
     </div>
   </section>;
-  if (step === (mode === "private" ? 5 : 4)) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
+  if (mode === "private" && step === 5) return <section><StepTitle title="Voting / Judging" body="Choose only currently supported review rules. Access does not bypass voting eligibility." /><div className="mt-6 grid gap-4 md:grid-cols-2"><Card className="p-5"><b>Free voting</b><p className="mt-2 text-sm text-slate-400">One eligible free vote follows the existing challenge voting rules.</p></Card><Card className="p-5"><b>Submission approval</b><p className="mt-2 text-sm text-slate-400">Private submissions require approval before they can appear publicly.</p></Card></div></section>;
+  if (step === (mode === "private" ? 6 : 4)) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
+  if (mode === "private" && step === 7) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   if (mode === "public" && step === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   const timelineSummary = {
     "Registration Close": formatChallengeLocalDateTime(form.registrationDeadline, form.timeZone) ?? "Not set",
@@ -445,7 +456,7 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
     "Voting/Review Close": formatChallengeLocalDateTime(form.votingDeadline, form.timeZone) ?? "Not set",
     "Winner Announcement": formatChallengeLocalDateTime(form.endsAt, form.timeZone) ?? "Not set"
   };
-  return <section><StepTitle title="Review & Publish" body="Check the challenge before creating a record." />{mode === "private" ? <div className="mt-6"><h3 className="text-lg font-black text-white">Media & Branding</h3><p className="mt-1 text-sm text-slate-400">Assets stay in the existing media flow and do not create invite records.</p><UploadGallery form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} className="mt-4" /></div> : null}<div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? "Private / invite-only" : "Public", "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Storage setup required" : form.coverImageUrl ? "Uploaded" : "Required", "Paid Entry": form.paidEntryEnabled ? "Requested" : "Off", "Sponsor Ready": form.sponsorReady ? "Requested" : "Off", "Prize Pool": form.prizePoolEnabled ? form.paidEntryEnabled || form.sponsorReady ? "Grows from confirmed revenue or sponsor funding" : form.confirmedCreatorPrizeFundingCents > 0 ? `${formatCents(form.confirmedCreatorPrizeFundingCents)} creator funding confirmed` : "Creator funding required before publish" : "Off" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Payment safety:</b> payments require secure confirmation. Winner allocation, cash prize release, and automatic payouts require admin approval.</Card></section>;
+  return <section><StepTitle title={mode === "private" ? "Review & Submit" : "Review & Publish"} body="Check the challenge before creating a record." /><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? form.publicPreviewEnabled ? "Private with public preview" : "Private / hidden" : "Public", ...(mode === "private" ? { "Access Code": form.accessCode } : {}), "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Storage setup required" : form.coverImageUrl ? "Uploaded" : "Required", "Paid Entry": form.paidEntryEnabled ? "Requested" : "Off", "Sponsor Ready": form.sponsorReady ? "Requested" : "Off", "Prize Pool": form.prizePoolEnabled ? form.paidEntryEnabled || form.sponsorReady ? "Grows from confirmed revenue or sponsor funding" : form.confirmedCreatorPrizeFundingCents > 0 ? `${formatCents(form.confirmedCreatorPrizeFundingCents)} creator funding confirmed` : "Creator funding required before publish" : "Off" }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Review checklist:</b> code generated, access settings complete, timeline valid, submission rules complete, media confirmed, and payment rules remain provider verified.</Card></section>;
 }
 
 function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents, draftId }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; draftId?: string }) {

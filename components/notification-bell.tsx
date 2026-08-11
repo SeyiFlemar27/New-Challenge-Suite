@@ -33,6 +33,10 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
     await fetch("/api/notifications", { method: "POST" }).catch(() => null);
     await refetch();
   }
+  function openNotification(notification: NotificationRecord) {
+    if (notification.status === "unread" || notification.read === false) void fetch(`/api/notifications/${notification.id}/read`, { method: "POST" }).then(() => refetch()).catch(() => undefined);
+    setOpen(false);
+  }
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
@@ -64,25 +68,26 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
         {unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--gold)] px-1 text-[10px] font-black text-black">{Math.min(unreadCount, 99)}</span> : null}
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(92vw,380px)] overflow-hidden rounded-[8px] border border-[var(--gold)]/20 bg-[#111] shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <div role="menu" className="fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-[8px] border border-yellow-300 bg-white text-slate-950 shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <div><p className="text-sm font-black">Notifications</p><p className="mt-0.5 text-xs text-slate-500">{unreadCount} unread</p></div>
-            <button type="button" className="text-xs font-black text-[var(--gold)] disabled:text-slate-600" onClick={() => void markAllRead()} disabled={!unreadCount}>Mark all as read</button>
+            <button type="button" className="text-xs font-black text-amber-700 disabled:text-slate-400" onClick={() => void markAllRead()} disabled={!unreadCount}>Mark all as read</button>
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[56dvh] overflow-y-auto sm:max-h-96">
             {notifications.length ? notifications.slice(0, 6).map((notification) => {
               const unread = notification.status === "unread" || notification.read === false;
               const content = (
-                <div className={cn("border-b border-white/5 px-4 py-3 text-left hover:bg-white/[0.03]", unread && "bg-[var(--gold)]/5")}>
-                  <p className="break-words text-sm font-black">{notification.title ?? "Notification"}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{notification.message ?? notification.body ?? "Notification update"}</p>
-                  <p className="mt-1 text-[11px] text-slate-600">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "Time unavailable"}</p>
+                <div className={cn("relative border-b border-slate-100 px-4 py-3 text-left hover:bg-yellow-50", unread && "bg-amber-50 pl-7")}>
+                  {unread ? <span className="absolute left-3 top-5 h-2 w-2 rounded-full bg-amber-500" aria-label="Unread" /> : null}
+                  <p className="break-words text-sm font-black text-slate-950">{notification.title ?? "Notification"}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{notification.message ?? notification.body ?? "Notification update"}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "Time unavailable"}</p>
                 </div>
               );
-              return notification.actionUrl ? <Link key={notification.id} href={notification.actionUrl} onClick={() => setOpen(false)}>{content}</Link> : <div key={notification.id}>{content}</div>;
-            }) : <div className="px-5 py-8 text-center"><p className="text-sm font-black">No new notifications</p><p className="mt-1 text-xs text-slate-400">You&apos;re all caught up.</p></div>}
+              return notification.actionUrl ? <Link key={notification.id} href={notification.actionUrl} onClick={() => openNotification(notification)}>{content}</Link> : <button type="button" className="block w-full" key={notification.id} onClick={() => openNotification(notification)}>{content}</button>;
+            }) : <div className="px-5 py-8 text-center"><p className="text-sm font-black">No notifications yet.</p><p className="mt-1 text-xs text-slate-500">Updates about your challenges and account will appear here.</p></div>}
           </div>
-          <div className="grid grid-cols-2 border-t border-white/10"><Link href="/notifications" onClick={() => setOpen(false)} className="px-4 py-3 text-center text-sm font-black text-[var(--gold)]">View all</Link><Link href="/settings/notifications" onClick={() => setOpen(false)} className="border-l border-white/10 px-4 py-3 text-center text-sm font-bold text-slate-300">Settings</Link></div>
+          <div className="grid grid-cols-2 border-t border-slate-200"><Link href="/notifications" onClick={() => setOpen(false)} className="px-4 py-3 text-center text-sm font-black text-amber-700">View all</Link><Link href="/settings/notifications" onClick={() => setOpen(false)} className="border-l border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">Settings</Link></div>
         </div>
       ) : null}
     </div>

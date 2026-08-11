@@ -60,9 +60,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     if (admin) { applyLanguage(DEFAULT_LANGUAGE); return; }
     const run = () => { applying.current = true; applyLanguage(language); applying.current = false; };
     run();
+    const hydrationChecks = [100, 400, 1000].map((delay) => window.setTimeout(run, delay));
     const observer = new MutationObserver(() => { if (!applying.current) requestAnimationFrame(run); });
     observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => { hydrationChecks.forEach((timer) => window.clearTimeout(timer)); observer.disconnect(); };
   }, [admin, language, pathname]);
 
   return <>{children}</>;

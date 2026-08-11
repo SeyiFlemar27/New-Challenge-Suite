@@ -93,11 +93,10 @@ export function isPublicChallenge(id: string, data: Record<string, unknown>) {
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
   const type = String(data.type ?? "").toLowerCase();
+  const publicPrivatePreview = visibility === "private" && type.includes("private") && data.publicPreviewEnabled === true;
   return PUBLIC_CHALLENGE_STATUSES.has(status)
-    && visibility === "public"
-    && !type.includes("private")
-    && !type.includes("exclusive")
-    && !type.includes("invite")
+    && (visibility === "public" || publicPrivatePreview)
+    && (publicPrivatePreview || (!type.includes("private") && !type.includes("exclusive") && !type.includes("invite")))
     && data.publicVisibility !== false
     && data.eventVisibility !== "hidden_until_approved";
 }
@@ -123,6 +122,7 @@ export function publicChallengeFields(data: Record<string, unknown>) {
     "usesPlaceholderMedia", "mediaFallbackType", "mediaStorageStatus", "isLiveEvent", "venueName",
     "eventCity", "eventState", "eventCountry", "eventCapacity", "tournamentType",
     "divisionFormat", "maxParticipants", "scoringMode", "sponsorEnabled", "creatorName",
+    "publicPreviewEnabled", "privateAccessMethod",
     "creatorUsername", "creatorAvatarUrl", "resultsConfirmed", "settlementPrepared", "settlementStatus",
     "predictionEnabled", "predictionArenaEnabled", "predictionMarketEnabled", "predictionMarketApproved", "predictionMarketStatus",
     "confirmedPredictionPoolCents", "confirmedPredictionCount",

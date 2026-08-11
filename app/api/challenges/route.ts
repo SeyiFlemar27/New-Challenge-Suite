@@ -189,6 +189,12 @@ export async function POST(request: Request) {
     customCategory: body.category === "Other" ? body.customCategory ?? null : null,
     type: body.type ?? (body.visibility === "private" ? "Private / Exclusive" : "Public Challenge"),
     visibility: body.visibility,
+    publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
+    privateAccessMethod: body.visibility === "private" ? "access_code" : "",
+    privateAccessCode: body.visibility === "private" ? body.privateAccessCode : "",
+    privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
+    privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,
+    privateAccessInstructions: body.visibility === "private" ? body.privateAccessInstructions : "",
     premiumOnly: Boolean(body.premiumOnly),
     planRequired: body.premiumOnly ? "pro" : null,
     status: lifecycleStatus,
@@ -338,7 +344,7 @@ export async function POST(request: Request) {
     publishedAt: body.publish && lifecycleStatus !== "pending_review" ? now : null
   };
   const privateInvitePromise = challenge.visibility === "private" || challenge.visibility === "exclusive"
-    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now })
+    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: body.privateAccessCode || undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100 })
     : Promise.resolve(null);
 
   await Promise.all([
