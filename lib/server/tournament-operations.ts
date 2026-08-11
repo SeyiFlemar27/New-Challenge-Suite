@@ -51,7 +51,6 @@ export function evaluateTournamentJoinEligibility(params: {
     if (params.invitation.expiresAt && now >= new Date(params.invitation.expiresAt)) return { allowed: false, code: "INVITATION_EXPIRED", message: "This tournament invitation has expired." };
   }
   if (params.profileComplete === false) return { allowed: false, code: "PROFILE_REQUIRED", message: "Complete your profile before joining." };
-  if ((params.tournament.eligibility as Record<string, unknown>)?.kycRequired && !params.kycApproved) return { allowed: false, code: "KYC_REQUIRED", message: "Verification is required before joining." };
   if (!params.rulesAccepted) return { allowed: false, code: "RULES_REQUIRED", message: "Tournament rules must be accepted." };
   if (confirmedParticipantCount(params.participants) >= params.tournament.participantCapacity) return { allowed: true, outcome: "waitlisted", code: "WAITLIST_AVAILABLE", message: "Tournament is full. Join the waitlist." };
   if (params.tournament.registrationType === "approval_required") return { allowed: true, outcome: "pending_approval", code: "APPLICATION_REQUIRED", message: "Application will be submitted for host review." };

@@ -9,8 +9,12 @@ const tempDir = join(root, ".tmp-challenge-publish-validation");
 await rm(tempDir, { recursive: true, force: true });
 await mkdir(tempDir, { recursive: true });
 const lifecycleSource = readFileSync(join(root, "lib/server/challenge-lifecycle.ts"), "utf8");
-const validationSource = readFileSync(join(root, "lib/server/challenge-validation.ts"), "utf8").replace('import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";', 'import { validateChallengeDates } from "./challenge-lifecycle.ts";');
+const dateTimeSource = readFileSync(join(root, "lib/challenge-date-time.ts"), "utf8");
+const validationSource = readFileSync(join(root, "lib/server/challenge-validation.ts"), "utf8")
+  .replace('import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";', 'import { validateChallengeDates } from "./challenge-lifecycle.ts";')
+  .replace('import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";', 'import { DEFAULT_CHALLENGE_TIME_ZONE } from "./challenge-date-time.ts";');
 await writeFile(join(tempDir, "challenge-lifecycle.ts"), lifecycleSource, "utf8");
+await writeFile(join(tempDir, "challenge-date-time.ts"), dateTimeSource, "utf8");
 await writeFile(join(tempDir, "challenge-validation.ts"), validationSource, "utf8");
 const { serverChallengeCreateSchema, validateChallengeForDraft, validateChallengeForPublish } = await import(pathToFileURL(join(tempDir, "challenge-validation.ts")).href);
 
@@ -32,11 +36,14 @@ const baseChallenge = {
   acceptedSubmissionTypes: ["image"],
   competitionFormat: "Entry Competition",
   bestOf: "1 Rounder",
-  startsAt: future(5),
-  submissionDeadline: future(3),
+  registrationDeadline: future(2),
+  startsAt: future(3),
+  submissionStartAt: future(3),
+  submissionDeadline: future(4),
   votingStartsAt: future(3),
-  votingDeadline: future(4),
+  votingDeadline: future(5),
   endsAt: future(6),
+  winnerAnnouncementAt: future(7),
   timeZone: "UTC",
   standardRules: "Submit original work. Respect all participants.",
   policyTerms: "Participants must follow platform and community rules.",

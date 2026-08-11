@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 const checkout = readFileSync("app/api/challenges/[id]/entry-checkout/route.ts", "utf8");
 const payments = readFileSync("lib/server/monetization-payments.ts", "utf8");
 const journey = readFileSync("lib/server/participant-journey.ts", "utf8");
-assert(checkout.includes("success_url") && checkout.includes("payment=processing"), "paid checkout must return to processing state");
+assert(checkout.includes("success_url") && checkout.includes("/registration-success?entryPaymentId="), "paid checkout must return to the provider-confirmation journey");
 assert(payments.includes("createsActiveParticipantBeforeWebhook: false"), "paid checkout must not create active participant before webhook");
 assert(payments.includes("confirmChallengeEntryPayment"), "webhook confirmation handler must exist");
 assert(journey.includes('"payment_required"') && journey.includes('"payment_pending"') && journey.includes('"can_submit"'), "paid journey states required");

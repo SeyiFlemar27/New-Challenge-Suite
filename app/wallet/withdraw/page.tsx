@@ -125,13 +125,13 @@ export default function WithdrawPage() {
               <ShieldCheck className="text-[var(--gold)]" size={34} />
               <h2 className="mt-5 text-2xl font-black">Review checks</h2>
               <div className="mt-6 space-y-3 text-sm text-slate-400">
-                <p>KYC is required before withdrawal approval.</p>
+                <p>Withdrawal requests are reviewed before payout processing.</p>
                 <p>New earnings remain in pending clearance for at least {data.pendingClearanceDays} days.</p>
                 <p>Approved requests require at least {data.minimumProcessingHours} hours of processing.</p>
                 <p>Withdrawal fee: $0.00.</p>
                 <p>Requests are created as pending review.</p>
                 <p>No instant payout is available.</p>
-                <p><a className="font-bold text-[var(--gold)]" href="/kyc/status">Review KYC status</a></p>
+                <p>Payout processing is handled through admin and provider review.</p>
               </div>
             </Card>
           </div>

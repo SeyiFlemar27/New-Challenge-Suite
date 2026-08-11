@@ -12,12 +12,12 @@ export function sponsorshipToWinnerFlowVisibility() {
       "admin_approves_winners",
       "ledger_credits_pending_hold",
       "winner_announcement",
-      "kyc_hold_payout_provider_required_before_withdrawal"
+      "hold_payout_provider_review_required_before_withdrawal"
     ],
     sponsorFundsGoToWinnersPercent: 100,
     paidVotePlatformFeeFirstPercent: 15,
     paidVoteParticipantSharePercent: 15,
-    winnerAnnouncementCopy: "Winners are approved by admin. Earnings enter pending balance first. Sponsor-funded prizes go 100% to winners. Paid vote revenue includes platform fee first, then participant vote-share, then challenge revenue split. KYC and 24-hour hold are required before withdrawal.",
+    winnerAnnouncementCopy: "Winners are approved by admin. Earnings enter pending balance first. Sponsor-funded prizes go 100% to winners. Paid vote revenue includes platform fee first, then participant vote-share, then challenge revenue split. Payout review and the 24-hour hold remain required before withdrawal.",
     noPayoutRelease: true,
     noFakeFunding: true
   };

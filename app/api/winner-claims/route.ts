@@ -11,10 +11,6 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Winner claims");
 
   const formData = await request.formData();
-  const identityDocument = formData.get("identityDocument");
-  if (!(identityDocument instanceof File)) {
-    return validationError({ identityDocument: "Identity document upload is required for review. Document storage and KYC processing are not active yet." });
-  }
   const submissionId = String(formData.get("submissionId") ?? "");
   if (!submissionId) return validationError({ submissionId: "Submission ID is required." });
 
@@ -50,9 +46,9 @@ export async function POST(request: Request) {
     payoutId: payoutRef.id,
     payoutProviderConnected: false,
     transferEnabled: false,
-    identityDocumentStorageStatus: "not_processed",
-    kycProcessingStatus: "not_active",
-    identityDocumentName: identityDocument.name,
+    identityDocumentStorageStatus: "not_required",
+    kycProcessingStatus: "not_required",
+    identityDocumentName: null,
     identityDocumentPath: null,
     payoutMethod: null,
     taxAcknowledged: Boolean(formData.get("taxAcknowledged") === "true"),
@@ -86,7 +82,7 @@ export async function POST(request: Request) {
       submissionId,
       winnerClaimId: ref.id,
       payoutId: payoutRef.id,
-      description: "Winner claim payout review placeholder. No cash payout, transfer, or KYC processing is active yet.",
+      description: "Winner claim payout review placeholder. No cash payout or transfer is active yet.",
       now
     })
   ]);

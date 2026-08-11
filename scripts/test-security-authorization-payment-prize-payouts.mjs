@@ -9,6 +9,7 @@ assert(checkout.includes("editableDraftStatus"), "funding must be completed befo
 assert(funding.includes("assertConfirmedSession"), "funding confirmation must validate provider metadata and amount");
 assert(funding.includes("db.runTransaction"), "funding confirmation must be atomic and idempotent");
 assert(funding.includes("payoutExecutionEnabled: false") && funding.includes("refundExecutionEnabled: false"), "funding must not execute payout or refund");
-assert(publish.includes("KYC_REQUIRED"), "paid or creator-funded publication must retain KYC lock");
+assert(!publish.includes("KYC_REQUIRED"), "paid or creator-funded publication must be KYC-free");
+assert(publish.includes("getUserPlanAccess") && publish.includes("validateEntryFee"), "plan and payment validation must remain");
 assert(!funding.includes("payouts.create") && !funding.includes("refunds.create"), "provider payout/refund execution must not be added");
 console.log("payment, prize, and payout authorization checks passed");

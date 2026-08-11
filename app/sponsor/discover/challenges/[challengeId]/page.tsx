@@ -155,7 +155,7 @@ export default function ChallengeOpportunityPage() {
       <Card className="mt-8 p-6">
         <h2 className="text-2xl font-black">Admin and payout controls</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {["Confirmed sponsor payment required", "Winner approval required", "KYC and 24-hour hold required"].map((item) => <p key={item} className="rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">{item}</p>)}
+          {["Confirmed sponsor payment required", "Winner approval required", "Payout review and 24-hour hold required"].map((item) => <p key={item} className="rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">{item}</p>)}
         </div>
       </Card>
     </div>}

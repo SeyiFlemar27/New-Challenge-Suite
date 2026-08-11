@@ -13,7 +13,7 @@ const checks = [
   "Queue cards link correctly",
   "Sensitive actions require confirmation",
   "Audit logs created",
-  "Withdrawal approval blocked without KYC",
+  "Withdrawal approval remains review-controlled without a KYC gate",
   "DoroCoins remain non-withdrawable",
   "No fake exports or notifications",
   "No money movement activated"

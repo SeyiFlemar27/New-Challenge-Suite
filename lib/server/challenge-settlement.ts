@@ -269,7 +269,7 @@ export async function buildConfirmedSettlementPreview(db: Firestore, input: {
       : "awaiting_confirmed_revenue",
     createsInternalCreditsOnly: true,
     payoutProviderCalled: false,
-    kycRequiredBeforeWithdrawal: true
+    kycRequiredBeforeWithdrawal: false
   };
 }
 
@@ -313,7 +313,7 @@ function cashLedgerEntry(input: {
     holdUntil: input.holdUntil,
     placement: input.placement ?? null,
     idempotencyKey: input.id,
-    kycRequiredBeforeWithdrawal: true,
+    kycRequiredBeforeWithdrawal: false,
     payoutProviderCalled: false,
     externalPayoutExecuted: false,
     paid: false,
@@ -534,7 +534,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       externalPayoutExecuted: false,
       automaticBankTransferExecuted: false,
       automaticRefundExecuted: false,
-      kycRequiredBeforeWithdrawal: true,
+      kycRequiredBeforeWithdrawal: false,
       confirmedPaymentSourcesOnly: true
     };
     transaction.set(settlementRef, settlement);

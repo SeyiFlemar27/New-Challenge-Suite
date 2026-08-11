@@ -194,7 +194,6 @@ export async function POST(request: Request) {
     eligibleSubmissionCount: leaderboard.entries.length
   });
   if (!access.canPredict) return fail(access.message, 403, { predictionAccess: access }, String(access.reason ?? "PREDICTION_BLOCKED").toUpperCase());
-  if (String(profile.kycStatus ?? "not_started") !== "verified") return fail("Identity verification is required before making a real-money prediction.", 403, undefined, "KYC_REQUIRED");
   if (profile.ageVerified !== true) return fail("Age verification is required before making a real-money prediction.", 403, undefined, "AGE_VERIFICATION_REQUIRED");
   if (profile.suspended === true || isSponsorProfile(profile)) return fail("This account cannot make predictions.", 403, undefined, "ACCOUNT_RESTRICTED");
 

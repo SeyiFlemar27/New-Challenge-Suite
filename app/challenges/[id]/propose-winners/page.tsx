@@ -145,7 +145,7 @@ export default function ProposeWinnersPage() {
                 <div className="mt-4 space-y-3">
                   {slots.map((slot) => <div key={slot.placement} className="flex justify-between rounded-[8px] bg-white/[0.03] p-3 text-sm"><span>{slot.placement === 1 ? "1st" : slot.placement === 2 ? "2nd" : "3rd"} place</span><span className="font-black text-[var(--gold)]">{slot.splitPercent}%</span></div>)}
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-400">Admin approval is required. Ledger finalization uses confirmed payment sources only, applies a 24-hour hold, and KYC remains required before withdrawal.</p>
+                <p className="mt-4 text-sm leading-6 text-slate-400">Admin approval is required. Ledger finalization uses confirmed payment sources only, applies a 24-hour hold, and keeps payout processing under review.</p>
               </Card>
               <Card className="p-5">
                 <h2 className="text-xl font-black">Proposal states</h2>

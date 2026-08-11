@@ -467,7 +467,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
   } : null;
   return <section>
     <StepTitle title="Monetization & Prize Pool" body="Choose how this challenge can be funded. Paid features require payment setup, admin review, and payout rules before they can go live." />
-    {!monetizationEligible ? <Card className="mt-6 border-yellow-500/25 bg-yellow-500/5 p-5 text-sm leading-6 text-yellow-50"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /><b>Monetized challenges are available to Creator, Host, and approved Enterprise accounts.</b><br />Free Basic challenges remain public, non-prize, and non-monetized.</Card> : <Card className="mt-6 border-white/10 bg-white/[0.03] p-5 text-sm leading-6 text-slate-300"><b className="text-white">{planName} monetization setup.</b><br />KYC is required before withdrawals. Payments are provider-confirmed only. Winner allocation requires admin approval and a 24-hour cash hold.</Card>}
+    {!monetizationEligible ? <Card className="mt-6 border-yellow-500/25 bg-yellow-500/5 p-5 text-sm leading-6 text-yellow-50"><LockKeyhole className="mb-2 text-[var(--gold)]" size={18} /><b>Monetized challenges are available to Creator, Host, and approved Enterprise accounts.</b><br />Free Basic challenges remain public, non-prize, and non-monetized.</Card> : <Card className="mt-6 border-white/10 bg-white/[0.03] p-5 text-sm leading-6 text-slate-300"><b className="text-white">{planName} monetization setup.</b><br />Payments are provider-confirmed only. Winner allocation and withdrawal requests require review, with a 24-hour cash hold.</Card>}
     <div className="mt-6 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-5">
         <MonetizationCard title="Enable Paid Entry" enabled={form.paidEntryEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidEntryEnabled", enabled)} setupCopy="Paid entry checkout will activate only after payment setup and provider confirmation are complete.">
@@ -501,7 +501,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
         <h3 className="mt-2 text-xl font-black text-white">Rules, not actual earnings</h3>
         <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
           <p><b className="text-white">Generated revenue:</b> confirmed revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite.</p><p><b className="text-white">Sponsor contributions:</b> excluded from the 65/20/15 split; the net sponsor prize goes to approved winners after one 15% settlement fee.</p>
-          <p><b className="text-white">Withdrawal rules:</b> admin approval, 24-hour hold, and KYC are required.</p>
+          <p><b className="text-white">Withdrawal rules:</b> admin approval, payout details, and the 24-hour hold remain required.</p>
           {entryFeeEstimate ? <div className="rounded-[8px] bg-black/30 p-3"><p className="font-bold text-white">Paid-entry estimate</p><p>Gross entry fee: {formatCents(entryFeeCents)}</p><p>Winner pool: {formatCents(entryFeeEstimate.winnerPool)}</p><p>Creator share: {formatCents(entryFeeEstimate.creator)}</p><p>Challenge Suite: {formatCents(entryFeeEstimate.platform)}</p></div> : null}
           <p className="text-xs text-slate-500">Estimates are not saved as revenue and do not create ledger entries.</p>
         </div>

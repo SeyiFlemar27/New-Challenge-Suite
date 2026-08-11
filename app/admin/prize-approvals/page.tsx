@@ -57,7 +57,7 @@ export default function AdminPrizeApprovalsPage() {
       />
 
       <Card className="mt-6 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300">
-        Admin approval is required before prize ledger finalization can proceed. Winner funds remain pending, a 24-hour hold applies, KYC is still required before withdrawal, and payout providers are not connected from this page.
+        Admin approval is required before prize ledger finalization can proceed. Winner funds remain pending, a 24-hour hold applies, and payout providers are not connected from this page.
       </Card>
 
       <div className="mt-6 flex justify-end">
@@ -100,7 +100,7 @@ export default function AdminPrizeApprovalsPage() {
                   <p className="text-sm font-black">Proposed winners</p>
                   {winners.length ? <div className="mt-3 space-y-2">{winners.map((winner, index) => <div key={`${proposal.id}_${winner.userId}_${index}`} className="flex flex-wrap justify-between gap-2 text-sm text-slate-300"><span>Place {winner.placement ?? index + 1}: {winner.userId ?? "Winner unavailable"}</span><span>{winner.splitPercent ?? 0}% / {money(winner.proposedAmountPreviewCents)}</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">Winner details are unavailable on this proposal.</p>}
                 </div>
-                <p className="mt-5 text-sm leading-6 text-slate-400">Use the admin prize approval API to preview, approve, reject, or request changes. Approved records remain non-paying until confirmed revenue, ledger finalization, hold, KYC, and payout provider requirements are complete.</p>
+                <p className="mt-5 text-sm leading-6 text-slate-400">Use the admin prize approval API to preview, approve, reject, or request changes. Approved records remain non-paying until confirmed revenue, ledger finalization, hold, and payout provider requirements are complete.</p>
                 <LinkButton href={`/admin/prize-approvals/${proposal.id}`} className="mt-5 w-full">Review Proposal</LinkButton>
               </Card>
             );

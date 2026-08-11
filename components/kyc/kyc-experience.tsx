@@ -35,9 +35,9 @@ export function normalizeKycStatusLabel(value?: string | null) {
 export function kycStatusCopy(statusValue?: string | null, required = false): StatusCopy {
   const status = normalizeKycStatusLabel(required ? statusValue : "not_required");
   const copies: Record<string, StatusCopy> = {
-    not_required: { label: "Not required", title: "Verification is not required", body: "Your current plan does not require identity verification. You can continue using free/basic Challenge Suite features.", cta: "Go to Dashboard", href: "/dashboard", tone: "neutral" },
-    required: { label: "Not started", title: "Verification required", body: "Complete identity verification to unlock premium-sensitive features after payment.", cta: "Start Verification", href: "/kyc/start", tone: "warning" },
-    not_started: { label: "Not started", title: "Verification required", body: "Complete identity verification to unlock premium-sensitive features after payment.", cta: "Start Verification", href: "/kyc/start", tone: "warning" },
+    not_required: { label: "Not required", title: "Verification is not required", body: "Identity verification is not required for current Challenge Suite product actions.", cta: "Go to Dashboard", href: "/dashboard", tone: "neutral" },
+    required: { label: "Historical record", title: "Verification is not required", body: "A historical verification state is retained for provider and admin review, but it does not block current product actions.", cta: "Go to Dashboard", href: "/dashboard", tone: "neutral" },
+    not_started: { label: "Historical record", title: "Verification is not required", body: "A historical verification state is retained for provider and admin review, but it does not block current product actions.", cta: "Go to Dashboard", href: "/dashboard", tone: "neutral" },
     in_progress: { label: "In progress", title: "Verification in progress", body: "You started verification but have not completed all steps yet.", cta: "Continue Verification", href: "/kyc/start", tone: "warning" },
     pending_review: { label: "Under review", title: "Verification under review", body: "Your identity check has been submitted. We'll update your account when Sumsub completes the review.", cta: "Refresh Status", href: "/kyc/status", tone: "neutral" },
     verified: { label: "Verified", title: "Identity verified", body: "Your identity has been verified. Premium-sensitive tools may now unlock where all other plan, provider, and admin requirements are met.", cta: "Return to Dashboard", href: "/dashboard", secondary: "View Earnings", secondaryHref: "/earnings", tone: "success" },
@@ -67,7 +67,7 @@ export function KycOverviewPageContent() {
   }, []);
   const required = kyc?.kycRequired === true;
   const copy = kycStatusCopy(kyc?.kycStatus, required);
-  const primaryLabel = copy.label === "In progress" ? "Continue Verification" : copy.label === "Under review" ? "View Verification Status" : copy.label === "Verified" ? "View Verified Status" : ["Needs attention", "Needs resubmission"].includes(copy.label) ? "Resubmit Verification" : "Start Verification";
+  const primaryLabel = required ? (copy.label === "In progress" ? "Continue Verification" : copy.label === "Under review" ? "View Verification Status" : copy.label === "Verified" ? "View Verified Status" : ["Needs attention", "Needs resubmission"].includes(copy.label) ? "Resubmit Verification" : "Start Verification") : "Go to Dashboard";
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl space-y-8">
@@ -75,8 +75,8 @@ export function KycOverviewPageContent() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Identity verification</p>
-              <h1 className="mt-3 text-4xl font-black leading-tight sm:text-5xl">Verify your identity</h1>
-              <p className="mt-4 text-lg leading-8 text-slate-300">Complete a secure identity check to unlock premium-sensitive Challenge Suite features.</p>
+              <h1 className="mt-3 text-4xl font-black leading-tight sm:text-5xl">Verification records</h1>
+              <p className="mt-4 text-lg leading-8 text-slate-300">Verification is not required for current launch activity. Historical provider records remain available for review.</p>
               {message ? <p className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-200">{message}</p> : null}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
@@ -91,13 +91,13 @@ export function KycOverviewPageContent() {
           <InfoCard icon={<FileBadge />} title="Government ID" body="Use a valid government-issued ID such as a passport, driver license, or national ID where supported." />
           <InfoCard icon={<Camera />} title="Face verification" body="Complete a selfie or liveness check so your identity can be matched securely." />
           <InfoCard icon={<ShieldCheck />} title="Secure review" body="Your verification is reviewed by Sumsub. Challenge Suite stores only verification status and provider metadata, not raw ID documents or face media." />
-          <InfoCard icon={<Sparkles />} title="Unlock premium tools" body="Once verified, eligible premium tools such as withdrawals, real-money Prediction Arena access, and revenue-related features can be unlocked where all other requirements are met." />
+          <InfoCard icon={<Sparkles />} title="Current launch policy" body="Current product actions depend on plan, payment, ownership, lifecycle, and review rules rather than identity verification." />
         </div>
 
         <Card className="p-6 sm:p-8">
           <h2 className="text-2xl font-black">Your information stays protected</h2>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {["Identity checks are handled through Sumsub.", "Challenge Suite does not store raw ID documents or selfie media.", "Verification is required only for premium-sensitive tools.", "Free/basic features remain available while review is pending."].map((item) => <p key={item} className="flex gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm font-bold text-slate-200"><BadgeCheck className="shrink-0 text-[var(--gold)]" size={18} />{item}</p>)}
+            {["Historical identity checks are handled through Sumsub.", "Challenge Suite does not store raw ID documents or selfie media.", "Verification is not required for current product actions.", "Provider and admin records remain available for future review."].map((item) => <p key={item} className="flex gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm font-bold text-slate-200"><BadgeCheck className="shrink-0 text-[var(--gold)]" size={18} />{item}</p>)}
           </div>
           <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm leading-6 text-yellow-100">Verification does not automatically approve withdrawals, payouts, refunds, or Prediction Arena settlement. Those features may still require additional review.</p>
         </Card>

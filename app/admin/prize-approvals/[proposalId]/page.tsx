@@ -156,7 +156,7 @@ export default function AdminPrizeApprovalDetailPage() {
               <Check label="Split equals 100%" ok={Boolean(detail.validation.valid)} />
               <Check label="No duplicate winners/placements" ok={Boolean(detail.validation.valid)} />
               <Check label="Confirmed payment sources only" ok={Boolean(preview?.confirmedOnly)} />
-              <Check label="KYC required before withdrawal" ok={Boolean(preview?.kycRequiredBeforeWithdrawal)} />
+              <Check label="KYC not required for withdrawal requests" ok={preview?.kycRequiredBeforeWithdrawal === false} />
               <Check label="Internal settlement only" ok={Boolean(preview?.createsInternalCreditsOnly)} />
               <Check label="Payout provider inactive" ok={preview?.providerPayoutCalled === false || proposal.payoutProviderCalled === false} />
             </div>
@@ -173,7 +173,7 @@ export default function AdminPrizeApprovalDetailPage() {
               {proposal.status === "approved" && !settlement ? <Button variant="ghost" onClick={() => void action("finalize-ledger")} disabled={Boolean(submitting)}>{submitting === "finalize-ledger" ? "Checking..." : "Retry Internal Settlement"}</Button> : null}
             </div>
             {notice ? <p className="mt-4 text-sm leading-6 text-slate-300">{notice}</p> : null}
-            <p className="mt-5 text-xs leading-5 text-slate-500">Approval creates internal credits from provider-confirmed records only. Funds remain pending review and KYC; no bank transfer or payout provider is called.</p>
+            <p className="mt-5 text-xs leading-5 text-slate-500">Approval creates internal credits from provider-confirmed records only. Funds remain pending payout review; no bank transfer or payout provider is called.</p>
           </Card>
           {challengeId ? <Link href={`/challenges/${challengeId}`} className="block rounded-[8px] border border-white/10 p-4 text-sm font-bold text-[var(--gold)]">Open challenge reference</Link> : null}
         </aside>

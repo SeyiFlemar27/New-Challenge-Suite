@@ -216,7 +216,7 @@ export async function settleApprovedPredictions(db: Firestore, input: {
         idempotencyKey: ledgerId,
         withdrawalFeeRate: 0,
         winnerWithdrawalFeeApplies: false,
-        kycRequiredBeforeWithdrawal: true,
+        kycRequiredBeforeWithdrawal: false,
         providerReference: null,
         payoutProviderCalled: false,
         createdBy: "prediction_settlement",

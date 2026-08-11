@@ -64,7 +64,7 @@ export function AdminQaData() {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">Safety boundary</p>
             <h2 className="mt-2 text-xl font-black">Review data only</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              Seeded withdrawals remain pending review with KYC and providers disconnected. No payout, prize release, refund, notification, or balance conversion is executed.
+              Seeded withdrawals remain pending review with providers disconnected. No payout, prize release, refund, notification, or balance conversion is executed.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

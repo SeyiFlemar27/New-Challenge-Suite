@@ -5,6 +5,6 @@ const source = read(
 );
 assert(source.includes("usesConfirmedSourcesOnly"), "missing " + "usesConfirmedSourcesOnly");
 assert(source.includes("pending_hold"), "missing " + "pending_hold");
-assert(source.includes("kycRequiredBeforeWithdrawal"), "missing " + "kycRequiredBeforeWithdrawal");
+assert(source.includes("kycRequiredBeforeWithdrawal: false"), "winner prize allocation must be KYC-free");
 assert(source.includes("payoutProviderCalled: false"), "missing " + "payoutProviderCalled: false");
 console.log("test-phase6-winner-prize-allocation-flow checks passed");

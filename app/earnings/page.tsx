@@ -11,7 +11,7 @@ type CashWallet = { availableBalanceCents: number; pendingBalanceCents: number; 
 type Earning = { id: string; challengeId?: string | null; settlementId?: string | null; sourceType: string; grossAmountCents: number; feeAmountCents: number; netAmountCents: number; status: string; createdAt?: string | null };
 type Withdrawal = { id: string; amountCents: number; status: string; createdAt?: string | null; payoutMethodLabel?: string };
 type PayoutMethod = { id: string; type: Method; label: string; currency: string; verificationStatus: string; providerConnected: boolean; primary: boolean; estimatedProcessingTime: string };
-type WithdrawalData = { requests: Withdrawal[]; kycStatus: string; payoutMethods: PayoutMethod[] };
+type WithdrawalData = { requests: Withdrawal[]; payoutMethods: PayoutMethod[] };
 type Method = "payoneer" | "bank_transfer" | "paypal";
 type Tab = "overview" | "transactions" | "payouts" | "documents";
 
@@ -21,7 +21,6 @@ export default function EarningsPage() {
   const [earnings, setEarnings] = useState<Earning[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [methods, setMethods] = useState<PayoutMethod[]>([]);
-  const [kycStatus, setKycStatus] = useState("");
   const [dateRange, setDateRange] = useState("all");
   const [activity, setActivity] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -42,7 +41,6 @@ export default function EarningsPage() {
     } else setError(walletResult.message || "Earnings could not be loaded.");
     if (withdrawalResult.ok && withdrawalResult.data) {
       setWithdrawals(withdrawalResult.data.requests ?? []);
-      setKycStatus(withdrawalResult.data.kycStatus ?? "");
     }
     if (methodResult.ok && methodResult.data) setMethods(methodResult.data.methods ?? []);
     setLoading(false);
@@ -61,7 +59,7 @@ export default function EarningsPage() {
     <div className="mt-7 flex gap-2 overflow-x-auto border-b border-white/10 pb-3" role="tablist">{([["overview", "Overview"], ["transactions", "Transactions"], ["payouts", "Payouts"], ["documents", "Financial Documents"]] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={"min-h-11 shrink-0 rounded-[8px] px-4 text-sm font-black " + (tab === value ? "bg-[var(--gold)] text-black" : "bg-white/5 text-slate-300")} onClick={() => setTab(value)}>{label}</button>)}</div>
     {loading ? <Card className="mt-8 h-72 animate-pulse" /> : error ? <Card className="mt-8 p-7"><h2 className="text-2xl font-black">Earnings unavailable</h2><p className="mt-3 text-red-200">{error}</p><Button className="mt-5" onClick={() => void load()}>Retry</Button></Card> : <>
       {tab === "overview" ? <><div className="mt-8 grid gap-5 lg:grid-cols-2">
-        <Card className="p-6 sm:p-8"><p className="text-sm font-black text-slate-400">Available funds</p><p className="mt-3 text-4xl font-black text-[var(--gold)]">{formatMoney(available)}</p><p className="mt-3 text-sm leading-6 text-slate-400">Balance available for withdrawal or use after platform review.</p><div className="mt-6 flex flex-wrap gap-3">{!methods.length ? <Button onClick={() => setPayoutOpen(true)}>Add Payout Method</Button> : kycStatus !== "verified" ? <LinkButton href="/kyc/status">Complete Verification</LinkButton> : available > 0 ? <LinkButton href="/earnings/withdraw">Withdraw Funds</LinkButton> : <Button disabled variant="secondary">No funds available</Button>}</div></Card>
+        <Card className="p-6 sm:p-8"><p className="text-sm font-black text-slate-400">Available funds</p><p className="mt-3 text-4xl font-black text-[var(--gold)]">{formatMoney(available)}</p><p className="mt-3 text-sm leading-6 text-slate-400">Balance available for withdrawal or use after platform review.</p><div className="mt-6 flex flex-wrap gap-3">{!methods.length ? <Button onClick={() => setPayoutOpen(true)}>Add Payout Method</Button> : available > 0 ? <LinkButton href="/earnings/withdraw">Withdraw Funds</LinkButton> : <Button disabled variant="secondary">No funds available</Button>}</div></Card>
         <Card className="p-6 sm:p-8"><p className="text-sm font-black text-slate-400">Earnings & expenses</p><div className="mt-5 grid grid-cols-2 gap-5"><div><p className="text-xs uppercase text-slate-500">Earnings to date</p><p className="mt-2 text-2xl font-black">{formatMoney(wallet?.lifetimeEarningsCents)}</p></div><div><p className="text-xs uppercase text-slate-500">Expenses to date</p><p className="mt-2 text-2xl font-black">{formatMoney(expenses)}</p></div></div><label className="mt-6 block text-sm font-bold">Period<select className={inputClass + " mt-2"} disabled><option>Since joining</option></select></label></Card>
       </div><p className="mt-5 text-sm text-slate-400">Each settlement line preserves its Gross amount, Platform fee, and Net credited amount without mixing Spin Credits or DoroCoins into cash.</p><ActivitySection entries={filtered} dateRange={dateRange} setDateRange={setDateRange} activity={activity} setActivity={setActivity} /></> : null}
       {tab === "transactions" ? <ActivitySection entries={filtered} dateRange={dateRange} setDateRange={setDateRange} activity={activity} setActivity={setActivity} /> : null}

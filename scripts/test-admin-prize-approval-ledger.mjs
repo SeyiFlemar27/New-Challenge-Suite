@@ -45,17 +45,17 @@ assert(proposalRoute.includes("payoutProviderCalled: false"), "winner proposal m
 
 assert(adminQueueRoute.includes("requireAdminUser"), "admin prize queue must require admin.");
 assert(adminListRoute.includes("requireAdminUser"), "admin challenge proposal list must require admin.");
-assert(previewRoute.includes("requireAdminUser"), "payout preview must require admin.");
-assert(approveRoute.includes("requireAdminUser"), "approval must require admin.");
-assert(rejectRoute.includes("requireAdminUser"), "reject must require admin.");
-assert(changesRoute.includes("requireAdminUser"), "request changes must require admin.");
+assert(previewRoute.includes("requireAdminPermission"), "payout preview must require admin finance permission.");
+assert(approveRoute.includes("requireRecentAdminAuthentication"), "approval must require recent admin authentication.");
+assert(rejectRoute.includes("requireAdminPermission"), "reject must require admin winner-review permission.");
+assert(changesRoute.includes("requireAdminPermission"), "request changes must require admin winner-review permission.");
 assert(approveRoute.includes("createInternalChallengeSettlement"), "approval must call the idempotent internal settlement service.");
 assert(approveRoute.includes("buildConfirmedSettlementPreview"), "admin approval must build a confirmed-source settlement preview.");
 assert(settlement.includes("idempotent: true"), "internal settlement must be idempotent.");
 assert(settlement.includes("pendingBalanceCents: FieldValue.increment(credit.netAmountCents)"), "admin approval must credit pending internal wallet balances.");
 assert(approveRoute.includes("payoutProviderCalled: false"), "admin approval must not call payout provider.");
 assert(approveRoute.includes("payoutMarkedPaid: false"), "admin approval must not mark payouts paid.");
-assert(approveRoute.includes("kycStillRequiredBeforeWithdrawal: true"), "admin approval must not bypass KYC.");
+assert(approveRoute.includes("kycStillRequiredBeforeWithdrawal: false"), "admin approval must follow the KYC-free launch policy.");
 assert(rejectRoute.includes("ledgerEntriesCreated: false") && changesRoute.includes("ledgerEntriesCreated: false"), "reject/request-changes must not create ledger entries.");
 
 assert(settlement.includes("getConfirmedEntryRevenueForChallenge"), "preview must source confirmed entry revenue.");
@@ -65,12 +65,12 @@ assert(settlement.includes("pendingFailedCancelledExcluded: true"), "unconfirmed
 assert(settlement.includes("SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 15"), "sponsor prize must deduct one 15% platform fee at settlement.");
 assert(settlement.includes("confirmedPaymentSourcesOnly: true"), "settlement must use confirmed sources only.");
 
-assert(payout.includes("CASH_EARNING_HOLD_HOURS = 24"), "24-hour hold constant must exist.");
-assert(helper.includes("holdUntilFromApproval") && helper.includes("CASH_EARNING_HOLD_HOURS"), "preview/finalization must calculate holdUntil from approval plus 24 hours.");
+assert(payout.includes("CASH_EARNING_HOLD_HOURS = 72"), "current 72-hour hold constant must exist.");
+assert(helper.includes("holdUntilFromApproval") && helper.includes("CASH_EARNING_HOLD_HOURS"), "preview/finalization must calculate holdUntil from approval using the current hold.");
 assert(settlement.includes("balanceBucket: \"pending\""), "winner funds must enter pending bucket only.");
 assert(settlement.includes("status: \"pending_review\""), "internal credits must remain pending review.");
 assert(settlement.includes("paid: false") && settlement.includes("withdrawn: false"), "settlement must not mark credits paid or withdrawn.");
-assert(wallet.includes("kycRequired: true"), "withdrawal architecture must require KYC.");
+assert(wallet.includes('kycRequired: isKycRequiredForAction("withdrawalRequest")'), "withdrawal architecture must use the centralized KYC policy.");
 assert(wallet.includes("DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash."), "DoroCoins must remain non-cash.");
 assert(wallet.includes("Reward points are not cash and cannot be withdrawn."), "reward points must remain non-cash.");
 

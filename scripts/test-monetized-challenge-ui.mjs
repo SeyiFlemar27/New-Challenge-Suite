@@ -29,11 +29,10 @@ assert(builder.includes("Entry fee must be at least $5."), "paid entry UI must b
 assert(builder.includes("Make this challenge Sponsor Ready"), "sponsor-ready option must exist.");
 assert(builder.includes("Sponsor-ready challenges can appear in Sponsor Discovery after publish."), "sponsor-ready copy must explain discovery safely.");
 assert(builder.includes("Enable Prize Pool"), "prize pool toggle must exist.");
-assert(builder.includes("65% of paid entry revenue goes to winners."), "prize pool copy must explain paid-entry winner share.");
-assert(builder.includes("65% of paid vote revenue goes to winners."), "prize pool copy must explain paid-vote winner share.");
-assert(builder.includes("100% of confirmed sponsor contributions goes to winners."), "prize pool copy must explain sponsor contribution handling.");
+assert(builder.includes("Confirmed generated revenue is split 65% to winners, 20% to the creator, and 15% to Challenge Suite."), "prize pool copy must explain the generated-revenue split.");
+assert(builder.includes("Confirmed sponsor funding stays separate and receives one 15% sponsor-prize fee at settlement."), "prize pool copy must explain sponsor contribution handling.");
 assert(builder.includes("Enable Paid Votes"), "paid votes control must exist.");
-assert(builder.includes("Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts") && builder.includes("checkout remains setup-required"), "paid votes must remain setup-safe for eligible paid accounts.");
+assert(builder.includes("Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts") && builder.includes("checkout remains webhook-confirmed"), "paid votes must remain provider-confirmed for eligible paid accounts.");
 assert(builder.includes("Monetization Preview"), "builder must show monetization preview panel.");
 assert(builder.includes("Rules, not actual earnings"), "builder preview must not claim actual earnings.");
 assert(builder.includes("Estimates are not saved as revenue and do not create ledger entries."), "builder estimates must not be revenue.");
@@ -53,7 +52,7 @@ assert(challengeRoute.includes("MONETIZATION_LOCKED"), "challenge API must rejec
 assert(challengeRoute.includes("ENTRY_FEE_MINIMUM"), "challenge API must reject invalid paid-entry amounts.");
 assert(challengeRoute.includes("PAID_VOTES_LOCKED") && challengeRoute.includes("paidVotesCheckoutStatus") && challengeRoute.includes("setup_required"), "challenge API must keep paid votes setup-safe.");
 assert(challengeRoute.includes("safeMonetization"), "challenge API must sanitize monetization before persistence.");
-assert(challengeRoute.includes("ledgerCreationEnabled: false"), "challenge API must not create ledger entries from builder submission.");
+assert(challengeRoute.includes("ledgerCreationEnabled: Boolean(requestedMonetization)"), "challenge API must record ledger readiness without creating entries from builder submission.");
 assert(challengeRoute.includes("checkoutActive: false"), "challenge API must not activate checkout from builder submission.");
 assert(challengeRoute.includes("cashHoldHours: 24"), "challenge monetization metadata must note 24-hour hold.");
 
@@ -88,7 +87,7 @@ assert(!challengeRoute.includes("stripe.checkout.sessions.create"), "challenge b
 assert(!challengeRoute.includes("revenueLedgerEntries") && !challengeRoute.includes("createLedgerEntry("), "challenge builder route must not create revenue ledger entries.");
 assert(stripeWebhook.includes("paymentPurpose === \"challenge_entry\"") && stripeWebhook.includes("paymentPurpose === \"paid_vote\"") && stripeWebhook.includes("paymentPurpose === \"sponsor_funding\""), "Stripe webhook must branch only by explicit payment purpose for monetization checkout foundation.");
 assert(!stripeWebhook.includes("finalizeApprovedWinnerProposalLedger"), "Stripe webhook must not finalize ledgers or release prizes.");
-assert(withdrawalsRoute.includes("WITHDRAWALS_SETUP_REQUIRED"), "withdrawals must remain setup-safe.");
+assert(withdrawalsRoute.includes("Withdrawal request submitted for review."), "withdrawals must remain review-controlled.");
 assert(!withdrawalsRoute.includes("providerTransferId: \"") && !withdrawalsRoute.includes("markPaid"), "withdrawals must not execute payouts or mark paid.");
 
 console.log("Monetized challenge UI foundation checks passed.");

@@ -112,8 +112,8 @@ export function SumsubVerificationPanel({ initialKyc }: { initialKyc?: Kyc | nul
     <div className="space-y-5">
       <Card className="p-6 sm:p-8">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Secure Sumsub check</p>
-        <h2 className="mt-3 text-2xl font-black">Continue to secure verification</h2>
-        <p className="mt-4 leading-7 text-slate-300">Sumsub handles the government ID, selfie, and liveness flow. Challenge Suite stores only verification status and provider metadata.</p>
+        <h2 className="mt-3 text-2xl font-black">Historical verification provider</h2>
+        <p className="mt-4 leading-7 text-slate-300">Verification is not required for current product actions. Existing Sumsub metadata is retained for historical and provider review.</p>
         {!configured ? <div className="mt-5 rounded-[8px] border border-yellow-500/25 bg-yellow-500/10 p-4 text-sm text-yellow-100"><TriangleAlert className="mb-2" />Verification is temporarily unavailable. Please try again shortly.</div> : null}
         {message ? <p className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-200">{message}</p> : null}
         <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -124,7 +124,7 @@ export function SumsubVerificationPanel({ initialKyc }: { initialKyc?: Kyc | nul
       </Card>
       {loading ? <Card className="p-6 sm:p-8"><div className="flex items-center gap-4"><Loader2 className="animate-spin text-[var(--gold)]" /><div><h3 className="font-black">Preparing secure verification</h3><p className="mt-1 text-sm text-slate-400">This usually takes a few seconds.</p></div></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--gold)]" /></div></Card> : null}
       {required && configured && sdkReady ? <Card className="overflow-hidden p-4 sm:p-6"><div id="sumsub-websdk-container" className="min-h-[420px] rounded-[8px] border border-white/10 bg-black/40" /></Card> : null}
-      <Card className="p-5 text-sm leading-6 text-slate-400"><ShieldCheck className="mb-3 text-[var(--gold)]" />Verification unlocks premium-sensitive tools only after Sumsub sends a trusted pass result. Free/basic features remain available while review is pending.</Card>
+      <Card className="p-5 text-sm leading-6 text-slate-400"><ShieldCheck className="mb-3 text-[var(--gold)]" />Plan, payment, ownership, lifecycle, and review requirements remain enforced independently of historical verification status.</Card>
     </div>
   );
 }

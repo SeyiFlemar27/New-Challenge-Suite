@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { getSumsubConfig } from "@/lib/server/sumsub";
+import { currentKycPolicyStatus, isKycRequiredForAction } from "@/lib/server/kyc-policy";
 
 export const KYC_STATUSES = [
   "not_required",
@@ -23,26 +24,25 @@ export function normalizeKycStatus(value: unknown): KycStatus {
 }
 
 export function premiumRequiresKyc(profile: Record<string, unknown>) {
-  const planId = String(profile.planId ?? profile.subscriptionPlan ?? profile.subscriptionPlanId ?? "free");
-  const status = String(profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus ?? "").toLowerCase();
-  const premium = profile.premium === true || profile.entitlementActive === true;
-  return planId !== "free" && (premium || ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status));
+  void profile;
+  return isKycRequiredForAction("hostTools");
 }
 
 export function premiumAccessState(profile: Record<string, unknown>, status: KycStatus) {
-  if (!premiumRequiresKyc(profile)) return "free_or_not_required";
+  if (!premiumRequiresKyc(profile)) return "active_without_kyc";
   return status === "verified" ? "active" : "pending_kyc";
 }
 
 export function safeKycMetadata(userId: string, profile: Record<string, unknown>, providerConfigured: boolean) {
   const required = premiumRequiresKyc(profile);
   const sumsub = getSumsubConfig();
-  const rawStatus = profile.kycStatus ?? profile.sumsubKycStatus ?? (providerConfigured ? "not_started" : "provider_not_configured");
-  const status = required ? normalizeKycStatus(rawStatus) : "not_required";
+  const historicalStatus = normalizeKycStatus(profile.kycStatus ?? profile.sumsubKycStatus ?? (providerConfigured ? "not_started" : "provider_not_configured"));
+  const status = required ? historicalStatus : currentKycPolicyStatus();
   return {
     userId,
     kycRequired: required,
     kycStatus: status,
+    historicalKycStatus: historicalStatus,
     premiumAccessState: premiumAccessState(profile, status),
     kycProvider: providerConfigured ? "sumsub" : "not_configured",
     kycSessionId: profile.kycSessionId ?? null,

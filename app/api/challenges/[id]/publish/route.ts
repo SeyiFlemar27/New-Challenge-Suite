@@ -16,6 +16,7 @@ import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/p
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { imageLessChallengePublishingAllowed } from "@/lib/server/provider-readiness";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -85,8 +86,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const confirmedPlatformFundingCents = Math.max(0, Number(current.confirmedPlatformPromotionalPrizeCents ?? 0));
   if (requiredCreatorFundingCents > confirmedCreatorFundingCents) return fail("Confirm the full creator-funded prize amount before publishing this challenge.", 409, { requiredCreatorFundingCents, confirmedCreatorFundingCents }, "PRIZE_FUNDING_REQUIRED");
   if (monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady && confirmedCreatorFundingCents + confirmedPlatformFundingCents <= 0) return fail("Confirm an approved prize funding source before publishing this challenge.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
-  const kycStatus = String(planProfile.kycStatus ?? planProfile.sumsubKycStatus ?? "not_started").toLowerCase();
-  if ((monetizationIntent.paidEntryRequested || requiredCreatorFundingCents > 0) && !["verified", "approved"].includes(kycStatus)) return fail("Identity verification is required before publishing a paid challenge.", 403, { kycStatus, redirectTo: "/kyc" }, "KYC_REQUIRED");
 
   let lifecycleStatus = resolveInitialChallengeStatus({ publish: true, startsAt: body.startsAt, endsAt: body.endsAt, submissionDeadline: body.submissionDeadline, votingDeadline: body.votingDeadline, sponsorEnabled: body.sponsorEnabled, visibility: body.visibility, competitionFormat: body.competitionFormat, premiumOnly: body.premiumOnly });
   const advancedReviewRequired = body.prizeType === "money" || body.prizeType === "physical_product" || body.isLiveEvent || body.tournamentType !== "none" || body.competitionFormat.toLowerCase().includes("tournament");
@@ -113,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     prizeReleaseActive: false,
     payoutReleaseActive: false,
     adminApprovalRequired: Boolean(requestedMonetization),
-    kycRequiredBeforeWithdrawal: Boolean(requestedMonetization),
+    kycRequiredBeforeWithdrawal: isKycRequiredForAction("withdrawalRequest"),
     cashHoldHours: 24,
     creatorPrizeFundingRequiredCents: requiredCreatorFundingCents,
     confirmedCreatorPrizeFundingCents: confirmedCreatorFundingCents,

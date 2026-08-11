@@ -77,7 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     payoutProviderCalled: false,
     payoutMarkedPaid: false,
     payoutExecutionEnabled: false,
-    kycStillRequiredBeforeWithdrawal: true,
+    kycStillRequiredBeforeWithdrawal: false,
     updatedAt: now
   };
 
@@ -107,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       grossConfirmedSponsorPrizeAmount: preview.grossConfirmedSponsorPrizeAmount,
       payoutProviderCalled: false,
       walletCreditsCreated: settlement.walletCreditsCreated,
-      kycStillRequiredBeforeWithdrawal: true
+      kycStillRequiredBeforeWithdrawal: false
     }
   }, db);
 

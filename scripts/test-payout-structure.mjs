@@ -20,7 +20,7 @@ const planAccess = read("lib/plan-access.ts");
 assert(exists("lib/server/payout-structure.ts"), "payout structure helper must exist.");
 
 assert(payout.includes("MINIMUM_ENTRY_FEE_CENTS = 500"), "minimum entry fee must be $5.");
-assert(payout.includes("CASH_EARNING_HOLD_HOURS = 24"), "24-hour hold must be configured.");
+assert(payout.includes("CASH_EARNING_HOLD_HOURS = 72"), "current 72-hour hold must be configured.");
 assert(payout.includes("winnerSharePercent: 65"), "paid revenue winner share must be 65%.");
 assert(payout.includes("creatorHostOperatorSharePercent: 20"), "paid revenue creator/host/operator share must be 20%.");
 assert(payout.includes("platformAdminSharePercent: 15"), "paid revenue platform/admin share must be 15%.");
@@ -73,7 +73,7 @@ assert(walletArchitecture.includes("splitPercent?: number | null"), "ledger shap
 assert(walletArchitecture.includes("entry_fee") && walletArchitecture.includes("paid_vote") && walletArchitecture.includes("sponsor_contribution"), "ledger source types must include monetized challenge sources.");
 
 assert(payout.includes("validateWithdrawalEligibility"), "withdrawal eligibility helper must exist.");
-assert(payout.includes("kyc_required"), "withdrawal eligibility must require KYC.");
+assert(payout.includes("WITHDRAWAL_ARCHITECTURE_CONFIG.kycRequired"), "withdrawal eligibility must defer to centralized policy.");
 assert(payout.includes("createsProviderPayout: false") && payout.includes("marksPaidAutomatically: false"), "withdrawal request must not execute payout or mark paid automatically.");
 assert(walletArchitecture.includes("DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash."), "DoroCoins must not be withdrawable.");
 assert(walletArchitecture.includes("Reward points are not cash and cannot be withdrawn."), "reward points must not be withdrawable.");

@@ -26,7 +26,7 @@ export function calculatePaidVoteParticipantShare(input: {
     eligibleParticipantRequired: true,
     status: eligible ? "pending_hold" : "ineligible",
     holdHours: 24,
-    kycRequiredBeforeWithdrawal: true,
+    kycRequiredBeforeWithdrawal: false,
     payoutProviderCalled: false,
     fakeVoteRevenueAllowed: false
   };

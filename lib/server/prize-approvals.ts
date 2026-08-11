@@ -256,8 +256,8 @@ export function buildPrizeApprovalPreview(input: {
     payoutPreviewUsesConfirmedSourcesOnly: true,
     ledgerFinalizationAvailable,
     ledgerFinalizationStatus: ledgerFinalizationAvailable ? "foundation_ready_pending_admin_approval" : "blocked_no_confirmed_payment_sources",
-    kycRequiredBeforeWithdrawal: true,
-    withdrawalBlockedUntilHoldKycAndProviderRequirements: true,
+    kycRequiredBeforeWithdrawal: false,
+    withdrawalBlockedUntilHoldAndProviderRequirements: true,
     providerPayoutCalled: false,
     marksPaidOrWithdrawn: false,
     createsCashLedgerEntries: false
@@ -304,7 +304,7 @@ export function buildLedgerFinalizationFoundation(input: {
     createsSpendableBalance: false,
     createsProviderPayout: false,
     marksPaidAutomatically: false,
-    kycStillRequiredBeforeWithdrawal: true
+    kycStillRequiredBeforeWithdrawal: false
   };
 }
 

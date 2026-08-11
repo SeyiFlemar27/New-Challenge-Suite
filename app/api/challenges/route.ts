@@ -18,6 +18,7 @@ import { imageLessChallengePublishingAllowed } from "@/lib/server/provider-readi
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 
 export async function GET() {
   const db = getAdminDb();
@@ -121,8 +122,6 @@ export async function POST(request: Request) {
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
-  const kycStatus = String(planProfile.kycStatus ?? planProfile.sumsubKycStatus ?? "not_started").toLowerCase();
-  if (body.publish && monetizationIntent.paidEntryRequested && !["verified", "approved"].includes(kycStatus)) return fail("Identity verification is required before publishing a paid challenge.", 403, { kycStatus, redirectTo: "/kyc" }, "KYC_REQUIRED");
   if (body.publish && monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady) return fail("Save this challenge as a draft and confirm an approved prize funding source before publishing.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
   if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
     return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
@@ -177,7 +176,7 @@ export async function POST(request: Request) {
     prizeReleaseActive: false,
     payoutReleaseActive: false,
     adminApprovalRequired: Boolean(requestedMonetization),
-    kycRequiredBeforeWithdrawal: Boolean(requestedMonetization),
+    kycRequiredBeforeWithdrawal: isKycRequiredForAction("withdrawalRequest"),
     cashHoldHours: 24
   };
   const challenge = {

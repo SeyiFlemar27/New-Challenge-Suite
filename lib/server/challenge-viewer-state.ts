@@ -175,7 +175,7 @@ export function resolveChallengeViewerState(input: {
     },
     ranking: null,
     winner: null,
-    payout: { kycRequiredBeforeWithdrawal: true, withdrawable: false },
+    payout: { kycRequiredBeforeWithdrawal: false, withdrawable: false },
     nextAction,
     blockers
   };

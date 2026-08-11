@@ -41,7 +41,7 @@ assertIncludes(subscriptions, '!["pro", "enterprise"].includes(plan.id)', "/subs
 assertIncludes(subscriptions, "Need Enterprise access?", "/subscriptions supports Enterprise application access");
 
 assertIncludes(sidebar, "Become a Sponsor", "account/profile navigation includes Become a Sponsor");
-assertIncludes(sidebar, "/sponsor/onboarding", "Become a Sponsor routes to sponsor onboarding");
+assertIncludes(sidebar, "/sponsor/start", "Become a Sponsor routes to the sponsor start flow");
 
 assertIncludes(onboarding, "Brand Profile", "sponsor onboarding starts with brand profile step");
 assertIncludes(onboarding, "Review & Submit", "sponsor onboarding includes review and submit step");

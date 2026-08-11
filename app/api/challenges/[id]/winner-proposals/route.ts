@@ -88,7 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     cashBalancesCredited: false,
     payoutProviderCalled: false,
     payoutMarkedPaid: false,
-    kycStillRequiredBeforeWithdrawal: true
+    kycStillRequiredBeforeWithdrawal: false
   };
 
   await ref.set(payload);

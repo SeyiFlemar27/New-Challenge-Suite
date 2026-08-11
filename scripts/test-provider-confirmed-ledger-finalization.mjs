@@ -25,13 +25,13 @@ assert(settlement.includes("balanceBucket: \"pending\""), "ledger entries must e
 assert(settlement.includes("status: \"pending_review\""), "ledger entries must remain pending review.");
 assert(settlement.includes("holdUntil"), "ledger entries must include holdUntil.");
 assert(settlement.includes("CASH_EARNING_HOLD_HOURS"), "24-hour hold configuration must be reused.");
-assert(settlement.includes("kycRequiredBeforeWithdrawal: true"), "KYC must remain required before withdrawal.");
+assert(settlement.includes("kycRequiredBeforeWithdrawal: false"), "internal credits must follow the KYC-free launch policy.");
 assert(settlement.includes("payoutProviderCalled: false"), "settlement must not call payout provider.");
 assert(settlement.includes("paid: false") && settlement.includes("withdrawn: false"), "ledger entries must not be marked paid or withdrawn.");
 assert(settlement.includes("idempotencyKey"), "ledger entries must include idempotency keys.");
 assert(settlement.includes("idempotent: true"), "settlement must return existing records idempotently.");
 
-assert(finalizeRoute.includes("requireAdminUser"), "finalize route must require admin.");
+assert(finalizeRoute.includes("requireRecentAdminAuthentication"), "finalize route must require recent admin authentication.");
 assert(finalizeRoute.includes("writeAuditLog"), "finalize route must audit attempts.");
 assert(finalizeRoute.includes("payoutProviderCalled: false"), "finalize route must not call provider.");
 assert(approveRoute.includes("createInternalChallengeSettlement"), "approve route must create internal settlement automatically.");

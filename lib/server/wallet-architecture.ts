@@ -1,3 +1,5 @@
+import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
+
 export const CASH_WALLET_BUCKETS = ["available", "pending", "held", "blocked_kyc", "blocked_review", "withdrawal_requested", "approved_for_manual_payout", "paid_out", "reversed"] as const;
 export type CashWalletBucket = typeof CASH_WALLET_BUCKETS[number];
 
@@ -84,7 +86,7 @@ export const WITHDRAWAL_ARCHITECTURE_CONFIG = {
   payoutProviderConfigured: false,
   payoutMethodCollectionEnabled: true,
   adminReviewRequired: true,
-  kycRequired: true,
+  kycRequired: isKycRequiredForAction("withdrawalRequest"),
   minimumWithdrawalAmountCents: 5000,
   pendingClearanceDays: 3,
   minimumProcessingHours: 24,
@@ -94,7 +96,7 @@ export const WITHDRAWAL_ARCHITECTURE_CONFIG = {
 export const WALLET_POLICY_COPY = {
   dorocoinNotCash: "DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash.",
   rewardPointsNotCash: "Reward points are not cash and cannot be withdrawn.",
-  withdrawalsSetupRequired: "Withdrawals require KYC, payout details, and admin review before manual payout handling."
+  withdrawalsSetupRequired: "Withdrawal requests require payout details and admin review before manual payout handling."
 };
 
 export function isEligibleEarningAccount(accountType: string, hasCashEarnings = false) {

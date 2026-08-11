@@ -32,7 +32,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   submissions: { title: "Submission Moderation", description: "Review pending and flagged entries without permanently deleting source media." },
   participants: { title: "Participant Oversight", description: "Review registrations, check-ins, flags, disqualifications, and reinstatements." },
   winners: { title: "Winner Confirmation", description: "Approve announcements or hold results. Prize release and payouts remain inactive." },
-  withdrawals: { title: "Withdrawal Review", description: "Review reserved eligible balances. KYC and payout providers are not connected." },
+  withdrawals: { title: "Withdrawal Review", description: "Review reserved eligible balances. Payout providers remain manual or disconnected." },
   disputes: { title: "Disputes", description: "Review challenge, submission, vote, winner, withdrawal, and Sponsor disputes." },
   users: { title: "User Oversight", description: "Inspect account type, effective tier, balances, subscriptions, safety, and activity." },
   creators: { title: "Creator Operations", description: "Review Creator accounts, challenge volume, boosts, Sponsor readiness, and earnings." },
@@ -55,7 +55,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   settings: { title: "Admin Settings", description: "Review platform identity, policy, safety, access, system status, and legal settings." },
   search: { title: "Admin Search", description: "Search the currently loaded operational index across users, brands, challenges, submissions, and withdrawals." }
   ,
-  predictions: { title: "Prediction Arena Market Review", description: "Review compliance-gated Prediction Arena records. Payment provider approval, KYC, age, region, and admin market approval are required." },
+  predictions: { title: "Prediction Arena Market Review", description: "Review compliance-gated Prediction Arena records. Payment confirmation, age, region, and admin market approval remain required." },
   "prediction-settlements": { title: "Prediction Settlement & Refund Review", description: "Review settlements, cancellations, disputes, and refunds. No automatic payout or refund execution is available." },
   "risk-safety": { title: "Risk & Safety Dashboard", description: "Review suspicious votes, suspicious predictions, media risk, account risk, and safety queues." },
   settlements: { title: "Settlements", description: "Review settlement preparation and approval records without triggering an external payout." },
@@ -68,7 +68,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   "enterprise-leads": { title: "Enterprise Leads", description: "Review Contact Sales inquiries and handoff status." },
   rewards: { title: "Reward Fulfillment", description: "Review voter points, spin history, and manual reward fulfillment." },
   "prize-wheel": { title: "Prize Wheel Manager", description: "Manage prize wheel rewards. High-value and manual prizes require admin fulfillment." },
-  kyc: { title: "KYC Status Overview", description: "View metadata-only premium KYC status. No raw ID or face media is stored in Firebase." }
+  kyc: { title: "Verification Records", description: "View historical provider metadata. Verification is not currently required for normal product actions, and no raw ID or face media is stored in Firebase." }
 };
 
 const queueActions: Record<string, Array<{ action: string; label: string; dangerous?: boolean }>> = {
@@ -221,7 +221,7 @@ function RecordCard({ record, section, onSelect, onAction }: { record: AdminReco
   const title = recordTitle(record);
   const status = recordStatus(record);
   const details = displayEntries(record).slice(0, 8);
-  return <Card className="flex min-w-0 flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><Status value={status} /></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">KYC and two different administrator approvals are required. Marking a request paid records a manual status only and never calls a payout provider.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6"><Button variant="secondary" onClick={() => onSelect(record)}>View details</Button>{availableQueueActions(section, status).slice(0, 3).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
+  return <Card className="flex min-w-0 flex-col p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 break-words text-xl font-black">{title}</h2></div><Status value={status} /></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl>{section === "withdrawals" ? <p className="mt-4 text-xs leading-5 text-amber-200">Two different administrator approvals remain required. Marking a request paid records a manual status only and never calls a payout provider.</p> : null}<div className="mt-auto flex flex-wrap gap-2 pt-6"><Button variant="secondary" onClick={() => onSelect(record)}>View details</Button>{availableQueueActions(section, status).slice(0, 3).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div></Card>;
 }
 
 function DetailDrawer({ record, section, onClose, onAction }: { record: AdminRecord; section: string; onClose: () => void; onAction?: (record: AdminRecord, action: string) => void }) {

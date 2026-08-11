@@ -48,7 +48,6 @@ function Activated({ data }: { data: Onboarding }) {
   ];
   const checks = [
     ["Subscription activated", true, "Completed"],
-    ["Identity verification", data.checklist.identityVerification, data.checklist.identityVerification ? "Completed" : "Required"],
     ["Creator/Host profile", data.checklist.profileComplete, data.checklist.profileComplete ? "Completed" : "Incomplete"],
     ["Payout method", data.checklist.payoutMethodComplete, data.checklist.payoutMethodComplete ? "Completed" : "Incomplete"],
     ["First challenge", data.checklist.firstChallengeComplete, data.checklist.firstChallengeComplete ? "Completed" : "Not created"]
@@ -56,8 +55,8 @@ function Activated({ data }: { data: Onboarding }) {
   return <><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Membership onboarding</p><h1 className="mt-3 text-3xl font-black sm:text-4xl">Welcome to the {data.subscription.planName}, {data.user.firstName}</h1><p className="mt-4 max-w-3xl leading-7 text-slate-300">Your payment has been confirmed and your membership is active.</p>
     <div className="mt-8 grid gap-6 lg:grid-cols-2"><Card className="p-6"><h2 className="text-xl font-black">Purchase summary</h2><dl className="mt-5 divide-y divide-white/10">{rows.map(([name, value]) => <div key={name} className="grid gap-1 py-3 sm:grid-cols-[150px_1fr]"><dt className="text-sm text-slate-400">{name}</dt><dd className="break-words font-bold">{value}</dd></div>)}</dl></Card>
       <Card className="p-6"><h2 className="text-xl font-black">Recommended setup</h2><ol className="mt-5 space-y-3">{checks.map(([name, complete, status], index) => <li key={name} className="flex items-center justify-between gap-4 rounded-[8px] border border-white/10 p-4"><span className="font-bold">{index + 1}. {name}</span><span className={complete ? "text-sm font-black text-emerald-300" : "text-sm font-black text-yellow-200"}>{status}</span></li>)}</ol></Card></div>
-    <Card className="mt-6 p-5"><p className="text-sm leading-6 text-slate-300">You can continue using Challenge Suite. Identity verification is required before creating paid challenges or withdrawing earnings.</p></Card>
-    <div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/kyc/status">Continue Identity Verification</LinkButton><LinkButton href={data.dashboardHref} variant="secondary">Finish Later</LinkButton></div>
+    <Card className="mt-6 p-5"><p className="text-sm leading-6 text-slate-300">Your membership tools are available where plan, payment, ownership, and review requirements are satisfied.</p></Card>
+    <div className="mt-6 flex flex-wrap gap-3"><LinkButton href={data.dashboardHref}>Continue to Dashboard</LinkButton></div>
   </>;
 }
 function Summary({ label: name, value }: { label: string; value: string }) { return <div><p className="text-xs font-black uppercase text-slate-500">{name}</p><p className="mt-2 font-black">{value}</p></div>; }

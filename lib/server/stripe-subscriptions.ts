@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import type { Firestore } from "firebase-admin/firestore";
 import { getSubscriptionPlan, resolveStripePriceEnv, subscriptionPlans } from "@/lib/server/subscriptions";
 import type { ProductPlanId } from "@/lib/types";
+import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 
 export type InternalSubscriptionStatus =
   | "active"
@@ -139,7 +140,7 @@ export async function persistStripeSubscriptionLifecycle(
   const accountType = metadataAccountType ?? (plan?.audience ?? null);
   const planMatchesAccount = Boolean(plan && accountType && plan.audience === accountType);
   const entitled = ["active", "payment_warning_1", "payment_warning_2"].includes(internalStatus) && planMatchesAccount;
-  const requiresKyc = Boolean(entitled && plan && plan.audience === "user" && plan.id !== "free");
+  const requiresKyc = Boolean(entitled && plan && plan.audience === "user" && plan.id !== "free" && isKycRequiredForAction("hostTools"));
   const canonicalPlanId = plan?.id && plan.id !== "free" ? plan.id as ProductPlanId : storedPlanId;
   const now = new Date().toISOString();
   const customerId = objectId(subscription.customer);
@@ -234,7 +235,7 @@ export async function persistStripeSubscriptionLifecycle(
     if (requiresKyc) {
       transaction.set(db.collection("kycMetadata").doc(owner.userId), {
         userId: owner.userId,
-        kycRequired: true,
+        kycRequired: requiresKyc,
         kycStatus,
         kycProvider: "sumsub",
         premiumAccessState,

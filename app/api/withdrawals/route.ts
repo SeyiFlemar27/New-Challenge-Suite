@@ -3,7 +3,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/cash-wallet";
 import { createWithdrawalRequest, maskAccount, MAX_DAILY_WITHDRAWAL_CENTS, MIN_WITHDRAWAL_CENTS } from "@/lib/server/withdrawals";
-import { loadKycMetadata } from "@/lib/server/kyc";
+import { currentKycPolicyStatus } from "@/lib/server/kyc-policy";
 import { WALLET_POLICY_COPY, WITHDRAWAL_ARCHITECTURE_CONFIG, getWithdrawalDisabledReasons, isEligibleEarningAccount } from "@/lib/server/wallet-architecture";
 
 export const dynamic = "force-dynamic";
@@ -22,13 +22,12 @@ export async function GET(request: Request) {
     db.collection("payoutMethods").where("userId", "==", user.uid).limit(20).get()
   ]);
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
-  const kyc = await loadKycMetadata(db, user.uid);
   const wallet = normalizeCashWallet(user.uid, walletSnap.data());
   const hasCashEarnings = wallet.availableBalanceCents > 0 || wallet.pendingBalanceCents > 0 || wallet.underReviewBalanceCents > 0 || wallet.lifetimeEarningsCents > 0;
   const disabledReasons = getWithdrawalDisabledReasons({
     accountType,
     availableBalanceCents: wallet.availableBalanceCents,
-    kycStatus: String(kyc.kycStatus),
+    kycStatus: currentKycPolicyStatus(),
     payoutMethodConfigured: !payoutMethodSnap.empty,
     hasCashEarnings
   });
@@ -61,8 +60,8 @@ export async function GET(request: Request) {
     payoutMethodCollectionEnabled: true,
     payoutProviderConfigured: WITHDRAWAL_ARCHITECTURE_CONFIG.payoutProviderConfigured,
     adminReviewRequired: WITHDRAWAL_ARCHITECTURE_CONFIG.adminReviewRequired,
-    kycProcessingActive: kyc.providerConfigured,
-    kycStatus: kyc.kycStatus,
+    kycProcessingActive: false,
+    kycStatus: currentKycPolicyStatus(),
     automaticPayoutsActive: false,
     accountType,
     eligibleForCashWithdrawals: isEligibleEarningAccount(accountType, hasCashEarnings),
@@ -105,8 +104,6 @@ export async function POST(request: Request) {
   if (amountCents !== Number(source.netAmountCents ?? source.amountCents ?? 0)) {
     return fail("Request the full net amount available from the selected earning.", 400, undefined, "WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
   }
-  const kyc = await loadKycMetadata(db, user.uid);
-  if (String(kyc.kycStatus) !== "verified") return fail("KYC verification is required before withdrawals.", 403, { kycStatus: kyc.kycStatus }, "KYC_REQUIRED");
   const now = new Date().toISOString();
   const payoutMethodId = String((body as any).payoutMethodId ?? "").trim();
   const savedMethodSnap = payoutMethodId ? await db.collection("payoutMethods").doc(payoutMethodId).get() : null;
@@ -138,7 +135,7 @@ export async function POST(request: Request) {
       accountHolderName,
       bankName,
       country: String(details.country ?? "US"),
-      kycStatusAtRequest: String(kyc.kycStatus),
+      kycStatusAtRequest: currentKycPolicyStatus(),
       idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceId}-${amountCents}-${resolvedMethod}`),
       now
     }));
