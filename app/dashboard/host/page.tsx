@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { apiRequest } from "@/lib/api/client";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CalendarClock, CheckCircle2, ClipboardCheck, Rocket, Trophy, UsersRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -108,13 +109,12 @@ export default function HostControlCenterPage() {
       const query = new URLSearchParams({ purpose: "subscription", resourceId: "host", verify: "1" });
       const reference = searchParams.get("session_id");
       if (reference && /^cs_[A-Za-z0-9_]+$/.test(reference)) query.set("reference", reference);
-      const response = await fetch(`/api/payments/status?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
-      const body = await response.json().catch(() => null) as { data?: { state?: string } } | null;
-      if (response.ok && body?.data?.state === "confirmed") {
+      const result = await apiRequest<{ state?: string }>(`/api/payments/status?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
+      if (result.ok && result.data?.state === "confirmed") {
         window.location.assign("/dashboard/host");
         return;
       }
-      setActivationMessage("Your Host membership is still being activated. Please try again shortly.");
+      setActivationMessage(result.ok ? "Your Host membership is still being activated. Please try again shortly." : result.message);
     } catch {
       setActivationMessage("Host membership status could not be refreshed. Please try again or contact support.");
     } finally {

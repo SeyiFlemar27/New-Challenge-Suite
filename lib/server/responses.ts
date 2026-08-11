@@ -7,7 +7,7 @@ export function ok<T>(data: T, message = "Action completed successfully.") {
 }
 
 export function fail(message: string, status = 400, details?: unknown, code = "REQUEST_FAILED") {
-  return NextResponse.json({ ok: false, code, message, details }, { status });
+  return NextResponse.json({ ok: false, code, message, error: { code, message }, details }, { status });
 }
 
 export function validationError(fieldErrors: FieldErrors, message = "Validation failed.") {
@@ -32,11 +32,9 @@ export function serverError(message = "Unexpected server error.", details?: unkn
 }
 
 export function serverUnavailable(feature: string) {
-  return NextResponse.json({
-    ok: false,
-    code: "SERVER_CONFIGURATION_ERROR",
-    message: `${feature} requires Firebase Admin credentials. Configure FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID), FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and FIREBASE_STORAGE_BUCKET or NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET before this API can read or write production data.`
-  }, { status: 503 });
+  const code = "SERVER_CONFIGURATION_ERROR";
+  const message = `${feature} is temporarily unavailable. Please try again later.`;
+  return NextResponse.json({ ok: false, code, message, error: { code, message } }, { status: 503 });
 }
 
 export async function readJson(request: Request) {

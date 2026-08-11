@@ -12,6 +12,7 @@ import {
 import { auth, isFirebaseConfigured } from "./client";
 import { AuthFlowError, safeAuthError, type SignupEmailState } from "./auth-errors";
 import type { AppRole, UserPlanId } from "@/lib/types";
+import { parseApiResponse } from "@/lib/api/client";
 
 export interface SignupInput {
   firstName: string;
@@ -58,10 +59,8 @@ export async function syncServerSession(user: User) {
       Authorization: `Bearer ${await user.getIdToken()}`
     }
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message || "Your session could not be restored.");
-  }
+  const result = await parseApiResponse<unknown>(response);
+  if (!result.ok) throw new Error(result.message || "Your session could not be restored.");
 }
 
 async function clearServerSession() {
@@ -86,11 +85,11 @@ async function callProfileBootstrap(user: User, init: RequestInit = {}) {
   headers.set("Authorization", `Bearer ${await user.getIdToken(true)}`);
 
   const response = await fetch("/api/auth/profile/bootstrap", { ...init, headers });
-  const body = await response.json().catch(() => ({ ok: false, message: "Invalid server response." }));
-  if (!response.ok || !body.ok) {
-    throw new Error(typeof body.message === "string" ? body.message : "Profile could not be prepared.");
+  const body = await parseApiResponse<BootstrapResponse>(response);
+  if (!body.ok || !body.data) {
+    throw new Error(body.message || "Profile could not be prepared.");
   }
-  return body.data as BootstrapResponse;
+  return body.data;
 }
 
 export async function signUpWithProfile(input: SignupInput) {
@@ -98,8 +97,8 @@ export async function signUpWithProfile(input: SignupInput) {
   if (!auth) throw new Error("Authentication is not configured yet.");
 
   const availability = await fetch("/api/auth/account-availability", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: input.email }) });
-  const availabilityBody = await availability.json().catch(() => null) as { message?: string; data?: { state?: SignupEmailState; available?: boolean } } | null;
-  if (!availability.ok) throw new AuthFlowError("unknown_conflict", "Account availability could not be confirmed. Please try again or contact support.");
+  const availabilityBody = await parseApiResponse<{ state?: SignupEmailState; available?: boolean }>(availability);
+  if (!availabilityBody.ok) throw new AuthFlowError("unknown_conflict", availabilityBody.message || "Account availability could not be confirmed. Please try again or contact support.");
   const availabilityState = availabilityBody?.data?.state ?? "unknown_conflict";
   if (availabilityBody?.data?.available !== true || !["available", "deleted_email_reuse_allowed"].includes(availabilityState)) {
     throw new AuthFlowError(availabilityState, availabilityBody?.message);
