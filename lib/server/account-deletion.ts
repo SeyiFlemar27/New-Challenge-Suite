@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 
-export const PENDING_ACCOUNT_DELETION_STATUSES = new Set(["deletion_requested", "deactivated", "scheduled_for_deletion"]);
+export const PENDING_ACCOUNT_DELETION_STATUSES = new Set(["deletion_requested", "deactivated", "scheduled_for_deletion", "auth_release_pending", "auth_release_failed", "finalization_failed"]);
 export const FINAL_ACCOUNT_DELETION_STATUSES = new Set(["deleted", "anonymized"]);
 
 export const accountHistorySources = [

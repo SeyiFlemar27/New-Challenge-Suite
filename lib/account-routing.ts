@@ -1,7 +1,7 @@
 import { normalizeAccountType } from "@/lib/plan-access";
 
 export function getDefaultRouteForAccount(profile: Record<string, unknown> = {}) {
-  if (["deletion_requested", "deactivated", "scheduled_for_deletion"].includes(String(profile.accountStatus ?? profile.deletionStatus ?? ""))) return "/account/deletion-status";
+  if (["deletion_requested", "deactivated", "scheduled_for_deletion", "auth_release_pending", "auth_release_failed", "finalization_failed"].includes(String(profile.accountStatus ?? profile.deletionStatus ?? ""))) return "/account/deletion-status";
   if (profile.accountTypeSelectionComplete === false) return "/onboarding/account-type";
   const accountType = normalizeAccountType(profile);
   if (accountType === "sponsor") {

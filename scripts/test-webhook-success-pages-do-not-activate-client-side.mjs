@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const shared = readFileSync("components/payment-status-journey.tsx", "utf8");
 const status = readFileSync("app/api/payments/status/route.ts", "utf8");
 const successPages = [
-  "app/checkout/subscription/success/page.tsx",
+  "app/checkout/subscription/success/route.ts",
   "app/checkout/dorocoins/success/page.tsx",
   "app/challenges/[id]/registration-success/page.tsx",
   "app/challenges/[id]/paid-votes/success/page.tsx",

@@ -6,7 +6,7 @@ for (const purpose of ["subscription_payment","dorocoin_purchase","challenge_ent
   assert(registry.includes(`"${purpose}"`), `missing typed payment purpose: ${purpose}`);
 }
 for (const page of [
-  "app/checkout/subscription/success/page.tsx",
+  "app/checkout/subscription/success/route.ts",
   "app/checkout/dorocoins/success/page.tsx",
   "app/challenges/[id]/registration-success/page.tsx",
   "app/challenges/[id]/paid-votes/success/page.tsx",

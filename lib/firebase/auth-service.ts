@@ -10,6 +10,7 @@ import {
   type User
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "./client";
+import { AuthFlowError, safeAuthError, type SignupEmailState } from "./auth-errors";
 import type { AppRole, UserPlanId } from "@/lib/types";
 
 export interface SignupInput {
@@ -97,9 +98,18 @@ export async function signUpWithProfile(input: SignupInput) {
   if (!auth) throw new Error("Authentication is not configured yet.");
 
   const availability = await fetch("/api/auth/account-availability", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: input.email }) });
-  const availabilityBody = await availability.json().catch(() => null) as { message?: string } | null;
-  if (!availability.ok) throw new Error(availabilityBody?.message || "Account availability could not be confirmed.");
-  const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
+  const availabilityBody = await availability.json().catch(() => null) as { message?: string; data?: { state?: SignupEmailState; available?: boolean } } | null;
+  if (!availability.ok) throw new AuthFlowError("unknown_conflict", "Account availability could not be confirmed. Please try again or contact support.");
+  const availabilityState = availabilityBody?.data?.state ?? "unknown_conflict";
+  if (availabilityBody?.data?.available !== true || !["available", "deleted_email_reuse_allowed"].includes(availabilityState)) {
+    throw new AuthFlowError(availabilityState, availabilityBody?.message);
+  }
+  let credential;
+  try {
+    credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
+  } catch (error) {
+    throw safeAuthError(error, availabilityState);
+  }
   try {
     await syncServerSession(credential.user);
     await callProfileBootstrap(credential.user, {
@@ -108,7 +118,7 @@ export async function signUpWithProfile(input: SignupInput) {
     });
   } catch (error) {
     await deleteFirebaseUser(credential.user).catch(() => undefined);
-    throw error;
+    throw safeAuthError(error);
   }
   return { mode: "firebase" as const, user: credential.user };
 }
@@ -122,7 +132,7 @@ export async function loginWithEmail(email: string, password: string) {
   } catch (error) {
     const code = String((error as { code?: string })?.code ?? "");
     if (["auth/user-not-found", "auth/invalid-credential"].includes(code)) throw new Error("No active account was found for this email. Create a new account or contact support.");
-    throw error;
+    throw safeAuthError(error);
   }
   const [, profile] = await Promise.all([
     syncServerSession(credential.user),

@@ -10,11 +10,13 @@ export function PlanFeatureGate({
   feature,
   requiredPlan,
   title,
+  allowPendingPreview = false,
   children
 }: {
   feature: PlanFeature;
   requiredPlan: string;
   title: string;
+  allowPendingPreview?: boolean;
   children: React.ReactNode;
 }) {
   const { user, loading, signedOut, error } = useCurrentUser();
@@ -50,6 +52,7 @@ export function PlanFeatureGate({
     );
   }
   if (!canAccessPlanFeature(profile, feature)) {
+    if (allowPendingPreview) return <>{children}</>;
     return (
       <AppShell>
         <Card className="mx-auto mt-14 max-w-2xl border-yellow-500/30 p-8 text-center">

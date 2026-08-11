@@ -71,35 +71,66 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const requestRef = db.collection("accountDeletionRequests").doc(user!.uid);
     const tombstoneRef = db.collection("deletedAccountReferences").doc(emailHash);
-    const batch = db.batch();
-    batch.set(requestRef, { id: user!.uid, userId: user!.uid, emailHash, status: hasRetainedHistory ? "deletion_requested" : "deleted", directDeletion: !hasRetainedHistory, retainedFinancialAndAuditRecords: hasRetainedHistory, historyFlags, enforcementReviewRequired, cancellationAllowed: hasRetainedHistory, requestedAt: now, updatedAt: now, finalizedAt: hasRetainedHistory ? null : now }, { merge: true });
-    batch.set(tombstoneRef, { id: emailHash, previousUserIdHash: normalizedEmailHash(user!.uid), status: hasRetainedHistory ? "deletion_requested" : "deleted", emailReuseAllowed: !hasRetainedHistory && !enforcementReviewRequired, enforcementReviewRequired, createdAt: now, updatedAt: now, emailReleasedAt: hasRetainedHistory ? null : now }, { merge: true });
+    if (!hasRetainedHistory) {
+      const releaseBatch = db.batch();
+      releaseBatch.set(requestRef, { id: user!.uid, userId: user!.uid, emailHash, status: "auth_release_pending", directDeletion: true, retainedFinancialAndAuditRecords: false, historyFlags, enforcementReviewRequired: false, cancellationAllowed: false, requestedAt: now, updatedAt: now, finalizedAt: null }, { merge: true });
+      releaseBatch.set(tombstoneRef, { id: emailHash, previousUserIdHash: normalizedEmailHash(user!.uid), status: "auth_release_pending", emailReuseAllowed: false, enforcementReviewRequired: false, createdAt: now, updatedAt: now, emailReleasedAt: null }, { merge: true });
+      const requestAuditRef = db.collection("auditLogs").doc();
+      releaseBatch.set(requestAuditRef, { id: requestAuditRef.id, actorId: user!.uid, actorType: "user", action: "account.deletion_requested", targetType: "account", targetId: user!.uid, previousStatus: "active", newStatus: "auth_release_pending", reason: "User-confirmed account deletion request.", relatedDeletionRequestId: requestRef.id, immutable: true, metadata: { directDeletion: true, retainedFinancialAndAuditRecords: false, historyFlags }, createdAt: now });
+      await releaseBatch.commit();
 
-    if (hasRetainedHistory) {
+      try {
+        await adminAuth.deleteUser(user!.uid);
+      } catch (releaseError) {
+        if ((releaseError as { code?: string })?.code !== "auth/user-not-found") {
+          const failedAt = new Date().toISOString();
+          const taskId = operationalTaskId("account_auth_release", user!.uid);
+          const failureBatch = db.batch();
+          failureBatch.set(requestRef, { status: "auth_release_failed", emailReleaseFailedAt: failedAt, updatedAt: failedAt }, { merge: true });
+          failureBatch.set(tombstoneRef, { status: "auth_release_failed", emailReuseAllowed: false, emailReleaseFailedAt: failedAt, updatedAt: failedAt }, { merge: true });
+          failureBatch.set(db.collection("adminActionTasks").doc(taskId), { id: taskId, sourceType: "account_auth_release", sourceCollection: "accountDeletionRequests", sourceId: user!.uid, title: "Firebase Auth email release failed", reason: "The account cannot be finalized or reused until its authentication identity is released.", state: "unassigned", priority: "high", slaDueAt: taskDeadline("support_ticket", failedAt), createdAt: failedAt, updatedAt: failedAt }, { merge: true });
+          const failureAuditRef = db.collection("auditLogs").doc();
+          failureBatch.set(failureAuditRef, { id: failureAuditRef.id, actorId: user!.uid, actorType: "user", action: "account.auth_release_failed", targetType: "account", targetId: user!.uid, previousStatus: "auth_release_pending", newStatus: "auth_release_failed", relatedDeletionRequestId: requestRef.id, immutable: true, createdAt: failedAt });
+          await failureBatch.commit();
+          return serverError("Account deletion is waiting for support to release the sign-in email.");
+        }
+      }
+
+      const finalizedAt = new Date().toISOString();
+      const finalBatch = db.batch();
+      finalBatch.delete(db.collection("profiles").doc(user!.uid));
+      finalBatch.set(db.collection("users").doc(user!.uid), { displayName: "Deleted account", email: null, accountStatus: "deleted", deletedAt: finalizedAt, updatedAt: finalizedAt });
+      finalBatch.delete(db.collection("notificationPreferences").doc(user!.uid));
+      finalBatch.delete(db.collection("userPreferences").doc(user!.uid));
+      finalBatch.set(requestRef, { status: "deleted", finalizedAt, emailReleasedAt: finalizedAt, updatedAt: finalizedAt }, { merge: true });
+      finalBatch.set(tombstoneRef, { status: "deleted", emailReuseAllowed: true, emailReleasedAt: finalizedAt, updatedAt: finalizedAt }, { merge: true });
+      for (const action of ["account.deleted", "account.email_released_for_reuse"]) {
+        const auditRef = db.collection("auditLogs").doc();
+        finalBatch.set(auditRef, { id: auditRef.id, actorId: user!.uid, actorType: "user", action, targetType: "account", targetId: user!.uid, previousStatus: "auth_release_pending", newStatus: "deleted", reason: "Firebase Auth identity was released before account deletion was finalized.", relatedDeletionRequestId: requestRef.id, immutable: true, metadata: { directDeletion: true, retainedFinancialAndAuditRecords: false, historyFlags }, createdAt: finalizedAt });
+      }
+      await finalBatch.commit();
+      return ok({ status: "deleted", directDeletion: true }, "Account deleted.");
+    }
+
+    const batch = db.batch();
+    batch.set(requestRef, { id: user!.uid, userId: user!.uid, emailHash, status: "deletion_requested", directDeletion: false, retainedFinancialAndAuditRecords: true, historyFlags, enforcementReviewRequired, cancellationAllowed: true, requestedAt: now, updatedAt: now, finalizedAt: null }, { merge: true });
+    batch.set(tombstoneRef, { id: emailHash, previousUserIdHash: normalizedEmailHash(user!.uid), status: "deletion_requested", emailReuseAllowed: false, enforcementReviewRequired, createdAt: now, updatedAt: now, emailReleasedAt: null }, { merge: true });
+    {
       const restoreProfile = { displayName: profileSnapshot.data()?.displayName ?? accountSnapshot.data()?.displayName ?? null, firstName: profileSnapshot.data()?.firstName ?? null, lastName: profileSnapshot.data()?.lastName ?? null, username: profileSnapshot.data()?.username ?? null, usernameNormalized: profileSnapshot.data()?.usernameNormalized ?? null, bio: profileSnapshot.data()?.bio ?? "", location: profileSnapshot.data()?.location ?? "", website: profileSnapshot.data()?.website ?? null, socialLinks: profileSnapshot.data()?.socialLinks ?? [], avatarUrl: profileSnapshot.data()?.avatarUrl ?? null, avatarPath: profileSnapshot.data()?.avatarPath ?? null, coverImageUrl: profileSnapshot.data()?.coverImageUrl ?? null, coverImagePath: profileSnapshot.data()?.coverImagePath ?? null, profileVisibility: profileSnapshot.data()?.profileVisibility ?? "public" };
       batch.set(requestRef, { restoreProfile }, { merge: true });
       batch.set(db.collection("profiles").doc(user!.uid), { displayName: "Deleted User", firstName: null, lastName: null, username: null, usernameNormalized: null, email: null, phone: null, bio: "", location: "", website: null, socialLinks: [], avatarUrl: null, avatarPath: null, coverImageUrl: null, coverImagePath: null, profileVisibility: "private", publicProfileHidden: true, accountStatus: "deletion_requested", deletionRequestedAt: now, updatedAt: now }, { merge: true });
       batch.set(db.collection("users").doc(user!.uid), { displayName: "Deleted User", email: null, accountStatus: "deletion_requested", deletionRequestedAt: now, updatedAt: now }, { merge: true });
       const taskId = operationalTaskId("account_deletion", user!.uid);
       batch.set(db.collection("adminActionTasks").doc(taskId), { id: taskId, sourceType: "account_deletion", sourceCollection: "accountDeletionRequests", sourceId: user!.uid, title: "Account deletion privacy review", reason: "The account has retained financial, challenge, identity, or audit history.", state: "unassigned", priority: "normal", slaDueAt: taskDeadline("support_ticket", now), createdAt: now, updatedAt: now }, { merge: true });
-    } else {
-      batch.delete(db.collection("profiles").doc(user!.uid));
-      batch.set(db.collection("users").doc(user!.uid), { displayName: "Deleted account", email: null, accountStatus: "deleted", deletedAt: now, updatedAt: now });
-      batch.delete(db.collection("notificationPreferences").doc(user!.uid));
-      batch.delete(db.collection("userPreferences").doc(user!.uid));
     }
 
-    for (const action of hasRetainedHistory ? ["account.deletion_requested", "account.public_profile_hidden", "account.personal_fields_anonymized"] : ["account.deletion_requested", "account.deleted", "account.email_released_for_reuse"]) {
+    for (const action of ["account.deletion_requested", "account.public_profile_hidden", "account.personal_fields_anonymized"]) {
       const auditRef = db.collection("auditLogs").doc();
-      batch.set(auditRef, { id: auditRef.id, actorId: user!.uid, actorType: "user", action, targetType: "account", targetId: user!.uid, previousStatus: "active", newStatus: hasRetainedHistory ? "deletion_requested" : "deleted", reason: "User-confirmed account deletion request.", relatedDeletionRequestId: requestRef.id, immutable: true, metadata: { directDeletion: !hasRetainedHistory, retainedFinancialAndAuditRecords: hasRetainedHistory, historyFlags }, createdAt: now });
+      batch.set(auditRef, { id: auditRef.id, actorId: user!.uid, actorType: "user", action, targetType: "account", targetId: user!.uid, previousStatus: "active", newStatus: "deletion_requested", reason: "User-confirmed account deletion request.", relatedDeletionRequestId: requestRef.id, immutable: true, metadata: { directDeletion: false, retainedFinancialAndAuditRecords: true, historyFlags }, createdAt: now });
     }
     await batch.commit();
-    if (hasRetainedHistory) {
-      await adminAuth.revokeRefreshTokens(user!.uid).catch(() => undefined);
-      return ok({ status: "deletion_requested", directDeletion: false, cancellationAllowed: true }, "Account deletion is in progress. Your public profile is hidden and required financial and audit records were preserved for review.");
-    }
-    await adminAuth.deleteUser(user!.uid);
-    return ok({ status: "deleted", directDeletion: true }, "Account deleted.");
+    await adminAuth.revokeRefreshTokens(user!.uid).catch(() => undefined);
+    return ok({ status: "deletion_requested", directDeletion: false, cancellationAllowed: true }, "Account deletion is in progress. Your public profile is hidden and required financial and audit records were preserved for review.");
   } catch (error) {
     return serverError("Account deletion could not be completed.", error instanceof Error ? error.message : error);
   }

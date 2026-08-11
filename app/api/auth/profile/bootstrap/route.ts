@@ -18,7 +18,7 @@ const bootstrapSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(60, "First name must be 60 characters or fewer."),
   lastName: z.string().trim().min(1, "Last name is required.").max(60, "Last name must be 60 characters or fewer."),
   role: roleSchema,
-  referralCode: z.string().trim().min(4).max(64).optional()
+  referralCode: z.string().trim().regex(/^[A-Za-z0-9_-]{4,32}$/, "Referral code looks invalid. You can leave this blank if you do not have one.").optional()
 });
 
 const accountTypeSelectionSchema = z.object({

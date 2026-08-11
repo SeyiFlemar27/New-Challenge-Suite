@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 
-const pending = new Set(["deletion_requested", "deactivated", "scheduled_for_deletion"]);
+const pending = new Set(["deletion_requested", "deactivated", "scheduled_for_deletion", "auth_release_pending", "auth_release_failed", "finalization_failed"]);
 
 export function AccountDeletionGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();

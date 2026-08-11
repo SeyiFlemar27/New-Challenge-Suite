@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { operationalTaskId, taskDeadline } from "@/lib/server/admin-operations";
 
 const schema = z.object({ action: z.enum(["schedule", "finalize"]), reason: z.string().trim().min(5).max(1000) });
 
@@ -24,9 +25,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (parsed.data.action === "schedule") {
       await ref.set({ status: "scheduled_for_deletion", cancellationAllowed: true, scheduledBy: user!.uid, scheduledAt: now, updatedAt: now }, { merge: true });
     } else {
-      await auth.deleteUser(id).catch((error: { code?: string }) => { if (error?.code !== "auth/user-not-found") throw error; });
       const emailHash = String(snap.data()?.emailHash ?? "");
       const enforcementReviewRequired = snap.data()?.enforcementReviewRequired === true;
+      try {
+        await auth.deleteUser(id);
+      } catch (releaseError) {
+        if ((releaseError as { code?: string })?.code !== "auth/user-not-found") {
+          const taskId = operationalTaskId("account_auth_release", id);
+          const failureBatch = db.batch();
+          failureBatch.set(ref, { status: "auth_release_failed", cancellationAllowed: false, emailReleaseFailedAt: now, updatedAt: now }, { merge: true });
+          if (emailHash) failureBatch.set(db.collection("deletedAccountReferences").doc(emailHash), { status: "auth_release_failed", emailReuseAllowed: false, emailReleaseFailedAt: now, updatedAt: now }, { merge: true });
+          failureBatch.set(db.collection("adminActionTasks").doc(taskId), { id: taskId, sourceType: "account_auth_release", sourceCollection: "accountDeletionRequests", sourceId: id, title: "Firebase Auth email release failed", reason: "The retained account cannot be finalized until its authentication identity is released.", state: "unassigned", priority: "high", slaDueAt: taskDeadline("support_ticket", now), createdAt: now, updatedAt: now }, { merge: true });
+          const failureAuditRef = db.collection("auditLogs").doc();
+          failureBatch.set(failureAuditRef, { id: failureAuditRef.id, actorId: user!.uid, actorType: "admin", action: "account.auth_release_failed", targetType: "account", targetId: id, previousStatus: snap.data()?.status, newStatus: "auth_release_failed", reason: parsed.data.reason, relatedDeletionRequestId: id, immutable: true, createdAt: now });
+          await failureBatch.commit();
+          return serverError("Account deletion requires support review because the sign-in email could not be released.");
+        }
+      }
       const batch = db.batch();
       batch.set(ref, { status: "anonymized", cancellationAllowed: false, finalizedBy: user!.uid, finalizedAt: now, restoreProfile: null, updatedAt: now }, { merge: true });
       batch.set(db.collection("users").doc(id), { displayName: "Deleted User", email: null, accountStatus: "anonymized", deletedAt: now, updatedAt: now }, { merge: true });

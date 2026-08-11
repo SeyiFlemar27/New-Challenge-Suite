@@ -8,6 +8,7 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
 import { signUpWithProfile } from "@/lib/firebase/auth-service";
+import { AuthFlowError, type SignupEmailState } from "@/lib/firebase/auth-errors";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/lib/i18n/use-language";
 
@@ -29,10 +30,12 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [authIssue, setAuthIssue] = useState<{ state: SignupEmailState; message: string } | null>(null);
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
+    if (field === "email") setAuthIssue(null);
   }
 
   function validate() {
@@ -40,6 +43,9 @@ export default function RegisterPage() {
     if (!form.firstName.trim()) next.firstName = t("First name is required.");
     if (!form.lastName.trim()) next.lastName = t("Last name is required.");
     if (!/^\S+@\S+\.\S+$/.test(form.email)) next.email = t("Enter a valid email address.");
+    if (form.referralCode.trim() && (!/^[A-Za-z0-9_-]{4,32}$/.test(form.referralCode.trim()) || form.referralCode.includes("@"))) {
+      next.referralCode = t("Referral code looks invalid. You can leave this blank if you do not have one.");
+    }
     if (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password)) {
       next.password = t("Use at least 8 characters with a number and uppercase letter.");
     }
@@ -53,6 +59,7 @@ export default function RegisterPage() {
     event.preventDefault();
     if (!validate()) return;
     setLoading(true);
+    setAuthIssue(null);
     try {
       const result = await signUpWithProfile({
         firstName: form.firstName,
@@ -67,7 +74,8 @@ export default function RegisterPage() {
       const returnPath = requestedReturnPath();
       router.push(returnPath ? `/auth/verify-email?returnUrl=${encodeURIComponent(returnPath)}` : "/auth/verify-email");
     } catch (error) {
-      setErrors({ submit: error instanceof Error ? error.message : "Could not create account." });
+      const issue = error instanceof AuthFlowError ? error : new AuthFlowError("unknown_conflict");
+      setAuthIssue({ state: issue.state, message: issue.message });
       setLoading(false);
     }
   }
@@ -84,11 +92,12 @@ export default function RegisterPage() {
             <Field label={t("Last Name")}><input className={inputClass} value={form.lastName} onChange={(event) => update("lastName", event.target.value)} placeholder={t("Last name")} /></Field>
           </div>
           <Field label={t("Email Address")}><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
-          <Field label={t("Referral code (optional)")}><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder={t("Referral code")} autoComplete="off" /></Field>
+          <Field label={t("Referral code (optional)")}><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder={t("Referral code")} autoComplete="off" />{errors.referralCode ? <p className="mt-2 text-sm text-amber-300">{errors.referralCode}</p> : null}</Field>
           <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">{t("After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.")}</Card>
           <PasswordField label={t("Password")} shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
           <PasswordField label={t("Confirm Password")} shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />
-          {Object.values(errors).filter(Boolean).map((error) => <p key={error} className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p>)}
+          {authIssue ? <AuthIssuePanel issue={authIssue} onRetry={() => setAuthIssue(null)} /> : null}
+          {Object.entries(errors).filter(([field, value]) => field !== "referralCode" && Boolean(value)).map(([field, error]) => <p key={`${field}-${error}`} className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p>)}
           <Agreement checked={accepted.terms} onChange={(terms) => setAccepted((current) => ({ ...current, terms }))} text={t("I accept the Terms of Service")} />
           <Agreement checked={accepted.privacy} onChange={(privacy) => setAccepted((current) => ({ ...current, privacy }))} text={t("I accept the Privacy Policy")} />
           <Agreement checked={accepted.community} onChange={(community) => setAccepted((current) => ({ ...current, community }))} text={t("I accept the Community Guidelines")} />
@@ -99,6 +108,23 @@ export default function RegisterPage() {
       </Card>
     </main>
   );
+}
+
+function AuthIssuePanel({ issue, onRetry }: { issue: { state: SignupEmailState; message: string }; onRetry: () => void }) {
+  const active = issue.state === "active_account_exists";
+  const pending = issue.state === "deletion_pending";
+  const provider = issue.state === "provider_conflict";
+  const retry = issue.state === "deleted_but_auth_not_released" || issue.state === "unknown_conflict";
+  return <section role="alert" className="rounded-[8px] border border-amber-300/30 bg-amber-950/30 p-4 text-sm text-amber-50">
+    <p className="font-bold leading-6">{issue.message}</p>
+    <div className="mt-3 flex flex-wrap gap-2">
+      {(active || provider) ? <Link href="/auth/login" className="rounded-[8px] bg-[var(--gold)] px-3 py-2 font-black text-black">Sign In</Link> : null}
+      {(active || provider) ? <Link href="/auth/forgot-password" className="rounded-[8px] border border-amber-200/30 px-3 py-2 font-bold">Reset Password</Link> : null}
+      {pending ? <Link href="/account/deletion-status" className="rounded-[8px] bg-[var(--gold)] px-3 py-2 font-black text-black">Check Deletion Status</Link> : null}
+      {retry ? <button type="button" onClick={onRetry} className="rounded-[8px] bg-[var(--gold)] px-3 py-2 font-black text-black">Try Again</button> : null}
+      {!active ? <Link href="/contact" className="rounded-[8px] border border-amber-200/30 px-3 py-2 font-bold">Contact Support</Link> : null}
+    </div>
+  </section>;
 }
 
 function Agreement({ checked, onChange, text }: { checked: boolean; onChange: (checked: boolean) => void; text: string }) {
@@ -118,4 +144,3 @@ function PasswordField({ label, shown, onToggle, value, onChange }: { label: str
     </Field>
   );
 }
-
