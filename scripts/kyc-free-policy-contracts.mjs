@@ -68,7 +68,8 @@ export function run(label) {
   assert(join.includes("payment") && submissions.includes("submission"), "payment/submission business validation must remain");
   assert(withdrawals.includes("WITHDRAWAL_SOURCE_NOT_ELIGIBLE") && withdrawals.includes("PAYOUT_METHOD_NOT_OWNED"), "withdrawal ownership checks must remain");
   assert(predictions.includes("AGE_VERIFICATION_REQUIRED") && predictions.includes("ACCOUNT_RESTRICTED"), "Prediction Arena non-KYC safety checks must remain");
-  assert(builder.includes("Payments are provider-confirmed only"), "provider-confirmed payment copy must remain");
+  assert(publish.includes("paymentActive: false") && publish.includes('status: requestedMonetization ? "setup_required" : "not_requested"'), "paid entry must remain inactive until review and payment setup");
+  assert(!builder.includes("Payments are provider-confirmed only"), "technical payment-record copy must stay out of the builder");
   for (const source of [withdrawals, settlement, predictionSettlement]) {
     assert(!/payoutExecuted:\s*true|externalPayoutExecuted:\s*true|payoutProviderCalled:\s*true/.test(source), "fake or automatic payout execution was introduced");
   }

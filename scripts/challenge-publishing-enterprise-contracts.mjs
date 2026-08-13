@@ -9,6 +9,7 @@ const sources = {
   publish: read("app/api/challenges/[id]/publish/route.ts"),
   create: read("app/api/challenges/route.ts"),
   feedback: read("lib/challenge-publish-feedback.ts"),
+  publishReadiness: read("lib/challenge-publish-readiness.ts"),
   readiness: read("lib/server/provider-readiness.ts"),
   preview: read("app/challenges/create/[draftId]/preview/page.tsx"),
   media: read("components/media-display.tsx"),
@@ -29,7 +30,7 @@ const sources = {
 
 assert.match(sources.readiness, /ALLOW_IMAGELESS_CHALLENGE_PUBLISHING[\s\S]*NEXT_PUBLIC_ALLOW_IMAGELESS_CHALLENGE_PUBLISHING/);
 assert.match(sources.publish, /const lifecycleStatus = "pending_review"/);
-assert.match(sources.publish, /ALREADY_UNDER_REVIEW/);
+assert.match(sources.publishReadiness, /ALREADY_UNDER_REVIEW/);
 assert.match(sources.publish, /serverError\("Challenge could not be submitted for review/);
 assert.doesNotMatch(sources.publish, /if\s*\([^)]*kyc[^)]*\)\s*return\s+fail/i);
 assert.match(sources.create, /if \(body\.publish\) lifecycleStatus = "pending_review"/);
@@ -37,9 +38,9 @@ assert.match(sources.create, /if \(body\.publish\) lifecycleStatus = "pending_re
 for (const message of [
   "Your session expired. Please sign in again.", "You can't publish this challenge.", "This feature isn't included in your plan.",
   "Some required details are missing.", "Your challenge timeline needs fixing.", "Please add challenge media before publishing.",
-  "Your media is still processing. Try again shortly.", "Payment setup is not ready yet.", "This challenge is already under review.",
-  "Network issue. Please try again.", "Something went wrong. Please try again."
-]) assert.ok(sources.feedback.includes(message), `missing publish feedback: ${message}`);
+  "Your media is still processing. Try again shortly.", "Paid entry setup needs attention.", "Prize funding needs attention.",
+  "Network issue. Please try again.", "Publishing failed. Please try again."
+]) assert.ok(`${sources.feedback}\n${sources.publishReadiness}`.includes(message), `missing publish feedback: ${message}`);
 assert.doesNotMatch(sources.builder, /response\.message \|\| "Challenge could not be published/);
 
 for (const title of ["Overview", "Rules & Eligibility", "Entry & Submission", "Voting & Timeline", "Monetization & Prize Pool", "Media & Branding", "Review & Publish"]) assert.ok(sources.builder.includes(title));

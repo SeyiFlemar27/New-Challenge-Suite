@@ -18,6 +18,7 @@ const source = {
   builder: read("components/challenge-builder.tsx"),
   createApi: read("app/api/challenges/route.ts"),
   publishApi: read("app/api/challenges/[id]/publish/route.ts"),
+  publishReadiness: read("lib/challenge-publish-readiness.ts"),
   readiness: read("lib/server/provider-readiness.ts"),
   statusApi: read("app/api/admin/system-status/route.ts"),
   statusUi: read("components/admin/admin-phase2-workspace.tsx"),
@@ -63,8 +64,9 @@ function mediaChecks() {
   assert(source.readiness.includes("imageLessChallengePublishingAllowed"));
   assert(source.createApi.includes("CHALLENGE_MEDIA_UNAVAILABLE") && source.publishApi.includes("CHALLENGE_MEDIA_UNAVAILABLE"));
   assert(source.createApi.includes('process.env.NODE_ENV === "production"') && source.publishApi.includes('process.env.NODE_ENV === "production"'));
-  assert(source.builder.includes("mediaPublicationBlocked") && source.builder.includes("Media Storage Required"));
-  assert(source.builder.includes("storage-confirmed challenge image"));
+  assert(source.builder.includes("mediaPublicationBlocked") && source.publishReadiness.includes("Please add challenge media before publishing."));
+  assert(source.builder.includes("form.coverImageUrl") && source.builder.includes("form.coverImagePath"));
+  assert(!source.builder.includes("Media Storage Required") && !source.builder.includes("storage-confirmed challenge image"));
   assert(source.builder.includes("imageLessPublishingAllowed"));
   assert(!source.builder.includes("placeholder is uploaded"));
 }

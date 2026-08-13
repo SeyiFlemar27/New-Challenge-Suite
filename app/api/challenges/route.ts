@@ -122,7 +122,6 @@ export async function POST(request: Request) {
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
-  if (body.publish && monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady) return fail("Save this challenge as a draft and confirm an approved prize funding source before publishing.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
   if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
     return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
   }
@@ -143,7 +142,7 @@ export async function POST(request: Request) {
   if (body.publish) lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const challengeInputForAccess = { ...body, ...moneyLocks, status: lifecycleStatus };
-  const creationAccess = canCreateChallenge(planProfile, challengeInputForAccess as Record<string, unknown>, activeChallengeCount);
+  const creationAccess = canCreateChallenge(planProfile, { ...challengeInputForAccess, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested } as Record<string, unknown>, activeChallengeCount);
   if (!creationAccess.allowed) {
     return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess, activeChallengeCount }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
   }
@@ -366,10 +365,6 @@ export async function POST(request: Request) {
     metadata: { source: "api/challenges", lifecycleStatus, moneyLocked: true }
   }, db).catch((error) => console.warn("[audit] challenge create log failed", error instanceof Error ? error.message : String(error)));
 
-  const publishMessage = body.usesPlaceholderMedia
-    ? "Challenge published successfully without media."
-    : lifecycleStatus === "pending_review"
-      ? "Challenge submitted for review."
-      : "Challenge scheduled.";
+  const publishMessage = lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.";
   return ok({ challenge }, body.publish ? publishMessage : "Challenge draft saved.");
 }

@@ -396,7 +396,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     dailyFreeVoteLimit: 5,
     monthlyBoostLimit: 1,
     voteMultiplierLimit: 1,
-    canCreatePaidChallenges: false,
+    canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
     canCreateSponsoredChallenges: true,
@@ -433,7 +433,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     dailyFreeVoteLimit: 20,
     monthlyBoostLimit: 3,
     voteMultiplierLimit: 3,
-    canCreatePaidChallenges: false,
+    canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
     canCreateSponsoredChallenges: true,
@@ -470,7 +470,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     dailyFreeVoteLimit: 50,
     monthlyBoostLimit: 10,
     voteMultiplierLimit: 5,
-    canCreatePaidChallenges: false,
+    canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
     canCreateSponsoredChallenges: true,
@@ -507,7 +507,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     dailyFreeVoteLimit: 100,
     monthlyBoostLimit: 50,
     voteMultiplierLimit: 20,
-    canCreatePaidChallenges: false,
+    canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
     canCreateSponsoredChallenges: true,
@@ -883,7 +883,7 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   if (enterpriseProgram && !access.isEnterprise) return { allowed: false, code: "ENTERPRISE_REQUIRED", message: "Program and campaign challenge builders require Enterprise access." };
   if ((oneVsOne || liveEvent) && !access.isHost) return { allowed: false, code: "HOST_REQUIRED", message: "1v1 and live-event challenge tools require Host access." };
   if (ranked && !access.isPro) return { allowed: false, code: "PRO_REQUIRED", message: "Ranked challenge creation requires Pro access." };
-  if (paid) return { allowed: false, code: "PAID_ENTRY_DISABLED", message: "Paid-entry prize pools are disabled for now. Use sponsor-funded or bragging-rights challenges." };
+  if (paid && !access.canCreatePaidChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to submit paid-entry challenges for review." };
   if (privateChallenge && !access.canCreatePrivateChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish private or exclusive challenges." };
   if (premiumOnly && !access.canAccessPremiumChallenges) return { allowed: false, code: "PRO_REQUIRED", message: "Pro access is required to publish premium-only challenges." };
   if (prize && !access.canCreatePrizeChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish sponsor-funded prize or product-prize challenges." };
