@@ -14,7 +14,7 @@ import { getChallengeLifecycleState, getChallengeTimelineDisplay, statusClassNam
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
-import { ChallengeMediaFrame } from "@/components/media-display";
+import { ChallengeMediaGallery } from "@/components/media-display";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
@@ -240,7 +240,7 @@ export default function ChallengeDetailPage() {
             <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)]">{challenge.category || challenge.type}</span>
           </div>
           <div className="relative overflow-hidden rounded-[16px]">
-            <ChallengeMediaFrame src={challenge.imageUrl} alt={challenge.title} className="aspect-[16/10] h-auto border-0 sm:aspect-video" placeholder="Challenge Suite" />
+            <ChallengeMediaGallery title={challenge.title} videoUrl={challenge.trailerUrl ?? rawChallenge?.trailerVideoUrl ?? rawChallenge?.promoVideoUrl} images={[challenge.imageUrl, rawChallenge?.promoImageUrl, rawChallenge?.galleryImageUrl]} />
             <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
             <span data-status-badge className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>

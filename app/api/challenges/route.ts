@@ -140,12 +140,7 @@ export async function POST(request: Request) {
     competitionFormat: body.competitionFormat,
     premiumOnly: body.premiumOnly
   });
-  const advancedReviewRequired = body.prizeType === "money"
-    || body.prizeType === "physical_product"
-    || body.isLiveEvent
-    || body.tournamentType !== "none"
-    || body.competitionFormat.toLowerCase().includes("tournament");
-  if (body.publish && advancedReviewRequired) lifecycleStatus = "pending_review";
+  if (body.publish) lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const challengeInputForAccess = { ...body, ...moneyLocks, status: lifecycleStatus };
   const creationAccess = canCreateChallenge(planProfile, challengeInputForAccess as Record<string, unknown>, activeChallengeCount);
@@ -359,7 +354,7 @@ export async function POST(request: Request) {
       now
     })
   ]);
-  await createNotification(db, { userId: user.uid, type: "challenge_created", title: body.publish ? "Challenge submitted" : "Challenge draft saved", body: `${challenge.title} is ${challenge.status.replaceAll("_", " ")}.`, targetId: ref.id });
+  if (body.publish) await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: ref.id }).catch(() => undefined);
   await writeAuditLog({
     actorId: user.uid,
     actorType: user.role === "creator" ? "creator" : "user",

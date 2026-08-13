@@ -44,10 +44,7 @@ export function VerificationGuard({ children }: { children: React.ReactNode }) {
 function LoadingGate() {
   return (
     <main className="theme-workspace flex min-h-screen items-center justify-center bg-[var(--background)] px-6 text-[var(--foreground)]">
-      <Card className="w-full max-w-md p-8 text-center">
-        <BrandLogo className="mb-5" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
-        <h1 className="text-2xl font-black">Restoring your session...</h1>
-      </Card>
+      <Card className="w-full max-w-md p-8" aria-label="Loading"><div className="mx-auto h-16 w-16 animate-pulse rounded-full bg-[var(--gold)]/20" /><div className="mx-auto mt-6 h-5 w-48 animate-pulse rounded bg-white/10" /><div className="mx-auto mt-3 h-4 w-64 max-w-full animate-pulse rounded bg-white/5" /></Card>
     </main>
   );
 }

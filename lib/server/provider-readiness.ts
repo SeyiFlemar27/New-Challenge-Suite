@@ -17,7 +17,8 @@ function item(id: string, name: string, configured: boolean, explanation: string
 }
 
 export function imageLessChallengePublishingAllowed() {
-  return process.env.ALLOW_IMAGELESS_CHALLENGE_PUBLISHING === "true";
+  return process.env.ALLOW_IMAGELESS_CHALLENGE_PUBLISHING === "true"
+    || process.env.NEXT_PUBLIC_ALLOW_IMAGELESS_CHALLENGE_PUBLISHING === "true";
 }
 
 export function challengeMediaReadiness() {

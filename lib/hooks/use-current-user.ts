@@ -36,6 +36,9 @@ export interface CurrentUserProfile {
   kycRequired?: boolean;
   kycStatus?: string;
   premiumAccessState?: string;
+  enterpriseAccessStatus?: string;
+  enterpriseApprovalStatus?: string;
+  enterpriseApplicationId?: string | null;
 }
 
 function initialsFromName(name: string) {
@@ -117,7 +120,10 @@ export function useCurrentUser() {
           customization: profile.customization as ProfileCustomization | undefined,
           kycRequired: Boolean(profileRecord.kycRequired),
           kycStatus: typeof profileRecord.kycStatus === "string" ? profileRecord.kycStatus : undefined,
-          premiumAccessState: typeof profileRecord.premiumAccessState === "string" ? profileRecord.premiumAccessState : undefined
+          premiumAccessState: typeof profileRecord.premiumAccessState === "string" ? profileRecord.premiumAccessState : undefined,
+          enterpriseAccessStatus: typeof profileRecord.enterpriseAccessStatus === "string" ? profileRecord.enterpriseAccessStatus : undefined,
+          enterpriseApprovalStatus: typeof profileRecord.enterpriseApprovalStatus === "string" ? profileRecord.enterpriseApprovalStatus : undefined,
+          enterpriseApplicationId: typeof profileRecord.enterpriseApplicationId === "string" ? profileRecord.enterpriseApplicationId : null
         });
       } catch (caught) {
         if (!cancelled) {

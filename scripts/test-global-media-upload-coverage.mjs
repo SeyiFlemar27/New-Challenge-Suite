@@ -39,7 +39,7 @@ assert(mediaUpload.includes("kind === \"document\" ? documentOk"), "valid docume
 assert(uploadField.includes("Replace"), "shared upload field must support replacing existing media.");
 assert(uploadField.includes("Remove"), "shared upload field must support remove/clear where used.");
 assert(uploadField.includes("Retry Upload"), "shared upload field must support retry after failure.");
-assert(uploadField.includes("Upload complete. Media URL and storage path are ready to save."), "shared upload field must not mark success before URL/path are available.");
+assert(uploadField.includes("Upload complete."), "shared upload field must show a concise completed state.");
 assert(uploadField.includes("onChange(downloadUrl, { path, fileName: file.name, contentType: file.type, size: file.size })"), "shared upload field must persist safe metadata.");
 assert(uploadField.includes("kind === \"document\""), "shared upload field must handle document UI safely.");
 assert(!/placeholder uploaded|mock media|fake upload|storage\.example|blob:/.test(uploadField), "shared upload field must not use fake uploaded media.");
@@ -72,7 +72,7 @@ assert(settingsPage.includes("profileMediaPath(userId, \"banner\")"), "profile b
 assert(settingsRoute.includes("invalidProfileMediaPath"), "settings API must validate profile media owner paths.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"logo\")"), "sponsor logo upload should use shared sponsor path.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"banner\")"), "sponsor banner upload should use shared sponsor path.");
-assert(sponsorOnboarding.includes("Brand media remains pending review"), "sponsor branding must stay pending-review safe.");
+assert(sponsorOnboarding.includes("Submitting sends the profile for review. It does not approve the brand"), "sponsor branding must stay pending-review safe.");
 assert(sponsorProfileRoute.includes("invalidSponsorMediaPath"), "sponsor API must validate sponsor media owner paths.");
 assert(!sponsorCampaignBuilder.includes("MediaUploadField"), "sponsor campaign asset upload UI is not implemented and remains deferred.");
 

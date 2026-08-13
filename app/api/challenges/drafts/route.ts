@@ -2,7 +2,6 @@
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { ok, serverUnavailable, fail } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
-import { createNotification } from "@/lib/server/notifications";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { calculateChallengeDraftProgress, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
@@ -69,6 +68,5 @@ export async function POST(request: Request) {
   };
   await ref.set(draft);
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.draft_created", targetType: "challenge", targetId: ref.id, after: { status: "draft" }, metadata: { source: "api/challenges/drafts" } }, db).catch(() => undefined);
-  await createNotification(db, { userId: user.uid, type: "challenge_draft_created", title: "Challenge draft created", body: "Your challenge draft is ready to edit.", targetId: ref.id });
   return ok({ challenge: draft }, "Challenge draft created.");
 }

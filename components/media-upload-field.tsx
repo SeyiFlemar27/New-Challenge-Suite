@@ -272,7 +272,7 @@ export function MediaUploadField({
   }
 
   const stageLabel = status === "preparing" ? "Preparing upload" : status === "processing" ? "Processing file" : status === "uploading" ? (progress > 0 ? `Uploading ${typeLabel}` : "Starting upload") : status === "complete" ? "Upload complete" : status === "failed" ? "Upload failed" : value ? "Upload complete" : "Ready to upload";
-  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? (progress > 0 ? `Uploading ${typeLabel}... ${progress}%` : "Starting secure upload...") : status === "processing" ? "Processing file and saving media reference..." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Review the reason below and retry when ready." : "Choose a file to upload.";
+  const stateCopy = status === "preparing" && progress === 0 ? "Preparing upload..." : status === "uploading" ? (progress > 0 ? `Uploading ${typeLabel}... ${progress}%` : "Starting upload...") : status === "processing" ? "Your media is still processing." : status === "complete" || value ? "Upload complete." : status === "failed" ? "Upload failed. Try again." : "Choose a file to upload.";
 
   return (
     <div>
@@ -280,7 +280,7 @@ export function MediaUploadField({
       <Card className="border-white/10 bg-black/30 p-4">
         {displayUrl ? (
           <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">
-            {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded. Preview opens after saving where supported.</div> : isVideo ? <video src={displayUrl} controls className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable. The uploaded media URL is saved.</div>}
+            {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded.</div> : isVideo ? <video src={displayUrl} controls playsInline className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable.</div>}
           </div>
         ) : (
           <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-36 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 px-4 py-8 text-center ${disabled ? "cursor-not-allowed bg-[#101010] text-slate-500" : "bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
@@ -306,7 +306,7 @@ export function MediaUploadField({
           </div>
         ) : null}
         {uploading && !disabled ? <Button type="button" variant="ghost" className="mt-3" onClick={cancelUpload}><XCircle size={16} /> Cancel Upload</Button> : null}
-        {status === "complete" || value ? <p className="mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 size={16} /> Upload complete. Media URL and storage path are ready to save.</p> : null}
+        {status === "complete" || value ? <p className="mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 size={16} /> Upload complete.</p> : null}
         {disabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : null}
         {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3">{!disabled ? <Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button> : null}<Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}
         {status === "failed" && !disabled ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryFileRef.current}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}

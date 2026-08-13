@@ -1,8 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
-import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
+import { normalizeMoneyLockedChallengeFields, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
@@ -43,6 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const current = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
   if (!userOwnsChallenge(current, user.uid)) return fail("You can only publish your own challenge drafts.", 403, undefined, "PERMISSION_DENIED");
+  if (String(current.status ?? current.lifecycleStatus ?? "") === "pending_review") return fail("This challenge is already under review.", 409, undefined, "ALREADY_UNDER_REVIEW");
   if (!editableDraftStatus(current) && current.status !== "pending_review") return fail("This challenge is not editable for publishing.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
 
   const publishValidation = validateChallengeForPublish({ ...body, creatorId: user.uid }, { mode: "publish", userId: user.uid });
@@ -87,9 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (requiredCreatorFundingCents > confirmedCreatorFundingCents) return fail("Confirm the full creator-funded prize amount before publishing this challenge.", 409, { requiredCreatorFundingCents, confirmedCreatorFundingCents }, "PRIZE_FUNDING_REQUIRED");
   if (monetizationIntent.prizePoolRequested && !monetizationIntent.paidEntryRequested && !monetizationIntent.sponsorReady && confirmedCreatorFundingCents + confirmedPlatformFundingCents <= 0) return fail("Confirm an approved prize funding source before publishing this challenge.", 409, { approvedSources: ["creator_funded", "entry_fee_allocated", "sponsor_funded", "platform_promotional"] }, "PRIZE_FUNDING_REQUIRED");
 
-  let lifecycleStatus = resolveInitialChallengeStatus({ publish: true, startsAt: body.startsAt, endsAt: body.endsAt, submissionDeadline: body.submissionDeadline, votingDeadline: body.votingDeadline, sponsorEnabled: body.sponsorEnabled, visibility: body.visibility, competitionFormat: body.competitionFormat, premiumOnly: body.premiumOnly });
-  const advancedReviewRequired = body.prizeType === "money" || body.prizeType === "physical_product" || body.isLiveEvent || body.tournamentType !== "none" || body.competitionFormat.toLowerCase().includes("tournament");
-  if (advancedReviewRequired) lifecycleStatus = "pending_review";
+  const lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
@@ -158,13 +157,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     lastPublishedAt: now
   };
 
-  await Promise.all([
-    db.collection("challenges").doc(id).set(update, { merge: true }),
-    (body.visibility === "private" || body.visibility === "exclusive") ? createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }) : Promise.resolve(null),
-    db.collection("revenueShareLedgers").doc(`revenue_share_${id}`).set(revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
-    writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now })
-  ]);
-  await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: lifecycleStatus === "pending_review" ? "Challenge submitted" : "Challenge scheduled", body: lifecycleStatus === "pending_review" ? "Your challenge is awaiting review." : "Your challenge is scheduled.", targetId: id });
+  try {
+    await Promise.all([
+      db.collection("challenges").doc(id).set(update, { merge: true }),
+      (body.visibility === "private" || body.visibility === "exclusive") ? createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }) : Promise.resolve(null),
+      db.collection("revenueShareLedgers").doc(`revenue_share_${id}`).set(revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
+      writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now })
+    ]);
+  } catch (error) {
+    return serverError("Challenge could not be submitted for review.", error instanceof Error ? error.message : error);
+  }
+  await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: id }).catch(() => undefined);
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.published", targetType: "challenge", targetId: id, after: { status: lifecycleStatus, title: body.title }, reason: lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge published from draft.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true } }, db).catch(() => undefined);
   if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
     await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {

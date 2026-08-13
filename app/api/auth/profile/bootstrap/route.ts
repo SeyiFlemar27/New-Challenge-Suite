@@ -78,6 +78,9 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     walkthroughCompleted: merged.walkthroughCompleted === undefined ? true : Boolean(merged.walkthroughCompleted),
     hasSponsorProfile,
     sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null,
+    enterpriseAccessStatus: typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : "not_submitted",
+    enterpriseApprovalStatus: typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : "not_submitted",
+    enterpriseApplicationId: typeof merged.enterpriseApplicationId === "string" ? merged.enterpriseApplicationId : null,
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };

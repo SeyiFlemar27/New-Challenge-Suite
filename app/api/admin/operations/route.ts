@@ -5,6 +5,7 @@ import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/l
 import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { createNotification } from "@/lib/server/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -200,7 +201,7 @@ export async function GET(request: Request) {
     const kyc = records(kycSnap).map((item) => ({ id: item.id, userId: item.userId ?? item.id, planId: item.planId ?? item.subscriptionPlanId ?? null, kycRequired: item.kycRequired === true, kycStatus: item.kycStatus ?? "not_started", kycProvider: item.kycProvider ?? "not_configured", sumsubApplicantId: item.sumsubApplicantId ?? null, sumsubProviderStatus: item.sumsubProviderStatus ?? null, sumsubReviewAnswer: item.sumsubReviewAnswer ?? null, sumsubReviewRejectType: item.sumsubReviewRejectType ?? null, submittedAt: item.kycSubmittedAt ?? null, verifiedAt: item.kycVerifiedAt ?? null, rejectedAt: item.kycRejectedAt ?? null, failureReason: item.kycFailureReason ?? null, kycSessionId: item.kycSessionId ?? null, rawIdentityStored: false, status: item.kycStatus ?? "not_started", updatedAt: item.updatedAt ?? item.kycLastCheckedAt ?? null }));
     const predictionSettlements = records(predictionSettlementSnap).map((item) => ({ id: item.id, predictionId: item.predictionId ?? item.id, challengeId: item.challengeId ?? null, userId: item.userId ?? null, status: item.settlementStatus ?? item.refundStatus ?? item.status ?? "admin_review_required", refundStatus: item.refundStatus ?? "not_applicable", automaticPayoutsEnabled: false, automaticRefundsEnabled: false, createdAt: item.createdAt ?? null }));
     const adRewards = records(adRewardSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, adProvider: item.adProvider ?? "disabled", status: item.adRewardStatus ?? "not_available", voteGranted: item.voteGranted === true, providerVerificationRequired: true, clientGrantBlocked: item.clientGrantBlocked !== false, createdAt: item.createdAt ?? null }));
-    const enterpriseLeads = records(enterpriseLeadSnap).map((item) => ({ id: item.id, company: item.company ?? "Enterprise lead", fullName: item.fullName ?? "", workEmail: item.workEmail ?? "", expectedMonthlyChallengeVolume: item.expectedMonthlyChallengeVolume ?? "", status: item.status ?? "new", emailSent: item.emailSent === true, createdAt: item.createdAt ?? null }));
+    const enterpriseLeads = records(enterpriseLeadSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, applicationType: item.applicationType ?? "enterprise_inquiry", company: item.company ?? "Enterprise lead", fullName: item.fullName ?? "", workEmail: item.workEmail ?? "", role: item.role ?? "", useCase: item.useCase ?? item.reason ?? "", teamSize: item.teamSize ?? "", relationship: item.relationship ?? "", status: item.status ?? "pending", approvalStatus: item.approvalStatus ?? item.status ?? "pending", createdAt: item.createdAt ?? null, updatedAt: item.updatedAt ?? null }));
     const mediaModeration = records(mediaUploadSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, path: item.path ?? item.storagePath ?? "", contentType: item.contentType ?? "unknown", status: item.status ?? item.moderationStatus ?? "recorded", publicReadApproved: item.publicReadApproved === true, privateMedia: item.privateMedia === true, createdAt: item.createdAt ?? null }));
     const riskSafety = [...submissions.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...participants.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...predictions.filter((item) => ["disputed", "suspended"].includes(String(item.status)))].map((item) => ({ ...item, status: item.status ?? "review_required" }));
     const pending = (list: Array<{ status?: unknown }>, statuses: string[]) => list.filter((item) => statuses.includes(String(item.status))).length;
@@ -304,11 +305,12 @@ export async function GET(request: Request) {
 const allowedActions: Record<string, Set<string>> = {
   sponsor: new Set(["approve", "reject", "request_changes", "suspend", "add_note"]),
   host: new Set(["verify", "reject", "request_changes", "suspend", "add_note"]),
-  challenge: new Set(["approve", "reject", "flag", "archive", "suspend", "add_note"]),
+  challenge: new Set(["approve", "reject", "request_changes", "flag", "archive", "suspend", "add_note"]),
   submission: new Set(["approve", "reject", "request_changes", "flag", "add_note"]),
   participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag", "add_note"]),
   winner: new Set(["approve", "hold", "request_review", "flag", "add_note"]),
-  withdrawal: new Set(["approve", "second_approve", "reject", "request_info", "mark_paid", "add_note"])
+  withdrawal: new Set(["approve", "second_approve", "reject", "request_info", "mark_paid", "add_note"]),
+  enterprise: new Set(["approve", "reject", "request_info", "add_note"])
 };
 
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
@@ -318,6 +320,7 @@ function permissionForAction(type: string, action: string): AdminPermission {
   if (type === "sponsor") return action === "suspend" ? "sponsors.suspend" : "sponsors.approve";
   if (type === "host") return "users.requireVerification";
   if (type === "challenge") return action === "archive" ? "challenges.archive" : "challenges.review";
+  if (type === "enterprise") return "challenges.review";
   if (type === "submission") return "submissions.review";
   if (type === "participant") return action === "disqualify" ? "participants.disqualify" : "participants.review";
   if (type === "winner") return action === "approve" ? "winners.confirm" : "winners.review";
@@ -334,11 +337,12 @@ function nextStatus(type: string, action: string) {
   const statuses: Record<string, Record<string, string>> = {
     sponsor: { approve: "approved", reject: "rejected", request_changes: "needs_changes", suspend: "suspended" },
     host: { verify: "verified", reject: "rejected", request_changes: "needs_changes", suspend: "suspended" },
-    challenge: { approve: "published", reject: "rejected", flag: "flagged", archive: "archived", suspend: "suspended" },
+    challenge: { approve: "published", reject: "rejected", request_changes: "changes_requested", flag: "flagged", archive: "archived", suspend: "suspended" },
     submission: { approve: "approved", reject: "rejected", request_changes: "resubmission_requested", flag: "flagged" },
     participant: { approve: "approved", reject: "rejected", disqualify: "disqualified", reinstate: "approved", flag: "flagged" },
     winner: { approve: "approved", hold: "held", request_review: "pending_admin_review", flag: "flagged" },
-    withdrawal: { approve: "pending_second_approval", second_approve: "approved_for_manual_payout", reject: "rejected", request_info: "needs_kyc", mark_paid: "paid" }
+    withdrawal: { approve: "pending_second_approval", second_approve: "approved_for_manual_payout", reject: "rejected", request_info: "needs_kyc", mark_paid: "paid" },
+    enterprise: { approve: "approved", reject: "rejected", request_info: "needs_info" }
   };
   return statuses[type]?.[action];
 }
@@ -397,6 +401,30 @@ export async function PATCH(request: Request) {
       previousStatus = String(snap.data()?.hostVerificationStatus ?? "not_submitted");
       const update = { hostVerificationStatus: status, hostVerifiedAt: action === "verify" ? now : null, updatedAt: now };
       await Promise.all([userRef.set(update, { merge: true }), profileRef.set(update, { merge: true })]);
+    } else if (type === "enterprise") {
+      const ref = db.collection("enterpriseInquiries").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists || snap.data()?.applicationType !== "enterprise_access_application") return fail("Enterprise application not found.", 404, undefined, "NOT_FOUND");
+      const application = snap.data() ?? {};
+      previousStatus = String(application.status ?? "pending");
+      if (!["pending", "needs_info", "requested_changes"].includes(previousStatus)) return fail("This application has already been reviewed.", 409, undefined, "INVALID_STATE");
+      const applicantId = String(application.userId ?? "");
+      if (!applicantId) return fail("This application is not linked to an account.", 422, undefined, "APPLICATION_ACCOUNT_REQUIRED");
+      const accessUpdate = {
+        enterpriseAccessStatus: status,
+        enterpriseApprovalStatus: status,
+        enterpriseApplicationId: id,
+        enterpriseApprovedAt: action === "approve" ? now : null,
+        enterpriseApprovedBy: action === "approve" ? user.uid : null,
+        updatedAt: now
+      };
+      await Promise.all([
+        ref.set({ status, approvalStatus: status, enterpriseAccessGranted: action === "approve", reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, updatedAt: now }, { merge: true }),
+        db.collection("users").doc(applicantId).set(accessUpdate, { merge: true }),
+        db.collection("profiles").doc(applicantId).set(accessUpdate, { merge: true })
+      ]);
+      const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Enterprise is now available in Switch Role." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "Enterprise application needs information", body: "Update your application so review can continue." } : { type: "enterprise_application_rejected", title: "Enterprise application reviewed", body: "Your Enterprise application was not approved." };
+      await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
     } else if (type === "withdrawal") {
       const ref = db.collection("withdrawalRequests").doc(id);
       await db.runTransaction(async (transaction) => {
@@ -462,7 +490,16 @@ export async function PATCH(request: Request) {
       if (!snap.exists) return fail("Challenge record not found.", 404, undefined, "NOT_FOUND");
       const challenge = snap.data() ?? {};
       previousStatus = String(challenge.status ?? "unknown");
-      const update = action === "approve" ? buildChallengeApprovalUpdate(challenge, user.uid, now) : action === "reject" ? buildChallengeRejectionUpdate(user.uid, now) : {
+      const update = action === "approve" ? buildChallengeApprovalUpdate(challenge, user.uid, now) : action === "reject" ? buildChallengeRejectionUpdate(user.uid, now) : action === "request_changes" ? {
+        status: "changes_requested",
+        lifecycleStatus: "changes_requested",
+        reviewStatus: "changes_requested",
+        adminReviewRequired: true,
+        reviewedBy: user.uid,
+        reviewedAt: now,
+        reviewReason: reason,
+        updatedAt: now
+      } : {
         status,
         reviewedBy: user.uid,
         reviewedAt: now,
@@ -476,6 +513,11 @@ export async function PATCH(request: Request) {
         moneyMovementEnabled: false,
         transferEnabled: false
       }, { merge: true });
+      const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? "");
+      if (creatorId && ["approve", "reject", "request_changes"].includes(action)) {
+        const notificationCopy = action === "approve" ? { type: "challenge_approved", title: "Challenge approved", body: "Your challenge is now available." } : action === "request_changes" ? { type: "challenge_changes_requested", title: "Challenge changes requested", body: "Review the requested changes and resubmit your challenge." } : { type: "challenge_rejected", title: "Challenge not approved", body: "Review the decision before editing your challenge." };
+        await createNotification(db, { userId: creatorId, ...notificationCopy, targetId: id });
+      }
       if (action === "approve" && challenge.isLiveEvent) {
         await db.collection("liveEvents").doc(id).set({
           id,
