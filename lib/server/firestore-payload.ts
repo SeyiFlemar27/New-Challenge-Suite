@@ -24,3 +24,19 @@ export function assertNoUndefinedFirestoreValues(value: unknown, path = "payload
     assertNoUndefinedFirestoreValues(entry, `${path}.${key}`);
   }
 }
+
+export function sanitizeFirestorePayload<T>(value: T, path = "payload"): T {
+  if (value === undefined) throw new InvalidFirestorePayloadError(path);
+  if (value === null || typeof value !== "object") return value;
+
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => sanitizeFirestorePayload(entry, `${path}[${index}]`)) as T;
+  }
+
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined)
+      .map(([key, entry]) => [key, sanitizeFirestorePayload(entry, `${path}.${key}`)])
+  ) as T;
+}

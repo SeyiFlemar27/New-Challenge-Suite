@@ -26,7 +26,8 @@ registerHooks({
 });
 
 const { buildStoredVotingSettings } = await import(pathToFileURL(`${root}/lib/server/challenge-publish-payload.ts`).href);
-const { assertNoUndefinedFirestoreValues, InvalidFirestorePayloadError } = await import(pathToFileURL(`${root}/lib/server/firestore-payload.ts`).href);
+const { assertNoUndefinedFirestoreValues, InvalidFirestorePayloadError, sanitizeFirestorePayload } = await import(pathToFileURL(`${root}/lib/server/firestore-payload.ts`).href);
+const { createAuditLogRecord } = await import(pathToFileURL(`${root}/lib/server/audit.ts`).href);
 const { commitChallengeReviewSubmission } = await import(pathToFileURL(`${root}/lib/server/challenge-review-submission.ts`).href);
 const { getNormalChallengeReadiness } = await import(pathToFileURL(`${root}/lib/normal-challenge-readiness.ts`).href);
 
@@ -48,6 +49,10 @@ const date = new Date();
 class Sentinel { constructor() { this.hidden = undefined; } }
 const sentinel = new Sentinel();
 assert.doesNotThrow(() => assertNoUndefinedFirestoreValues({ date, sentinel, nullable: null, values: [1, "two"] }));
+assert.deepEqual(sanitizeFirestorePayload({ canonical: true, legacy: undefined, nested: { keep: "yes", omit: undefined } }), { canonical: true, nested: { keep: "yes" } });
+assert.throws(() => sanitizeFirestorePayload({ values: [true, undefined] }), InvalidFirestorePayloadError);
+assert.equal(sanitizeFirestorePayload(date), date);
+assert.equal(sanitizeFirestorePayload(sentinel), sentinel);
 
 const screenshotState = {
   title: "Screenshot equivalent challenge",
@@ -121,8 +126,10 @@ const now = "2026-08-13T12:00:00.000Z";
 const update = { ...screenshotState, id: challengeId, creatorId: "creator-1", ownerId: "creator-1", status: "pending_review", lifecycleStatus: "pending_review", votingSettings: legacy, reviewRevisionId: `challenge_review_${challengeId}_initial`, updatedAt: now };
 const revision = { id: `challenge_review_${challengeId}_initial`, challengeId, creatorId: "creator-1", status: "pending_review", revision: 1, submittedAt: now, createdAt: now, updatedAt: now };
 const revenue = { id: `revenue_share_${challengeId}`, challengeId, creatorId: "creator-1", status: "foundation", createdAt: now, updatedAt: now };
-const submitAudit = { id: `challenge_submit_${challengeId}_initial`, actorId: "creator-1", action: "challenge_submitted_for_review", targetId: challengeId, createdAt: now };
-const revisionAudit = { id: `challenge_revision_${challengeId}_initial`, actorId: "creator-1", action: "challenge_review_revision_created", targetId: challengeId, createdAt: now };
+const submitAudit = createAuditLogRecord({ actorId: "creator-1", actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: challengeId, before: { status: "draft" }, after: { status: "pending_review" }, createdAt: now }, `challenge_submit_${challengeId}_initial`, now);
+const revisionAudit = createAuditLogRecord({ actorId: "creator-1", actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: challengeId, after: { revisionId: revision.id, revision: 1 }, createdAt: now }, `challenge_revision_${challengeId}_initial`, now);
+assert.equal(Object.hasOwn(revisionAudit, "before"), false, "an absent audit before-state must be omitted, not stored as undefined");
+assert.doesNotThrow(() => assertNoUndefinedFirestoreValues(revisionAudit, "revisionAudit"));
 const transitionInput = { challengeId, userId: "creator-1", expectedStatus: "draft", update, revision, revenue, submitAudit, revisionAudit, prizePool: { prizeType: "money", prizeValueCents: 100000, sponsorEnabled: false, paidEntryEnabled: false, now } };
 
 const successful = fakeDb({ [`challenges/${challengeId}`]: { id: challengeId, creatorId: "creator-1", status: "draft" } });
@@ -150,6 +157,12 @@ assert.doesNotMatch(route, /allowDoroCoinVotes:\s*undefined/);
 assert.match(route, /buildStoredVotingSettings\(body\.votingSettings\)/);
 assert.match(route, /commitChallengeReviewSubmission\(db/);
 assert.match(route, /SUBMIT_PAYLOAD_INVALID/);
+assert.match(route, /storedChallengeFields = sanitizeFirestorePayload\(body, "challengeUpdate"\)/);
+assert.doesNotMatch(route, /const update = \{\s*\.\.\.body,/);
+assert.match(route, /stage: "payload_validation"/);
+assert.match(route, /payloadName/);
+assert.match(route, /safePath: error\.fieldPath/);
+assert.match(route, /requestId: publishRequestId/);
 assert.match(route, /We couldn't submit this challenge because some saved details need attention\./);
 assert.ok(route.indexOf("if (transition.idempotent)") < route.indexOf("createNotification(db"), "idempotent retries must return before notification creation");
 assert.ok(route.indexOf("commitChallengeReviewSubmission(db") < route.indexOf("createNotification(db"), "notification must follow the critical commit");

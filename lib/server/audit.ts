@@ -77,8 +77,8 @@ export function createAuditLogRecord(input: AuditLogInput, id: string, createdAt
     action: input.action,
     targetType: input.targetType,
     targetId: input.targetId,
-    before: removeUndefined(input.before),
-    after: removeUndefined(input.after),
+    ...(input.before === undefined ? {} : { before: removeUndefined(input.before) }),
+    ...(input.after === undefined ? {} : { after: removeUndefined(input.after) }),
     reason: input.reason ?? null,
     metadata: removeUndefined(input.metadata ?? {}) as Record<string, unknown>,
     createdAt

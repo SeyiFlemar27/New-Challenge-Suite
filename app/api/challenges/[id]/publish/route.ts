@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { randomUUID } from "node:crypto";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server/responses";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
@@ -21,7 +22,7 @@ import { getChallengePublishBlocker } from "@/lib/challenge-publish-readiness";
 import { normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payload";
-import { InvalidFirestorePayloadError } from "@/lib/server/firestore-payload";
+import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -36,6 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const rawBody = normalizeChallengeTimelineForStorage({ ...((parsed.body ?? {}) as Record<string, unknown>), publish: true }) as Record<string, unknown>;
   const { id } = await params;
   const now = new Date().toISOString();
+  const publishRequestId = `PUB-${randomUUID().slice(0, 8).toUpperCase()}`;
 
   const [challengeSnap, accountSnap, profileSnap, ownedChallengesSnap] = await Promise.all([
     db.collection("challenges").doc(id).get(),
@@ -64,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     mediaStatus: String(rawBody.mediaStatus ?? "unknown"),
     placeholderRequested: rawBody.usesPlaceholderMedia === true
   };
-  async function rejectPublish(message: string, status: number, details: unknown, code: string) {
+  async function rejectPublish(message: string, status: number, details: unknown, code: string, supportDiagnostic?: { requestId: string; stage: string; payloadName: string; safePath: string }) {
     await writeAuditLog({
       actorId,
       actorType: "creator",
@@ -84,6 +86,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         paidEntry: { requested: rawMonetization.paidEntryRequested === true, amountConfigured: Number(rawMonetization.entryFeeAmountCents ?? 0) > 0 },
         sponsorReady: { requested: rawMonetization.sponsorReady === true },
         prizePool: { requested: rawMonetization.prizePoolRequested === true, confirmedFundingPresent: Number(current.confirmedCreatorPrizeFundingCents ?? 0) > 0 },
+        ...(supportDiagnostic ? { supportDiagnostic } : {}),
         occurredAt: now
       },
       createdAt: now
@@ -181,8 +184,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
   const economyRules = await getActiveEconomyRules(db);
   const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
+  const storedChallengeFields = sanitizeFirestorePayload(body, "challengeUpdate");
   const update = {
-    ...body,
+    ...storedChallengeFields,
     submissionStartAt: body.submissionStartAt || body.startsAt,
     votingStartsAt: simpleVotingStartAt,
     winnerAnnouncementAt: body.winnerAnnouncementAt || body.endsAt,
@@ -237,8 +241,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   } catch (error) {
     if (error instanceof InvalidFirestorePayloadError) {
-      console.error("[challenge.publish] invalid Firestore payload", { challengeId: id, userId: user.uid, action: "publish_challenge", code: "SUBMIT_PAYLOAD_INVALID", fieldPath: error.fieldPath });
-      return rejectPublish("We couldn't submit this challenge because some saved details need attention.", 422, undefined, "SUBMIT_PAYLOAD_INVALID");
+      const payloadName = error.fieldPath.split(/[.[]/, 1)[0] || "submitPayload";
+      const supportDiagnostic = { requestId: publishRequestId, stage: "payload_validation", payloadName, safePath: error.fieldPath };
+      console.error("[challenge.publish] invalid Firestore payload", { challengeId: id, userId: user.uid, action: "publish_challenge", code: "SUBMIT_PAYLOAD_INVALID", ...supportDiagnostic });
+      return rejectPublish("We couldn't submit this challenge because some saved details need attention.", 422, { reference: publishRequestId }, "SUBMIT_PAYLOAD_INVALID", supportDiagnostic);
     }
     if (error instanceof ChallengeReviewTransitionError) {
       const status = error.code === "CHALLENGE_NOT_FOUND" ? 404 : error.code === "PERMISSION_DENIED" ? 403 : 409;
