@@ -1,4 +1,5 @@
 import { NORMAL_CHALLENGE_STEPS } from "@/lib/challenge-builder-foundation";
+import { NORMAL_CHALLENGE_CAPACITY_ERROR, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 
 export type NormalChallengeIssue = { code: string; field: string; step: number; message: string };
 export type NormalChallengeReadiness = {
@@ -28,8 +29,8 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
 
   const mode = text(challenge.participationMode) || (bool(challenge.requiresParticipantApproval) ? "approval" : "open");
   if (!['open', 'approval'].includes(mode)) issue(issues, "PARTICIPATION_MODE_REQUIRED", "participationMode", 1, "Choose Open Participation or Approval Required.");
-  const capacity = number(challenge.maxParticipants);
-  if (capacity < 0 || capacity > 100000) issue(issues, "CAPACITY_INVALID", "maxParticipants", 1, "Set a valid participant capacity.");
+  const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants);
+  if (capacityIssue) issue(issues, "CAPACITY_INVALID", "maxParticipants", 1, capacityIssue);
   const minAge = number(challenge.minimumAge); const maxAge = number(challenge.maximumAge);
   if (minAge && maxAge && minAge > maxAge) issue(issues, "AGE_RANGE_INVALID", "minimumAge", 1, "Minimum age cannot be greater than maximum age.");
 
@@ -75,4 +76,14 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
 
 export function firstIssueForStep(challenge: Record<string, unknown>, step: number) {
   return getNormalChallengeReadiness(challenge).issues.find((item) => item.step === step) ?? null;
+}
+
+export function normalChallengeSubmitIssue(details: unknown) {
+  if (!details || typeof details !== "object") return null;
+  const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== "object" || Array.isArray(fieldErrors)) return null;
+  if (Object.prototype.hasOwnProperty.call(fieldErrors, "maxParticipants")) {
+    return { field: "maxParticipants", step: 1, message: NORMAL_CHALLENGE_CAPACITY_ERROR };
+  }
+  return { field: "challenge", step: null, message: "Some required details need attention." };
 }

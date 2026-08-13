@@ -1,8 +1,10 @@
 ﻿import { z } from "zod";
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
+import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 
 export const serverChallengeCreateSchema = z.object({
+  challengeType: z.string().trim().max(80).optional(),
   title: z.string().trim().max(120, "Title must be 120 characters or fewer.").default(""),
   description: z.string().trim().max(2000, "Description must be 2,000 characters or fewer.").default(""),
   category: z.string().trim().max(80).default(""),
@@ -141,7 +143,10 @@ export const serverChallengeCreateSchema = z.object({
     advancementRule: z.string().trim().max(240).default("")
   })).max(20).default([]),
   divisionFormat: z.coerce.number().int().refine((value) => [2, 4, 6].includes(value), "Division format must be 2, 4, or 6.").default(2),
-  maxParticipants: z.coerce.number().int().min(2).max(50).default(50),
+  maxParticipants: z.preprocess(
+    (value) => value === "" ? 0 : value === null ? Number.NaN : value,
+    z.coerce.number().int().min(0).max(50)
+  ).default(50),
   scoringMode: z.enum(["best_of", "points"]).default("best_of"),
   bestOfRounds: z.coerce.number().int().refine((value) => [3, 5, 7].includes(value), "Best-of scoring must be 3, 5, or 7.").default(3),
   pointsToWin: z.coerce.number().int().min(1).max(100000).default(10),
@@ -181,6 +186,16 @@ export const serverChallengeCreateSchema = z.object({
   }).optional(),
   publish: z.coerce.boolean().default(false)
 }).superRefine((value, ctx) => {
+  const explicitChallengeType = String(value.challengeType ?? "").toLowerCase();
+  const normalChallenge = explicitChallengeType
+    ? explicitChallengeType === "normal"
+    : String(value.type ?? "").toLowerCase() === "public challenge";
+  if (normalChallenge) {
+    const capacityError = normalChallengeCapacityError(value.maxParticipants);
+    if (capacityError) ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: capacityError });
+  } else if (value.maxParticipants < 2) {
+    ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: "Participant capacity must be at least 2." });
+  }
   if (value.timerEnabled && value.timerDuration <= 0) {
     ctx.addIssue({ code: "custom", path: ["timerDuration"], message: "Timer duration must be greater than zero." });
   }

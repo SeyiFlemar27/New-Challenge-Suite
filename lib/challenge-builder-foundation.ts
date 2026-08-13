@@ -63,3 +63,16 @@ export function inferLegacyMaxUnlockedStep(challenge: Record<string, unknown>) {
   if (Number.isFinite(stored)) return Math.max(1, Math.min(6, Math.trunc(stored)));
   return 1;
 }
+
+export function normalizeNormalChallengeStep(
+  value: unknown,
+  readiness: { ready: boolean; nextRequiredStep: number }
+) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 && parsed <= 6) return parsed;
+  if (readiness.ready) return 6;
+  const nextRequiredStep = Number(readiness.nextRequiredStep);
+  return Number.isInteger(nextRequiredStep) && nextRequiredStep >= 0 && nextRequiredStep < 6
+    ? nextRequiredStep
+    : 0;
+}
