@@ -69,20 +69,9 @@ function removeUndefined(value: unknown): unknown {
   );
 }
 
-export async function writeAuditLog(input: AuditLogInput, db: Firestore | null = getAdminDb()) {
-  if (!db) {
-    console.warn("[audit] skipped because Firebase Admin is not configured", {
-      action: input.action,
-      targetType: input.targetType,
-      targetId: input.targetId
-    });
-    return null;
-  }
-
-  const ref = db.collection("auditLogs").doc();
-  const createdAt = input.createdAt ?? new Date().toISOString();
-  const record: AuditLogRecord = {
-    id: ref.id,
+export function createAuditLogRecord(input: AuditLogInput, id: string, createdAt = input.createdAt ?? new Date().toISOString()): AuditLogRecord {
+  return {
+    id,
     actorId: input.actorId,
     actorType: input.actorType,
     action: input.action,
@@ -94,6 +83,20 @@ export async function writeAuditLog(input: AuditLogInput, db: Firestore | null =
     metadata: removeUndefined(input.metadata ?? {}) as Record<string, unknown>,
     createdAt
   };
+}
+
+export async function writeAuditLog(input: AuditLogInput, db: Firestore | null = getAdminDb()) {
+  if (!db) {
+    console.warn("[audit] skipped because Firebase Admin is not configured", {
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId
+    });
+    return null;
+  }
+
+  const ref = db.collection("auditLogs").doc();
+  const record = createAuditLogRecord(input, ref.id);
 
   await ref.set(record);
   return record;

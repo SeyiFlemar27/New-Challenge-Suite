@@ -81,6 +81,12 @@ export async function writeChallengePrizePoolFoundation(db: Firestore, input: Pa
   const ref = db.collection("prizePools").doc(input.challengeId);
   const existingSnap = await ref.get();
   const existing = existingSnap.exists ? existingSnap.data() ?? {} : {};
+  const record = mergeChallengePrizePoolFoundation(existing, input);
+  await ref.set(record, { merge: true });
+  return record;
+}
+
+export function mergeChallengePrizePoolFoundation(existing: Record<string, unknown>, input: Parameters<typeof createChallengePrizePoolFoundation>[0]) {
   const base = createChallengePrizePoolFoundation(input);
   const creator = cents(existing.confirmedCreatorFundingCents);
   const entry = cents(existing.confirmedEntryFeeAllocationCents);
@@ -89,9 +95,7 @@ export async function writeChallengePrizePoolFoundation(db: Firestore, input: Pa
   const total = creator + entry + sponsor + platform;
   const sources = new Set<PrizePoolFundingSource>(base.fundingSources);
   if (creator) sources.add("creator_funded"); if (entry) sources.add("entry_fee_allocated"); if (sponsor) sources.add("sponsor_funded"); if (platform) sources.add("platform_promotional");
-  const record = { ...base, ...existing, confirmedCreatorFundingCents: creator, confirmedEntryFeeAllocationCents: entry, confirmedSponsorContributionCents: sponsor, confirmedPlatformPromotionalCents: platform, totalConfirmedCents: total, totalCommittedCents: Math.max(total, cents(existing.totalCommittedCents)), amountCents: total, visibleJackpotCents: total, fundingSources: [...sources], status: total > 0 ? String(existing.status ?? "fully_funded") : base.status, fundingStatus: total > 0 ? String(existing.fundingStatus ?? "fully_funded") : base.fundingStatus, winnerSplits: winnerSplit(total), updatedAt: input.now ?? new Date().toISOString() };
-  await ref.set(record, { merge: true });
-  return record;
+  return { ...base, ...existing, confirmedCreatorFundingCents: creator, confirmedEntryFeeAllocationCents: entry, confirmedSponsorContributionCents: sponsor, confirmedPlatformPromotionalCents: platform, totalConfirmedCents: total, totalCommittedCents: Math.max(total, cents(existing.totalCommittedCents)), amountCents: total, visibleJackpotCents: total, fundingSources: [...sources], status: total > 0 ? String(existing.status ?? "fully_funded") : base.status, fundingStatus: total > 0 ? String(existing.fundingStatus ?? "fully_funded") : base.fundingStatus, winnerSplits: winnerSplit(total), updatedAt: input.now ?? new Date().toISOString() };
 }
 
 export function publicPrizePoolFields(pool: Partial<PrizePoolFoundation> | null | undefined) {

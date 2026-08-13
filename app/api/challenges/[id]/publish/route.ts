@@ -4,9 +4,8 @@ import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { normalizeMoneyLockedChallengeFields, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
-import { writeAuditLog } from "@/lib/server/audit";
+import { createAuditLogRecord, writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
-import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
@@ -21,6 +20,9 @@ import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { getChallengePublishBlocker } from "@/lib/challenge-publish-readiness";
 import { normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
+import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payload";
+import { InvalidFirestorePayloadError } from "@/lib/server/firestore-payload";
+import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -192,11 +194,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status: lifecycleStatus,
     lifecycleStatus,
     economyRuleVersion: current.economyRuleVersion ?? economyRules.version,
-    votingSettings: {
-      ...body.votingSettings,
-      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes,
-      allowDoroCoinVotes: undefined
-    },
+    votingSettings: buildStoredVotingSettings(body.votingSettings),
     monetization: safeMonetization,
     sponsorEnabled,
     participantApprovalMode: body.requiresParticipantApproval ? "manual" : "automatic",
@@ -216,23 +214,48 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     reviewRevisionId: `challenge_review_${id}_initial`
   };
 
+  const revisionId = `challenge_review_${id}_initial`;
+  const submitAuditRef = db.collection("auditLogs").doc(`challenge_submit_${id}_initial`);
+  const revisionAuditRef = db.collection("auditLogs").doc(`challenge_revision_${id}_initial`);
+  const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "pending_review", revision: 1, submittedAt: now, createdAt: now, updatedAt: now };
+  const revenue = revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now });
+  const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true }, createdAt: now }, submitAuditRef.id, now);
+  const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: 1 }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
+
+  let transition: { idempotent: boolean; challenge: Record<string, unknown> };
   try {
-    await Promise.all([
-      db.collection("challenges").doc(id).set(update, { merge: true }),
-      db.collection("challengeReviewRevisions").doc(`challenge_review_${id}_initial`).set({ id: `challenge_review_${id}_initial`, challengeId: id, creatorId: user.uid, status: "pending_review", revision: 1, submittedAt: now, createdAt: now, updatedAt: now }, { merge: true }),
-      (body.visibility === "private" || body.visibility === "exclusive") ? createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }) : Promise.resolve(null),
-      db.collection("revenueShareLedgers").doc(`revenue_share_${id}`).set(revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
-      writeChallengePrizePoolFoundation(db, { challengeId: id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now })
-    ]);
+    transition = await commitChallengeReviewSubmission(db, {
+      challengeId: id,
+      userId: user.uid,
+      expectedStatus: currentStatus,
+      update,
+      revision,
+      revenue,
+      submitAudit: { ...submitAudit },
+      revisionAudit: { ...revisionAudit },
+      prizePool: { prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now }
+    });
   } catch (error) {
+    if (error instanceof InvalidFirestorePayloadError) {
+      console.error("[challenge.publish] invalid Firestore payload", { challengeId: id, userId: user.uid, action: "publish_challenge", code: "SUBMIT_PAYLOAD_INVALID", fieldPath: error.fieldPath });
+      return rejectPublish("We couldn't submit this challenge because some saved details need attention.", 422, undefined, "SUBMIT_PAYLOAD_INVALID");
+    }
+    if (error instanceof ChallengeReviewTransitionError) {
+      const status = error.code === "CHALLENGE_NOT_FOUND" ? 404 : error.code === "PERMISSION_DENIED" ? 403 : 409;
+      return rejectPublish(error.message, status, undefined, error.code);
+    }
     await writeAuditLog({ actorId: user.uid, actorType: "creator", action: "challenge.publish_failed", targetType: "challenge", targetId: id, before: { status: String(current.status ?? current.lifecycleStatus ?? "unknown") }, after: { attemptedStatus: lifecycleStatus }, reason: "Challenge submission write failed.", metadata: { action: "publish_challenge", causeCode: "PUBLISH_WRITE_FAILED", planId: planAccess.normalizedPlanId, accountType: planAccess.accountType, media: mediaSummary, paidEntry: { requested: monetizationIntent.paidEntryRequested }, sponsorReady: { requested: monetizationIntent.sponsorReady }, prizePool: { requested: monetizationIntent.prizePoolRequested }, occurredAt: now }, createdAt: now }, db).catch(() => undefined);
     return serverError("Challenge could not be submitted for review.", error instanceof Error ? error.message : error);
   }
+  if (transition.idempotent) return ok({ challenge: transition.challenge, idempotent: true }, "Challenge is already submitted for review.");
+
+  if (body.visibility === "private" || body.visibility === "exclusive") {
+    await createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }).catch(async (error) => {
+      await writeAuditLog({ actorId: user.uid, actorType: "system", action: "challenge.private_invite_failed", targetType: "challenge", targetId: id, reason: "Private invite creation failed after review submission.", metadata: { causeCode: "PRIVATE_INVITE_DELIVERY_FAILED", occurredAt: now }, createdAt: now }, db).catch(() => undefined);
+      console.error("[challenge.publish] private invite creation failed", { challengeId: id, userId: user.uid, code: "PRIVATE_INVITE_DELIVERY_FAILED", message: error instanceof Error ? error.message : "Unknown error" });
+    });
+  }
   await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: id }).catch(() => undefined);
-  await Promise.all([
-    writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true } }, db).catch(() => undefined),
-    writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId: `challenge_review_${id}_initial`, revision: 1 }, metadata: { source: "api/challenges/[id]/publish" } }, db).catch(() => undefined)
-  ]);
   if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
     await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {
       await db.collection("adminActionTasks").doc(`doro_create_${id}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "create_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
