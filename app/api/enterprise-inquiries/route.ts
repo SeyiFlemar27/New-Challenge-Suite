@@ -1,17 +1,54 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { requireRequestUser } from "@/lib/server/auth";
+import { writeAuditLog } from "@/lib/server/audit";
+import {
+  canEditEnterpriseApplication,
+  decidedEnterpriseApplicationStatuses,
+  ENTERPRISE_APPLICATION_COLLECTION,
+  ENTERPRISE_APPLICATION_TYPE,
+  enterpriseApplicationStatus,
+  latestEnterpriseApplication
+} from "@/lib/server/enterprise-applications";
 
 export const dynamic = "force-dynamic";
+
+function text(value: unknown, max: number) {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function submittedFields(body: Record<string, unknown>) {
+  return {
+    fullName: text(body.fullName, 160),
+    company: text(body.company ?? body.organization, 180),
+    workEmail: text(body.workEmail, 180),
+    website: text(body.website, 220) || null,
+    roleTitle: text(body.role ?? body.roleTitle, 160) || null,
+    expectedChallengeVolume: text(body.expectedUsage ?? body.expectedUse, 240) || null,
+    useCase: text(body.useCase ?? body.reason, 1200),
+    relationship: text(body.relationship, 1000) || null,
+    teamSize: text(body.teamSize, 80) || null,
+    budgetOrPlanInterest: text(body.budgetRange ?? body.budgetOrPlanInterest, 120) || null,
+    contactDetails: text(body.contactDetails ?? body.message, 1500) || null
+  };
+}
+
+function validateApplicationFields(fields: ReturnType<typeof submittedFields>) {
+  if (!fields.fullName) return validationError({ fullName: "Full name is required." });
+  if (!fields.company) return validationError({ company: "Company or organization is required." });
+  if (!/^\S+@\S+\.\S+$/.test(fields.workEmail)) return validationError({ workEmail: "A valid work email is required." });
+  if (!fields.useCase) return validationError({ useCase: "Tell us why Enterprise access is needed." });
+  return null;
+}
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Enterprise applications");
-  const snapshot = await db.collection("enterpriseInquiries").where("userId", "==", user.uid).limit(20).get();
-  const applications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).filter((item) => item.applicationType === "enterprise_access_application").sort((a, b) => String(b.updatedAt ?? b.createdAt ?? "").localeCompare(String(a.updatedAt ?? a.createdAt ?? "")));
-  return ok({ application: applications[0] ?? null }, "Enterprise application status loaded.");
+  const snapshot = await db.collection(ENTERPRISE_APPLICATION_COLLECTION).where("userId", "==", user.uid).limit(20).get();
+  const applications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }));
+  return ok({ application: latestEnterpriseApplication(applications) }, "Enterprise application status loaded.");
 }
 
 export async function POST(request: Request) {
@@ -19,54 +56,94 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Enterprise inquiries");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const body = parsed.body ?? {};
-  const applicationType = String(body.applicationType ?? "enterprise_inquiry").trim().slice(0, 80);
-  const fullName = String(body.fullName ?? "").trim().slice(0, 160);
-  const company = String(body.company ?? body.organization ?? "").trim().slice(0, 180);
-  const workEmail = String(body.workEmail ?? "").trim().slice(0, 180);
-  const useCase = String(body.useCase ?? body.expectedUse ?? body.reason ?? "").trim().slice(0, 1200);
-  if (!fullName) return validationError({ fullName: "Full name is required." });
-  if (!company) return validationError({ company: "Company or organization is required." });
-  if (!/^\S+@\S+\.\S+$/.test(workEmail)) return validationError({ workEmail: "A valid work email is required." });
-  if (!useCase) return validationError({ useCase: "Tell us why Enterprise access is needed." });
-  const now = new Date().toISOString();
-  const ref = db.collection("enterpriseInquiries").doc();
-  const isApplication = applicationType === "enterprise_access_application";
+  const body = (parsed.body ?? {}) as Record<string, unknown>;
+  const applicationType = text(body.applicationType ?? "enterprise_inquiry", 80);
+  const isApplication = applicationType === ENTERPRISE_APPLICATION_TYPE;
   const auth = isApplication ? await requireRequestUser(request) : null;
   if (auth?.response) return auth.response;
-  const inquiry = {
-    id: ref.id,
-    userId: auth?.user.uid ?? null,
-    applicationType,
-    fullName,
-    company,
-    workEmail,
-    website: String(body.website ?? "").trim().slice(0, 220) || null,
-    role: String(body.role ?? "").trim().slice(0, 160) || null,
-    expectedUsage: String(body.expectedUsage ?? body.expectedUse ?? "").trim().slice(0, 240) || null,
-    useCase,
-    reason: String(body.reason ?? useCase).trim().slice(0, 1200),
-    relationship: String(body.relationship ?? "").trim().slice(0, 1000) || null,
-    teamSize: String(body.teamSize ?? "").trim().slice(0, 80) || null,
-    budgetRange: isApplication ? null : String(body.budgetRange ?? "").trim().slice(0, 120) || null,
-    message: String(body.message ?? "").trim().slice(0, 1500) || null,
-    status: "pending",
-    approvalStatus: "pending",
-    enterpriseAccessGranted: false,
-    paymentRequired: false,
-    emailProviderConfigured: Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER),
-    emailSent: false,
-    createdAt: now,
-    updatedAt: now
-  };
+  const fields = submittedFields(body);
+  const invalid = validateApplicationFields(fields);
+  if (invalid) return invalid;
+  const now = new Date().toISOString();
+
   try {
-    await Promise.all([
-      ref.set(inquiry),
-      db.collection("notifications").doc(`enterprise_${ref.id}`).set({ id: `enterprise_${ref.id}`, audience: "admin", adminOnly: true, type: isApplication ? "enterprise_access_application" : "enterprise_inquiry", title: isApplication ? "New enterprise access application" : "New enterprise inquiry", body: `${company} submitted ${isApplication ? "an Enterprise access application" : "an Enterprise inquiry"}.`, targetId: ref.id, status: "unread", createdAt: now })
-    ]);
-    return ok({ inquiryId: ref.id, status: "pending", emailSent: false, enterpriseAccessGranted: false }, isApplication ? "Enterprise application submitted for review." : "Your inquiry has been saved for review.");
+    let existing: (Record<string, unknown> & { id: string }) | null = null;
+    if (isApplication && auth?.user) {
+      const snapshot = await db.collection(ENTERPRISE_APPLICATION_COLLECTION).where("userId", "==", auth.user.uid).limit(20).get();
+      existing = latestEnterpriseApplication(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      if (existing && decidedEnterpriseApplicationStatuses.has(enterpriseApplicationStatus(existing))) {
+        return fail("This Enterprise application has already been reviewed.", 409, { status: enterpriseApplicationStatus(existing) }, "ENTERPRISE_APPLICATION_LOCKED");
+      }
+    }
+
+    const ref = existing
+      ? db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(existing.id)
+      : db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc();
+    const inquiry = {
+      id: ref.id,
+      userId: auth?.user.uid ?? null,
+      userRef: auth?.user.uid ?? null,
+      applicationType,
+      applicantName: fields.fullName,
+      applicantEmail: fields.workEmail,
+      fullName: fields.fullName,
+      company: fields.company,
+      companyName: fields.company,
+      workEmail: fields.workEmail,
+      website: fields.website,
+      role: fields.roleTitle,
+      roleTitle: fields.roleTitle,
+      expectedUsage: fields.expectedChallengeVolume,
+      expectedChallengeVolume: fields.expectedChallengeVolume,
+      useCase: fields.useCase,
+      reason: fields.useCase,
+      relationship: fields.relationship,
+      teamSize: fields.teamSize,
+      budgetRange: fields.budgetOrPlanInterest,
+      budgetOrPlanInterest: fields.budgetOrPlanInterest,
+      message: fields.contactDetails,
+      contactDetails: fields.contactDetails,
+      submittedFields: fields,
+      status: "pending",
+      approvalStatus: "pending",
+      enterpriseAccessGranted: false,
+      paymentRequired: false,
+      emailProviderConfigured: Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER),
+      emailSent: false,
+      submittedAt: existing?.submittedAt ?? existing?.createdAt ?? now,
+      lastSubmittedAt: now,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      resubmittedAt: existing ? now : null
+    };
+    await ref.set(inquiry, { merge: Boolean(existing) });
+    await db.collection("notifications").doc(`enterprise_${ref.id}`).set({
+      id: `enterprise_${ref.id}`,
+      audience: "admin",
+      adminOnly: true,
+      type: isApplication ? ENTERPRISE_APPLICATION_TYPE : "enterprise_inquiry",
+      title: isApplication ? "Enterprise application ready for review" : "New enterprise sales inquiry",
+      body: `${fields.company} submitted ${isApplication ? "an Enterprise access application" : "an Enterprise sales inquiry"}.`,
+      targetId: ref.id,
+      status: "unread",
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    }, { merge: true });
+    if (isApplication && auth?.user) {
+      await writeAuditLog({
+        actorId: auth.user.uid,
+        actorType: "user",
+        action: existing ? "enterprise_application_updated" : "enterprise_application_submitted",
+        targetType: "enterprise_application",
+        targetId: ref.id,
+        before: { status: existing ? enterpriseApplicationStatus(existing) : "not_submitted" },
+        after: { status: "pending", userId: auth.user.uid },
+        reason: existing ? "Enterprise application resubmitted." : "Enterprise application submitted."
+      }, db);
+    }
+    return ok({ application: inquiry, inquiryId: ref.id, status: "pending", emailSent: false, enterpriseAccessGranted: false }, isApplication ? "Enterprise application submitted for review." : "Your inquiry has been saved for review.");
   } catch (error) {
-    return serverError("Enterprise inquiry could not be saved.", error instanceof Error ? error.message : error);
+    return serverError(isApplication ? "Enterprise application could not be submitted." : "Enterprise inquiry could not be saved.", error instanceof Error ? error.message : error);
   }
 }
 
@@ -77,26 +154,48 @@ export async function PATCH(request: Request) {
   if (!db) return serverUnavailable("Enterprise applications");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const id = String(parsed.body?.id ?? "");
-  const ref = db.collection("enterpriseInquiries").doc(id);
+  const body = (parsed.body ?? {}) as Record<string, unknown>;
+  const id = text(body.id, 160);
+  const ref = db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(id);
   const snap = await ref.get();
-  if (!snap.exists || snap.data()?.userId !== user.uid) return validationError({ id: "Application not found." });
-  if (!['needs_info', 'requested_changes'].includes(String(snap.data()?.status ?? ""))) return validationError({ status: "This application is not open for changes." });
+  const previous = { id, ...(snap.data() ?? {}) } as Record<string, unknown> & { id: string };
+  if (!snap.exists || previous.userId !== user.uid || !canEditEnterpriseApplication(previous)) return fail("This application is not open for changes.", 409, undefined, "ENTERPRISE_APPLICATION_LOCKED");
+  const fields = submittedFields({ ...previous, ...body });
+  const invalid = validateApplicationFields(fields);
+  if (invalid) return invalid;
   const now = new Date().toISOString();
   const update = {
-    fullName: String(parsed.body?.fullName ?? snap.data()?.fullName ?? "").trim().slice(0, 160),
-    company: String(parsed.body?.company ?? parsed.body?.organization ?? snap.data()?.company ?? "").trim().slice(0, 180),
-    workEmail: String(parsed.body?.workEmail ?? snap.data()?.workEmail ?? "").trim().slice(0, 180),
-    useCase: String(parsed.body?.useCase ?? parsed.body?.reason ?? snap.data()?.useCase ?? "").trim().slice(0, 1200),
-    reason: String(parsed.body?.reason ?? parsed.body?.useCase ?? snap.data()?.reason ?? "").trim().slice(0, 1200),
-    relationship: String(parsed.body?.relationship ?? snap.data()?.relationship ?? "").trim().slice(0, 1000) || null,
-    expectedUsage: String(parsed.body?.expectedUse ?? parsed.body?.expectedUsage ?? snap.data()?.expectedUsage ?? "").trim().slice(0, 240) || null,
-    teamSize: String(parsed.body?.teamSize ?? snap.data()?.teamSize ?? "").trim().slice(0, 80) || null,
+    applicantName: fields.fullName,
+    applicantEmail: fields.workEmail,
+    fullName: fields.fullName,
+    company: fields.company,
+    companyName: fields.company,
+    workEmail: fields.workEmail,
+    website: fields.website,
+    role: fields.roleTitle,
+    roleTitle: fields.roleTitle,
+    expectedUsage: fields.expectedChallengeVolume,
+    expectedChallengeVolume: fields.expectedChallengeVolume,
+    useCase: fields.useCase,
+    reason: fields.useCase,
+    relationship: fields.relationship,
+    teamSize: fields.teamSize,
+    budgetRange: fields.budgetOrPlanInterest,
+    budgetOrPlanInterest: fields.budgetOrPlanInterest,
+    message: fields.contactDetails,
+    contactDetails: fields.contactDetails,
+    submittedFields: fields,
     status: "pending",
     approvalStatus: "pending",
+    requestedInfoMessage: null,
     resubmittedAt: now,
+    lastSubmittedAt: now,
     updatedAt: now
   };
   await ref.set(update, { merge: true });
-  return ok({ application: { id, ...snap.data(), ...update } }, "Enterprise application resubmitted.");
+  await Promise.all([
+    db.collection("notifications").doc(`enterprise_${id}`).set({ id: `enterprise_${id}`, audience: "admin", adminOnly: true, type: ENTERPRISE_APPLICATION_TYPE, title: "Enterprise application updated", body: `${fields.company} updated its Enterprise application.`, targetId: id, status: "unread", updatedAt: now }, { merge: true }),
+    writeAuditLog({ actorId: user.uid, actorType: "user", action: "enterprise_application_updated", targetType: "enterprise_application", targetId: id, before: { status: enterpriseApplicationStatus(previous) }, after: { status: "pending", userId: user.uid }, reason: "Enterprise application resubmitted." }, db)
+  ]);
+  return ok({ application: { ...previous, ...update } }, "Enterprise application resubmitted.");
 }

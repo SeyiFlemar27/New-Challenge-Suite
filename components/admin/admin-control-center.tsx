@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowRight, BarChart3, Bell, ClipboardCheck, Coins, FileClock, Flag,
+  Activity, ArrowRight, BarChart3, Bell, BriefcaseBusiness, ClipboardCheck, Coins, FileClock, Flag,
   FolderCog, Landmark, LifeBuoy, Megaphone, Radio, Search, ShieldAlert,
   ShieldCheck, SlidersHorizontal, Trophy, UserCog, UsersRound, WalletCards, X
 } from "lucide-react";
@@ -18,7 +18,7 @@ type AdminData = {
   users: AdminRecord[]; creators: AdminRecord[]; hostWorkspaces: AdminRecord[]; sponsorBrands: AdminRecord[];
   events: AdminRecord[]; tournaments: AdminRecord[]; cashLedger: AdminRecord[]; adminNotifications: AdminRecord[];
   support: AdminRecord[]; announcements: AdminRecord[]; auditLogs: AdminRecord[];
-  predictions: AdminRecord[]; predictionSettlements: AdminRecord[]; rewards: AdminRecord[]; prizeWheel: AdminRecord[]; kyc: AdminRecord[]; adRewards: AdminRecord[]; enterpriseLeads: AdminRecord[]; mediaModeration: AdminRecord[]; riskSafety: AdminRecord[];
+  predictions: AdminRecord[]; predictionSettlements: AdminRecord[]; rewards: AdminRecord[]; prizeWheel: AdminRecord[]; kyc: AdminRecord[]; adRewards: AdminRecord[]; enterpriseApplications: AdminRecord[]; enterpriseLeads: AdminRecord[]; contactRequests: AdminRecord[]; mediaModeration: AdminRecord[]; riskSafety: AdminRecord[];
   doroCoin: { wallets: AdminRecord[]; transactions: AdminRecord[]; conversionEnabled: false; adjustmentsEnabled: false };
   reports: Record<string, unknown>; settings: Record<string, unknown>;
 };
@@ -65,7 +65,9 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   "system-status": { title: "System Status", description: "Review recorded service and job status. Missing provider telemetry is shown as not connected." },
   "media-moderation": { title: "Upload & Media Moderation", description: "Review uploaded media metadata and moderation status without exposing private files publicly." },
   "ad-rewards": { title: "Ad Reward Verification Logs", description: "Review ad vote reward attempts. Provider verification is required and fake client grants are blocked." },
-  "enterprise-leads": { title: "Enterprise Leads", description: "Review Contact Sales inquiries and handoff status." },
+  "enterprise-applications": { title: "Enterprise Applications", description: "Review account applications and grant Enterprise access only after an authorized decision." },
+  "enterprise-leads": { title: "Enterprise Leads", description: "Review sales and business inquiries from organizations interested in Challenge Suite." },
+  "contact-requests": { title: "Contact Requests", description: "Review general account, product, payment, and support requests." },
   rewards: { title: "Reward Fulfillment", description: "Review voter points, spin history, and manual reward fulfillment." },
   "prize-wheel": { title: "Prize Wheel Manager", description: "Manage prize wheel rewards. High-value and manual prizes require admin fulfillment." },
   kyc: { title: "Verification Records", description: "View historical provider metadata. Verification is not currently required for normal product actions, and no raw ID or face media is stored in Firebase." }
@@ -79,13 +81,17 @@ const queueActions: Record<string, Array<{ action: string; label: string; danger
   participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }, { action: "add_note", label: "Add note" }],
   winners: [{ action: "approve", label: "Approve announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request review" }, { action: "flag", label: "Flag" }, { action: "add_note", label: "Add note" }],
   withdrawals: [{ action: "approve", label: "First approval" }, { action: "second_approve", label: "Second approval" }, { action: "mark_paid", label: "Mark paid manually" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
-  "enterprise-leads": [{ action: "approve", label: "Approve" }, { action: "request_info", label: "Request info" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }]
+  "enterprise-applications": [{ action: "approve", label: "Approve" }, { action: "request_info", label: "Request Info" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add Internal Note" }]
 };
-const typeBySection: Record<string, string> = { sponsors: "sponsor", hosts: "host", challenges: "challenge", submissions: "submission", participants: "participant", winners: "winner", withdrawals: "withdrawal", "enterprise-leads": "enterprise" };
+const typeBySection: Record<string, string> = { sponsors: "sponsor", hosts: "host", challenges: "challenge", submissions: "submission", participants: "participant", winners: "winner", withdrawals: "withdrawal", "enterprise-applications": "enterprise" };
 const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
 
 function availableQueueActions(section: string, status: string) {
   return (queueActions[section] ?? []).filter((item) => {
+    if (section === "enterprise-applications") {
+      if (["approved", "rejected"].includes(status)) return item.action === "add_note";
+      if (["needs_info", "requested_changes"].includes(status)) return ["approve", "reject", "add_note"].includes(item.action);
+    }
     if (section !== "withdrawals") return true;
     if (item.action === "approve") return ["pending_review", "needs_kyc"].includes(status);
     if (item.action === "second_approve") return status === "pending_second_approval";
@@ -100,7 +106,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   const [data, setData] = useState<AdminData | null>(null);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(section === "enterprise-applications" ? "pending" : "all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selected, setSelected] = useState<AdminRecord | null>(null);
   const [pendingAction, setPendingAction] = useState<{ record: AdminRecord; action: string } | null>(null);
@@ -118,7 +124,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setFilter(params.get("status") ?? "all");
+    setFilter(params.get("status") ?? (normalizedSection === "enterprise-applications" ? "pending" : "all"));
     setSearchQuery(params.get("q") ?? "");
     void load();
     const refresh = () => void load();
@@ -128,11 +134,17 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
 
   const sourceRecords = useMemo(() => {
     if (!data) return [];
-    const value = data[normalizedSection as keyof AdminData];
+    const value = normalizedSection === "enterprise-applications"
+      ? data.enterpriseApplications
+      : normalizedSection === "enterprise-leads"
+        ? data.enterpriseLeads
+        : normalizedSection === "contact-requests"
+          ? data.contactRequests
+          : data[normalizedSection as keyof AdminData];
     return Array.isArray(value) ? value as AdminRecord[] : [];
   }, [data, normalizedSection]);
-  const statuses = useMemo(() => [...new Set(sourceRecords.map(recordStatus))], [sourceRecords]);
-  const filteredRecords = useMemo(() => filter === "all" ? sourceRecords : sourceRecords.filter((item) => recordStatus(item) === filter), [filter, sourceRecords]);
+  const statuses = useMemo(() => normalizedSection === "enterprise-applications" ? ["pending", "needs_info", "approved", "rejected"] : [...new Set(sourceRecords.map(recordStatus))], [normalizedSection, sourceRecords]);
+  const filteredRecords = useMemo(() => filter === "all" ? sourceRecords : sourceRecords.filter((item) => filter === "pending" && normalizedSection === "enterprise-applications" ? ["pending", "in_review"].includes(recordStatus(item)) : recordStatus(item) === filter), [filter, normalizedSection, sourceRecords]);
 
   function openAction(record: AdminRecord, action: string) {
     setPendingAction({ record, action });
@@ -182,6 +194,7 @@ function Overview({ data }: { data: AdminData }) {
     ["Flagged submissions", data.overview.flaggedSubmissions, "/admin/submissions?status=flagged", ShieldAlert],
     ["Participant approvals", data.overview.participantApprovals, "/admin/participants?status=pending", UsersRound],
     ["Winner confirmations", data.overview.winnerConfirmations, "/admin/winners?status=pending_admin_review", Trophy],
+    ["Enterprise applications", data.overview.pendingEnterpriseApplications, "/admin/enterprise-applications?status=pending", BriefcaseBusiness],
     ["Withdrawal reviews", data.overview.pendingWithdrawalReviews, "/admin/withdrawals?status=pending_review", Landmark],
     ["Open disputes", data.overview.openDisputes, "/admin/disputes?status=open", Flag],
     ["Revenue review items", data.overview.revenueReviewItems, "/admin/reports?type=revenue_review", BarChart3]
@@ -190,6 +203,7 @@ function Overview({ data }: { data: AdminData }) {
     [Number(data.overview.pendingSponsorReviews ?? 0), "sponsor application", "/admin/sponsors?status=pending_review", "Review Sponsors"],
     [Number(data.overview.pendingSubmissions ?? 0), "submission", "/admin/submissions?status=pending_review", "Review Submissions"],
     [Number(data.overview.pendingWithdrawalReviews ?? 0), "withdrawal request", "/admin/withdrawals?status=pending_review", "Review Withdrawals"],
+    [Number(data.overview.pendingEnterpriseApplications ?? 0), "Enterprise application", "/admin/enterprise-applications?status=pending", "Review Applications"],
     [Number(data.overview.winnerConfirmations ?? 0), "winner announcement", "/admin/winners?status=pending_admin_review", "Review Winners"]
   ] as const;
   const activeUrgent = urgent.filter(([count]) => count > 0);
@@ -215,7 +229,12 @@ function ActionCentre({ data, onSelect }: { data: AdminData; onSelect: (record: 
 }
 
 function Queue({ records, allRecords, statuses, filter, setFilter, section, onSelect, onAction }: { records: AdminRecord[]; allRecords: AdminRecord[]; statuses: string[]; filter: string; setFilter: (value: string) => void; section: string; onSelect: (record: AdminRecord) => void; onAction: (record: AdminRecord, action: string) => void }) {
-  return <><div className="scrollbar-dark mt-8 flex gap-2 overflow-x-auto pb-2"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All <span className="ml-1 opacity-70">{allRecords.length}</span></Button>{statuses.map((status) => <Button key={status} variant={filter === status ? "primary" : "secondary"} onClick={() => setFilter(status)}>{friendlyLabel(status)} <span className="ml-1 opacity-70">{allRecords.filter((item) => recordStatus(item) === status).length}</span></Button>)}</div><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record) => <RecordCard key={record.id} record={record} section={section} onSelect={onSelect} onAction={onAction} />) : <Card className="xl:col-span-2"><EmptyState icon={<ClipboardCheck />} title={`No ${friendlyLabel(filter === "all" ? section : filter).toLowerCase()} records`} body="The live Firestore queue is currently empty for this filter." /></Card>}</div></>;
+  const enterpriseQueue = section === "enterprise-applications";
+  const statusCount = (status: string) => allRecords.filter((item) => enterpriseQueue && status === "pending"
+    ? ["pending", "in_review"].includes(recordStatus(item))
+    : recordStatus(item) === status).length;
+  const emptyTitle = enterpriseQueue ? filter === "pending" ? "No enterprise applications need review." : `No ${friendlyLabel(filter).toLowerCase()} enterprise applications.` : `No ${friendlyLabel(filter === "all" ? section : filter).toLowerCase()} records`;
+  return <><div className="scrollbar-dark mt-8 flex gap-2 overflow-x-auto pb-2"><Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>All <span className="ml-1 opacity-70">{allRecords.length}</span></Button>{statuses.map((status) => <Button key={status} variant={filter === status ? "primary" : "secondary"} onClick={() => setFilter(status)}>{friendlyLabel(status)} <span className="ml-1 opacity-70">{statusCount(status)}</span></Button>)}</div><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record) => <RecordCard key={record.id} record={record} section={section} onSelect={onSelect} onAction={onAction} />) : <Card className="xl:col-span-2"><EmptyState icon={<ClipboardCheck />} title={emptyTitle} body={enterpriseQueue ? "New applications will appear here as soon as they are submitted." : "New records will appear here when they are submitted."} /></Card>}</div></>;
 }
 
 function RecordCard({ record, section, onSelect, onAction }: { record: AdminRecord; section: string; onSelect: (record: AdminRecord) => void; onAction: (record: AdminRecord, action: string) => void }) {
@@ -227,7 +246,19 @@ function RecordCard({ record, section, onSelect, onAction }: { record: AdminReco
 
 function DetailDrawer({ record, section, onClose, onAction }: { record: AdminRecord; section: string; onClose: () => void; onAction?: (record: AdminRecord, action: string) => void }) {
   const technical = technicalEntries(record);
-  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`${recordTitle(record)} details`}><button className="absolute inset-0 bg-black/80" onClick={onClose} aria-label="Close details" /><aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6 text-white sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 text-2xl font-black">{recordTitle(record)}</h2><div className="mt-3"><Status value={recordStatus(record)} /></div></div><button onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close details"><X /></button></div><div className="mt-8 grid gap-3 sm:grid-cols-2">{displayEntries(record, true).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</div>{technical.length ? <details className="mt-6 rounded-[8px] border border-white/10 p-4"><summary className="cursor-pointer font-bold">Technical details</summary><dl className="mt-4 grid gap-3 sm:grid-cols-2">{technical.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl></details> : null}<Card className="mt-8 p-5"><h3 className="font-black">Related operations</h3><div className="mt-4 flex flex-wrap gap-2">{relatedLinks(record, section).map((item) => <LinkButton key={item.href} href={item.href} variant="secondary">{item.label}</LinkButton>)}{!relatedLinks(record, section).length ? <p className="text-sm text-slate-400">Related records will appear as their data becomes available.</p> : null}</div></Card>{onAction ? <div className="mt-8 flex flex-wrap gap-2">{availableQueueActions(section, recordStatus(record)).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div> : null}</aside></div>;
+  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`${recordTitle(record)} details`}><button className="absolute inset-0 bg-black/80" onClick={onClose} aria-label="Close details" /><aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-[var(--gold)]/20 bg-[#0b0b0b] p-6 text-white sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">{friendlyLabel(section)}</p><h2 className="mt-2 text-2xl font-black">{recordTitle(record)}</h2><div className="mt-3"><Status value={recordStatus(record)} /></div></div><button onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close details"><X /></button></div>{section === "enterprise-applications" ? <EnterpriseApplicationDetail record={record} /> : <div className="mt-8 grid gap-3 sm:grid-cols-2">{displayEntries(record, true).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</div>}{technical.length ? <details className="mt-6 rounded-[8px] border border-white/10 p-4"><summary className="cursor-pointer font-bold">Technical details</summary><dl className="mt-4 grid gap-3 sm:grid-cols-2">{technical.map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl></details> : null}<Card className="mt-8 p-5"><h3 className="font-black">Related operations</h3><div className="mt-4 flex flex-wrap gap-2">{relatedLinks(record, section).map((item) => <LinkButton key={item.href} href={item.href} variant="secondary">{item.label}</LinkButton>)}{!relatedLinks(record, section).length ? <p className="text-sm text-slate-400">Related records will appear as their data becomes available.</p> : null}</div></Card>{onAction ? <div className="mt-8 flex flex-wrap gap-2">{availableQueueActions(section, recordStatus(record)).map((item) => <Button key={item.action} variant={item.dangerous ? "secondary" : "primary"} onClick={() => onAction(record, item.action)}>{item.label}</Button>)}</div> : null}</aside></div>;
+}
+
+function EnterpriseApplicationDetail({ record }: { record: AdminRecord }) {
+  const identity = [["Applicant name", record.applicantName], ["Email", record.applicantEmail], ["Company / organization", record.companyName], ["Role / title", record.roleTitle], ["Current account type", record.currentAccountType], ["Current plan", record.currentPlan]] as const;
+  const answers = [["Use case", record.useCase], ["Expected challenge volume", record.expectedChallengeVolume], ["Team size", record.teamSize], ["Budget / plan interest", record.budgetOrPlanInterest], ["Contact details", record.contactDetails], ["Relationship", record.relationship], ["Website", record.website]] as const;
+  const timeline = [["Submitted", record.submittedAt], ["Last updated", record.updatedAt], ["Last resubmitted", record.lastSubmittedAt], ["Reviewed", record.reviewedAt], ["Decision reason", record.decisionReason], ["Requested information", record.requestedInfoMessage]] as const;
+  return <div className="mt-8 space-y-6"><DetailSection title="Applicant and account" entries={identity} /><DetailSection title="Application answers" entries={answers} /><DetailSection title="Timeline and review" entries={timeline} />{record.internalNote ? <Card className="p-5"><h3 className="font-black">Internal notes</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-300">{String(record.internalNote)}</p></Card> : null}</div>;
+}
+
+function DetailSection({ title, entries }: { title: string; entries: ReadonlyArray<readonly [string, unknown]> }) {
+  const available = entries.filter(([, value]) => value !== null && value !== undefined && value !== "");
+  return <Card className="p-5"><h3 className="font-black">{title}</h3><dl className="mt-4 grid gap-3 sm:grid-cols-2">{available.map(([label, value]) => <DataPoint key={label} label={label} value={value} />)}</dl></Card>;
 }
 
 function ActionDialog({ action, reason, note, setReason, setNote, submitting, onCancel, onConfirm }: { action: string; reason: string; note: string; setReason: (value: string) => void; setNote: (value: string) => void; submitting: boolean; onCancel: () => void; onConfirm: () => void }) {
@@ -247,6 +278,7 @@ function RecordsWorkspace({ section, data, onSelect }: { section: string; data: 
   else if (section === "prediction-settlements") records = data.predictionSettlements;
   else if (section === "ad-rewards") records = data.adRewards;
   else if (section === "enterprise-leads") records = data.enterpriseLeads;
+  else if (section === "contact-requests") records = data.contactRequests;
   else if (section === "media-moderation") records = data.mediaModeration;
   else if (section === "risk-safety") records = data.riskSafety;
   else {
@@ -258,7 +290,7 @@ function RecordsWorkspace({ section, data, onSelect }: { section: string; data: 
     "sponsor-brands": "No Sponsor brands are available.", events: "No event records are available.", tournaments: "No tournament plans are available.",
     dorocoin: "No DoroCoin wallet or transaction records are available.", "cash-ledger": "No cash ledger entries are available.",
     notifications: "No admin notifications are waiting.", support: "No support tickets are open.", announcements: "No announcements have been drafted.",
-    predictions: "No Prediction Arena records are waiting.", "prediction-settlements": "No prediction settlement or refund reviews are waiting.", rewards: "No reward fulfillment records are waiting.", "prize-wheel": "No prize wheel prizes have been configured.", kyc: "No KYC metadata records are available.", "ad-rewards": "No ad reward logs are available.", "enterprise-leads": "No enterprise leads have been submitted.", "media-moderation": "No media uploads are queued for moderation.", "risk-safety": "No risk or safety records are queued."
+    predictions: "No Prediction Arena records are waiting.", "prediction-settlements": "No prediction settlement or refund reviews are waiting.", rewards: "No reward fulfillment records are waiting.", "prize-wheel": "No prize wheel prizes have been configured.", kyc: "No KYC metadata records are available.", "ad-rewards": "No ad reward logs are available.", "enterprise-leads": "No enterprise sales inquiries have been submitted.", "contact-requests": "No contact requests are waiting.", "media-moderation": "No media uploads are queued for moderation.", "risk-safety": "No risk or safety records are queued."
   };
   return <><Card className="mt-8 border-yellow-500/20 bg-yellow-500/[0.03] p-5 text-sm leading-6 text-slate-300"><strong className="text-white">Current availability:</strong> this page shows real stored records only. Actions that depend on an unconfigured provider stay unavailable and explain what is needed.</Card><div className="mt-6 grid gap-5 xl:grid-cols-2">{records.length ? records.map((record, index) => <button key={`${section}_${record.id}_${String(record.type ?? index)}`} onClick={() => onSelect(record)} className="text-left"><Card className="h-full p-5 transition hover:border-[var(--gold)]/40"><div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-black">{recordTitle(record)}</h2><Status value={recordStatus(record)} /></div><dl className="mt-4 grid gap-3 sm:grid-cols-2">{displayEntries(record).slice(0, 6).map(([key, value]) => <DataPoint key={key} label={key} value={value} />)}</dl><p className="mt-5 text-sm font-black text-[var(--gold)]">View details</p></Card></button>) : <Card className="xl:col-span-2"><EmptyState icon={sectionIcon(section)} title={emptyCopy[section] ?? "No records yet"} body="Real records will appear here when they are created." /></Card>}</div></>;
 }
@@ -302,7 +334,7 @@ function recordStatus(record: AdminRecord) {
   return String(record.status ?? record.sponsorStatus ?? record.hostStatus ?? record.verificationStatus ?? "recorded");
 }
 function recordTitle(record: AdminRecord) {
-  return String(record.brandName ?? record.workspaceName ?? record.organizationName ?? record.title ?? record.subject ?? record.userName ?? record.displayName ?? record.challengeTitle ?? record.payoutMethodLabel ?? record.type ?? record.id);
+  return String(record.applicantName ?? record.companyName ?? record.brandName ?? record.workspaceName ?? record.organizationName ?? record.title ?? record.subject ?? record.userName ?? record.displayName ?? record.challengeTitle ?? record.payoutMethodLabel ?? record.type ?? record.id);
 }
 function displayEntries(record: AdminRecord, all = false) {
   const hidden = new Set(["id", "brandName", "workspaceName", "organizationName", "title", "subject", "userName", "displayName", "challengeTitle", "payoutMethodLabel", "status", "sponsorStatus", "hostStatus", "verificationStatus", "mediaUrl", "adminNote", "internalNote"]);
@@ -339,11 +371,11 @@ function relatedLinks(record: AdminRecord, section: string) {
   const links: Array<{ href: string; label: string }> = [];
   if (record.challengeId) links.push({ href: `/challenges/${record.challengeId}`, label: "View Challenge" });
   if (section === "challenges") links.push({ href: `/challenges/${record.id}`, label: "View Challenge" });
-  if (record.userId) links.push({ href: `/admin/search?q=${encodeURIComponent(String(record.userId))}`, label: "Find User" });
+  if (record.userId) links.push({ href: `/admin/people/users/${encodeURIComponent(String(record.userId))}`, label: "View User" });
   if (section === "withdrawals") links.push({ href: "/admin/cash-ledger", label: "View Cash Ledger" });
   return links;
 }
 function sectionIcon(section: string) {
-  const icons: Record<string, React.ReactNode> = { disputes: <Flag />, creators: <UserCog />, "host-workspaces": <UsersRound />, "sponsor-brands": <ShieldCheck />, events: <Radio />, tournaments: <Trophy />, dorocoin: <Coins />, "cash-ledger": <WalletCards />, notifications: <Bell />, support: <LifeBuoy />, announcements: <Megaphone />, predictions: <Coins />, "prediction-settlements": <Landmark />, rewards: <Trophy />, "prize-wheel": <Trophy />, kyc: <ShieldCheck />, "ad-rewards": <Bell />, "enterprise-leads": <FolderCog />, "media-moderation": <ClipboardCheck />, "risk-safety": <ShieldAlert /> };
+  const icons: Record<string, React.ReactNode> = { disputes: <Flag />, creators: <UserCog />, "host-workspaces": <UsersRound />, "sponsor-brands": <ShieldCheck />, events: <Radio />, tournaments: <Trophy />, dorocoin: <Coins />, "cash-ledger": <WalletCards />, notifications: <Bell />, support: <LifeBuoy />, announcements: <Megaphone />, predictions: <Coins />, "prediction-settlements": <Landmark />, rewards: <Trophy />, "prize-wheel": <Trophy />, kyc: <ShieldCheck />, "ad-rewards": <Bell />, "enterprise-applications": <BriefcaseBusiness />, "enterprise-leads": <FolderCog />, "contact-requests": <LifeBuoy />, "media-moderation": <ClipboardCheck />, "risk-safety": <ShieldAlert /> };
   return icons[section] ?? <Activity />;
 }

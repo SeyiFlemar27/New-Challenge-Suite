@@ -35,18 +35,10 @@ export function VerificationGuard({ children }: { children: React.ReactNode }) {
   const publicPage = isPublicRoute(pathname);
 
   if (publicPage || !firebaseConfigured) return <>{children}</>;
-  if (loading) return <LoadingGate />;
+  if (loading) return null;
   if (!user) return <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref={`/auth/login?next=${encodeURIComponent(pathname)}`} actionLabel="Sign In" />;
   if (!verified) return <Gate title="Check your email" body="Enter the 6-digit code we sent to continue into Challenge Suite." actionHref="/auth/verify-email" actionLabel="Enter Code" />;
   return <>{children}</>;
-}
-
-function LoadingGate() {
-  return (
-    <main className="theme-workspace flex min-h-screen items-center justify-center bg-[var(--background)] px-6 text-[var(--foreground)]">
-      <Card className="w-full max-w-md p-8" aria-label="Loading"><div className="mx-auto h-16 w-16 animate-pulse rounded-full bg-[var(--gold)]/20" /><div className="mx-auto mt-6 h-5 w-48 animate-pulse rounded bg-white/10" /><div className="mx-auto mt-3 h-4 w-64 max-w-full animate-pulse rounded bg-white/5" /></Card>
-    </main>
-  );
 }
 
 function Gate({ title, body, actionHref, actionLabel }: { title: string; body: string; actionHref: string; actionLabel: string }) {

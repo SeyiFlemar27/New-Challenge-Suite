@@ -66,7 +66,9 @@ const groups: NavGroup[] = [
   { label: "Communications", items: [
     { href: "/admin/announcements", label: "Announcements", icon: Megaphone, permission: "content.edit" },
     { href: "/admin/notifications", label: "Delivery logs", icon: Bell, permission: "content.preview" },
-    { href: "/admin/enterprise-leads", label: "Contact requests", icon: BriefcaseBusiness, permission: "tickets.view" }
+    { href: "/admin/enterprise-applications", label: "Enterprise Applications", icon: BriefcaseBusiness, permission: "challenges.review" },
+    { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: BriefcaseBusiness, permission: "tickets.view" },
+    { href: "/admin/contact-requests", label: "Contact Requests", icon: LifeBuoy, permission: "tickets.view" }
   ] },
   { label: "Analytics & Content", items: [
     { href: "/admin/reports", label: "Analytics overview", icon: BarChart3, permission: "admin.dashboard.view" },

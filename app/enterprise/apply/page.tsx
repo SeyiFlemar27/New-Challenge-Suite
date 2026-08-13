@@ -23,7 +23,7 @@ export default function EnterpriseApplyPage() {
     if (!requestedId) return;
     void apiRequest<{ application: Record<string, unknown> | null }>("/api/enterprise-inquiries").then((result) => {
       const application = result.data?.application;
-      if (!result.ok || !application || String(application.id) !== requestedId || !["needs_info", "requested_changes"].includes(String(application.status ?? ""))) return;
+      if (!result.ok || !application || String(application.id) !== requestedId || !["pending", "in_review", "needs_info", "requested_changes"].includes(String(application.status ?? ""))) return;
       setEditId(requestedId);
       setForm({
         fullName: String(application.fullName ?? ""), workEmail: String(application.workEmail ?? ""), organization: String(application.company ?? ""), role: String(application.role ?? ""), reason: String(application.reason ?? application.useCase ?? ""), expectedUse: String(application.expectedUsage ?? ""), teamSize: String(application.teamSize ?? ""), relationship: String(application.relationship ?? ""), message: String(application.message ?? "")

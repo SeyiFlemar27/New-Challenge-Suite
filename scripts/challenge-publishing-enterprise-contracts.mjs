@@ -17,6 +17,7 @@ const sources = {
   detail: read("app/challenges/[id]/page.tsx"),
   explore: read("app/explore/page.tsx"),
   enterpriseApi: read("app/api/enterprise-inquiries/route.ts"),
+  enterpriseApplications: read("lib/server/enterprise-applications.ts"),
   enterpriseStatus: read("app/enterprise/status/page.tsx"),
   enterprisePage: read("app/enterprise/page.tsx"),
   enterpriseApply: read("app/enterprise/apply/page.tsx"),
@@ -67,7 +68,7 @@ assert.match(sources.upload, /Upload complete\./);
 
 assert.match(sources.enterpriseApi, /requireRequestUser/);
 assert.match(sources.enterpriseApi, /userId: auth\?\.user\.uid/);
-assert.match(sources.enterpriseApi, /requested_changes/);
+assert.match(sources.enterpriseApplications, /requested_changes/);
 assert.match(sources.enterpriseStatus, /Pending review/);
 assert.match(sources.enterpriseStatus, /Contact Support/);
 assert.match(sources.enterpriseStatus, /href="\/contact"/);
@@ -75,7 +76,7 @@ assert.doesNotMatch(sources.enterprisePage, /const approved = false/);
 assert.match(sources.enterprisePage, /enterpriseAccessStatus/);
 assert.match(sources.topbar, /canSwitchEnterpriseRole/);
 assert.match(sources.topbar, /\/enterprise\/dashboard/);
-assert.match(sources.adminUi, /"enterprise-leads": \[\{ action: "approve"/);
+assert.match(sources.adminUi, /"enterprise-applications": \[\{ action: "approve"/);
 assert.match(sources.adminApi, /enterprise: new Set\(\["approve", "reject", "request_info", "add_note"\]\)/);
 assert.match(sources.adminApi, /enterpriseAccessStatus: status/);
 assert.match(sources.adminApi, /enterprise_application_approved/);
@@ -87,7 +88,8 @@ assert.doesNotMatch(sources.create, /createNotification\([^\n]+Challenge draft s
 assert.match(sources.adminApi, /challenge_approved/);
 assert.match(sources.adminApi, /challenge_changes_requested/);
 assert.doesNotMatch(sources.guard, /Restoring your session|Checking session|Rehydrating auth/);
-assert.match(sources.guard, /animate-pulse/);
+assert.match(sources.guard, /if \(loading\) return null/);
+assert.doesNotMatch(sources.guard, /LoadingGate|aria-label="Loading"/);
 
 for (const source of [sources.builder, sources.preview, sources.upload, sources.enterprisePage, sources.enterpriseApply, sources.enterpriseStatus]) {
   assert.doesNotMatch(source, /FirebaseError|StripeError|raw JSON|stack trace/);

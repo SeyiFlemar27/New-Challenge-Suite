@@ -6,6 +6,7 @@ import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/
 import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { createNotification } from "@/lib/server/notifications";
+import { ENTERPRISE_APPLICATION_COLLECTION, ENTERPRISE_APPLICATION_TYPE } from "@/lib/server/enterprise-applications";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
       db.collection("kycMetadata").limit(200).get(),
       db.collection("predictionSettlementReviews").limit(200).get(),
       db.collection("adVoteRewardLogs").limit(200).get(),
-      db.collection("enterpriseInquiries").limit(200).get(),
+      db.collection(ENTERPRISE_APPLICATION_COLLECTION).limit(200).get(),
       db.collection("mediaUploads").limit(200).get()
     ]);
     const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap, doroWalletSnap, doroTransactionSnap, cashWalletSnap, cashLedgerSnap, liveEventSnap, tournamentSnap, notificationSnap, supportSnap, announcementSnap, predictionSnap, rewardSpinSnap, prizeWheelSnap, kycSnap, predictionSettlementSnap, adRewardSnap, enterpriseLeadSnap, mediaUploadSnap] = snapshots;
@@ -201,7 +202,44 @@ export async function GET(request: Request) {
     const kyc = records(kycSnap).map((item) => ({ id: item.id, userId: item.userId ?? item.id, planId: item.planId ?? item.subscriptionPlanId ?? null, kycRequired: item.kycRequired === true, kycStatus: item.kycStatus ?? "not_started", kycProvider: item.kycProvider ?? "not_configured", sumsubApplicantId: item.sumsubApplicantId ?? null, sumsubProviderStatus: item.sumsubProviderStatus ?? null, sumsubReviewAnswer: item.sumsubReviewAnswer ?? null, sumsubReviewRejectType: item.sumsubReviewRejectType ?? null, submittedAt: item.kycSubmittedAt ?? null, verifiedAt: item.kycVerifiedAt ?? null, rejectedAt: item.kycRejectedAt ?? null, failureReason: item.kycFailureReason ?? null, kycSessionId: item.kycSessionId ?? null, rawIdentityStored: false, status: item.kycStatus ?? "not_started", updatedAt: item.updatedAt ?? item.kycLastCheckedAt ?? null }));
     const predictionSettlements = records(predictionSettlementSnap).map((item) => ({ id: item.id, predictionId: item.predictionId ?? item.id, challengeId: item.challengeId ?? null, userId: item.userId ?? null, status: item.settlementStatus ?? item.refundStatus ?? item.status ?? "admin_review_required", refundStatus: item.refundStatus ?? "not_applicable", automaticPayoutsEnabled: false, automaticRefundsEnabled: false, createdAt: item.createdAt ?? null }));
     const adRewards = records(adRewardSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, challengeId: item.challengeId ?? null, adProvider: item.adProvider ?? "disabled", status: item.adRewardStatus ?? "not_available", voteGranted: item.voteGranted === true, providerVerificationRequired: true, clientGrantBlocked: item.clientGrantBlocked !== false, createdAt: item.createdAt ?? null }));
-    const enterpriseLeads = records(enterpriseLeadSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, applicationType: item.applicationType ?? "enterprise_inquiry", company: item.company ?? "Enterprise lead", fullName: item.fullName ?? "", workEmail: item.workEmail ?? "", role: item.role ?? "", useCase: item.useCase ?? item.reason ?? "", teamSize: item.teamSize ?? "", relationship: item.relationship ?? "", status: item.status ?? "pending", approvalStatus: item.approvalStatus ?? item.status ?? "pending", createdAt: item.createdAt ?? null, updatedAt: item.updatedAt ?? null }));
+    const enterpriseRecords = records(enterpriseLeadSnap);
+    const enterpriseApplications = enterpriseRecords.filter((item) => item.applicationType === ENTERPRISE_APPLICATION_TYPE).map((item) => {
+      const account = userMap.get(String(item.userId ?? "")) ?? ({} as RecordData);
+      const internalNote = notes.get(`enterprise_${item.id}`);
+      return {
+        id: item.id,
+        userId: item.userId ?? null,
+        userRef: item.userRef ?? item.userId ?? null,
+        applicationType: ENTERPRISE_APPLICATION_TYPE,
+        applicantName: item.applicantName ?? item.fullName ?? account.displayName ?? account.name ?? "Applicant",
+        applicantEmail: item.applicantEmail ?? item.workEmail ?? account.email ?? "",
+        companyName: item.companyName ?? item.company ?? "Organization",
+        roleTitle: item.roleTitle ?? item.role ?? "",
+        currentAccountType: account.accountType ?? account.role ?? "user",
+        currentPlan: account.planId ?? account.subscriptionPlan ?? "free",
+        enterpriseAccessStatus: account.enterpriseAccessStatus ?? account.enterpriseApprovalStatus ?? "not_submitted",
+        useCase: item.useCase ?? item.reason ?? "",
+        expectedChallengeVolume: item.expectedChallengeVolume ?? item.expectedUsage ?? "",
+        teamSize: item.teamSize ?? "",
+        budgetOrPlanInterest: item.budgetOrPlanInterest ?? item.budgetRange ?? "",
+        contactDetails: item.contactDetails ?? item.message ?? "",
+        website: item.website ?? "",
+        relationship: item.relationship ?? "",
+        status: item.status ?? item.approvalStatus ?? "pending",
+        submittedAt: item.submittedAt ?? item.createdAt ?? null,
+        lastSubmittedAt: item.lastSubmittedAt ?? item.resubmittedAt ?? item.updatedAt ?? null,
+        createdAt: item.createdAt ?? null,
+        updatedAt: item.updatedAt ?? null,
+        reviewedAt: item.reviewedAt ?? null,
+        reviewedBy: item.reviewedBy ?? null,
+        decisionReason: item.decisionReason ?? null,
+        requestedInfoMessage: item.requestedInfoMessage ?? null,
+        internalNote: internalNote?.note ?? null,
+        actionHistoryCount: auditLogs.filter((event) => String(event.targetId ?? "") === item.id).length
+      };
+    });
+    const enterpriseLeads = enterpriseRecords.filter((item) => item.applicationType !== ENTERPRISE_APPLICATION_TYPE).map((item) => ({ id: item.id, userId: item.userId ?? null, applicationType: item.applicationType ?? "enterprise_inquiry", company: item.company ?? "Enterprise lead", fullName: item.fullName ?? "", workEmail: item.workEmail ?? "", role: item.role ?? "", useCase: item.useCase ?? item.reason ?? "", teamSize: item.teamSize ?? "", relationship: item.relationship ?? "", status: item.status ?? "pending", createdAt: item.createdAt ?? null, updatedAt: item.updatedAt ?? null }));
+    const contactRequests = support;
     const mediaModeration = records(mediaUploadSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, path: item.path ?? item.storagePath ?? "", contentType: item.contentType ?? "unknown", status: item.status ?? item.moderationStatus ?? "recorded", publicReadApproved: item.publicReadApproved === true, privateMedia: item.privateMedia === true, createdAt: item.createdAt ?? null }));
     const riskSafety = [...submissions.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...participants.filter((item) => Array.isArray(item.riskFlags) && item.riskFlags.length), ...predictions.filter((item) => ["disputed", "suspended"].includes(String(item.status)))].map((item) => ({ ...item, status: item.status ?? "review_required" }));
     const pending = (list: Array<{ status?: unknown }>, statuses: string[]) => list.filter((item) => statuses.includes(String(item.status))).length;
@@ -210,6 +248,7 @@ export async function GET(request: Request) {
         pendingSponsorReviews: pending(sponsors, ["pending_review", "submitted"]),
         pendingHostVerifications: hosts.filter((item) => ["pending_review", "submitted"].includes(String(item.hostVerificationStatus))).length,
         pendingChallengeReviews: pending(challenges, ["pending_review", "flagged"]),
+        pendingEnterpriseApplications: pending(enterpriseApplications, ["pending", "in_review"]),
         pendingSubmissions: pending(submissions, ["pending_review"]),
         flaggedSubmissions: pending(submissions, ["flagged"]),
         participantApprovals: pending(participants, ["pending"]),
@@ -260,7 +299,9 @@ export async function GET(request: Request) {
       prizeWheel,
       kyc: hasAdminPermission(user.adminPermissions, "users.requireVerification") ? kyc : [],
       adRewards,
+      enterpriseApplications,
       enterpriseLeads,
+      contactRequests,
       mediaModeration,
       riskSafety,
       auditLogs: hasAdminPermission(user.adminPermissions, "auditLogs.viewRaw") ? auditLogs : [],
@@ -372,6 +413,10 @@ export async function PATCH(request: Request) {
 
   try {
     if (action === "add_note") {
+      if (type === "enterprise") {
+        const applicationSnap = await db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(id).get();
+        if (!applicationSnap.exists || applicationSnap.data()?.applicationType !== ENTERPRISE_APPLICATION_TYPE) return fail("Enterprise application not found.", 404, undefined, "NOT_FOUND");
+      }
       await db.collection("adminNotes").doc(`${type}_${id}`).set({
         id: `${type}_${id}`,
         targetType: type,
@@ -384,8 +429,8 @@ export async function PATCH(request: Request) {
       await writeAuditLog({
         actorId: user.uid,
         actorType: "admin",
-        action: `${type}.note_added`,
-        targetType: type,
+        action: type === "enterprise" ? "enterprise_internal_note_added" : `${type}.note_added`,
+        targetType: type === "enterprise" ? "enterprise_application" : type,
         targetId: id,
         reason: "Internal admin note added.",
         metadata: { note }
@@ -402,12 +447,12 @@ export async function PATCH(request: Request) {
       const update = { hostVerificationStatus: status, hostVerifiedAt: action === "verify" ? now : null, updatedAt: now };
       await Promise.all([userRef.set(update, { merge: true }), profileRef.set(update, { merge: true })]);
     } else if (type === "enterprise") {
-      const ref = db.collection("enterpriseInquiries").doc(id);
+      const ref = db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(id);
       const snap = await ref.get();
       if (!snap.exists || snap.data()?.applicationType !== "enterprise_access_application") return fail("Enterprise application not found.", 404, undefined, "NOT_FOUND");
       const application = snap.data() ?? {};
       previousStatus = String(application.status ?? "pending");
-      if (!["pending", "needs_info", "requested_changes"].includes(previousStatus)) return fail("This application has already been reviewed.", 409, undefined, "INVALID_STATE");
+      if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) return fail("This application has already been reviewed.", 409, undefined, "INVALID_STATE");
       const applicantId = String(application.userId ?? "");
       if (!applicantId) return fail("This application is not linked to an account.", 422, undefined, "APPLICATION_ACCOUNT_REQUIRED");
       const accessUpdate = {
@@ -418,13 +463,16 @@ export async function PATCH(request: Request) {
         enterpriseApprovedBy: action === "approve" ? user.uid : null,
         updatedAt: now
       };
-      await Promise.all([
-        ref.set({ status, approvalStatus: status, enterpriseAccessGranted: action === "approve", reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, updatedAt: now }, { merge: true }),
-        db.collection("users").doc(applicantId).set(accessUpdate, { merge: true }),
-        db.collection("profiles").doc(applicantId).set(accessUpdate, { merge: true })
-      ]);
-      const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Enterprise is now available in Switch Role." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "Enterprise application needs information", body: "Update your application so review can continue." } : { type: "enterprise_application_rejected", title: "Enterprise application reviewed", body: "Your Enterprise application was not approved." };
+      const batch = db.batch();
+      batch.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, updatedAt: now }, { merge: true });
+      batch.set(db.collection("users").doc(applicantId), accessUpdate, { merge: true });
+      batch.set(db.collection("profiles").doc(applicantId), accessUpdate, { merge: true });
+      await batch.commit();
+      const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Your Enterprise workspace is ready." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "More information needed", body: "Please update your Enterprise application." } : { type: "enterprise_application_rejected", title: "Enterprise application not approved", body: "Contact support if you have questions." };
       await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
+      if (action === "approve") {
+        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus }, after: { enterpriseAccessStatus: "approved", applicationId: id }, reason: reason || "Enterprise application approved." }, db);
+      }
     } else if (type === "withdrawal") {
       const ref = db.collection("withdrawalRequests").doc(id);
       await db.runTransaction(async (transaction) => {
@@ -581,8 +629,8 @@ export async function PATCH(request: Request) {
     await writeAuditLog({
       actorId: user.uid,
       actorType: "admin",
-      action: `${type}.${action}`,
-      targetType: type,
+      action: type === "enterprise" ? action === "approve" ? "enterprise_application_approved" : action === "reject" ? "enterprise_application_rejected" : "enterprise_application_info_requested" : `${type}.${action}`,
+      targetType: type === "enterprise" ? "enterprise_application" : type,
       targetId: id,
       before: { status: previousStatus },
       after: { status, moneyMovementEnabled: false },

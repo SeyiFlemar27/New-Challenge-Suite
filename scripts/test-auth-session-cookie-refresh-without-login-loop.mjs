@@ -6,8 +6,8 @@ const guard = readFileSync("components/verification-guard.tsx", "utf8");
 const serverAuth = readFileSync("lib/server/auth.ts", "utf8");
 const sessionRoute = readFileSync("app/api/auth/session/route.ts", "utf8");
 
-assert(guard.includes("if (loading) return <LoadingGate />"));
-assert(guard.includes("Restoring your session..."));
+assert(guard.includes("if (loading) return null"), "session restoration should remain silent while auth state is verified.");
+assert(!guard.includes("LoadingGate") && !guard.includes("Restoring your session"), "session restoration must not render a banner or empty loading card.");
 assert(!guard.includes("router.replace("), "the auth guard must not create a redirect loop while Firebase restores.");
 assert(serverAuth.includes("verifySessionCookie") && serverAuth.includes("verifyIdToken"), "server auth must support verified cookie and bearer paths.");
 assert(serverAuth.includes("profile?.role") && serverAuth.includes("profile?.isAdmin"), "session restoration must preserve role checks from server data.");
