@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, LockKeyhole, RefreshCw, Save } from "lucide-react";
+import { LockKeyhole, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ApiErrorPanel } from "@/components/api-error-panel";
@@ -39,7 +39,7 @@ type FormState = {
   sponsorshipGoal: string; preferredSponsorCategory: string; sponsorNote: string; sponsorPlacementPreferences: string[];
 };
 
-const publicSteps = ["Overview", "Rules & Eligibility", "Entry & Submission", "Voting & Timeline", "Monetization & Prize Pool", "Media & Branding", "Review & Publish"];
+const publicSteps = ["Basics", "Participation", "Entry & Submission", "Competition", "Rewards", "Schedule", "Review"];
 const privateSteps = ["Basics", "Access Code", "Entry & Eligibility", "Submissions", "Timeline", "Voting / Judging", "Prize & Monetization", "Media & Branding", "Review & Submit"];
 const publicStepSubtitles = [
   "Set the basic details for your challenge.",
@@ -57,7 +57,7 @@ const publicStepGuides = [
   ["Keep Timing Clear", "Give participants enough time.", "Check every deadline in the selected timezone.", "Leave time for winner review."],
   ["Plan Rewards Clearly", "Paid entry and sponsor-ready requests can be reviewed after submission.", "Use valid amounts and winner settings.", "Funding release remains review-dependent."],
   ["Make It Look Ready", "Use a clear primary image.", "Keep optional media focused.", "Wait for uploads to finish before submitting."],
-  ["Submit With Confidence", "Review each section before submitting.", "Preview saves your latest changes without publishing.", "Your challenge will be reviewed before it goes public."]
+  ["Submit With Confidence", "Review each section before submitting.", "Check every readiness issue before submitting.", "Your challenge will be reviewed before it goes public."]
 ];
 const categories = ["Fitness", "Creative", "Photography", "Food", "Gaming", "Education", "Business", "Other"];
 
@@ -375,7 +375,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
     entryFeeValid: !form.paidEntryEnabled || entryFeeCents >= 500
   });
   const publishBlocked = Boolean(publishBlocker);
-  const publishLabel = mode === "private" ? "Publish Private Challenge" : "Publish Challenge";
+  const publishLabel = "Submit for Review";
 
   function validateStep() {
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
@@ -402,16 +402,6 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
     setAutosaveState("saved");
     try { window.localStorage.removeItem(recoveryKey); } catch {}
     setNotice("Draft saved.");
-  }
-
-  async function openPreview() {
-    if (!draftId) return setError("Save this draft before opening preview.");
-    setSaving(true);
-    const response = await updateChallengeDraft(draftId, { ...payload(false), creationStep: step });
-    setSaving(false);
-    if (!response.ok) return setError("Preview could not be opened. Please try again.");
-    try { window.localStorage.removeItem(recoveryKey); } catch {}
-    router.push(`/challenges/create/${draftId}/preview`);
   }
 
   async function publish() {
@@ -444,7 +434,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
   return (
     <AppShell>
       <div className="mx-auto max-w-[1440px]" data-mobile-creator-builder>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><PageTitle title={steps[step]} subtitle={mode === "public" ? publicStepSubtitles[step] : `Complete the ${steps[step].toLowerCase()} details for this private challenge.`} /><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="text-xs font-bold text-slate-400">{autosaveState === "saving" ? "Saving..." : autosaveState === "saved" ? "Saved" : autosaveState === "offline" ? "Offline - changes will sync" : autosaveState === "failed" ? "Save failed - retry" : draftId ? "Autosave on" : ""}</span><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button><Button variant="ghost" onClick={openPreview} disabled={saving}><Eye size={17} /> Preview</Button></div></div>
+        <PageTitle title={steps[step]} subtitle={mode === "public" ? publicStepSubtitles[step] : `Complete the ${steps[step].toLowerCase()} details for this private challenge.`} />
         <div className="mt-7 grid gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-24 lg:h-fit"><Stepper steps={steps} current={step} onSelect={setStep} /></aside>
           <div className="min-w-0">
@@ -453,7 +443,7 @@ export function ChallengeBuilder({ mode, draftId }: { mode: Mode; draftId?: stri
           </div>
         </div>
         {error ? <ApiErrorPanel title="Challenge could not be submitted" message={error} onRetry={() => setError("")} /> : null}{notice ? <p className="mt-5 rounded-[8px] bg-emerald-950/40 p-4 text-emerald-200">{notice}</p> : null}{step === steps.length - 1 ? <Checklist readiness={validation} blocker={publishBlocker} mediaUploadDisabled={mediaUploadDisabled && imageLessPublishingAllowed} className="mt-5" /> : <Card className="mt-5 flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm font-black text-white">Step {step + 1} of {steps.length}</span><span className="text-sm text-slate-400">{validation.missingCount} requirement{validation.missingCount === 1 ? "" : "s"} remaining</span></Card>}
-        <div className="mt-8 grid gap-3 border-t border-white/10 pt-6 sm:flex sm:items-center sm:justify-between"><Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button><div className="grid gap-3 sm:flex"><Button variant="secondary" onClick={saveDraft} disabled={saving}><Save size={17} /> Save Draft</Button>{step < steps.length - 1 ? <Button onClick={next}>Continue</Button> : <Button onClick={publish} disabled={saving || publishBlocked}>{saving ? "Publishing..." : publishLabel}</Button>}</div></div>
+        <div className="mt-8 flex items-center justify-between gap-3 border-t border-white/10 pt-6"><Button variant="ghost" disabled={step === 0} onClick={() => setStep((value) => Math.max(value - 1, 0))}>Back</Button>{step < steps.length - 1 ? <Button onClick={next}>Continue</Button> : <Button onClick={publish} disabled={saving || publishBlocked}>{saving ? "Submitting..." : publishLabel}</Button>}</div>
       </div>
     </AppShell>
   );

@@ -1,6 +1,6 @@
-﻿import { ChallengeBuilder } from "@/components/challenge-builder";
+import { NormalChallengeBuilder } from "@/components/normal-challenge-builder";
 
 export default async function EditChallengeDraftPage({ params }: { params: Promise<{ draftId: string }> }) {
   const { draftId } = await params;
-  return <ChallengeBuilder mode="public" draftId={draftId} />;
+  return <NormalChallengeBuilder draftId={draftId} />;
 }

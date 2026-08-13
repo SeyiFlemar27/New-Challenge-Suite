@@ -7,6 +7,7 @@ const read = (file) => readFileSync(join(root, file), "utf8");
 const exists = (file) => existsSync(join(root, file));
 
 const createPage = read("app/challenges/create/page.tsx");
+const normalBuilder = read("components/normal-challenge-builder.tsx");
 const draftApi = read("app/api/challenges/drafts/route.ts");
 const loginPage = read("app/auth/login/page.tsx");
 const verifyEmailPage = read("app/auth/verify-email/page.tsx");
@@ -18,14 +19,12 @@ assert(exists("app/challenges/create/page.tsx"), "Create Challenge route must ex
 assert(exists("app/api/challenges/drafts/route.ts"), "Server-backed draft API must exist.");
 assert(exists("app/auth/login/page.tsx"), "Login page must exist.");
 
-assert(createPage.includes("/auth/login?next="), "Create Challenge must redirect unauthenticated users to login with next.");
-assert(createPage.includes("encodeURIComponent(createChallengePath)") && createPage.includes("/challenges/create"), "Create Challenge next path must be encoded and point back to /challenges/create.");
-assert(createPage.includes("authState.loading") && createPage.includes("useAuth()"), "Create Challenge must wait for auth state before deciding redirect.");
-assert(createPage.includes("authState.user ?? firebaseAuth?.currentUser"), "Create Challenge must tolerate the post-login Firebase auth/context handoff.");
-assert(createPage.indexOf("if (!activeUser)") < createPage.indexOf("createChallengeDraft()"), "Create Challenge must not create drafts before an authenticated user exists.");
-assert(createPage.includes("creatingDraftRef") && createPage.includes("if (creatingDraftRef.current) return"), "Create Challenge must guard against duplicate draft creation loops.");
-assert(createPage.includes("UNAUTHENTICATED") && createPage.includes("router.replace(loginContinuationPath)"), "Create Challenge must return to login if the server rejects auth.");
-assert(createPage.includes("router.replace(`/challenges/create/${id}`)"), "Authenticated Create Challenge must open the persisted draft editor.");
+assert(createPage.includes("NormalChallengeBuilder"), "Create Challenge must use the authenticated Normal Challenge builder.");
+assert(normalBuilder.includes('href="/auth/login?next=%2Fchallenges%2Fcreate"'), "Create Challenge must offer a safe same-origin login continuation.");
+assert(normalBuilder.includes("useCurrentUser()") && normalBuilder.includes("if(loading||loadingDraft)"), "Create Challenge must wait for auth state before showing protected builder controls.");
+assert(normalBuilder.includes("if(!user)return") && !/useEffect\([^)]*createChallengeDraft/s.test(normalBuilder), "Create Challenge must protect draft creation behind authenticated UI and avoid mount-time draft writes.");
+assert(normalBuilder.includes("if(!id){const r=await createChallengeDraft(payload)"), "The first draft must be created only after the valid Basics Continue action.");
+assert(normalBuilder.includes("router.replace(`/challenges/create/${newId}`)"), "Authenticated Create Challenge must open the persisted draft editor.");
 
 assert(draftApi.includes("requireRequestUser(request)"), "Draft API must require server-side authenticated user.");
 assert(draftApi.includes("if (response) return response"), "Draft API must reject unauthenticated users before creating a draft.");
@@ -47,7 +46,7 @@ assert(apiClient.includes("Authorization") && apiClient.includes("auth.currentUs
 assert(authService.includes("signInWithEmailAndPassword") && authService.includes("getIdToken(true)"), "Login/bootstrap flow must establish a Firebase user and refreshed token.");
 assert(authProvider.includes("listenToAuth") && authProvider.includes("setUser(nextUser"), "Auth provider must still use Firebase auth state, not a second auth system.");
 
-assert(!createPage.includes("createChallengeDraft().then") || createPage.indexOf("if (!activeUser)") < createPage.indexOf("createChallengeDraft().then"), "No draft should be created for unauthenticated users.");
+assert(!createPage.includes("createChallengeDraft"), "The route shell must not create a draft during render or mount.");
 assert(!loginPage.includes("http://") && !loginPage.includes("https://"), "Login continuation must not hard-code external redirects.");
 
 console.log("Create Challenge auth redirect checks passed.");

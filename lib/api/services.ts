@@ -318,8 +318,8 @@ export function createChallenge(payload: unknown) {
   return apiRequest<{ challenge: unknown }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export function createChallengeDraft() {
-  return apiRequest<{ challenge: { id: string } & Record<string, unknown> }>("/api/challenges/drafts", { method: "POST", body: JSON.stringify({}) });
+export function createChallengeDraft(payload: unknown) {
+  return apiRequest<{ challenge: { id: string } & Record<string, unknown> }>("/api/challenges/drafts", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function fetchChallengeDraft(draftId: string) {

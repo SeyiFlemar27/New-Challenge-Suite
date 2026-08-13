@@ -6,21 +6,23 @@ import { calculateChallengeDraftProgress, editableDraftStatus, resolveChallengeM
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { isRetiredHybridCompetition, retiredHybridCompetitionState } from "@/lib/server/retired-competitions";
+import { inferLegacyMaxUnlockedStep, normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
+import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 
 const allowedDraftFields = new Set([
-  "title", "description", "category", "customCategory", "type", "visibility", "premiumOnly",
+  "title", "description", "category", "customCategory", "type", "challengeType", "coverMediaType", "visibility", "premiumOnly",
   "acceptedSubmissionTypes", "competitionFormat", "bestOf", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline",
   "registrationDeadline", "votingDeadline", "votingStartsAt", "votingEndsAt", "winnerAnnouncementAt", "timeZone", "timezone", "lateRegistrationEnabled",
   "standardRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
   "documentPaths", "mediaUploadStatus", "mediaStatus", "usesPlaceholderMedia", "mediaFallbackType", "prizeType",
   "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerSelection", "inviteCode", "accessCode",
-  "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "maxParticipants",
+  "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "participationMode", "maxParticipants", "hideParticipantList", "waitlistEnabled", "eligibleCountry", "minimumAge", "maximumAge", "teamParticipationEnabled",
   "sponsorEnabled", "sponsorSlots", "minimumSponsorshipAmount", "sponsorPlacementOptions", "sponsorPackages",
   "monetization", "isLiveEvent", "venueName", "eventAddress", "eventCity", "eventState", "eventCountry",
   "eventMapUrl", "eventCapacity", "externalLiveUrl", "externalLiveProvider", "externalLiveStatus", "externalLiveOpensAt",
   "externalLiveCtaLabel", "tournamentType", "tournamentStages", "divisionFormat", "scoringMode", "bestOfRounds",
-  "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep"
+  "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "submissionRequirements", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt"
 ]);
 
 const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
@@ -36,6 +38,8 @@ function sanitizeDraftPatch(body: Record<string, unknown>) {
   if (patch.participantApprovalMode && !["automatic", "manual"].includes(String(patch.participantApprovalMode))) delete patch.participantApprovalMode;
   if (patch.maxParticipants !== undefined) patch.maxParticipants = Math.max(0, Math.trunc(Number(patch.maxParticipants) || 0));
   if (patch.creationStep !== undefined) patch.creationStep = Math.max(0, Math.trunc(Number(patch.creationStep) || 0));
+  if (patch.builderCurrentStep !== undefined) patch.builderCurrentStep = Math.max(0, Math.min(6, Math.trunc(Number(patch.builderCurrentStep) || 0)));
+  if (patch.maxUnlockedStep !== undefined) patch.maxUnlockedStep = Math.max(0, Math.min(6, Math.trunc(Number(patch.maxUnlockedStep) || 0)));
   return patch;
 }
 
@@ -65,11 +69,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const ref = db.collection("challenges").doc(id);
   const now = new Date().toISOString();
-  const updated = await db.runTransaction(async (transaction) => {
+  let updated: Record<string, unknown>;
+  try {
+    updated = await db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const current = { id: snap.id, ...snap.data() } as Record<string, unknown>;
     if (!userOwnsChallenge(current, user.uid)) throw new Error("PERMISSION_DENIED");
+    const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
+    const usesNormalBuilderFoundation = lockedType === "normal" && (
+      String(current.builderVersion ?? "") === "normal_v1" || String(current.challengeType ?? "") === "normal"
+    );
+    if (patch.challengeType !== undefined && normalizeBuilderChallengeType(patch.challengeType) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");
+    if (patch.type !== undefined && normalizeBuilderChallengeType(patch.type) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");
     if (isRetiredHybridCompetition(current) || isRetiredHybridCompetition({ ...current, ...patch })) {
       return { ...current, ...calculateChallengeDraftProgress(current), retiredCompetition: true, archived: true };
     }
@@ -80,11 +92,31 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       normalizedPatch.monetization = { ...currentMonetization, ...normalizedPatch.monetization as Record<string, unknown> };
     }
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
+    const currentUnlocked = inferLegacyMaxUnlockedStep(current);
+    const requestedStep = Number(normalizedPatch.builderCurrentStep ?? normalizedPatch.creationStep ?? current.builderCurrentStep ?? current.creationStep ?? 1);
+    const requestedUnlocked = Number(normalizedPatch.maxUnlockedStep ?? currentUnlocked);
+    if (usesNormalBuilderFoundation && (requestedStep > currentUnlocked + 1 || requestedUnlocked > currentUnlocked + 1)) throw new Error("FUTURE_STEP_LOCKED");
+    const normalReadiness = usesNormalBuilderFoundation ? getNormalChallengeReadiness(merged) : null;
+    if (normalReadiness && requestedStep === currentUnlocked + 1) {
+      if (!normalReadiness.steps[currentUnlocked]?.complete) throw new Error("CURRENT_STEP_INCOMPLETE");
+    }
     const progress = calculateChallengeDraftProgress(merged);
-    const finalPatch = { ...normalizedPatch, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
+    const firstInvalidStep = normalReadiness ? normalReadiness.steps.findIndex((item) => !item.complete) : -1;
+    const requestedBoundary = Math.max(currentUnlocked, Math.min(currentUnlocked + 1, requestedUnlocked, requestedStep));
+    const safeUnlockedStep = firstInvalidStep >= 0 ? Math.min(requestedBoundary, firstInvalidStep) : requestedBoundary;
+    const finalPatch = { ...normalizedPatch, challengeType: lockedType, challengeTypeLocked: true, maxUnlockedStep: safeUnlockedStep, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
     transaction.set(ref, finalPatch, { merge: true });
     return { ...merged, ...progress, retiredCompetition: false, archived: false };
-  });
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "CHALLENGE_NOT_FOUND") return fail("Challenge draft not found.", 404, undefined, code);
+    if (code === "PERMISSION_DENIED") return fail("You can only edit your own challenge drafts.", 403, undefined, code);
+    if (code === "CHALLENGE_TYPE_LOCKED") return fail("Challenge type can't be changed after the draft is created.", 409, undefined, code);
+    if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
+    if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
+    throw error;
+  }
   if ("retiredCompetition" in updated && updated.retiredCompetition === true) {
     return fail("Hybrid Competition has been discontinued. Historical records remain available in read-only mode.", 410, { archived: true, preserveHistoricalRecords: true }, "HYBRID_COMPETITION_RETIRED");
   }
@@ -106,7 +138,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
     if (!userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
     if (!editableDraftStatus(challenge)) throw new Error("CHALLENGE_NOT_EDITABLE");
-    transaction.set(ref, { status: "cancelled", lifecycleStatus: "cancelled", deletedAt: now, deletedBy: user.uid, draftDeleted: true, updatedAt: now }, { merge: true });
+    const hasActivity = [challenge.participantCount, challenge.submissionCount, challenge.confirmedPaymentCount, challenge.paymentCount].some((value) => Number(value ?? 0) > 0);
+    transaction.set(ref, hasActivity
+      ? { status: "cancelled", lifecycleStatus: "cancelled", cancellationReason: "Creator cancelled a draft with recorded activity.", cancelledAt: now, cancelledBy: user.uid, draftDeleted: false, updatedAt: now }
+      : { status: "cancelled", lifecycleStatus: "cancelled", deletedAt: now, deletedBy: user.uid, draftDeleted: true, updatedAt: now }, { merge: true });
   });
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.draft_deleted", targetType: "challenge", targetId: id, metadata: { softDelete: true } }, db).catch(() => undefined);
   return ok({ id, status: "cancelled" }, "Draft deleted.");
