@@ -22,7 +22,7 @@ export type MediaUploadValidation =
   | { ok: false; code: MediaUploadErrorCode; message: string; maxSizeMb?: number };
 
 const imageTypes = ["image/jpeg", "image/png", "image/webp"];
-const videoTypes = ["video/mp4", "video/webm", "video/quicktime"];
+const videoTypes = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/avi"];
 const documentTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
 
 export function mediaAccept(kind: MediaUploadKind) {

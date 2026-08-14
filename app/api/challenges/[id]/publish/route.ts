@@ -156,7 +156,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
 
-  const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
+  const sponsorEnabled = Boolean((body.sponsorEnabled || monetizationIntent.sponsorReady) && planAccess.canCreateSponsoredChallenges);
   const safeMonetization = {
     ...currentMonetization,
     ...body.monetization,
@@ -183,7 +183,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   };
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
   const economyRules = await getActiveEconomyRules(db);
-  const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
+  const normalV2 = body.builderVersion === "normal_v2";
+  const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" && !normalV2 ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
+  const reviewRevisionNumber = currentStatus === "changes_requested" || currentStatus === "requires_changes"
+    ? Math.max(1, Number(current.reviewRevisionNumber ?? 1)) + 1
+    : 1;
+  const revisionSuffix = reviewRevisionNumber === 1 ? "initial" : `revision_${reviewRevisionNumber}`;
   const storedChallengeFields = sanitizeFirestorePayload(body, "challengeUpdate");
   const update = {
     ...storedChallengeFields,
@@ -215,16 +220,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     nextIncompleteSection: progress.nextIncompleteSection,
     updatedAt: now,
     lastPublishedAt: now,
-    reviewRevisionId: `challenge_review_${id}_initial`
+    reviewRevisionId: `challenge_review_${id}_${revisionSuffix}`,
+    reviewRevisionNumber,
+    reviewReason: null
   };
 
-  const revisionId = `challenge_review_${id}_initial`;
-  const submitAuditRef = db.collection("auditLogs").doc(`challenge_submit_${id}_initial`);
-  const revisionAuditRef = db.collection("auditLogs").doc(`challenge_revision_${id}_initial`);
-  const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "pending_review", revision: 1, submittedAt: now, createdAt: now, updatedAt: now };
+  const revisionId = `challenge_review_${id}_${revisionSuffix}`;
+  const submitAuditRef = db.collection("auditLogs").doc(`challenge_submit_${id}_${revisionSuffix}`);
+  const revisionAuditRef = db.collection("auditLogs").doc(`challenge_revision_${id}_${revisionSuffix}`);
+  const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "pending_review", revision: reviewRevisionNumber, submittedAt: now, createdAt: now, updatedAt: now };
   const revenue = revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now });
   const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true }, createdAt: now }, submitAuditRef.id, now);
-  const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: 1 }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
+  const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: reviewRevisionNumber }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
 
   let transition: { idempotent: boolean; challenge: Record<string, unknown> };
   try {

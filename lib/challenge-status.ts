@@ -693,7 +693,7 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
   const timeLimitedUploads = isRecord(record.timeLimitedUploads) ? record.timeLimitedUploads : {};
   const challengeType = String(record.type ?? record.challengeType ?? "").toLowerCase();
   const tournamentType = String(record.tournamentType ?? "none").toLowerCase();
-  const specializedVotingTimeline = record.isLiveEvent === true || (tournamentType !== "" && tournamentType !== "none") || /tournament|live event/.test(challengeType);
+  const specializedVotingTimeline = record.builderVersion === "normal_v2" || record.isLiveEvent === true || (tournamentType !== "" && tournamentType !== "none") || /tournament|live event/.test(challengeType);
   const registrationClosesAt = firstDate(record, ["registrationEndAt", "registrationClosesAt", "registrationDeadline", "registrationEndsAt", "registrationEndDate"], "end");
   const submissionOpensAt = firstDate(record, ["submissionStartAt", "submissionOpensAt", "submissionStartsAt", "submissionsOpenAt", "submissionStartDate", "challengeStartsAt", "startsAt"], "start") ?? normalizeChallengeDate(timeLimitedUploads.startsAt, "start") ?? registrationClosesAt;
   const configuredSubmissionClosesAt = firstDate(record, ["submissionDeadline", "submissionEndAt", "submissionClosesAt", "submissionsCloseAt", "submissionEndDate"], "end") ?? normalizeChallengeDate(timeLimitedUploads.endsAt, "end");
@@ -839,7 +839,6 @@ function numberOrNull(value: unknown) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
 
 
 

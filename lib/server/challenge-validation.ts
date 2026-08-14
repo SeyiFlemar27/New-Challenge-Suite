@@ -2,12 +2,29 @@
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
+import { isNormalChallengeV2, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
+
+const normalMediaSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  url: z.string().trim().url(),
+  path: z.string().trim().min(1).max(500),
+  fileName: z.string().trim().max(240).default(""),
+  contentType: z.string().trim().max(120).default(""),
+  size: z.coerce.number().int().min(0),
+  width: z.coerce.number().int().min(1).optional(),
+  height: z.coerce.number().int().min(1).optional(),
+  durationSeconds: z.coerce.number().min(0).optional(),
+  moderationStatus: z.enum(["pending", "approved", "rejected"]).default("pending")
+});
 
 export const serverChallengeCreateSchema = z.object({
   challengeType: z.string().trim().max(80).optional(),
+  builderVersion: z.string().trim().max(40).optional(),
   title: z.string().trim().max(120, "Title must be 120 characters or fewer.").default(""),
   description: z.string().trim().max(2000, "Description must be 2,000 characters or fewer.").default(""),
+  shortDescription: z.string().trim().max(240).default(""),
   category: z.string().trim().max(80).default(""),
+  subcategory: z.string().trim().max(80).default(""),
   customCategory: z.string().trim().max(80).optional().or(z.literal("")),
   type: z.string().trim().optional(),
   visibility: z.enum(["public", "private", "exclusive"]).default("public"),
@@ -27,6 +44,7 @@ export const serverChallengeCreateSchema = z.object({
   timeZone: z.string().trim().max(80).default(DEFAULT_CHALLENGE_TIME_ZONE),
   lateRegistrationEnabled: z.coerce.boolean().default(false),
   standardRules: z.string().trim().max(6000).default(""),
+  challengeRules: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
   policyTerms: z.string().trim().max(6000).default(""),
   challengeGuidelines: z.string().trim().max(6000).default(""),
   coverImageUrl: z.string().trim().url("Cover image URL must be valid.").optional().or(z.literal("")),
@@ -43,12 +61,17 @@ export const serverChallengeCreateSchema = z.object({
   promoVideoPath: z.string().trim().max(500).default(""),
   documentUrls: z.array(z.string().trim().url("Document URL must be valid.")).max(2).default([]),
   documentPaths: z.array(z.string().trim().max(500)).max(2).default([]),
+  challengeImages: z.array(normalMediaSchema).max(3).default([]),
+  challengeVideo: normalMediaSchema.optional().nullable(),
   prizeType: z.enum(["none", "money", "physical_product", "digital_product", "bragging_rights"]).default("bragging_rights"),
   prizeTitle: z.string().trim().max(120).default(""),
   prizeDescription: z.string().trim().max(1200).default(""),
   prizeValue: z.coerce.number().min(0).max(100000000).default(0),
   prizeDeliveryNotes: z.string().trim().max(1200).default(""),
   numberOfWinners: z.coerce.number().int().min(1).max(100).default(1),
+  winnerSplits: z.array(z.coerce.number().min(0).max(100)).max(100).default([]),
+  winnerPrizeAmountsCents: z.array(z.coerce.number().int().min(0).max(10000000000)).max(3).default([]),
+  prizeCurrency: z.string().trim().max(3).default("USD"),
   winnerSelection: z.enum(["highest_votes", "judge_selection", "hybrid", "manual"]).default("highest_votes"),
   inviteCode: z.string().trim().max(80).default(""),
   accessCode: z.string().trim().max(80).default(""),
@@ -66,6 +89,15 @@ export const serverChallengeCreateSchema = z.object({
   }).default({ allowFreeVotes: true, allowPaidVotes: true, weightedVotes: true }),
   requiresSubmissionApproval: z.coerce.boolean().default(false),
   requiresParticipantApproval: z.coerce.boolean().default(false),
+  participationMode: z.enum(["open", "approval"]).default("open"),
+  locationEligibility: z.enum(["worldwide", "selected"]).default("worldwide"),
+  eligibleCountries: z.array(z.string().trim().length(2)).max(250).default([]),
+  eligibleCountry: z.string().trim().max(100).default(""),
+  ageRestrictionMode: z.enum(["none", "minimum"]).default("none"),
+  minimumAge: z.coerce.number().int().min(0).max(120).default(0),
+  capacityMode: z.enum(["unlimited", "limited"]).default("unlimited"),
+  waitlistEnabled: z.coerce.boolean().default(false),
+  hideParticipantList: z.coerce.boolean().default(false),
   participantApprovalMode: z.enum(["automatic", "manual"]).default("automatic"),
   sponsorEnabled: z.coerce.boolean().default(false),
   sponsorSlots: z.coerce.number().int().min(0).max(20).default(0),
@@ -147,6 +179,21 @@ export const serverChallengeCreateSchema = z.object({
     (value) => value === "" ? 0 : value === null ? Number.NaN : value,
     z.coerce.number().int().min(0).max(50)
   ).default(50),
+  joinWindowMode: z.enum(["until_submissions", "custom"]).default("until_submissions"),
+  registrationEnabled: z.coerce.boolean().default(true),
+  registrationOpensAt: z.string().trim().optional(),
+  submissionRequirements: z.string().trim().max(6000).default(""),
+  submissionRequirementsList: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+  fixAndResubmitEnabled: z.coerce.boolean().default(false),
+  fixAndResubmitHours: z.coerce.number().int().default(24),
+  oneEntryPerParticipant: z.coerce.boolean().default(true),
+  hideVoteTotals: z.coerce.boolean().default(false),
+  hideRankings: z.coerce.boolean().default(false),
+  publishConfirmations: z.object({
+    accurate: z.coerce.boolean().default(false),
+    rights: z.coerce.boolean().default(false),
+    review: z.coerce.boolean().default(false)
+  }).default({ accurate: false, rights: false, review: false }),
   scoringMode: z.enum(["best_of", "points"]).default("best_of"),
   bestOfRounds: z.coerce.number().int().refine((value) => [3, 5, 7].includes(value), "Best-of scoring must be 3, 5, or 7.").default(3),
   pointsToWin: z.coerce.number().int().min(1).max(100000).default(10),
@@ -193,6 +240,9 @@ export const serverChallengeCreateSchema = z.object({
   if (normalChallenge) {
     const capacityError = normalChallengeCapacityError(value.maxParticipants);
     if (capacityError) ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: capacityError });
+    if (value.builderVersion === "normal_v2" && value.fixAndResubmitEnabled && !NORMAL_RESUBMIT_WINDOWS.includes(value.fixAndResubmitHours as 12 | 24 | 48 | 72)) {
+      ctx.addIssue({ code: "custom", path: ["fixAndResubmitHours"], message: "Choose a 12, 24, 48, or 72 hour correction window." });
+    }
   } else if (value.maxParticipants < 2) {
     ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: "Participant capacity must be at least 2." });
   }
@@ -352,17 +402,22 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const errors: ChallengeValidationIssue[] = [];
   const now = context.now ?? new Date();
   const kind = challengeKind(challenge);
+  const normalV2 = isNormalChallengeV2(challenge);
   const hostOps = typeof challenge.hostOperations === "object" && challenge.hostOperations ? challenge.hostOperations as Record<string, unknown> : null;
 
   requireText(errors, challenge, "title", "Basics", "Add a challenge title.", 3);
-  requireText(errors, challenge, "description", "Basics", "Add a complete description.", 20);
-  requireText(errors, challenge, "category", "Basics", "Select a category.");
+  requireText(errors, challenge, "description", normalV2 ? "Overview" : "Basics", "Add a complete description.", 20);
+  requireText(errors, challenge, "category", normalV2 ? "Overview" : "Basics", "Select a category.");
+  if (normalV2) {
+    requireText(errors, challenge, "shortDescription", "Overview", "Add a short description.", 10);
+    requireText(errors, challenge, "subcategory", "Overview", "Select a subcategory.");
+  }
   requireText(errors, challenge, "type", "Basics", "Select a challenge type.");
   requireText(errors, challenge, "competitionFormat", "Format & Rules", "Select a competition format.");
   if (!list(challenge.acceptedSubmissionTypes).length) makeIssue(errors, "REQUIRED_ACCEPTED_MEDIA_TYPE", "acceptedSubmissionTypes", "Format & Rules", "Select at least one accepted media type.");
-  requireText(errors, challenge, "standardRules", "Format & Rules", "Add at least one competition rule.", 10);
+  if (!normalV2) requireText(errors, challenge, "standardRules", "Format & Rules", "Add at least one competition rule.", 10);
   requireText(errors, challenge, "challengeGuidelines", "Format & Rules", "Add submission requirements or challenge guidelines.", 10);
-  requireText(errors, challenge, "policyTerms", "Format & Rules", "Add eligibility or participation terms.", 10);
+  if (!normalV2) requireText(errors, challenge, "policyTerms", "Format & Rules", "Add eligibility or participation terms.", 10);
 
   requireDate(errors, challenge, "startsAt", "Schedule", "Add a challenge start date.");
   requireDate(errors, challenge, "endsAt", "Schedule", "Add a challenge end date.");
@@ -376,7 +431,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const endsAt = dateValue(challenge.endsAt);
   const submissionDeadline = dateValue(challenge.submissionDeadline);
   const submissionStartAt = dateValue(challenge.submissionStartAt ?? challenge.startsAt);
-  const votingStartsAt = dateValue(challenge.votingStartsAt ?? challenge.submissionDeadline);
+  const votingStartsAt = dateValue(challenge.votingStartsAt ?? (normalV2 ? undefined : challenge.submissionDeadline));
   const votingDeadline = dateValue(challenge.votingDeadline);
   const registrationDeadline = dateValue(challenge.registrationDeadline);
   const externalLiveOpensAt = dateValue(challenge.externalLiveOpensAt);
@@ -387,20 +442,33 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   if (submissionStartAt && submissionDeadline && submissionDeadline <= submissionStartAt) makeIssue(errors, "SUBMISSION_DEADLINE_NOT_AFTER_START", "submissionDeadline", "Schedule", "Submission deadline must be after the challenge/submission start time.");
   if (submissionDeadline && votingDeadline && submissionDeadline > votingDeadline) makeIssue(errors, "SUBMISSION_AFTER_VOTING_CLOSE", "submissionDeadline", "Schedule", "Submission deadline must be before or at the voting/review close time.");
   if (votingStartsAt && votingDeadline && votingStartsAt >= votingDeadline) makeIssue(errors, "VOTING_START_AFTER_CLOSE", "votingStartsAt", "Schedule", "Voting must open before voting closes.");
-  if (votingDeadline && endsAt && votingDeadline >= endsAt) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", "Winner announcement must be after voting/review closes.");
+  if (votingDeadline && endsAt && (normalV2 ? votingDeadline > endsAt : votingDeadline >= endsAt)) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", normalV2 ? "Results cannot be announced before voting closes." : "Winner announcement must be after voting/review closes.");
   if (registrationDeadline && submissionStartAt && registrationDeadline > submissionStartAt) makeIssue(errors, "REGISTRATION_AFTER_START", "registrationDeadline", "Schedule", "Registration or invite close must be before or at the challenge/submission start time.");
   if (kind.livestreamEnabled && externalLiveOpensAt && startsAt && externalLiveOpensAt > startsAt) makeIssue(errors, "LIVESTREAM_AFTER_START", "externalLiveOpensAt", "Schedule", "Livestream access should open before the live challenge begins.");
 
   const ownerId = text(challenge.creatorId) || context.userId || "";
   const challengeId = text(challenge.id);
-  const coverUrl = text(challenge.coverImageUrl);
-  const coverPath = text(challenge.coverImagePath);
+  const primaryImage = normalV2 ? (list(challenge.challengeImages)[0] as Record<string, unknown> | undefined) : undefined;
+  const coverUrl = text(primaryImage?.url ?? challenge.coverImageUrl);
+  const coverPath = text(primaryImage?.path ?? challenge.coverImagePath);
   const coverMediaSkipped = canSkipCoverMedia(challenge);
   const allowedDraftPrefixes = ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `challenges/hybrid-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`, `live-events/hybrid-drafts/${ownerId}/media/`] : [];
   const allowedChallengePrefixes = challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/gallery/`, `challenges/${challengeId}/video/`, `challenges/${challengeId}/documents/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [];
   const allowedMediaPrefixes = [...allowedDraftPrefixes, ...allowedChallengePrefixes];
   if ((!coverUrl || !coverPath) && !coverMediaSkipped) makeIssue(errors, "REQUIRED_BANNER", "coverImageUrl", "Media", "Upload a challenge banner.");
   else if (!coverMediaSkipped && !validStoragePath(coverPath, allowedMediaPrefixes)) makeIssue(errors, "INVALID_BANNER_STORAGE_PATH", "coverImagePath", "Media", "Challenge banner storage path must belong to this challenge or owner draft path.");
+  if (normalV2) {
+    for (const [index, item] of list(challenge.challengeImages).entries()) {
+      const media = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      if (!validStoragePath(text(media.path), allowedMediaPrefixes)) makeIssue(errors, "INVALID_MEDIA_STORAGE_PATH", `challengeImages.${index}.path`, "Media & Branding", "Challenge images must use confirmed Challenge Suite storage paths.");
+      if (text(media.moderationStatus) === "rejected") makeIssue(errors, "MEDIA_REJECTED", `challengeImages.${index}`, "Media & Branding", "Remove media that did not pass review and upload a replacement.");
+    }
+    if (challenge.challengeVideo && typeof challenge.challengeVideo === "object") {
+      const video = challenge.challengeVideo as Record<string, unknown>;
+      if (!validStoragePath(text(video.path), allowedMediaPrefixes)) makeIssue(errors, "INVALID_MEDIA_STORAGE_PATH", "challengeVideo.path", "Media & Branding", "Challenge video must use a confirmed Challenge Suite storage path.");
+      if (text(video.moderationStatus) === "rejected") makeIssue(errors, "MEDIA_REJECTED", "challengeVideo", "Media & Branding", "Remove the video that did not pass review or upload a replacement.");
+    }
+  }
   for (const field of ["promoImagePath", "trailerVideoPath", "promoVideoPath"]) {
     const value = text(challenge[field]);
     if (value && !validStoragePath(value, allowedMediaPrefixes)) makeIssue(errors, "INVALID_MEDIA_STORAGE_PATH", field, "Media", "Optional media storage paths must belong to this challenge or owner draft path.");
@@ -417,10 +485,18 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   }
 
   const prizeType = text(challenge.prizeType) || "bragging_rights";
+  if (normalV2 && prizeType !== "money") makeIssue(errors, "NORMAL_CASH_PRIZE_REQUIRED", "prizeType", "Monetization & Prize Pool", "Normal Challenges require a cash prize.");
   if (!prizeType) makeIssue(errors, "REQUIRED_PRIZE_TYPE", "prizeType", "Prizes", "Select prize information.");
   if (!["none", "bragging_rights"].includes(prizeType) && !text(challenge.prizeTitle)) makeIssue(errors, "REQUIRED_PRIZE_TITLE", "prizeTitle", "Prizes", "Add prize title for product or money prize metadata.");
   if (!["none"].includes(prizeType) && !text(challenge.winnerSelection ?? hostOps?.winnerSelection)) makeIssue(errors, "REQUIRED_WINNER_SELECTION", "winnerSelection", "Prizes", "Select the winner-selection method.");
   if (numberValue(challenge.numberOfWinners ?? (bool(hostOps?.multipleWinners) ? 3 : 1)) <= 0) makeIssue(errors, "REQUIRED_WINNER_COUNT", "numberOfWinners", "Prizes", "Select the number of winners.");
+  if (normalV2) {
+    const winnerCount = numberValue(challenge.numberOfWinners);
+    const amounts = list(challenge.winnerPrizeAmountsCents).map(numberValue);
+    if (winnerCount < 1 || winnerCount > 3 || amounts.length !== winnerCount || amounts.some((amount) => amount <= 0)) {
+      makeIssue(errors, "INVALID_CASH_PLACEMENTS", "winnerPrizeAmountsCents", "Monetization & Prize Pool", "Add a valid cash amount for every winner placement.");
+    }
+  }
 
   if (kind.isLive) {
     if (!text(challenge.venueName)) makeIssue(errors, "LIVE_LOCATION_REQUIRED", "venueName", "Live Event", "Add the physical event venue.");

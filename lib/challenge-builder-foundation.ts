@@ -1,12 +1,14 @@
 export const NORMAL_CHALLENGE_STEPS = [
-  "Basics",
-  "Participation",
-  "Entry & Submission",
-  "Competition",
-  "Rewards",
+  "Overview",
+  "Eligibility",
+  "Monetization & Prize Pool",
+  "Media & Branding",
   "Schedule",
-  "Review"
+  "Entry & Submission",
+  "Review",
+  "Publish"
 ] as const;
+export const NORMAL_CHALLENGE_MAX_STEP = NORMAL_CHALLENGE_STEPS.length - 1;
 
 export type BuilderChallengeType = "normal" | "private" | "tournament" | "live_event";
 export type BuilderPlan = "free" | "creator" | "pro" | "host" | "enterprise";
@@ -60,7 +62,7 @@ export function isUnfinishedChallengeDraft(record: Record<string, unknown>) {
 
 export function inferLegacyMaxUnlockedStep(challenge: Record<string, unknown>) {
   const stored = Number(challenge.maxUnlockedStep ?? challenge.creationStep);
-  if (Number.isFinite(stored)) return Math.max(1, Math.min(6, Math.trunc(stored)));
+  if (Number.isFinite(stored)) return Math.max(1, Math.min(NORMAL_CHALLENGE_MAX_STEP, Math.trunc(stored)));
   return 1;
 }
 
@@ -69,10 +71,10 @@ export function normalizeNormalChallengeStep(
   readiness: { ready: boolean; nextRequiredStep: number }
 ) {
   const parsed = Number(value);
-  if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 && parsed <= 6) return parsed;
-  if (readiness.ready) return 6;
+  if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 && parsed <= NORMAL_CHALLENGE_MAX_STEP) return parsed;
+  if (readiness.ready) return NORMAL_CHALLENGE_MAX_STEP;
   const nextRequiredStep = Number(readiness.nextRequiredStep);
-  return Number.isInteger(nextRequiredStep) && nextRequiredStep >= 0 && nextRequiredStep < 6
+  return Number.isInteger(nextRequiredStep) && nextRequiredStep >= 0 && nextRequiredStep < NORMAL_CHALLENGE_MAX_STEP
     ? nextRequiredStep
     : 0;
 }

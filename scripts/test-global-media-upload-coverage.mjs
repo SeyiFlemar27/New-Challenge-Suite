@@ -40,7 +40,7 @@ assert(uploadField.includes("Replace"), "shared upload field must support replac
 assert(uploadField.includes("Remove"), "shared upload field must support remove/clear where used.");
 assert(uploadField.includes("Retry Upload"), "shared upload field must support retry after failure.");
 assert(uploadField.includes("Upload complete."), "shared upload field must show a concise completed state.");
-assert(uploadField.includes("onChange(downloadUrl, { path, fileName: file.name, contentType: file.type, size: file.size })"), "shared upload field must persist safe metadata.");
+assert(uploadField.includes("const metadata = { path, fileName: file.name, contentType: file.type, size: file.size") && uploadField.includes("onChange(downloadUrl, metadata)"), "shared upload field must persist safe metadata plus validated dimensions when available.");
 assert(uploadField.includes("kind === \"document\""), "shared upload field must handle document UI safely.");
 assert(!/placeholder uploaded|mock media|fake upload|storage\.example|blob:/.test(uploadField), "shared upload field must not use fake uploaded media.");
 

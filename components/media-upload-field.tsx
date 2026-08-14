@@ -10,7 +10,8 @@ import { appendUploadFileName, classifyStorageError, defaultMaxSizeMb, formatUpl
 
 export type { MediaUploadKind, MediaUploadStage } from "@/lib/media-upload";
 
-type UploadMetadata = { path: string; fileName: string; contentType: string; size: number };
+export type UploadMetadata = { path: string; fileName: string; contentType: string; size: number; width?: number; height?: number; durationSeconds?: number };
+export type UploadFileValidation = { ok: true; metadata?: Pick<UploadMetadata, "width" | "height" | "durationSeconds"> } | { ok: false; message: string; code?: string };
 
 export function MediaUploadField({
   label,
@@ -24,7 +25,8 @@ export function MediaUploadField({
   required = false,
   disabled = false,
   disabledReason = "Media uploads are temporarily unavailable while storage is being connected.",
-  onStatusChange
+  onStatusChange,
+  validateFile
 }: {
   label: string;
   value?: string;
@@ -38,6 +40,7 @@ export function MediaUploadField({
   disabled?: boolean;
   disabledReason?: string;
   onStatusChange?: (status: MediaUploadStage) => void;
+  validateFile?: (file: File) => Promise<UploadFileValidation>;
 }) {
   const auth = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -154,6 +157,13 @@ export function MediaUploadField({
       logUploadDebug("validation_failed", { reason: validation.code, uploadPath: storagePath, contentType: file.type, size: file.size });
       return;
     }
+    const customValidation = validateFile ? await validateFile(file) : { ok: true as const };
+    if (!customValidation.ok) {
+      setStatus("failed");
+      setError(customValidation.message);
+      setErrorCode(customValidation.code || "invalid_media_dimensions");
+      return;
+    }
 
     const path = appendUploadFileName(storagePath, file.name);
     setStatus("uploading");
@@ -209,8 +219,9 @@ export function MediaUploadField({
           }
         });
       });
-      onChange(downloadUrl, { path, fileName: file.name, contentType: file.type, size: file.size });
-      setUploadedFile({ path, fileName: file.name, contentType: file.type, size: file.size });
+      const metadata = { path, fileName: file.name, contentType: file.type, size: file.size, ...customValidation.metadata };
+      onChange(downloadUrl, metadata);
+      setUploadedFile(metadata);
       setLocalPreview("");
       setSelectedFile(null);
       retryFileRef.current = null;

@@ -112,16 +112,16 @@ export function isPublicSubmission(id: string, data: Record<string, unknown>) {
 
 export function publicChallengeFields(data: Record<string, unknown>) {
   return pick(data, [
-    "title", "description", "category", "type", "visibility", "status", "lifecycleStatus",
+    "title", "shortDescription", "description", "category", "subcategory", "type", "visibility", "status", "lifecycleStatus", "builderVersion",
     "computedStatus", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
     "votingStartsAt", "votingDeadline", "votingEndsAt", "winnerAnnouncementAt", "acceptedSubmissionTypes",
     "competitionFormat", "bestOf", "votingSettings", "rules", "standardRules",
-    "challengeGuidelines", "prizeType", "prizeTitle", "prizeDescription", "publicPrizeStatus",
+    "challengeGuidelines", "challengeRules", "prizeType", "prizeTitle", "prizeDescription", "prizeCurrency", "numberOfWinners", "winnerPrizeAmountsCents", "publicPrizeStatus",
     "participantCount", "submissionCount", "voteCount", "weightedVoteCount", "coverImageUrl",
-    "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "mediaUploadStatus", "mediaStatus",
+    "challengeImages", "challengeVideo", "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "mediaUploadStatus", "mediaStatus",
     "usesPlaceholderMedia", "mediaFallbackType", "mediaStorageStatus", "isLiveEvent", "venueName",
     "eventCity", "eventState", "eventCountry", "eventCapacity", "tournamentType",
-    "divisionFormat", "maxParticipants", "scoringMode", "sponsorEnabled", "creatorName",
+    "divisionFormat", "maxParticipants", "capacityMode", "waitlistEnabled", "locationEligibility", "eligibleCountries", "ageRestrictionMode", "minimumAge", "hideParticipantList", "scoringMode", "sponsorEnabled", "creatorName",
     "publicPreviewEnabled", "privateAccessMethod",
     "creatorUsername", "creatorAvatarUrl", "resultsConfirmed", "settlementPrepared", "settlementStatus",
     "predictionEnabled", "predictionArenaEnabled", "predictionMarketEnabled", "predictionMarketApproved", "predictionMarketStatus",

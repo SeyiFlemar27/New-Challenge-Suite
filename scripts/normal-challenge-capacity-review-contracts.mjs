@@ -6,6 +6,8 @@ const read = (path) => readFileSync(path, "utf8");
 const capacity = await import(pathToFileURL("lib/normal-challenge-capacity.ts"));
 const foundation = await import(pathToFileURL("lib/challenge-builder-foundation.ts"));
 const builder = read("components/normal-challenge-builder.tsx");
+const steps = read("components/normal-challenge-builder-steps.tsx");
+const model = read("lib/normal-challenge-builder-model.ts");
 const readiness = read("lib/normal-challenge-readiness.ts");
 const capacitySource = read("lib/normal-challenge-capacity.ts");
 const schema = read("lib/server/challenge-validation.ts");
@@ -31,19 +33,19 @@ const ready = { ready: true, nextRequiredStep: 0 };
 const incomplete = { ready: false, nextRequiredStep: 3 };
 for (const value of [6, "6"]) assert.equal(foundation.normalizeNormalChallengeStep(value, ready), 6);
 for (const value of ["Review", Number.NaN, -1, 99, 3.5]) {
-  assert.equal(foundation.normalizeNormalChallengeStep(value, ready), 6, `completed draft ${String(value)} must land on Review`);
+  assert.equal(foundation.normalizeNormalChallengeStep(value, ready), 7, `completed draft ${String(value)} must land on Publish`);
   assert.equal(foundation.normalizeNormalChallengeStep(value, incomplete), 3, `incomplete draft ${String(value)} must land on its next required step`);
 }
 
-assert.match(builder, /normalizeNormalChallengeCapacity\(form\.maxParticipants\)/);
-assert.match(builder, /normalizeNormalChallengeStep\(c\.builderCurrentStep\?\?c\.creationStep\?\?1,loadedReadiness\)/);
-assert.match(builder, /if\(step!==6\)return null/);
-assert.match(builder, /step===6\?<Button[\s\S]*Submit for Review/);
-assert.match(builder, /normalChallengeSubmitIssue\(r\.details\)/);
+assert.match(model, /normalizeNormalChallengeCapacity\(form\.maxParticipants\)/);
+assert.match(builder, /normalizeNormalChallengeStep\(challenge\.builderCurrentStep \?\? challenge\.creationStep \?\? 1, loadedReadiness\)/);
+assert.match(steps, /if \(step === 6\) return <Review/);
+assert.match(builder, /step === NORMAL_CHALLENGE_MAX_STEP[\s\S]*Submit for Review/);
+assert.match(builder, /normalChallengeSubmitIssue\(result\.details\)/);
 assert.match(builder, /Some required details need attention\./);
-assert.match(builder, /No fixed capacity\./);
-assert.match(builder, /Limited to \$\{capacity\} participants\./);
-assert.match(builder, /Waitlist is enabled when the limit is reached\./);
+assert.match(steps, /No fixed capacity\./);
+assert.match(steps, /Limited to \$\{form\.maxParticipants/);
+assert.match(steps, /with a waitlist/);
 assert.doesNotMatch(builder, /Too small: expected number to be >=2/);
 assert.match(capacitySource, /Set capacity to at least 2, or leave it blank for no fixed capacity\./);
 

@@ -8,6 +8,7 @@ const sources = {
   builder: read("components/challenge-builder.tsx"),
   normalBuilder: read("components/normal-challenge-builder.tsx"),
   builderFoundation: read("lib/challenge-builder-foundation.ts"),
+  normalConfig: read("lib/normal-challenge-config.ts"),
   publish: read("app/api/challenges/[id]/publish/route.ts"),
   create: read("app/api/challenges/route.ts"),
   feedback: read("lib/challenge-publish-feedback.ts"),
@@ -46,10 +47,10 @@ for (const message of [
 ]) assert.ok(`${sources.feedback}\n${sources.publishReadiness}`.includes(message), `missing publish feedback: ${message}`);
 assert.doesNotMatch(sources.builder, /response\.message \|\| "Challenge could not be published/);
 
-for (const title of ["Basics", "Participation", "Entry & Submission", "Competition", "Rewards", "Schedule", "Review"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
+for (const title of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
 assert.match(sources.normalBuilder, /NORMAL_CHALLENGE_STEPS\[step\]/);
 assert.match(sources.normalBuilder, /createChallengeDraft\(payload\)/);
-assert.match(sources.normalBuilder, /publishChallengeDraft\(id,payload\)/);
+assert.match(sources.normalBuilder, /publishChallengeDraft\(id, payload\)/);
 assert.match(sources.normalBuilder, /Submit for Review/);
 assert.doesNotMatch(sources.normalBuilder, /setPreview\(true\)|function Preview\(|\/preview/);
 assert.match(sources.preview, /redirect\(`\/challenges\/create\/\$\{draftId\}`\)/);

@@ -169,8 +169,9 @@ assert.ok(route.indexOf("commitChallengeReviewSubmission(db") < route.indexOf("c
 assert.doesNotMatch(route.slice(route.indexOf("commitChallengeReviewSubmission(db"), route.indexOf("createNotification(db")), /Promise\.all\(\[\s*db\.collection\("challenges"\)/);
 
 const builder = readFileSync("components/normal-challenge-builder.tsx", "utf8");
+const builderSteps = readFileSync("components/normal-challenge-builder-steps.tsx", "utf8");
 assert.match(builder, /Submit for Review/);
-assert.match(builder, /No fixed capacity\./);
+assert.match(builderSteps, /No fixed capacity\./);
 assert.doesNotMatch(builder, />Preview</);
 assert.doesNotMatch(builder, />Publish(?: Challenge)?</);
 
