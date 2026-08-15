@@ -48,7 +48,7 @@ export const ECONOMY_V1_RULES = {
     predictionArenaEligible: false
   },
   voting: { freeVotesPerChallengePerLocalDay: 1, paidVoteCostCredits: 10, paidVoteDailyLimit: 10, paidVotingEnabled: true },
-  paidEntry: { winnerPercent: 65, platformPercent: 15, creatorPercent: 10, hostSponsorPercent: 10 },
+  paidEntry: { winnerPercent: 65, platformPercent: 15, creatorPercent: 20, hostSponsorPercent: 0 },
   growthWallet: { defaultAllocationPercent: 10, minimumAllocationPercent: 0, maximumAllocationPercent: 30, expiryMonths: 12, withdrawable: false },
   creatorLevels: [
     { id: "rookie", name: "Rookie Creator", minimumScore: 0, benefits: ["standard_creator_tools"] },

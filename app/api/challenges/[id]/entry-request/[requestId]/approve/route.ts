@@ -7,10 +7,6 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { resolveParticipantStatus } from "@/lib/server/submission-lifecycle";
 
-function addHoursIso(now: string, hours: number) {
-  return new Date(new Date(now).getTime() + hours * 60 * 60 * 1000).toISOString();
-}
-
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; requestId: string }> }) {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
@@ -21,7 +17,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(id);
     const requestRef = db.collection("challengeEntryRequests").doc(requestId);
-    const [challengeSnap, requestSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(requestRef)]);
+    const participantRef = db.collection("challengeParticipants").doc(requestId);
+    const [challengeSnap, requestSnap, participantSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(requestRef), transaction.get(participantRef)]);
     if (!challengeSnap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
@@ -31,13 +28,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (String(entryRequest.status) === "approved") return { entryRequest, duplicate: true };
     const participantId = `${id}_${entryRequest.userId}`;
     const paid = isPaidEntryChallenge(challenge);
+    const paidParticipant = paid ? (participantSnap.exists ? participantSnap.data() ?? {} : null) : null;
+    if (paid && (!paidParticipant || !["paid", "confirmed"].includes(String(paidParticipant.entryPaymentStatus ?? "").toLowerCase()))) throw new Error("PAYMENT_CONFIRMATION_REQUIRED");
     const update = paid ? {
       status: "approved",
       approvedAt: now,
       approvedBy: user.uid,
-      paymentWindowStatus: "open",
-      paymentDeadline: addHoursIso(now, 24),
-      participantId: null,
+      paymentWindowStatus: "confirmed",
+      paymentDeadline: null,
+      participantId,
       updatedAt: now
     } : {
       status: "approved",
@@ -48,7 +47,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       updatedAt: now
     };
     transaction.set(requestRef, update, { merge: true });
-    if (!paid) {
+    if (paid) {
+      transaction.set(participantRef, {
+        status: "active",
+        fullEntryGranted: true,
+        entryRequestId: requestId,
+        approvedAt: now,
+        approvedBy: user.uid,
+        updatedAt: now
+      }, { merge: true });
+    } else {
       transaction.set(db.collection("challengeParticipants").doc(participantId), {
         id: participantId,
         challengeId: id,

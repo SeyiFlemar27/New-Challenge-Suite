@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = (path) => readFileSync(path, "utf8");
+const foundation = read("lib/challenge-builder-foundation.ts");
+const shell = read("components/normal-challenge-builder.tsx");
+const steps = read("components/normal-challenge-builder-steps.tsx");
+const model = read("lib/normal-challenge-builder-model.ts");
+const upload = read("components/media-upload-field.tsx");
+const gallery = read("components/challenge-media-carousel.tsx");
+const explore = read("app/explore/page.tsx");
+const detail = read("app/challenges/[id]/page.tsx");
+const joinPage = read("app/challenges/[id]/join/page.tsx");
+const journey = read("lib/server/participant-journey.ts");
+const checkout = read("app/api/challenges/[id]/entry-checkout/route.ts");
+const payment = read("lib/server/monetization-payments.ts");
+const request = read("app/api/challenges/[id]/entry-request/route.ts");
+const approve = read("app/api/challenges/[id]/entry-request/[requestId]/approve/route.ts");
+const reject = read("app/api/challenges/[id]/entry-request/[requestId]/reject/route.ts");
+const join = read("app/api/challenges/[id]/join/route.ts");
+const settlement = read("lib/server/challenge-settlement.ts");
+const economy = read("lib/server/economy-rules.ts");
+
+const orderedSteps = ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"];
+let previous = -1;
+for (const label of orderedSteps) {
+  const index = foundation.indexOf(`navLabel: "${label}"`);
+  assert(index > previous, `${label} must appear in the canonical eight-step order`);
+  previous = index;
+}
+assert.match(foundation, /fields: \["participationMode"[\s\S]*"waitlistEnabled"[\s\S]*"hideParticipantList"\]/);
+assert.match(foundation, /fields: \["numberOfWinners"[\s\S]*"entryFeeAmountCents"[\s\S]*"sponsorReady"[\s\S]*"votingSettings"\]/);
+assert.match(foundation, /fields: \["challengeImages", "challengeVideo"\]/);
+assert.match(foundation, /fields: \["timeZone"[\s\S]*"winnerAnnouncementAt"\]/);
+assert.match(foundation, /fields: \["acceptedSubmissionTypes"[\s\S]*"fixAndResubmitEnabled"\]/);
+assert.match(shell, /xl:grid-cols-\[270px_minmax\(0,760px\)_280px\]/);
+assert.match(shell, /Builder Guide/);
+assert.match(shell, /MobileGuide/);
+assert.match(shell, /attemptedSteps\.has\(step\)/);
+assert.match(shell, /status === "pending_review"/);
+assert.match(shell, /Finish Later/);
+assert.match(steps, /<select/);
+assert.doesNotMatch(steps, />Choice</);
+assert.match(steps, /\[0, 1, 2\]\.map/);
+assert.match(steps, /Image 1 is the public cover/);
+assert.match(model, /sponsorshipGoal/);
+assert.match(model, /preferredSponsorCategory/);
+assert.match(model, /sponsorNote/);
+
+assert.match(upload, /data-upload-progress-circle/);
+assert.match(upload, /conic-gradient/);
+assert.match(upload, /status === "processing"/);
+assert.match(upload, /Upload failed\. Try again\./);
+assert.match(gallery, /orderedMedia/);
+assert.match(gallery, /videoUrl \? \[\{ id: `video:/);
+assert.match(gallery, /Challenge media thumbnails/);
+assert.match(gallery, /lightboxOpen/);
+assert.match(gallery, /onMouseEnter/);
+assert.match(gallery, /onMouseLeave=\{\(\) => pause\(videoRef\.current\)\}/);
+assert.doesNotMatch(gallery, /autoplay|autoPlay/);
+assert.doesNotMatch(gallery, /currentTime\s*=\s*0/);
+assert.match(gallery, /loading="lazy"/);
+assert.match(explore, /<ExploreCardMedia/);
+assert.match(detail, /<ChallengeMediaGallery/);
+
+const paymentGate = journey.indexOf("if (paymentRequired && !paymentConfirmed)");
+const approvalGate = journey.indexOf("if (approvalRequired && !request && paymentConfirmed)");
+assert(paymentGate >= 0 && approvalGate > paymentGate, "paid approval journey must collect confirmed payment before requesting approval");
+assert.doesNotMatch(checkout, /ENTRY_REQUEST_APPROVAL_REQUIRED/);
+assert.match(payment, /status: manualApproval \? "pending_approval" : "active"/);
+assert.match(payment, /fullEntryGranted: !manualApproval/);
+assert.match(request, /Complete payment before requesting approval/);
+assert.match(approve, /PAYMENT_CONFIRMATION_REQUIRED/);
+assert.match(approve, /fullEntryGranted: true/);
+assert.match(reject, /refundStatus: "refund_review"/);
+assert.match(reject, /refundExecutionEnabled: false/);
+assert.match(journey, /"join_waitlist"/);
+assert.match(join, /status: "waitlisted"/);
+assert.match(join, /waitlistCount/);
+assert.match(joinPage, /I accept the challenge rules, voting policy, and prize terms/);
+assert.match(joinPage, /Request to Join/);
+assert.match(joinPage, /Join Waitlist/);
+
+assert.match(economy, /paidEntry: \{ winnerPercent: 65, platformPercent: 15, creatorPercent: 20, hostSponsorPercent: 0 \}/);
+assert.match(settlement, /generatedRevenueWinnerWeights/);
+assert.match(settlement, /count === 1[\s\S]*amountCents: 65/);
+assert.match(settlement, /count === 2[\s\S]*amountCents: 35[\s\S]*amountCents: 30/);
+assert.match(settlement, /amountCents: 25[\s\S]*amountCents: 20[\s\S]*amountCents: 20/);
+assert.match(settlement, /SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0/);
+assert.match(settlement, /sponsorMoneyExcludedFromChallengeSplit: true/);
+assert.match(settlement, /creatorReceivesSponsorMoney: false/);
+assert.match(settlement, /externalPayoutExecuted: false/);
+
+console.log("PASS challenge-redesign-contracts.mjs");

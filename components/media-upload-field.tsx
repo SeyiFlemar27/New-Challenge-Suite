@@ -26,7 +26,8 @@ export function MediaUploadField({
   disabled = false,
   disabledReason = "Media uploads are temporarily unavailable while storage is being connected.",
   onStatusChange,
-  validateFile
+  validateFile,
+  appearance = "default"
 }: {
   label: string;
   value?: string;
@@ -41,6 +42,7 @@ export function MediaUploadField({
   disabledReason?: string;
   onStatusChange?: (status: MediaUploadStage) => void;
   validateFile?: (file: File) => Promise<UploadFileValidation>;
+  appearance?: "default" | "builder";
 }) {
   const auth = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -74,6 +76,7 @@ export function MediaUploadField({
   const displayProgress = (value && !uploading && status !== "failed") ? 100 : progress;
   const isDocument = kind === "document";
   const typeLabel = kind === "video" ? "video" : kind === "document" ? "document" : "image";
+  const builderAppearance = appearance === "builder";
 
   function setStatus(next: MediaUploadStage) {
     setStatusState(next);
@@ -287,14 +290,14 @@ export function MediaUploadField({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-slate-300"><span>{label}</span>{required ? <span className="text-xs uppercase tracking-[0.14em] text-[var(--gold)]">Required</span> : null}</div>
-      <Card className="border-white/10 bg-black/30 p-4">
+      <div className={`mb-2 flex items-center justify-between gap-3 text-sm font-bold ${builderAppearance ? "text-slate-700" : "text-slate-300"}`}><span>{label}</span>{required ? <span className="text-xs uppercase tracking-[0.14em] text-[var(--gold)]">Required</span> : null}</div>
+      <Card className={builderAppearance ? "border-slate-200 bg-white p-3 shadow-none" : "border-white/10 bg-black/30 p-4"}>
         {displayUrl ? (
-          <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#111]">
+          <div className={`overflow-hidden rounded-[8px] border ${builderAppearance ? "border-slate-200 bg-slate-100" : "border-white/10 bg-[#111]"}`}>
             {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded.</div> : isVideo ? <video src={displayUrl} controls playsInline className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable.</div>}
           </div>
         ) : (
-          <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-36 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-white/15 px-4 py-8 text-center ${disabled ? "cursor-not-allowed bg-[#101010] text-slate-500" : "bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
+          <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-44 w-full flex-col items-center justify-center rounded-[8px] border border-dashed px-4 py-8 text-center ${builderAppearance ? disabled ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : "border-slate-300 bg-slate-50 text-slate-700 hover:border-amber-500 hover:bg-amber-50" : disabled ? "cursor-not-allowed border-white/15 bg-[#101010] text-slate-500" : "border-white/15 bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
             {kind === "video" ? <Video className="mb-3" /> : kind === "document" ? <FileText className="mb-3" /> : kind === "image" ? <ImageIcon className="mb-3" /> : <UploadCloud className="mb-3" />}
             <span className="font-black">{disabled ? "Media skipped for now" : buttonLabel ?? (kind === "video" ? "Upload Video" : kind === "document" ? "Upload Document" : kind === "image" ? "Upload Image" : "Upload Media")}</span>
             <span className="mt-2 text-xs text-slate-500">{disabled ? disabledReason : `${kind === "video" ? "MP4, WebM, or QuickTime" : kind === "document" ? "PDF, Word document, or text file" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to ${limitMb}MB`}</span>
@@ -302,22 +305,19 @@ export function MediaUploadField({
         )}
         <input ref={inputRef} className="hidden" type="file" accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />
         {(uploading || status === "failed" || status === "complete" || value) ? (
-          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/25 p-4" aria-live="polite">
+          <div className={`mt-4 rounded-[8px] border p-4 ${builderAppearance ? "border-slate-200 bg-slate-50" : "border-white/10 bg-black/25"}`} aria-live="polite">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="truncate text-sm font-black text-white">{displayFileName}</p>
+                <p className={`truncate text-sm font-black ${builderAppearance ? "text-slate-950" : "text-white"}`}>{displayFileName}</p>
                 <p className="mt-1 text-xs text-slate-400">{displayFile ? formatUploadBytes(displayFileSize) : "File saved"}{uploading && uploadSpeed ? ` - ${uploadSpeed}` : ""}</p>
               </div>
               <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${status === "failed" ? "bg-red-500/10 text-red-200" : status === "complete" || value ? "bg-emerald-500/10 text-emerald-200" : "bg-yellow-500/10 text-yellow-100"}`}>{stageLabel}</span>
             </div>
-            <div className="mt-4 flex items-center justify-between gap-3 text-xs font-bold text-slate-400"><span>{stateCopy}</span><span>{displayProgress}% uploaded</span></div>
-            <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label={`${label} upload progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayProgress}>
-              <div className={`h-full transition-all duration-300 ${status === "failed" ? "bg-red-500" : "bg-[var(--gold)]"}`} style={{ width: `${displayProgress}%` }} />
-            </div>
+            <div className="mt-4 flex items-center justify-between gap-4 text-xs font-bold text-slate-500"><span>{stateCopy}</span><span data-upload-progress-circle className={`grid size-12 shrink-0 place-items-center rounded-full ${status === "failed" ? "text-red-700" : "text-emerald-700"}`} style={{ background: `radial-gradient(closest-side, ${builderAppearance ? "white" : "#111"} 72%, transparent 74%), conic-gradient(${status === "failed" ? "#dc2626" : "#16a34a"} ${displayProgress}%, ${builderAppearance ? "#e2e8f0" : "#334155"} 0)` }} role="progressbar" aria-label={`${label} upload progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayProgress}><span className="text-[10px] font-black">{displayProgress}%</span></span></div>
           </div>
         ) : null}
         {uploading && !disabled ? <Button type="button" variant="ghost" className="mt-3" onClick={cancelUpload}><XCircle size={16} /> Cancel Upload</Button> : null}
-        {status === "complete" || value ? <p className="mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 size={16} /> Upload complete.</p> : null}
+        {status === "complete" || value ? <p className={`mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold ${builderAppearance ? "text-emerald-800" : "text-emerald-200"}`}><CheckCircle2 size={16} /> Upload complete.</p> : null}
         {disabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : null}
         {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3">{!disabled ? <Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button> : null}<Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}
         {status === "failed" && !disabled ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryFileRef.current}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}

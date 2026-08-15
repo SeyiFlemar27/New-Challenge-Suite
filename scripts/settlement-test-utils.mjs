@@ -14,7 +14,7 @@ export function splitChallengeRevenue(gross) {
 }
 
 export function splitSponsorPrize(gross) {
-  const fee = Math.floor(gross * 0.15);
+  const fee = 0;
   return { gross, fee, net: gross - fee };
 }
 

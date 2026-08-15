@@ -67,9 +67,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const eligibility = evaluateChallengeEligibility({ challenge: accessContext.challenge, userId: user.uid, profile, participant: participantSnap.exists ? participantSnap.data() ?? {} : null, hasPrivateAccess: accessContext.hasAccessGrant });
   if (!eligibility.eligible) return fail(eligibility.blockers[0]?.message ?? "You are not eligible to request entry.", 403, { blockers: eligibility.blockers }, eligibility.blockers[0]?.code ?? "NOT_ELIGIBLE");
   if (userOwnsChallenge(challenge, user.uid)) return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
-  if (participantSnap.exists) return fail("You already joined this challenge.", 409, undefined, "ALREADY_JOINED");
   const manual = challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
   if (!manual) return fail("This challenge uses automatic entry. Join directly instead.", 409, { action: isPaidEntryChallenge(challenge) ? "pay_entry_fee" : "join" }, "ENTRY_REQUEST_NOT_REQUIRED");
+  const paid = isPaidEntryChallenge(challenge);
+  const participant = participantSnap.exists ? participantSnap.data() ?? {} : null;
+  const paymentConfirmed = participant && ["paid", "confirmed"].includes(String(participant.entryPaymentStatus ?? "").toLowerCase());
+  if (paid && !paymentConfirmed) return fail("Complete payment before requesting approval.", 402, { action: "pay_entry_fee", checkoutUrl: `/api/challenges/${id}/entry-checkout` }, "PAID_ENTRY_PAYMENT_REQUIRED");
+  if (!paid && participantSnap.exists) return fail("You already joined this challenge.", 409, undefined, "ALREADY_JOINED");
+  if (paid && participant && !["pending_approval", "rejected"].includes(String(participant.status ?? "").toLowerCase())) return fail("You already joined this challenge.", 409, undefined, "ALREADY_JOINED");
   const now = new Date().toISOString();
   const requestId = `${id}_${user.uid}`;
   const requestRecord = {
@@ -79,8 +84,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status: existingRequestSnap.exists && existingRequestSnap.data()?.status === "approved" ? "approved" : "pending",
     entryAgreementAccepted: true,
     entryAgreementAcceptedAt: now,
-    paidEntryRequired: isPaidEntryChallenge(challenge),
-    paymentWindowStatus: "not_started",
+    paidEntryRequired: paid,
+    paymentWindowStatus: paid ? "confirmed" : "not_required",
+    participantId: paid ? participantSnap.id : null,
     paymentDeadline: null,
     createdAt: existingRequestSnap.data()?.createdAt ?? now,
     updatedAt: now

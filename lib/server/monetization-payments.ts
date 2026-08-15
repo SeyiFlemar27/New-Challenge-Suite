@@ -221,6 +221,7 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
     ]);
     if (!challengeSnap.exists) throw new Error("Challenge not found for paid-entry confirmation.");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    const manualApproval = challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
     const amountCents = cents(payment.amountCents);
     const revenue = calculateEntryRevenueFoundation(amountCents);
     const reservationExpiresAtMs = parseTime(payment.reservationExpiresAt) ?? 0;
@@ -272,13 +273,13 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       id: participantId,
       challengeId,
       userId,
-      status: "active",
+      status: manualApproval ? "pending_approval" : "active",
       paidEntryEnabled: true,
       entryFeeCents: amountCents,
       entryPaymentId: id,
       entryPaymentStatus: "paid",
       entryPaymentConfirmedAt: now,
-      fullEntryGranted: true,
+      fullEntryGranted: !manualApproval,
       webhookConfirmationRequired: true,
       paidConfirmedBy: "stripe_webhook",
       updatedAt: now,

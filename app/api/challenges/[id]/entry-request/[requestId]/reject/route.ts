@@ -18,7 +18,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(id);
     const requestRef = db.collection("challengeEntryRequests").doc(requestId);
-    const [challengeSnap, requestSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(requestRef)]);
+    const participantRef = db.collection("challengeParticipants").doc(requestId);
+    const [challengeSnap, requestSnap, participantSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(requestRef), transaction.get(participantRef)]);
     if (!challengeSnap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
@@ -27,6 +28,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (String(entryRequest.challengeId) !== id) throw new Error("ENTRY_REQUEST_MISMATCH");
     const update = { status: "rejected", rejectedAt: now, rejectedBy: user.uid, rejectionReason: note || null, updatedAt: now };
     transaction.set(requestRef, update, { merge: true });
+    if (participantSnap.exists && ["paid", "confirmed"].includes(String(participantSnap.data()?.entryPaymentStatus ?? "").toLowerCase())) {
+      transaction.set(participantRef, { status: "rejected", fullEntryGranted: false, refundStatus: "refund_review", refundExecutionEnabled: false, rejectedAt: now, updatedAt: now }, { merge: true });
+      const entryPaymentId = String(participantSnap.data()?.entryPaymentId ?? "");
+      if (entryPaymentId) transaction.set(db.collection("challengeEntryPayments").doc(entryPaymentId), { refundStatus: "refund_review", refundExecutionEnabled: false, reviewReason: "entry_request_rejected_after_confirmed_payment", updatedAt: now }, { merge: true });
+    }
     return { entryRequest: { ...entryRequest, ...update } };
   });
   await writeAuditLog({ actorId: user.uid, actorType: "creator", action: "entry_request.rejected", targetType: "challenge", targetId: id, after: result.entryRequest }, db).catch(() => undefined);

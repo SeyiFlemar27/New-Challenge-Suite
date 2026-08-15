@@ -62,7 +62,7 @@ assert(settlement.includes("getConfirmedEntryRevenueForChallenge"), "preview mus
 assert(settlement.includes("getConfirmedPaidVoteRevenueForChallenge"), "preview must source confirmed paid-vote revenue.");
 assert(settlement.includes("getConfirmedSponsorContributionForChallenge"), "preview must source confirmed sponsor revenue.");
 assert(settlement.includes("pendingFailedCancelledExcluded: true"), "unconfirmed payment states must be ignored.");
-assert(settlement.includes("SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 15"), "sponsor prize must deduct one 15% platform fee at settlement.");
+assert(settlement.includes("SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0"), "sponsor prize funding must remain fully allocated to winners.");
 assert(settlement.includes("confirmedPaymentSourcesOnly: true"), "settlement must use confirmed sources only.");
 
 assert(payout.includes("CASH_EARNING_HOLD_HOURS = 72"), "current 72-hour hold constant must exist.");

@@ -15,21 +15,26 @@ import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { apiRequest } from "@/lib/api/client";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
 
-function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, submissionId, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; journey: any; entryFeeLabel: string; challengeId: string; submissionId?: string | null; onPay: () => void; onJoin: (action: "register" | "enter_challenge") => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
+function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, submissionId, agreed, onAgreementChange, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; journey: any; entryFeeLabel: string; challengeId: string; submissionId?: string | null; agreed: boolean; onAgreementChange: (value: boolean) => void; onPay: () => void; onJoin: (action: "register" | "join_waitlist" | "enter_challenge" | "request_entry") => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
   if (access.canSubmit) return null;
   const action = String(journey?.primaryAction ?? access.action ?? "back_to_challenge");
+  const requiresAgreement = ["pay_entry_fee", "register", "join", "join_waitlist", "enter_challenge", "request_entry"].includes(action);
   return (
     <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">
       <h3 className="font-black">{access.title}</h3>
       <p className="mt-2 text-slate-200">{access.reason === "payment_required" ? `Pay the ${entryFeeLabel} entry fee before submitting.` : access.message}</p>
-      {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button> : null}
-      {action === "register" || action === "join" ? <Button className="mt-4 w-full" onClick={() => onJoin("register")} disabled={joinLoading}>{joinLoading ? "Saving..." : "Register for Challenge"}</Button> : null}
-      {action === "enter_challenge" ? <Button className="mt-4 w-full" onClick={() => onJoin("enter_challenge")} disabled={joinLoading}>{joinLoading ? "Entering..." : "Enter Challenge"}</Button> : null}
-      {action === "refresh_status" ? <Button className="mt-4 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button> : null}
+      {requiresAgreement ? <label className="mt-4 flex items-start gap-3 rounded-[8px] border border-white/10 bg-black/20 p-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => onAgreementChange(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label> : null}
+      {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading || !agreed}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button> : null}
+      {action === "register" || action === "join" ? <Button className="mt-4 w-full" onClick={() => onJoin("register")} disabled={joinLoading || !agreed}>{joinLoading ? "Saving..." : "Join Challenge"}</Button> : null}
+      {action === "join_waitlist" ? <Button className="mt-4 w-full" onClick={() => onJoin("join_waitlist")} disabled={joinLoading || !agreed}>{joinLoading ? "Saving..." : "Join Waitlist"}</Button> : null}
+      {action === "request_entry" ? <Button className="mt-4 w-full" onClick={() => onJoin("request_entry")} disabled={joinLoading || !agreed}>{joinLoading ? "Sending Request..." : "Request to Join"}</Button> : null}
+      {action === "enter_challenge" ? <Button className="mt-4 w-full" onClick={() => onJoin("enter_challenge")} disabled={joinLoading || !agreed}>{joinLoading ? "Entering..." : "Enter Challenge"}</Button> : null}
+      {action === "refresh_status" || action === "refresh_payment" ? <Button className="mt-4 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button> : null}
       {action === "view_entry" && submissionId ? <LinkButton href={`/submissions/${submissionId}`} className="mt-4 w-full">View My Entry</LinkButton> : null}
       {action === "manage_challenge" ? <LinkButton href="/challenges" className="mt-4 w-full">Manage Challenge</LinkButton> : null}
       {action === "sign_in" ? <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/join`)}`} className="mt-4 w-full">Sign In</LinkButton> : null}
@@ -167,6 +172,10 @@ export default function JoinChallengePage() {
 
   async function startPaidEntryCheckout() {
     setError("");
+    if (!agreed) {
+      setError("Accept the challenge rules before continuing to payment.");
+      return;
+    }
     if (!auth.user) {
       setError("Sign in before paying the entry fee.");
       return;
@@ -185,15 +194,21 @@ export default function JoinChallengePage() {
     window.location.href = result.data.url;
   }
 
-  async function startFreeJoin(action: "register" | "enter_challenge" = "register") {
+  async function startFreeJoin(action: "register" | "join_waitlist" | "enter_challenge" | "request_entry" = "register") {
     setError("");
     if (!auth.user) {
       setError("Sign in before joining this challenge.");
       return;
     }
     if (!currentChallenge) return;
+    if (!agreed) {
+      setError("Accept the challenge rules before continuing.");
+      return;
+    }
     setJoinLoading(true);
-    const result = await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true, action } as any);
+    const result = action === "request_entry"
+      ? await apiRequest(`/api/challenges/${currentChallenge.id}/entry-request`, { method: "POST", body: JSON.stringify({ entryAgreementAccepted: true }) })
+      : await joinChallenge(currentChallenge.id, { entryAgreementAccepted: true, action } as any);
     setJoinLoading(false);
     if (!result.ok) {
       setError(result.message);
@@ -374,6 +389,8 @@ export default function JoinChallengePage() {
               entryFeeLabel={entryFeeLabel}
               challengeId={currentChallenge.id}
               submissionId={existingSubmissionId}
+              agreed={agreed}
+              onAgreementChange={setAgreed}
               onPay={() => void startPaidEntryCheckout()}
               onJoin={(action) => void startFreeJoin(action)}
               onRefresh={() => void refetch()}

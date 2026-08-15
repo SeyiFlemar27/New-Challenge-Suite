@@ -14,6 +14,7 @@ export type ParticipantJourneyStep =
   | "request_entry"
   | "request_pending"
   | "request_rejected"
+  | "waitlisted"
   | "payment_required"
   | "payment_pending"
   | "entered_waiting_submission"
@@ -29,6 +30,7 @@ export type ParticipantJourneyStep =
 export type ParticipantJourneyAction =
   | "sign_in"
   | "register"
+  | "join_waitlist"
   | "enter_challenge"
   | "request_entry"
   | "pay_entry_fee"
@@ -159,20 +161,21 @@ export function getParticipantJourneyState(input: JourneyInput) {
   if (!authenticated) return result("auth_required", "Sign in to continue", "Sign in before participating in this challenge.", "sign_in", input, flags, "auth_required");
   if (isSponsorProfile(profile)) return result("blocked_sponsor", "Sponsors cannot participate as competitors", "Use sponsor tools for funding, messaging, and campaign activity.", null, input, flags, "sponsor_blocked");
   if (phase.phase === "timeline_needs_review") return result("timeline_needs_review", "Schedule pending", "The organizer is confirming the challenge schedule.", null, input, flags, "timeline_needs_review");
+  if (!registered && challengeFull) return challenge.waitlistEnabled === true ? result("register", "Join Waitlist", "The challenge is full, but the waitlist is open.", "join_waitlist", input, flags, null) : result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
   if (submission && isRejectedSubmission(submission.status) && phase.canSubmit && entered) return result("fix_and_resubmit", "Fix and resubmit", `Update your entry before ${submissionDeadline ?? "the deadline"}.`, "fix_and_resubmit", input, flags, null);
   if (submission && isSubmitted(submission.status)) return result("already_submitted", "Entry submitted", "Your entry has been submitted for this challenge.", "view_entry", input, flags, "already_submitted");
-  if (requestStatus === "pending") return result("request_pending", "Approval pending", "The host is reviewing your registration.", null, input, flags, "request_pending");
+  if (participantStatus === "waitlisted") return result("waitlisted", "Waitlisted", "You are on the waitlist. We will update your status if a place becomes available.", null, input, flags, "waitlisted");
+  if (requestStatus === "pending") return result("request_pending", "Awaiting Approval", "The host is reviewing your request to join.", null, input, flags, "request_pending");
   if (requestStatus === "rejected") return result("request_rejected", "Request rejected", "Your entry request was not approved.", "back_to_challenge", input, flags, "request_rejected");
-  if (approvalRequired && !registered) return result("request_entry", "Request Entry", "This challenge requires approval before you can enter.", "request_entry", input, flags, null);
-  if (approvalRequired && !approvalGranted) return result("request_pending", "Approval pending", "The host is reviewing your registration.", null, input, flags, "request_pending");
   if (paymentRequired && isPendingPayment(paymentStatus)) return result("payment_pending", "Payment processing", "We are confirming your payment. This page will update after confirmation.", "refresh_payment", input, flags, "payment_pending");
   if (paymentRequired && !paymentConfirmed) {
     const canCompleteExisting = registered && phase.phase !== "submission_closed";
     if (!phase.canJoin && !canCompleteExisting) return result("registration_closed", "Registration closed", "Registration is closed for this challenge.", "back_to_challenge", input, flags, "registration_closed");
     return result("payment_required", "Complete payment", "Your registration is incomplete until payment succeeds.", "pay_entry_fee", input, flags, null);
   }
+  if (approvalRequired && !request && paymentConfirmed) return result("request_entry", "Request to Join", "Payment is confirmed. Send your request to the creator for approval.", "request_entry", input, flags, null);
+  if (approvalRequired && !approvalGranted) return result("request_pending", "Awaiting Approval", "The host is reviewing your request to join.", null, input, flags, "request_pending");
   if (!registered) {
-    if (challengeFull) return result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
     if (!phase.canJoin) return result("registration_closed", "Registration closed", registrationClosesAt ? `Registration ended ${registrationClosesAt}.` : "Registration is closed for this challenge.", null, input, flags, "registration_closed");
     return result("register", "Join Challenge", registrationClosesAt ? `Registration closes ${registrationClosesAt}.` : "Registration is open.", "register", input, flags, null);
   }

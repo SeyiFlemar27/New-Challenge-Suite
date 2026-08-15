@@ -14,7 +14,7 @@ import {
 import { createNotification } from "@/lib/server/notifications";
 import { calculateGrowthWalletAllocation, calculatePaidEntrySplit, ECONOMY_V1_RULES, ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
 
-export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 15;
+export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
 export type SettlementWinner = {
   userId: string;
@@ -150,6 +150,17 @@ function distributeByWeights(amountCents: number, weights: Array<{ position: num
   });
 }
 
+export function generatedRevenueWinnerWeights(count: number) {
+  if (count <= 0) return [];
+  if (count === 1) return [{ position: 1, amountCents: 65, percent: 65 }];
+  if (count === 2) return [{ position: 1, amountCents: 35, percent: 35 }, { position: 2, amountCents: 30, percent: 30 }];
+  return [
+    { position: 1, amountCents: 25, percent: 25 },
+    { position: 2, amountCents: 20, percent: 20 },
+    { position: 3, amountCents: 20, percent: 20 }
+  ].slice(0, count);
+}
+
 export function buildSettlementBreakdown(input: {
   challenge: Record<string, unknown>;
   winners: SettlementWinner[];
@@ -158,14 +169,14 @@ export function buildSettlementBreakdown(input: {
   confirmedSponsorPrizeCents: number;
 }) {
   const economyV1 = input.challenge.economyRuleVersion === ECONOMY_V1_RULE_VERSION;
-  const grossConfirmedChallengeRevenue = economyV1 ? cents(input.confirmedEntryRevenueCents) : cents(input.confirmedEntryRevenueCents) + cents(input.confirmedPaidVoteRevenueCents);
+  const grossConfirmedChallengeRevenue = cents(input.confirmedEntryRevenueCents) + cents(input.confirmedPaidVoteRevenueCents);
   const legacySplit = calculatePaidRevenueSplit(grossConfirmedChallengeRevenue);
   const v1Split = calculatePaidEntrySplit(grossConfirmedChallengeRevenue);
   const generatedSplit = economyV1 ? { winnerShareCents: v1Split.winnerAmountCents, creatorHostOperatorShareCents: v1Split.creatorAmountCents, platformAdminShareCents: v1Split.platformAmountCents } : legacySplit;
   const grossConfirmedSponsorPrizeAmount = cents(input.confirmedSponsorPrizeCents);
   const sponsorPrizePlatformFeeAmount = Math.floor(grossConfirmedSponsorPrizeAmount * SPONSOR_PRIZE_PLATFORM_FEE_PERCENT / 100);
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
-  const challengeDistribution = distributeByPercent(generatedSplit.winnerShareCents, winnerSplits(input.winners));
+  const challengeDistribution = distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(input.winners.length));
   const sponsorSplits = customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(input.winners.length);
   const sponsorGrossDistribution = customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount)
     ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
@@ -217,12 +228,13 @@ export function buildSettlementBreakdown(input: {
         netAmountCents: net?.amountCents ?? 0
       };
     }),
-    challengeGeneratedRevenueSplit: economyV1 ? { winnerSharePercent: 65, platformAdminSharePercent: 15, creatorSharePercent: 10, hostSponsorSharePercent: 10 } : PAID_REVENUE_SPLIT,
+    challengeGeneratedRevenueSplit: economyV1 ? { winnerSharePercent: 65, platformAdminSharePercent: 15, creatorSharePercent: 20, hostSponsorSharePercent: 0 } : PAID_REVENUE_SPLIT,
     economyRuleVersion: economyV1 ? ECONOMY_V1_RULE_VERSION : String(input.challenge.economyRuleVersion ?? "legacy_paid_entry_v0"),
     sponsorMoneyExcludedFromChallengeSplit: true,
     creatorReceivesSponsorMoney: false,
     normalWinnerPrizeExtraFeeRate: 0,
-    sponsorPrizeFeeDeductedOnce: true,
+    sponsorPrizeFeeDeductedOnce: false,
+    sponsorPrizePlatformFeeApplied: false,
     externalPayoutExecuted: false
   };
 }

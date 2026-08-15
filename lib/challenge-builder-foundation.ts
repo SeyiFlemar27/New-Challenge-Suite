@@ -1,13 +1,15 @@
-export const NORMAL_CHALLENGE_STEPS = [
-  "Overview",
-  "Eligibility",
-  "Monetization & Prize Pool",
-  "Media & Branding",
-  "Schedule",
-  "Entry & Submission",
-  "Review",
-  "Publish"
+export const NORMAL_CHALLENGE_STEP_DEFINITIONS = [
+  { key: "overview", navLabel: "Overview", title: "Overview", description: "Give people a clear reason to join and compete.", fields: ["title", "category", "subcategory", "shortDescription", "description", "challengeRules"], guide: ["Lead with one clear outcome.", "Use plain language participants can scan quickly.", "Add only rules that materially affect an entry."] },
+  { key: "eligibility", navLabel: "Eligibility", title: "Eligibility", description: "Decide who can join and how participation is approved.", fields: ["participationMode", "locationEligibility", "eligibleCountries", "minimumAge", "maxParticipants", "waitlistEnabled", "hideParticipantList"], guide: ["Keep access broad unless the challenge genuinely needs restrictions.", "Approval is useful when every participant needs review.", "A blank capacity means there is no fixed limit."] },
+  { key: "monetization", navLabel: "Monetization & Prize Pool", title: "Monetization & Prize Pool", description: "Set the guaranteed cash prize and optional challenge monetization.", fields: ["numberOfWinners", "winnerPrizeAmountsCents", "entryFeeAmountCents", "sponsorReady", "votingSettings"], guide: ["Placement amounts combine into the Base Prize.", "Confirmed creator funding goes directly to the prize pool.", "Sponsor funds remain separate from challenge-generated revenue."] },
+  { key: "media", navLabel: "Media & Branding", title: "Media & Branding", description: "Build a clear gallery that helps people understand your challenge.", fields: ["challengeImages", "challengeVideo"], guide: ["Image 1 is the public cover.", "Use consistent, high-quality imagery.", "Video is optional and appears first in public galleries."] },
+  { key: "schedule", navLabel: "Schedule", title: "Schedule", description: "Plan the Join, Submit, Vote, and Results lifecycle.", fields: ["timeZone", "registrationOpensAt", "registrationDeadline", "submissionStartAt", "submissionDeadline", "votingStartsAt", "votingDeadline", "winnerAnnouncementAt"], guide: ["Use one timezone for the whole challenge.", "Exact boundary transitions are allowed.", "Results appear only after the scheduled time and admin confirmation."] },
+  { key: "submission", navLabel: "Entry & Submission", title: "Entry & Submission", description: "Explain exactly what participants need to submit.", fields: ["acceptedSubmissionTypes", "challengeGuidelines", "submissionRequirementsList", "fixAndResubmitEnabled"], guide: ["Keep instructions concise and testable.", "Choose only formats you can review.", "Correction windows begin only after an explicit request."] },
+  { key: "review", navLabel: "Review", title: "Review Your Challenge", description: "Check your challenge before you continue.", fields: [], guide: ["Review every section as a participant would see it.", "Use Edit to return to any section that needs attention.", "Partial prize funding does not block admin review."] },
+  { key: "publish", navLabel: "Publish", title: "Ready to Submit?", description: "Your challenge is complete. Submit it for review when you're ready.", fields: ["publishConfirmations"], guide: ["Submission sends the challenge to admin review.", "Editing pauses while review is in progress.", "You can resubmit if an admin requests changes."] }
 ] as const;
+
+export const NORMAL_CHALLENGE_STEPS = NORMAL_CHALLENGE_STEP_DEFINITIONS.map((step) => step.navLabel) as readonly string[];
 export const NORMAL_CHALLENGE_MAX_STEP = NORMAL_CHALLENGE_STEPS.length - 1;
 
 export type BuilderChallengeType = "normal" | "private" | "tournament" | "live_event";

@@ -45,7 +45,8 @@ assert.match(builder, /normalChallengeSubmitIssue\(result\.details\)/);
 assert.match(builder, /Some required details need attention\./);
 assert.match(steps, /No fixed capacity\./);
 assert.match(steps, /Limited to \$\{form\.maxParticipants/);
-assert.match(steps, /with a waitlist/);
+assert.match(steps, /label="Waitlist"/);
+assert.match(steps, /Enable when capacity is reached/);
 assert.doesNotMatch(builder, /Too small: expected number to be >=2/);
 assert.match(capacitySource, /Set capacity to at least 2, or leave it blank for no fixed capacity\./);
 

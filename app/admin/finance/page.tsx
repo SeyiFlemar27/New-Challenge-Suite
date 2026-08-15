@@ -30,7 +30,7 @@ export default function AdminFinancePage() {
             <Amount label="Creator / Host (20%)" value={settlement.creatorHostAmount} />
             <Amount label="Platform Fee (15%)" value={settlement.platformChallengeFeeAmount} />
             <Amount label="Gross Sponsor Prize" value={settlement.grossConfirmedSponsorPrizeAmount} />
-            <Amount label="Sponsor Fee (15%)" value={settlement.sponsorPrizePlatformFeeAmount} />
+            <Amount label="Sponsor Prize Platform Fee" value={settlement.sponsorPrizePlatformFeeAmount} />
             <Amount label="Net Sponsor Prize" value={settlement.netSponsorPrizeAmount} />
             <Amount label="Internal Credits" value={credits.reduce((sum: number, item: any) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0)} />
           </div>

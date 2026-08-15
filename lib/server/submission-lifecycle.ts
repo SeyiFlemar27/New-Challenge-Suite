@@ -20,6 +20,7 @@ export const participantStatuses = [
   "entered",
   "enrolled",
   "pending_approval",
+  "waitlisted",
   "approved",
   "rejected",
   "active",

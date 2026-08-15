@@ -15,7 +15,7 @@ const sources = {
   publishReadiness: read("lib/challenge-publish-readiness.ts"),
   readiness: read("lib/server/provider-readiness.ts"),
   preview: read("app/challenges/create/[draftId]/preview/page.tsx"),
-  media: read("components/media-display.tsx"),
+  media: read("components/media-display.tsx") + read("components/challenge-media-carousel.tsx"),
   upload: read("components/media-upload-field.tsx"),
   detail: read("app/challenges/[id]/page.tsx"),
   explore: read("app/explore/page.tsx"),
@@ -48,7 +48,7 @@ for (const message of [
 assert.doesNotMatch(sources.builder, /response\.message \|\| "Challenge could not be published/);
 
 for (const title of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
-assert.match(sources.normalBuilder, /NORMAL_CHALLENGE_STEPS\[step\]/);
+assert.match(sources.normalBuilder, /NORMAL_CHALLENGE_(?:STEPS\[step\]|STEP_DEFINITIONS\[step\])/);
 assert.match(sources.normalBuilder, /createChallengeDraft\(payload\)/);
 assert.match(sources.normalBuilder, /publishChallengeDraft\(id, payload\)/);
 assert.match(sources.normalBuilder, /Submit for Review/);
@@ -56,12 +56,12 @@ assert.doesNotMatch(sources.normalBuilder, /setPreview\(true\)|function Preview\
 assert.match(sources.preview, /redirect\(`\/challenges\/create\/\$\{draftId\}`\)/);
 
 assert.match(sources.media, /data-video-first/);
-assert.ok(sources.media.indexOf("<video") < sources.media.indexOf("imageUrls.map"), "video must render before images");
-assert.match(sources.media, /controls playsInline preload="metadata"/);
+assert.ok(sources.media.indexOf("videoUrl ?") < sources.media.indexOf("cleanImages.map"), "video must render before images");
+assert.match(sources.media, /controls muted playsInline preload="metadata"/);
 assert.doesNotMatch(sources.media, /autoPlay/);
 assert.match(sources.detail, /ChallengeMediaGallery/);
-assert.match(sources.explore, /trailerVideoUrl \|\| challenge\.promoVideoUrl/);
-assert.match(sources.explore, /<Play size=\{14\}/);
+assert.match(sources.explore, /trailerVideoUrl (?:\|\||\?\?) challenge\.promoVideoUrl/);
+assert.match(sources.media, /<Play size=\{14\}/);
 
 assert.doesNotMatch(sources.upload, /Media URL and storage path are ready to save|uploaded media URL is saved|saving media reference/);
 assert.doesNotMatch(sources.builder, /existing server validation|provider verified|storage path/i);

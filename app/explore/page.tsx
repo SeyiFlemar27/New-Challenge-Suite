@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, inputClass, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { ChallengeMediaFrame } from "@/components/media-display";
+import { ExploreCardMedia } from "@/components/challenge-media-carousel";
 import { Bookmark, CalendarDays, Filter, Play, Search, SlidersHorizontal, Trophy, Users } from "lucide-react";
 
 type ExploreChallenge = Record<string, any>;
@@ -175,7 +176,7 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
   }
   return <article data-mobile-explore-card role="link" tabIndex={0} onClick={openCard} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } }} className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] shadow-lg shadow-black/20 transition hover:border-[var(--gold)]/50 hover:bg-[#1a1a1a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
     <div className="relative">
-      {challenge.trailerVideoUrl || challenge.promoVideoUrl ? <><video src={String(challenge.trailerVideoUrl ?? challenge.promoVideoUrl)} poster={String(challenge.coverImageUrl ?? "") || undefined} muted playsInline preload="metadata" className="aspect-[16/10] h-auto w-full object-cover" aria-label={`${String(challenge.title ?? "Challenge")} video preview`} /><span className="pointer-events-none absolute bottom-3 left-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white"><Play size={14} fill="currentColor" /></span></> : <ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="aspect-[16/10] h-auto rounded-none border-0" placeholder="Challenge Suite" />}
+      <ExploreCardMedia title={String(challenge.title ?? "Challenge")} videoUrl={String(challenge.trailerVideoUrl ?? challenge.promoVideoUrl ?? "")} images={[challenge.coverImageUrl, ...(Array.isArray(challenge.challengeImages) ? challenge.challengeImages.map((item: any) => typeof item === "string" ? item : item?.url) : []), challenge.promoImageUrl, challenge.galleryImageUrl]} />
       <span className="absolute left-3 top-3 flex flex-wrap items-center gap-2"><Badge>{String(challenge.typeLabel ?? "Standard Challenge")}</Badge><Badge>{publicPhaseLabel(phase.label)}</Badge>{challenge.isOwnedByViewer ? <Badge>Yours</Badge> : null}</span>
       {!interactionsDisabled ? <button type="button" onClick={toggleSaved} disabled={saving} className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white backdrop-blur transition hover:text-[var(--gold)] disabled:opacity-60" aria-label={saved ? "Remove saved challenge" : "Save challenge"} aria-pressed={saved}><Bookmark size={18} className={saved ? "fill-[var(--gold)] text-[var(--gold)]" : ""} /></button> : null}
     </div>

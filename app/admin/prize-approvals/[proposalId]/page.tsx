@@ -120,7 +120,7 @@ export default function AdminPrizeApprovalDetailPage() {
               <Data label="Creator / Host (20%)" value={money(preview.creatorHostAmount)} />
               <Data label="Challenge Suite Fee (15%)" value={money(preview.platformChallengeFeeAmount)} />
               <Data label="Confirmed Sponsor Prize" value={money(preview.grossConfirmedSponsorPrizeAmount)} />
-              <Data label="Sponsor Prize Fee (15%)" value={money(preview.sponsorPrizePlatformFeeAmount)} />
+              <Data label="Sponsor Prize Platform Fee" value={money(preview.sponsorPrizePlatformFeeAmount)} />
               <Data label="Net Sponsor Prize to Winners" value={money(preview.netSponsorPrizeAmount)} />
               <Data label="Currency" value={preview.currency} />
             </div> : <p className="mt-4 text-sm text-slate-400">Confirmed revenue is currently unavailable or $0 until payment confirmation is connected.</p>}

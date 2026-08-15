@@ -66,7 +66,7 @@ export function runEconomyContract(metaUrl) {
   else if (name.includes("free-vs-paid-breakdown")) has(files.detail, ["freeVoteCount", "paidVoteCount", "voteBreakdown"]);
   else if (name.includes("revenue-held")) has(files.voting, ["held_pending_challenge_completion", "releaseRequiresFraudClearance", "releaseRequiresDisputeClearance"]);
   else if (name.includes("settlement-blocked")) has(files.voting, ["releaseRequiresDisputeClearance", "releaseRequiresVoteIntegrityClearance"]);
-  else if (name.includes("split-new")) has(files.rules + files.settlement + files.create, ["winnerPercent: 65", "platformPercent: 15", "creatorPercent: 10", "hostSponsorPercent: 10", "economyRuleVersion"]);
+  else if (name.includes("split-new")) has(files.rules + files.settlement + files.create, ["winnerPercent: 65", "platformPercent: 15", "creatorPercent: 20", "hostSponsorPercent: 0", "economyRuleVersion"]);
   else if (name.includes("old-challenges")) has(files.settlement, ["legacy_paid_entry_v0", "calculatePaidRevenueSplit", "economyV1"]);
   else if (name.includes("unresolved-host")) has(files.settlement, ["settlementUnresolvedAllocations", "requires_admin_resolution", "paid_entry_host_sponsor_allocation_unresolved"]);
   else if (name.includes("split-after")) has(files.settlement, ["Admin-approved winners are required before settlement", "proposalSnap.data()?.status !== \"approved\""]);
