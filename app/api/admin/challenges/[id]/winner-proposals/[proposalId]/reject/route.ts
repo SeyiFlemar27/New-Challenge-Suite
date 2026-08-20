@@ -3,6 +3,7 @@ import { requireAdminPermission } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
 import { getChallengeOrNull, getProposalOrNull } from "@/lib/server/prize-approvals";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { createNotification } from "@/lib/server/notifications";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
   const { user, response } = await requireAdminPermission(request, "winners.review");
@@ -22,11 +23,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!proposal || String(proposal.challengeId) !== challengeId) return fail("Winner proposal not found.", 404, undefined, "WINNER_PROPOSAL_NOT_FOUND");
 
   const now = new Date().toISOString();
+  const changesRequested = parsed.body?.decision === "changes_requested" || parsed.body?.requestChanges === true;
   const update = {
-    status: "rejected",
+    status: changesRequested ? "changes_requested" : "rejected",
     reviewedAt: now,
     reviewedByAdminId: user.uid,
-    adminDecision: "rejected",
+    adminDecision: changesRequested ? "changes_requested" : "rejected",
     adminNote,
     ledgerFinalizationStatus: "rejected_no_ledger_entries",
     ledgerEntriesCreated: false,
@@ -45,6 +47,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     reason: "Winner proposal rejected. No ledger entries were created.",
     metadata: { challengeId, payoutProviderCalled: false, ledgerEntriesCreated: false }
   }, db);
+  const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "");
+  if (creatorId) await createNotification(db, { userId: creatorId, type: changesRequested ? "winner_proposal_changes_requested" : "winner_proposal_rejected", title: changesRequested ? "Winner proposal needs changes" : "Winner proposal not approved", body: adminNote, entityType: "winner_proposal", entityId: proposalId, targetId: proposalId, actionUrl: `/challenges/${challengeId}/manage?tab=winners&focus=${encodeURIComponent(proposalId)}`, metadata: { challengeId, proposalId }, idempotencyKey: `winner_proposal_${changesRequested ? "changes" : "rejected"}_${proposalId}_${now}` }).catch(() => undefined);
 
-  return ok({ proposal: { ...proposal, ...update } }, "Winner proposal rejected. No ledger entries were created.");
+  return ok({ proposal: { ...proposal, ...update } }, changesRequested ? "Winner proposal changes requested. No ledger entries were created." : "Winner proposal rejected. No ledger entries were created.");
 }

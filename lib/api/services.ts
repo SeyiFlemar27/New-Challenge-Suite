@@ -117,8 +117,8 @@ export function fetchPrivateExclusiveChallenges(limit = 30) {
   return apiRequest<{ challenges: unknown[] }>(`/api/private-exclusive?limit=${limit}`);
 }
 
-export function checkPrivateInviteCode(inviteCode: string) {
-  return apiRequest<{ challengeId: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "check_code", inviteCode }) });
+export function checkPrivateInviteCode(inviteCode: string, challengeId?: string) {
+  return apiRequest<{ challengeId: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "check_code", inviteCode, challengeId }) });
 }
 
 export function requestPrivateAccess(payload: { challengeId?: string; reason: string; note?: string }) {

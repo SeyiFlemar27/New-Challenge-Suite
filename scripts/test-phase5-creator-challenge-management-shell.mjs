@@ -5,13 +5,11 @@ const source = read(
 );
 assert(source.includes("Challenge Management"), "missing " + "Challenge Management");
 assert(source.includes("Participants"), "missing " + "Participants");
-assert(source.includes("Entry Requests"), "missing " + "Entry Requests");
+assert(source.includes("Participant Requests"), "missing " + "Participant Requests");
 assert(source.includes("Submissions"), "missing " + "Submissions");
 assert(source.includes("Voting"), "missing " + "Voting");
-assert(source.includes("Reports"), "missing " + "Reports");
 assert(source.includes("Winners"), "missing " + "Winners");
-assert(source.includes("Timeline"), "missing " + "Timeline");
-assert(source.includes("Settings"), "missing " + "Settings");
-assert(source.includes("Settlement"), "missing " + "Settlement");
-assert(source.includes("Audit Log"), "missing " + "Audit Log");
+assert(source.includes("Prize & Revenue"), "missing " + "Prize & Revenue");
+assert(source.includes("Sponsors"), "missing " + "Sponsors");
+assert(source.includes("Schedule"), "missing " + "Schedule");
 console.log("test-phase5-creator-challenge-management-shell checks passed");

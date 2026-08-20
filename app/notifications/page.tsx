@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { Bell, CheckCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Button, Card, EmptyState, PageTitle } from "@/components/ui";
 
 type NotificationRecord = {
   id: string;
@@ -33,9 +34,8 @@ export default function NotificationsPage() {
     await refetch();
   }
 
-  async function markRead(id: string) {
-    await fetch(`/api/notifications/${id}/read`, { method: "POST" }).catch(() => null);
-    await refetch();
+  function openNotification(id: string, unread: boolean) {
+    if (unread) void fetch(`/api/notifications/${id}/read`, { method: "POST" }).then(() => refetch()).catch(() => undefined);
   }
 
   return (
@@ -64,8 +64,8 @@ export default function NotificationsPage() {
           <div className="mt-8 space-y-3">
             {notifications.map((notification) => {
               const unread = notification.status === "unread" || notification.read === false;
-              return (
-                <Card key={notification.id} className={`p-5 ${unread ? "border-[var(--gold)]/35 bg-[var(--gold)]/5" : "bg-[#141414]"}`}>
+              return <Link key={notification.id} href={notification.actionUrl ?? "/notifications/unavailable"} onClick={() => openNotification(notification.id, unread)} className="block rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`Open notification: ${notification.title ?? "Notification"}`}>
+                <Card className={`p-5 transition hover:border-[var(--gold)]/45 hover:bg-[var(--gold)]/5 ${unread ? "border-[var(--gold)]/35 bg-[var(--gold)]/5" : "bg-[#141414]"}`}>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -76,13 +76,10 @@ export default function NotificationsPage() {
                       <p className="mt-2 text-sm leading-6 text-slate-300">{notification.message ?? notification.body ?? "Notification update"}</p>
                       <p className="mt-2 text-xs text-slate-500">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "Time not available"}</p>
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      {notification.actionUrl ? <LinkButton href={notification.actionUrl} variant="secondary">Open</LinkButton> : null}
-                      {unread ? <Button variant="ghost" onClick={() => void markRead(notification.id)}>Mark Read</Button> : null}
-                    </div>
+                    <span className="shrink-0 text-sm font-black text-amber-700">Open</span>
                   </div>
                 </Card>
-              );
+              </Link>;
             })}
           </div>
         ) : null}

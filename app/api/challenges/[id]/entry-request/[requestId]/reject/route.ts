@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
   await writeAuditLog({ actorId: user.uid, actorType: "creator", action: "entry_request.rejected", targetType: "challenge", targetId: id, after: result.entryRequest }, db).catch(() => undefined);
   const participantUserId = String((result.entryRequest as Record<string, unknown>).userId ?? "");
-  if (participantUserId) await createNotification(db, { userId: participantUserId, type: "entry_request_rejected", title: "Entry request declined", body: note || "Your challenge entry request was declined.", targetId: id });
+  if (participantUserId) await createNotification(db, { userId: participantUserId, type: "entry_request_rejected", title: "Entry request declined", body: note || "Your challenge entry request was declined.", entityType: "challenge", entityId: id, targetId: id, actionUrl: `/challenges/${id}`, metadata: { challengeId: id, requestId } });
   return ok(result, "Entry request rejected.");
 }
 

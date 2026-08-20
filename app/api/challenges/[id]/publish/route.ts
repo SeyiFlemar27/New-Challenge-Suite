@@ -263,7 +263,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (transition.idempotent) return ok({ challenge: transition.challenge, idempotent: true }, "Challenge is already submitted for review.");
 
   if (body.visibility === "private" || body.visibility === "exclusive") {
-    await createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now }).catch(async (error) => {
+    await createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now, code: typeof body.privateAccessCode === "string" ? body.privateAccessCode : undefined, expiresAt: typeof body.privateAccessCodeExpiresAt === "string" ? body.privateAccessCodeExpiresAt : null, maxUses: typeof body.privateAccessCodeMaxUses === "number" ? body.privateAccessCodeMaxUses : null }).catch(async (error) => {
       await writeAuditLog({ actorId: user.uid, actorType: "system", action: "challenge.private_invite_failed", targetType: "challenge", targetId: id, reason: "Private invite creation failed after review submission.", metadata: { causeCode: "PRIVATE_INVITE_DELIVERY_FAILED", occurredAt: now }, createdAt: now }, db).catch(() => undefined);
       console.error("[challenge.publish] private invite creation failed", { challengeId: id, userId: user.uid, code: "PRIVATE_INVITE_DELIVERY_FAILED", message: error instanceof Error ? error.message : "Unknown error" });
     });

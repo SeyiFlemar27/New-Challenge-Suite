@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const discovery = fs.readFileSync("app/api/challenge-discovery/route.ts", "utf8");
+const publicFields = fs.readFileSync("lib/server/public-challenge.ts", "utf8");
+const invites = fs.readFileSync("lib/server/private-invites.ts", "utf8");
+const verify = fs.readFileSync("app/api/private-exclusive/route.ts", "utf8");
+const builder = fs.readFileSync("components/challenge-builder.tsx", "utf8");
+assert.match(discovery, /PRIVATE_DISCOVERY_FORBIDDEN/);
+assert.doesNotMatch(discovery, /privateAccessCode/);
+assert.doesNotMatch(publicFields.match(/publicChallengeFields[\s\S]+?publicSubmissionFields/)?.[0] ?? "", /privateAccessCode/);
+assert.match(invites, /createHash\("sha256"\)/);
+assert.match(verify, /INVITE_CHALLENGE_MISMATCH/);
+assert.match(verify, /runTransaction/);
+for (const step of ["Overview", "Access", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert(builder.includes(step));
+console.log("private discovery and access security contracts: ok");

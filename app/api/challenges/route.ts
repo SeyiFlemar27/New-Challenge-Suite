@@ -209,11 +209,10 @@ export async function POST(request: Request) {
     bestOf: body.bestOf,
     numberOfWinners: body.numberOfWinners,
     winnerSelection: body.winnerSelection,
-    votingSettings: {
+    votingSettings: Object.fromEntries(Object.entries({
       ...body.votingSettings,
-      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes,
-      allowDoroCoinVotes: undefined
-    },
+      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes
+    }).filter(([key, value]) => key !== "allowDoroCoinVotes" && value !== undefined)),
     rules: body.standardRules
       ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
       : [],

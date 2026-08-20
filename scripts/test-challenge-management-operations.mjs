@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const approve = fs.readFileSync("app/api/challenges/[id]/entry-request/[requestId]/approve/route.ts", "utf8");
+const reject = fs.readFileSync("app/api/challenges/[id]/entry-request/[requestId]/reject/route.ts", "utf8");
+const manage = fs.readFileSync("app/api/challenges/[id]/manage/route.ts", "utf8");
+const ui = fs.readFileSync("app/challenges/[id]/manage/page.tsx", "utf8");
+assert.match(approve, /runTransaction/);
+assert.match(approve, /CHALLENGE_CAPACITY_FULL/);
+assert.match(reject, /refundStatus: "refund_review"/);
+assert.match(manage, /alreadyCheckedIn/);
+assert.match(manage, /participant\.check_in/);
+for (const tab of ["Overview", "Participant Requests", "Participants", "Submissions", "Winners", "Prize & Revenue", "Schedule"]) assert(ui.includes(tab));
+assert.match(ui, /Manual Check-In/);
+console.log("challenge management operational contracts: ok");

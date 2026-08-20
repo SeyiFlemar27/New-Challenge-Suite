@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ClipboardCheck, Trophy } from "lucide-react";
@@ -24,12 +24,13 @@ type CandidatePayload = {
   readiness: { ready: boolean; message: string; lifecycle: { primaryStatus: string; submissionStatus: string; votingStatus: string } };
   candidates: WinnerCandidate[];
   proposals: Array<{ id: string; status?: string; adminNote?: string | null; updatedAt?: string | null }>;
-  activeProposal: { id: string; status?: string } | null;
+  activeProposal: { id: string; status?: string; winners?: Array<{ placement: number; submissionId?: string | null }>; notes?: string; adminNote?: string | null } | null;
   noEligibleCandidatesMessage: string | null;
 };
 
 const oneWinner = [{ placement: 1, splitPercent: 100 }];
-const threeWinners = [{ placement: 1, splitPercent: 70 }, { placement: 2, splitPercent: 20 }, { placement: 3, splitPercent: 10 }];
+const twoWinners = [{ placement: 1, splitPercent: 70 }, { placement: 2, splitPercent: 30 }];
+const threeWinners = [{ placement: 1, splitPercent: 50 }, { placement: 2, splitPercent: 30 }, { placement: 3, splitPercent: 20 }];
 
 function label(value: unknown) {
   return String(value ?? "not available").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -38,11 +39,12 @@ function label(value: unknown) {
 export default function ProposeWinnersPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
-  const [mode, setMode] = useState<"one" | "three">("one");
+  const [mode, setMode] = useState<"one" | "two" | "three">("one");
   const [selected, setSelected] = useState<Record<number, string>>({});
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
+  const initializedProposalId = useRef("");
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["winner-candidates", challengeId],
     queryFn: () => apiRequest<CandidatePayload>(`/api/challenges/${challengeId}/winner-candidates`),
@@ -51,12 +53,21 @@ export default function ProposeWinnersPage() {
   });
 
   const payload = data?.ok ? data.data : null;
-  const slots = mode === "one" ? oneWinner : threeWinners;
+  const slots = mode === "one" ? oneWinner : mode === "two" ? twoWinners : threeWinners;
   const candidates = payload?.candidates ?? [];
   const candidatesById = useMemo(() => new Map(candidates.map((candidate) => [candidate.submissionId, candidate])), [candidates]);
   const duplicateSelection = new Set(Object.values(selected).filter(Boolean)).size !== Object.values(selected).filter(Boolean).length;
   const allFilled = slots.every((slot) => selected[slot.placement]);
-  const canSubmit = Boolean(payload?.readiness.ready && !payload.activeProposal && candidates.length && allFilled && !duplicateSelection);
+  const approved = payload?.activeProposal?.status === "approved";
+  const canSubmit = Boolean(payload?.readiness.ready && !approved && candidates.length && allFilled && !duplicateSelection);
+  useEffect(() => {
+    const proposal = payload?.activeProposal;
+    if (!proposal || initializedProposalId.current === proposal.id || !proposal.winners?.length) return;
+    initializedProposalId.current = proposal.id;
+    setMode(proposal.winners.length === 1 ? "one" : proposal.winners.length === 2 ? "two" : "three");
+    setSelected(Object.fromEntries(proposal.winners.map((winner) => [winner.placement, winner.submissionId ?? ""])));
+    setNotes(proposal.notes ?? "");
+  }, [payload?.activeProposal]);
 
   async function submit() {
     if (!canSubmit) return;
@@ -106,14 +117,15 @@ export default function ProposeWinnersPage() {
                   <Mini label="Proposal Status" value={payload.activeProposal ? label(payload.activeProposal.status) : "None active"} />
                 </div>
                 {!payload.readiness.ready ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/[0.04] p-4 text-sm text-yellow-100">{payload.readiness.message}</p> : null}
-                {payload.activeProposal ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/[0.04] p-4 text-sm text-yellow-100">An active proposal is already {label(payload.activeProposal.status).toLowerCase()}. New proposals are available after rejection or requested changes.</p> : null}
+                 {payload.activeProposal ? <p className="mt-5 rounded-[8px] border border-yellow-500/20 bg-yellow-500/[0.04] p-4 text-sm text-yellow-100">Proposal status: {label(payload.activeProposal.status)}. {approved ? "Official winners are locked." : "You can revise this proposal until admin approval."}{payload.activeProposal.adminNote ? ` Admin response: ${payload.activeProposal.adminNote}` : ""}</p> : null}
               </Card>
 
               <Card className="p-5 sm:p-6">
                 <h2 className="text-xl font-black">Winner mode</h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <Button variant={mode === "one" ? "primary" : "secondary"} onClick={() => { setMode("one"); setSelected({}); }}>One winner / 100%</Button>
-                  <Button variant={mode === "three" ? "primary" : "secondary"} onClick={() => { setMode("three"); setSelected({}); }}>Three winners / 70-20-10</Button>
+                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                   <Button variant={mode === "one" ? "primary" : "secondary"} onClick={() => { setMode("one"); setSelected({}); }}>One winner / 100%</Button>
+                   <Button variant={mode === "two" ? "primary" : "secondary"} onClick={() => { setMode("two"); setSelected({}); }}>Two winners / 70-30</Button>
+                   <Button variant={mode === "three" ? "primary" : "secondary"} onClick={() => { setMode("three"); setSelected({}); }}>Three winners / 50-30-20</Button>
                 </div>
               </Card>
 
@@ -134,7 +146,7 @@ export default function ProposeWinnersPage() {
                 <Field label="Operator note">
                   <textarea className={textareaClass} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Add context for admin review. Do not include private payment or identity details." />
                 </Field>
-                <Button className="mt-5 w-full" onClick={() => void submit()} disabled={!canSubmit || submitting}>{submitting ? "Submitting..." : "Submit Winners for Admin Review"}</Button>
+                 <Button className="mt-5 w-full" onClick={() => void submit()} disabled={!canSubmit || submitting}>{submitting ? "Submitting..." : payload.activeProposal ? "Update Winners for Admin Review" : "Submit Winners for Admin Review"}</Button>
                 {notice ? <p className="mt-4 text-sm text-slate-300">{notice}</p> : null}
               </Card>
             </div>

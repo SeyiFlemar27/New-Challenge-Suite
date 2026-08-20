@@ -29,6 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const challengeData = challengeSnap.data() ?? {};
+  const creatorId = String(challengeData.creatorId ?? challengeData.ownerId ?? challengeData.hostId ?? challengeData.userId ?? "");
   const publiclyVisible = isPublicChallenge(challengeSnap.id, challengeData);
   const user = await getOptionalRequestUser(request);
   let requestProfile: Record<string, unknown> = {};
@@ -55,7 +56,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const entryPaymentId = user ? `challenge_entry_fee_${id}_${user.uid}` : null;
   const legacyEntryPaymentId = user ? `challenge_entry_${id}_${user.uid}` : null;
-  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap, entryRequestSnap] = await Promise.all([
+  const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap, entryRequestSnap, creatorProfileSnap, creatorAccountSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
     db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
@@ -66,7 +67,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     entryPaymentId ? db.collection("challengeEntryPayments").doc(entryPaymentId).get() : Promise.resolve(null),
     legacyEntryPaymentId ? db.collection("challengeEntryPayments").doc(legacyEntryPaymentId).get() : Promise.resolve(null),
     user ? db.collection("submissions").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
-    user ? db.collection("challengeEntryRequests").doc(`${id}_${user.uid}`).get() : Promise.resolve(null)
+    user ? db.collection("challengeEntryRequests").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
+    creatorId ? db.collection("profiles").doc(creatorId).get() : Promise.resolve(null),
+    creatorId ? db.collection("users").doc(creatorId).get() : Promise.resolve(null)
   ]);
 
   const sponsorships = sponsorshipsSnap.docs
@@ -108,6 +111,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
 
   const publicChallenge = publicChallengeFields(challengeData);
+  const creatorProfile = { ...(creatorAccountSnap?.exists ? creatorAccountSnap.data() ?? {} : {}), ...(creatorProfileSnap?.exists ? creatorProfileSnap.data() ?? {} : {}) };
+  const creatorFullName = [creatorProfile.firstName, creatorProfile.lastName].filter((value) => typeof value === "string" && value.trim()).join(" ");
+  const creatorDisplayName = [creatorProfile.displayName, creatorProfile.name, creatorFullName, creatorProfile.username, typeof creatorProfile.email === "string" ? creatorProfile.email.split("@")[0] : "", challengeData.creatorName]
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .find(Boolean) ?? "Challenge creator";
+  const creatorUsername = typeof creatorProfile.username === "string" ? creatorProfile.username : typeof challengeData.creatorUsername === "string" ? challengeData.creatorUsername : null;
+  const creatorAvatarUrl = typeof creatorProfile.avatarUrl === "string" ? creatorProfile.avatarUrl : typeof creatorProfile.photoURL === "string" ? creatorProfile.photoURL : typeof challengeData.creatorAvatarUrl === "string" ? challengeData.creatorAvatarUrl : null;
   const activeEntryPaymentSnap = entryPaymentSnap?.exists ? entryPaymentSnap : legacyEntryPaymentSnap;
   const entryPayment = activeEntryPaymentSnap?.exists ? { id: activeEntryPaymentSnap.id, ...activeEntryPaymentSnap.data() } as Record<string, unknown> : null;
   const participantData = participantSnap?.exists ? participantSnap.data() ?? {} : null;
@@ -197,7 +207,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   return ok({
     phaseSummary,
-    challenge: { id: challengeSnap.id, ...publicChallenge, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
+    challenge: { id: challengeSnap.id, ...publicChallenge, creatorDisplayName, creatorUsername, creatorAvatarUrl, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
     submissions: leaderboard.entries,
     topParticipants: topParticipants.entries,
     leaderboard: leaderboardPayload,

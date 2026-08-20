@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { inviteExpired } from "@/lib/server/private-invites";
+import { hashPrivateInviteCode, inviteExpired } from "@/lib/server/private-invites";
 import { writeAuditLog } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +82,8 @@ export async function POST(request: Request) {
     const code = String(parsed.body?.inviteCode ?? "").trim().toUpperCase();
     if (!code) return validationError({ inviteCode: "Invite code is required." });
 
-    const inviteSnap = await db.collection("privateChallengeInvites").where("code", "==", code).where("status", "==", "active").limit(1).get();
+    const hashedInviteSnap = await db.collection("privateChallengeInvites").where("codeHash", "==", hashPrivateInviteCode(code)).where("status", "==", "active").limit(1).get();
+    const inviteSnap = hashedInviteSnap.empty ? await db.collection("privateChallengeInvites").where("code", "==", code).where("status", "==", "active").limit(1).get() : hashedInviteSnap;
     if (inviteSnap.empty) {
       return fail("Invalid or expired invite code.", 404, { fieldErrors: { inviteCode: "Invite code was not found or is inactive." } }, "INVALID_INVITE_CODE");
     }
@@ -92,23 +93,32 @@ export async function POST(request: Request) {
     if (invite.enabled === false || inviteExpired(invite)) {
       return fail("Invite code has expired or is disabled.", 410, { fieldErrors: { inviteCode: "Invite code is no longer active." } }, "INVITE_INACTIVE");
     }
-    const currentUses = Number(invite.currentUses ?? 0);
-    const maxUses = Number(invite.maxUses ?? 0);
-    if (maxUses > 0 && currentUses >= maxUses) {
-      return fail("Invite code has reached its maximum uses.", 409, { fieldErrors: { inviteCode: "Invite code can no longer be used." } }, "INVITE_LIMIT_REACHED");
-    }
     const challengeId = String(invite.challengeId ?? "");
     if (!challengeId) {
       return fail("Invite code is not connected to a challenge.", 400, { fieldErrors: { inviteCode: "Invite configuration is incomplete." } }, "VALIDATION_ERROR");
     }
+    const requestedChallengeId = String(parsed.body?.challengeId ?? "").trim();
+    if (requestedChallengeId && requestedChallengeId !== challengeId) return fail("This access code does not match the selected private challenge.", 403, { fieldErrors: { inviteCode: "Use the access code shared for this challenge." } }, "INVITE_CHALLENGE_MISMATCH");
 
     const challengeSnap = await db.collection("challenges").doc(challengeId).get();
     if (!challengeSnap.exists || !isPrivateChallenge(challengeSnap.data() ?? {})) {
       return fail("Private challenge is unavailable.", 404, { fieldErrors: { challengeId: "Private challenge does not exist or is unavailable." } }, "NOT_FOUND");
     }
 
-    await db.runTransaction(async (transaction) => {
-      transaction.set(db.collection("privateChallengeAccess").doc(`${challengeId}_${user.uid}`), {
+    let accessCreated = false;
+    try {
+    accessCreated = await db.runTransaction(async (transaction) => {
+      const currentInviteSnap = await transaction.get(inviteDoc.ref);
+      const accessRef = db.collection("privateChallengeAccess").doc(`${challengeId}_${user.uid}`);
+      const currentAccessSnap = await transaction.get(accessRef);
+      if (currentAccessSnap.exists && currentAccessSnap.data()?.status === "approved") return false;
+      if (!currentInviteSnap.exists) throw new Error("INVITE_INACTIVE");
+      const currentInvite = currentInviteSnap.data() ?? {};
+      const transactionUses = Number(currentInvite.currentUses ?? 0);
+      const transactionMaxUses = Number(currentInvite.maxUses ?? 0);
+      if (currentInvite.enabled === false || currentInvite.status !== "active" || inviteExpired(currentInvite)) throw new Error("INVITE_INACTIVE");
+      if (transactionMaxUses > 0 && transactionUses >= transactionMaxUses) throw new Error("INVITE_LIMIT_REACHED");
+      transaction.set(accessRef, {
         id: `${challengeId}_${user.uid}`,
         challengeId,
         userId: user.uid,
@@ -118,7 +128,7 @@ export async function POST(request: Request) {
         createdAt: now,
         updatedAt: now
       }, { merge: true });
-      transaction.set(inviteDoc.ref, { currentUses: currentUses + 1, lastUsedAt: now, updatedAt: now }, { merge: true });
+      transaction.set(inviteDoc.ref, { currentUses: transactionUses + 1, lastUsedAt: now, updatedAt: now }, { merge: true });
       transaction.create(db.collection("privateInviteAuditEvents").doc(), {
         challengeId,
         inviteId: inviteDoc.id,
@@ -126,8 +136,15 @@ export async function POST(request: Request) {
         action: "invite_code_used",
         createdAt: now
       });
+      return true;
     });
-    await writeAuditLog({
+    } catch (error) {
+      const codeValue = error instanceof Error ? error.message : "INVITE_ACCESS_FAILED";
+      if (codeValue === "INVITE_INACTIVE") return fail("Invite code has expired or is disabled.", 410, { fieldErrors: { inviteCode: "Invite code is no longer active." } }, codeValue);
+      if (codeValue === "INVITE_LIMIT_REACHED") return fail("Invite code has reached its maximum uses.", 409, { fieldErrors: { inviteCode: "Invite code can no longer be used." } }, codeValue);
+      return serverError("Private challenge access could not be verified.", codeValue);
+    }
+    if (accessCreated) await writeAuditLog({
       actorId: user.uid,
       actorType: "user",
       action: "private_invite.used",
@@ -137,7 +154,7 @@ export async function POST(request: Request) {
       metadata: { inviteId: inviteDoc.id }
     }, db).catch(() => undefined);
 
-    return ok({ challengeId, challenge: { id: challengeSnap.id, ...challengeSnap.data() } }, "Access granted. Private challenge unlocked.");
+    return ok({ challengeId, challenge: { id: challengeSnap.id, title: challengeSnap.data()?.title ?? "Private challenge", status: challengeSnap.data()?.status ?? "active" } }, accessCreated ? "Access granted. Private challenge unlocked." : "Private challenge access is already active.");
   }
 
   if (action === "request_access") {

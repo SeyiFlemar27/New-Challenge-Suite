@@ -17,6 +17,7 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { deterministicId } from "@/lib/server/idempotency";
+import { createNotification } from "@/lib/server/notifications";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
   const { user, response } = await requireRecentAdminAuthentication(request, "settlements.approve");
@@ -122,6 +123,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await db.collection("adminActionTasks").doc(deterministicId("doro_results_failure", challengeId, proposalId)).set({ type: "dorocoin_reward_delivery_failure", sourceType: "approved_free_challenge_results", challengeId, proposalId, status: "open", failureCount: rewardResults.filter((result) => result.status === "rejected").length, createdAt: now }, { merge: true });
     }
   }
+  const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "");
+  if (creatorId) await createNotification(db, { userId: creatorId, type: "winner_proposal_approved", title: "Winner proposal approved", body: `Official winners for ${String(challenge.title ?? "your challenge")} were approved.`, entityType: "winner_proposal", entityId: proposalId, targetId: proposalId, actionUrl: `/challenges/${challengeId}/manage?tab=winners&focus=${encodeURIComponent(proposalId)}`, metadata: { challengeId, proposalId }, idempotencyKey: `winner_proposal_approved_${proposalId}` }).catch(() => undefined);
 
   return ok({
     proposal: { ...proposal, ...update, settlementId: settlement.settlement.id, settlementStatus: settlement.settlement.status },

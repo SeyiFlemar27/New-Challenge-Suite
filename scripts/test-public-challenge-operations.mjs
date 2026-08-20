@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const route = fs.readFileSync("app/api/challenges/[id]/route.ts", "utf8");
+const page = fs.readFileSync("app/challenges/[id]/page.tsx", "utf8");
+const countdown = fs.readFileSync("components/challenge-milestone-countdown.tsx", "utf8");
+assert.match(route, /creatorDisplayName/);
+assert.match(route, /creatorFullName/);
+assert.match(page, /ChallengeMilestoneCountdown/);
+assert.match(page, /Manage Challenge/);
+assert.match(countdown, /setInterval/);
+assert.match(countdown, /Results announced|Challenge ended|Completed/);
+assert.doesNotMatch(countdown, /00:00:00/);
+console.log("public challenge identity and countdown contracts: ok");

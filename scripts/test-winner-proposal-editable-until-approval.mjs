@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const route = fs.readFileSync("app/api/challenges/[id]/winner-proposals/route.ts", "utf8");
+const candidates = fs.readFileSync("app/api/challenges/[id]/winner-candidates/route.ts", "utf8");
+const page = fs.readFileSync("app/challenges/[id]/propose-winners/page.tsx", "utf8");
+const reject = fs.readFileSync("app/api/admin/challenges/[id]/winner-proposals/[proposalId]/reject/route.ts", "utf8");
+assert.match(route, /editableProposal/);
+assert.match(route, /pending_admin_review.*changes_requested.*rejected/s);
+assert.match(route, /runTransaction/);
+assert.match(route, /WINNERS_ALREADY_APPROVED/);
+assert.match(candidates, /activeProposal/);
+assert.match(page, /Update Winners for Admin Review/);
+assert.match(page, /Two winners \/ 70-30/);
+assert.match(reject, /changes_requested/);
+assert.match(reject, /adminNote/);
+console.log("editable winner proposal contracts: ok");

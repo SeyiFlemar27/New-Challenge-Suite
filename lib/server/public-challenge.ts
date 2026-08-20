@@ -93,10 +93,9 @@ export function isPublicChallenge(id: string, data: Record<string, unknown>) {
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
   const type = String(data.type ?? "").toLowerCase();
-  const publicPrivatePreview = visibility === "private" && type.includes("private") && data.publicPreviewEnabled === true;
   return PUBLIC_CHALLENGE_STATUSES.has(status)
-    && (visibility === "public" || publicPrivatePreview)
-    && (publicPrivatePreview || (!type.includes("private") && !type.includes("exclusive") && !type.includes("invite")))
+    && visibility === "public"
+    && !type.includes("private") && !type.includes("exclusive") && !type.includes("invite")
     && data.publicVisibility !== false
     && data.eventVisibility !== "hidden_until_approved";
 }

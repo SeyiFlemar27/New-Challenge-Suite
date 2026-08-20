@@ -94,6 +94,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await db.collection("challengeEntryRequests").doc(requestId).set(requestRecord, { merge: true });
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "entry_request.created", targetType: "challenge", targetId: id, after: requestRecord, metadata: { manualApproval: true } }, db).catch(() => undefined);
   const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? "");
-  if (creatorId) await createNotification(db, { userId: creatorId, type: "entry_request_created", title: "Entry request received", body: "A participant requested access to your challenge.", targetId: id });
+  if (creatorId) await createNotification(db, { userId: creatorId, type: "entry_request_created", title: "Entry request received", body: "A participant requested access to your challenge.", entityType: "entry_request", entityId: requestId, targetId: requestId, actionUrl: `/challenges/${id}/manage?tab=participant-requests&focus=${encodeURIComponent(requestId)}`, metadata: { challengeId: id, requestId } });
   return ok({ entryRequest: requestRecord }, "Entry request submitted.");
 }

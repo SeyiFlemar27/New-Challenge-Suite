@@ -19,6 +19,7 @@ import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/chal
 import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 import { DynamicTranslatedText } from "@/components/i18n/dynamic-translated-text";
+import { ChallengeMilestoneCountdown } from "@/components/challenge-milestone-countdown";
 import type { DynamicTranslations } from "@/lib/i18n/dynamic-content";
 
 type ChallengeGuideSection = "overview" | "rules" | "submission" | "voting" | "prizes" | "leaderboard";
@@ -255,6 +256,7 @@ export default function ChallengeDetailPage() {
             <SummaryItem value={displayStatus} label="Current phase" support={nextImportantTime ?? undefined} />
             <SummaryItem value={votingOpen ? "Voting open" : eligibleSubmissionCount <= 0 ? "Voting unavailable" : "Voting not started"} label={`${totalVotes.toLocaleString()} verified votes`} />
           </div>
+          <div className="mt-4"><ChallengeMilestoneCountdown challenge={rawChallenge ?? (challenge as unknown as Record<string, unknown>)} /></div>
           <Card data-mobile-primary-action className="mt-5 p-5 sm:p-8">
             <ParticipantJourneyPanel
               journey={participantJourney}

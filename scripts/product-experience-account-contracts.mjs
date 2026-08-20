@@ -51,13 +51,13 @@ has(challengeDeletion, "hardDeleteAllowed", "Challenge deletion is activity-awar
 has(challengeLifecycle, "request_admin_deletion", "Challenges with history can request admin deletion.");
 has(challengeLifecycle, "status: \"cancelled\"", "Active challenges are cancelled rather than erased.");
 
-for (const step of ["Basics", "Access Code", "Entry & Eligibility", "Submissions", "Timeline", "Voting / Judging", "Prize & Monetization", "Media & Branding", "Review & Submit"]) has(privateBuilder, `\"${step}\"`, `Private builder includes ${step}.`);
+for (const step of ["Overview", "Access", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) has(privateBuilder, `\"${step}\"`, `Private builder includes ${step}.`);
 has(privateAccess, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "Private codes avoid ambiguous characters.");
 has(privateAccess, "Uint8Array(5)", "Private access code is five characters.");
 has(privateBuilder, "readOnly aria-label=\"Generated private challenge access code\"", "Creator cannot manually type the access code.");
 has(privateBuilder, "Regenerate", "Access code can be regenerated before publish.");
 has(privateBuilder, "publicPreviewEnabled", "Private challenge supports explicit public preview.");
-has(publicChallenge, "publicPrivatePreview", "Only private records with public preview are discoverable.");
+has(publicChallenge, "!type.includes(\"private\")", "Private challenges never enter ordinary public Explore.");
 lacks(publicChallenge, "privateAccessCode\"", "Public challenge fields never expose private access codes.");
 
 for (const step of ["Event Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Challenge Format", "Voting / Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) has(liveBuilder, `\"${step}\"`, `Live builder includes ${step}.`);
@@ -65,9 +65,9 @@ has(liveBuilder, "Physical venue name", "Live events are physical-first.");
 has(liveBuilder, "paid_setup_required", "Paid ticket choice remains setup-only.");
 has(liveBuilder, "ticketCheckoutActive: false", "Live builder never enables fake ticket checkout.");
 
-for (const step of ["Tournament Basics", "Format & Capacity", "Registration", "Rounds & Schedule", "Rules & Scoring", "Prize & Sponsorship", "Media & Branding", "Review & Launch"]) has(tournamentBuilder, `\"${step}\"`, `Tournament builder includes ${step}.`);
-has(tournamentValidation, "[\"single_elimination\", \"round_robin\"]", "Tournament supports single elimination and round robin.");
-has(tournamentBuilder, "Double elimination and group stage + knockout are not available yet.", "Advanced formats are clearly unavailable.");
+for (const step of ["Overview", "Format & Capacity", "Registration", "Seeding & Bracket", "Rounds & Schedule", "Rules & Scoring", "Monetization & Prize Pool", "Media & Branding", "Sponsors", "Review & Publish"]) has(tournamentBuilder, `\"${step}\"`, `Tournament builder includes ${step}.`);
+has(tournamentValidation, "[\"single_elimination\", \"double_elimination\"]", "Tournament supports the two launch elimination formats.");
+lacks(tournamentValidation, "round_robin", "Round Robin is not a launch format.");
 has(tournamentBuilder, "after registration closes", "Bracket/pairing generation waits for registration close.");
 
 for (const type of ["standard", "private", "live_event", "tournament"]) has(exploreApi, `\"${type}\"`, `Explore API supports ${type}.`);

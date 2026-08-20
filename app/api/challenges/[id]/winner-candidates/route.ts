@@ -19,8 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     db.collection("winnerProposals").where("challengeId", "==", challengeId).limit(25).get()
   ]);
   const proposals: Array<Record<string, unknown> & { id: string }> = proposalsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const blockingStatuses = new Set(["pending_admin_review", "approved"]);
-  const activeProposal = proposals.find((proposal) => blockingStatuses.has(String(proposal.status ?? "")));
+  proposals.sort((a, b) => String(b.updatedAt ?? b.createdAt ?? "").localeCompare(String(a.updatedAt ?? a.createdAt ?? "")));
+  const activeProposal = proposals.find((proposal) => ["draft", "pending_admin_review", "changes_requested", "approved"].includes(String(proposal.status ?? "")));
   return ok({
     challenge: {
       id: challenge.id,

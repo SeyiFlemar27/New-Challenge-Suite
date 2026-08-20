@@ -137,9 +137,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
   ];
   await Promise.all(writes);
-  await createNotification(db, { userId: user.uid, type: "sponsorship_submitted", title: "Sponsorship proposal sent", body: "The creator must approve the proposed terms before platform review.", targetId: ref.id });
+  await createNotification(db, { userId: user.uid, type: "sponsorship_submitted", title: "Sponsorship proposal sent", body: "The creator must approve the proposed terms before platform review.", entityType: "sponsor_proposal", entityId: ref.id, targetId: ref.id, actionUrl: `/sponsor/proposals/${ref.id}`, metadata: { challengeId: id, proposalId: ref.id } });
   if (typeof challenge.creatorId === "string") {
-    await createNotification(db, { userId: challenge.creatorId, type: "sponsorship_received", title: "New sponsorship proposal", body: `${body.brandName || body.sponsorName} sent collaboration terms for ${challenge.title ?? "your challenge"}.`, targetId: ref.id });
+    await createNotification(db, { userId: challenge.creatorId, type: "sponsorship_received", title: "New sponsorship proposal", body: `${body.brandName || body.sponsorName} sent collaboration terms for ${challenge.title ?? "your challenge"}.`, entityType: "sponsor_proposal", entityId: ref.id, targetId: ref.id, actionUrl: `/challenges/${id}/manage?tab=sponsors&focus=${encodeURIComponent(ref.id)}`, metadata: { challengeId: id, proposalId: ref.id } });
   }
   return ok({ sponsorship: proposal }, "Sponsorship proposal sent to the creator for review.");
 }

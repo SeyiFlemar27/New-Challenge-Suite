@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
 import { writeAuditLog } from "@/lib/server/audit";
 
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -11,19 +12,27 @@ export function generateInviteCode(length = 8) {
   return value;
 }
 
+export function hashPrivateInviteCode(code: string) {
+  return createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
+}
+
 export async function createPrivateChallengeInvite(db: Firestore, input: { challengeId: string; creatorId: string; now: string; code?: string; expiresAt?: string | null; maxUses?: number | null }) {
   let code = input.code && /^[A-HJ-NP-Z2-9]{5}$/.test(input.code) ? input.code : generateInviteCode(5);
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const existing = await db.collection("privateChallengeInvites").where("code", "==", code).limit(1).get();
-    if (existing.empty) break;
-    code = generateInviteCode();
+    const [hashed, legacy] = await Promise.all([
+      db.collection("privateChallengeInvites").where("codeHash", "==", hashPrivateInviteCode(code)).limit(1).get(),
+      db.collection("privateChallengeInvites").where("code", "==", code).limit(1).get()
+    ]);
+    if (hashed.empty && legacy.empty) break;
+    code = generateInviteCode(5);
   }
   const ref = db.collection("privateChallengeInvites").doc();
   const invite = {
     id: ref.id,
     challengeId: input.challengeId,
     creatorId: input.creatorId,
-    code,
+    codeHash: hashPrivateInviteCode(code),
+    codeLastTwo: code.slice(-2),
     status: "active",
     enabled: true,
     maxUses: input.maxUses ?? 100,
@@ -47,7 +56,7 @@ export async function createPrivateChallengeInvite(db: Firestore, input: { chall
     reason: "Private challenge invite foundation created.",
     metadata: { moneyMovementEnabled: false }
   }, db).catch(() => undefined);
-  return invite;
+  return { ...invite, code };
 }
 
 export async function hasPrivateChallengeAccess(db: Firestore, challengeId: string, userId: string) {

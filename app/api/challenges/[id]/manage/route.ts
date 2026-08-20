@@ -16,9 +16,9 @@ function ownsChallenge(challenge: Record<string, unknown>, userId: string) {
   return [challenge.creatorId, challenge.ownerId, challenge.hostId, challenge.userId].some((value) => String(value ?? "") === userId);
 }
 
-async function rows(db: FirebaseFirestore.Firestore, collection: string, challengeId: string, limit = 200) {
+async function rows(db: FirebaseFirestore.Firestore, collection: string, challengeId: string, limit = 200): Promise<Record<string, unknown>[]> {
   const snap = await db.collection(collection).where("challengeId", "==", challengeId).limit(limit).get().catch(() => null);
-  return snap?.docs.map((doc) => ({ id: doc.id, ...doc.data() })) ?? [];
+  return snap?.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)) ?? [];
 }
 
 async function context(request: Request, challengeId: string) {
@@ -37,13 +37,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const access = await context(request, id);
   if (access.response || !access.db || !access.challenge || !access.user) return access.response;
-  const [participants, entryRequests, submissions, reports, winnerProposals, settlements, directAudits, relatedAudits] = await Promise.all([
+  const [participants, entryRequests, submissions, reports, winnerProposals, settlements, sponsorships, financialLedger, prizePoolSnap, directAudits, relatedAudits] = await Promise.all([
     rows(access.db, "challengeParticipants", id),
     rows(access.db, "challengeEntryRequests", id),
     rows(access.db, "submissions", id),
     rows(access.db, "challengeReports", id),
     rows(access.db, "winnerProposals", id, 50),
     rows(access.db, "challengeSettlements", id, 25),
+    rows(access.db, "sponsorships", id, 100),
+    rows(access.db, "challengeFinancialLedger", id, 200),
+    access.db.collection("prizePools").doc(id).get(),
     access.db.collection("auditLogs").where("targetId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => []),
     access.db.collection("auditLogs").where("metadata.challengeId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => [])
   ]);
@@ -57,6 +60,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     reports,
     winnerProposals,
     settlements,
+    sponsorships,
+    financialLedger: financialLedger.map((item) => ({ id: item.id, revenueType: item.revenueType ?? null, shareType: item.shareType ?? item.sourceType ?? null, amountCents: Number(item.amountCents ?? item.netAmountCents ?? 0), currency: item.currency ?? "usd", status: item.status ?? null, createdAt: item.createdAt ?? null })),
+    prizePool: prizePoolSnap.exists ? { id: prizePoolSnap.id, ...prizePoolSnap.data() } : null,
     audits,
     permissions: { isAdmin: Boolean(access.user?.isAdmin), canModerateSensitiveActions: Boolean(access.user?.isAdmin) },
     financialExecutionEnabled: false
@@ -98,6 +104,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!snap.exists || String(snap.data()?.challengeId ?? "") !== id) return fail("Management record not found.", 404, undefined, "NOT_FOUND");
   const current = snap.data() ?? {};
   const now = new Date().toISOString();
+  if (targetType === "participant" && action === "check_in") {
+    const type = String(access.challenge.type ?? access.challenge.competitionType ?? "").toLowerCase();
+    if (!access.challenge.isLiveEvent && !type.includes("live")) return fail("Check-in is available only for Live Events.", 409, undefined, "LIVE_EVENT_REQUIRED");
+    const checkIn = await access.db.runTransaction(async (transaction) => {
+      const currentSnap = await transaction.get(ref);
+      if (!currentSnap.exists || String(currentSnap.data()?.challengeId ?? "") !== id) throw new Error("PARTICIPANT_NOT_FOUND");
+      if (currentSnap.data()?.checkedInAt || currentSnap.data()?.checkInStatus === "checked_in") return { alreadyCheckedIn: true, participant: currentSnap.data() ?? {} };
+      const update = { checkInStatus: "checked_in", checkedInAt: now, checkedInBy: access.user.uid, updatedAt: now };
+      transaction.set(ref, update, { merge: true });
+      return { alreadyCheckedIn: false, participant: { ...(currentSnap.data() ?? {}), ...update } };
+    });
+    if (!checkIn.alreadyCheckedIn) await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: "participant.check_in", targetType: "participant", targetId, before: { checkInStatus: current.checkInStatus ?? null }, after: { checkInStatus: "checked_in", checkedInAt: now }, metadata: { challengeId: id, manualFallback: true } }, access.db);
+    const participantId = String(checkIn.participant.userId ?? checkIn.participant.participantId ?? "");
+    if (participantId && !checkIn.alreadyCheckedIn) await createNotification(access.db, { userId: participantId, type: "event_check_in_confirmed", title: "Event check-in confirmed", body: "Your attendance was confirmed by the event manager.", actionUrl: `/challenges/${id}`, targetId: id, idempotencyKey: `event_check_in_${id}_${targetId}` }).catch(() => undefined);
+    return ok({ targetId, targetType, status: String(checkIn.participant.status ?? "approved"), action, alreadyCheckedIn: checkIn.alreadyCheckedIn }, checkIn.alreadyCheckedIn ? "Participant was already checked in." : "Participant checked in.");
+  }
   let nextStatus = String(current.status ?? "pending");
   const update: Record<string, unknown> = { updatedAt: now };
 

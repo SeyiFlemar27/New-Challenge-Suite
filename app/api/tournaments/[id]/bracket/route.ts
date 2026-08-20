@@ -2,7 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canPerformTournamentRole } from "@/lib/server/tournament-permissions";
-import { generateSingleEliminationBracket, seedParticipants } from "@/lib/server/tournament-operations";
+import { generateTournamentBracket, seedParticipants } from "@/lib/server/tournament-operations";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentParticipantFoundation } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +25,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   ]);
   const participants = participantsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentParticipantFoundation[];
   const seeded = seedParticipants(participants, tournament.seedingMethod === "random" ? "random" : "manual");
-  const bracket = generateSingleEliminationBracket({ tournament, participants: seeded, existingMatches: matchesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentMatchFoundation[] });
+  const bracket = generateTournamentBracket({ tournament, participants: seeded, existingMatches: matchesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentMatchFoundation[] });
   if (!bracket.created) return fail("Bracket could not be generated.", 409, bracket, bracket.code);
   await db.runTransaction(async (transaction) => {
     seeded.forEach((participant) => transaction.set(db.collection("tournamentParticipants").doc(participant.id), { seed: participant.seed, updatedAt: participant.updatedAt }, { merge: true }));
     bracket.rounds.forEach((round) => transaction.set(db.collection("tournamentRounds").doc(round.id), round));
     bracket.matches.forEach((match) => transaction.set(db.collection("tournamentMatches").doc(match.id), match));
     transaction.set(db.collection("tournaments").doc(id), { status: "ready", seedsLockedAt: new Date().toISOString(), bracketGeneratedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
-    transaction.set(db.collection("tournamentAuditEvents").doc(`${id}_bracket_generated`), { id: `${id}_bracket_generated`, tournamentId: id, actorId: user.uid, action: "bracket_generated", createdAt: new Date().toISOString(), metadata: { expectedMatchCount: bracket.expectedMatchCount, seedingMethod: tournament.seedingMethod } });
+    transaction.set(db.collection("tournamentAuditEvents").doc(`${id}_bracket_generated`), { id: `${id}_bracket_generated`, tournamentId: id, actorId: user.uid, action: "bracket_generated", createdAt: new Date().toISOString(), metadata: { expectedMatchCount: bracket.expectedMatchCount, seedingMethod: tournament.seedingMethod, format: tournament.format } });
   });
   return ok({ rounds: bracket.rounds, matches: bracket.matches, expectedMatchCount: bracket.expectedMatchCount }, "Tournament bracket generated server-side.");
 }

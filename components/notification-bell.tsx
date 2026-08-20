@@ -84,7 +84,7 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
                   <p className="mt-1 text-[11px] text-slate-500">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "Time unavailable"}</p>
                 </div>
               );
-              return notification.actionUrl ? <Link key={notification.id} href={notification.actionUrl} onClick={() => openNotification(notification)}>{content}</Link> : <button type="button" className="block w-full" key={notification.id} onClick={() => openNotification(notification)}>{content}</button>;
+              return <Link key={notification.id} href={notification.actionUrl ?? "/notifications/unavailable"} onClick={() => openNotification(notification)} aria-label={`Open notification: ${notification.title ?? "Notification"}`}>{content}</Link>;
             }) : <div className="px-5 py-8 text-center"><p className="text-sm font-black">No notifications yet.</p><p className="mt-1 text-xs text-slate-500">Updates about your challenges and account will appear here.</p></div>}
           </div>
           <div className="grid grid-cols-2 border-t border-slate-200"><Link href="/notifications" onClick={() => setOpen(false)} className="px-4 py-3 text-center text-sm font-black text-amber-700">View all</Link><Link href="/settings/notifications" onClick={() => setOpen(false)} className="border-l border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">Settings</Link></div>

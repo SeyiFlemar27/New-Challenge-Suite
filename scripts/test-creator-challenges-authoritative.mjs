@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const api = fs.readFileSync("app/api/creator/challenges/route.ts", "utf8");
+const page = fs.readFileSync("app/creator/challenges/page.tsx", "utf8");
+const groups = fs.readFileSync("lib/creator-challenges.ts", "utf8");
+for (const owner of ["creatorId", "ownerId", "hostId", "userId"]) assert(api.includes(`"${owner}"`));
+assert.match(api, /ownershipFields\.map\(\(field\) => db\.collection\("challenges"\)\.where\(field, "==", user\.uid\)\.get\(\)\)/);
+for (const tab of ["Active", "Pending Review", "Requires Changes", "Scheduled", "Drafts", "Completed", "Cancelled"]) assert(groups.includes(tab));
+assert(!groups.includes('label: "All"'));
+assert.match(page, /Manage Challenge/);
+assert.match(page, /payload\.counts\[tab\]/);
+assert.doesNotMatch(page, /ACTIVE \(0\)/);
+console.log("creator challenge authoritative data contracts: ok");

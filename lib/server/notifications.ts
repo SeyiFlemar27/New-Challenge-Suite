@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { notificationDestination } from "@/lib/notification-navigation";
 
 export type NotificationStatus = "unread" | "read" | "archived";
 export type NotificationPriority = "low" | "normal" | "high";
@@ -41,11 +42,6 @@ function safeId(value: unknown) {
   return safeText(value, "", 160).replace(/[^a-zA-Z0-9_.:-]/g, "_");
 }
 
-function safeActionUrl(value: unknown) {
-  const path = safeText(value, "", 500);
-  return path.startsWith("/") && !path.startsWith("//") ? path : null;
-}
-
 export async function createNotification(db: Firestore, input: CreateNotificationInput) {
   const idempotencyKey = safeId(input.idempotencyKey);
   const ref = idempotencyKey ? db.collection("notifications").doc(idempotencyKey) : db.collection("notifications").doc();
@@ -64,7 +60,7 @@ export async function createNotification(db: Firestore, input: CreateNotificatio
     entityType: input.entityType ?? null,
     entityId: input.entityId ?? input.targetId ?? null,
     targetId: input.targetId ?? input.entityId ?? null,
-    actionUrl: safeActionUrl(input.actionUrl),
+    actionUrl: notificationDestination(input),
     read: false,
     readAt: null,
     archivedAt: null,
@@ -81,7 +77,10 @@ export async function listUserNotifications(db: Firestore, userId: string, limit
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const snap = await db.collection("notifications").where("userId", "==", userId).limit(100).get();
   return snap.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() } as StoredNotification))
+    .map((doc) => {
+      const notification = { id: doc.id, ...doc.data() } as StoredNotification;
+      return { ...notification, actionUrl: notificationDestination({ type: notification.type, entityType: notification.entityType, entityId: notification.entityId, targetId: notification.targetId, actionUrl: notification.actionUrl, metadata: notification.metadata }) };
+    })
     .sort((left, right) => String(right.createdAt ?? "").localeCompare(String(left.createdAt ?? "")))
     .slice(0, safeLimit);
 }

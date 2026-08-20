@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const read = (path) => fs.readFileSync(path, "utf8");
+const navigation = read("lib/notification-navigation.ts");
+const bell = read("components/notification-bell.tsx");
+const page = read("app/notifications/page.tsx");
+const producers = [read("app/api/challenges/[id]/entry-request/route.ts"), read("app/api/admin/challenges/[id]/winner-proposals/[proposalId]/approve/route.ts")].join("\n");
+assert.match(navigation, /participant-requests.*focus=/s);
+assert.match(navigation, /tab=winners/);
+assert.match(navigation, /notifications\/unavailable/);
+assert.match(bell, /<Link[^>]+href=\{notification\.actionUrl \?\? "\/notifications\/unavailable"\}/);
+assert.match(page, /void fetch\(`\/api\/notifications\/\$\{id\}\/read`, \{ method: "POST" \}\)/);
+assert.match(page, /\.catch\(\(\) => undefined\)/);
+assert.match(producers, /metadata: \{ challengeId.*requestId|metadata: \{ challengeId, proposalId/s);
+console.log("notification deep-link contracts: ok");

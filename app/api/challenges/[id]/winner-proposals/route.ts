@@ -52,16 +52,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     getWinnerCandidates(db, challengeId),
     db.collection("winnerProposals").where("challengeId", "==", challengeId).limit(25).get()
   ]);
-  const blockingStatuses = new Set(["pending_admin_review", "approved"]);
-  const activeProposal = existingProposalSnap.docs.find((doc) => blockingStatuses.has(String(doc.data().status ?? "")));
-  if (activeProposal) return fail("An active winner proposal already exists for this challenge.", 409, { proposalId: activeProposal.id }, "ACTIVE_WINNER_PROPOSAL_EXISTS");
+  const proposals = existingProposalSnap.docs.sort((a, b) => String(b.data().updatedAt ?? b.data().createdAt ?? "").localeCompare(String(a.data().updatedAt ?? a.data().createdAt ?? "")));
+  const approvedProposal = proposals.find((doc) => String(doc.data().status ?? "") === "approved");
+  if (approvedProposal) return fail("Official winners are already approved for this challenge.", 409, { proposalId: approvedProposal.id }, "WINNERS_ALREADY_APPROVED");
+  const editableProposal = proposals.find((doc) => ["draft", "pending_admin_review", "changes_requested", "rejected"].includes(String(doc.data().status ?? "")));
   const candidateByUserId = new Set(candidates.map((candidate) => candidate.userId));
   const candidateBySubmissionId = new Set(candidates.map((candidate) => candidate.submissionId));
   const invalidWinner = winners.find((winner) => !candidateByUserId.has(winner.userId) || (winner.submissionId && !candidateBySubmissionId.has(winner.submissionId)));
   if (invalidWinner) return fail("Selected winner must belong to an eligible challenge submission.", 400, { winner: invalidWinner }, "WINNER_CANDIDATE_INVALID");
 
   const now = new Date().toISOString();
-  const ref = db.collection("winnerProposals").doc();
+  const ref = editableProposal?.ref ?? db.collection("winnerProposals").doc();
+  const previous = editableProposal?.data() ?? {};
   const proposalStatus = parsed.body?.saveAsDraft === true ? "draft" : "pending_admin_review";
   const preview = buildPrizeApprovalPreview({ challengeId, proposalId: ref.id, challenge, winners, approvedAt: now });
   const payload = {
@@ -74,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     winners,
     winnerSplit: winners.map((winner) => ({ placement: winner.placement, splitPercent: winner.splitPercent })),
     notes: typeof parsed.body?.notes === "string" ? parsed.body.notes.trim().slice(0, 2000) : "",
-    createdAt: now,
+    createdAt: previous.createdAt ?? now,
     updatedAt: now,
     submittedAt: proposalStatus === "pending_admin_review" ? now : null,
     reviewedAt: null,
@@ -88,10 +90,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     cashBalancesCredited: false,
     payoutProviderCalled: false,
     payoutMarkedPaid: false,
-    kycStillRequiredBeforeWithdrawal: false
+    kycStillRequiredBeforeWithdrawal: false,
+    revision: Number(previous.revision ?? 0) + 1
   };
 
-  await ref.set(payload);
+  const committed = await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(ref);
+    if (current.exists && String(current.data()?.status ?? "") === "approved") throw new Error("WINNERS_ALREADY_APPROVED");
+    transaction.set(ref, payload, { merge: true });
+    return true;
+  }).catch((error) => {
+    if (error instanceof Error && error.message === "WINNERS_ALREADY_APPROVED") return false;
+    throw error;
+  });
+  if (!committed) return fail("Official winners were approved while this proposal was being updated.", 409, { proposalId: ref.id }, "WINNERS_ALREADY_APPROVED");
   await writeAuditLog({
     actorId: user.uid,
     actorType: user.isAdmin ? "admin" : user.role === "host" || user.role === "creator" ? "creator" : "user",

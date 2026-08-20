@@ -14,7 +14,16 @@ export function singleEliminationMatchCount(capacity: number) {
 }
 
 export function singleEliminationStageCount(capacity: number) {
-  return Math.max(0, Math.log2(capacity));
+  return Math.max(0, Math.ceil(Math.log2(capacity)));
+}
+
+export function bracketSizeForParticipants(participantCount: number) {
+  if (participantCount < 2) return 0;
+  return 2 ** Math.ceil(Math.log2(participantCount));
+}
+
+export function doubleEliminationMatchCount(participantCount: number) {
+  return participantCount < 2 ? 0 : (2 * participantCount) - 1;
 }
 
 export function roundTitlesForCapacity(capacity: number) {
@@ -73,7 +82,7 @@ export function buildRoundRobinPlan(capacity: number, resultMethod: TournamentRe
 }
 
 export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
-  return [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }];
+  return [{ placement: 1, percent: 25 }, { placement: 2, percent: 20 }, { placement: 3, percent: 20 }];
 }
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
@@ -91,17 +100,15 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     participantCount: 0,
     privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
     registrationType: text(input.registrationType, "open") as TournamentFoundation["registrationType"],
-    roundPlan: text(input.format, "single_elimination") === "round_robin"
-      ? buildRoundRobinPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod)
-      : buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
+    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
     registrationOpensAt: text(input.registrationOpensAt) || null,
     registrationClosesAt: text(input.registrationClosesAt) || null,
     tournamentStartsAt: text(input.tournamentStartsAt) || null,
     expectedEndAt: text(input.expectedEndAt) || null,
-    entryType: "free",
-    entryFeeAmountMinor: null,
-    currency: "USD",
-    eligibility: {},
+    entryType: text(input.entryType, "free") === "paid_entry_setup_required" ? "paid_entry_setup_required" : "free",
+    entryFeeAmountMinor: text(input.entryType, "free") === "paid_entry_setup_required" ? Math.max(0, Math.trunc(Number(input.entryFeeAmountMinor ?? 0))) : null,
+    currency: text(input.currency, "USD").toUpperCase(),
+    eligibility: input.eligibility && typeof input.eligibility === "object" ? input.eligibility as Record<string, unknown> : {},
     requiresCheckIn: Boolean(input.requiresCheckIn),
     seedingMethod: text(input.seedingMethod, "manual") as TournamentFoundation["seedingMethod"],
     resultMethod: text(input.resultMethod, "votes") as TournamentFoundation["resultMethod"],
@@ -153,13 +160,13 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
   if (!text(tournament.description)) errors.push("Full description is required.");
   if (!text(tournament.category)) errors.push("Category is required.");
   if (text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded" && text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "storage_disabled") errors.push("Cover media must be uploaded unless storage-disabled mode is active.");
-  if (!["single_elimination", "round_robin"].includes(text(tournament.format))) errors.push("Choose single elimination or round robin.");
-  if (text(tournament.format) === "single_elimination" && ![8, 16, 32, 64].includes(Number(tournament.participantCapacity))) errors.push("Single elimination capacity must be 8, 16, 32, or 64.");
+  if (!["single_elimination", "double_elimination"].includes(text(tournament.format))) errors.push("Choose Single Elimination or Double Elimination.");
+  if (!Number.isInteger(Number(tournament.participantCapacity)) || Number(tournament.participantCapacity) < 4 || Number(tournament.participantCapacity) > 64) errors.push("Tournament capacity must be a whole number from 4 to 64.");
   if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Registration and tournament dates are required.");
   if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
   if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");
   const distribution = Array.isArray(tournament.prizeDistribution) ? tournament.prizeDistribution as TournamentPrizeDistribution[] : [];
-  if (distribution.reduce((sum, item) => sum + Number(item.percent ?? 0), 0) !== 100) errors.push("Prize distribution must total 100%.");
+  if (distribution.reduce((sum, item) => sum + Number(item.percent ?? 0), 0) !== 65) errors.push("Winner allocations must total 65% of eligible generated revenue.");
   if (text(tournament.entryType) === "paid_entry_setup_required") warnings.push("Paid entry requires provider-confirmed checkout before registrations can become paid.");
   if (Number((tournament.prizePool as Record<string, unknown> | undefined)?.confirmedPrizePoolMinor ?? 0) <= 0) warnings.push("No confirmed prize funding is available yet.");
   return { ready: errors.length === 0, errors, warnings };

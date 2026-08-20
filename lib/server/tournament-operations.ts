@@ -10,7 +10,8 @@ import type {
   TournamentRoundPlanItem,
   TournamentSubmissionStatus
 } from "@/lib/tournament-types";
-import { buildRoundPlan, singleEliminationMatchCount } from "@/lib/server/tournaments";
+import { randomInt } from "node:crypto";
+import { bracketSizeForParticipants, buildRoundPlan, doubleEliminationMatchCount, singleEliminationMatchCount } from "@/lib/server/tournaments";
 
 export type TournamentActor = { uid: string; role?: string; isAdmin?: boolean; accountType?: string };
 export type TournamentOperationResult = { allowed: boolean; code: string; message: string; details?: Record<string, unknown> };
@@ -69,7 +70,13 @@ export function participantRecord(params: { id: string; tournamentId: string; us
 
 export function seedParticipants(participants: TournamentParticipantFoundation[], method: "manual" | "random") {
   const eligible = participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status));
-  const ordered = method === "random" ? [...eligible].sort((a, b) => a.id.localeCompare(b.id)).map((item, index, list) => list[(index * 7) % list.length]) : eligible;
+  const ordered = [...eligible];
+  if (method === "random") {
+    for (let index = ordered.length - 1; index > 0; index -= 1) {
+      const swapIndex = randomInt(index + 1);
+      [ordered[index], ordered[swapIndex]] = [ordered[swapIndex], ordered[index]];
+    }
+  }
   return ordered.map((participant, index) => ({ ...participant, seed: index + 1, updatedAt: iso() }));
 }
 
@@ -80,8 +87,9 @@ function matchId(tournamentId: string, roundNumber: number, matchNumber: number)
 export function generateSingleEliminationBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[]; now?: string }) {
   const eligible = params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).sort((a, b) => Number(a.seed ?? 9999) - Number(b.seed ?? 9999));
   if (params.existingMatches.length) return { created: false, code: "BRACKET_ALREADY_GENERATED", rounds: [], matches: [] };
-  if (eligible.length !== params.tournament.participantCapacity) return { created: false, code: "CAPACITY_NOT_FILLED", rounds: [], matches: [] };
-  const plan = params.tournament.roundPlan?.length ? params.tournament.roundPlan : buildRoundPlan(params.tournament.participantCapacity, params.tournament.resultMethod, params.tournament.thirdPlaceMethod);
+  if (eligible.length < 2 || eligible.length > params.tournament.participantCapacity) return { created: false, code: "PARTICIPANT_COUNT_INVALID", rounds: [], matches: [] };
+  const bracketSize = bracketSizeForParticipants(eligible.length);
+  const plan = buildRoundPlan(bracketSize, params.tournament.resultMethod, params.tournament.thirdPlaceMethod);
   const rounds: TournamentRoundFoundation[] = plan.filter((round) => round.title !== "Bronze Match").map((round) => ({
     id: `${params.tournament.id}_round_${round.roundNumber}`,
     tournamentId: params.tournament.id,
@@ -95,32 +103,87 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
     votingClosesAt: round.votingClosesAt
   }));
   const matches: TournamentMatchFoundation[] = [];
-  let matchesInRound = params.tournament.participantCapacity / 2;
-  for (let roundNumber = 1; roundNumber <= Math.log2(params.tournament.participantCapacity); roundNumber += 1) {
+  let matchesInRound = bracketSize / 2;
+  const slots = [...eligible.map((item) => item.id), ...Array<string | null>(bracketSize - eligible.length).fill(null)];
+  for (let roundNumber = 1; roundNumber <= Math.log2(bracketSize); roundNumber += 1) {
     for (let index = 1; index <= matchesInRound; index += 1) {
       const firstRound = roundNumber === 1;
-      const participantA = firstRound ? eligible[index - 1]?.id ?? null : null;
-      const participantB = firstRound ? eligible[eligible.length - index]?.id ?? null : null;
+      const participantA = firstRound ? slots[index - 1] ?? null : null;
+      const participantB = firstRound ? slots[bracketSize - index] ?? null : null;
+      const byeWinner = firstRound && Boolean(participantA || participantB) && !(participantA && participantB) ? participantA || participantB : null;
       matches.push({
         id: matchId(params.tournament.id, roundNumber, index),
         tournamentId: params.tournament.id,
         roundId: `${params.tournament.id}_round_${roundNumber}`,
         roundNumber,
         matchNumber: index,
-        status: firstRound ? "ready" : "scheduled",
+        bracket: "winners",
+        status: byeWinner ? "bye" : firstRound ? "ready" : "scheduled",
         participantAId: participantA,
         participantBId: participantB,
-        winnerParticipantId: null,
+        winnerParticipantId: byeWinner,
         loserParticipantId: null,
-        nextMatchId: roundNumber < Math.log2(params.tournament.participantCapacity) ? matchId(params.tournament.id, roundNumber + 1, Math.ceil(index / 2)) : null,
-        nextSlot: roundNumber < Math.log2(params.tournament.participantCapacity) ? (index % 2 === 1 ? "A" : "B") : null,
+        nextMatchId: roundNumber < Math.log2(bracketSize) ? matchId(params.tournament.id, roundNumber + 1, Math.ceil(index / 2)) : null,
+        nextSlot: roundNumber < Math.log2(bracketSize) ? (index % 2 === 1 ? "A" : "B") : null,
         resultMethod: params.tournament.resultMethod,
         resultStatus: null
       });
     }
     matchesInRound /= 2;
   }
-  return { created: true, code: "BRACKET_GENERATED", expectedMatchCount: singleEliminationMatchCount(params.tournament.participantCapacity), rounds, matches };
+  for (const match of matches.filter((item) => item.status === "bye" && item.nextMatchId)) {
+    const next = matches.find((item) => item.id === match.nextMatchId);
+    if (!next || !match.winnerParticipantId) continue;
+    if (match.nextSlot === "A") next.participantAId = match.winnerParticipantId;
+    if (match.nextSlot === "B") next.participantBId = match.winnerParticipantId;
+    if (next.participantAId && next.participantBId) next.status = "ready";
+  }
+  return { created: true, code: "BRACKET_GENERATED", expectedMatchCount: singleEliminationMatchCount(eligible.length), rounds, matches };
+}
+
+export function generateDoubleEliminationBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[] }) {
+  const single = generateSingleEliminationBracket(params);
+  if (!single.created) return single;
+  const winners = single.matches.map((match) => ({ ...match, id: match.id.replace("_r", "_wb_r"), roundId: match.roundId.replace("_round_", "_wb_round_"), bracket: "winners" as const }));
+  const winnersByOriginalId = new Map(single.matches.map((match, index) => [match.id, winners[index].id]));
+  winners.forEach((match, index) => {
+    const source = single.matches[index];
+    match.nextMatchId = source.nextMatchId ? winnersByOriginalId.get(source.nextMatchId) ?? null : null;
+  });
+  const winnerRounds = Math.ceil(Math.log2(bracketSizeForParticipants(params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).length)));
+  const losers: TournamentMatchFoundation[] = [];
+  for (let loserRound = 1; loserRound <= Math.max(1, 2 * (winnerRounds - 1)); loserRound += 1) {
+    const pairRound = Math.ceil(loserRound / 2);
+    const count = Math.max(1, 2 ** Math.max(0, winnerRounds - pairRound - 1));
+    for (let index = 1; index <= count; index += 1) {
+      const nextCount = Math.max(1, Math.ceil(count / 2));
+      const nextRound = loserRound + 1;
+      const hasNext = loserRound < 2 * (winnerRounds - 1);
+      losers.push({ id: `${params.tournament.id}_lb_r${loserRound}_m${index}`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_lb_round_${loserRound}`, roundNumber: winnerRounds + loserRound, matchNumber: index, bracket: "losers", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: hasNext ? `${params.tournament.id}_lb_r${nextRound}_m${Math.min(nextCount, loserRound % 2 === 1 ? index : Math.ceil(index / 2))}` : `${params.tournament.id}_grand_final`, nextSlot: hasNext ? (loserRound % 2 === 1 ? "A" : index % 2 === 1 ? "A" : "B") : "B", resultMethod: params.tournament.resultMethod, resultStatus: null });
+    }
+  }
+  winners.forEach((match) => {
+    const sourceRound = match.roundNumber;
+    const targetRound = sourceRound === 1 ? 1 : 2 * (sourceRound - 1);
+    match.loserNextMatchId = `${params.tournament.id}_lb_r${targetRound}_m${sourceRound === 1 ? Math.ceil(match.matchNumber / 2) : match.matchNumber}`;
+    match.loserNextSlot = sourceRound === 1 ? (match.matchNumber % 2 === 1 ? "A" : "B") : "B";
+  });
+  const winnerFinal = winners.find((item) => !item.nextMatchId);
+  if (winnerFinal) { winnerFinal.nextMatchId = `${params.tournament.id}_grand_final`; winnerFinal.nextSlot = "A"; }
+  const grandFinalResetId = `${params.tournament.id}_grand_final_reset`;
+  const grandFinal: TournamentMatchFoundation = { id: `${params.tournament.id}_grand_final`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_round`, roundNumber: winnerRounds * 3, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: grandFinalResetId, resultMethod: params.tournament.resultMethod, resultStatus: null };
+  const grandFinalReset: TournamentMatchFoundation = { id: grandFinalResetId, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_reset_round`, roundNumber: winnerRounds * 3 + 1, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: null, resultMethod: params.tournament.resultMethod, resultStatus: null };
+  const rounds = [
+    ...single.rounds.map((round) => ({ ...round, id: round.id.replace("_round_", "_wb_round_"), title: `Winners ${round.title}` })),
+    ...Array.from({ length: Math.max(1, 2 * (winnerRounds - 1)) }, (_, index) => ({ id: `${params.tournament.id}_lb_round_${index + 1}`, tournamentId: params.tournament.id, roundNumber: winnerRounds + index + 1, title: `Losers Round ${index + 1}`, brief: "A second loss eliminates a participant.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null })),
+    { id: `${params.tournament.id}_grand_final_round`, tournamentId: params.tournament.id, roundNumber: winnerRounds * 3, title: "Grand Final", brief: "Winners bracket finalist faces the losers bracket finalist.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null },
+    { id: `${params.tournament.id}_grand_final_reset_round`, tournamentId: params.tournament.id, roundNumber: winnerRounds * 3 + 1, title: "Grand Final Reset", brief: "Played only if the undefeated finalist receives a first loss in the Grand Final.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null }
+  ];
+  return { created: true, code: "DOUBLE_ELIMINATION_BRACKET_GENERATED", expectedMatchCount: doubleEliminationMatchCount(params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).length), rounds, matches: [...winners, ...losers, grandFinal, grandFinalReset] };
+}
+
+export function generateTournamentBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[] }) {
+  return params.tournament.format === "double_elimination" ? generateDoubleEliminationBracket(params) : generateSingleEliminationBracket(params);
 }
 
 export function validateTournamentSubmission(params: { tournament: TournamentFoundation; round: TournamentRoundPlanItem | TournamentRoundFoundation; mediaUrl?: string | null; mediaPath?: string | null; mediaType?: string; now?: Date; replacementAllowed?: boolean; existingStatus?: TournamentSubmissionStatus | null }) {

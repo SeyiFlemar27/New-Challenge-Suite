@@ -47,7 +47,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const validation = validateTournamentFoundation({ ...tournament, ...body }, { publish: body.status === "scheduled" || body.status === "pending_review" });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
   const merged = { ...tournament, ...body };
-  const update = { ...body, readiness: evaluateTournamentReadiness(merged), updatedAt: new Date().toISOString(), bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
-  await ref.set(update, { merge: true });
-  return ok({ tournament: { ...tournament, ...update } }, "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
+  const readiness = evaluateTournamentReadiness(merged);
+  if (body.status === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
+  const now = new Date().toISOString();
+  const transitionToReview = tournament.status !== "pending_review" && body.status === "pending_review";
+  const update = { ...body, ...(transitionToReview ? { submittedAt: now } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
+  const batch = db.batch();
+  batch.set(ref, update, { merge: true });
+  if (transitionToReview) {
+    batch.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { id: `${id}_initial`, tournamentId: id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });
+    batch.set(db.collection("tournamentAuditEvents").doc(`${id}_submitted_initial`), { id: `${id}_submitted_initial`, tournamentId: id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
+  }
+  await batch.commit();
+  return ok({ tournament: { ...tournament, ...update } }, transitionToReview ? "Tournament submitted for admin review." : "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
 }
