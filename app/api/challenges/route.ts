@@ -19,6 +19,7 @@ import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time"
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
+import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export async function GET() {
   const db = getAdminDb();
@@ -69,6 +70,13 @@ export async function POST(request: Request) {
     db.collection("challenges").where("creatorId", "==", user.uid).limit(200).get()
   ]);
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
+  const enterpriseAccess = normalizeEnterpriseAccess(planProfile);
+  if (body.officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) {
+    return fail("Your Enterprise role cannot create official Challenge Suite challenges.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
+  }
+  if (body.ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) {
+    return fail("Your Enterprise role cannot create personal challenges.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  }
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
   const monetizationAccess = getChallengeMonetizationAccess(planProfile);
@@ -176,6 +184,12 @@ export async function POST(request: Request) {
   const challenge = {
     id: ref.id,
     creatorId: user.uid,
+    createdBy: user.uid,
+    officialChallenge: Boolean(body.officialChallenge),
+    ownershipType: body.officialChallenge ? "challenge_suite_official" : body.ownershipType,
+    organizationOwnerId: body.officialChallenge ? "challenge_suite" : null,
+    enterpriseChallengeLeadId: body.officialChallenge ? user.uid : null,
+    enterpriseAssignments: body.officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
     title: body.title,
     description: body.description,
     category: body.category === "Other" ? body.customCategory : body.category,
@@ -183,11 +197,13 @@ export async function POST(request: Request) {
     type: body.type ?? (body.visibility === "private" ? "Private / Exclusive" : "Public Challenge"),
     visibility: body.visibility,
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
-    privateAccessMethod: body.visibility === "private" ? "access_code" : "",
+    privateAccessMethod: body.visibility === "private" ? "link_and_code" : "",
     privateAccessCode: body.visibility === "private" ? body.privateAccessCode : "",
     privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
     privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,
     privateAccessInstructions: body.visibility === "private" ? body.privateAccessInstructions : "",
+    privateParticipantQuestions: body.visibility === "private" ? body.privateParticipantQuestions : [],
+    privateParticipantAcknowledgements: body.visibility === "private" ? body.privateParticipantAcknowledgements : [],
     premiumOnly: Boolean(body.premiumOnly),
     planRequired: body.premiumOnly ? "pro" : null,
     status: lifecycleStatus,

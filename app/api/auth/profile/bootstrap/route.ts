@@ -81,6 +81,12 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterpriseAccessStatus: typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : "not_submitted",
     enterpriseApprovalStatus: typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : "not_submitted",
     enterpriseApplicationId: typeof merged.enterpriseApplicationId === "string" ? merged.enterpriseApplicationId : null,
+    enterpriseRole: typeof merged.enterpriseRole === "string" ? merged.enterpriseRole : null,
+    enterpriseScope: typeof merged.enterpriseScope === "string" ? merged.enterpriseScope : null,
+    enterpriseDepartment: typeof merged.enterpriseDepartment === "string" ? merged.enterpriseDepartment : null,
+    enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
+    enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
+    enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };

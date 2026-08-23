@@ -7,6 +7,7 @@ import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-per
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { createNotification } from "@/lib/server/notifications";
 import { ENTERPRISE_APPLICATION_COLLECTION, ENTERPRISE_APPLICATION_TYPE } from "@/lib/server/enterprise-applications";
+import { isEnterpriseRole, isEnterpriseScope, rolePermissions } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
 
@@ -455,23 +456,46 @@ export async function PATCH(request: Request) {
       if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) return fail("This application has already been reviewed.", 409, undefined, "INVALID_STATE");
       const applicantId = String(application.userId ?? "");
       if (!applicantId) return fail("This application is not linked to an account.", 422, undefined, "APPLICATION_ACCOUNT_REQUIRED");
+      const requestedRole = parsed.body?.enterpriseRole;
+      const requestedScope = parsed.body?.enterpriseScope;
+      const enterpriseRole = isEnterpriseRole(requestedRole) ? requestedRole : "operations";
+      const enterpriseScope = isEnterpriseScope(requestedScope) ? requestedScope : "assigned_only";
+      const permissionAdditions = Array.isArray(parsed.body?.permissionAdditions) ? parsed.body.permissionAdditions : [];
+      const permissionRemovals = Array.isArray(parsed.body?.permissionRemovals) ? parsed.body.permissionRemovals : [];
+      const enterprisePermissions = rolePermissions(enterpriseRole, permissionAdditions, permissionRemovals);
+      const previousAccountType = String(application.currentAccountType ?? "user");
+      const staffAccess = action === "approve" ? {
+        status: "active", role: enterpriseRole, scope: enterpriseScope,
+        department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
+        permissions: enterprisePermissions,
+        categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
+        regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
+        onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid
+      } : null;
       const accessUpdate = {
         enterpriseAccessStatus: status,
         enterpriseApprovalStatus: status,
         enterpriseApplicationId: id,
         enterpriseApprovedAt: action === "approve" ? now : null,
         enterpriseApprovedBy: action === "approve" ? user.uid : null,
+        ...(action === "approve" ? {
+          accountType: "enterprise", selectedAccountType: "enterprise", dashboardType: "enterprise_studio",
+          enterprisePreviousAccountType: previousAccountType, enterpriseRole, enterpriseScope,
+          enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope,
+          enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false,
+          staffAccess,
+        } : {}),
         updatedAt: now
       };
       const batch = db.batch();
-      batch.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, updatedAt: now }, { merge: true });
+      batch.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, updatedAt: now }, { merge: true });
       batch.set(db.collection("users").doc(applicantId), accessUpdate, { merge: true });
       batch.set(db.collection("profiles").doc(applicantId), accessUpdate, { merge: true });
       await batch.commit();
       const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Your Enterprise workspace is ready." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "More information needed", body: "Please update your Enterprise application." } : { type: "enterprise_application_rejected", title: "Enterprise application not approved", body: "Contact support if you have questions." };
       await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
       if (action === "approve") {
-        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus }, after: { enterpriseAccessStatus: "approved", applicationId: id }, reason: reason || "Enterprise application approved." }, db);
+        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus, accountType: previousAccountType }, after: { enterpriseAccessStatus: "approved", accountType: "enterprise", role: enterpriseRole, scope: enterpriseScope, applicationId: id }, reason: reason || "Enterprise application approved." }, db);
       }
     } else if (type === "withdrawal") {
       const ref = db.collection("withdrawalRequests").doc(id);

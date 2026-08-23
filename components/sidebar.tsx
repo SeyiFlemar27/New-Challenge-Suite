@@ -39,7 +39,7 @@ import { logout } from "@/lib/firebase/auth-service";
 type NavIcon = typeof Home;
 type NavItem = { href: string; label: string; icon: NavIcon };
 type NavSection = { label: string; items: NavItem[] };
-type WorkspaceNavigationContext = "admin" | "host" | "creator" | "sponsor" | "user";
+type WorkspaceNavigationContext = "admin" | "enterprise" | "host" | "creator" | "sponsor" | "user";
 
 const competitorSections: NavSection[] = [
   { label: "Main", items: [
@@ -183,8 +183,33 @@ const sponsorSections: NavSection[] = [
   ] }
 ];
 
+function enterpriseSections(permissions: string[]): NavSection[] {
+  const allowed = (permission: string) => permissions.includes(permission);
+  return [
+    { label: "Main", items: [{ href: "/enterprise", label: "Enterprise Studio", icon: Home }, { href: "/explore", label: "Explore", icon: LayoutGrid }, { href: "/favorites", label: "Saved", icon: Star }] },
+    { label: "Operations", items: [
+      { href: "/enterprise/challenges", label: "Challenges", icon: Medal },
+      { href: "/enterprise/assigned", label: "Assigned to Me", icon: ClipboardCheck },
+      ...(allowed("submissions.view") ? [{ href: "/enterprise/submissions", label: "Submissions", icon: ClipboardCheck }] : []),
+      ...(allowed("reviews.view") ? [{ href: "/enterprise/reviews", label: "Reviews", icon: ShieldCheck }] : []),
+    ] },
+    { label: "Performance", items: [
+      ...(allowed("analytics.view") ? [{ href: "/enterprise/analytics", label: "Analytics", icon: BarChart3 }] : []),
+      ...(allowed("finance.view") ? [{ href: "/enterprise/finance", label: "Finance", icon: ReceiptText }] : []),
+      ...(allowed("sponsors.view") ? [{ href: "/enterprise/sponsorships", label: "Sponsorships", icon: Target }] : []),
+    ] },
+    { label: "Community", items: [{ href: "/leaderboards", label: "Leaderboards", icon: BarChart3 }, { href: "/winners", label: "Winners", icon: Trophy }] },
+    { label: "Internal", items: [
+      ...(allowed("team.view") ? [{ href: "/enterprise/team", label: "Team", icon: UsersRound }] : []),
+      ...(allowed("activity.view") ? [{ href: "/enterprise/activity", label: "Activity", icon: ClipboardCheck }] : []),
+    ] },
+    { label: "Account", items: [{ href: "/profile", label: "Profile", icon: User }, { href: "/settings", label: "Settings", icon: Settings }] },
+  ].filter((section) => section.items.length);
+}
+
 export function workspaceNavigationContext(pathname: string): WorkspaceNavigationContext {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
+  if (pathname === "/enterprise" || pathname.startsWith("/enterprise/")) return "enterprise";
   if (pathname === "/dashboard/host" || pathname.startsWith("/dashboard/host/") || pathname === "/host" || pathname.startsWith("/host/")) return "host";
   if (pathname === "/creator" || pathname.startsWith("/creator/")) return "creator";
   if (pathname === "/sponsor" || pathname.startsWith("/sponsor/")) return "sponsor";
@@ -222,8 +247,9 @@ function sectionsForTier(tierId: string, sponsor: boolean) {
   return competitorSections;
 }
 
-function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, tierId: string, sponsor: boolean) {
+function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, tierId: string, sponsor: boolean, enterprisePermissions: string[]) {
   if (context === "admin") return isAdmin ? adminSections : [];
+  if (context === "enterprise") return enterpriseSections(enterprisePermissions);
   if (context === "host") return hostSections;
   if (context === "creator") return creatorSections;
   if (context === "sponsor") return sponsorSections;
@@ -234,6 +260,7 @@ function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean
   if (context === "admin") return isAdmin
     ? { name: "Admin Command Center", homeHref: "/admin" }
     : { name: "Challenge Suite", homeHref: "/dashboard" };
+  if (context === "enterprise") return { name: "Enterprise Studio", homeHref: "/enterprise" };
   if (context === "host") return { name: "Host Control Center", homeHref: "/dashboard/host" };
   if (context === "creator") return { name: "Creator Studio", homeHref: "/dashboard" };
   if (context === "sponsor") return { name: "Sponsor Dashboard", homeHref: "/sponsor/dashboard" };
@@ -255,7 +282,7 @@ export function Sidebar() {
   const workspaceContext = workspaceNavigationContext(pathname);
   const sections = signedOut
     ? guestSections
-    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, effectiveTier.id, user?.accountType === "sponsor");
+    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, effectiveTier.id, user?.accountType === "sponsor", user?.enterprisePermissions ?? []);
   const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName);
   const activeHref = activeNavigationHref(pathname);
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
@@ -310,8 +337,8 @@ export function Sidebar() {
         </nav>
         <div className="space-y-3 p-5">
           <Link href="/dorocoins" aria-label="Open DoroCoin wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins</Link>
-          <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link>
-          {!loading && !signedOut && user?.accountType !== "sponsor" ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
+          {workspaceContext !== "enterprise" ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : <div className="flex min-h-11 items-center justify-center rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><ShieldCheck size={16} className="mr-2 text-[var(--gold)]" /> Enterprise Access</div>}
+          {!loading && !signedOut && user?.accountType !== "sponsor" && workspaceContext !== "enterprise" ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
     </>

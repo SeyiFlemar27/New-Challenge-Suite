@@ -17,7 +17,7 @@ const allowedDraftFields = new Set([
   "standardRules", "challengeRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
   "documentPaths", "challengeImages", "challengeVideo", "mediaUploadStatus", "mediaStatus", "usesPlaceholderMedia", "mediaFallbackType", "prizeType",
-  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode",
+  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode", "privateAccessMethod", "privateAccessCode", "privateAccessCodeExpiresAt", "privateAccessCodeMaxUses", "privateAccessInstructions", "privateParticipantQuestions", "privateParticipantAcknowledgements",
   "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "participationMode", "locationEligibility", "eligibleCountries", "ageRestrictionMode", "capacityMode", "maxParticipants", "hideParticipantList", "waitlistEnabled", "eligibleCountry", "minimumAge", "maximumAge", "teamParticipationEnabled",
   "sponsorEnabled", "sponsorSlots", "minimumSponsorshipAmount", "sponsorPlacementOptions", "sponsorPackages",
   "monetization", "isLiveEvent", "venueName", "eventAddress", "eventCity", "eventState", "eventCountry",

@@ -39,6 +39,12 @@ export interface CurrentUserProfile {
   enterpriseAccessStatus?: string;
   enterpriseApprovalStatus?: string;
   enterpriseApplicationId?: string | null;
+  enterpriseRole?: string | null;
+  enterpriseScope?: string | null;
+  enterpriseDepartment?: string | null;
+  enterprisePermissions?: string[];
+  enterpriseStaffStatus?: string | null;
+  enterpriseOnboardingComplete?: boolean;
 }
 
 function initialsFromName(name: string) {
@@ -123,7 +129,13 @@ export function useCurrentUser() {
           premiumAccessState: typeof profileRecord.premiumAccessState === "string" ? profileRecord.premiumAccessState : undefined,
           enterpriseAccessStatus: typeof profileRecord.enterpriseAccessStatus === "string" ? profileRecord.enterpriseAccessStatus : undefined,
           enterpriseApprovalStatus: typeof profileRecord.enterpriseApprovalStatus === "string" ? profileRecord.enterpriseApprovalStatus : undefined,
-          enterpriseApplicationId: typeof profileRecord.enterpriseApplicationId === "string" ? profileRecord.enterpriseApplicationId : null
+          enterpriseApplicationId: typeof profileRecord.enterpriseApplicationId === "string" ? profileRecord.enterpriseApplicationId : null,
+          enterpriseRole: typeof profileRecord.enterpriseRole === "string" ? profileRecord.enterpriseRole : null,
+          enterpriseScope: typeof profileRecord.enterpriseScope === "string" ? profileRecord.enterpriseScope : null,
+          enterpriseDepartment: typeof profileRecord.enterpriseDepartment === "string" ? profileRecord.enterpriseDepartment : null,
+          enterprisePermissions: Array.isArray(profileRecord.enterprisePermissions) ? profileRecord.enterprisePermissions.filter((value): value is string => typeof value === "string") : [],
+          enterpriseStaffStatus: typeof profileRecord.enterpriseStaffStatus === "string" ? profileRecord.enterpriseStaffStatus : null,
+          enterpriseOnboardingComplete: Boolean(profileRecord.enterpriseOnboardingComplete)
         });
       } catch (caught) {
         if (!cancelled) {

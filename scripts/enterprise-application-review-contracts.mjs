@@ -60,7 +60,7 @@ assert.match(topbar, /!user\.isAdmin/);
 assert.match(topbar, /href: "\/enterprise\/dashboard", label: "Enterprise"/);
 assert.doesNotMatch(topbar, /label: "Host"/);
 assert.match(dashboard, /enterpriseAccessStatus[\s\S]*approved/);
-assert.match(dashboard, /Enterprise Control Center/);
+assert.match(dashboard, /Enterprise Studio/);
 
 for (const copy of ["Enterprise application submitted", "Pending review", "We'll notify you when your application has been reviewed.", "You can continue using your normal account while this is being reviewed.", "More information needed", "Enterprise access approved", "Enterprise application not approved", "Contact Support"]) assert.ok(statusPage.includes(copy), `missing status copy ${copy}`);
 assert.match(statusPage, /href="\/contact"/);

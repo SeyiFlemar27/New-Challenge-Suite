@@ -7,7 +7,7 @@ import {
   FolderCog, Landmark, LifeBuoy, Megaphone, Radio, Search, ShieldAlert,
   ShieldCheck, SlidersHorizontal, Trophy, UserCog, UsersRound, WalletCards, X
 } from "lucide-react";
-import { Button, Card, EmptyState, LinkButton, PageTitle, textareaClass } from "@/components/ui";
+import { Button, Card, EmptyState, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type AdminRecord = Record<string, unknown> & { id: string; status?: string };
@@ -112,6 +112,9 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   const [pendingAction, setPendingAction] = useState<{ record: AdminRecord; action: string } | null>(null);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
+  const [enterpriseRole, setEnterpriseRole] = useState("operations");
+  const [enterpriseScope, setEnterpriseScope] = useState("assigned_only");
+  const [enterpriseDepartment, setEnterpriseDepartment] = useState("Operations");
   const [submitting, setSubmitting] = useState(false);
 
   async function load() {
@@ -150,13 +153,19 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
     setPendingAction({ record, action });
     setReason("");
     setNote("");
+    setEnterpriseRole("operations");
+    setEnterpriseScope("assigned_only");
+    setEnterpriseDepartment("Operations");
   }
   async function confirmAction() {
     if (!pendingAction) return;
     if (reasonRequired.has(pendingAction.action) && !reason.trim()) return setNotice("A reason is required for this action.");
     if (pendingAction.action === "add_note" && !note.trim()) return setNotice("Enter an internal note.");
     setSubmitting(true);
-    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note }) });
+    const enterpriseProvisioning = normalizedSection === "enterprise-applications" && pendingAction.action === "approve"
+      ? { enterpriseRole, enterpriseScope, enterpriseDepartment }
+      : {};
+    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note, ...enterpriseProvisioning }) });
     setSubmitting(false);
     setNotice(result.message);
     if (result.ok) {
@@ -180,7 +189,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
       {!loading && data && ["categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) ? <Configuration section={normalizedSection} records={data.settings} /> : null}
       {!loading && data && !["overview", "action-centre", "reports", "audit-logs", "search", "categories", "voting-rules", "revenue-rules", "feature-flags", "roles", "settings"].includes(normalizedSection) && !queueActions[normalizedSection] ? <RecordsWorkspace section={normalizedSection} data={data} onSelect={setSelected} /> : null}
       {selected ? <DetailDrawer record={selected} section={normalizedSection} onClose={() => setSelected(null)} onAction={queueActions[normalizedSection] ? openAction : undefined} /> : null}
-      {pendingAction ? <ActionDialog action={pendingAction.action} reason={reason} note={note} setReason={setReason} setNote={setNote} submitting={submitting} onCancel={() => setPendingAction(null)} onConfirm={confirmAction} /> : null}
+      {pendingAction ? <ActionDialog action={pendingAction.action} reason={reason} note={note} setReason={setReason} setNote={setNote} enterpriseProvisioning={normalizedSection === "enterprise-applications" && pendingAction.action === "approve"} enterpriseRole={enterpriseRole} enterpriseScope={enterpriseScope} enterpriseDepartment={enterpriseDepartment} setEnterpriseRole={setEnterpriseRole} setEnterpriseScope={setEnterpriseScope} setEnterpriseDepartment={setEnterpriseDepartment} submitting={submitting} onCancel={() => setPendingAction(null)} onConfirm={confirmAction} /> : null}
     </>
   );
 }
@@ -261,10 +270,10 @@ function DetailSection({ title, entries }: { title: string; entries: ReadonlyArr
   return <Card className="p-5"><h3 className="font-black">{title}</h3><dl className="mt-4 grid gap-3 sm:grid-cols-2">{available.map(([label, value]) => <DataPoint key={label} label={label} value={value} />)}</dl></Card>;
 }
 
-function ActionDialog({ action, reason, note, setReason, setNote, submitting, onCancel, onConfirm }: { action: string; reason: string; note: string; setReason: (value: string) => void; setNote: (value: string) => void; submitting: boolean; onCancel: () => void; onConfirm: () => void }) {
+function ActionDialog({ action, reason, note, setReason, setNote, enterpriseProvisioning, enterpriseRole, enterpriseScope, enterpriseDepartment, setEnterpriseRole, setEnterpriseScope, setEnterpriseDepartment, submitting, onCancel, onConfirm }: { action: string; reason: string; note: string; setReason: (value: string) => void; setNote: (value: string) => void; enterpriseProvisioning: boolean; enterpriseRole: string; enterpriseScope: string; enterpriseDepartment: string; setEnterpriseRole: (value: string) => void; setEnterpriseScope: (value: string) => void; setEnterpriseDepartment: (value: string) => void; submitting: boolean; onCancel: () => void; onConfirm: () => void }) {
   const needsReason = reasonRequired.has(action);
   const noteOnly = action === "add_note";
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="Confirm admin action"><button className="absolute inset-0 bg-black/85" onClick={onCancel} aria-label="Cancel admin action" /><Card className="relative z-10 w-full max-w-xl border-[var(--gold)]/25 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Review decision</p><h2 className="mt-3 text-2xl font-black">{friendlyLabel(action)}</h2><div className="mt-4 rounded-[8px] border border-white/10 p-4"><h3 className="font-black">What happens next</h3><p className="mt-2 text-sm leading-6 text-slate-300">The server will verify your permission and the record's current state, save the decision, and add an audit event. This control does not execute an external payment, payout, or refund.</p></div>{needsReason ? <label className="mt-6 block"><span className="mb-2 block text-sm font-bold">Reason required</span><textarea className={textareaClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this action is required." /></label> : null}<label className="mt-5 block"><span className="mb-2 block text-sm font-bold">{noteOnly ? "Internal note required" : "Internal note (optional)"}</span><textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Visible only to authorized administrators." /></label><div className="mt-6 grid gap-3 sm:grid-cols-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button onClick={onConfirm} disabled={submitting}>{submitting ? "Saving..." : `Confirm ${friendlyLabel(action)}`}</Button></div></Card></div>;
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="Confirm admin action"><button className="absolute inset-0 bg-black/85" onClick={onCancel} aria-label="Cancel admin action" /><Card className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto border-[var(--gold)]/25 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Review decision</p><h2 className="mt-3 text-2xl font-black">{friendlyLabel(action)}</h2><div className="mt-4 rounded-[8px] border border-white/10 p-4"><h3 className="font-black">What happens next</h3><p className="mt-2 text-sm leading-6 text-slate-300">The server will verify your permission and the record's current state, save the decision, and add an audit event. This control does not execute an external payment, payout, or refund.</p></div>{enterpriseProvisioning ? <div className="mt-6 grid gap-4 sm:grid-cols-2"><label><span className="mb-2 block text-sm font-bold">Enterprise role</span><select className={inputClass} value={enterpriseRole} onChange={(event) => setEnterpriseRole(event.target.value)}><option value="platform_owner">Platform Owner</option><option value="operations">Operations</option><option value="reviewer">Reviewer</option><option value="finance">Finance</option><option value="partnerships">Partnerships</option><option value="support_safety">Support &amp; Safety</option></select></label><label><span className="mb-2 block text-sm font-bold">Access scope</span><select className={inputClass} value={enterpriseScope} onChange={(event) => setEnterpriseScope(event.target.value)}><option value="assigned_only">Assigned Only</option><option value="all_official">All Official</option><option value="read_all_edit_assigned">Read All / Edit Assigned</option></select></label><label className="sm:col-span-2"><span className="mb-2 block text-sm font-bold">Department</span><input className={inputClass} value={enterpriseDepartment} maxLength={100} onChange={(event) => setEnterpriseDepartment(event.target.value)} /></label><p className="sm:col-span-2 text-xs leading-5 text-slate-400">Permissions are derived from the selected role. Access scope is enforced again by Enterprise APIs.</p></div> : null}{needsReason ? <label className="mt-6 block"><span className="mb-2 block text-sm font-bold">Reason required</span><textarea className={textareaClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this action is required." /></label> : null}<label className="mt-5 block"><span className="mb-2 block text-sm font-bold">{noteOnly ? "Internal note required" : "Internal note (optional)"}</span><textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Visible only to authorized administrators." /></label><div className="mt-6 grid gap-3 sm:grid-cols-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button onClick={onConfirm} disabled={submitting}>{submitting ? "Saving..." : `Confirm ${friendlyLabel(action)}`}</Button></div></Card></div>;
 }
 
 function RecordsWorkspace({ section, data, onSelect }: { section: string; data: AdminData; onSelect: (record: AdminRecord) => void }) {
