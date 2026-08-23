@@ -9,8 +9,8 @@ function positiveInteger(value: unknown, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function singleEliminationMatchCount(capacity: number) {
-  return Math.max(0, capacity - 1);
+export function singleEliminationMatchCount(capacity: number, includeBronzeMatch = false) {
+  return Math.max(0, capacity - 1) + (includeBronzeMatch && capacity >= 4 ? 1 : 0);
 }
 
 export function singleEliminationStageCount(capacity: number) {
@@ -28,10 +28,12 @@ export function doubleEliminationMatchCount(participantCount: number) {
 
 export function roundTitlesForCapacity(capacity: number) {
   const titles: Record<number, string[]> = {
+    4: ["Semifinal", "Final"],
     8: ["Quarterfinal", "Semifinal", "Final"],
     16: ["Round of 16", "Quarterfinal", "Semifinal", "Final"],
     32: ["Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"],
-    64: ["Round of 64", "Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"]
+    64: ["Round of 64", "Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"],
+    128: ["Round of 128", "Round of 64", "Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"]
   };
   return titles[capacity] ?? [];
 }
@@ -95,11 +97,13 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     coverMedia: { url: text(input.coverImageUrl) || null, path: text(input.coverImagePath) || null, status: text(input.coverImageUrl) ? "uploaded" : "missing" },
     trailerMedia: { url: text(input.trailerUrl) || null, path: text(input.trailerPath) || null, status: text(input.trailerUrl) ? "uploaded" : "missing" },
     status: "draft",
+    configVersion: 2,
     format: text(input.format, "single_elimination") as TournamentFoundation["format"],
+    participationMode: text(input.participationMode, "individual") === "team" ? "team" : "individual",
     participantCapacity: positiveInteger(input.participantCapacity, 8),
     participantCount: 0,
     privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
-    registrationType: text(input.registrationType, "open") as TournamentFoundation["registrationType"],
+    registrationType: text(input.registrationType, "open") === "invite_only" ? "invite_only" : "open",
     roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
     registrationOpensAt: text(input.registrationOpensAt) || null,
     registrationClosesAt: text(input.registrationClosesAt) || null,
@@ -110,7 +114,9 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     currency: text(input.currency, "USD").toUpperCase(),
     eligibility: input.eligibility && typeof input.eligibility === "object" ? input.eligibility as Record<string, unknown> : {},
     requiresCheckIn: Boolean(input.requiresCheckIn),
-    seedingMethod: text(input.seedingMethod, "manual") as TournamentFoundation["seedingMethod"],
+    checkInClosesAt: text(input.checkInClosesAt) || null,
+    teamConfig: text(input.participationMode) === "team" ? { minimumSize: positiveInteger(input.minimumTeamSize, 2), maximumSize: Math.min(20, positiveInteger(input.maximumTeamSize, 5)), joiningMode: text(input.teamJoiningMode) === "invite_and_requests" ? "invite_and_requests" : "invite_only", captainPaysEntryFee: true, rosterLocksAtCheckInClose: true } : null,
+    seedingMethod: "ranking",
     resultMethod: text(input.resultMethod, "votes") as TournamentFoundation["resultMethod"],
     advancementMethod: text(input.advancementMethod, "bracket") as TournamentFoundation["advancementMethod"],
     voting: { paidVotesActive: false, webhookConfirmationRequired: true },
@@ -137,6 +143,7 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
 export function tournamentSubdomainFoundation() {
   return {
     tournamentParticipants: { implemented: "model_foundation", fakeRecordsAllowed: false },
+    tournamentTeams: { implemented: "server_authoritative", memberRosterPublic: false, captainSubmissionRequired: true },
     tournamentRounds: { implemented: "model_foundation", bracketGenerationEnabled: false },
     tournamentMatches: { implemented: "model_foundation", fakeMatchesAllowed: false },
     tournamentSubmissions: { implemented: "model_foundation", realMediaRequired: true },
@@ -161,7 +168,14 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
   if (!text(tournament.category)) errors.push("Category is required.");
   if (text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded" && text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "storage_disabled") errors.push("Cover media must be uploaded unless storage-disabled mode is active.");
   if (!["single_elimination", "double_elimination"].includes(text(tournament.format))) errors.push("Choose Single Elimination or Double Elimination.");
-  if (!Number.isInteger(Number(tournament.participantCapacity)) || Number(tournament.participantCapacity) < 4 || Number(tournament.participantCapacity) > 64) errors.push("Tournament capacity must be a whole number from 4 to 64.");
+  if (![4, 8, 16, 32, 64, 128].includes(Number(tournament.participantCapacity))) errors.push("Choose a bracket size of 4, 8, 16, 32, 64, or 128.");
+  if (!["individual", "team"].includes(text(tournament.participationMode))) errors.push("Choose Individual or Team tournament participation.");
+  if (text(tournament.participationMode) === "team") {
+    const config = tournament.teamConfig as Record<string, unknown> | undefined;
+    const minimum = Number(config?.minimumSize ?? 0);
+    const maximum = Number(config?.maximumSize ?? 0);
+    if (!Number.isInteger(minimum) || !Number.isInteger(maximum) || minimum < 1 || minimum > maximum || maximum > 20) errors.push("Team size must satisfy 1 <= minimum <= maximum <= 20.");
+  }
   if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Registration and tournament dates are required.");
   if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
   if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");

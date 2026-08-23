@@ -21,9 +21,10 @@ export type TournamentStatus = typeof TOURNAMENT_STATUSES[number];
 export type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin" | "group_stage_to_final" | "league" | "hybrid";
 export type TournamentPrivacy = "public" | "private" | "invite_only";
 export type TournamentRegistrationType = "open" | "approval_required" | "invite_only";
+export type TournamentParticipationMode = "individual" | "team";
 export type TournamentEntryType = "free" | "paid_entry_setup_required";
 export type TournamentSeedingMethod = "manual" | "random" | "registration_order" | "ranking";
-export type TournamentResultMethod = "votes" | "judges" | "hybrid";
+export type TournamentResultMethod = "votes" | "judges" | "creator_decision" | "hybrid";
 export type TournamentAdvancementMethod = "bracket" | "points" | "manual_admin_review";
 export type TournamentTieBreaker = "host_review" | "judge_review" | "higher_seed" | "rematch" | "sudden_death_voting" | "predefined_rule";
 export type TournamentThirdPlaceMethod = "none" | "third_place_match" | "bronze_match" | "score_based";
@@ -56,6 +57,8 @@ export type TournamentFoundation = {
   trailerMedia: TournamentMedia;
   status: TournamentStatus;
   format: TournamentFormat;
+  configVersion?: number;
+  participationMode: TournamentParticipationMode;
   participantCapacity: number;
   participantCount: number;
   privacy: TournamentPrivacy;
@@ -70,6 +73,8 @@ export type TournamentFoundation = {
   currency: string;
   eligibility: Record<string, unknown>;
   requiresCheckIn: boolean;
+  checkInClosesAt: string | null;
+  teamConfig: { minimumSize: number; maximumSize: number; joiningMode: "invite_only" | "invite_and_requests"; captainPaysEntryFee: true; rosterLocksAtCheckInClose: true } | null;
   seedingMethod: TournamentSeedingMethod;
   resultMethod: TournamentResultMethod;
   advancementMethod: TournamentAdvancementMethod;
@@ -95,9 +100,10 @@ export type TournamentFoundation = {
 
 export type TournamentPrizeDistribution = { placement: 1 | 2 | 3; percent: number };
 export type TournamentRoundPlanItem = { roundNumber: number; title: string; brief: string; submissionOpensAt: string | null; submissionDeadlineAt: string | null; votingOpensAt: string | null; votingClosesAt: string | null; acceptedMedia: ("image" | "video")[]; resultMethod: TournamentResultMethod; advancementRule: string };
-export type TournamentParticipantFoundation = { id: string; tournamentId: string; userId: string; status: TournamentParticipantStatus; applicationStatus?: TournamentApplicationStatus | null; checkInStatus: TournamentCheckInStatus; seed: number | null; inviteId?: string | null; waitlistPosition?: number | null; createdAt: string; updatedAt: string };
+export type TournamentParticipantFoundation = { id: string; tournamentId: string; userId: string; teamId?: string | null; status: TournamentParticipantStatus; applicationStatus?: TournamentApplicationStatus | null; checkInStatus: TournamentCheckInStatus; seed: number | null; rankingScore?: number | null; cumulativeScore?: number | null; inviteId?: string | null; waitlistPosition?: number | null; createdAt: string; updatedAt: string };
+export type TournamentTeamFoundation = { id: string; tournamentId: string; name: string; captainUserId: string; memberUserIds: string[]; status: "forming" | "ready" | "checked_in" | "waitlisted" | "active" | "eliminated" | "withdrawn" | "disqualified"; paymentStatus: "not_required" | "pending" | "confirmed" | "refunded" | "review_required"; seed: number | null; rankingScore: number | null; rosterLockedAt: string | null; createdAt: string; updatedAt: string };
 export type TournamentRoundFoundation = { id: string; tournamentId: string; roundNumber: number; title: string; brief: string; status: TournamentRoundStatus; startsAt: string | null; endsAt: string | null; votingOpensAt: string | null; votingClosesAt: string | null };
-export type TournamentMatchFoundation = { id: string; tournamentId: string; roundId: string; roundNumber: number; matchNumber: number; bracket?: "winners" | "losers" | "grand_final"; status: TournamentMatchStatus; participantAId: string | null; participantBId: string | null; winnerParticipantId: string | null; loserParticipantId: string | null; nextMatchId: string | null; nextSlot: "A" | "B" | null; loserNextMatchId?: string | null; loserNextSlot?: "A" | "B" | null; resetMatchId?: string | null; resultMethod: TournamentResultMethod; resultStatus: TournamentResultStatus | null };
+export type TournamentMatchFoundation = { id: string; tournamentId: string; roundId: string; roundNumber: number; matchNumber: number; bracket?: "winners" | "losers" | "grand_final" | "bronze"; status: TournamentMatchStatus; participantAId: string | null; participantBId: string | null; winnerParticipantId: string | null; loserParticipantId: string | null; nextMatchId: string | null; nextSlot: "A" | "B" | null; loserNextMatchId?: string | null; loserNextSlot?: "A" | "B" | null; resetMatchId?: string | null; resultMethod: TournamentResultMethod; resultStatus: TournamentResultStatus | null };
 export type TournamentSubmissionFoundation = { id: string; tournamentId: string; roundId: string | null; matchId: string | null; participantId: string; userId: string; status: TournamentSubmissionStatus; mediaUrl: string | null; mediaPath: string | null; mediaType: "image" | "video"; caption?: string; submittedAt?: string | null };
 export type TournamentVoteFoundation = { id: string; tournamentId: string; matchId: string | null; voterId: string; submissionId: string; voteType: "free" | "paid"; status: "recorded" | "voided" };
 export type TournamentJudgeFoundation = { id: string; tournamentId: string; userId: string; status: "pending" | "accepted" | "declined" | "revoked" | "active" | "removed" };
@@ -109,11 +115,15 @@ export type TournamentReportFoundation = { id: string; tournamentId: string; rep
 export type TournamentDisputeFoundation = { id: string; tournamentId: string; matchId: string | null; status: "open" | "under_review" | "resolved" };
 export type TournamentPrizePoolFoundation = { id: string; tournamentId: string; currency: string; confirmedAmountMinor: number; status: "setup_required" | "confirmed" | "admin_review" };
 export type TournamentPayoutFoundation = { id: string; tournamentId: string; userId: string; status: "not_started" | "pending_hold" | "kyc_required" | "provider_setup_required" };
-export type TournamentPlacementFoundation = { id: string; tournamentId: string; placement: 1 | 2 | 3; participantId: string; userId: string; sourceMatchId: string; lockedAt: string; payoutStatus: "not_started" | "pending_admin_review" | "pending_hold" | "kyc_required" };
+export type TournamentPlacementFoundation = { id: string; tournamentId: string; placement: 1 | 2 | 3; participantId: string; userId: string | null; teamId?: string | null; sourceMatchId: string; lockedAt: string; payoutStatus: "not_started" | "pending_admin_review" | "pending_hold" | "kyc_required" };
 export type TournamentAuditEvent = { id: string; tournamentId: string; actorId: string; action: string; reason?: string; metadata?: Record<string, unknown>; createdAt: string };
 
 export const TOURNAMENT_SUBDOMAIN_COLLECTIONS = [
   "tournamentParticipants",
+  "tournamentTeams",
+  "tournamentTeamMemberships",
+  "tournamentTeamInvitations",
+  "tournamentTeamRequests",
   "tournamentRounds",
   "tournamentMatches",
   "tournamentSubmissions",

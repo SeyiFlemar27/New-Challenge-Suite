@@ -10,7 +10,7 @@ import type {
   TournamentRoundPlanItem,
   TournamentSubmissionStatus
 } from "@/lib/tournament-types";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { bracketSizeForParticipants, buildRoundPlan, doubleEliminationMatchCount, singleEliminationMatchCount } from "@/lib/server/tournaments";
 
 export type TournamentActor = { uid: string; role?: string; isAdmin?: boolean; accountType?: string };
@@ -41,6 +41,7 @@ export function evaluateTournamentJoinEligibility(params: {
 }): TournamentOperationResult & { outcome?: TournamentParticipantStatus } {
   const now = params.now ?? new Date();
   if (!params.actor) return { allowed: false, code: "AUTH_REQUIRED", message: "Sign in before joining this tournament." };
+  if (params.tournament.participationMode === "team") return { allowed: false, code: "TEAM_REGISTRATION_REQUIRED", message: "Create or join a tournament team to enter this tournament." };
   if (isSponsor(params.actor)) return { allowed: false, code: "SPONSOR_CANNOT_JOIN", message: "Sponsors cannot compete in tournaments." };
   if (params.tournament.hostId === params.actor.uid) return { allowed: false, code: "OWNER_CANNOT_JOIN", message: "Tournament hosts cannot compete in their own tournament." };
   if (params.tournament.entryType !== "free" && !params.paymentConfirmed) return { allowed: false, code: "PAYMENT_CONFIRMATION_REQUIRED", message: "Confirmed tournament entry payment is required." };
@@ -54,7 +55,7 @@ export function evaluateTournamentJoinEligibility(params: {
   if (params.profileComplete === false) return { allowed: false, code: "PROFILE_REQUIRED", message: "Complete your profile before joining." };
   if (!params.rulesAccepted) return { allowed: false, code: "RULES_REQUIRED", message: "Tournament rules must be accepted." };
   if (confirmedParticipantCount(params.participants) >= params.tournament.participantCapacity) return { allowed: true, outcome: "waitlisted", code: "WAITLIST_AVAILABLE", message: "Tournament is full. Join the waitlist." };
-  if (params.tournament.registrationType === "approval_required") return { allowed: true, outcome: "pending_approval", code: "APPLICATION_REQUIRED", message: "Application will be submitted for host review." };
+  if (params.tournament.registrationType === "approval_required" && Number(params.tournament.configVersion ?? 1) < 2) return { allowed: true, outcome: "pending_approval", code: "APPLICATION_REQUIRED", message: "Legacy tournament application will be submitted for host review." };
   return { allowed: true, outcome: "registered", code: "REGISTRATION_ALLOWED", message: "Registration can be created." };
 }
 
@@ -68,10 +69,12 @@ export function participantRecord(params: { id: string; tournamentId: string; us
   return { id: params.id, tournamentId: params.tournamentId, userId: params.userId, status: params.status, checkInStatus: "pending", seed: null, inviteId: params.inviteId ?? null, waitlistPosition: params.waitlistPosition ?? null, createdAt: now, updatedAt: now };
 }
 
-export function seedParticipants(participants: TournamentParticipantFoundation[], method: "manual" | "random") {
+export function seedParticipants(participants: TournamentParticipantFoundation[], method: "manual" | "random" | "ranking", tournamentId = "legacy") {
   const eligible = participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status));
   const ordered = [...eligible];
-  if (method === "random") {
+  if (method === "ranking") {
+    ordered.sort((a, b) => Number(b.rankingScore ?? b.cumulativeScore ?? -1) - Number(a.rankingScore ?? a.cumulativeScore ?? -1) || createHash("sha256").update(`${tournamentId}:${a.id}`).digest("hex").localeCompare(createHash("sha256").update(`${tournamentId}:${b.id}`).digest("hex")));
+  } else if (method === "random") {
     for (let index = ordered.length - 1; index > 0; index -= 1) {
       const swapIndex = randomInt(index + 1);
       [ordered[index], ordered[swapIndex]] = [ordered[swapIndex], ordered[index]];
@@ -90,7 +93,7 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
   if (eligible.length < 2 || eligible.length > params.tournament.participantCapacity) return { created: false, code: "PARTICIPANT_COUNT_INVALID", rounds: [], matches: [] };
   const bracketSize = bracketSizeForParticipants(eligible.length);
   const plan = buildRoundPlan(bracketSize, params.tournament.resultMethod, params.tournament.thirdPlaceMethod);
-  const rounds: TournamentRoundFoundation[] = plan.filter((round) => round.title !== "Bronze Match").map((round) => ({
+  const rounds: TournamentRoundFoundation[] = plan.map((round) => ({
     id: `${params.tournament.id}_round_${round.roundNumber}`,
     tournamentId: params.tournament.id,
     roundNumber: round.roundNumber,
@@ -138,11 +141,37 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
     if (match.nextSlot === "B") next.participantBId = match.winnerParticipantId;
     if (next.participantAId && next.participantBId) next.status = "ready";
   }
-  return { created: true, code: "BRACKET_GENERATED", expectedMatchCount: singleEliminationMatchCount(eligible.length), rounds, matches };
+  const bronzeRound = plan.find((round) => round.title === "Bronze Match");
+  if (bronzeRound && bracketSize >= 4) {
+    const bronzeMatchId = `${params.tournament.id}_bronze_match`;
+    const semifinalRound = Math.log2(bracketSize) - 1;
+    for (const semifinal of matches.filter((item) => item.roundNumber === semifinalRound)) {
+      semifinal.loserNextMatchId = bronzeMatchId;
+      semifinal.loserNextSlot = semifinal.matchNumber % 2 === 1 ? "A" : "B";
+    }
+    matches.push({
+      id: bronzeMatchId,
+      tournamentId: params.tournament.id,
+      roundId: `${params.tournament.id}_round_${bronzeRound.roundNumber}`,
+      roundNumber: bronzeRound.roundNumber,
+      matchNumber: 1,
+      bracket: "bronze",
+      status: "scheduled",
+      participantAId: null,
+      participantBId: null,
+      winnerParticipantId: null,
+      loserParticipantId: null,
+      nextMatchId: null,
+      nextSlot: null,
+      resultMethod: params.tournament.resultMethod,
+      resultStatus: null
+    });
+  }
+  return { created: true, code: "BRACKET_GENERATED", expectedMatchCount: singleEliminationMatchCount(eligible.length, Boolean(bronzeRound)), rounds, matches };
 }
 
 export function generateDoubleEliminationBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[] }) {
-  const single = generateSingleEliminationBracket(params);
+  const single = generateSingleEliminationBracket({ ...params, tournament: { ...params.tournament, thirdPlaceMethod: "none" } });
   if (!single.created) return single;
   const winners = single.matches.map((match) => ({ ...match, id: match.id.replace("_r", "_wb_r"), roundId: match.roundId.replace("_round_", "_wb_round_"), bracket: "winners" as const }));
   const winnersByOriginalId = new Map(single.matches.map((match, index) => [match.id, winners[index].id]));
@@ -179,7 +208,7 @@ export function generateDoubleEliminationBracket(params: { tournament: Tournamen
     { id: `${params.tournament.id}_grand_final_round`, tournamentId: params.tournament.id, roundNumber: winnerRounds * 3, title: "Grand Final", brief: "Winners bracket finalist faces the losers bracket finalist.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null },
     { id: `${params.tournament.id}_grand_final_reset_round`, tournamentId: params.tournament.id, roundNumber: winnerRounds * 3 + 1, title: "Grand Final Reset", brief: "Played only if the undefeated finalist receives a first loss in the Grand Final.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null }
   ];
-  return { created: true, code: "DOUBLE_ELIMINATION_BRACKET_GENERATED", expectedMatchCount: doubleEliminationMatchCount(params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).length), rounds, matches: [...winners, ...losers, grandFinal, grandFinalReset] };
+  return { created: true, code: "DOUBLE_ELIMINATION_BRACKET_GENERATED", expectedMatchCount: doubleEliminationMatchCount(bracketSizeForParticipants(params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).length)), rounds, matches: [...winners, ...losers, grandFinal, grandFinalReset] };
 }
 
 export function generateTournamentBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[] }) {
@@ -189,7 +218,9 @@ export function generateTournamentBracket(params: { tournament: TournamentFounda
 export function validateTournamentSubmission(params: { tournament: TournamentFoundation; round: TournamentRoundPlanItem | TournamentRoundFoundation; mediaUrl?: string | null; mediaPath?: string | null; mediaType?: string; now?: Date; replacementAllowed?: boolean; existingStatus?: TournamentSubmissionStatus | null }) {
   const now = params.now ?? new Date();
   const deadline = "submissionDeadlineAt" in params.round ? params.round.submissionDeadlineAt : params.round.endsAt;
-  if (deadline && now > new Date(deadline)) return { valid: false, code: "SUBMISSION_DEADLINE_CLOSED", message: "Submission deadline has passed." };
+  const opensAt = "submissionOpensAt" in params.round ? params.round.submissionOpensAt : params.round.startsAt;
+  if (opensAt && now < new Date(opensAt)) return { valid: false, code: "SUBMISSION_NOT_OPEN", message: "Round submissions are not open yet." };
+  if (deadline && now >= new Date(deadline)) return { valid: false, code: "SUBMISSION_DEADLINE_CLOSED", message: "Submission deadline has passed." };
   if (!params.mediaUrl || !params.mediaPath) return { valid: false, code: "UPLOADED_MEDIA_REQUIRED", message: "Tournament submissions require uploaded media URL and storage path." };
   if (!["image", "video"].includes(String(params.mediaType))) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "Tournament submissions support image or video media." };
   if (params.existingStatus === "submitted" && !params.replacementAllowed) return { valid: false, code: "REPLACEMENT_NOT_ALLOWED", message: "Submission replacement is not allowed by tournament rules." };
@@ -211,6 +242,34 @@ export function validateJudgeRubric(criteria: Array<{ name: string; weight: numb
 export function calculateHybridScore(params: { audienceScore: number; judgeScore: number; audiencePercent: number; judgePercent: number }) {
   if (params.audiencePercent + params.judgePercent !== 100) return { valid: false, finalScore: 0, sourceValuesStored: true };
   return { valid: true, finalScore: (params.audienceScore * params.audiencePercent + params.judgeScore * params.judgePercent) / 100, sourceValuesStored: true };
+}
+
+export function cumulativeTournamentScore(current: number | null | undefined, matchScore: number) {
+  const previous = Number(current ?? 0);
+  const next = Number(matchScore);
+  if (!Number.isFinite(previous) || !Number.isFinite(next) || next < 0) return { valid: false, score: previous };
+  return { valid: true, score: Math.round((previous + next) * 10000) / 10000 };
+}
+
+export function splitTeamPrizeEqually(params: { amountMinor: number; lockedRosterUserIds: string[]; payoutEligibleUserIds?: string[] }) {
+  const amountMinor = Math.trunc(params.amountMinor);
+  const roster = [...new Set(params.lockedRosterUserIds.filter(Boolean))].sort();
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || !roster.length) return { valid: false, allocations: [], allocatedMinor: 0 };
+  const eligible = params.payoutEligibleUserIds ? new Set(params.payoutEligibleUserIds) : null;
+  const base = Math.floor(amountMinor / roster.length);
+  const remainder = amountMinor % roster.length;
+  const allocations = roster.map((userId, index) => {
+    const amount = base + (index < remainder ? 1 : 0);
+    return { userId, amountMinor: amount, status: eligible && !eligible.has(userId) ? "pending_hold" as const : "pending_admin_review" as const };
+  });
+  return { valid: true, allocations, allocatedMinor: allocations.reduce((sum, item) => sum + item.amountMinor, 0) };
+}
+
+export function resolveTournamentNoSubmission(params: { participantASubmitted: boolean; participantBSubmitted: boolean; extensionAlreadyUsed: boolean }) {
+  if (params.participantASubmitted !== params.participantBSubmitted) return { action: "forfeit" as const, winnerSlot: params.participantASubmitted ? "A" as const : "B" as const, extensionHours: 0 };
+  if (!params.participantASubmitted && !params.extensionAlreadyUsed) return { action: "extend" as const, winnerSlot: null, extensionHours: 12 };
+  if (!params.participantASubmitted) return { action: "admin_review" as const, winnerSlot: null, extensionHours: 0 };
+  return { action: "continue" as const, winnerSlot: null, extensionHours: 0 };
 }
 
 export function resolveMatchResult(params: { match: TournamentMatchFoundation; winnerParticipantId: string; loserParticipantId: string; fraudFlag?: boolean; moderationIssue?: boolean; unresolvedTie?: boolean; overrideReason?: string; actor?: TournamentActor }) {

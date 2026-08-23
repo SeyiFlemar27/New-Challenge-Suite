@@ -65,10 +65,10 @@ has(liveBuilder, "Physical venue name", "Live events are physical-first.");
 has(liveBuilder, "paid_setup_required", "Paid ticket choice remains setup-only.");
 has(liveBuilder, "ticketCheckoutActive: false", "Live builder never enables fake ticket checkout.");
 
-for (const step of ["Overview", "Format & Capacity", "Registration", "Seeding & Bracket", "Rounds & Schedule", "Rules & Scoring", "Monetization & Prize Pool", "Media & Branding", "Sponsors", "Review & Publish"]) has(tournamentBuilder, `\"${step}\"`, `Tournament builder includes ${step}.`);
+for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) has(tournamentBuilder, `\"${step}\"`, `Tournament builder includes ${step}.`);
 has(tournamentValidation, "[\"single_elimination\", \"double_elimination\"]", "Tournament supports the two launch elimination formats.");
 lacks(tournamentValidation, "round_robin", "Round Robin is not a launch format.");
-has(tournamentBuilder, "after registration closes", "Bracket/pairing generation waits for registration close.");
+has(tournamentBuilder, "Performance seeding is platform-managed.", "New brackets use platform-managed performance seeding.");
 
 for (const type of ["standard", "private", "live_event", "tournament"]) has(exploreApi, `\"${type}\"`, `Explore API supports ${type}.`);
 for (const label of ["Standard Challenge", "Private Challenge", "Live Event", "Tournament"]) has(exploreApi, label, `Explore labels ${label}.`);

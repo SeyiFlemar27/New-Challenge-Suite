@@ -40,10 +40,11 @@ export async function getTournamentBundle(id: string): Promise<{ available: bool
   const tournamentSnap = await db.collection("tournaments").doc(id).get();
   if (!tournamentSnap.exists) return { available: true, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found." };
   const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentRow[];
-  const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() };
+  const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as TournamentRow;
   try {
-    const [participants, rounds, matches, submissions, announcements, sponsors, placements, audits] = await Promise.all([
+    const [participants, teams, rounds, matches, submissions, announcements, sponsors, placements, audits] = await Promise.all([
       db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(500).get(),
+      db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get(),
       db.collection("tournamentRounds").where("tournamentId", "==", id).limit(100).get(),
       db.collection("tournamentMatches").where("tournamentId", "==", id).limit(200).get(),
       db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(200).get(),
@@ -55,7 +56,9 @@ export async function getTournamentBundle(id: string): Promise<{ available: bool
     return {
       available: true,
       tournament,
-      participants: rows(participants),
+      participants: tournament.participationMode === "team"
+        ? rows(teams).map((team) => ({ id: team.id, tournamentId: id, displayName: String(team.name ?? "Tournament Team"), status: team.status, seed: team.seed ?? null }))
+        : rows(participants),
       rounds: rows(rounds),
       matches: rows(matches),
       submissions: rows(submissions),

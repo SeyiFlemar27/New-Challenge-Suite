@@ -5,7 +5,7 @@ const bracketRoute = read("app/api/tournaments/[id]/bracket/route.ts");
 const resultRoute = read("app/api/tournaments/[id]/results/route.ts");
 const operations = read("lib/server/tournament-operations.ts");
 
-assert(bracketRoute.includes("generateSingleEliminationBracket"));
+assert(bracketRoute.includes("generateTournamentBracket"));
 assert(bracketRoute.includes('where("tournamentId", "==", id)'));
 assert(bracketRoute.includes("TOURNAMENT_REGISTRATION_MUST_CLOSE"));
 assert(resultRoute.includes("resolveMatchResult"));
