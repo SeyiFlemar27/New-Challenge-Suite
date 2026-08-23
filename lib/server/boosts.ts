@@ -1,17 +1,8 @@
 import { isChallengeEligibleForBoost, isPublicChallengeStatus } from "@/lib/challenge-status";
+import { hasActiveMonthlyBoost, monthlyBoostEntitlement, monthlyBoostEntitlementKey } from "@/lib/monthly-boost";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
-
-export const boostPackages = {
-  spark: { id: "spark", name: "Spark Boost", coins: 40, reach: "1,200 estimated views", durationDays: 2 },
-  surge: { id: "surge", name: "Surge Boost", coins: 90, reach: "4,800 estimated views", durationDays: 5 },
-  spotlight: { id: "spotlight", name: "Spotlight Boost", coins: 180, reach: "12,000 estimated views", durationDays: 7 }
-} as const;
-
-export function getBoostPackage(packageId: unknown) {
-  if (typeof packageId !== "string") return null;
-  return boostPackages[packageId as keyof typeof boostPackages] ?? null;
-}
+import { deterministicId } from "@/lib/server/idempotency";
 const NON_PUBLIC_VISIBILITY = new Set(["private", "hidden", "unlisted", "draft", "incomplete", "pending", "rejected", "suspended", "archived", "deleted", "cancelled"]);
 
 export function getChallengeBoostAccess(input: {
@@ -24,7 +15,7 @@ export function getChallengeBoostAccess(input: {
   const visibility = String(challenge.visibility ?? challenge.accessType ?? challenge.publicVisibility ?? "public").toLowerCase();
   const planAccess = getUserPlanAccess(input.profile ?? {});
   const owner = Boolean(userId && userOwnsChallenge(challenge, userId));
-  const allowedAccount = ["creator", "host", "enterprise"].includes(String(planAccess.accountType ?? "").toLowerCase());
+  const allowedAccount = ["creator", "pro", "host", "enterprise"].includes(planAccess.normalizedPlanId) && planAccess.accountType !== "sponsor";
   const publiclyVisible = isPublicChallengeStatus(status) && !NON_PUBLIC_VISIBILITY.has(visibility);
   const eligibleStatus = isChallengeEligibleForBoost(status);
 
@@ -34,4 +25,17 @@ export function getChallengeBoostAccess(input: {
   if (!publiclyVisible) return { allowed: false, owner: true, publiclyVisible: false, eligibleStatus, reason: "public_challenge_required" as const };
   if (!eligibleStatus) return { allowed: false, owner: true, publiclyVisible, eligibleStatus: false, reason: "status_not_eligible" as const };
   return { allowed: true, owner: true, publiclyVisible: true, eligibleStatus: true, reason: null };
+}
+
+export async function loadMonthlyBoostState(db: FirebaseFirestore.Firestore, challenge: Record<string, unknown>, userId: string, profile: Record<string, unknown>, now = new Date()) {
+  const entitlementId = deterministicId("monthly_boost_entitlement", userId, monthlyBoostEntitlementKey(profile, now));
+  const entitlementSnap = await db.collection("monthlyBoostEntitlements").doc(entitlementId).get();
+  const entitlement = monthlyBoostEntitlement(profile, Number(entitlementSnap.data()?.used ?? 0), now);
+  return {
+    ...entitlement,
+    access: getChallengeBoostAccess({ challenge, userId, profile }),
+    active: hasActiveMonthlyBoost(challenge, now),
+    endsAt: challenge.monthlyBoostEndsAt ?? challenge.boostEndsAt ?? challenge.boostedUntil ?? null,
+    durationHours: 72
+  };
 }

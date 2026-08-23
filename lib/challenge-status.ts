@@ -189,15 +189,7 @@ const sponsorEligibleStatuses = new Set<CanonicalChallengeStatus | LegacyChallen
 
 const boostEligibleStatuses = new Set<CanonicalChallengeStatus | LegacyChallengeStatus>([
   "scheduled",
-  "registration_not_open",
-  "registration_open",
-  "active",
-  "submission_open",
-  "voting_open",
-  "published",
-  "registration_open",
-  "voting",
-  "upcoming"
+  "active"
 ]);
 
 const publicChallengeStatuses = new Set<CanonicalChallengeStatus | LegacyChallengeStatus>([
@@ -839,7 +831,6 @@ function numberOrNull(value: unknown) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
 
 
 

@@ -7,6 +7,8 @@ import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-ch
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
+import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -92,7 +94,12 @@ function sortChallenges(items: Array<Record<string, unknown>>, sort: string) {
   const copy = [...items];
   if (sort === "participants") return copy.sort((a, b) => Number(b.participantCount ?? 0) - Number(a.participantCount ?? 0));
   if (sort === "ending_soon") return copy.sort((a, b) => byDate("submissionDeadline", a) - byDate("submissionDeadline", b));
-  return copy.sort((a, b) => byDate("publishedAt", b) - byDate("publishedAt", a));
+  return copy.sort((a, b) => Number(b.discoveryScore ?? 0) - Number(a.discoveryScore ?? 0) || byDate("publishedAt", b) - byDate("publishedAt", a));
+}
+
+function withoutRankingSignals(item: Record<string, unknown>) {
+  const { discoveryScore: _discoveryScore, trendingScore: _trendingScore, ...publicItem } = item;
+  return publicItem;
 }
 
 function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary; userId: string | null; sponsor: boolean; participant?: Record<string, unknown> }) {
@@ -127,7 +134,7 @@ function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary
 
 export async function GET(request: NextRequest) {
   const db = getAdminDb();
-  if (!db) return ok({ challenges: [], featured: [], trending: [], categories: [], page: 1, limit: 24, total: 0, hasMore: false, filters: {}, privateFieldsExcluded: true, realDataOnly: true, backendAvailable: false, reason: "backend_not_configured" }, "Explore is temporarily unavailable while the challenge service is being connected.");
+  if (!db) return ok({ challenges: [], featured: [], trending: [], categories: [], page: 1, limit: CHALLENGE_PAGE_SIZE, total: 0, hasMore: false, filters: {}, privateFieldsExcluded: true, realDataOnly: true, backendAvailable: false, reason: "backend_not_configured" }, "Explore is temporarily unavailable while the challenge service is being connected.");
   const user = await getOptionalRequestUser(request);
   const sponsor = isSponsorProfile(user ? { role: user.role } : {});
   const url = new URL(request.url);
@@ -139,7 +146,7 @@ export async function GET(request: NextRequest) {
   const sponsorReady = url.searchParams.get("sponsorReady") === "true";
   const sort = text(url.searchParams.get("sort")).slice(0, 40).toLowerCase() || "recent";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
-  const limit = Math.min(48, Math.max(8, Number(url.searchParams.get("limit") ?? 24) || 24));
+  const limit = CHALLENGE_PAGE_SIZE;
   try {
     const [snap, participantSnap] = await Promise.all([
       db.collection("challenges").orderBy("createdAt", "desc").limit(180).get(),
@@ -187,7 +194,8 @@ export async function GET(request: NextRequest) {
         completedRecently: recentCompletion,
         completedInteractionsDisabled: ["completed", "winners_announced", "voting_closed"].includes(phase.phase),
         isOwnedByViewer: owned,
-        trendingScore: trend?.score ?? null,
+        trendingScore: (trend?.score ?? 0) + monthlyBoostRankingWeight(raw),
+        discoveryScore: (trend?.score ?? 0) + monthlyBoostRankingWeight(raw),
         activityLabel: trend?.activityLabel ?? null,
         paidEntry: { required: paid, amountCents: paid ? paidEntryAmountCents(raw) : 0, currency: "usd" },
         creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
@@ -197,10 +205,11 @@ export async function GET(request: NextRequest) {
     });
     const sorted = sortChallenges(all, sort);
     const start = (page - 1) * limit;
-    const items = sorted.slice(start, start + limit);
+    const items = sorted.slice(start, start + limit).map(withoutRankingSignals);
     const trending = all.filter((item) => Number(item.trendingScore ?? 0) > 0 && !item.completedInteractionsDisabled)
       .sort((a, b) => Number(b.trendingScore ?? 0) - Number(a.trendingScore ?? 0))
-      .slice(0, 12);
+      .slice(0, 12)
+      .map(withoutRankingSignals);
     const categories = Array.from(new Set(all.map((item) => String(item.category ?? "")).filter(Boolean))).slice(0, 12);
     return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
   } catch (error) {

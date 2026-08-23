@@ -5,6 +5,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
 import { calculateChallengeDraftProgress, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { ok, serverUnavailable } from "@/lib/server/responses";
+import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
 
 type DashboardChallengeRelationship = "created" | "joined" | "submitted";
 
@@ -21,7 +22,8 @@ function personalChallengeFields(id: string, data: Record<string, unknown>, rela
     completionPercentage: Number(data.completionPercentage ?? progress.completionPercentage),
     nextIncompleteSection: data.nextIncompleteSection ?? progress.nextIncompleteSection,
     lastAutosavedAt: data.lastAutosavedAt ?? data.updatedAt ?? null,
-    visibility: data.visibility ?? "public"
+    visibility: data.visibility ?? "public",
+    recommendationScore: monthlyBoostRankingWeight(data)
   };
 }
 
@@ -37,10 +39,11 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Dashboard");
 
-  const [userSnap, profileSnap, walletSnap, ownedChallengesSnap, participantsSnap, submissionsSnap, notificationsSnap, badgesSnap, kycSnap] = await Promise.all([
+  const [userSnap, profileSnap, walletSnap, cashWalletSnap, ownedChallengesSnap, participantsSnap, submissionsSnap, notificationsSnap, badgesSnap, kycSnap] = await Promise.all([
     db.collection("users").doc(user.uid).get(),
     db.collection("profiles").doc(user.uid).get(),
     db.collection("doroCoinWallets").doc(user.uid).get(),
+    db.collection("cashWallets").doc(user.uid).get(),
     db.collection("challenges").where("creatorId", "==", user.uid).limit(50).get(),
     db.collection("challengeParticipants").where("userId", "==", user.uid).limit(50).get(),
     db.collection("submissions").where("userId", "==", user.uid).limit(50).get(),
@@ -160,6 +163,7 @@ export async function GET(request: Request) {
     submissions,
     participantEntries,
     wallet: walletSnap.exists ? { userId: user.uid, ...wallet } : null,
+    cashWallet: cashWalletSnap.exists ? { userId: user.uid, ...cashWalletSnap.data() } : { userId: user.uid, availableBalanceCents: 0, pendingBalanceCents: 0 },
     badges,
     leaderboard: [],
     notifications

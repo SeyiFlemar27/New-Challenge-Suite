@@ -1,87 +1,93 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { createNotification } from "@/lib/server/notifications";
 import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
-import { fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
-import { getUserPlanAccess } from "@/lib/plan-access";
-import { getChallengeBoostAccess } from "@/lib/server/boosts";
+import { fail, forbidden, ok, serverError, serverUnavailable, readJson } from "@/lib/server/responses";
+import { extendedMonthlyBoostEnd, monthlyBoostEntitlement, monthlyBoostEntitlementKey, monthlyBoostMonthKey } from "@/lib/monthly-boost";
+import { getChallengeBoostAccess, loadMonthlyBoostState } from "@/lib/server/boosts";
+
+export const dynamic = "force-dynamic";
+
+async function accountProfile(db: FirebaseFirestore.Firestore, userId: string) {
+  const [account, profile] = await Promise.all([db.collection("users").doc(userId).get(), db.collection("profiles").doc(userId).get()]);
+  return { ...(profile.data() ?? {}), ...(account.data() ?? {}) } as Record<string, unknown>;
+}
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Monthly Boost");
+  try {
+    const [challengeSnap, profile] = await Promise.all([db.collection("challenges").doc(id).get(), accountProfile(db, user.uid)]);
+    if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+    const challenge = { id, ...challengeSnap.data() } as Record<string, unknown>;
+    const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile });
+    if (!access.owner) return forbidden("Only the challenge owner can manage Monthly Boost.");
+    return ok({ state: await loadMonthlyBoostState(db, challenge, user.uid, profile) }, "Monthly Boost state loaded.");
+  } catch (error) {
+    return serverError("Monthly Boost state could not be loaded.", error instanceof Error ? error.message : error);
+  }
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
-  if (!db) return serverUnavailable("Challenge boosts");
+  if (!db) return serverUnavailable("Monthly Boost");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const packageId = parsed.body?.packageId;
   const idempotencyKey = getRequestIdempotencyKey(request, parsed.body);
-  if (typeof packageId !== "string") return validationError({ packageId: "Select a valid boost package." });
-  const [challengeSnap, packageSnap, accountSnap, profileSnap, boostsSnap] = await Promise.all([
-    db.collection("challenges").doc(id).get(),
-    db.collection("boostPackages").doc(packageId).get(),
-    db.collection("users").doc(user.uid).get(),
-    db.collection("profiles").doc(user.uid).get(),
-    db.collection("boosts").where("userId", "==", user.uid).limit(250).get()
-  ]);
-  const planAccess = getUserPlanAccess({
-    ...(profileSnap.exists ? profileSnap.data() ?? {} : {}),
-    ...(accountSnap.exists ? accountSnap.data() ?? {} : {})
-  });
-  if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
-  const challenge = challengeSnap.data() ?? {};
-  const boostAccess = getChallengeBoostAccess({ challenge, userId: user.uid, profile: {
-    ...(profileSnap.exists ? profileSnap.data() ?? {} : {}),
-    ...(accountSnap.exists ? accountSnap.data() ?? {} : {})
-  } });
-  if (boostAccess.reason === "owner_required") return forbidden("Only the challenge owner can boost this challenge.");
-  if (boostAccess.reason === "public_challenge_required") return fail("Publish this challenge publicly before boosting it.", 409, undefined, "BOOST_REJECTED");
-  if (boostAccess.reason === "status_not_eligible") return fail("This challenge is not eligible for boosting.", 409, undefined, "BOOST_REJECTED");
-  if (planAccess.accountType === "sponsor" || planAccess.monthlyBoostLimit <= 0) {
-    return forbidden("Challenge boosts require the Creator plan or higher.");
-  }
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
-  const boostsThisMonth = boostsSnap.docs.filter((document) => {
-    const startsAt = Date.parse(String(document.data().startsAt ?? ""));
-    return Number.isFinite(startsAt) && startsAt >= monthStart.getTime();
-  }).length;
-  if (boostsThisMonth >= planAccess.monthlyBoostLimit) {
-    return fail(`Your ${planAccess.planName} plan includes ${planAccess.monthlyBoostLimit} challenge boost${planAccess.monthlyBoostLimit === 1 ? "" : "s"} per month.`, 403, undefined, "PLAN_LIMIT_REACHED");
-  }
-  if (!boostAccess.allowed) return forbidden("Challenge boosts require an eligible creator, host, or enterprise owner account.");
-  if (!packageSnap.exists || packageSnap.data()?.active !== true) return validationError({ packageId: "Select an active boost package." });
-  const boostPackage = packageSnap.data()!;
-  const coins = Number(boostPackage.coins);
-  const durationDays = Number(boostPackage.durationDays);
-  if (!Number.isFinite(coins) || coins <= 0) return validationError({ packageId: "Boost package has an invalid DoroCoin cost." });
-  if (!Number.isFinite(durationDays) || durationDays <= 0) return validationError({ packageId: "Boost package has an invalid duration." });
+  if (!idempotencyKey) return fail("Please confirm Monthly Boost again.", 400, undefined, "IDEMPOTENCY_KEY_REQUIRED");
   const now = new Date();
-  const endsAt = new Date(now);
-  endsAt.setDate(endsAt.getDate() + durationDays);
-  const boostId = idempotencyKey ? deterministicId("boost", id, user.uid, packageId, idempotencyKey) : undefined;
-  const ref = boostId ? db.collection("boosts").doc(boostId) : db.collection("boosts").doc();
-  if (boostId) {
-    const existingBoost = await ref.get();
-    if (existingBoost.exists) return ok({ boost: { id: ref.id, ...existingBoost.data() }, idempotentReplay: true }, "Challenge boost is already active.");
-  }
+  const challengeRef = db.collection("challenges").doc(id);
+  const userRef = db.collection("users").doc(user.uid);
+  const profileRef = db.collection("profiles").doc(user.uid);
+
   try {
-    await applyDoroCoinTransaction(db, { userId: user.uid, amount: -coins, type: "boost_spend", description: `Boost challenge ${id}`, sourceId: ref.id, transactionId: deterministicId("boost", ref.id, "spend"), idempotencyKey: boostId ?? undefined, createdBy: user.uid });
+    const result = await db.runTransaction(async (transaction) => {
+      const [challengeSnap, accountSnap, profileSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(userRef), transaction.get(profileRef)]);
+      if (!challengeSnap.exists) throw new BoostError("NOT_FOUND", "Challenge not found.", 404);
+      const challenge = { id, ...challengeSnap.data() } as Record<string, unknown>;
+      const profile = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) } as Record<string, unknown>;
+      const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile });
+      if (access.reason === "owner_required") throw new BoostError("FORBIDDEN", "Only the challenge owner can use Monthly Boost.", 403);
+      if (access.reason === "plan_required") throw new BoostError("PLAN_REQUIRED", "Monthly Boosts are available with eligible premium plans.", 403);
+      if (access.reason === "public_challenge_required") throw new BoostError("CHALLENGE_NOT_DISCOVERABLE", "This challenge must be approved and publicly discoverable before it can be boosted.", 409);
+      if (access.reason === "status_not_eligible") throw new BoostError("BOOST_STATUS_INELIGIBLE", "Monthly Boost is available only while a challenge is Scheduled or Active.", 409);
+      if (!access.allowed) throw new BoostError("BOOST_FORBIDDEN", "Monthly Boost is not available for this challenge.", 403);
+
+      const entitlementKey = monthlyBoostEntitlementKey(profile, now);
+      const entitlementRef = db.collection("monthlyBoostEntitlements").doc(deterministicId("monthly_boost_entitlement", user.uid, entitlementKey));
+      const redemptionRef = db.collection("monthlyBoostRedemptions").doc(deterministicId("monthly_boost", user.uid, id, idempotencyKey));
+      const [entitlementSnap, redemptionSnap] = await Promise.all([transaction.get(entitlementRef), transaction.get(redemptionRef)]);
+      const entitlement = monthlyBoostEntitlement(profile, Number(entitlementSnap.data()?.used ?? 0), now);
+      if (redemptionSnap.exists) return { replay: true, endsAt: redemptionSnap.data()?.endsAt, entitlement };
+      if (entitlement.allowance <= 0) throw new BoostError("PLAN_REQUIRED", "Monthly Boosts are available with eligible premium plans.", 403);
+      if (entitlement.remaining <= 0) throw new BoostError("MONTHLY_BOOST_EXHAUSTED", "You have used all Monthly Boosts available for this month.", 409);
+
+      const startsAt = now.toISOString();
+      const endsAt = extendedMonthlyBoostEnd(challenge.monthlyBoostEndsAt ?? challenge.boostEndsAt ?? challenge.boostedUntil, now);
+      const nextUsed = entitlement.used + 1;
+      const redemption = { id: redemptionRef.id, userId: user.uid, challengeId: id, entitlementKey, entitlementMonth: monthlyBoostMonthKey(now), planId: entitlement.planId, durationHours: 72, startsAt, endsAt, status: "active", createdAt: startsAt };
+      transaction.set(entitlementRef, { userId: user.uid, entitlementKey, month: monthlyBoostMonthKey(now), planId: entitlement.planId, allowance: entitlement.allowance, used: nextUsed, updatedAt: startsAt }, { merge: true });
+      transaction.set(redemptionRef, redemption);
+      transaction.set(challengeRef, { monthlyBoostEndsAt: endsAt, monthlyBoostStatus: "active", monthlyBoostUpdatedAt: startsAt, updatedAt: startsAt }, { merge: true });
+      transaction.set(db.collection("auditLogs").doc(`${redemptionRef.id}_redeemed`), { id: `${redemptionRef.id}_redeemed`, actorId: user.uid, challengeId: id, action: "monthly_boost.redeemed", entityType: "challenge", entityId: id, createdAt: startsAt, metadata: { entitlementKey, durationHours: 72 } });
+      return { replay: false, endsAt, entitlement: { ...entitlement, used: nextUsed, remaining: Math.max(0, entitlement.allowance - nextUsed) } };
+    });
+
+    if (!result.replay) await createNotification(db, { userId: user.uid, type: "challenge_boosted", title: "Monthly Boost active", body: "Your challenge received 72 hours of additional discovery ranking weight.", targetId: id }).catch(() => undefined);
+    return ok({ boost: { challengeId: id, endsAt: result.endsAt, status: "active" }, entitlement: result.entitlement, idempotentReplay: result.replay }, result.replay ? "Monthly Boost was already applied." : "Monthly Boost is active.");
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "Challenge boost could not be purchased.", 409, undefined, "BOOST_REJECTED");
+    if (error instanceof BoostError) return fail(error.message, error.status, undefined, error.code);
+    console.error("[monthly-boost] redemption failed", { challengeId: id, userId: user.uid, message: error instanceof Error ? error.message : String(error) });
+    return serverError("Monthly Boost could not be applied.", error instanceof Error ? error.message : error);
   }
-  const boost = { id: ref.id, challengeId: id, userId: user.uid, packageId, status: "active", coins, reach: boostPackage.reach ?? "", startsAt: now.toISOString(), endsAt: endsAt.toISOString(), viewsGained: 0 };
-  await ref.set(boost);
-  await db.collection("challenges").doc(id).set({
-    boostCount: Number(challenge.boostCount ?? 0) + 1,
-    boostedUntil: endsAt.toISOString(),
-    visibilityBoostScore: Number(challenge.visibilityBoostScore ?? 0) + coins,
-    updatedAt: now.toISOString()
-  }, { merge: true });
-  await createNotification(db, { userId: user.uid, type: "challenge_boosted", title: "Boost active", body: `${boostPackage.name ?? "Boost"} is now active.`, targetId: id });
-  return ok({ boost }, "Challenge boost is active.");
 }
 
-
+class BoostError extends Error {
+  constructor(public code: string, message: string, public status: number) { super(message); }
+}

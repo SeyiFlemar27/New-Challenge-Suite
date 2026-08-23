@@ -1,2 +1,1 @@
-import { run } from "./experience-polish-contracts.mjs";
-run("test-monthly-boosts-confirmation-modal.mjs");
+import "./unified-production-experience-contracts.mjs";

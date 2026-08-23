@@ -1,6 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
+import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +57,9 @@ export async function GET(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Challenge discovery");
-  const kind = new URL(request.url).searchParams.get("type") ?? "";
+    const url = new URL(request.url);
+    const kind = url.searchParams.get("type") ?? "";
+    const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
   if (!["private", "live", "tournament"].includes(kind)) return fail("A supported challenge discovery type is required.", 400, undefined, "DISCOVERY_TYPE_INVALID");
   try {
     const [userSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
@@ -89,9 +93,10 @@ export async function GET(request: Request) {
       const profile = profiles.get(ownerId(item.data)) ?? {};
       const fullName = [profile.firstName, profile.lastName].map((value) => text(value)).filter(Boolean).join(" ");
       const displayName = [profile.displayName, profile.name, fullName, profile.username, item.data.creatorName, item.data.hostName].map((value) => text(value)).find(Boolean) ?? "Challenge creator";
-      return publicRecord(item.id, item.data, kind, displayName, user.uid);
-    }).sort((left, right) => String(left.startsAt ?? "").localeCompare(String(right.startsAt ?? "")));
-    return ok({ challenges, type: kind, total: challenges.length }, "Challenge discovery loaded.");
+      return { ...publicRecord(item.id, item.data, kind, displayName, user.uid), rankingScore: monthlyBoostRankingWeight(item.data) };
+    }).sort((left, right) => Number(right.rankingScore) - Number(left.rankingScore) || String(left.startsAt ?? "").localeCompare(String(right.startsAt ?? "")));
+    const start = (page - 1) * CHALLENGE_PAGE_SIZE;
+    return ok({ challenges: challenges.slice(start, start + CHALLENGE_PAGE_SIZE).map(({ rankingScore: _rankingScore, ...challenge }) => challenge), type: kind, total: challenges.length, page, limit: CHALLENGE_PAGE_SIZE, hasMore: start + CHALLENGE_PAGE_SIZE < challenges.length }, "Challenge discovery loaded.");
   } catch (error) {
     return serverError("Challenge discovery could not be loaded.", error instanceof Error ? error.message : error);
   }

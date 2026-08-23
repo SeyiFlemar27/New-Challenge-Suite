@@ -13,6 +13,7 @@ import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalize
 import { findCustomizationOption } from "@/lib/customization/options";
 import { cn } from "@/lib/utils";
 import { getEffectiveTier, getPlanExperience } from "@/lib/plan-access";
+import { CreatorStudio } from "@/components/creator/creator-studio";
 
 
 type BadgeRecord = {
@@ -226,63 +227,11 @@ export default function DashboardPage() {
     );
   }
 
-  if (planExperience.planId === "creator") {
-    return (
-      <AppShell>
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex items-start gap-4">
-            <BrandLogo imageClassName="h-16 w-16 border border-[var(--gold)]" />
-            <div>
-              <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator Plan</p>
-              <PageTitle title="Creator Studio" subtitle="Run public and private challenges from one creator workspace." />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            {quickActions.map((action) => <LinkButton key={action.href} href={action.href} variant={action.variant}>{action.label}</LinkButton>)}
-          </div>
-        </div>
-
-        {errorMessage ? (
-          <Card className="mt-8 p-6 md:p-8">
-            <h2 className="text-2xl font-black text-[var(--gold-2)]">Creator Studio could not load</h2>
-            <p className="mt-3 text-slate-300">{errorMessage}</p>
-          </Card>
-        ) : null}
-
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {tierStats.slice(0, 3).map((stat) => <Stat key={stat.title} className={dashboardStyle} icon={stat.icon} title={stat.title} value={String(stat.value)} label={stat.label} />)}
-        </div>
-
-
-        <Card className="mt-8 p-6 md:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Creator activity</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Your creator activity</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Creator-owned challenges, drafts, and active work appear here.</p>
-            </div>
-            <LinkButton href="/challenges" variant="secondary">View All</LinkButton>
-          </div>
-
-          {hostedChallenges.length ? (
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              {hostedChallenges.slice(0, 3).map((challenge) => <CreatorActivityCard key={challenge.id} challenge={challenge} />)}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-[8px] border border-white/10 bg-black/25 p-6">
-              <EmptyState icon={<Swords />} title="No creator activity yet" body="Create your first challenge or open Explore to join existing competitions." action={<div className="flex flex-col gap-3 sm:flex-row"><LinkButton href="/challenges">Open Challenges</LinkButton><LinkButton href="/explore" variant="secondary">Explore</LinkButton></div>} />
-            </div>
-          )}
-        </Card>
-
-        {badges.length ? <Card className="mt-8 p-6">
-          <h2 className="flex gap-2 text-2xl font-black"><Award className="text-[var(--gold)]" /> Recent Badges</h2>
-          {badges.slice(0, 3).map((badge) => <p key={badge.id ?? badge.name ?? badge.title} className="mt-5 rounded-[8px] bg-[#1a1a1a] p-5 font-bold">{badge.title ?? badge.name ?? "Achievement"}</p>)}
-          <LinkButton href="/profile" variant="ghost" className="mt-8 w-full text-[var(--gold)]">View All Badges</LinkButton>
-        </Card> : null}
-      </AppShell>
-    );
+  if (planExperience.planId === "creator" || planExperience.planId === "pro") {
+    const cashWallet = dashboard?.cashWallet as { availableBalanceCents?: number; pendingBalanceCents?: number } | null | undefined;
+    return <AppShell><CreatorStudio displayName={dashboard?.user.displayName ?? ""} challenges={hostedChallenges} availableEarningsCents={Number(cashWallet?.availableBalanceCents ?? 0)} pendingEarningsCents={Number(cashWallet?.pendingBalanceCents ?? 0)} /></AppShell>;
   }
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">

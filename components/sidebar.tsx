@@ -17,7 +17,6 @@ import {
   Menu,
   Radio,
   ReceiptText,
-  Rocket,
   Settings,
   ShieldCheck,
   LogIn,
@@ -93,24 +92,24 @@ const adminSections: NavSection[] = [
 
 const starterSections: NavSection[] = [
   { label: "Main", items: [
-    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
-  { label: "Competitions", items: [
+  { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
-  { label: "Community", items: [
-    { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
-    { href: "/winners", label: "Winners", icon: Trophy }
+  { label: "Creator", items: [
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
+  ] },
+  { label: "Finance", items: [
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Account", items: [
-    { href: "/profile", label: "Profile", icon: User },
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];
@@ -119,56 +118,48 @@ const creatorSections: NavSection[] = [
   { label: "Main", items: [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift },
   ] },
-  { label: "Competitions", items: [
+  { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
-  { label: "Creator Tools", items: [
-    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck },
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
-    { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket },
-    { href: "/creator/sponsor-ready", label: "Sponsor-Ready", icon: ShieldCheck }
+  { label: "Creator", items: [
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
   ] },
-  { label: "Community", items: [
-    { href: "/leaderboards", label: "Leaderboards", icon: Award },
-    { href: "/winners", label: "Winners", icon: Trophy }
+  { label: "Finance", items: [
+    { href: "/earnings", label: "Earnings", icon: ReceiptText },
+    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
+    { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
   { label: "Account", items: [
-    { href: "/profile", label: "Profile", icon: User },
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];
 
 const hostSections: NavSection[] = [
   { label: "Main", items: [
-    { href: "/dashboard/host", label: "Host Control Center", icon: Home },
+    { href: "/dashboard/host", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Saved", icon: Star },
+  ] },
+  { label: "Challenges", items: [
+    { href: "/challenges", label: "Challenges", icon: Medal },
+    { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
+    { href: "/host/live-events", label: "Live Event Challenges", icon: Radio },
+    { href: "/host/tournaments", label: "Tournament Challenges", icon: Award },
+    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck }
+  ] },
+  { label: "Creator", items: [
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
+  ] },
+  { label: "Finance", items: [
     { href: "/earnings", label: "Earnings", icon: ReceiptText },
     { href: "/dorocoins", label: "DoroCoins", icon: Coins },
     { href: "/rewards", label: "Rewards", icon: Gift }
   ] },
-  { label: "Competitions", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/host/live-events", label: "Live Events", icon: Radio },
-    { href: "/host/tournaments", label: "Tournaments", icon: Award },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck }
-  ] },
-  { label: "Operations", items: [
-    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck },
-    { href: "/host/participants", label: "Participants", icon: UsersRound },
-    { href: "/host/reports", label: "Reports", icon: BarChart3 },
-    { href: "/creator/boosts", label: "Monthly Boosts", icon: Rocket }
-  ] },
   { label: "Account", items: [
-    { href: "/settings/billing", label: "Billing", icon: ReceiptText },
     { href: "/settings", label: "Settings", icon: Settings }
   ] }
 ];

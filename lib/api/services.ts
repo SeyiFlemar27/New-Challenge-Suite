@@ -46,6 +46,7 @@ export interface DashboardResponse {
   submissions: unknown[];
   participantEntries?: unknown[];
   wallet: unknown | null;
+  cashWallet?: { status: string; availableBalanceCents: number; pendingBalanceCents: number; lockedBalanceCents: number; withdrawalsEnabled: false } | null;
   badges: unknown[];
   leaderboard: unknown[];
   notifications: unknown[];
@@ -310,10 +311,6 @@ export function fetchDoroCoinPackages() {
   return apiRequest<{ packages: unknown[]; coinsPerUsd?: number }>("/api/dorocoin/packages");
 }
 
-export function fetchBoostPackages() {
-  return apiRequest<{ packages: unknown[] }>("/api/boost-packages");
-}
-
 export function createChallenge(payload: unknown) {
   return apiRequest<{ challenge: unknown }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
 }
@@ -360,12 +357,13 @@ export function fetchWinnerDetails(winnerId: string) {
   return apiRequest<{ winner: unknown; challenge: unknown | null; profile: unknown | null; leaderboard: unknown[]; resultStatus?: string; resultMessage?: string | null; payoutStatus?: string; payoutActive?: boolean }>(`/api/winners/${winnerId}`);
 }
 
-export function fetchLeaderboards(board = "global", options: { type?: "global" | "challenge"; challengeId?: string; limit?: number } = {}) {
+export function fetchLeaderboards(board = "global", options: { type?: "global" | "challenge" | "tournament"; challengeId?: string; page?: number; period?: "week" | "month" | "all" } = {}) {
   const params = new URLSearchParams({ board });
   if (options.type) params.set("type", options.type);
   if (options.challengeId) params.set("challengeId", options.challengeId);
-  if (options.limit) params.set("limit", String(options.limit));
-  return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; visibilityMode?: string; visible?: boolean; message?: string | null }>(`/api/leaderboards?${params.toString()}`);
+  if (options.page) params.set("page", String(options.page));
+  if (options.period) params.set("period", options.period);
+  return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; competitionMode?: string; visibilityMode?: string; visible?: boolean; message?: string | null; pagination?: { page: number; pageSize: number; total: number; totalPages: number }; currentUserPosition?: unknown | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
 export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "credits"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {

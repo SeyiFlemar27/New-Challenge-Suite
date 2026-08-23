@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ClipboardList, Medal, Swords, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
+import { Card, EmptyState, inputClass, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { CREATOR_CHALLENGE_TABS, CREATOR_CHALLENGE_TAB_LABELS, type CreatorChallengeTab } from "@/lib/creator-challenges";
+import { ChallengePagination } from "@/components/challenge-pagination";
+import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 
 type CreatorChallenge = Record<string, unknown> & { id: string; productStatusGroup: CreatorChallengeTab };
-type Payload = { challenges: CreatorChallenge[]; counts: Record<CreatorChallengeTab, number>; total: number };
+type Payload = { challenges: CreatorChallenge[]; counts: Record<CreatorChallengeTab, number>; total: number; page: number; limit: number };
 
 function challengeTypeLabel(challenge: CreatorChallenge) {
   const value = String(challenge.challengeType ?? challenge.type ?? "normal").toLowerCase();
@@ -30,19 +32,28 @@ function nextDeadline(challenge: CreatorChallenge) {
 
 export default function CreatorChallengesPage() {
   const [activeTab, setActiveTab] = useState<CreatorChallengeTab>("active");
-  const query = useQuery({ queryKey: ["creator-challenges"], queryFn: () => apiRequest<Payload>("/api/creator/challenges"), staleTime: 20_000 });
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [type, setType] = useState("");
+  const [sort, setSort] = useState("updated");
+  useEffect(() => { const params = new URLSearchParams(window.location.search); const tab = params.get("status") as CreatorChallengeTab | null; if (tab && CREATOR_CHALLENGE_TABS.includes(tab)) setActiveTab(tab); setPage(Math.max(1, Number(params.get("page") ?? 1) || 1)); setSearch(params.get("q") ?? ""); setType(params.get("type") ?? ""); setSort(params.get("sort") ?? "updated"); }, []);
+  const params = new URLSearchParams({ tab: activeTab, page: String(page), q: search, type, sort });
+  const query = useQuery({ queryKey: ["creator-challenges", { activeTab, page, search, type, sort }], queryFn: () => apiRequest<Payload>(`/api/creator/challenges?${params}`), staleTime: 20_000 });
   const payload = query.data?.ok ? query.data.data : null;
-  const challenges = useMemo(() => (payload?.challenges ?? []).filter((challenge) => challenge.productStatusGroup === activeTab), [activeTab, payload]);
+  const challenges = payload?.challenges ?? [];
+  const changePage = (next: number) => { setPage(next); const url = new URL(window.location.href); url.searchParams.set("status", activeTab); url.searchParams.set("page", String(next)); if (search) url.searchParams.set("q", search); else url.searchParams.delete("q"); if (type) url.searchParams.set("type", type); else url.searchParams.delete("type"); url.searchParams.set("sort", sort); window.history.pushState(null, "", url); };
 
   return <AppShell><div className="mx-auto max-w-7xl">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><PageTitle title="Challenges" subtitle="Manage every challenge you create or host." icon={<Medal />} /><LinkButton href="/challenges/create" className="w-full sm:w-auto">Create Challenge</LinkButton></div>
     <div className="mt-7 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Challenge status">
-      {CREATOR_CHALLENGE_TABS.map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={`min-h-11 shrink-0 rounded-[8px] border px-4 text-sm font-black ${activeTab === tab ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-[var(--gold)]/35"}`}>{CREATOR_CHALLENGE_TAB_LABELS[tab]} {payload ? <span aria-label={`${payload.counts[tab]} challenges`}>({payload.counts[tab]})</span> : null}</button>)}
+      {CREATOR_CHALLENGE_TABS.map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => { setActiveTab(tab); setPage(1); }} className={`min-h-11 shrink-0 rounded-[8px] border px-4 text-sm font-black ${activeTab === tab ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-[var(--gold)]/35"}`}>{CREATOR_CHALLENGE_TAB_LABELS[tab]} {payload ? <span aria-label={`${payload.counts[tab]} challenges`}>({payload.counts[tab]})</span> : null}</button>)}
     </div>
+    <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px]"><input className={inputClass} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search your challenges" aria-label="Search your challenges" /><select className={inputClass} value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} aria-label="Challenge type"><option value="">All challenge types</option><option value="normal">Normal</option><option value="private">Private</option><option value="live">Live Event</option><option value="tournament">Tournament</option></select><select className={inputClass} value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }} aria-label="Sort challenges"><option value="updated">Recently updated</option><option value="oldest">Oldest updated</option><option value="title">Title</option></select></div>
     {query.isLoading ? <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-[390px] animate-pulse bg-[#151515]" />)}</div> : null}
     {!query.isLoading && !payload ? <Card className="mt-7 p-6"><h2 className="text-xl font-black text-[var(--gold-2)]">Challenges could not load</h2><p className="mt-2 text-slate-300">{query.data?.message ?? "Please try again."}</p></Card> : null}
-    {payload && challenges.length ? <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{challenges.map((challenge) => <CreatorChallengeCard key={challenge.id} challenge={challenge} />)}</div> : null}
+    {payload && challenges.length ? <div id="creator-challenge-results" className="mt-7 grid scroll-mt-24 gap-5 sm:grid-cols-2 xl:grid-cols-3">{challenges.map((challenge) => <CreatorChallengeCard key={challenge.id} challenge={challenge} />)}</div> : null}
     {payload && !challenges.length ? <Card className="mt-7"><EmptyState icon={<Swords className="text-[var(--gold)]" />} title={`No challenges in ${CREATOR_CHALLENGE_TAB_LABELS[activeTab]}`} body="Challenges will appear here when they reach this stage." action={activeTab === "drafts" ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : undefined} /></Card> : null}
+    {payload ? <ChallengePagination page={page} total={payload.total} pageSize={payload.limit || CHALLENGE_PAGE_SIZE} disabled={query.isFetching} anchorId="creator-challenge-results" onPageChange={changePage} /> : null}
   </div></AppShell>;
 }
 

@@ -190,7 +190,6 @@ export default function ChallengeDetailPage() {
   const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const ownerAccount = Boolean((userState as any)?.ownerAccount);
-  const canBoost = Boolean(ownerAccount && (userState as any)?.boostAccess?.allowed);
   const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
@@ -272,7 +271,7 @@ export default function ChallengeDetailPage() {
               registrationClosesAt={phaseSummary?.registrationEndAt}
             />
           </Card>
-          {ownerAccount ? <Card className="mt-6 p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Owner Controls</p><div className="mt-4 grid gap-3 sm:flex sm:flex-wrap"><LinkButton href={`/challenges/${challenge.id}/manage`} className="w-full sm:w-auto">Manage Challenge</LinkButton>{canBoost ? <LinkButton href={`/challenges/${challenge.id}/boost`} className="w-full sm:w-auto" variant="secondary">Boost Challenge</LinkButton> : null}<LinkButton href={`/challenges/${challenge.id}/participants`} className="w-full sm:w-auto" variant="secondary">Manage Participants</LinkButton></div></Card> : null}
+          {ownerAccount ? <Card className="mt-6 p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Owner Controls</p><div className="mt-4 grid gap-3 sm:flex sm:flex-wrap"><LinkButton href={`/challenges/${challenge.id}/manage`} className="w-full sm:w-auto">Manage Challenge</LinkButton><LinkButton href={`/challenges/${challenge.id}/participants`} className="w-full sm:w-auto" variant="secondary">Manage Participants</LinkButton></div></Card> : null}
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>

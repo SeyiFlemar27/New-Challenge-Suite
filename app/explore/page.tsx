@@ -8,9 +8,11 @@ import { apiRequest } from "@/lib/api/client";
 import { ChallengeMediaFrame } from "@/components/media-display";
 import { ExploreCardMedia } from "@/components/challenge-media-carousel";
 import { Bookmark, CalendarDays, Filter, Play, Search, SlidersHorizontal, Trophy, Users } from "lucide-react";
+import { ChallengePagination } from "@/components/challenge-pagination";
+import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 
 type ExploreChallenge = Record<string, any>;
-type ExploreResponse = { challenges: ExploreChallenge[]; featured?: ExploreChallenge[]; trending?: ExploreChallenge[]; categories: string[]; total: number; page: number; hasMore: boolean; filters: Record<string, string> };
+type ExploreResponse = { challenges: ExploreChallenge[]; featured?: ExploreChallenge[]; trending?: ExploreChallenge[]; categories: string[]; total: number; page: number; limit: number; hasMore: boolean; filters: Record<string, string> };
 
 const phaseOptions = [
   ["", "Active stages"],
@@ -58,7 +60,7 @@ export default function ExplorePage() {
     if (type) params.set("type", type);
     if (sort !== "recent") params.set("sort", sort);
     params.set("page", String(page));
-    params.set("limit", "24");
+    params.set("limit", String(CHALLENGE_PAGE_SIZE));
     return `/api/explore/challenges?${params.toString()}`;
   }, [category, entry, page, phase, query, sort, type]);
 
@@ -121,10 +123,10 @@ export default function ExplorePage() {
 
           {trending.length ? <section className="mt-7" aria-labelledby="trending-challenges"><div className="mb-3"><h2 id="trending-challenges" className="text-xl font-black text-white">Trending Challenges</h2><p className="mt-1 text-sm text-slate-400">Challenges gaining meaningful activity across Challenge Suite.</p></div><div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3" role="list" aria-label="Trending challenges">{trending.map((item) => <TrendingCard key={String(item.id)} challenge={item} />)}</div></section> : null}
 
-          <section className="mt-8">
+          <section className="mt-8 scroll-mt-24" id="challenge-results">
             <div className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500"><SlidersHorizontal size={16} /> Browse</div>
             {loading ? <div className="mobile-card-list grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-[420px] animate-pulse rounded-[8px] bg-[#151515]" />)}</div> : error ? <Card className="border-red-500/20 bg-red-950/20 p-6 text-red-100"><p className="font-black">Explore could not load</p><p className="mt-2 text-sm text-red-100/70">{error}</p><Button className="mt-4" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button></Card> : challenges.length ? <div className="mobile-card-list grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge} />)}</div> : <div className="rounded-[8px] border border-white/10 bg-[#111111] p-10 text-center"><Filter className="mx-auto text-slate-600" size={36} /><h2 className="mt-4 text-2xl font-black text-white">No challenges found</h2><p className="mt-2 text-sm text-slate-400">Adjust your search or filters.</p></div>}
-            {data?.hasMore ? <div className="mt-8 flex justify-center"><Button onClick={() => setPage((value) => value + 1)}>Load more challenges</Button></div> : null}
+            {data ? <ChallengePagination page={page} total={data.total} pageSize={data.limit || CHALLENGE_PAGE_SIZE} disabled={loading} anchorId="challenge-results" onPageChange={setPage} /> : null}
           </section>
         </div>
       </div>

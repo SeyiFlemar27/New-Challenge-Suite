@@ -91,8 +91,9 @@ has(notifications, "bg-white", "Notification panel uses a readable light surface
 has(notifications, "/api/notifications/${notification.id}/read", "Individual notifications can be marked read.");
 has(topbar, "canSwitchSponsorRole", "Role switching requires sponsor capability.");
 lacks(topbar, "Host Control Center</span>", "Role switcher does not present Host as a role.");
-has(host, "Monthly challenge boosts", "Host dashboard exposes monthly boosts.");
-has(planAccess, "monthlyBoostLimit: 10", "Host has a config-driven boost allocation.");
-has(planAccess, "monthlyBoostLimit: 1", "Creator boost allocation remains lower than Host.");
+has(host, "Creator Studio", "Host dashboard uses the shared Creator Studio context.");
+lacks(host, "Manage boosts", "Host dashboard does not expose a standalone boost destination.");
+has(planAccess, "monthlyBoostLimit: 5", "Host has the locked five-boost monthly allocation.");
+has(planAccess, "monthlyBoostLimit: 2", "Creator has the locked two-boost monthly allocation.");
 
 console.log("Product experience and account lifecycle contracts passed.");

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiRequest } from "@/lib/api/client";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CalendarClock, CheckCircle2, ClipboardCheck, Rocket, Trophy, UsersRound } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, ClipboardCheck, Trophy, UsersRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlanFeatureGate } from "@/components/plan-feature-gate";
 import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
@@ -131,7 +131,7 @@ export default function HostControlCenterPage() {
     <PlanFeatureGate feature="host_control_center" requiredPlan="Host" title="Host tools are available on the Host Plan" allowPendingPreview={pendingCheckoutReturn}>
       <AppShell>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <PageTitle title="Host Control Center" subtitle="See what is active, what needs attention, and what is coming next." />
+          <PageTitle title="Creator Studio" subtitle="Manage your challenges, track what needs attention, and keep each competition moving." />
           {hostAction("Create Competition", "/challenges/create", "primary", "w-full sm:w-auto")}
         </div>
 
@@ -157,13 +157,6 @@ export default function HostControlCenterPage() {
           <Metric title="Pending Reviews" value={pendingReviews} icon={<ClipboardCheck />} />
           <Metric title="Upcoming Deadlines" value={deadlines.length} icon={<CalendarClock />} />
         </div>
-
-        <Card className="mt-7 border-yellow-400/30 bg-yellow-50 p-5 text-slate-950 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3"><span className="rounded-[8px] bg-yellow-200 p-2 text-yellow-950"><Rocket size={20} /></span><div><h2 className="font-black">Monthly challenge boosts</h2><p className="mt-1 text-sm text-slate-600">{pendingCheckoutReturn ? "Host boosts unlock only after your membership is confirmed by the server." : `Your Host plan includes ${hostPlan.monthlyBoostLimit} boosts each month. Usage and remaining allocation come from recorded boost activity.`}</p></div></div>
-            {hostAction("Manage boosts", "/creator/boosts")}
-          </div>
-        </Card>
 
         {attention.length ? <Card className="mt-7 p-5 sm:p-6">
           <div className="flex items-center gap-3"><AlertCircle className="text-[var(--gold)]" /><h2 className="text-xl font-black">Needs Attention</h2></div>
