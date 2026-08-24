@@ -6,7 +6,7 @@ import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/
 import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { createNotification } from "@/lib/server/notifications";
-import { ENTERPRISE_APPLICATION_COLLECTION, ENTERPRISE_APPLICATION_TYPE } from "@/lib/server/enterprise-applications";
+import { ENTERPRISE_APPLICATION_COLLECTION, ENTERPRISE_APPLICATION_REVISION_COLLECTION, ENTERPRISE_APPLICATION_TYPE, enterpriseApplicationRevisionId, enterpriseApplicationVersion } from "@/lib/server/enterprise-applications";
 import { isEnterpriseRole, isEnterpriseScope, rolePermissions } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
@@ -235,6 +235,10 @@ export async function GET(request: Request) {
         reviewedBy: item.reviewedBy ?? null,
         decisionReason: item.decisionReason ?? null,
         requestedInfoMessage: item.requestedInfoMessage ?? null,
+        version: enterpriseApplicationVersion(item),
+        currentRevision: enterpriseApplicationVersion(item),
+        reviewAttempt: Number(item.reviewAttempt ?? 1),
+        timeline: Array.isArray(item.timeline) ? item.timeline : [],
         internalNote: internalNote?.note ?? null,
         actionHistoryCount: auditLogs.filter((event) => String(event.targetId ?? "") === item.id).length
       };
@@ -449,13 +453,6 @@ export async function PATCH(request: Request) {
       await Promise.all([userRef.set(update, { merge: true }), profileRef.set(update, { merge: true })]);
     } else if (type === "enterprise") {
       const ref = db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(id);
-      const snap = await ref.get();
-      if (!snap.exists || snap.data()?.applicationType !== "enterprise_access_application") return fail("Enterprise application not found.", 404, undefined, "NOT_FOUND");
-      const application = snap.data() ?? {};
-      previousStatus = String(application.status ?? "pending");
-      if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) return fail("This application has already been reviewed.", 409, undefined, "INVALID_STATE");
-      const applicantId = String(application.userId ?? "");
-      if (!applicantId) return fail("This application is not linked to an account.", 422, undefined, "APPLICATION_ACCOUNT_REQUIRED");
       const requestedRole = parsed.body?.enterpriseRole;
       const requestedScope = parsed.body?.enterpriseScope;
       const enterpriseRole = isEnterpriseRole(requestedRole) ? requestedRole : "operations";
@@ -463,38 +460,56 @@ export async function PATCH(request: Request) {
       const permissionAdditions = Array.isArray(parsed.body?.permissionAdditions) ? parsed.body.permissionAdditions : [];
       const permissionRemovals = Array.isArray(parsed.body?.permissionRemovals) ? parsed.body.permissionRemovals : [];
       const enterprisePermissions = rolePermissions(enterpriseRole, permissionAdditions, permissionRemovals);
-      const previousAccountType = String(application.currentAccountType ?? "user");
-      const staffAccess = action === "approve" ? {
-        status: "active", role: enterpriseRole, scope: enterpriseScope,
-        department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
-        permissions: enterprisePermissions,
-        categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
-        regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
-        onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid
-      } : null;
-      const accessUpdate = {
-        enterpriseAccessStatus: status,
-        enterpriseApprovalStatus: status,
-        enterpriseApplicationId: id,
-        enterpriseApprovedAt: action === "approve" ? now : null,
-        enterpriseApprovedBy: action === "approve" ? user.uid : null,
-        ...(action === "approve" ? {
-          workspaceTypes: ["personal", "enterprise"], enterpriseRole, enterpriseScope,
-          enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope,
-          enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false,
-          staffAccess,
-        } : {}),
-        updatedAt: now
-      };
-      const batch = db.batch();
-      batch.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, updatedAt: now }, { merge: true });
-      batch.set(db.collection("users").doc(applicantId), accessUpdate, { merge: true });
-      batch.set(db.collection("profiles").doc(applicantId), accessUpdate, { merge: true });
-      await batch.commit();
+      const expectedVersion = Number(parsed.body?.expectedVersion ?? parsed.body?.currentRevision ?? 0);
+      let applicantId = "";
+      let previousAccountType = "user";
+      await db.runTransaction(async (transaction) => {
+        const applicationSnap = await transaction.get(ref);
+        if (!applicationSnap.exists || applicationSnap.data()?.applicationType !== ENTERPRISE_APPLICATION_TYPE) throw new Error("NOT_FOUND");
+        const application = applicationSnap.data() ?? {};
+        previousStatus = String(application.status ?? "pending");
+        if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) throw new Error("INVALID_STATE");
+        const currentVersion = enterpriseApplicationVersion(application);
+        if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) throw new Error("STALE_APPLICATION_VERSION");
+        applicantId = String(application.userId ?? "");
+        if (!applicantId) throw new Error("APPLICATION_ACCOUNT_REQUIRED");
+        const userRef = db.collection("users").doc(applicantId);
+        const profileRef = db.collection("profiles").doc(applicantId);
+        const [accountSnap, profileSnap] = await Promise.all([transaction.get(userRef), transaction.get(profileRef)]);
+        const account = accountSnap.data() ?? {};
+        const profile = profileSnap.data() ?? {};
+        previousAccountType = String(account.accountType ?? application.currentAccountType ?? "user");
+        const existingWorkspaces = new Set<string>([
+          ...(Array.isArray(account.workspaceTypes) ? account.workspaceTypes.filter((value): value is string => typeof value === "string") : []),
+          ...(Array.isArray(profile.workspaceTypes) ? profile.workspaceTypes.filter((value): value is string => typeof value === "string") : []),
+          "personal"
+        ]);
+        if (action === "approve") existingWorkspaces.add("enterprise");
+        const staffAccess = action === "approve" ? {
+          status: "active", role: enterpriseRole, scope: enterpriseScope,
+          department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
+          permissions: enterprisePermissions,
+          categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
+          regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
+          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid
+        } : null;
+        const event = { type: `admin_${action}`, status, at: now, message: action === "approve" ? "Enterprise access approved." : action === "request_info" ? "More information requested." : "Application not approved." };
+        const accessUpdate = {
+          enterpriseAccessStatus: status, enterpriseApprovalStatus: status, enterpriseApplicationId: id,
+          enterpriseApprovedAt: action === "approve" ? now : null, enterpriseApprovedBy: action === "approve" ? user.uid : null,
+          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, staffAccess } : {}),
+          updatedAt: now
+        };
+        transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
+        transaction.set(userRef, accessUpdate, { merge: true });
+        transaction.set(profileRef, accessUpdate, { merge: true });
+        transaction.set(db.collection(ENTERPRISE_APPLICATION_REVISION_COLLECTION).doc(enterpriseApplicationRevisionId(id, currentVersion)), { decisionStatus: status, decidedAt: now, decidedBy: user.uid, decisionReason: reason || null }, { merge: true });
+        transaction.create(db.collection("auditLogs").doc(`${id}_v${currentVersion}_${action}`), { id: `${id}_v${currentVersion}_${action}`, actorId: user.uid, actorType: "admin", action: `enterprise_application_${action}`, targetType: "enterprise_application", targetId: id, before: { status: previousStatus, version: currentVersion }, after: { status, reviewedRevision: currentVersion }, reason: reason || event.message, metadata: {}, createdAt: now });
+      });
       const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Your Enterprise workspace is ready." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "More information needed", body: "Please update your Enterprise application." } : { type: "enterprise_application_rejected", title: "Enterprise application not approved", body: "Contact support if you have questions." };
       await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
       if (action === "approve") {
-        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus, accountType: previousAccountType }, after: { enterpriseAccessStatus: "approved", personalAccountTypePreserved: previousAccountType, availableWorkspaces: ["personal", "enterprise"], role: enterpriseRole, scope: enterpriseScope, applicationId: id }, reason: reason || "Enterprise application approved." }, db);
+        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus, accountType: previousAccountType }, after: { enterpriseAccessStatus: "approved", personalAccountTypePreserved: previousAccountType, enterpriseWorkspaceAdded: true, role: enterpriseRole, scope: enterpriseScope, applicationId: id }, reason: reason || "Enterprise application approved." }, db);
       }
     } else if (type === "withdrawal") {
       const ref = db.collection("withdrawalRequests").doc(id);
@@ -649,21 +664,25 @@ export async function PATCH(request: Request) {
         createdAt: now
       }, { merge: true });
     }
-    await writeAuditLog({
-      actorId: user.uid,
-      actorType: "admin",
-      action: type === "enterprise" ? action === "approve" ? "enterprise_application_approved" : action === "reject" ? "enterprise_application_rejected" : "enterprise_application_info_requested" : `${type}.${action}`,
-      targetType: type === "enterprise" ? "enterprise_application" : type,
-      targetId: id,
-      before: { status: previousStatus },
-      after: { status, moneyMovementEnabled: false },
-      reason: reason || null,
-      metadata: { note: note || null, transferEnabled: false }
-    }, db);
+    if (type !== "enterprise") {
+      await writeAuditLog({
+        actorId: user.uid,
+        actorType: "admin",
+        action: `${type}.${action}`,
+        targetType: type,
+        targetId: id,
+        before: { status: previousStatus },
+        after: { status, moneyMovementEnabled: false },
+        reason: reason || null,
+        metadata: { note: note || null, transferEnabled: false }
+      }, db);
+    }
     return ok({ type, id, action, previousStatus, newStatus: status }, "Admin decision saved. No money movement was performed.");
   } catch (error) {
     if (error instanceof Error && error.message === "NOT_FOUND") return fail("Record not found.", 404, undefined, "NOT_FOUND");
     if (error instanceof Error && error.message === "INVALID_STATE") return fail("This record is no longer eligible for that action.", 409, undefined, "INVALID_STATE");
+    if (error instanceof Error && error.message === "STALE_APPLICATION_VERSION") return fail("This application changed after it was opened. Refresh it before making a decision.", 409, undefined, "STALE_APPLICATION_VERSION");
+    if (error instanceof Error && error.message === "APPLICATION_ACCOUNT_REQUIRED") return fail("This application is not linked to an account.", 422, undefined, "APPLICATION_ACCOUNT_REQUIRED");
     if (error instanceof Error && error.message === "KYC_REQUIRED") return fail("Identity verification must be verified before approval. KYC processing is not active yet.", 409, undefined, "KYC_REQUIRED");
     if (error instanceof Error && error.message === "SECOND_APPROVER_REQUIRED") return fail("A different authorized administrator must complete the second approval.", 409, undefined, "SECOND_APPROVER_REQUIRED");
     return serverError("Admin decision could not be saved.", error instanceof Error ? error.message : error);

@@ -23,6 +23,7 @@ export default function SponsorDashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [approvalNoticeVisible, setApprovalNoticeVisible] = useState(false);
 
   async function load() {
     setLoading(true); setError("");
@@ -41,11 +42,23 @@ export default function SponsorDashboardPage() {
   const deadlines = (dashboard?.campaigns ?? []).flatMap((campaign) => [campaign.startDate ? { label: `${campaign.campaignTitle || "Campaign"} starts`, value: campaign.startDate } : null, campaign.endDate ? { label: `${campaign.campaignTitle || "Campaign"} ends`, value: campaign.endDate } : null]).filter(Boolean).slice(0, 4) as Array<{ label: string; value: string }>;
   const greetingName = String(profile?.brandName || profile?.legalBusinessName || profile?.contactPerson || profile?.displayName || "").trim();
   const widgetErrors = dashboard?.widgetErrors ?? {};
+  const approvalNoticeKey = `sponsor_approval_seen_${String(profile?.sponsorOrganizationId ?? profile?.userId ?? "workspace")}`;
+  useEffect(() => {
+    if (!workspace.approved) return setApprovalNoticeVisible(false);
+    setApprovalNoticeVisible(localStorage.getItem(approvalNoticeKey) !== "true");
+  }, [approvalNoticeKey, workspace.approved]);
+
+  function dismissApprovalNotice() {
+    localStorage.setItem(approvalNoticeKey, "true");
+    setApprovalNoticeVisible(false);
+  }
 
   if (loading) return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl space-y-6"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <Card key={item} className="h-28 animate-pulse" />)}</div><Card className="h-72 animate-pulse" /></div></SponsorShell>;
 
   return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl">
     <section className="rounded-[8px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">Sponsor Workspace</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">{greetingName ? `Welcome, ${greetingName}` : "Welcome"}</h1><div className="mt-4 flex flex-wrap gap-2 text-sm"><Status label={workspace.statusLabel} tone={workspace.approved ? "success" : "pending"} /><Status label={experience.badgeLabel} tone="brand" /><Status label={workspace.subscriptionStatus.replaceAll("_", " ")} tone={workspace.subscriptionStatus === "active" ? "success" : "neutral"} /></div><p className="mt-5 max-w-2xl text-base leading-7 text-slate-600"><strong className="text-slate-950">Next step:</strong> {workspace.nextActionLabel}. {workspace.lockedReason || "Your sponsor workspace is ready for campaign planning and discovery."}</p></div><div className="flex flex-wrap gap-3"><LinkButton href={workspace.nextActionHref}>{workspace.nextActionLabel}<ArrowRight size={16} /></LinkButton>{workspace.canDiscover ? <><LinkButton href="/sponsor/discover?tab=creators" variant="secondary">Discover Creators</LinkButton><LinkButton href="/sponsor/discover?tab=challenges" variant="secondary">Discover Challenges</LinkButton></> : <LinkButton href="/sponsor/onboarding" variant="secondary">Review Brand Profile</LinkButton>}</div></div></section>
+
+    {approvalNoticeVisible ? <Card className="mt-6 border-emerald-200 bg-emerald-50 p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-emerald-950">Sponsor workspace approved</p><p className="mt-1 text-sm text-emerald-800">Your approved Sponsor workspace is ready for eligible proposals, funding, and collaboration work.</p></div><Button variant="secondary" onClick={dismissApprovalNotice}>Dismiss</Button></div></Card> : null}
 
     {error ? <Card className="mt-6 border-red-200 bg-red-50 p-5"><p className="font-bold text-red-800">Sponsor overview is temporarily unavailable.</p><p className="mt-2 text-sm text-red-700">{error}</p><Button className="mt-4" variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Retry overview</Button></Card> : null}
     {Object.keys(widgetErrors).length ? <Card className="mt-6 border-amber-200 bg-amber-50 p-5"><p className="font-bold text-amber-900">Some overview sections need another try.</p><p className="mt-2 text-sm text-amber-800">The rest of your sponsor workspace remains available.</p><Button className="mt-4" variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Retry unavailable sections</Button></Card> : null}

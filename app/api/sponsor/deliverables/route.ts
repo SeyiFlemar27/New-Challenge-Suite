@@ -1,5 +1,5 @@
 ﻿import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
-import { requireSponsorContext } from "@/lib/server/sponsor";
+import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sponsor";
 import { cleanText, isoNow, normalizeDeliverableStatus, safeArray } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +12,15 @@ export async function GET(request: Request) {
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  const permissionError = requireSponsorPermission(context, "deliverable.view");
+  if (permissionError) return permissionError;
   const url = new URL(request.url);
   const campaignId = url.searchParams.get("campaignId");
   try {
-    let query: FirebaseFirestore.Query = context.db.collection("sponsorDeliverables").where("sponsorId", "==", context.user.uid);
+    let query: FirebaseFirestore.Query = context.db.collection("sponsorDeliverables").where("sponsorId", "==", context.sponsorId);
     if (campaignId) query = query.where("relatedCampaignId", "==", campaignId);
     const snap = await query.limit(100).get();
-    const deliverables = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => String((b as any).updatedAt ?? "").localeCompare(String((a as any).updatedAt ?? "")));
+    const deliverables = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
     return ok({ deliverables }, "Sponsor deliverables loaded.");
   } catch (error) {
     console.error("[sponsor-deliverables:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
@@ -30,6 +32,8 @@ export async function POST(request: Request) {
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  const permissionError = requireSponsorPermission(context, "deliverable.manage");
+  if (permissionError) return permissionError;
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
@@ -37,8 +41,12 @@ export async function POST(request: Request) {
   try {
     const now = isoNow();
     const ref = context.db.collection("sponsorDeliverables").doc();
-    const deliverable = { id: ref.id, ...deliverablePayload(body, context.user.uid, now), createdAt: now, createdBy: context.user.uid };
-    await Promise.all([ref.set(deliverable), context.db.collection("sponsorDeliverableRevisions").add({ sponsorId: context.user.uid, deliverableId: ref.id, revisionNumber: deliverable.revisionNumber, status: deliverable.status, feedback: deliverable.sponsorFeedback, createdAt: now, createdBy: context.user.uid })]);
+    const deliverable = { id: ref.id, ...deliverablePayload(body, context.sponsorId, now), sponsorOrganizationId: context.organizationId, ownerUid: context.user.uid, createdAt: now, createdBy: context.user.uid };
+    const revisionRef = context.db.collection("sponsorDeliverableRevisions").doc(`${ref.id}_v1`);
+    const batch = context.db.batch();
+    batch.create(ref, deliverable);
+    batch.create(revisionRef, { id: revisionRef.id, sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, deliverableId: ref.id, version: 1, revisionNumber: deliverable.revisionNumber, status: deliverable.status, feedback: deliverable.sponsorFeedback, createdAt: now, createdBy: context.user.uid });
+    await batch.commit();
     return ok({ deliverable }, "Deliverable saved. Approval does not release payment.");
   } catch (error) {
     console.error("[sponsor-deliverables:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });

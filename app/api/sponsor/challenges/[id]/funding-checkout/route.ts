@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let contribution;
   try {
     contribution = await createPendingSponsorContribution(context.db, {
-      sponsorId: context.user.uid,
+      sponsorId: context.sponsorId,
       challengeId,
       challenge,
       sponsorProfile: context.sponsorProfile,

@@ -5,7 +5,7 @@ import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
 import { calculatePaidRevenueSplit, calculateSponsorContributionSplit, MINIMUM_ENTRY_FEE_CENTS, validateEntryFee, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { calculateEntryEntitlement, consumeEntryEntitlement, type RewardEntitlementType } from "@/lib/server/reward-economy";
 
-export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding"] as const;
+export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding", "sponsor_wallet_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
 export type MonetizationPaymentStatus = "pending" | "paid" | "confirmed" | "failed" | "canceled" | "cancelled" | "expired" | "refund_required" | "refund_review" | "refunded" | "payment_review_required";
 
@@ -600,8 +600,51 @@ export async function expireSponsorContribution(db: Firestore, session: Stripe.C
   return { handled: true, kind: "sponsor_funding", id, status: "expired" };
 }
 
+export async function createPendingSponsorWalletFunding(db: Firestore, input: { sponsorId: string; organizationId: string; userId: string; amountCents: number; idempotencyKey: string; now?: string }) {
+  const amountCents = cents(input.amountCents);
+  if (amountCents < 500) throw new Error("Sponsor wallet funding amount must be at least $5.");
+  const id = deterministicId("sponsor_wallet_funding", input.sponsorId, input.idempotencyKey);
+  const now = input.now ?? new Date().toISOString();
+  const ref = db.collection("sponsorWalletFunding").doc(id);
+  const existing = await ref.get();
+  if (existing.exists) return { id: ref.id, ...existing.data() } as Record<string, unknown> & { id: string };
+  const record = { id, sponsorId: input.sponsorId, sponsorOrganizationId: input.organizationId, userId: input.userId, paymentPurpose: "sponsor_wallet_funding", amountCents, currency: "USD", status: "pending", provider: "stripe", providerConfirmed: false, stripeCheckoutSessionId: null, stripePaymentIntentId: null, idempotencyKey: input.idempotencyKey, createdAt: now, updatedAt: now };
+  await ref.create(record);
+  return record;
+}
+
+export async function confirmSponsorWalletFunding(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session) {
+  const id = metadata(session).sponsorWalletFundingId;
+  if (!id) throw new Error("Missing sponsor wallet funding id.");
+  const fundingRef = db.collection("sponsorWalletFunding").doc(id);
+  const now = new Date().toISOString();
+  return db.runTransaction(async (transaction) => {
+    const fundingSnap = await transaction.get(fundingRef);
+    if (!fundingSnap.exists) throw new Error("Stored sponsor wallet funding record not found.");
+    const funding = fundingSnap.data() ?? {};
+    assertStripeSessionMatchesRecord(session, funding, "sponsor_wallet_funding");
+    if (funding.status === "confirmed") return { handled: true, kind: "sponsor_wallet_funding", id, duplicate: true };
+    const sponsorId = text(funding.sponsorId, 160);
+    const amountCents = cents(funding.amountCents);
+    const walletRef = db.collection("sponsorWallets").doc(sponsorId);
+    const transactionRef = db.collection("sponsorWalletTransactions").doc(deterministicId("sponsor_wallet_topup", id));
+    transaction.set(fundingRef, { status: "confirmed", providerConfirmed: true, confirmedAt: now, updatedAt: now, stripeCheckoutSessionId: session.id, stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null, stripeEventId: event.id }, { merge: true });
+    transaction.set(walletRef, { sponsorId, sponsorOrganizationId: funding.sponsorOrganizationId ?? sponsorId, currency: "USD", availableBalanceCents: FieldValue.increment(amountCents), confirmedFundingCents: FieldValue.increment(amountCents), providerStatus: "active", fundingEnabled: true, paymentReleaseEnabled: false, updatedAt: now, createdAt: funding.createdAt ?? now }, { merge: true });
+    transaction.create(transactionRef, { id: transactionRef.id, sponsorId, sponsorOrganizationId: funding.sponsorOrganizationId ?? sponsorId, type: "provider_funding_confirmed", direction: "credit", amountCents, currency: "USD", status: "confirmed", reference: id, provider: "stripe", providerConfirmed: true, externalPayoutExecuted: false, createdAt: now });
+    return { handled: true, kind: "sponsor_wallet_funding", id, duplicate: false, amountCents };
+  });
+}
+
+export async function expireSponsorWalletFunding(db: Firestore, session: Stripe.Checkout.Session) {
+  const id = metadata(session).sponsorWalletFundingId;
+  if (!id) return { handled: false, reason: "sponsor_wallet_funding_id_missing" };
+  const now = new Date().toISOString();
+  await db.collection("sponsorWalletFunding").doc(id).set({ status: "expired", expiredAt: now, updatedAt: now, stripeCheckoutSessionId: session.id }, { merge: true });
+  return { handled: true, kind: "sponsor_wallet_funding", id, status: "expired" };
+}
+
 export function checkoutMetadataForPurpose(purpose: MonetizationPaymentPurpose, record: Record<string, unknown>) {
-  const transactionPurpose = purpose === "challenge_entry_fee" || purpose === "challenge_entry" ? "challenge_entry_payment" : purpose === "paid_vote" ? "vote_purchase" : "sponsor_contribution";
+  const transactionPurpose = purpose === "challenge_entry_fee" || purpose === "challenge_entry" ? "challenge_entry_payment" : purpose === "paid_vote" ? "vote_purchase" : purpose === "sponsor_wallet_funding" ? "sponsor_wallet_funding" : "sponsor_contribution";
   const base = {
     paymentPurpose: purpose,
     transactionPurpose,
@@ -612,6 +655,7 @@ export function checkoutMetadataForPurpose(purpose: MonetizationPaymentPurpose, 
   };
   if (purpose === "challenge_entry_fee" || purpose === "challenge_entry") return { ...base, entryPaymentId: text(record.id, 160) };
   if (purpose === "paid_vote") return { ...base, votePurchaseId: text(record.id, 160), voteQuantity: String(cents(record.voteQuantity)) };
+  if (purpose === "sponsor_wallet_funding") return { ...base, sponsorId: text(record.sponsorId, 160), sponsorWalletFundingId: text(record.id, 160) };
   return { ...base, sponsorId: text(record.sponsorId, 160), sponsorContributionId: text(record.id, 160) };
 }
 

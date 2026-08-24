@@ -12,7 +12,9 @@ run("provisioning", () => {
   const adminUi = read("components/admin/admin-control-center.tsx");
   const access = read("lib/enterprise-access.ts");
   assert.match(admin, /personalAccountTypePreserved: previousAccountType/);
-  assert.match(admin, /workspaceTypes: \["personal", "enterprise"\]/);
+  assert.match(admin, /const existingWorkspaces = new Set<string>\([^]*"personal"/);
+  assert.match(admin, /existingWorkspaces\.add\("enterprise"\)/);
+  assert.match(admin, /workspaceTypes: \[\.\.\.existingWorkspaces\]/);
   assert.match(admin, /staffAccess/);
   assert.doesNotMatch(admin, /enterprisePreviousAccountType/);
   assert.match(admin, /rolePermissions\(enterpriseRole/);

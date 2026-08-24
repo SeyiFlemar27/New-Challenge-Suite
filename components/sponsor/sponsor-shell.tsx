@@ -62,7 +62,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
       { label: "Saved", href: "/sponsor/saved", icon: Bookmark }
     ] },
     { label: "Sponsorships", items: [
-      { label: "Sponsorships", href: "/sponsor/campaigns", icon: Handshake },
+      { label: "Sponsorships", href: "/sponsor/sponsorships", icon: Handshake },
       { label: "Proposals", href: "/sponsor/proposals", icon: FileText },
       { label: "Deliverables", href: "/sponsor/deliverables", icon: ClipboardCheck }
     ] },
@@ -90,7 +90,7 @@ export function SponsorShell({ children, profile }: { children: React.ReactNode;
   return <main className="sponsor-mobile-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
     <ProductWalkthrough />
     <div className="grid min-h-screen md:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="hidden h-screen overflow-y-auto border-r border-slate-200 bg-white px-5 py-6 shadow-[8px_0_30px_rgba(15,23,42,0.03)] md:sticky md:top-0 md:block">
+      <aside className="hidden h-screen overflow-y-auto border-r border-slate-200 bg-[var(--panel)] px-5 py-6 shadow-[8px_0_30px_rgba(15,23,42,0.03)] md:sticky md:top-0 md:block">
         <div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-amber-300" /><div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-700">Sponsor</p><h1 className="truncate text-base font-black text-slate-950">{brandName}</h1></div></div>
         {statusCard}{nav}{accountFooter}
         <Link href="/landing" className="mt-6 block rounded-[8px] border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-600 transition hover:border-amber-400 hover:text-slate-950">View public site</Link>

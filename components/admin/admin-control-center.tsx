@@ -165,7 +165,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
     const enterpriseProvisioning = normalizedSection === "enterprise-applications" && pendingAction.action === "approve"
       ? { enterpriseRole, enterpriseScope, enterpriseDepartment }
       : {};
-    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note, ...enterpriseProvisioning }) });
+    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note, expectedVersion: pendingAction.record.currentRevision ?? pendingAction.record.version, ...enterpriseProvisioning }) });
     setSubmitting(false);
     setNotice(result.message);
     if (result.ok) {

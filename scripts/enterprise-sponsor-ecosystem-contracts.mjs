@@ -42,11 +42,11 @@ export function runEnterpriseSponsorEcosystemContract(name) {
     includesAll(enterpriseOnboarding, ["enterpriseOnboardingModules", "access.permissions.includes", "assignment_context", "Having no assignment does not block onboarding"], name);
     includesAll(enterpriseOnboardingRoute, ["completedTaskIds", "runTransaction", "enterpriseOnboarding", "state.completed"], name);
   } else if (name === "sponsor-seven-step-onboarding") {
-    includesAll(sponsorOnboarding, ["Audience Preferences", "Workflow Preferences", "Review & Submit", "preferredAudienceSize", "preferredCampaignDuration"], name);
+    includesAll(sponsorOnboarding, ["Brand Basics", "Connect Your Channels", "Contact Person", "Sponsorship Goals", "Preferred Categories", "Sponsorship Preferences", '"Review"', "preferredAudienceSize", "preferredCampaignDuration"], name);
     const steps = sponsorOnboarding.match(/const steps = \[(.*?)\] as const;/s)?.[1] ?? "";
     assert.equal((steps.match(/"/g) ?? []).length / 2, 7, `${name}: expected exactly seven steps`);
   } else if (name === "proposal-nine-step-builder") {
-    includesAll(proposalBuilder, ["Scope & Objectives", "Budget & Funding", "Timeline & Milestones", "Brand & Usage Rights", "Prize Contribution is 100% winner-directed"], name);
+    includesAll(proposalBuilder, ["Sponsorship Goal", "Offer & Funding", "Brand Visibility", "Campaign Creative", "Timeline & Expiry", '"Message"', '"Review"', "Prize Contribution is 100% winner-directed"], name);
     const steps = proposalBuilder.match(/const steps = \[(.*?)\] as const;/s)?.[1] ?? "";
     assert.equal((steps.match(/"/g) ?? []).length / 2, 9, `${name}: expected exactly nine steps`);
   } else if (name === "proposal-immutable-revisions") {
@@ -58,7 +58,7 @@ export function runEnterpriseSponsorEcosystemContract(name) {
   } else if (name === "creator-counterpart-authorization") {
     includesAll(creatorCounterpart, ["requireRequestUser", "creatorCanAccess", "PERMISSION_DENIED", "request_changes", "counter", "accept", "decline"], name);
   } else if (name === "funding-gated-no-movement") {
-    includesAll(funding, ["proposalFundingEligible", "PROPOSAL_NOT_FUNDING_ELIGIBLE", "providerConfirmationRequired: true", "clientPaymentStatusTrusted: false", "moneyMovement: false"], name);
+    includesAll(funding, ["proposalFundingEligible", "PROPOSAL_NOT_FUNDING_ELIGIBLE", "INSUFFICIENT_SPONSOR_FUNDS", "partialFundingAllowed: false", 'collection("sponsorships")', 'status: "converted_to_sponsorship"', "externalPayoutExecuted: false"], name);
   } else if (name === "prize-contribution-isolated") {
     includesAll(proposalBuilder, ["prizeContribution", "creatorSponsorship", "platformFee", "100% winner-directed"], name);
     includesAll(proposalCreate, ["prizeContributionCents", "creatorSponsorshipCents", "platformFeeCents"], name);

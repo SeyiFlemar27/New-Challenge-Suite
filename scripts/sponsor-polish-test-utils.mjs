@@ -55,14 +55,14 @@ export function runSponsorPolishContract(name) {
   assert.match(messagesApi, /getConversation\(db, input\.conversationId, input\.senderId\)/);
 
   assert.match(proposalWizard, /Opportunity/);
-  assert.match(proposalWizard, /Partnership/);
-  assert.match(proposalWizard, /Scope & Objectives/);
-  assert.match(proposalWizard, /Budget & Funding/);
+  assert.match(proposalWizard, /Sponsorship Goal/);
+  assert.match(proposalWizard, /Offer & Funding/);
+  assert.match(proposalWizard, /Brand Visibility/);
   assert.match(proposalWizard, /Deliverables/);
-  assert.match(proposalWizard, /Timeline & Milestones/);
-  assert.match(proposalWizard, /Brand & Usage Rights/);
-  assert.match(proposalWizard, /Terms/);
-  assert.match(proposalWizard, /Review & Send/);
+  assert.match(proposalWizard, /Campaign Creative/);
+  assert.match(proposalWizard, /Timeline & Expiry/);
+  assert.match(proposalWizard, /Message/);
+  assert.match(proposalWizard, /Review/);
   assert.doesNotMatch(proposalWizard, /label="(?:Creator|Challenge|Campaign) ID"/i);
   assert.match(proposalWizard, /milestone_payment/);
   assert.match(proposalWizard, /deliverables/);

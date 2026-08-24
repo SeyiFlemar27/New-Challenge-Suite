@@ -33,9 +33,9 @@ export function cleanMoneyCents(value: unknown) {
   return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 100) : 0;
 }
 
-export function formatMoney(cents: unknown, currency = "USD") {
+export function formatMoney(cents: unknown, currency: unknown = "USD") {
   const amount = Number(cents ?? 0) / 100;
-  return `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${String(currency || "USD")} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function isoNow() { return new Date().toISOString(); }

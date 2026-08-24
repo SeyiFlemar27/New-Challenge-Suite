@@ -1,6 +1,8 @@
 import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
+import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
-import { cleanText, isoNow, proposalAcceptanceState } from "@/lib/sponsor-collaboration";
+import { cleanText, isoNow, proposalAcceptanceState, proposalIsExpired } from "@/lib/sponsor-collaboration";
+import { proposalPayload } from "../route";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   const requested = cleanText(body.action ?? body.status).toLowerCase();
   const action = requested === "sent" ? "send" : requested === "accepted" ? "accept" : requested === "withdrawn" ? "withdraw" : requested === "archived" ? "archive" : requested;
-  if (!["send", "accept", "withdraw", "archive"].includes(action)) return validationError({ action: "Choose an available proposal action." });
+  if (!["save_draft", "send", "accept", "withdraw", "archive"].includes(action)) return validationError({ action: "Choose an available proposal action." });
   try {
     const { proposalId } = await params;
     const owned = await assertSponsorOwnedDoc(context.db, "sponsorProposals", proposalId, context.sponsorId);
@@ -49,8 +51,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       const proposal = fresh.data() ?? {};
       if (Number(proposal.version ?? 0) !== expectedVersion) throw new Error("PROPOSAL_VERSION_CONFLICT");
       const status = String(proposal.status ?? "draft");
-      const next: Record<string, unknown> = { updatedAt: isoNow(), updatedBy: context.user.uid, version: expectedVersion + 1 };
-      if (action === "send") {
+      const now = isoNow();
+      const next: Record<string, unknown> = { updatedAt: now, updatedBy: context.user.uid, version: expectedVersion + 1 };
+      if (["send", "accept"].includes(action) && proposalIsExpired(proposal)) throw new Error("PROPOSAL_EXPIRED");
+      if (action === "save_draft") {
+        if (status !== "draft") throw new Error("PROPOSAL_ACTION_NOT_ALLOWED");
+        Object.assign(next, proposalPayload({ ...body, status: "draft" }, context.sponsorId, now, proposal), { ownerUid: proposal.ownerUid ?? context.user.uid, sponsorOrganizationId: context.organizationId });
+        const revisionNumber = Number(proposal.revisionNumber ?? 1) + 1;
+        const revisionRef = context.db.collection("sponsorProposalRevisions").doc(`${proposalId}_r${revisionNumber}`);
+        next.activeRevisionId = revisionRef.id;
+        next.revisionNumber = revisionNumber;
+        next.sponsorAcceptedRevisionId = null;
+        next.creatorAcceptedRevisionId = null;
+        transaction.create(revisionRef, { id: revisionRef.id, sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, proposalId, status: "proposed", revisionNumber, budgetSnapshotCents: next.proposedBudgetCents, deliverablesSnapshot: next.deliverables, dateSnapshot: { startDate: next.startDate, endDate: next.endDate, expiresAt: next.expiresAt ?? null }, paymentPreference: next.paymentPreference, usageRights: next.usageRights, cancellationTerms: next.cancellationTerms, sponsorRole: next.sponsorRole, sponsorCategory: next.sponsorCategory, categoryExclusive: next.categoryExclusive, requestedPlacements: next.requestedPlacements, sponsorMessage: next.notesToCreator, createdAt: now, createdBy: context.user.uid, immutable: true });
+      } else if (action === "send") {
         if (status !== "draft") throw new Error("PROPOSAL_ACTION_NOT_ALLOWED");
         if (!proposal.linkedCreatorId && !proposal.linkedChallengeId) throw new Error("PROPOSAL_RECIPIENT_REQUIRED");
         next.status = "sent";
@@ -76,11 +90,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       transaction.create(activityRef, { sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, proposalId, action: `proposal_${action}`, status: next.status ?? status, revisionId: proposal.activeRevisionId ?? null, createdAt: next.updatedAt, createdBy: context.user.uid });
       updated = { id: proposalId, ...proposal, ...next };
     });
-    return ok({ proposal: updated }, action === "accept" ? "Your acceptance was recorded for the current revision. Funding remains unavailable until both parties accept the same revision and eligibility checks pass." : "Proposal updated.");
+    const saved = updated as Record<string, unknown> | null;
+    if (action === "send" && saved) {
+      let creatorId = String(saved.linkedCreatorId ?? "");
+      const challengeId = String(saved.linkedChallengeId ?? "");
+      if (!creatorId && challengeId) {
+        const challenge = (await context.db.collection("challenges").doc(challengeId).get()).data() ?? {};
+        creatorId = String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? challenge.createdBy ?? "");
+      }
+      if (creatorId) await createNotification(context.db, { userId: creatorId, type: "sponsorship_received", title: "New sponsorship proposal", body: `${String(saved.title ?? "A sponsor")} sent sponsorship terms for your review.`, entityType: "sponsor_proposal", entityId: proposalId, actionUrl: `/creator/sponsorships?proposal=${encodeURIComponent(proposalId)}`, idempotencyKey: `sponsor_proposal_sent_${proposalId}_${String(saved.version)}` }).catch(() => undefined);
+    }
+    return ok({ proposal: updated }, action === "save_draft" ? "Proposal draft saved." : action === "accept" ? "Your acceptance was recorded for the current revision. Funding remains unavailable until both parties accept the same revision and eligibility checks pass." : "Proposal updated.");
   } catch (error) {
     if (error instanceof Error && error.message === "PROPOSAL_VERSION_CONFLICT") return fail("This proposal changed. Refresh it before taking action.", 409, undefined, "PROPOSAL_VERSION_CONFLICT");
     if (error instanceof Error && error.message === "PROPOSAL_RECIPIENT_REQUIRED") return validationError({ recipient: "Select an eligible creator or challenge before sending." });
     if (error instanceof Error && error.message === "PROPOSAL_REVISION_REQUIRED") return validationError({ revision: "A current proposal revision is required." });
+    if (error instanceof Error && error.message === "PROPOSAL_EXPIRED") return fail("This proposal has expired. Update its expiration date before continuing.", 422, undefined, "PROPOSAL_EXPIRED");
     if (error instanceof Error && error.message === "PROPOSAL_ACTION_NOT_ALLOWED") return fail("This action is not available for the proposal's current status.", 422, undefined, "PROPOSAL_ACTION_NOT_ALLOWED");
     console.error("[sponsor-proposal:patch]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Proposal could not be updated.");

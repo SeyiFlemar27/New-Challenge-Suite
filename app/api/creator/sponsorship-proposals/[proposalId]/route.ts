@@ -1,7 +1,9 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
+import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, proposalAcceptanceState } from "@/lib/sponsor-collaboration";
+import { listSponsorOrganizationMemberUserIds } from "@/lib/server/sponsor-organizations";
+import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, proposalAcceptanceState, proposalIsExpired } from "@/lib/sponsor-collaboration";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       if (Number(proposal.version ?? 0) !== expectedVersion) throw new Error("PROPOSAL_VERSION_CONFLICT");
       const status = String(proposal.status ?? "");
       if (!["sent", "viewed", "received", "under_review", "negotiating", "changes_requested"].includes(status)) throw new Error("PROPOSAL_ACTION_NOT_ALLOWED");
+      if (action !== "view" && proposalIsExpired(proposal)) throw new Error("PROPOSAL_EXPIRED");
       const now = isoNow();
       const next: Record<string, unknown> = { updatedAt: now, updatedBy: auth.user.uid, version: expectedVersion + 1 };
       if (action === "view") next.status = status === "sent" ? "viewed" : status;
@@ -73,7 +76,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
         const revisionRef = db.collection("sponsorProposalRevisions").doc(`${proposalId}_r${revisionNumber}`);
         const deliverables = body.deliverables === undefined ? proposal.deliverables ?? [] : normalizeProposalDeliverables(body.deliverables);
         const budgetSnapshotCents = body.budget === undefined ? Number(proposal.proposedBudgetCents ?? 0) : cleanMoneyCents(body.budget);
-        transaction.create(revisionRef, { id: revisionRef.id, sponsorId: proposal.sponsorId, sponsorOrganizationId: proposal.sponsorOrganizationId ?? proposal.sponsorId, proposalId, status: "countered", revisionNumber, budgetSnapshotCents, deliverablesSnapshot: deliverables, dateSnapshot: { startDate: cleanText(body.startDate ?? proposal.startDate).slice(0, 40), endDate: cleanText(body.endDate ?? proposal.endDate).slice(0, 40) }, creatorMessage: cleanText(body.message).slice(0, 1600), createdAt: now, createdBy: auth.user.uid, immutable: true });
+        transaction.create(revisionRef, { id: revisionRef.id, sponsorId: proposal.sponsorId, sponsorOrganizationId: proposal.sponsorOrganizationId ?? proposal.sponsorId, proposalId, status: "countered", revisionNumber, budgetSnapshotCents, deliverablesSnapshot: deliverables, dateSnapshot: { startDate: cleanText(body.startDate ?? proposal.startDate).slice(0, 40), endDate: cleanText(body.endDate ?? proposal.endDate).slice(0, 40), expiresAt: proposal.expiresAt ?? null }, paymentPreference: proposal.paymentPreference ?? null, usageRights: proposal.usageRights ?? "", cancellationTerms: proposal.cancellationTerms ?? "", sponsorRole: proposal.sponsorRole ?? "supporting", sponsorCategory: proposal.sponsorCategory ?? "", categoryExclusive: proposal.categoryExclusive === true, requestedPlacements: Array.isArray(proposal.requestedPlacements) ? proposal.requestedPlacements : [], creatorMessage: cleanText(body.message).slice(0, 1600), createdAt: now, createdBy: auth.user.uid, immutable: true });
         Object.assign(next, { activeRevisionId: revisionRef.id, revisionNumber, proposedBudgetCents: budgetSnapshotCents, deliverables, status: "negotiating", sponsorAcceptedRevisionId: null, creatorAcceptedRevisionId: null });
       }
       const activityRef = db.collection("sponsorProposalActivity").doc(`${proposalId}_creator_${action}_${expectedVersion + 1}`);
@@ -81,10 +84,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       transaction.create(activityRef, { sponsorId: proposal.sponsorId, sponsorOrganizationId: proposal.sponsorOrganizationId ?? proposal.sponsorId, proposalId, action: `creator_${action}`, status: next.status ?? status, revisionId: next.activeRevisionId ?? proposal.activeRevisionId ?? null, createdAt: now, createdBy: auth.user.uid });
       updated = { id: proposalId, ...proposal, ...next };
     });
+    const saved = updated as Record<string, unknown> | null;
+    const organizationId = String(saved?.sponsorOrganizationId ?? saved?.sponsorId ?? "");
+    if (organizationId) {
+      const memberUserIds = await listSponsorOrganizationMemberUserIds(db, organizationId);
+      await Promise.all(memberUserIds.map((userId) => createNotification(db, { userId, type: `sponsor_proposal_creator_${action}`, title: "Creator responded to a proposal", body: `A creator ${action === "request_changes" ? "requested changes to" : action === "counter" ? "countered" : action === "accept" ? "accepted" : action === "decline" ? "declined" : "viewed"} your sponsorship proposal.`, entityType: "sponsor_proposal", entityId: proposalId, actionUrl: `/sponsor/proposals/${proposalId}`, idempotencyKey: `sponsor_proposal_creator_${action}_${proposalId}_${String(saved?.version)}_${userId}` }).catch(() => undefined)));
+    }
     return ok({ proposal: updated }, action === "accept" ? "Your acceptance was recorded for the current revision. Funding remains subject to both-party acceptance and eligibility checks." : "Proposal response saved.");
   } catch (error) {
     if (error instanceof Error && error.message === "PROPOSAL_VERSION_CONFLICT") return fail("This proposal changed. Refresh it before responding.", 409, undefined, "PROPOSAL_VERSION_CONFLICT");
     if (error instanceof Error && error.message === "PROPOSAL_REVISION_REQUIRED") return validationError({ revision: "A current proposal revision is required." });
+    if (error instanceof Error && error.message === "PROPOSAL_EXPIRED") return fail("This proposal has expired. Ask the sponsor to send an updated proposal.", 422, undefined, "PROPOSAL_EXPIRED");
     if (error instanceof Error && error.message === "PROPOSAL_ACTION_NOT_ALLOWED") return fail("This response is not available for the proposal's current status.", 422, undefined, "PROPOSAL_ACTION_NOT_ALLOWED");
     console.error("[creator-sponsorship-proposal:patch]", { userId: auth.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Proposal response could not be saved.");

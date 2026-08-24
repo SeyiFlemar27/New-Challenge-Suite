@@ -140,3 +140,19 @@ export async function ensurePrimarySponsorOrganization(db: Firestore, input: { u
 export function hasSponsorPermission(access: SponsorOrganizationAccess, permission: SponsorPermission) {
   return access.permissions.includes(permission);
 }
+
+export async function listSponsorOrganizationMemberUserIds(db: Firestore, organizationId: string) {
+  const memberships = await db.collection("sponsorMemberships")
+    .where("sponsorOrganizationId", "==", organizationId)
+    .limit(100)
+    .get();
+  const userIds = memberships.docs
+    .filter((doc) => String(doc.data().status ?? "active") === "active")
+    .map((doc) => String(doc.data().userId ?? "").trim())
+    .filter(Boolean);
+  if (userIds.length) return [...new Set(userIds)];
+
+  const organization = await db.collection("sponsorOrganizations").doc(organizationId).get();
+  const legacyOwnerUserId = String(organization.data()?.legacyOwnerUserId ?? "").trim();
+  return legacyOwnerUserId ? [legacyOwnerUserId] : [];
+}

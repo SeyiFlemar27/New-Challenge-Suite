@@ -10,9 +10,11 @@ import {
   confirmChallengeEntryPayment,
   confirmPaidVotePurchase,
   confirmSponsorContribution,
+  confirmSponsorWalletFunding,
   expireChallengeEntryPayment,
   expirePaidVotePurchase,
-  expireSponsorContribution
+  expireSponsorContribution,
+  expireSponsorWalletFunding
 } from "@/lib/server/monetization-payments";
 import {
   invoicePaymentIntentId,
@@ -164,6 +166,8 @@ export async function POST(request: Request) {
           outcome = await confirmPaidVotePurchase(db, event, session);
         } else if (paymentPurpose === "sponsor_funding") {
           outcome = await confirmSponsorContribution(db, event, session);
+        } else if (paymentPurpose === "sponsor_wallet_funding") {
+          outcome = await confirmSponsorWalletFunding(db, event, session);
         } else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) {
           outcome = await confirmPredictionPayment(db, event, session);
         } else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) {
@@ -201,7 +205,8 @@ export async function POST(request: Request) {
         const paymentPurpose = session.metadata?.paymentPurpose;
         if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
         else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
-        else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
+          else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
+          else if (paymentPurpose === "sponsor_wallet_funding") outcome = await expireSponsorWalletFunding(db, session);
         else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) outcome = await expirePredictionPayment(db, session);
         else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) outcome = await expireCreatorPrizeFunding(db, session);
         break;

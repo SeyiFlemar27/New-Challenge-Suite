@@ -103,7 +103,8 @@ const starterSections: NavSection[] = [
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
   { label: "Creator", items: [
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
+    { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
   ] },
   { label: "Finance", items: [
     { href: "/earnings", label: "Earnings", icon: ReceiptText },
@@ -127,7 +128,8 @@ const creatorSections: NavSection[] = [
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
   { label: "Creator", items: [
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
+    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
+    { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
   ] },
   { label: "Finance", items: [
     { href: "/earnings", label: "Earnings", icon: ReceiptText },

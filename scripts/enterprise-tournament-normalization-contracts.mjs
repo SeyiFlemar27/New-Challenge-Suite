@@ -12,7 +12,8 @@ run("enterprise_identity", () => {
   const access = read("lib/enterprise-access.ts");
   const bootstrap = read("app/api/auth/profile/bootstrap/route.ts");
   assert.match(admin, /personalAccountTypePreserved: previousAccountType/);
-  assert.match(admin, /workspaceTypes: \["personal", "enterprise"\]/);
+  assert.match(admin, /existingWorkspaces\.add\("enterprise"\)/);
+  assert.match(admin, /workspaceTypes: \[\.\.\.existingWorkspaces\]/);
   assert.doesNotMatch(admin, /enterprisePreviousAccountType/);
   assert.match(access, /isEnterpriseAccessActive/);
   assert.match(access, /expiresAt > now/);

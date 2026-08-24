@@ -28,11 +28,13 @@ export function CreatorWorkspace({ mode = "dashboard" }: { mode?: keyof typeof l
   const challenges = data?.challenges ?? [];
   const filtered = useMemo(() => challenges.filter((item) => String(item.title ?? "").toLowerCase().includes(search.toLowerCase())), [challenges, search]);
   const status = (item: RecordItem) => String(item.status ?? item.lifecycleStatus ?? "draft").toLowerCase();
-  const sponsorReady = filtered.filter((item) => Boolean(item.sponsorReady || item.sponsorEnabled || (item.monetization as Record<string, unknown> | undefined)?.sponsorReady));
+  const sponsorReadyStatuses = new Set(["published", "scheduled"]);
+  const sponsorEligible = filtered.filter((item) => sponsorReadyStatuses.has(status(item)));
+  const sponsorReady = sponsorEligible.filter((item) => Boolean(item.sponsorReady || item.sponsorEnabled || (item.monetization as Record<string, unknown> | undefined)?.sponsorReady));
   const eligibleBoosts = filtered.filter((item) => ["published", "registration_open", "active", "voting"].includes(status(item)) && String(item.visibility ?? "public") === "public");
   const activeBoostIds = new Set((data?.boosts ?? []).filter((item) => ["active", "confirmed"].includes(String(item.status ?? "").toLowerCase())).map((item) => String(item.challengeId ?? "")));
   const boostRecords = view === "active" ? eligibleBoosts.filter((item) => activeBoostIds.has(item.id)) : view === "history" ? filtered.filter((item) => (data?.boosts ?? []).some((boost) => String(boost.challengeId ?? "") === item.id)) : view === "ineligible" ? filtered.filter((item) => !eligibleBoosts.some((eligible) => eligible.id === item.id)) : view === "eligible" ? eligibleBoosts : filtered;
-  const sponsorRecords = view === "interest" ? sponsorReady.filter((item) => data?.sponsorInterest.some((interest) => String(interest.challengeId ?? "") === item.id)) : view === "not_ready" ? filtered.filter((item) => !sponsorReady.some((ready) => ready.id === item.id)) : sponsorReady;
+  const sponsorRecords = view === "interest" ? sponsorReady.filter((item) => data?.sponsorInterest.some((interest) => String(interest.challengeId ?? "") === item.id)) : view === "not_ready" ? sponsorEligible.filter((item) => !sponsorReady.some((ready) => ready.id === item.id)) : sponsorReady;
   const title = labels[mode];
 
   return <AppShell><div className="mx-auto max-w-7xl"><div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><PageTitle title={title[0]} subtitle={title[1]} /><div className="flex flex-wrap gap-2"><LinkButton href="/challenges/create">Create Challenge</LinkButton><LinkButton href="/my-challenges" variant="secondary">Manage Challenges</LinkButton></div></div><nav className="mt-7 flex gap-2 overflow-x-auto border-b border-white/10 pb-3" aria-label="Creator tools">{Object.entries(labels).map(([key, value]) => <Link key={key} href={key === "dashboard" ? "/creator" : `/creator/${key}`} className={`shrink-0 rounded-[8px] px-4 py-2 text-sm font-black ${mode === key ? "bg-[var(--gold)] text-black" : "bg-white/5 text-slate-300"}`}>{value[0]}</Link>)}</nav>

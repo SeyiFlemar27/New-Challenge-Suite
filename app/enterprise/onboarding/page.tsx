@@ -21,6 +21,7 @@ export default function EnterpriseOnboardingPage() {
   const progress = useMemo(() => state?.totalTasks ? Math.round((state.completedTasks / state.totalTasks) * 100) : 0, [state]);
 
   async function toggleTask(taskId: string, completed: boolean) {
+    if (state?.modules.flatMap((module) => module.tasks).find((task) => task.id === taskId)?.completionMode === "audited_action") return;
     setBusyTask(taskId); setError("");
     const result = await apiRequest<Omit<OnboardingState, "access">>("/api/enterprise/onboarding", { method: "PATCH", body: JSON.stringify({ taskId, completed }) });
     setBusyTask(null);

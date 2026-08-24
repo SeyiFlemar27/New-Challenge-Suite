@@ -40,7 +40,7 @@ export function run(name) {
   if (name.includes("sponsor-benefits")) { assert(sources.sponsorBenefits.includes("How sponsorship works")); assert(!sources.sponsorBenefits.includes("guaranteed ROI")); }
   if (name.includes("sponsor-start")) assert(sources.sponsorStart.includes('href="/sponsor/benefits"'));
   if (name.includes("sponsor-onboarding")) { assert(sources.sponsorOnboarding.includes("Save & Finish Later")); assert(sources.sponsorOnboarding.includes("Return to Overview")); }
-  if (name.includes("sponsor-preapproval")) assert(sources.sponsorShell.includes("Complete Profile") && sources.sponsorShell.includes("Billing & Plan"));
+  if (name.includes("sponsor-preapproval")) assert(sources.sponsorShell.includes("Complete brand profile") && sources.sponsorShell.includes("Plan &amp; Billing"));
   if (name.includes("i18n")) { for (const code of ["en","fr","es","pt"]) assert(sources.i18n.includes(`code: \"${code}\"`)); assert(sources.i18n.includes('DEFAULT_LANGUAGE: LanguageCode = "en"')); assert(sources.selector.includes("localStorage.setItem")); assert(sources.languageApi.includes("requireRequestUser")); }
   if (name.includes("demo-record-cleanup")) { assert(sources.cleanup.includes("Dry run only")); assert(sources.cleanup.includes("PROTECTED_COLLECTIONS")); assert(sources.cleanup.includes("Deletion is intentionally unavailable")); }
   console.log(`PASS ${name}`);

@@ -41,7 +41,7 @@ export function runSponsorWorkspaceContract(name) {
       for (const route of ["app/sponsor/dashboard/page.tsx", "app/sponsor/onboarding/page.tsx", "app/sponsor/campaigns/page.tsx", "app/sponsor/discover/page.tsx", "app/sponsor/proposals/page.tsx", "app/sponsor/billing/page.tsx", "app/sponsor/reports/page.tsx", "app/sponsor/settings/page.tsx", "app/sponsor/support/page.tsx"]) assert(exists(route), `Missing sponsor route: ${route}`);
       break;
     case "sidebar-simplified":
-      hasAll(source.shell, ["Overview", "Campaigns", "Discover", "Proposals", "Billing & Plan", "Reports", "Settings", "Support", "Complete Profile"], "Sponsor navigation missing item");
+      hasAll(source.shell, ["Sponsor Studio", "Discover", "Saved", "Sponsorships", "Proposals", "Deliverables", "Analytics", "Reports", "Wallet", "Settings", "Support", "Brand Profile", "Connected Channels", "Plan &amp; Billing"], "Sponsor navigation missing item");
       assert(!source.shell.includes('label: "Inbox"'), "Sponsor navigation must use the global message entry point instead of a separate Inbox item.");
       assert(!source.shell.includes('label: "Assets"') && !source.shell.includes('label: "Team"'), "Primary sponsor navigation must stay simplified.");
       break;
@@ -50,7 +50,7 @@ export function runSponsorWorkspaceContract(name) {
       break;
     case "plans-billing-merged":
       hasAll(source.billing, ["Current Plan", "Payment Methods", "Sponsor Funds", "Invoices & Receipts", "Billing History"], "Billing & Plan missing tab");
-      assert(source.shell.includes('label: "Billing & Plan"') && !source.shell.includes('label: "Plans"'), "Plans and billing must be one navigation item.");
+      assert(source.shell.includes("Plan &amp; Billing") && !source.shell.includes('label: "Billing & Plan"') && !source.shell.includes('label: "Plans"'), "Plan and billing must remain in the Sponsor footer menu, not primary navigation.");
       break;
     case "state-canonical":
       hasAll(source.access, ["resolveSponsorWorkspaceState", '"draft"', '"submitted"', '"pending_review"', '"needs_changes"', '"approved"', '"rejected"', '"suspended"', "calculateSponsorCompletion"], "Canonical sponsor resolver incomplete");
@@ -64,7 +64,7 @@ export function runSponsorWorkspaceContract(name) {
       hasAll(source.dashboard, ["Sponsor overview is temporarily unavailable.", "Retry overview", "onClick={() => void load()}"], "Dashboard retry state incomplete");
       break;
     case "onboarding-complete-flow":
-      hasAll(source.onboarding, ["Brand Profile", "Business Details", "Media & Identity", "Sponsorship Goals", "Review & Submit", "Save & Finish Later", "Submit for Review"], "Onboarding flow incomplete");
+      hasAll(source.onboarding, ["Brand Basics", "Connect Your Channels", "Contact Person", "Sponsorship Goals", "Preferred Categories", "Sponsorship Preferences", "Review", "Save & Finish Later", "Submit for Review"], "Onboarding flow incomplete");
       hasAll(source.profileApi, ['reviewAction === "submit" ? "submitted" : "in_progress"', "Sponsor profile submitted for review."], "Onboarding persistence incomplete");
       break;
     case "onboarding-native-uploads":
@@ -92,7 +92,7 @@ export function runSponsorWorkspaceContract(name) {
       assert(!source.inbox.includes("Fund Challenge"), "Inbox must not show context-free funding actions.");
       break;
     case "inbox-contextual-not-crowded":
-      hasAll(source.inbox, ["No conversations yet", "proposal", "creator replies"], "Inbox empty state incomplete");
+      hasAll(source.inbox, ['redirect("/messages")'], "Sponsor messages must use the canonical global conversation workspace");
       assert(!source.inbox.includes("Fund Challenge"), "Inbox must keep funding contextual.");
       break;
     case "billing-plan-friendly-provider-states":
@@ -113,7 +113,7 @@ export function runSponsorWorkspaceContract(name) {
       break;
     case "route-and-button-functional-qa":
       hasAll(source.shell + source.dashboard + source.discover + source.support, ["/sponsor/dashboard", "/sponsor/onboarding", "/sponsor/campaigns", "/sponsor/discover", "/sponsor/proposals", "/sponsor/billing", "/sponsor/settings", "/sponsor/support"], "Primary sponsor route missing");
-      assert(source.shell.includes('aria-disabled="true"') && source.dashboard.includes("Retry overview"), "Locked and retry actions must be explicit.");
+      assert(source.shell.includes("!workspace.approved") && source.shell.includes("Complete brand profile") && source.dashboard.includes("Retry overview"), "Locked and retry actions must be explicit.");
       break;
     case "mobile-no-overflow":
       hasAll(source.shell, ["overflow-x-hidden", "md:hidden", "w-[min(90vw,360px)]", "min-w-0", "min-h-11"], "Sponsor mobile shell incomplete");

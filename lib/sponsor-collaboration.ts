@@ -1,4 +1,4 @@
-export const proposalStatuses = ["draft", "sent", "viewed", "received", "under_review", "negotiating", "changes_requested", "accepted", "declined", "admin_review", "funding_required", "funded", "live", "completed", "cancelled", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
+export const proposalStatuses = ["draft", "sent", "viewed", "received", "under_review", "negotiating", "countered", "changes_requested", "accepted", "declined", "admin_review", "funding_required", "funded", "converted_to_sponsorship", "live", "completed", "cancelled", "expired", "withdrawn", "converted_to_campaign", "archived"] as const;
 export const proposalRevisionStatuses = ["proposed", "countered", "changes_requested", "accepted", "declined", "withdrawn"] as const;
 export const deliverableStatuses = ["not_started", "pending", "in_progress", "active", "submitted", "under_review", "changes_requested", "approved", "completed", "blocked", "overdue", "cancelled"] as const;
 export const approvalStatuses = ["pending", "under_review", "approved", "changes_requested", "rejected", "overdue", "cancelled"] as const;
@@ -42,5 +42,12 @@ export function proposalAcceptanceState(proposal: Record<string, unknown>) {
 
 export function proposalFundingEligible(proposal: Record<string, unknown>) {
   const acceptance = proposalAcceptanceState(proposal);
-  return acceptance.fullyAccepted && ["accepted", "funding_required"].includes(String(proposal.status ?? ""));
+  return !proposalIsExpired(proposal) && acceptance.fullyAccepted && ["accepted", "funding_required"].includes(String(proposal.status ?? ""));
+}
+
+export function proposalIsExpired(proposal: Record<string, unknown>, now = Date.now()) {
+  const expiresAt = String(proposal.expiresAt ?? "").trim();
+  if (!expiresAt) return false;
+  const timestamp = Date.parse(expiresAt);
+  return Number.isFinite(timestamp) && timestamp <= now;
 }

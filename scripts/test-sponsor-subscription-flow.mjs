@@ -43,8 +43,8 @@ assertIncludes(subscriptions, "Need Enterprise access?", "/subscriptions support
 assertIncludes(sidebar, "Become a Sponsor", "account/profile navigation includes Become a Sponsor");
 assertIncludes(sidebar, "/sponsor/start", "Become a Sponsor routes to the sponsor start flow");
 
-assertIncludes(onboarding, "Brand Profile", "sponsor onboarding starts with brand profile step");
-assertIncludes(onboarding, "Review & Submit", "sponsor onboarding includes review and submit step");
+assertIncludes(onboarding, "Brand Basics", "sponsor onboarding starts with brand basics step");
+assertIncludes(onboarding, '"Review"', "sponsor onboarding includes review step");
 assertIncludes(onboarding, "Brand / organization name", "sponsor onboarding has brand organization field");
 assertIncludes(onboarding, "Business email", "sponsor onboarding has business email field");
 assertIncludes(onboarding, "Website", "sponsor onboarding has website field");
@@ -56,8 +56,8 @@ assertIncludes(onboarding, "Preferred sponsorship type", "sponsor onboarding has
 assertIncludes(onboarding, "Brand description", "sponsor onboarding has brand description field");
 assertIncludes(onboarding, "Save & Finish Later", "sponsor onboarding supports saving progress");
 assertIncludes(onboarding, "Submit for Review", "sponsor onboarding explains review submission");
-assertIncludes(onboarding, "activate a plan", "sponsor onboarding does not imply plan activation");
-assertIncludes(onboarding, "It does not approve the brand, activate a plan, or enable funding.", "onboarding does not claim fake automation");
+assertIncludes(onboarding, "activate funding", "sponsor onboarding does not imply funding activation");
+assertIncludes(onboarding, "It does not alter your Personal account, activate funding, or approve the brand.", "onboarding does not claim fake automation");
 assertNotIncludes(onboarding, "Payment completed", "onboarding does not claim payment completed");
 assertNotIncludes(onboarding, "Brand approved", "onboarding does not claim brand approved");
 assertNotIncludes(onboarding, "Email sent", "onboarding does not claim email sent");

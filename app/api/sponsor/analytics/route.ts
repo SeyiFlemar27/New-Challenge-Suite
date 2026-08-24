@@ -10,12 +10,12 @@ export async function GET(request: Request) {
   if (!context) return serverError("Sponsor access could not be verified.");
   try {
     const [snapshotsSnap, campaignAnalyticsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap] = await Promise.all([
-      context.db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", context.user.uid).limit(25).get(),
-      context.db.collection("sponsorCampaignAnalytics").where("sponsorId", "==", context.user.uid).limit(25).get(),
-      context.db.collection("sponsorCampaignBriefs").where("sponsorId", "==", context.user.uid).limit(100).get(),
-      context.db.collection("sponsorProposals").where("sponsorId", "==", context.user.uid).limit(100).get(),
-      context.db.collection("sponsorContributions").where("sponsorId", "==", context.user.uid).limit(100).get(),
-      context.db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", context.user.uid).limit(100).get()
+      context.db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", context.sponsorId).limit(25).get(),
+      context.db.collection("sponsorCampaignAnalytics").where("sponsorId", "==", context.sponsorId).limit(25).get(),
+      context.db.collection("sponsorCampaignBriefs").where("sponsorId", "==", context.sponsorId).limit(100).get(),
+      context.db.collection("sponsorProposals").where("sponsorId", "==", context.sponsorId).limit(100).get(),
+      context.db.collection("sponsorContributions").where("sponsorId", "==", context.sponsorId).limit(100).get(),
+      context.db.collection("sponsorDeliverables").where("sponsorId", "==", context.sponsorId).limit(100).get()
     ]);
     const summary = buildSponsorReportingSummary({
       campaigns: campaignsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),

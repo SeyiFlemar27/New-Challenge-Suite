@@ -5,7 +5,7 @@ import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, norm
 
 export const dynamic = "force-dynamic";
 
-function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: string, existing: Record<string, unknown> = {}) {
+export function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: string, existing: Record<string, unknown> = {}) {
   const status = normalizeProposalStatus(body.status ?? existing.status ?? "draft");
   const deliverables = body.deliverables === undefined ? normalizeProposalDeliverables(existing.deliverables) : normalizeProposalDeliverables(body.deliverables);
   return {
@@ -20,6 +20,7 @@ function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: 
     currency: cleanText(body.currency ?? existing.currency, "USD").slice(0, 12),
     startDate: cleanText(body.startDate ?? existing.startDate).slice(0, 40),
     endDate: cleanText(body.endDate ?? existing.endDate).slice(0, 40),
+    expiresAt: cleanText(body.expiresAt ?? existing.expiresAt).slice(0, 40) || null,
     deliverables,
     deliverablesCount: deliverables.length,
     paymentPreference: cleanText(body.paymentPreference ?? existing.paymentPreference, "milestone_payment").slice(0, 120),
@@ -33,6 +34,10 @@ function proposalPayload(body: Record<string, unknown>, sponsorId: string, now: 
     milestones: Array.isArray(body.milestones) ? body.milestones.slice(0, 20) : Array.isArray(existing.milestones) ? existing.milestones : [],
     usageRights: cleanText(body.usageRights ?? existing.usageRights).slice(0, 1200),
     cancellationTerms: cleanText(body.cancellationTerms ?? existing.cancellationTerms).slice(0, 1200),
+    sponsorRole: body.sponsorRole === "primary" ? "primary" : existing.sponsorRole === "primary" ? "primary" : "supporting",
+    sponsorCategory: cleanText(body.sponsorCategory ?? existing.sponsorCategory).slice(0, 120),
+    categoryExclusive: body.categoryExclusive === undefined ? existing.categoryExclusive === true : body.categoryExclusive === true,
+    requestedPlacements: safeArray(body.requestedPlacements ?? existing.requestedPlacements),
     attachments: safeArray(body.attachments ?? existing.attachments),
     status,
     unreadMessageCount: Number(existing.unreadMessageCount ?? 0),
@@ -55,7 +60,7 @@ export async function GET(request: Request) {
   if (!context) return serverError("Sponsor access could not be verified.");
   try {
     const snap = await context.db.collection("sponsorProposals").where("sponsorId", "==", context.sponsorId).limit(100).get();
-    const proposals = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => String((b as any).updatedAt ?? "").localeCompare(String((a as any).updatedAt ?? "")));
+    const proposals = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
     return ok({ proposals }, "Sponsor proposals loaded.");
   } catch (error) {
     console.error("[sponsor-proposals:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
@@ -88,7 +93,7 @@ export async function POST(request: Request) {
     const batch = context.db.batch();
     batch.create(ref, proposal);
     batch.create(activityRef, { sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, proposalId: ref.id, action: proposal.status === "sent" ? "proposal_sent" : "proposal_draft_saved", status: proposal.status, createdAt: now, createdBy: context.user.uid });
-    batch.create(revisionRef, { id: revisionRef.id, sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, proposalId: ref.id, status: "proposed", revisionNumber: 1, budgetSnapshotCents: proposal.proposedBudgetCents, deliverablesSnapshot: proposal.deliverables, dateSnapshot: { startDate: proposal.startDate, endDate: proposal.endDate }, paymentPreference: proposal.paymentPreference, usageRights: proposal.usageRights, cancellationTerms: proposal.cancellationTerms, sponsorMessage: proposal.notesToCreator, createdAt: now, createdBy: context.user.uid, immutable: true });
+    batch.create(revisionRef, { id: revisionRef.id, sponsorId: context.sponsorId, sponsorOrganizationId: context.organizationId, proposalId: ref.id, status: "proposed", revisionNumber: 1, budgetSnapshotCents: proposal.proposedBudgetCents, deliverablesSnapshot: proposal.deliverables, dateSnapshot: { startDate: proposal.startDate, endDate: proposal.endDate }, paymentPreference: proposal.paymentPreference, usageRights: proposal.usageRights, cancellationTerms: proposal.cancellationTerms, sponsorRole: proposal.sponsorRole, sponsorCategory: proposal.sponsorCategory, categoryExclusive: proposal.categoryExclusive, requestedPlacements: proposal.requestedPlacements, sponsorMessage: proposal.notesToCreator, createdAt: now, createdBy: context.user.uid, immutable: true });
     await batch.commit();
     return ok({ proposal }, proposal.status === "sent" ? "Proposal sent. No contract, funding, or payment release was activated." : "Proposal draft saved.");
   } catch (error) {

@@ -10,7 +10,7 @@ export function Button({
   children,
   variant = "primary",
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "purple" | "ghost" }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "purple" | "ghost" | "destructive" }) {
   return (
     <button
       data-ui-button
@@ -20,6 +20,7 @@ export function Button({
         variant === "secondary" && "border border-[var(--gold-strong)] bg-transparent text-[var(--foreground)] hover:bg-yellow-400/10",
         variant === "purple" && "purple-gradient text-white shadow-[0_0_30px_rgba(118,92,246,.28)]",
         variant === "ghost" && "border border-[var(--line)] bg-[var(--panel-2)] text-[var(--foreground)] hover:bg-[var(--panel-3)]",
+        variant === "destructive" && "border border-red-300 bg-red-700 text-white hover:bg-red-800",
         className
       )}
       {...props}
