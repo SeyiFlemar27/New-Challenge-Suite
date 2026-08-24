@@ -97,6 +97,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
   if (!validation.success) return rejectPublish("Some required details are missing.", 400, { fieldErrors: zodFieldErrors(validation.error) }, "VALIDATION_ERROR");
   const body = validation.data;
+  const judgeAccountIds = body.hostOperations?.judgeAccountIds ?? [];
+  if (body.isLiveEvent && body.hostOperations?.winnerSelection === "judge_selection") {
+    if (!judgeAccountIds.length) return rejectPublish("Assign at least one registered judge before submitting this event.", 422, { fieldErrors: { judgeAccountIds: "Assign at least one registered judge." } }, "REGISTERED_JUDGE_REQUIRED");
+    const judgeSnaps = await db.getAll(...judgeAccountIds.map((judgeId) => db.collection("users").doc(judgeId)));
+    if (judgeSnaps.some((snap) => !snap.exists || String(snap.data()?.accountStatus ?? "active") !== "active")) return rejectPublish("One or more assigned judges are no longer available. Choose registered accounts and try again.", 422, { fieldErrors: { judgeAccountIds: "Choose active registered accounts." } }, "REGISTERED_JUDGE_INVALID");
+  }
   if (body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return rejectPublish("Please add challenge media before publishing.", 503, { setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   if (planAccess.isSponsor) return rejectPublish("You can't publish this challenge.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
 

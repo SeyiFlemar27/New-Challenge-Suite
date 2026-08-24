@@ -1,4 +1,5 @@
 import { TOURNAMENT_STATUSES, type TournamentFormat, type TournamentPrivacy, type TournamentRegistrationType, type TournamentThirdPlaceMethod, type TournamentTieBreaker } from "@/lib/tournament-types";
+import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory } from "@/lib/normal-challenge-config";
 
 export const TOURNAMENT_CAPACITY_MIN = 4;
 export const TOURNAMENT_CAPACITY_MAX = 128;
@@ -37,7 +38,15 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   const expectedEndAt = dateValue(input.expectedEndAt);
   if (!text(input.title)) errors.push({ field: "title", message: "Tournament title is required." });
   if (!text(input.description)) errors.push({ field: "description", message: "Tournament description is required." });
-  if (!text(input.category)) errors.push({ field: "category", message: "Tournament category is required." });
+  const category = text(input.category);
+  const subcategory = text(input.subcategory);
+  if (!category) errors.push({ field: "category", message: "Tournament category is required." });
+  else if (!isCanonicalChallengeCategory(category)) errors.push({ field: "category", message: "Choose a category from the available options." });
+  if (!subcategory) errors.push({ field: "subcategory", message: "Tournament subcategory is required." });
+  else if (!isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
+  if (text(input.currency || "USD") !== "USD") errors.push({ field: "currency", message: "Tournament money values are recorded in USD." });
+  const minimumAge = Number(input.ageRestriction ?? 0);
+  if (!Number.isInteger(minimumAge) || minimumAge < 0 || minimumAge > 120) errors.push({ field: "ageRestriction", message: "Minimum age must be a whole number from 0 to 120." });
   if (!TOURNAMENT_FORMATS.includes(format)) errors.push({ field: "format", message: "Tournament format is invalid." });
   if (!["single_elimination", "double_elimination"].includes(format)) errors.push({ field: "format", message: "Choose Single Elimination or Double Elimination." });
   if (!TOURNAMENT_BRACKET_SIZES.includes(capacity as typeof TOURNAMENT_BRACKET_SIZES[number])) errors.push({ field: "participantCapacity", message: "Choose a bracket size of 4, 8, 16, 32, 64, or 128." });

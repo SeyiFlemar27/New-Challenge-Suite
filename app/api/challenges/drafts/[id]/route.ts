@@ -83,6 +83,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
     if (patch.challengeType !== undefined && normalizeBuilderChallengeType(patch.challengeType) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");
     if (patch.type !== undefined && normalizeBuilderChallengeType(patch.type) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");
+    if (body.ownershipType !== undefined && body.ownershipType !== current.ownershipType) throw new Error("CHALLENGE_OWNERSHIP_LOCKED");
+    if (body.officialChallenge !== undefined && Boolean(body.officialChallenge) !== Boolean(current.officialChallenge)) throw new Error("CHALLENGE_OWNERSHIP_LOCKED");
     if (isRetiredHybridCompetition(current) || isRetiredHybridCompetition({ ...current, ...patch })) {
       return { ...current, ...calculateChallengeDraftProgress(current), retiredCompetition: true, archived: true };
     }
@@ -114,6 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (code === "CHALLENGE_NOT_FOUND") return fail("Challenge draft not found.", 404, undefined, code);
     if (code === "PERMISSION_DENIED") return fail("You can only edit your own challenge drafts.", 403, undefined, code);
     if (code === "CHALLENGE_TYPE_LOCKED") return fail("Challenge type can't be changed after the draft is created.", 409, undefined, code);
+    if (code === "CHALLENGE_OWNERSHIP_LOCKED") return fail("Challenge ownership can't be changed after the draft is created.", 409, undefined, code);
     if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
     if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
     throw error;

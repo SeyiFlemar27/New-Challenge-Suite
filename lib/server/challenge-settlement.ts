@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/payout-structure";
 import { createNotification } from "@/lib/server/notifications";
 import { calculateGrowthWalletAllocation, calculatePaidEntrySplit, ECONOMY_V1_RULES, ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
+import { getConfirmedCreatorPrizeFunding } from "@/lib/server/prize-funding";
 
 export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
@@ -21,6 +22,10 @@ export type SettlementWinner = {
   submissionId: string | null;
   placement: number;
   splitPercent: number;
+  teamId?: string | null;
+  rosterSnapshotReference?: string | null;
+  allocationOrder?: number;
+  payoutStatus?: "pending_admin_review" | "pending_hold";
 };
 
 type ConfirmedSource = {
@@ -50,6 +55,7 @@ function operatorRecipientId(challenge: Record<string, unknown>) {
 }
 
 function creatorRecipientId(challenge: Record<string, unknown>) {
+  if (challenge.officialChallenge === true || text(challenge.ownershipType) === "challenge_suite_official") return "";
   return text(challenge.creatorId) || text(challenge.ownerId) || text(challenge.userId);
 }
 
@@ -76,14 +82,15 @@ export function defaultPlacementSplit(count: number) {
 
 function validPercentSplits(splits: Array<{ position: number; percent: number }>, winners: SettlementWinner[]) {
   const positions = new Set(winners.map((winner) => winner.placement));
-  return splits.length === winners.length
+  return splits.length === positions.size
+    && new Set(splits.map((split) => split.position)).size === positions.size
     && splits.reduce((sum, split) => sum + split.percent, 0) === 100
     && splits.every((split) => positions.has(split.position) && split.percent >= 0);
 }
 
 function winnerSplits(winners: SettlementWinner[]) {
-  const configured = winners.map((winner) => ({ position: winner.placement, percent: cents(winner.splitPercent) }));
-  return validPercentSplits(configured, winners) ? configured : defaultPlacementSplit(winners.length);
+  const configured = [...new Map(winners.map((winner) => [winner.placement, { position: winner.placement, percent: cents(winner.splitPercent) }])).values()];
+  return validPercentSplits(configured, winners) ? configured : defaultPlacementSplit(new Set(winners.map((winner) => winner.placement)).size);
 }
 
 function customSponsorSplits(challenge: Record<string, unknown>, winners: SettlementWinner[]) {
@@ -127,7 +134,8 @@ function customSponsorAmountDistribution(challenge: Record<string, unknown>, win
     };
   });
   const total = amounts.reduce((sum, item) => sum + item.amountCents, 0);
-  return amounts.length === winners.length
+  return amounts.length === positions.size
+    && new Set(amounts.map((item) => item.position)).size === positions.size
     && total === cents(grossAmountCents)
     && amounts.every((item) => positions.has(item.position))
     ? amounts.map((item) => ({
@@ -150,6 +158,20 @@ function distributeByWeights(amountCents: number, weights: Array<{ position: num
   });
 }
 
+function distributePlacementMembers<T extends { position: number; amountCents: number }>(allocations: T[], winners: SettlementWinner[]) {
+  return winners.map((winner) => {
+    const placement = allocations.find((item) => item.position === winner.placement);
+    const members = winners
+      .filter((item) => item.placement === winner.placement)
+      .sort((a, b) => Number(a.allocationOrder ?? Number.MAX_SAFE_INTEGER) - Number(b.allocationOrder ?? Number.MAX_SAFE_INTEGER) || a.userId.localeCompare(b.userId));
+    const index = members.findIndex((item) => item.userId === winner.userId);
+    const total = placement?.amountCents ?? 0;
+    const base = members.length ? Math.floor(total / members.length) : 0;
+    const remainder = members.length ? total % members.length : 0;
+    return { winner, amountCents: base + (index >= 0 && index < remainder ? 1 : 0), memberCount: members.length, allocationIndex: index };
+  });
+}
+
 export function generatedRevenueWinnerWeights(count: number) {
   if (count <= 0) return [];
   if (count === 1) return [{ position: 1, amountCents: 65, percent: 65 }];
@@ -167,6 +189,7 @@ export function buildSettlementBreakdown(input: {
   confirmedEntryRevenueCents: number;
   confirmedPaidVoteRevenueCents: number;
   confirmedSponsorPrizeCents: number;
+  confirmedCreatorPrizeCents?: number;
 }) {
   const economyV1 = input.challenge.economyRuleVersion === ECONOMY_V1_RULE_VERSION;
   const grossConfirmedChallengeRevenue = cents(input.confirmedEntryRevenueCents) + cents(input.confirmedPaidVoteRevenueCents);
@@ -174,10 +197,15 @@ export function buildSettlementBreakdown(input: {
   const v1Split = calculatePaidEntrySplit(grossConfirmedChallengeRevenue);
   const generatedSplit = economyV1 ? { winnerShareCents: v1Split.winnerAmountCents, creatorHostOperatorShareCents: v1Split.creatorAmountCents, platformAdminShareCents: v1Split.platformAmountCents } : legacySplit;
   const grossConfirmedSponsorPrizeAmount = cents(input.confirmedSponsorPrizeCents);
+  const grossConfirmedCreatorPrizeAmount = cents(input.confirmedCreatorPrizeCents);
   const sponsorPrizePlatformFeeAmount = Math.floor(grossConfirmedSponsorPrizeAmount * SPONSOR_PRIZE_PLATFORM_FEE_PERCENT / 100);
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
-  const challengeDistribution = distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(input.winners.length));
-  const sponsorSplits = customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(input.winners.length);
+  const placementCount = new Set(input.winners.map((winner) => winner.placement)).size;
+  const generatedPlacementDistribution = distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
+  const creatorPlacementDistribution = distributeByPercent(grossConfirmedCreatorPrizeAmount, defaultPlacementSplit(placementCount));
+  const challengeDistribution = generatedPlacementDistribution.map((item) => ({ ...item, amountCents: item.amountCents + (creatorPlacementDistribution.find((creator) => creator.position === item.position)?.amountCents ?? 0) }));
+  const memberChallengeDistribution = distributePlacementMembers(challengeDistribution, input.winners);
+  const sponsorSplits = customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(placementCount);
   const sponsorGrossDistribution = customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount)
     ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
   const sponsorFeeDistribution = distributeByWeights(sponsorPrizePlatformFeeAmount, sponsorGrossDistribution);
@@ -185,11 +213,15 @@ export function buildSettlementBreakdown(input: {
     const fee = sponsorFeeDistribution.find((item) => item.position === gross.position);
     return { ...gross, amountCents: gross.amountCents - (fee?.amountCents ?? 0) };
   });
+  const memberSponsorGrossDistribution = distributePlacementMembers(sponsorGrossDistribution, input.winners);
+  const memberSponsorFeeDistribution = distributePlacementMembers(sponsorFeeDistribution, input.winners);
+  const memberSponsorNetDistribution = distributePlacementMembers(sponsorNetDistribution, input.winners);
 
   return {
     currency: DEFAULT_CASH_CURRENCY,
     grossConfirmedChallengeRevenue,
-    winnerPoolAmount: generatedSplit.winnerShareCents,
+    winnerPoolAmount: generatedSplit.winnerShareCents + grossConfirmedCreatorPrizeAmount,
+    grossConfirmedCreatorPrizeAmount,
     creatorHostAmount: generatedSplit.creatorHostOperatorShareCents,
     platformChallengeFeeAmount: generatedSplit.platformAdminShareCents,
     hostSponsorAllocationAmount: economyV1 ? v1Split.hostSponsorAmountCents : 0,
@@ -201,31 +233,41 @@ export function buildSettlementBreakdown(input: {
     sponsorPrizePlatformFeeAmount,
     netSponsorPrizeAmount,
     winnerDistribution: input.winners.map((winner) => {
-      const allocation = challengeDistribution.find((item) => item.position === winner.placement);
+      const allocation = memberChallengeDistribution.find((item) => item.winner.userId === winner.userId && item.winner.placement === winner.placement);
       return {
         userId: winner.userId,
         submissionId: winner.submissionId,
         placement: winner.placement,
-        splitPercent: allocation?.percent ?? 0,
+        splitPercent: challengeDistribution.find((item) => item.position === winner.placement)?.percent ?? 0,
         grossAmountCents: allocation?.amountCents ?? 0,
         feeRate: 0,
         feeAmountCents: 0,
-        netAmountCents: allocation?.amountCents ?? 0
+        netAmountCents: allocation?.amountCents ?? 0,
+        teamId: winner.teamId ?? null,
+        rosterSnapshotReference: winner.rosterSnapshotReference ?? null,
+        allocationOrder: winner.allocationOrder ?? allocation?.allocationIndex ?? 0,
+        memberCount: allocation?.memberCount ?? 1,
+        payoutStatus: winner.payoutStatus ?? "pending_admin_review"
       };
     }),
     sponsorPrizeDistribution: input.winners.map((winner) => {
-      const gross = sponsorGrossDistribution.find((item) => item.position === winner.placement);
-      const fee = sponsorFeeDistribution.find((item) => item.position === winner.placement);
-      const net = sponsorNetDistribution.find((item) => item.position === winner.placement);
+      const gross = memberSponsorGrossDistribution.find((item) => item.winner.userId === winner.userId && item.winner.placement === winner.placement);
+      const fee = memberSponsorFeeDistribution.find((item) => item.winner.userId === winner.userId && item.winner.placement === winner.placement);
+      const net = memberSponsorNetDistribution.find((item) => item.winner.userId === winner.userId && item.winner.placement === winner.placement);
       return {
         userId: winner.userId,
         submissionId: winner.submissionId,
         placement: winner.placement,
-        splitPercent: gross?.percent ?? 0,
+        splitPercent: sponsorGrossDistribution.find((item) => item.position === winner.placement)?.percent ?? 0,
         grossAmountCents: gross?.amountCents ?? 0,
         feeRate: SPONSOR_PRIZE_PLATFORM_FEE_PERCENT / 100,
         feeAmountCents: fee?.amountCents ?? 0,
-        netAmountCents: net?.amountCents ?? 0
+        netAmountCents: net?.amountCents ?? 0,
+        teamId: winner.teamId ?? null,
+        rosterSnapshotReference: winner.rosterSnapshotReference ?? null,
+        allocationOrder: winner.allocationOrder ?? gross?.allocationIndex ?? 0,
+        memberCount: gross?.memberCount ?? 1,
+        payoutStatus: winner.payoutStatus ?? "pending_admin_review"
       };
     }),
     challengeGeneratedRevenueSplit: economyV1 ? { winnerSharePercent: 65, platformAdminSharePercent: 15, creatorSharePercent: 20, hostSponsorSharePercent: 0 } : PAID_REVENUE_SPLIT,
@@ -240,23 +282,27 @@ export function buildSettlementBreakdown(input: {
 }
 
 export async function getConfirmedSettlementSources(db: Firestore, challengeId: string) {
-  const [entry, paidVote, sponsor] = await Promise.all([
+  const [entry, paidVote, sponsor, creatorPrize] = await Promise.all([
     getConfirmedEntryRevenueForChallenge(db, challengeId),
     getConfirmedPaidVoteRevenueForChallenge(db, challengeId),
-    getConfirmedSponsorContributionForChallenge(db, challengeId)
+    getConfirmedSponsorContributionForChallenge(db, challengeId),
+    getConfirmedCreatorPrizeFunding(db, challengeId)
   ]);
   const sourceIds = (source: ConfirmedSource) => source.records.map((record) => record.id);
   return {
     confirmedEntryRevenueCents: entry.grossAmountCents,
     confirmedPaidVoteRevenueCents: paidVote.grossAmountCents,
     confirmedSponsorPrizeCents: sponsor.grossAmountCents,
+    confirmedCreatorPrizeCents: creatorPrize.grossAmountCents,
     entryPaymentCount: entry.recordCount,
     paidVotePaymentCount: paidVote.recordCount,
     sponsorPaymentCount: sponsor.recordCount,
+    creatorPrizePaymentCount: creatorPrize.recordCount,
     sourceBreakdown: {
       confirmedEntryPaymentIds: sourceIds(entry),
       confirmedPaidVotePaymentIds: sourceIds(paidVote),
-      confirmedSponsorPaymentIds: sourceIds(sponsor)
+      confirmedSponsorPaymentIds: sourceIds(sponsor),
+      confirmedCreatorPrizePaymentIds: sourceIds(creatorPrize)
     },
     confirmedOnly: true,
     pendingFailedCancelledExcluded: true
@@ -276,7 +322,7 @@ export async function buildConfirmedSettlementPreview(db: Firestore, input: {
       ...sources
     }),
     ...sources,
-    status: sources.confirmedEntryRevenueCents + sources.confirmedPaidVoteRevenueCents + sources.confirmedSponsorPrizeCents > 0
+    status: sources.confirmedEntryRevenueCents + sources.confirmedPaidVoteRevenueCents + sources.confirmedSponsorPrizeCents + sources.confirmedCreatorPrizeCents > 0
       ? "ready_for_admin_approval"
       : "awaiting_confirmed_revenue",
     createsInternalCreditsOnly: true,
@@ -300,7 +346,13 @@ function cashLedgerEntry(input: {
   holdUntil: string | null;
   adminId: string;
   now: string;
+  payoutStatus?: "pending_admin_review" | "pending_hold";
+  teamId?: string | null;
+  rosterSnapshotReference?: string | null;
+  allocationOrder?: number;
+  memberCount?: number;
 }) {
+  const status = input.payoutStatus ?? "pending_admin_review";
   return {
     id: input.id,
     walletCreditId: input.id,
@@ -318,12 +370,17 @@ function cashLedgerEntry(input: {
     netAmountCents: input.netAmountCents,
     amountCents: input.netAmountCents,
     currency: DEFAULT_CASH_CURRENCY,
-    status: "pending_review",
-    balanceBucket: "pending",
+    status: status === "pending_hold" ? "pending_hold" : "pending_review",
+    balanceBucket: status === "pending_hold" ? "locked" : "pending",
     pendingReviewAt: input.now,
     availableAt: null,
     holdUntil: input.holdUntil,
     placement: input.placement ?? null,
+    teamId: input.teamId ?? null,
+    rosterSnapshotReference: input.rosterSnapshotReference ?? null,
+    allocationOrder: input.allocationOrder ?? null,
+    teamMemberCount: input.memberCount ?? null,
+    allocationBasis: input.teamId ? "equal_locked_roster_minor_units" : "official_individual_placement",
     idempotencyKey: input.id,
     kycRequiredBeforeWithdrawal: false,
     payoutProviderCalled: false,
@@ -344,8 +401,12 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
   challenge: Record<string, unknown>;
   winners: SettlementWinner[];
   approvedAt?: string;
+  entityCollection?: "challenges" | "tournaments";
+  sourceProvenance?: Record<string, unknown>;
+  proposalMetadata?: Record<string, unknown>;
+  confirmedSources?: Awaited<ReturnType<typeof getConfirmedSettlementSources>>;
 }) {
-  const sources = await getConfirmedSettlementSources(db, input.challengeId);
+  const sources = input.confirmedSources ?? await getConfirmedSettlementSources(db, input.challengeId);
   const breakdown = buildSettlementBreakdown({
     challenge: input.challenge,
     winners: input.winners,
@@ -354,7 +415,8 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
   const settlementId = safeId(`challenge_settlement_${input.challengeId}_${input.proposalId}`);
   const settlementRef = db.collection("challengeSettlements").doc(settlementId);
   const proposalRef = db.collection("winnerProposals").doc(input.proposalId);
-  const challengeRef = db.collection("challenges").doc(input.challengeId);
+  const entityCollection = input.entityCollection ?? "challenges";
+  const challengeRef = db.collection(entityCollection).doc(input.challengeId);
   const now = input.approvedAt ?? new Date().toISOString();
   const holdUntil = holdUntilFromApproval(now, CASH_EARNING_HOLD_HOURS);
   const economyV1ForSettlement = breakdown.economyRuleVersion === ECONOMY_V1_RULE_VERSION;
@@ -368,7 +430,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       transaction.get(challengeRef),
       transaction.get(growthWalletRef)
     ]);
-    const confirmedMoneyNow = breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount > 0;
+    const confirmedMoneyNow = breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount + breakdown.grossConfirmedCreatorPrizeAmount > 0;
     const existingSettlement = settlementSnap.exists ? settlementSnap.data() ?? {} : null;
     if (existingSettlement && (existingSettlement.status !== "awaiting_confirmed_revenue" || !confirmedMoneyNow)) {
       const storedSettlement = {
@@ -407,7 +469,12 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         placement: winner.placement,
         holdUntil,
         adminId: input.adminId,
-        now
+        now,
+        payoutStatus: winner.payoutStatus,
+        teamId: winner.teamId,
+        rosterSnapshotReference: winner.rosterSnapshotReference,
+        allocationOrder: winner.allocationOrder,
+        memberCount: winner.memberCount
       }));
     }
     for (const winner of breakdown.sponsorPrizeDistribution) {
@@ -427,7 +494,12 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         placement: winner.placement,
         holdUntil,
         adminId: input.adminId,
-        now
+        now,
+        payoutStatus: winner.payoutStatus,
+        teamId: winner.teamId,
+        rosterSnapshotReference: winner.rosterSnapshotReference,
+        allocationOrder: winner.allocationOrder,
+        memberCount: winner.memberCount
       }));
     }
     const economyV1 = economyV1ForSettlement;
@@ -449,6 +521,30 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         transaction.create(db.collection("creatorGrowthWalletAllocations").doc(growthId), { id: growthId, userId: operatorId, sourceTransactionId: growthId, challengeId: input.challengeId, settlementId, sourceType: "creator_earning_allocation", originalAmountCents: growthAllocation.amountCents, remainingAmountCents: growthAllocation.amountCents, expiresAt: expiresAtDate.toISOString(), status: "active", ruleVersion: ECONOMY_V1_RULE_VERSION, createdAt: now, updatedAt: now });
         transaction.set(growthWalletRef, { userId: operatorId, balanceCents: FieldValue.increment(growthAllocation.amountCents), allocationPercent: growthAllocation.allocationPercent, allocationOptIn: growthAllocation.allocationPercent > 0, withdrawable: false, restrictedUseOnly: true, ruleVersion: ECONOMY_V1_RULE_VERSION, updatedAt: now }, { merge: true });
       }
+    } else if (breakdown.creatorHostAmount > 0 && (input.challenge.officialChallenge === true || text(input.challenge.ownershipType) === "challenge_suite_official")) {
+      const unresolvedId = safeId(`${settlementId}_enterprise_official_creator_share`);
+      transaction.create(db.collection("settlementUnresolvedAllocations").doc(unresolvedId), {
+        id: unresolvedId,
+        challengeId: input.challengeId,
+        settlementId,
+        amountCents: breakdown.creatorHostAmount,
+        currency: DEFAULT_CASH_CURRENCY,
+        allocationType: "enterprise_official_organizational_share",
+        status: "requires_enterprise_finance_review",
+        ruleVersion: breakdown.economyRuleVersion,
+        externalPayoutExecuted: false,
+        createdAt: now,
+        updatedAt: now
+      });
+      transaction.set(db.collection("adminActionTasks").doc(unresolvedId), {
+        id: unresolvedId,
+        type: "enterprise_official_creator_share_review",
+        challengeId: input.challengeId,
+        settlementId,
+        amountCents: breakdown.creatorHostAmount,
+        status: "open",
+        createdAt: now
+      }, { merge: true });
     }
     const hostSponsorId = economyV1 ? hostSponsorRecipientId(input.challenge) : "";
     if (hostSponsorId && breakdown.hostSponsorAllocationAmount > 0) {
@@ -466,7 +562,8 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         userId: credit.userId,
         status: "review_only",
         currency: DEFAULT_CASH_CURRENCY,
-        pendingBalanceCents: FieldValue.increment(credit.netAmountCents),
+        pendingBalanceCents: FieldValue.increment(credit.status === "pending_hold" ? 0 : credit.netAmountCents),
+        lockedBalanceCents: FieldValue.increment(credit.status === "pending_hold" ? credit.netAmountCents : 0),
         lifetimeEarningsCents: FieldValue.increment(credit.netAmountCents),
         withdrawalsEnabled: false,
         payoutProviderConnected: false,
@@ -547,10 +644,13 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       automaticBankTransferExecuted: false,
       automaticRefundExecuted: false,
       kycRequiredBeforeWithdrawal: false,
-      confirmedPaymentSourcesOnly: true
+      confirmedPaymentSourcesOnly: true,
+      settlementEntityType: entityCollection === "tournaments" ? "tournament" : "challenge",
+      sourceProvenance: input.sourceProvenance ?? null
     };
     transaction.set(settlementRef, settlement);
     transaction.set(proposalRef, {
+      ...(input.proposalMetadata ?? {}),
       settlementId,
       settlementStatus: settlement.status,
       ledgerFinalizationStatus: settlement.status,
@@ -579,8 +679,8 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       id: settlement.auditLogId,
       actorId: input.adminId,
       actorType: "admin",
-      action: "challenge.settlement_created",
-      targetType: "challenge",
+      action: entityCollection === "tournaments" ? "tournament.settlement_created" : "challenge.settlement_created",
+      targetType: entityCollection === "tournaments" ? "tournament" : "challenge",
       targetId: input.challengeId,
       reason: "Admin-approved winners created internal settlement credits. No external payout was executed.",
       metadata: {
@@ -603,7 +703,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     };
   });
 
-  if (result.created && breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount > 0) {
+  if (result.created && breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount + breakdown.grossConfirmedCreatorPrizeAmount > 0) {
     const winnerIds = [...new Set(input.winners.map((winner) => winner.userId).filter(Boolean))];
     await Promise.allSettled([
       ...winnerIds.map((userId) => createNotification(db, {

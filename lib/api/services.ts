@@ -88,6 +88,8 @@ export function fetchBootstrapProfile() {
       emailVerified?: boolean;
       emailVerifiedAt?: string | null;
       isAdmin: boolean;
+      activeWorkspace?: "personal" | "enterprise";
+      availableWorkspaces?: Array<"personal" | "enterprise">;
       sponsorOnboardingStatus?: string | null;
       sponsorOnboardingComplete?: boolean;
       creatorOnboardingComplete?: boolean;

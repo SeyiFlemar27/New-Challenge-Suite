@@ -187,3 +187,17 @@ export async function expireCreatorPrizeFunding(db: Firestore, session: Stripe.C
   await db.collection("creatorPrizeFundingPayments").doc(id).set({ status: "expired", reservationStatus: "not_reserved", webhookConfirmed: false, providerSessionId: session.id, expiredAt: now, updatedAt: now }, { merge: true });
   return { handled: true, kind: CREATOR_PRIZE_PAYMENT_PURPOSE, id, status: "expired" };
 }
+
+export async function getConfirmedCreatorPrizeFunding(db: Firestore, challengeId: string) {
+  const snap = await db.collection("creatorPrizeFundingPayments").where("challengeId", "==", challengeId).get();
+  const records = snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
+    .filter((item) => item.paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE && item.webhookConfirmed === true && item.status === "confirmed");
+  return {
+    grossAmountCents: records.reduce((sum, item) => sum + cents(item.amountCents ?? item.grossAmountCents), 0),
+    recordCount: records.length,
+    records,
+    confirmedOnly: true,
+    pendingFailedCancelledExcluded: true
+  };
+}

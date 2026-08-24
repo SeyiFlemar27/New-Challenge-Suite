@@ -11,9 +11,10 @@ run("provisioning", () => {
   const admin = read("app/api/admin/operations/route.ts");
   const adminUi = read("components/admin/admin-control-center.tsx");
   const access = read("lib/enterprise-access.ts");
-  assert.match(admin, /accountType: "enterprise"/);
+  assert.match(admin, /personalAccountTypePreserved: previousAccountType/);
+  assert.match(admin, /workspaceTypes: \["personal", "enterprise"\]/);
   assert.match(admin, /staffAccess/);
-  assert.match(admin, /enterprisePreviousAccountType/);
+  assert.doesNotMatch(admin, /enterprisePreviousAccountType/);
   assert.match(admin, /rolePermissions\(enterpriseRole/);
   assert.match(adminUi, /Enterprise role/);
   assert.match(adminUi, /Access scope/);

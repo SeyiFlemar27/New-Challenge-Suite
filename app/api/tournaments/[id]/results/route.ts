@@ -73,6 +73,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     } else if (!match.nextMatchId && match.bracket !== "losers" && !requiresGrandFinalReset) {
       const placementRows = finalPlacements({ finalMatch: { ...match, winnerParticipantId, loserParticipantId }, bronzeMatch: null });
       placementRows.forEach((placement) => transaction.set(db.collection("tournamentPlacements").doc(`${id}_${placement.placement}`), { ...placement, id: `${id}_${placement.placement}`, tournamentId: id, userId: tournament.participationMode === "team" ? null : placement.participantId, teamId: tournament.participationMode === "team" ? placement.participantId : null, lockedAt: new Date().toISOString(), payoutStatus: "pending_admin_review" }, { merge: true }));
+      transaction.set(db.collection("tournaments").doc(id), { status: "under_review", resultsUnderReviewAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
     }
   });
   return ok({ result, advancement, grandFinalResetRequired: requiresGrandFinalReset }, requiresGrandFinalReset ? "A Grand Final reset is required because both finalists now have one loss." : "Tournament result confirmed server-side. Payout remains admin and ledger-gated.");

@@ -9,6 +9,7 @@ import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
 import { FINAL_ACCOUNT_DELETION_STATUSES, PENDING_ACCOUNT_DELETION_STATUSES, normalizedEmailHash, normalizeAccountDeletionStatus } from "@/lib/server/account-deletion";
+import { isEnterpriseAccessActive, normalizeEnterpriseAccess, resolveActiveWorkspace } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,20 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
   const displayName = identity.displayName;
   const merged = { ...profile, ...account };
   const isAdmin = Boolean(account.isAdmin || profile.isAdmin);
-  const planAccess = getUserPlanAccess(merged);
-  const accountType = isAdmin ? "admin" : normalizeAccountType(merged);
+  const legacyEnterpriseIdentity = merged.accountType === "enterprise" || merged.dashboardType === "enterprise_studio";
+  const preservedPersonalType = legacyEnterpriseIdentity
+    ? String(merged.enterprisePreviousAccountType ?? (merged.role === "sponsor" ? "sponsor" : "user"))
+    : String(merged.accountType ?? "");
+  const personalIdentity = { ...merged, accountType: preservedPersonalType, dashboardType: legacyEnterpriseIdentity ? undefined : merged.dashboardType };
+  const planAccess = getUserPlanAccess(personalIdentity);
+  const accountType = isAdmin ? "admin" : normalizeAccountType(personalIdentity);
   const sponsorOnboardingStatus = typeof merged.sponsorOnboardingStatus === "string" ? merged.sponsorOnboardingStatus : accountType === "sponsor" ? "not_started" : null;
   const hasSponsorProfile = Boolean(merged.hasSponsorProfile || merged.brandProfileComplete || merged.sponsorOnboardingComplete);
   const accountTypeSelectionComplete = merged.accountTypeSelectionComplete === false
     ? false
     : Boolean(merged.account_type || merged.accountType || merged.role);
+  const enterpriseAccess = normalizeEnterpriseAccess(merged);
+  const enterpriseAvailable = isEnterpriseAccessActive(enterpriseAccess);
 
   return {
     uid: user.uid,
@@ -57,8 +65,8 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     role: typeof account.role === "string" ? account.role : typeof profile.role === "string" ? profile.role : "user",
     ...planAccess,
     accountType,
-    dashboardType: String(merged.dashboard_type ?? merged.dashboardType ?? (accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard")),
-    selectedAccountType: String(merged.account_type ?? (accountType === "sponsor" ? "sponsor" : "user")),
+    dashboardType: String((!legacyEnterpriseIdentity && (merged.dashboard_type ?? merged.dashboardType)) || (accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard")),
+    selectedAccountType: String(legacyEnterpriseIdentity ? preservedPersonalType : merged.account_type ?? (accountType === "sponsor" ? "sponsor" : "user")),
     accountTypeSelectionComplete,
     roleIntent: String(merged.role_intent ?? merged.roleIntent ?? "compete"),
     planId: planAccess.normalizedPlanId,
@@ -87,6 +95,8 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
     enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
     enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
+    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess),
+    availableWorkspaces: enterpriseAvailable ? ["personal", "enterprise"] : ["personal"],
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };

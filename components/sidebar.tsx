@@ -35,6 +35,7 @@ import { BrandLogo, planBadgeLabel } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { logout } from "@/lib/firebase/auth-service";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 type NavIcon = typeof Home;
 type NavItem = { href: string; label: string; icon: NavIcon };
@@ -323,6 +324,7 @@ export function Sidebar() {
               <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
               {user?.accountType !== "sponsor" ? <Link href="/sponsor/start" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
             </>}
+            {!signedOut ? <WorkspaceSwitcher user={user} compact /> : null}
           </div>
         </aside>
       </div> : null}
@@ -336,6 +338,7 @@ export function Sidebar() {
           <NavigationSections sections={sections} activeHref={activeHref} />
         </nav>
         <div className="space-y-3 p-5">
+          <WorkspaceSwitcher user={user} />
           <Link href="/dorocoins" aria-label="Open DoroCoin wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins</Link>
           {workspaceContext !== "enterprise" ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : <div className="flex min-h-11 items-center justify-center rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><ShieldCheck size={16} className="mr-2 text-[var(--gold)]" /> Enterprise Access</div>}
           {!loading && !signedOut && user?.accountType !== "sponsor" && workspaceContext !== "enterprise" ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}

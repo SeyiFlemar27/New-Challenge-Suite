@@ -55,9 +55,8 @@ assert.doesNotMatch(adminUi, /live Firestore queue/);
 for (const action of ["Approve", "Reject", "Request Info", "Add Internal Note", "View User"]) assert.ok(adminUi.includes(action), `missing admin action ${action}`);
 for (const field of ["Applicant name", "Email", "Company / organization", "Role / title", "Current account type", "Current plan", "Use case", "Expected challenge volume", "Team size", "Budget / plan interest", "Contact details", "Submitted", "Last updated", "Internal notes", "Technical details"]) assert.ok(adminUi.includes(field), `missing detail field ${field}`);
 
-assert.match(topbar, /canSwitchEnterpriseRole[\s\S]*enterpriseAccessStatus[\s\S]*approved/);
-assert.match(topbar, /!user\.isAdmin/);
-assert.match(topbar, /href: "\/enterprise\/dashboard", label: "Enterprise"/);
+assert.match(topbar, /WorkspaceSwitcher/);
+assert.doesNotMatch(topbar, /canSwitchEnterpriseRole/);
 assert.doesNotMatch(topbar, /label: "Host"/);
 assert.match(dashboard, /enterpriseAccessStatus[\s\S]*approved/);
 assert.match(dashboard, /Enterprise Studio/);

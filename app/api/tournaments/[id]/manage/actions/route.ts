@@ -5,6 +5,7 @@ import { adminTournamentActionFoundation } from "@/lib/server/tournament-operati
 import { canPerformTournamentRole } from "@/lib/server/tournament-permissions";
 import { canPauseTournament } from "@/lib/server/tournament-lifecycle";
 import type { TournamentFoundation, TournamentRoundPlanItem, TournamentStatus } from "@/lib/tournament-types";
+import { tournamentPlacementFingerprint } from "@/lib/server/tournament-settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!action) return fail("Tournament action is required.", 400, undefined, "TOURNAMENT_ACTION_REQUIRED");
   if (["schedule_change", "pause", "cancel", "resume", "participant_removed", "submission_rejected", "dispute_resolved"].includes(action) && reason.length < 5) return fail("A reason is required for sensitive tournament actions.", 400, foundation, "TOURNAMENT_ACTION_REASON_REQUIRED");
   const now = new Date().toISOString();
+  if (action === "review_final_placements") {
+    const placementsSnap = await db.collection("tournamentPlacements").where("tournamentId", "==", id).get();
+    const placements = placementsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).filter((item) => [1, 2, 3].includes(Number(item.placement)));
+    if (!placements.some((item) => Number(item.placement) === 1)) return fail("Competition-derived final placements are not ready for review.", 409, undefined, "TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+    const fingerprint = tournamentPlacementFingerprint(placements);
+    await db.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(tournamentRef);
+      if (!fresh.exists || !["under_review", "final"].includes(String(fresh.data()?.status ?? ""))) throw new Error("TOURNAMENT_RESULTS_NOT_READY");
+      transaction.set(tournamentRef, { creatorPlacementReviewFingerprint: fingerprint, creatorPlacementReviewedAt: now, creatorPlacementReviewedBy: user.uid, creatorPlacementReviewStatus: "ready_for_admin_finalization", updatedAt: now }, { merge: true });
+      transaction.set(db.collection("tournamentAuditEvents").doc(`${id}_placements_reviewed_${fingerprint}`), { id: `${id}_placements_reviewed_${fingerprint}`, tournamentId: id, actorId: user.uid, action: "competition_placements_reviewed", reason: reason || "Competition-derived placements reviewed without changes.", createdAt: now, metadata: { placementFingerprint: fingerprint, placementIds: placements.map((item) => item.id), creatorCannotReplaceBracketWinners: true } }, { merge: true });
+    });
+    return ok({ action, placementFingerprint: fingerprint, status: "ready_for_admin_finalization", payoutProviderCalled: false }, "Competition-derived placements are ready for Admin finalization.");
+  }
   if (action === "pause" || action === "resume") {
     const roundSnaps = action === "resume" ? await db.collection("tournamentRounds").where("tournamentId", "==", id).get() : null;
     const outcome = await db.runTransaction(async (transaction) => {

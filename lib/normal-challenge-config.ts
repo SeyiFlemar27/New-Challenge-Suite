@@ -21,6 +21,15 @@ export const NORMAL_ELIGIBLE_COUNTRIES = [
   ["BR", "Brazil"], ["IN", "India"], ["AU", "Australia"], ["NZ", "New Zealand"]
 ] as const;
 
+export function isCanonicalChallengeCategory(category: string) {
+  return NORMAL_CHALLENGE_CATEGORIES.some((item) => item.label === category);
+}
+
+export function isCanonicalChallengeSubcategory(category: string, subcategory: string) {
+  const match = NORMAL_CHALLENGE_CATEGORIES.find((item) => item.label === category);
+  return Boolean(match && match.subcategories.some((item) => item === subcategory));
+}
+
 export const NORMAL_RESUBMIT_WINDOWS = [12, 24, 48, 72] as const;
 export const NORMAL_PRIZE_SPLITS: Record<number, number[]> = { 1: [100], 2: [70, 30], 3: [50, 30, 20] };
 

@@ -66,7 +66,7 @@ assert.match(model, /oneEntryPerParticipant: true/);
 assert.match(config, /\[12, 24, 48, 72\]/);
 assert.match(steps, /after a creator or admin requests (?:changes|a correction)/);
 
-assert.match(steps, /Ready to continue to Publish/);
+assert.match(steps, /Ready to submit for review/);
 assert.match(steps, /three confirmations|required|rights to publish|reviewed before it goes public/i);
 assert.match(readiness, /CONFIRM_ACCURATE/);
 assert.match(readiness, /CONFIRM_RIGHTS/);

@@ -39,7 +39,10 @@ export type EnterpriseAccessRecord = {
   categoryScope: string[];
   regionScope: string[];
   onboardingComplete: boolean;
+  expiresAt: string | null;
 };
+
+export type WorkspaceContext = "personal" | "enterprise";
 
 export function isEnterpriseRole(value: unknown): value is EnterpriseRole { return ENTERPRISE_ROLES.includes(value as EnterpriseRole); }
 export function isEnterpriseScope(value: unknown): value is EnterpriseScope { return ENTERPRISE_SCOPES.includes(value as EnterpriseScope); }
@@ -70,11 +73,24 @@ export function normalizeEnterpriseAccess(source: Record<string, unknown>): Ente
     categoryScope: (Array.isArray(nested.categoryScope) ? nested.categoryScope : Array.isArray(source.enterpriseCategoryScope) ? source.enterpriseCategoryScope : []).filter((value): value is string => typeof value === "string"),
     regionScope: (Array.isArray(nested.regionScope) ? nested.regionScope : Array.isArray(source.enterpriseRegionScope) ? source.enterpriseRegionScope : []).filter((value): value is string => typeof value === "string"),
     onboardingComplete: Boolean(nested.onboardingComplete ?? source.enterpriseOnboardingComplete),
+    expiresAt: typeof (nested.expiresAt ?? source.enterpriseAccessExpiresAt) === "string" ? String(nested.expiresAt ?? source.enterpriseAccessExpiresAt) : null,
   };
 }
 
 export function hasEnterprisePermission(access: EnterpriseAccessRecord | null, permission: EnterprisePermission) {
-  return access?.status === "active" && access.permissions.includes(permission);
+  if (!isEnterpriseAccessActive(access) || !access) return false;
+  return access.permissions.includes(permission);
+}
+
+export function isEnterpriseAccessActive(access: EnterpriseAccessRecord | null, now = Date.now()) {
+  if (!access || access.status !== "active") return false;
+  if (!access.expiresAt) return true;
+  const expiresAt = Date.parse(access.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
+
+export function resolveActiveWorkspace(source: Record<string, unknown>, access: EnterpriseAccessRecord | null): WorkspaceContext {
+  return source.activeWorkspace === "enterprise" && isEnterpriseAccessActive(access) ? "enterprise" : "personal";
 }
 
 export function enterpriseChallengeInScope(access: EnterpriseAccessRecord, challenge: Record<string, unknown>, userId: string, write = false) {

@@ -479,8 +479,7 @@ export async function PATCH(request: Request) {
         enterpriseApprovedAt: action === "approve" ? now : null,
         enterpriseApprovedBy: action === "approve" ? user.uid : null,
         ...(action === "approve" ? {
-          accountType: "enterprise", selectedAccountType: "enterprise", dashboardType: "enterprise_studio",
-          enterprisePreviousAccountType: previousAccountType, enterpriseRole, enterpriseScope,
+          workspaceTypes: ["personal", "enterprise"], enterpriseRole, enterpriseScope,
           enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope,
           enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false,
           staffAccess,
@@ -495,7 +494,7 @@ export async function PATCH(request: Request) {
       const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Your Enterprise workspace is ready." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "More information needed", body: "Please update your Enterprise application." } : { type: "enterprise_application_rejected", title: "Enterprise application not approved", body: "Contact support if you have questions." };
       await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
       if (action === "approve") {
-        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus, accountType: previousAccountType }, after: { enterpriseAccessStatus: "approved", accountType: "enterprise", role: enterpriseRole, scope: enterpriseScope, applicationId: id }, reason: reason || "Enterprise application approved." }, db);
+        await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "enterprise_access_granted", targetType: "user", targetId: applicantId, before: { enterpriseAccessStatus: previousStatus, accountType: previousAccountType }, after: { enterpriseAccessStatus: "approved", personalAccountTypePreserved: previousAccountType, availableWorkspaces: ["personal", "enterprise"], role: enterpriseRole, scope: enterpriseScope, applicationId: id }, reason: reason || "Enterprise application approved." }, db);
       }
     } else if (type === "withdrawal") {
       const ref = db.collection("withdrawalRequests").doc(id);

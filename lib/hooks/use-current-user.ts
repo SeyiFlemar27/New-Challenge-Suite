@@ -45,6 +45,8 @@ export interface CurrentUserProfile {
   enterprisePermissions?: string[];
   enterpriseStaffStatus?: string | null;
   enterpriseOnboardingComplete?: boolean;
+  activeWorkspace?: "personal" | "enterprise";
+  availableWorkspaces?: Array<"personal" | "enterprise">;
 }
 
 function initialsFromName(name: string) {
@@ -135,7 +137,9 @@ export function useCurrentUser() {
           enterpriseDepartment: typeof profileRecord.enterpriseDepartment === "string" ? profileRecord.enterpriseDepartment : null,
           enterprisePermissions: Array.isArray(profileRecord.enterprisePermissions) ? profileRecord.enterprisePermissions.filter((value): value is string => typeof value === "string") : [],
           enterpriseStaffStatus: typeof profileRecord.enterpriseStaffStatus === "string" ? profileRecord.enterpriseStaffStatus : null,
-          enterpriseOnboardingComplete: Boolean(profileRecord.enterpriseOnboardingComplete)
+          enterpriseOnboardingComplete: Boolean(profileRecord.enterpriseOnboardingComplete),
+          activeWorkspace: profileRecord.activeWorkspace === "enterprise" ? "enterprise" : "personal",
+          availableWorkspaces: Array.isArray(profileRecord.availableWorkspaces) ? profileRecord.availableWorkspaces.filter((value): value is "personal" | "enterprise" => value === "personal" || value === "enterprise") : ["personal"]
         });
       } catch (caught) {
         if (!cancelled) {

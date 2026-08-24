@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { adminTournamentActionFoundation, deriveTournamentCorrectionImpact } from "@/lib/server/tournament-operations";
+import { finalizeTournamentSettlement } from "@/lib/server/tournament-settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,24 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!foundation.adminRequired) return fail("Unsupported admin tournament action.", 400, foundation, "ADMIN_TOURNAMENT_ACTION_UNSUPPORTED");
   if (reason.length < 5) return fail("Admin tournament actions require a reason.", 400, foundation, "ADMIN_TOURNAMENT_REASON_REQUIRED");
   const now = new Date().toISOString();
+  if (action === "approve_payout_foundation") {
+    try {
+      const result = await finalizeTournamentSettlement(db, { tournamentId: id, adminId: user.uid, reason });
+      return ok({ action, ...result, auditRequired: true, payoutProviderCalled: false }, result.settlement.idempotent ? "Official placements were already finalized; the existing internal settlement was returned." : "Official Tournament placements finalized and internal settlement prepared. No external payout was executed.");
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "TOURNAMENT_SETTLEMENT_FAILED";
+      const messages: Record<string, string> = {
+        TOURNAMENT_NOT_FOUND: "Tournament not found.",
+        TOURNAMENT_RESULTS_NOT_FINAL: "Tournament results must be under review before Admin finalization.",
+        TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED: "Competition-derived official placements are required.",
+        TOURNAMENT_CREATOR_REVIEW_REQUIRED: "The Creator or Host must review the competition-derived placements first.",
+        TOURNAMENT_SETTLEMENT_CORRECTION_REQUIRED: "A settlement-sensitive result correction requires Finance review.",
+        TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID: "A placed participant record needs Admin review.",
+        TOURNAMENT_LOCKED_ROSTER_REQUIRED: "A placed Team requires its canonical locked roster before settlement."
+      };
+      return fail(messages[code] ?? "Tournament settlement could not be prepared safely.", code === "TOURNAMENT_NOT_FOUND" ? 404 : 409, { payoutProviderCalled: false }, code);
+    }
+  }
   await db.collection("tournamentAuditEvents").doc(`${id}_${action}_${now}`).set({ id: `${id}_${action}_${now}`, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { foundation } });
   return ok({ action, auditRequired: true, payoutProviderCalled: false, balanceOverwriteAllowed: false, rawVoteTotalEditable: false }, "Admin tournament action was audited. No payout, refund, raw vote edit, or balance overwrite occurred.");
 }

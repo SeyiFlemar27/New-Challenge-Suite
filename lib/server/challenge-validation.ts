@@ -2,7 +2,7 @@
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
-import { isNormalChallengeV2, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
+import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isNormalChallengeV2, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
 
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -233,7 +233,29 @@ export const serverChallengeCreateSchema = z.object({
     showSponsorRequestButton: z.coerce.boolean().default(false),
     sponsorCategories: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
     sponsorVisibilityAreas: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
-    launchMode: z.enum(["draft", "publish", "schedule"]).default("draft")
+    launchMode: z.enum(["draft", "publish", "schedule"]).default("draft"),
+    registrationOpensAt: z.string().trim().max(40).default(""),
+    registrationClosesAt: z.string().trim().max(40).default(""),
+    ticketType: z.enum(["free", "paid_setup_required"]).default("free"),
+    ticketPrice: z.coerce.number().min(0).default(0),
+    ticketInstructions: z.string().trim().max(2000).default(""),
+    checkInTime: z.string().trim().max(40).default(""),
+    checkInStartAt: z.string().trim().max(40).default(""),
+    checkInEndAt: z.string().trim().max(40).default(""),
+    checkInRequired: z.coerce.boolean().default(false),
+    timezone: z.string().trim().max(80).default("America/New_York"),
+    waitlistEnabled: z.coerce.boolean().default(false),
+    participantListVisibility: z.enum(["visible", "hidden"]).default("visible"),
+    eventFormat: z.enum(["attendance_only", "digital_submission", "physical_competition"]).default("attendance_only"),
+    judgeAccountIds: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+    eventRules: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+    sponsorshipGoal: z.coerce.number().min(0).default(0),
+    sponsorNote: z.string().trim().max(2000).default(""),
+    sponsorSupportTypes: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
+    ticketCheckoutActive: z.literal(false).default(false),
+    ticketPaymentConfirmationRequired: z.literal(true).default(true),
+    manualCheckInEnabled: z.literal(true).default(true),
+    qrCheckInRequiresServerToken: z.literal(true).default(true)
   }).optional(),
   publish: z.coerce.boolean().default(false)
 }).superRefine((value, ctx) => {
@@ -249,6 +271,16 @@ export const serverChallengeCreateSchema = z.object({
     }
   } else if (value.maxParticipants < 2) {
     ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: "Participant capacity must be at least 2." });
+  }
+  if (value.publish) {
+    if (!isCanonicalChallengeCategory(value.category)) ctx.addIssue({ code: "custom", path: ["category"], message: "Choose a category from the available options." });
+    if (value.subcategory && !isCanonicalChallengeSubcategory(value.category, value.subcategory)) ctx.addIssue({ code: "custom", path: ["subcategory"], message: "Choose a subcategory that belongs to the selected category." });
+  }
+  if (value.isLiveEvent) {
+    const countryCodes = new Set(NORMAL_ELIGIBLE_COUNTRIES.map(([code]) => code));
+    if (!countryCodes.has(value.eventCountry as typeof NORMAL_ELIGIBLE_COUNTRIES[number][0])) ctx.addIssue({ code: "custom", path: ["eventCountry"], message: "Choose an event country from the available options." });
+    const location = value.hostOperations?.locationRestriction ?? "";
+    if (location && !countryCodes.has(location as typeof NORMAL_ELIGIBLE_COUNTRIES[number][0])) ctx.addIssue({ code: "custom", path: ["hostOperations", "locationRestriction"], message: "Choose Worldwide or one of the available countries." });
   }
   if (value.timerEnabled && value.timerDuration <= 0) {
     ctx.addIssue({ code: "custom", path: ["timerDuration"], message: "Timer duration must be greater than zero." });
