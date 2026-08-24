@@ -119,7 +119,7 @@ export function runSponsorWorkspaceContract(name) {
       hasAll(source.shell, ["overflow-x-hidden", "md:hidden", "w-[min(90vw,360px)]", "min-w-0", "min-h-11"], "Sponsor mobile shell incomplete");
       break;
     case "access-own-data-only":
-      assert(source.dashboardApi.includes('.where("sponsorId", "==", user.uid)'), "Dashboard must query owned sponsor data.");
+      assert(source.dashboardApi.includes('.where("sponsorId", "==", sponsorId)'), "Dashboard must query organization-owned sponsor data.");
       assert(source.proposalDetailApi.includes("assertSponsorOwnedDoc") && source.profileApi.includes("requireRequestUser"), "Sponsor detail/profile authorization missing.");
       break;
     case "unapproved-actions-locked-with-reason":

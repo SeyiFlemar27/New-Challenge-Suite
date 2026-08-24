@@ -10,6 +10,7 @@ import { deterministicId } from "@/lib/server/idempotency";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
 import { FINAL_ACCOUNT_DELETION_STATUSES, PENDING_ACCOUNT_DELETION_STATUSES, normalizedEmailHash, normalizeAccountDeletionStatus } from "@/lib/server/account-deletion";
 import { isEnterpriseAccessActive, normalizeEnterpriseAccess, resolveActiveWorkspace } from "@/lib/enterprise-access";
+import { resolveSponsorOrganizationAccess, type SponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 
 export const dynamic = "force-dynamic";
 
@@ -36,25 +37,28 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>) {
+function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>, sponsorAccess: SponsorOrganizationAccess | null) {
   const identity = resolveProfileIdentity({ ...profile, ...account }, String(user.email ?? ""));
   const displayName = identity.displayName;
   const merged = { ...profile, ...account };
   const isAdmin = Boolean(account.isAdmin || profile.isAdmin);
   const legacyEnterpriseIdentity = merged.accountType === "enterprise" || merged.dashboardType === "enterprise_studio";
-  const preservedPersonalType = legacyEnterpriseIdentity
-    ? String(merged.enterprisePreviousAccountType ?? (merged.role === "sponsor" ? "sponsor" : "user"))
+  const legacySponsorIdentity = merged.accountType === "sponsor" || merged.dashboardType === "sponsor_dashboard";
+  const preservedPersonalType = legacyEnterpriseIdentity || legacySponsorIdentity
+    ? String(merged.sponsorPreviousAccountType ?? merged.enterprisePreviousAccountType ?? "user")
     : String(merged.accountType ?? "");
-  const personalIdentity = { ...merged, accountType: preservedPersonalType, dashboardType: legacyEnterpriseIdentity ? undefined : merged.dashboardType };
+  const personalIdentity = { ...merged, accountType: preservedPersonalType, role: legacySponsorIdentity ? String(merged.sponsorPreviousRole ?? "user") : merged.role, dashboardType: legacyEnterpriseIdentity || legacySponsorIdentity ? undefined : merged.dashboardType };
   const planAccess = getUserPlanAccess(personalIdentity);
   const accountType = isAdmin ? "admin" : normalizeAccountType(personalIdentity);
-  const sponsorOnboardingStatus = typeof merged.sponsorOnboardingStatus === "string" ? merged.sponsorOnboardingStatus : accountType === "sponsor" ? "not_started" : null;
+  const sponsorOnboardingStatus = typeof merged.sponsorOnboardingStatus === "string" ? merged.sponsorOnboardingStatus : sponsorAccess ? "not_started" : null;
   const hasSponsorProfile = Boolean(merged.hasSponsorProfile || merged.brandProfileComplete || merged.sponsorOnboardingComplete);
   const accountTypeSelectionComplete = merged.accountTypeSelectionComplete === false
     ? false
     : Boolean(merged.account_type || merged.accountType || merged.role);
   const enterpriseAccess = normalizeEnterpriseAccess(merged);
   const enterpriseAvailable = isEnterpriseAccessActive(enterpriseAccess);
+  const sponsorAvailable = Boolean(sponsorAccess);
+  const availableWorkspaces = ["personal", ...(sponsorAvailable ? ["sponsor"] : []), ...(enterpriseAvailable ? ["enterprise"] : [])];
 
   return {
     uid: user.uid,
@@ -62,11 +66,11 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     lastName: String(profile.lastName ?? account.lastName ?? ""),
     displayName,
     email: String(user.email ?? profile.email ?? account.email ?? ""),
-    role: typeof account.role === "string" ? account.role : typeof profile.role === "string" ? profile.role : "user",
+    role: typeof personalIdentity.role === "string" ? personalIdentity.role : "user",
     ...planAccess,
     accountType,
-    dashboardType: String((!legacyEnterpriseIdentity && (merged.dashboard_type ?? merged.dashboardType)) || (accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard")),
-    selectedAccountType: String(legacyEnterpriseIdentity ? preservedPersonalType : merged.account_type ?? (accountType === "sponsor" ? "sponsor" : "user")),
+    dashboardType: String((!legacyEnterpriseIdentity && !legacySponsorIdentity && (merged.dashboard_type ?? merged.dashboardType)) || "user_dashboard"),
+    selectedAccountType: String(legacyEnterpriseIdentity || legacySponsorIdentity ? preservedPersonalType : merged.account_type ?? "user"),
     accountTypeSelectionComplete,
     roleIntent: String(merged.role_intent ?? merged.roleIntent ?? "compete"),
     planId: planAccess.normalizedPlanId,
@@ -85,7 +89,11 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     hostOnboardingComplete: Boolean(merged.hostOnboardingComplete),
     walkthroughCompleted: merged.walkthroughCompleted === undefined ? true : Boolean(merged.walkthroughCompleted),
     hasSponsorProfile,
-    sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : accountType === "sponsor" ? "not_submitted" : null,
+    sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : sponsorAccess ? "not_submitted" : null,
+    isSponsor: sponsorAvailable,
+    sponsorOrganizationId: sponsorAccess?.organizationId ?? null,
+    sponsorOrganizationName: sponsorAccess ? String(sponsorAccess.organization.name ?? "Sponsor Workspace") : null,
+    sponsorOrganizationLogoUrl: sponsorAccess ? String(sponsorAccess.organization.logoUrl ?? "") || null : null,
     enterpriseAccessStatus: typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : "not_submitted",
     enterpriseApprovalStatus: typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : "not_submitted",
     enterpriseApplicationId: typeof merged.enterpriseApplicationId === "string" ? merged.enterpriseApplicationId : null,
@@ -95,8 +103,8 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
     enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
     enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
-    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess),
-    availableWorkspaces: enterpriseAvailable ? ["personal", "enterprise"] : ["personal"],
+    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, sponsorAvailable),
+    availableWorkspaces,
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };
@@ -110,10 +118,11 @@ export async function GET(request: Request) {
   if (!db) return serverUnavailable("Profile bootstrap");
 
   try {
-    const [accountSnap, profileSnap, walletSnap] = await Promise.all([
+    const [accountSnap, profileSnap, walletSnap, sponsorAccess] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
-      db.collection("doroCoinWallets").doc(user.uid).get()
+      db.collection("doroCoinWallets").doc(user.uid).get(),
+      resolveSponsorOrganizationAccess(db, user.uid)
     ]);
     const accountStatus = normalizeAccountDeletionStatus(accountSnap.data()?.accountStatus ?? profileSnap.data()?.accountStatus);
     if (FINAL_ACCOUNT_DELETION_STATUSES.has(accountStatus)) return fail("No active account was found for this email.", 410, { createAccountHref: "/auth/register", supportHref: "/contact" }, "ACCOUNT_DELETED");
@@ -125,7 +134,8 @@ export async function GET(request: Request) {
         user,
         accountSnap.exists ? accountSnap.data() ?? {} : {},
         profileSnap.exists ? profileSnap.data() ?? {} : {},
-        walletSnap.exists ? walletSnap.data() ?? {} : {}
+        walletSnap.exists ? walletSnap.data() ?? {} : {},
+        sponsorAccess
       )
     }, "Profile loaded.");
   } catch (error) {
@@ -172,9 +182,10 @@ export async function POST(request: Request) {
     // Signup role expresses account intent only. Paid entitlement is granted
     // later by verified Stripe webhook processing.
     const planFields = planFieldsFor("free");
-    const accountType = isAdmin ? "admin" : parsed.data.role === "sponsor" ? "sponsor" : "user";
-    const dashboardType = accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard";
-    const sponsorFields = accountType === "sponsor"
+    const sponsorIntent = parsed.data.role === "sponsor";
+    const accountType = isAdmin ? "admin" : "user";
+    const dashboardType = "user_dashboard";
+    const sponsorFields = sponsorIntent
       ? {
           sponsorOnboardingStatus: "not_started",
           sponsorVerificationStatus: "not_submitted",
@@ -191,7 +202,7 @@ export async function POST(request: Request) {
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         displayName,
-        role: parsed.data.role,
+        role: sponsorIntent ? "user" : parsed.data.role,
         roleIntent: parsed.data.role,
         role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : parsed.data.role === "host" ? "host" : "compete",
         ...planFields,
@@ -215,7 +226,7 @@ export async function POST(request: Request) {
         displayName,
         initials: initialsFromName(displayName || email),
         email,
-        role: parsed.data.role,
+        role: sponsorIntent ? "user" : parsed.data.role,
         roleIntent: parsed.data.role,
         role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : parsed.data.role === "host" ? "host" : "compete",
         ...planFields,
@@ -256,15 +267,16 @@ export async function POST(request: Request) {
     }
 
     const walletRef = await ensureWallet(db, user.uid);
-    const [accountSnap, profileSnap, walletSnap] = await Promise.all([
+    const [accountSnap, profileSnap, walletSnap, sponsorAccess] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
-      walletRef.get()
+      walletRef.get(),
+      resolveSponsorOrganizationAccess(db, user.uid)
     ]);
 
     return ok({
       profileExists: true,
-      user: toProfile(user, accountSnap.data() ?? {}, profileSnap.data() ?? {}, walletSnap.data() ?? {})
+      user: toProfile(user, accountSnap.data() ?? {}, profileSnap.data() ?? {}, walletSnap.data() ?? {}, sponsorAccess)
     }, "Profile created.");
   } catch (error) {
     return serverError("Profile could not be created.", error instanceof Error ? error.message : error);
@@ -291,10 +303,10 @@ export async function PATCH(request: Request) {
     if (existing.accountTypeSelectionComplete === true) return fail("Account type has already been selected.", 409, undefined, "ACCOUNT_TYPE_ALREADY_SELECTED");
 
     const selected = parsed.data.accountType;
-    const compatibilityAccountType = selected === "sponsor" ? "sponsor" : "user";
-    const role = selected === "user" ? "user" : selected;
+    const compatibilityAccountType = "user";
+    const role = selected === "user" || selected === "sponsor" ? "user" : selected;
     const roleIntent = selected === "user" ? "compete" : selected === "creator" ? "create" : selected;
-    const dashboardType = selected === "creator" ? "creator_studio" : selected === "host" ? "host_control_center" : selected === "sponsor" ? "sponsor_dashboard" : "user_dashboard";
+    const dashboardType = selected === "creator" ? "creator_studio" : selected === "host" ? "host_control_center" : "user_dashboard";
     const now = new Date().toISOString();
     const sponsorFields = selected === "sponsor" ? {
       sponsorOnboardingStatus: "not_started",

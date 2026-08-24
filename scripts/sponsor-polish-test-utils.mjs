@@ -43,7 +43,7 @@ export function runSponsorPolishContract(name) {
   assert.match(dashboard, /greetingName/);
   assert.match(dashboard, /Retry unavailable sections/);
   assert.doesNotMatch(dashboard, /mock|demo sponsor|sample campaign/i);
-  assert.match(sponsorShell, /Complete Profile/);
+  assert.match(sponsorShell, /Complete brand profile/);
   assert.match(sponsorShell, /Reports/);
   assert.doesNotMatch(sponsorShell, /label: "Inbox"/);
 
@@ -54,10 +54,14 @@ export function runSponsorPolishContract(name) {
   assert.match(messagesApi, /url\.startsWith\("https:\/\/"\)/);
   assert.match(messagesApi, /getConversation\(db, input\.conversationId, input\.senderId\)/);
 
-  assert.match(proposalWizard, /Proposal Basics/);
-  assert.match(proposalWizard, /Recipient & Opportunity/);
-  assert.match(proposalWizard, /Budget & Payment Style/);
-  assert.match(proposalWizard, /Deliverables & Brand Requirements/);
+  assert.match(proposalWizard, /Opportunity/);
+  assert.match(proposalWizard, /Partnership/);
+  assert.match(proposalWizard, /Scope & Objectives/);
+  assert.match(proposalWizard, /Budget & Funding/);
+  assert.match(proposalWizard, /Deliverables/);
+  assert.match(proposalWizard, /Timeline & Milestones/);
+  assert.match(proposalWizard, /Brand & Usage Rights/);
+  assert.match(proposalWizard, /Terms/);
   assert.match(proposalWizard, /Review & Send/);
   assert.doesNotMatch(proposalWizard, /label="(?:Creator|Challenge|Campaign) ID"/i);
   assert.match(proposalWizard, /milestone_payment/);
@@ -77,7 +81,7 @@ export function runSponsorPolishContract(name) {
   assert.doesNotMatch(intro, /SponsorShell/);
   assert.match(intro, /Start Sponsor Profile/);
   assert.match(onboarding, /pending review/i);
-  assert.match(sponsorShell, /if \(!workspace\.approved\)/);
+  assert.match(sponsorShell, /!workspace\.approved/);
   assert.match(settings, /setAppTheme/);
   assert.match(sponsorSettings, /\/settings\/appearance/);
   assert.doesNotMatch(read("components/public-site/public-shell.tsx"), /ThemeToggle|setTheme|useTheme/);

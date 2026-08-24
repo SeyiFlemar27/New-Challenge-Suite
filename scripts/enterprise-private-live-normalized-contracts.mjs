@@ -47,7 +47,8 @@ run("navigation", () => {
   const sidebar = read("components/sidebar.tsx");
   assert.match(sidebar, /Enterprise Studio/);
   assert.match(sidebar, /enterpriseSections\(permissions/);
-  assert.match(sidebar, /workspaceContext !== "enterprise"/);
+  assert.match(sidebar, /personalEconomyContext/);
+  assert.match(sidebar, /workspaceContext === "user" \|\| workspaceContext === "creator" \|\| workspaceContext === "host"/);
   assert.doesNotMatch(sidebar, /context === "enterprise"[^]*adminSections/);
 });
 

@@ -43,13 +43,16 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const search = url.searchParams.get("q")?.toLowerCase().trim() ?? "";
+    const page = Math.max(1, Math.floor(Number(url.searchParams.get("page") ?? 1) || 1));
     const snap = await context.db.collection("profiles").limit(200).get();
     let creators = snap.docs.flatMap((doc) => {
       const creator = safeCreator(doc.id, doc.data());
       return creator ? [creator] : [];
     });
     if (search) creators = creators.filter((creator) => [creator.displayName, creator.username, creator.niche, creator.category, creator.location].some((value) => String(value).toLowerCase().includes(search)));
-    return ok({ creators: creators.slice(0, 80), filters: { search, metricsAreFoundation: true } }, "Sponsor-safe creators loaded.");
+    const total = creators.length;
+    const pageSize = 36;
+    return ok({ creators: creators.slice((page - 1) * pageSize, page * pageSize), filters: { search, metricsAreFoundation: true }, pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } }, "Sponsor-safe creators loaded.");
   } catch (error) {
     console.error("[sponsor-discover-creators:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Creator discovery could not be loaded.");

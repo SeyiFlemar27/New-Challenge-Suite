@@ -42,7 +42,7 @@ export type EnterpriseAccessRecord = {
   expiresAt: string | null;
 };
 
-export type WorkspaceContext = "personal" | "enterprise";
+export type WorkspaceContext = "personal" | "sponsor" | "enterprise";
 
 export function isEnterpriseRole(value: unknown): value is EnterpriseRole { return ENTERPRISE_ROLES.includes(value as EnterpriseRole); }
 export function isEnterpriseScope(value: unknown): value is EnterpriseScope { return ENTERPRISE_SCOPES.includes(value as EnterpriseScope); }
@@ -89,8 +89,10 @@ export function isEnterpriseAccessActive(access: EnterpriseAccessRecord | null, 
   return Number.isFinite(expiresAt) && expiresAt > now;
 }
 
-export function resolveActiveWorkspace(source: Record<string, unknown>, access: EnterpriseAccessRecord | null): WorkspaceContext {
-  return source.activeWorkspace === "enterprise" && isEnterpriseAccessActive(access) ? "enterprise" : "personal";
+export function resolveActiveWorkspace(source: Record<string, unknown>, access: EnterpriseAccessRecord | null, sponsorAvailable = false): WorkspaceContext {
+  if (source.activeWorkspace === "enterprise" && isEnterpriseAccessActive(access)) return "enterprise";
+  if (source.activeWorkspace === "sponsor" && sponsorAvailable) return "sponsor";
+  return "personal";
 }
 
 export function enterpriseChallengeInScope(access: EnterpriseAccessRecord, challenge: Record<string, unknown>, userId: string, write = false) {

@@ -32,3 +32,15 @@ export function normalizeProposalDeliverables(value: unknown) {
 }
 export function cleanMoneyCents(value: unknown) { const numeric = Number(value ?? 0); return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 100) : 0; }
 export function isoNow() { return new Date().toISOString(); }
+
+export function proposalAcceptanceState(proposal: Record<string, unknown>) {
+  const activeRevisionId = String(proposal.activeRevisionId ?? "");
+  const sponsorAccepted = Boolean(activeRevisionId && proposal.sponsorAcceptedRevisionId === activeRevisionId);
+  const creatorAccepted = Boolean(activeRevisionId && proposal.creatorAcceptedRevisionId === activeRevisionId);
+  return { activeRevisionId, sponsorAccepted, creatorAccepted, fullyAccepted: sponsorAccepted && creatorAccepted };
+}
+
+export function proposalFundingEligible(proposal: Record<string, unknown>) {
+  const acceptance = proposalAcceptanceState(proposal);
+  return acceptance.fullyAccepted && ["accepted", "funding_required"].includes(String(proposal.status ?? ""));
+}

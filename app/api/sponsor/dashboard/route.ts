@@ -8,17 +8,17 @@ export async function GET(request: Request) {
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
-  const { db, user, sponsorProfile: sponsor } = context;
+  const { db, user, sponsorId, sponsorProfile: sponsor } = context;
   try {
     const widgetNames = ["activity", "notifications", "campaigns", "proposals", "funding", "deliverables", "messages"] as const;
     const results = await Promise.allSettled([
       db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
       db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
-      db.collection("sponsorCampaignBriefs").where("sponsorId", "==", user.uid).limit(100).get(),
-      db.collection("sponsorProposals").where("sponsorId", "==", user.uid).limit(100).get(),
-      db.collection("sponsorContributions").where("sponsorId", "==", user.uid).limit(100).get(),
-      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", user.uid).limit(100).get(),
-      db.collection("sponsorConversations").where("sponsorId", "==", user.uid).limit(100).get()
+      db.collection("sponsorCampaignBriefs").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorProposals").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorContributions").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorConversations").where("sponsorId", "==", sponsorId).limit(100).get()
     ]);
     const widgetErrors: Record<string, string> = {};
     const docs = (index: number) => {

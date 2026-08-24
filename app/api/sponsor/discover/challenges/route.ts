@@ -39,11 +39,15 @@ export async function GET(request: Request) {
   const workspace = resolveSponsorWorkspaceState(context.sponsorProfile);
   if (!workspace.canDiscover) return fail(workspace.lockedReason || "Sponsor approval is required before discovering challenges.", 403, { sponsorStatus: workspace.status }, "SPONSOR_DISCOVERY_LOCKED");
   try {
-    const search = new URL(request.url).searchParams.get("q")?.toLowerCase().trim() ?? "";
+    const params = new URL(request.url).searchParams;
+    const search = params.get("q")?.toLowerCase().trim() ?? "";
+    const page = Math.max(1, Math.floor(Number(params.get("page") ?? 1) || 1));
     const snap = await context.db.collection("challenges").limit(200).get();
     let challenges = snap.docs.flatMap((doc) => { const item = safeChallenge(doc.id, doc.data()); return item ? [item] : []; });
     if (search) challenges = challenges.filter((challenge) => [challenge.title, challenge.creatorName, challenge.category].some((value) => String(value).toLowerCase().includes(search)));
-    return ok({ challenges: challenges.slice(0, 100), metricsAreEstimated: false }, "Sponsor-safe challenges loaded.");
+    const total = challenges.length;
+    const pageSize = 36;
+    return ok({ challenges: challenges.slice((page - 1) * pageSize, page * pageSize), metricsAreEstimated: false, filters: { search }, pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } }, "Sponsor-safe challenges loaded.");
   } catch (error) {
     console.error("[sponsor-discover-challenges:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Challenge discovery could not be loaded.");
