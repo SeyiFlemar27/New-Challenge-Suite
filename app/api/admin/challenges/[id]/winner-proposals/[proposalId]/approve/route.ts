@@ -18,6 +18,7 @@ import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createNotification } from "@/lib/server/notifications";
+import { grantRewardPointsForEvent, type RewardableEventType } from "@/lib/server/reward-economy";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; proposalId: string }> }) {
   const { user, response } = await requireRecentAdminAuthentication(request, "settlements.approve");
@@ -125,6 +126,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "");
   if (creatorId) await createNotification(db, { userId: creatorId, type: "winner_proposal_approved", title: "Winner proposal approved", body: `Official winners for ${String(challenge.title ?? "your challenge")} were approved.`, entityType: "winner_proposal", entityId: proposalId, targetId: proposalId, actionUrl: `/challenges/${challengeId}/manage?tab=winners&focus=${encodeURIComponent(proposalId)}`, metadata: { challengeId, proposalId }, idempotencyKey: `winner_proposal_approved_${proposalId}` }).catch(() => undefined);
+
+  if (proposal.status !== "approved") {
+    const challengeType = String(challenge.challengeType ?? challenge.type ?? "normal").toLowerCase();
+    const individualTournament = challengeType.includes("tournament") && challenge.teamBased !== true;
+    const completionJobs = candidates.map((candidate) => grantRewardPointsForEvent(db, { userId: candidate.userId, eventType: "challenge_participation_completed", sourceId: challengeId, sourceEventKey: `challenge-completed:${challengeId}:${candidate.userId}`, metadata: { proposalId } }));
+    const placementJobs = winners.map((winner) => {
+      const placement = Number(winner.placement ?? 0);
+      const eventType = individualTournament
+        ? (placement === 1 ? "individual_tournament_champion" : undefined)
+        : ({ 1: "challenge_first_place", 2: "challenge_second_place", 3: "challenge_third_place" } as Record<number, RewardableEventType>)[placement];
+      return eventType ? grantRewardPointsForEvent(db, { userId: winner.userId, eventType, sourceId: challengeId, sourceEventKey: `placement:${challengeId}:${winner.userId}:${placement}`, metadata: { placement, proposalId } }) : Promise.resolve(null);
+    });
+    const rewardResults = await Promise.allSettled([...completionJobs, ...placementJobs]);
+    if (rewardResults.some((item) => item.status === "rejected")) await db.collection("adminActionTasks").doc(deterministicId("reward_results_failure", challengeId, proposalId)).set({ type: "reward_delivery_failure", rewardEventType: "challenge_results", challengeId, proposalId, status: "open", createdAt: now }, { merge: true });
+  }
 
   return ok({
     proposal: { ...proposal, ...update, settlementId: settlement.settlement.id, settlementStatus: settlement.settlement.status },

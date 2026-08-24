@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
 import { calculatePaidRevenueSplit, calculateSponsorContributionSplit, MINIMUM_ENTRY_FEE_CENTS, validateEntryFee, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
+import { calculateEntryEntitlement, consumeEntryEntitlement, type RewardEntitlementType } from "@/lib/server/reward-economy";
 
 export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
@@ -106,7 +107,7 @@ export function assertStripeSessionMatchesRecord(session: Stripe.Checkout.Sessio
   if (lowerCurrency(session.currency) !== lowerCurrency(record.currency)) throw new Error("Stripe currency does not match the stored pending payment record.");
 }
 
-export async function createPendingEntryPayment(db: Firestore, input: { userId: string; challengeId: string; challenge: Record<string, unknown>; now?: string }) {
+export async function createPendingEntryPayment(db: Firestore, input: { userId: string; challengeId: string; challenge: Record<string, unknown>; rewardEntitlementId?: string; now?: string }) {
   if (!isPaidEntryChallenge(input.challenge)) throw new Error("This challenge does not require paid entry checkout.");
   const amountCents = paidEntryAmountCents(input.challenge);
   const fee = validateEntryFee(amountCents);
@@ -118,7 +119,7 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
   const nowMs = new Date(now).getTime();
   const reservationExpiresAt = addMinutesIso(now, 20);
   const revenue = calculateEntryRevenueFoundation(amountCents);
-  const record = {
+  let record = {
     id,
     userId: input.userId,
     challengeId: input.challengeId,
@@ -127,6 +128,10 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     paymentPurpose: "challenge_entry_fee",
     amountCents,
     amount: amountCents,
+    grossEntryFeeCents: amountCents,
+    rewardEntitlementId: null as string | null,
+    rewardEntitlementType: null as string | null,
+    rewardDiscountCents: 0,
     amountGrossCents: revenue.amountGrossCents,
     platformFeeCents: revenue.platformFeeCents,
     amountNetCents: revenue.amountNetCents,
@@ -156,6 +161,8 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     const challengeRef = db.collection("challenges").doc(input.challengeId);
     const participantQuery = db.collection("challengeParticipants").where("challengeId", "==", input.challengeId).limit(1000);
     const paymentQuery = db.collection("challengeEntryPayments").where("challengeId", "==", input.challengeId).limit(1000);
+    const entitlementRef = input.rewardEntitlementId ? db.collection("rewardEntitlements").doc(input.rewardEntitlementId) : null;
+    const entitlementSnap = entitlementRef ? await transaction.get(entitlementRef) : null;
     const [paymentSnap, legacyPaymentSnap, participantSnap, freshChallengeSnap, participantRows, paymentRows] = await Promise.all([
       transaction.get(paymentRef),
       transaction.get(legacyPaymentRef),
@@ -178,6 +185,20 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     if (paymentSnap.exists && !existingIsReserved && paymentSnap.data()?.status === "pending") {
       transaction.set(paymentRef, { status: "canceled", reservationStatus: "released", releasedAt: now, updatedAt: now }, { merge: true });
     }
+    if (entitlementRef && entitlementSnap) {
+      if (!entitlementSnap.exists) throw new Error("The selected reward is no longer available.");
+      const entitlement = entitlementSnap.data() ?? {};
+      if (entitlement.userId !== input.userId) throw new Error("The selected reward is not available for this account.");
+      const activeReservation = entitlement.status === "reserved" && Date.parse(String(entitlement.reservedUntil ?? "")) > nowMs;
+      if (activeReservation && entitlement.reservationId !== id) throw new Error("The selected reward is already reserved for another checkout.");
+      if (!activeReservation && !["available", "reserved"].includes(String(entitlement.status))) throw new Error("The selected reward is no longer available.");
+      if (entitlement.expiresAt && Date.parse(String(entitlement.expiresAt)) <= nowMs) throw new Error("The selected reward has expired.");
+      const calculation = calculateEntryEntitlement({ type: entitlement.type as RewardEntitlementType, value: cents(entitlement.value), feeCents: amountCents, maximumFeeCents: cents(entitlement.maximumFeeCents ?? entitlement.value) });
+      if (!calculation.eligible) throw new Error("The selected reward cannot be used for this entry fee.");
+      const discountedRevenue = calculateEntryRevenueFoundation(calculation.payableCents);
+      record = { ...record, amountCents: calculation.payableCents, amount: calculation.payableCents, amountGrossCents: discountedRevenue.amountGrossCents, platformFeeCents: discountedRevenue.platformFeeCents, amountNetCents: discountedRevenue.amountNetCents, winnerShareCents: discountedRevenue.winnerShareCents, creatorHostOperatorShareCents: discountedRevenue.creatorHostOperatorShareCents, rewardEntitlementId: entitlementRef.id, rewardEntitlementType: String(entitlement.type), rewardDiscountCents: calculation.discountCents };
+      transaction.set(entitlementRef, { status: "reserved", reservationId: id, reservedUntil: reservationExpiresAt, updatedAt: now }, { merge: true });
+    }
     transaction.set(paymentRef, { ...record, ...(paymentSnap.exists ? { createdAt: paymentSnap.data()?.createdAt ?? now } : {}) }, { merge: true });
   });
   return record;
@@ -192,6 +213,39 @@ export async function attachCheckoutSession(db: Firestore, collection: string, i
     updatedAt: now,
     checkoutSuccessActivates: false
   }, { merge: true });
+}
+
+export async function confirmRewardEntitledEntry(db: Firestore, paymentId: string) {
+  const now = new Date().toISOString();
+  const nowMs = Date.parse(now);
+  return db.runTransaction(async (transaction) => {
+    const paymentRef = db.collection("challengeEntryPayments").doc(paymentId);
+    const paymentSnap = await transaction.get(paymentRef);
+    if (!paymentSnap.exists) throw new Error("Stored entry record not found.");
+    const payment = paymentSnap.data() ?? {};
+    if (payment.status === "confirmed" && payment.entitlementConfirmed === true) return { id: paymentId, duplicate: true, status: "confirmed" };
+    if (cents(payment.amountCents) !== 0 || !payment.rewardEntitlementId) throw new Error("This entry still requires provider checkout.");
+    const challengeId = text(payment.challengeId, 160);
+    const userId = text(payment.userId, 160);
+    const participantId = `${challengeId}_${userId}`;
+    const challengeRef = db.collection("challenges").doc(challengeId);
+    const participantRef = db.collection("challengeParticipants").doc(participantId);
+    const participantQuery = db.collection("challengeParticipants").where("challengeId", "==", challengeId).limit(1000);
+    const [challengeSnap, participantSnap, participantRows] = await Promise.all([transaction.get(challengeRef), transaction.get(participantRef), transaction.get(participantQuery)]);
+    if (!challengeSnap.exists) throw new Error("Challenge not found for reward entry confirmation.");
+    const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    const capacity = challengeCapacity(challenge);
+    const occupied = activeParticipantCount(participantRows.docs.map((doc) => doc.data() ?? {}));
+    const alreadyActive = participantSnap.exists && isActiveParticipantStatus(participantSnap.data()?.status);
+    if (capacity !== null && occupied >= capacity && !alreadyActive) throw new Error("This challenge is full. The reward was not used.");
+    await consumeEntryEntitlement(transaction, db, { entitlementId: String(payment.rewardEntitlementId), checkoutId: paymentId, paymentId, now });
+    const manualApproval = challenge.participantApprovalMode === "manual" || challenge.requiresParticipantApproval === true || challenge.privateApprovalRequired === true;
+    transaction.set(paymentRef, { status: "confirmed", provider: "reward_entitlement", providerSessionId: null, providerPaymentIntentId: null, webhookConfirmed: false, entitlementConfirmed: true, participantId, reservationStatus: "converted_to_participant", confirmedAt: now, updatedAt: now, restorationPolicy: "manual_review_required", metadata: { checkoutSuccessActivatesEntry: true, webhookConfirmationRequired: false, rewardEntitlementConfirmed: true, payoutExecutionCreated: false } }, { merge: true });
+    transaction.set(participantRef, { id: participantId, challengeId, userId, status: manualApproval ? "pending_approval" : "active", paidEntryEnabled: true, entryFeeCents: 0, grossEntryFeeCents: cents(payment.grossEntryFeeCents), entryPaymentId: paymentId, entryPaymentStatus: "confirmed", entryPaymentConfirmedAt: now, fullEntryGranted: !manualApproval, webhookConfirmationRequired: false, paidConfirmedBy: "reward_entitlement", updatedAt: now, joinedAt: now, registeredAt: now }, { merge: true });
+    transaction.set(challengeRef, { participantCount: FieldValue.increment(participantSnap.exists ? 0 : 1), updatedAt: now }, { merge: true });
+    transaction.create(db.collection("auditLogs").doc(deterministicId("reward_entitled_entry", paymentId)), { actorId: userId, actorType: "user", action: "challenge_entry.reward_entitlement_confirmed", targetType: "challenge", targetId: challengeId, metadata: { entryPaymentId: paymentId, participantId, rewardEntitlementId: payment.rewardEntitlementId, chargedAmountCents: 0 }, createdAt: now });
+    return { id: paymentId, duplicate: false, status: "confirmed", participantId, manualApproval };
+  });
 }
 
 export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session) {
@@ -254,6 +308,9 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
         refundExecutionEnabled: false
       }, { merge: true });
       return { handled: true, kind: "challenge_entry_fee", id, duplicate: false, enrollmentActivated: false, reviewRequired: true, payoutProviderCalled: false, prizeReleased: false };
+    }
+    if (payment.rewardEntitlementId) {
+      await consumeEntryEntitlement(transaction, db, { entitlementId: String(payment.rewardEntitlementId), checkoutId: id, paymentId: id, now });
     }
     transaction.set(paymentRef, {
       ...basePaymentUpdate,
@@ -336,7 +393,17 @@ export async function expireChallengeEntryPayment(db: Firestore, session: Stripe
   const id = metadata(session).entryPaymentId;
   if (!id) return { handled: false, reason: "entry_payment_id_missing" };
   const now = new Date().toISOString();
-  await db.collection("challengeEntryPayments").doc(id).set({ status: "canceled", reservationStatus: "expired", expiredAt: now, updatedAt: now, stripeCheckoutSessionId: session.id, providerSessionId: session.id, webhookConfirmed: false }, { merge: true });
+  const paymentRef = db.collection("challengeEntryPayments").doc(id);
+  const paymentSnap = await paymentRef.get();
+  const rewardEntitlementId = paymentSnap.data()?.rewardEntitlementId;
+  await paymentRef.set({ status: "canceled", reservationStatus: "expired", expiredAt: now, updatedAt: now, stripeCheckoutSessionId: session.id, providerSessionId: session.id, webhookConfirmed: false }, { merge: true });
+  if (rewardEntitlementId) {
+    const entitlementRef = db.collection("rewardEntitlements").doc(String(rewardEntitlementId));
+    await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(entitlementRef);
+      if (snap.exists && snap.data()?.status === "reserved" && snap.data()?.reservationId === id) transaction.set(entitlementRef, { status: "available", reservationId: null, reservedUntil: null, updatedAt: now }, { merge: true });
+    });
+  }
   return { handled: true, kind: "challenge_entry_fee", id, status: "canceled", reservationStatus: "expired" };
 }
 

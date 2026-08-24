@@ -3,6 +3,7 @@ import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { fail, forbidden, ok, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
+import { grantRewardPointsForEvent } from "@/lib/server/reward-economy";
 
 const MAX_ATTEMPTS = 5;
 
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       await awardDoroCoinEngagement(db, { userId: String(referral.data().referrerId), sourceType: "referral_signup", actionId: user.uid });
       await referral.ref.set({ status: "qualified", qualifiedAt: now, updatedAt: now }, { merge: true });
     }
+    await grantRewardPointsForEvent(db, { userId: user.uid, eventType: "account_verified", sourceId: user.uid, sourceEventKey: `account-verified:${user.uid}` }).catch(() => undefined);
     return ok({ verified: true }, "Email verified.");
   } catch (error) {
     return serverError("Email verification could not be completed.", error instanceof Error ? error.message : error);

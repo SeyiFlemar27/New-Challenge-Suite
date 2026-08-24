@@ -170,17 +170,15 @@ function spinCreditLabel(credits: number) {
   return `${credits.toLocaleString()} spin${credits === 1 ? "" : "s"}`;
 }
 
-function getAvailability(data: SummaryData | null, tier: RewardTier, prizes: RewardPrize[], credits: number, points: number): { state: WheelAvailability; message: string } {
+function getAvailability(data: SummaryData | null, tier: RewardTier, prizes: RewardPrize[], _credits: number, points: number): { state: WheelAvailability; message: string } {
   const config = tierConfig[tier];
   if (!data) return { state: "loading", message: "Loading rewards." };
   if (data.prizeSetupRequired) return { state: "setup_required", message: "Reward Wheel Setup Required" };
   if (!data.settings?.rewardsEnabled) return { state: "unavailable", message: "Rewards are unavailable." };
   if (data.settings?.maintenanceMode) return { state: "unavailable", message: "Rewards are paused." };
   if (data.settings?.tierEnabled?.[tier] === false) return { state: "locked", message: `${config.label} is unavailable.` };
-  if (points < config.threshold) return { state: "locked", message: `You need ${(config.threshold - points).toLocaleString()} more points to unlock this tier.` };
   if (points < config.cost) return { state: "no_points", message: "Not enough points or spins available." };
   if (!prizes.length) return { state: "no_prizes", message: "Reward setup is not available for this tier yet." };
-  if (credits <= 0) return { state: "no_credits", message: "Not enough points or spins available." };
   return { state: "active", message: "Ready to spin." };
 }
 
@@ -270,7 +268,7 @@ export default function RewardWheelPage() {
   const points = rewardPoints(data);
   const configuredPrizes = useMemo(() => data?.prizes?.[tier] ?? [], [data?.prizes, tier]);
   const visualSlices = useMemo(() => buildVisualSlices(tier, configuredPrizes), [configuredPrizes, tier]);
-  const credits = Number(data?.spinCreditsByTier?.[tier] ?? 0);
+  const credits = Math.floor(points / tierConfig[tier].cost);
   const availability = getAvailability(data, tier, configuredPrizes, credits, points);
   const controlsLocked = spinning || requestingSpin;
   const canSpin = !loading && !controlsLocked && availability.state === "active";
@@ -350,10 +348,10 @@ export default function RewardWheelPage() {
               <div className="space-y-4">
                 <Card className="border-white/10 bg-white/[0.03] p-5">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">{tierConfig[tier].label} Tier</p>
-                  <h3 className="mt-2 text-3xl font-black" style={{ color: tierConfig[tier].accent }}>{credits.toLocaleString()} Available Spin{credits === 1 ? "" : "s"}</h3>
+                  <h3 className="mt-2 text-3xl font-black" style={{ color: tierConfig[tier].accent }}>{tierConfig[tier].cost.toLocaleString()} Reward Points</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <Stat label="Unlock" value={`${tierConfig[tier].threshold} pts`} />
-                    <Stat label="Points per Spin Credit" value={`${tierConfig[tier].cost} pts`} />
+                    <Stat label="Cost" value={`${tierConfig[tier].cost} pts`} />
+                    <Stat label="Affordable spins" value={credits.toLocaleString()} />
                   </div>
                   <p className={`mt-4 rounded-[8px] border p-3 text-sm font-bold ${availability.state === "active" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-100" : "border-yellow-500/20 bg-yellow-500/5 text-yellow-100"}`}>{availability.message}</p>
                   {reducedMotion ? <p className="mt-3 rounded-[8px] bg-white/[0.04] p-3 text-xs font-bold text-slate-300">Reduced motion enabled.</p> : null}

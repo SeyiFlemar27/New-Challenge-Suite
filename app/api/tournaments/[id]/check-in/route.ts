@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
+import { recordMeaningfulRewardActivity } from "@/lib/server/reward-economy";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return { checkedIn: true, idempotent: false };
     });
     if (checkIn.missing) return fail("Tournament team not found.", 404, undefined, "TOURNAMENT_TEAM_NOT_FOUND");
+    if (!checkIn.idempotent) await Promise.all((Array.isArray(team.memberUserIds) ? team.memberUserIds : []).map((memberId) => recordMeaningfulRewardActivity(db, { userId: String(memberId), activityType: "tournament_check_in", sourceId: `${id}:${teamRef.id}` }).catch(() => undefined)));
     return ok({ checkInStatus: "checked_in", teamId: teamRef.id, rosterLocked: true, idempotent: checkIn.idempotent }, checkIn.idempotent ? "Tournament team is already checked in." : "Tournament team checked in and roster locked.");
   }
   const participantRef = db.collection("tournamentParticipants").doc(`${id}_${user.uid}`);
@@ -43,5 +45,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!participantSnap.exists) return fail("Tournament participant record is required.", 403, undefined, "TOURNAMENT_PARTICIPANT_REQUIRED");
   await participantRef.set({ checkInStatus: "checked_in", status: "checked_in", checkedInAt: now, updatedAt: now }, { merge: true });
   await db.collection("tournamentAuditEvents").doc(`${id}_${user.uid}_checked_in`).set({ id: `${id}_${user.uid}_checked_in`, tournamentId: id, actorId: user.uid, action: "participant_checked_in", createdAt: now });
+  await recordMeaningfulRewardActivity(db, { userId: user.uid, activityType: "tournament_check_in", sourceId: `${id}:${user.uid}` }).catch(() => undefined);
   return ok({ checkInStatus: "checked_in" }, "Tournament check-in confirmed.");
 }

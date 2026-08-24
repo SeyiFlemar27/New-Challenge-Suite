@@ -6,6 +6,7 @@ import { getEffectiveTier, getUserPlanAccess, planFieldsFor } from "@/lib/plan-a
 import { sanitizeCustomization } from "@/lib/customization/access";
 import { resolveProfileIdentity, isDemoProfileContent } from "@/lib/profile-identity";
 import { isQaOrDemoRecord } from "@/lib/server/public-challenge";
+import { grantRewardPointsForEvent } from "@/lib/server/reward-economy";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -246,6 +247,7 @@ export async function PATCH(request: Request) {
         updatedAt: now
       }, { merge: true })
     ]);
+    await grantRewardPointsForEvent(db, { userId: user.uid, eventType: "profile_completed", sourceId: user.uid, sourceEventKey: `profile-complete:${user.uid}`, metadata: { completedFields: ["displayName", "selfDeclaredRegion"] } }).catch(() => undefined);
 
     return ok({
       user: {

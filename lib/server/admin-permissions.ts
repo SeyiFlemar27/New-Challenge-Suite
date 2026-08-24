@@ -16,7 +16,8 @@ export const ADMIN_PERMISSIONS = [
   "content.edit", "content.preview", "content.schedule", "content.publish", "content.rollback",
   "settings.view", "settings.editGeneral", "settings.editFinancial", "settings.editVoting", "settings.editPlans",
   "settings.editIntegrations", "roles.manage", "developerTools.view", "featureControls.manage",
-  "systemDiagnostics.view", "jobs.view", "jobs.retry", "auditLogs.viewRaw", "qaTools.use"
+  "systemDiagnostics.view", "jobs.view", "jobs.retry", "auditLogs.viewRaw", "qaTools.use",
+  "rewards.view", "rewards.configure", "rewards.publish", "rewards.adjustUser", "rewards.investigate", "rewards.emergencyControl"
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -31,7 +32,7 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 const viewPermissions: AdminPermission[] = [
   "admin.dashboard.view", "admin.actionCentre.view", "admin.search.use", "users.view", "challenges.view",
-  "submissions.view", "finance.view", "sponsors.view", "tickets.view", "settings.view"
+  "submissions.view", "finance.view", "sponsors.view", "tickets.view", "settings.view", "rewards.view"
 ];
 
 const rolePermissions: Record<AdminRole, AdminPermission[]> = {

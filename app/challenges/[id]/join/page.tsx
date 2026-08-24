@@ -19,8 +19,9 @@ import { apiRequest } from "@/lib/api/client";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
+type EntryReward = { id: string; type: "free_entry" | "fixed_entry_discount" | "percentage_entry_discount"; value?: number; expiresAt?: string | null };
 
-function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, submissionId, agreed, onAgreementChange, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; journey: any; entryFeeLabel: string; challengeId: string; submissionId?: string | null; agreed: boolean; onAgreementChange: (value: boolean) => void; onPay: () => void; onJoin: (action: "register" | "join_waitlist" | "enter_challenge" | "request_entry") => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
+function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, submissionId, agreed, entryRewards, selectedRewardId, onRewardChange, onAgreementChange, onPay, onJoin, onRefresh, entryCheckoutLoading, joinLoading }: { access: SubmissionAccess; journey: any; entryFeeLabel: string; challengeId: string; submissionId?: string | null; agreed: boolean; entryRewards: EntryReward[]; selectedRewardId: string; onRewardChange: (value: string) => void; onAgreementChange: (value: boolean) => void; onPay: () => void; onJoin: (action: "register" | "join_waitlist" | "enter_challenge" | "request_entry") => void; onRefresh: () => void; entryCheckoutLoading: boolean; joinLoading: boolean }) {
   if (access.canSubmit) return null;
   const action = String(journey?.primaryAction ?? access.action ?? "back_to_challenge");
   const requiresAgreement = ["pay_entry_fee", "register", "join", "join_waitlist", "enter_challenge", "request_entry"].includes(action);
@@ -29,7 +30,7 @@ function SubmissionAccessCard({ access, journey, entryFeeLabel, challengeId, sub
       <h3 className="font-black">{access.title}</h3>
       <p className="mt-2 text-slate-200">{access.reason === "payment_required" ? `Pay the ${entryFeeLabel} entry fee before submitting.` : access.message}</p>
       {requiresAgreement ? <label className="mt-4 flex items-start gap-3 rounded-[8px] border border-white/10 bg-black/20 p-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => onAgreementChange(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label> : null}
-      {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading || !agreed}>{entryCheckoutLoading ? "Starting Checkout..." : `Pay Entry Fee - ${entryFeeLabel}`}</Button> : null}
+      {action === "pay_entry_fee" && entryRewards.length ? <label className="mt-4 block text-sm font-bold">Apply a reward<select className={`${inputClass} mt-2`} value={selectedRewardId} onChange={(event) => onRewardChange(event.target.value)}><option value="">Do not apply a reward</option>{entryRewards.map((reward) => <option key={reward.id} value={reward.id}>{reward.type === "free_entry" ? "Free entry credit" : reward.type === "percentage_entry_discount" ? `${reward.value ?? 0}% entry discount` : `$${((reward.value ?? 0) / 100).toFixed(2)} entry discount`}</option>)}</select></label> : null}`r`n      {action === "pay_entry_fee" ? <Button className="mt-4 w-full" onClick={onPay} disabled={entryCheckoutLoading || !agreed}>{entryCheckoutLoading ? "Starting Checkout..." : `Continue - ${entryFeeLabel}`}</Button> : null}
       {action === "register" || action === "join" ? <Button className="mt-4 w-full" onClick={() => onJoin("register")} disabled={joinLoading || !agreed}>{joinLoading ? "Saving..." : "Join Challenge"}</Button> : null}
       {action === "join_waitlist" ? <Button className="mt-4 w-full" onClick={() => onJoin("join_waitlist")} disabled={joinLoading || !agreed}>{joinLoading ? "Saving..." : "Join Waitlist"}</Button> : null}
       {action === "request_entry" ? <Button className="mt-4 w-full" onClick={() => onJoin("request_entry")} disabled={joinLoading || !agreed}>{joinLoading ? "Sending Request..." : "Request to Join"}</Button> : null}
@@ -86,6 +87,8 @@ export default function JoinChallengePage() {
   const [paymentReturnProcessing, setPaymentReturnProcessing] = useState(false);
   const [checkingSubmissionAccess, setCheckingSubmissionAccess] = useState(false);
   const [submissionWindowExpired, setSubmissionWindowExpired] = useState(false);
+  const [entryRewards, setEntryRewards] = useState<EntryReward[]>([]);
+  const [selectedRewardId, setSelectedRewardId] = useState("");
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -96,6 +99,14 @@ export default function JoinChallengePage() {
   useEffect(() => {
     setPaymentReturnProcessing(new URLSearchParams(window.location.search).get("payment") === "processing");
   }, []);
+
+  useEffect(() => {
+    if (!auth.user) { setEntryRewards([]); setSelectedRewardId(""); return; }
+    apiRequest<{ entitlements?: EntryReward[] }>("/api/rewards/summary").then((result) => {
+      if (!result.ok) return;
+      setEntryRewards((result.data?.entitlements ?? []).filter((item) => ["free_entry", "fixed_entry_discount", "percentage_entry_discount"].includes(item.type)));
+    });
+  }, [auth.user]);
 
   const details = data?.ok ? data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
@@ -184,13 +195,19 @@ export default function JoinChallengePage() {
     const result = await fetch(`/api/challenges/${challengeId}/entry-checkout`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ entryAgreementAccepted: true })
+      body: JSON.stringify({ entryAgreementAccepted: true, rewardEntitlementId: selectedRewardId || undefined })
     }).then((response) => response.json()).catch(() => ({ ok: false, message: "Paid entry checkout could not start." }));
     setEntryCheckoutLoading(false);
-    if (!result.ok || !result.data?.url) {
+    if (!result.ok) {
       setError(result.message ?? "Paid entry checkout could not start.");
       return;
     }
+    if (result.data?.status === "confirmed") {
+      setSelectedRewardId("");
+      await refetch();
+      return;
+    }
+    if (!result.data?.url) { setError("Paid entry checkout could not start."); return; }
     window.location.href = result.data.url;
   }
 
@@ -390,6 +407,9 @@ export default function JoinChallengePage() {
               challengeId={currentChallenge.id}
               submissionId={existingSubmissionId}
               agreed={agreed}
+              entryRewards={entryRewards}
+              selectedRewardId={selectedRewardId}
+              onRewardChange={setSelectedRewardId}
               onAgreementChange={setAgreed}
               onPay={() => void startPaidEntryCheckout()}
               onJoin={(action) => void startFreeJoin(action)}

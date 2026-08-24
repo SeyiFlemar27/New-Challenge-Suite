@@ -3,6 +3,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
+import { grantRewardPointsForEvent, recordMeaningfulRewardActivity } from "@/lib/server/reward-economy";
 
 export const dynamic = "force-dynamic";
 
@@ -117,7 +118,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
     if (!checkIn.alreadyCheckedIn) await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: "participant.check_in", targetType: "participant", targetId, before: { checkInStatus: current.checkInStatus ?? null }, after: { checkInStatus: "checked_in", checkedInAt: now }, metadata: { challengeId: id, manualFallback: true } }, access.db);
     const participantId = String(checkIn.participant.userId ?? checkIn.participant.participantId ?? "");
-    if (participantId && !checkIn.alreadyCheckedIn) await createNotification(access.db, { userId: participantId, type: "event_check_in_confirmed", title: "Event check-in confirmed", body: "Your attendance was confirmed by the event manager.", actionUrl: `/challenges/${id}`, targetId: id, idempotencyKey: `event_check_in_${id}_${targetId}` }).catch(() => undefined);
+    if (participantId && !checkIn.alreadyCheckedIn) {
+      await recordMeaningfulRewardActivity(access.db, { userId: participantId, activityType: "live_event_check_in", sourceId: targetId }).catch(() => undefined);
+      await createNotification(access.db, { userId: participantId, type: "event_check_in_confirmed", title: "Event check-in confirmed", body: "Your attendance was confirmed by the event manager.", actionUrl: `/challenges/${id}`, targetId: id, idempotencyKey: `event_check_in_${id}_${targetId}` }).catch(() => undefined);
+    }
     return ok({ targetId, targetType, status: String(checkIn.participant.status ?? "approved"), action, alreadyCheckedIn: checkIn.alreadyCheckedIn }, checkIn.alreadyCheckedIn ? "Participant was already checked in." : "Participant checked in.");
   }
   let nextStatus = String(current.status ?? "pending");
@@ -152,6 +156,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await ref.set(update, { merge: true });
   const participantId = String(current.userId ?? current.participantId ?? "");
+  if (targetType === "submission" && action === "approve" && String(current.status ?? "") !== "approved" && participantId) {
+    await grantRewardPointsForEvent(access.db, { userId: participantId, eventType: "approved_submission", sourceId: targetId, sourceEventKey: `submission-approved:${targetId}:${participantId}`, metadata: { challengeId: id } }).catch(() => undefined);
+  }
   if (participantId && ["reject", "approve", "request_resubmission", "request_info", "request_disqualification"].includes(action)) {
     await createNotification(access.db, { userId: participantId, type: `${targetType}_${action}`, title: action === "approve" ? "Entry approved" : action === "reject" ? "Review update" : action === "request_resubmission" ? "Submission changes requested" : action === "request_info" ? "Information requested" : "Disqualification review requested", body: requestedChanges || reason || note || "Your competition record was updated.", actionUrl: targetType === "submission" ? `/submissions/${targetId}` : `/challenges/${id}`, targetId, idempotencyKey: `${targetType}_${targetId}_${action}_${now.slice(0, 16)}` }).catch(() => undefined);
   }

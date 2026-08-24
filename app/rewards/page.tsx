@@ -1,69 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Gift, History, ShoppingCart, Trophy } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Award, CalendarCheck, Gift, History, Sparkles, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
-type Summary = any;
+type Summary = {
+  availableRewardPoints?: number;
+  lifetimeRewardPoints?: number;
+  streak?: { current?: number; eligibleToday?: boolean; checkedInToday?: boolean };
+  achievements?: Array<{ id: string }>;
+  entitlements?: Array<{ id: string; type?: string }>;
+};
+
+const tiers = [
+  { id: "basic", label: "Basic Spin", cost: 100 },
+  { id: "standard", label: "Standard Spin", cost: 250 },
+  { id: "premium", label: "Premium Spin", cost: 500 }
+];
 
 export default function RewardsPage() {
   const [data, setData] = useState<Summary | null>(null);
   const [message, setMessage] = useState("");
+  const [checkingIn, setCheckingIn] = useState(false);
 
-  useEffect(() => {
+  function load() {
     apiRequest<Summary>("/api/rewards/summary").then((result) => result.ok ? setData(result.data ?? null) : setMessage(result.message));
-  }, []);
+  }
 
-  const points = Number(data?.availableRewardPoints ?? data?.points ?? 0);
+  useEffect(load, []);
+
+  async function checkIn() {
+    setCheckingIn(true);
+    const result = await apiRequest("/api/rewards/check-in", { method: "POST" });
+    setMessage(result.message || (result.ok ? "Check-in recorded." : "Check-in could not be completed."));
+    setCheckingIn(false);
+    if (result.ok) load();
+  }
+
+  const points = Number(data?.availableRewardPoints ?? 0);
   const lifetime = Number(data?.lifetimeRewardPoints ?? points);
-  const credits = data?.spinCreditsByTier ?? { basic: 0, standard: 0, premium: 0 };
-  const availableSpins = Number(credits.basic ?? 0) + Number(credits.standard ?? 0) + Number(credits.premium ?? 0);
-  const setupRequired = Boolean(data?.prizeSetupRequired);
+  const streak = Number(data?.streak?.current ?? 0);
 
-  return (
-    <AppShell>
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <PageTitle title="Voter Rewards" subtitle="Track real reward points, available spins, and confirmed reward activity." icon={<Gift className="text-[var(--gold)]" />} />
-        <div className="flex flex-col gap-3 sm:flex-row xl:pt-2">
-          <LinkButton href="/rewards/history" variant="secondary" className="justify-center"><History size={17} /> Reward History</LinkButton>
-          <LinkButton href="/rewards/wheel" className="justify-center"><Trophy size={17} /> Open Spin Wheel</LinkButton>
-        </div>
+  return <AppShell>
+    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      <PageTitle title="Rewards" subtitle="Earn Reward Points through eligible activity and use them for spins. Reward Points have no cash value and are separate from DoroCoins." icon={<Gift className="text-[var(--gold)]" />} />
+      <div className="flex flex-col gap-3 sm:flex-row xl:pt-2">
+        <LinkButton href="/rewards/history" variant="secondary" className="justify-center"><History size={17} /> History</LinkButton>
+        <LinkButton href="/rewards/wheel" className="justify-center"><Trophy size={17} /> Spin Wheel</LinkButton>
+      </div>
+    </div>
+
+    {message ? <Card className="mt-6 p-4 text-sm font-bold" role="status">{message}</Card> : null}
+    {!data && !message ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-32 animate-pulse" />)}</div> : null}
+
+    {data ? <>
+      <div className="mt-8 grid gap-5 md:grid-cols-3">
+        <Metric label="Available Points" value={points.toLocaleString()} icon={<Sparkles size={18} />} />
+        <Metric label="Lifetime Earned" value={lifetime.toLocaleString()} icon={<Award size={18} />} />
+        <Metric label="Current Streak" value={streak + " day" + (streak === 1 ? "" : "s")} icon={<CalendarCheck size={18} />} />
       </div>
 
-      {message ? <Card className="mt-6 border-yellow-500/20 p-4 text-yellow-100">{message}</Card> : null}
-      {!data && !message ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2].map((item) => <Card key={item} className="h-32 animate-pulse" />)}</div> : null}
-
-      {data ? <>
-        <div className="mt-8 grid gap-5 md:grid-cols-3">
-          <Metric label="Available Points" value={points.toLocaleString()} />
-          <Metric label="Lifetime Points" value={lifetime.toLocaleString()} />
-          <Metric label="Available Spins" value={availableSpins.toLocaleString()} />
-        </div>
-
-        {points <= 0 && availableSpins <= 0 ? <Card className="mt-8 border-[var(--gold)]/25 bg-[var(--gold)]/5 p-6 sm:p-8">
-          <h2 className="flex items-center gap-2 text-2xl font-black"><Gift className="text-[var(--gold)]" /> No reward activity yet</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Your reward points and spin history will appear here after eligible activity.</p>
-          <div className="mt-5 flex flex-wrap gap-3"><LinkButton href="/dorocoins"><ShoppingCart size={17} /> Buy DoroCoins</LinkButton></div>
-        </Card> : null}
-
-        {setupRequired ? <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-6">
-          <h2 className="text-xl font-black text-yellow-100">Reward Wheel Setup Required</h2>
-          <p className="mt-2 text-sm leading-6 text-yellow-50/80">Reward points can still be tracked. Prize setup is required before spins are available.</p>
-          <LinkButton href="/rewards/wheel" variant="secondary" className="mt-4">Open Spin Wheel</LinkButton>
-        </Card> : null}
-
-        <Card className="mt-8 p-6 sm:p-8">
-          <h2 className="text-2xl font-black">Reward tiers</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">{[{ id: "basic", label: "Basic", threshold: 150, cost: 50 }, { id: "standard", label: "Standard", threshold: 270, cost: 70 }, { id: "premium", label: "Premium", threshold: 390, cost: 150 }].map((tier) => <Card key={tier.id} className="bg-black/30 p-4"><p className="font-black">{tier.label}</p><p className="mt-2 text-sm text-slate-400">Unlocks at {tier.threshold} points.</p><p className="mt-2 text-sm font-bold text-[var(--gold)]">{tier.cost} points per spin</p></Card>)}</div>
-          <div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/rewards/wheel"><Trophy size={17} /> Open Spin Wheel</LinkButton><LinkButton href="/dorocoins" variant="secondary"><ShoppingCart size={17} /> DoroCoin Activity</LinkButton></div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+        <Card className="p-6 sm:p-8">
+          <h2 className="text-2xl font-black">Choose a spin</h2>
+          <p className="mt-2 text-sm text-slate-400">Each spin directly deducts its point cost. You can spin again whenever your balance is sufficient.</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">{tiers.map((tier) => <div key={tier.id} className="rounded-[8px] border border-white/10 p-4"><p className="font-black">{tier.label}</p><p className="mt-3 text-2xl font-black text-[var(--gold)]">{tier.cost}</p><p className="text-xs text-slate-400">Reward Points</p></div>)}</div>
+          <LinkButton href="/rewards/wheel" className="mt-6"><Trophy size={17} /> Open Spin Wheel</LinkButton>
         </Card>
-      </> : null}
-    </AppShell>
-  );
+
+        <Card className="p-6 sm:p-8">
+          <h2 className="text-xl font-black">Daily streak</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Eligible activity unlocks today&apos;s check-in. Checking in does not award points by itself; milestone rewards are awarded once.</p>
+          <button type="button" onClick={checkIn} disabled={checkingIn || !data.streak?.eligibleToday || data.streak?.checkedInToday} className="mt-5 min-h-11 rounded-[8px] bg-[var(--gold)] px-4 text-sm font-black text-black disabled:cursor-not-allowed disabled:opacity-50">{data.streak?.checkedInToday ? "Checked in today" : checkingIn ? "Checking in..." : "Check in"}</button>
+          <p className="mt-4 text-xs text-slate-500">Milestones: 3, 7, 14, and 30 days.</p>
+        </Card>
+      </div>
+
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <Card className="p-6"><h2 className="text-xl font-black">Achievements</h2><p className="mt-2 text-sm text-slate-400">{data.achievements?.length ? data.achievements.length + " earned." : "Your verified achievements will appear here."}</p></Card>
+        <Card className="p-6"><h2 className="text-xl font-black">Available rewards</h2><p className="mt-2 text-sm text-slate-400">{data.entitlements?.length ? data.entitlements.length + " available." : "Spin rewards such as entry discounts and boosts will appear here."}</p></Card>
+      </div>
+    </> : null}
+  </AppShell>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <Card className="p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{label}</p><p className="mt-3 text-3xl font-black text-[var(--gold-2)]">{value}</p></Card>;
+function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return <Card className="p-5"><div className="flex items-center gap-2 text-[var(--gold)]">{icon}<p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</p></div><p className="mt-3 text-3xl font-black text-[var(--gold-2)]">{value}</p></Card>;
 }

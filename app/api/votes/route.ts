@@ -8,6 +8,7 @@ import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-sign
 import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
+import { grantRewardPointsForEvent } from "@/lib/server/reward-economy";
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -69,6 +70,11 @@ export async function POST(request: Request) {
       timeZone: String(profile.timeZone ?? profile.timezone ?? "UTC"),
       confirmedLargeSpend: body.confirmedLargeSpend
     });
+    if (body.voteMode === "free" && !result.idempotentReplay) {
+      await grantRewardPointsForEvent(db, { userId: user.uid, eventType: "valid_free_vote", sourceId: String(result.vote?.id ?? ""), sourceEventKey: `free-vote:${String(result.vote?.id ?? "")}:${user.uid}`, metadata: { challengeId: body.challengeId, submissionId: body.submissionId } }).catch(async () => {
+        await db.collection("adminActionTasks").doc(`reward_free_vote_${String(result.vote?.id ?? "unknown")}`).set({ type: "reward_delivery_failure", rewardEventType: "valid_free_vote", userId: user.uid, sourceId: String(result.vote?.id ?? ""), status: "open", createdAt: new Date().toISOString() }, { merge: true });
+      });
+    }
     return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, creditCost: result.creditCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "credits" ? `${result.quantity} additional vote${result.quantity === 1 ? "" : "s"} counted using Challenge Credits.` : "Free vote counted.");
   } catch (error) {
     const err = error as Error & { code?: string };
