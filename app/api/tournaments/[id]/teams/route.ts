@@ -14,9 +14,66 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const db = getAdminDb();
   if (!db) return serverUnavailable("Tournament teams");
   const { id } = await context.params;
-  const snap = await db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get();
-  const teams = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as TournamentTeamFoundation)).map((team) => ({ ...team, canManage: team.captainUserId === user.uid }));
-  return ok({ teams }, "Tournament teams loaded.");
+  const url = new URL(request.url);
+  const search = String(url.searchParams.get("q") ?? "").trim().toLowerCase().slice(0, 60);
+  const searchTeamId = String(url.searchParams.get("teamId") ?? "");
+  if (search) {
+    if (search.length < 2 || !searchTeamId) return validationError({ q: "Enter at least two characters." });
+    const searchTeam = await db.collection("tournamentTeams").doc(searchTeamId).get();
+    if (!searchTeam.exists || searchTeam.data()?.tournamentId !== id || searchTeam.data()?.captainUserId !== user.uid) return fail("Only the Team Captain can search for members.", 403, undefined, "TEAM_CAPTAIN_REQUIRED");
+    if (searchTeam.data()?.rosterLockedAt) return conflict("This Team roster is locked.");
+    const profiles = await db.collection("users").limit(250).get();
+    const members = profiles.docs.map((profile) => {
+      const data = profile.data();
+      return { id: profile.id, displayName: String(data.displayName ?? data.name ?? data.username ?? "Account"), username: String(data.username ?? "") };
+    }).filter((profile) => profile.id !== user.uid && `${profile.displayName} ${profile.username}`.toLowerCase().includes(search)).slice(0, 12);
+    return ok({ members }, "Eligible account results loaded.");
+  }
+  const [snap, membershipSnap, invitationsSnap, requestsSnap, transfersSnap] = await Promise.all([
+    db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get(),
+    db.collection("tournamentTeamMemberships").doc(`${id}_${user.uid}`).get(),
+    db.collection("tournamentTeamInvitations").where("tournamentId", "==", id).limit(300).get(),
+    db.collection("tournamentTeamRequests").where("tournamentId", "==", id).limit(300).get(),
+    db.collection("tournamentCaptainTransfers").where("tournamentId", "==", id).limit(100).get()
+  ]);
+  const records = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as TournamentTeamFoundation));
+  const viewerTeamId = String(membershipSnap.data()?.teamId ?? "");
+  const viewerTeam = records.find((team) => team.id === viewerTeamId) ?? null;
+  const captainTeamIds = new Set(records.filter((team) => team.captainUserId === user.uid).map((team) => team.id));
+  const visibleInvitations = invitationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as {
+    id: string;
+    inviteeUserId?: string;
+    teamId?: string;
+    status?: string;
+  })).filter((invite) => invite.inviteeUserId === user.uid || captainTeamIds.has(String(invite.teamId ?? "")));
+  const visibleRequests = requestsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as {
+    id: string;
+    userId?: string;
+    teamId?: string;
+    status?: string;
+  })).filter((joinRequest) => joinRequest.userId === user.uid || captainTeamIds.has(String(joinRequest.teamId ?? "")));
+  const visibleTransfers = transfersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as {
+    id: string;
+    teamId?: string;
+    fromUserId?: string;
+    toUserId?: string;
+    status?: string;
+  })).filter((transfer) => transfer.fromUserId === user.uid || transfer.toUserId === user.uid);
+  const identityIds = new Set<string>();
+  if (viewerTeam) viewerTeam.memberUserIds.forEach((memberId) => identityIds.add(memberId));
+  visibleInvitations.forEach((invite) => identityIds.add(String(invite.inviteeUserId ?? "")));
+  visibleRequests.forEach((joinRequest) => identityIds.add(String(joinRequest.userId ?? "")));
+  visibleTransfers.forEach((transfer) => {
+    identityIds.add(String(transfer.fromUserId ?? ""));
+    identityIds.add(String(transfer.toUserId ?? ""));
+  });
+  const profileSnaps = await Promise.all([...identityIds].filter(Boolean).slice(0, 100).map((profileId) => db.collection("users").doc(profileId).get()));
+  const identities = Object.fromEntries(profileSnaps.map((profile) => {
+    const data = profile.data() ?? {};
+    return [profile.id, { id: profile.id, displayName: String(data.displayName ?? data.name ?? data.username ?? "Tournament member"), username: String(data.username ?? "") }];
+  }));
+  const teams = records.map((team) => ({ id: team.id, tournamentId: team.tournamentId, name: team.name, status: team.status, paymentStatus: team.paymentStatus, seed: team.seed, rankingScore: team.rankingScore, rosterLockedAt: team.rosterLockedAt, memberCount: team.memberUserIds.length, canManage: team.captainUserId === user.uid, isViewerTeam: team.id === viewerTeamId }));
+  return ok({ teams, viewerTeam, viewerCanManage: viewerTeam?.captainUserId === user.uid, invitations: visibleInvitations, requests: visibleRequests, captainTransfers: visibleTransfers, identities }, "Tournament teams loaded.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -87,6 +144,33 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const teamSnap = await teamRef.get();
   if (!teamSnap.exists) return fail("Tournament team not found.", 404, undefined, "TOURNAMENT_TEAM_NOT_FOUND");
   const team = { id: teamSnap.id, ...teamSnap.data() } as TournamentTeamFoundation;
+
+  if (action === "confirm_captain_transfer") {
+    const transferRef = db.collection("tournamentCaptainTransfers").doc(`${targetTeamId}_${user.uid}`);
+    const nextMembershipRef = db.collection("tournamentTeamMemberships").doc(`${id}_${user.uid}`);
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [currentTeamSnap, transferSnap, currentCaptainMembership, nextCaptainMembership] = await Promise.all([
+          transaction.get(teamRef),
+          transaction.get(transferRef),
+          transaction.get(db.collection("tournamentTeamMemberships").doc(`${id}_${team.captainUserId}`)),
+          transaction.get(nextMembershipRef)
+        ]);
+        const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
+        const transfer = transferSnap.data();
+        if (!currentTeamSnap.exists || currentTeam.rosterLockedAt || !transferSnap.exists || transfer?.status !== "pending" || transfer?.fromUserId !== currentTeam.captainUserId || transfer?.toUserId !== user.uid || !currentCaptainMembership.exists || !nextCaptainMembership.exists) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
+        transaction.set(teamRef, { captainUserId: user.uid, updatedAt: now }, { merge: true });
+        transaction.set(currentCaptainMembership.ref, { role: "member", updatedAt: now }, { merge: true });
+        transaction.set(nextMembershipRef, { role: "captain", updatedAt: now }, { merge: true });
+        transaction.set(transferRef, { status: "accepted", acceptedAt: now, updatedAt: now }, { merge: true });
+        transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_captain_transfer_accepted_${user.uid}`), { id: `${targetTeamId}_captain_transfer_accepted_${user.uid}`, tournamentId: id, actorId: user.uid, action: "team_captain_transfer_accepted", createdAt: now, metadata: { teamId: targetTeamId, previousCaptainId: currentTeam.captainUserId, nextCaptainId: user.uid } });
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "CAPTAIN_TRANSFER_STATE_CHANGED") return conflict("This Captain transfer can no longer be accepted.");
+      throw error;
+    }
+    return ok({ teamId: targetTeamId, captainUserId: user.uid }, "You are now the Team Captain.");
+  }
 
   if (action === "accept_invite") {
     const invitationRef = db.collection("tournamentTeamInvitations").doc(`${targetTeamId}_${user.uid}`);
@@ -172,25 +256,56 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return ok({ teamId: targetTeamId, userId: requestedUserId }, "Team join request accepted.");
   }
 
+  if (action === "reject_request") {
+    const requestedUserId = String(body.userId ?? "");
+    const requestRef = db.collection("tournamentTeamRequests").doc(`${targetTeamId}_${requestedUserId}`);
+    const requestSnap = await requestRef.get();
+    if (!requestSnap.exists || requestSnap.data()?.status !== "pending") return conflict("This join request can no longer be rejected.");
+    await requestRef.set({ status: "rejected", decidedAt: now, decidedBy: user.uid, updatedAt: now }, { merge: true });
+    return ok({ requestId: requestRef.id }, "Team join request rejected.");
+  }
+
+  if (action === "revoke_invite") {
+    const invitedUserId = String(body.userId ?? "");
+    const invitationRef = db.collection("tournamentTeamInvitations").doc(`${targetTeamId}_${invitedUserId}`);
+    const invitationSnap = await invitationRef.get();
+    if (!invitationSnap.exists || invitationSnap.data()?.status !== "pending") return conflict("This invitation can no longer be revoked.");
+    await invitationRef.set({ status: "revoked", revokedAt: now, revokedBy: user.uid, updatedAt: now }, { merge: true });
+    return ok({ invitationId: invitationRef.id }, "Team invitation revoked.");
+  }
+
+  if (action === "remove_member") {
+    const removedUserId = String(body.userId ?? "");
+    if (!removedUserId || removedUserId === user.uid || !team.memberUserIds.includes(removedUserId)) return validationError({ userId: "Choose an active Team member." });
+    const removedMembershipRef = db.collection("tournamentTeamMemberships").doc(`${id}_${removedUserId}`);
+    await db.runTransaction(async (transaction) => {
+      const currentTeamSnap = await transaction.get(teamRef);
+      const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
+      if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || !currentTeam.memberUserIds.includes(removedUserId)) throw new Error("ROSTER_CHANGED");
+      transaction.set(teamRef, { memberUserIds: currentTeam.memberUserIds.filter((memberId) => memberId !== removedUserId), status: "forming", updatedAt: now }, { merge: true });
+      transaction.delete(removedMembershipRef);
+      transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_member_removed_${removedUserId}`), { id: `${targetTeamId}_member_removed_${removedUserId}`, tournamentId: id, actorId: user.uid, action: "team_member_removed", createdAt: now, metadata: { teamId: targetTeamId, removedUserId } });
+    });
+    return ok({ teamId: targetTeamId, userId: removedUserId }, "Team member removed.");
+  }
+
   if (action === "transfer_captain") {
     const nextCaptainId = String(body.userId ?? "");
     if (!team.memberUserIds.includes(nextCaptainId) || nextCaptainId === user.uid) return validationError({ userId: "Choose another active team member." });
-    const nextMembershipRef = db.collection("tournamentTeamMemberships").doc(`${id}_${nextCaptainId}`);
+    const transferRef = db.collection("tournamentCaptainTransfers").doc(`${targetTeamId}_${nextCaptainId}`);
     try {
       await db.runTransaction(async (transaction) => {
-        const [currentTeamSnap, currentCaptainMembership, nextCaptainMembership] = await Promise.all([transaction.get(teamRef), transaction.get(membershipRef), transaction.get(nextMembershipRef)]);
+        const [currentTeamSnap, nextCaptainMembership, existingTransfer] = await Promise.all([transaction.get(teamRef), transaction.get(db.collection("tournamentTeamMemberships").doc(`${id}_${nextCaptainId}`)), transaction.get(transferRef)]);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || !currentTeam.memberUserIds.includes(nextCaptainId) || !currentCaptainMembership.exists || !nextCaptainMembership.exists) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
-        transaction.set(teamRef, { captainUserId: nextCaptainId, updatedAt: now }, { merge: true });
-        transaction.set(membershipRef, { role: "member", updatedAt: now }, { merge: true });
-        transaction.set(nextMembershipRef, { role: "captain", updatedAt: now }, { merge: true });
-        transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_captain_${now}`), { id: `${targetTeamId}_captain_${now}`, tournamentId: id, actorId: user.uid, action: "team_captain_transferred", createdAt: now, metadata: { teamId: targetTeamId, nextCaptainId } });
+        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || !currentTeam.memberUserIds.includes(nextCaptainId) || !nextCaptainMembership.exists || (existingTransfer.exists && existingTransfer.data()?.status === "pending")) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
+        transaction.set(transferRef, { id: transferRef.id, tournamentId: id, teamId: targetTeamId, fromUserId: user.uid, toUserId: nextCaptainId, status: "pending", requestedAt: now, createdAt: now, updatedAt: now });
+        transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_captain_transfer_requested_${nextCaptainId}`), { id: `${targetTeamId}_captain_transfer_requested_${nextCaptainId}`, tournamentId: id, actorId: user.uid, action: "team_captain_transfer_requested", createdAt: now, metadata: { teamId: targetTeamId, nextCaptainId } });
       });
     } catch (error) {
       if (error instanceof Error && error.message === "CAPTAIN_TRANSFER_STATE_CHANGED") return conflict("The Team roster changed. Refresh and try again.");
       throw error;
     }
-    return ok({ teamId: targetTeamId, captainUserId: nextCaptainId }, "Team Captain transferred.");
+    return ok({ teamId: targetTeamId, proposedCaptainUserId: nextCaptainId }, "Captain transfer sent for confirmation.");
   }
 
   if (action === "disband") {

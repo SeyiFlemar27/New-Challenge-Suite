@@ -19,6 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const permission = canPerformTournamentRole({ uid: user.uid, role: user.role, isAdmin: user.isAdmin }, tournament, ["host", "manager"]);
   if (!permission.allowed) return fail("Tournament host or manager permission is required.", 403, permission, "TOURNAMENT_MANAGER_REQUIRED");
   if (tournament.status !== "registration_closed" && tournament.status !== "seeding") return fail("Bracket generation requires closed registration.", 409, { status: tournament.status }, "TOURNAMENT_REGISTRATION_MUST_CLOSE");
+  if (tournament.requiresCheckIn && (tournament as TournamentFoundation & { noShowResolutionStatus?: string }).noShowResolutionStatus !== "completed") return fail("Resolve check-in no-shows and waitlist offers before generating the bracket.", 409, undefined, "TOURNAMENT_NO_SHOW_RESOLUTION_PENDING");
   const [participantsSnap, teamsSnap, matchesSnap] = await Promise.all([
     db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(1000).get(),
     db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get(),

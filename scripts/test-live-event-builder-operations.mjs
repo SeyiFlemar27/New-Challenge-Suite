@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 const builder = fs.readFileSync("components/host/host-competition-wizard.tsx", "utf8");
 const manage = fs.readFileSync("app/api/challenges/[id]/manage/route.ts", "utf8");
-for (const step of ["Event Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Challenge Format", "Voting / Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) assert(builder.includes(step));
+for (const step of ["Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Format", "Voting & Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) assert(builder.includes(step));
 for (const mode of ["attendance_only", "digital_submission", "physical_competition"]) assert(builder.includes(mode));
 assert.match(builder, /qrCheckInRequiresServerToken: true/);
 assert.match(builder, /manualCheckInEnabled: true/);

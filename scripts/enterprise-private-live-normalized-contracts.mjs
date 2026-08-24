@@ -54,8 +54,12 @@ run("private_steps", () => {
   const builder = read("components/challenge-builder.tsx");
   const match = builder.match(/const privateSteps = \[([^\]]+)\]/);
   assert.ok(match);
-  assert.equal((match[1].match(/"/g) ?? []).length / 2, 10);
-  for (const step of ["Overview", "Private Access", "Eligibility", "Participant Requirements", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(match[1].includes(`"${step}"`));
+  assert.equal((match[1].match(/"/g) ?? []).length / 2, 9);
+  for (const step of ["Overview", "Access", "Eligibility", "Monetization", "Media", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(match[1].includes(`"${step}"`));
+  assert.ok(!match[1].includes("Participant Requirements"), "Participant requirements belong inside Eligibility, not a separate step.");
+  assert.match(builder, /ChallengeBuilderFrame/);
+  assert.match(builder, /privateParticipantQuestions/);
+  assert.match(builder, /privateParticipantAcknowledgements/);
 });
 
 run("private_aliases", () => {
@@ -72,7 +76,7 @@ run("private_requirements", () => {
   const route = read("app/api/challenges/route.ts");
   const draft = read("app/api/challenges/drafts/[id]/route.ts");
   for (const field of ["privateParticipantQuestions", "privateParticipantAcknowledgements"]) { assert.ok(builder.includes(field)); assert.ok(route.includes(field)); assert.ok(draft.includes(field)); }
-  assert.match(builder, /Do not request passwords, payment details, identity documents/);
+  assert.match(builder, /Do not request unnecessary sensitive information/);
 });
 
 run("live_steps", () => {
@@ -83,6 +87,8 @@ run("live_steps", () => {
   assert.match(wizard, /manualCheckInEnabled: true/);
   assert.match(wizard, /qrCheckInRequiresServerToken: true/);
   assert.match(wizard, /judgeAccountIds/);
+  assert.match(wizard, /ChallengeBuilderFrame/);
+  assert.match(wizard, /setTimeout\(\(\) =>/);
 });
 
 console.log(`Normalized Enterprise, Private, and Live Event contracts passed${selected.size ? `: ${[...selected].join(", ")}` : ""}.`);

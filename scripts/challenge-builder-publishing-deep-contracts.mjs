@@ -41,7 +41,7 @@ assert(!publishRoute.includes("KYC_REQUIRED") && !builder.includes("KYC_REQUIRED
 
 assert(privateBuilder.includes("canCreatePrivateChallenges"), "Private builder entitlement must remain intact");
 assert(tournament.includes("readiness.ready") && tournament.includes('saveDraft("pending_review")'), "tournament readiness gating must remain intact");
-assert(hostBuilder.includes("const problem = validate()") && hostBuilder.includes("createChallenge(payload(publish))"), "host builders must retain canonical validation");
+assert(hostBuilder.includes("const problem = validate()") && hostBuilder.includes("persistDraft") && hostBuilder.includes("publishChallengeDraft"), "host builders must retain validation, draft persistence, and server review submission");
 assert(media.indexOf("...(videoUrl ?") < media.indexOf("...cleanImages.map"), "public challenge media must remain video-first");
 assert(explore.includes("<Play") && explore.includes("playsInline"), "Explore video behavior must remain intact");
 assert(!verification.includes("Restoring your session") && !verification.includes("Checking session"), "technical session loading copy must remain removed");

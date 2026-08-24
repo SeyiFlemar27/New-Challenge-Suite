@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Save, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
-import { createChallenge } from "@/lib/api/services";
+import { createChallenge, publishChallengeDraft, updateChallengeDraft } from "@/lib/api/services";
 import { MediaUploadField } from "@/components/media-upload-field";
 import { challengeDraftMediaPath } from "@/lib/media-upload-paths";
+import { BuilderContent, BuilderFooter, BuilderStepHeading, BuilderSurface, ChallengeBuilderFrame, type BuilderGuideContent } from "@/components/challenge-builder-frame";
 
 const defaultSteps = ["Basic Details", "Visibility", "Format & Rounds", "Participants", "Submissions", "Voting", "Judging", "Prize Setup", "Media & Branding", "Sponsor Readiness", "Review & Publish"];
-const liveEventSteps = ["Event Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Challenge Format", "Voting / Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"];
+const liveEventSteps = ["Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Format", "Voting & Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"];
+const liveEventGuides: BuilderGuideContent[] = liveEventSteps.map((title, index) => ({
+  title,
+  description: index === 1 ? "Set the physical venue, timezone, and operating window." : index === 2 ? "Configure server-authoritative registration and ticket intent." : index === 4 ? "Choose the event format and reveal only relevant competition controls." : index === 5 ? "Assign real judges and preserve result governance." : index === 9 ? "Review the event before admin submission." : `Complete the ${title.toLowerCase()} settings for this Live Event.`,
+  points: index === 1 ? ["Live Events are physical-first.", "Use structured location details.", "Check-in must fit inside the event window."] : index === 2 ? ["Payment confirmation remains authoritative.", "Capacity and waitlist are server-enforced.", "Approval follows the configured registration mode."] : index === 4 ? ["Attendance-only creates no fake submissions.", "Digital controls appear only when required.", "In-person competition remains operationally tracked."] : index === 5 ? ["Judges use real Challenge Suite accounts.", "Hybrid scoring remains unavailable.", "Judge permissions are server-authoritative."] : ["Use participant-facing language.", "Keep details consistent across steps.", "Admin review is required before launch."]
+}));
 const options = {  visibilityMode: ["public", "invite_only", "access_code", "approved_list", "hidden", "public_preview"],
   format: ["single_round", "multi_round", "knockout", "leaderboard", "judge_reviewed", "submission_voting", "registration_only"],
   winnerSelection: ["highest_votes", "judge_selection", "hybrid", "manual"]
@@ -38,8 +44,10 @@ type Form = typeof initial;
 
 export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwnership }: { initialCompetitionType?: string; enterpriseOwnership?: "official" | "personal" } = {}) {
   const auth = useAuth();
-  const [step, setStep] = useState(0), [form, setForm] = useState(() => ({ ...initial, competitionType: initialCompetitionType ?? initial.competitionType, winnerSelection: initialCompetitionType === "Live Event" ? "judge_selection" : initial.winnerSelection })), [saving, setSaving] = useState(false);
-  const [error, setError] = useState(""), [createdId, setCreatedId] = useState("");
+  const [step, setStep] = useState(0), [unlockedStep, setUnlockedStep] = useState(0), [form, setForm] = useState(() => ({ ...initial, competitionType: initialCompetitionType ?? initial.competitionType, winnerSelection: initialCompetitionType === "Live Event" ? "judge_selection" : initial.winnerSelection })), [saving, setSaving] = useState(false);
+  const [error, setError] = useState(""), [draftId, setDraftId] = useState(""), [submittedId, setSubmittedId] = useState("");
+  const [autosaveFailed, setAutosaveFailed] = useState(false), [mobileGuideOpen, setMobileGuideOpen] = useState(false);
+  const autosaveVersion = useRef(0);
   const liveEvent = form.competitionType === "Live Event";
   const activeSteps = liveEvent ? liveEventSteps : defaultSteps;
   const update = <K extends keyof Form>(key: K, value: Form[K]) => { setForm((current) => ({ ...current, [key]: value })); setError(""); };
@@ -103,13 +111,52 @@ export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwners
       }, publish
     };
   };
-  async function submit(publish: boolean) {
+  async function persistDraft(quiet = false) {
     const problem = validate(); if (problem) return setError(problem);
-    setSaving(true); const result = await createChallenge(payload(publish)); setSaving(false);
+    const requestVersion = ++autosaveVersion.current;
+    if (!quiet) setSaving(true);
+    const result = draftId ? await updateChallengeDraft(draftId, { ...payload(false), creationStep: step }) : await createChallenge(payload(false));
+    if (!quiet) setSaving(false);
+    if (requestVersion !== autosaveVersion.current) return false;
     if (!result.ok) return setError(result.message || "Competition could not be saved.");
-    setCreatedId(((result.data?.challenge as { id?: string } | undefined)?.id) || "saved");
+    const id = ((result.data?.challenge as { id?: string } | undefined)?.id) || draftId;
+    if (id) setDraftId(id);
+    setAutosaveFailed(false);
+    return true;
   }
-  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" /><h1 className="mt-5 text-3xl font-black">Competition saved</h1><p className="mt-3 text-slate-300">Advanced events, tournaments, sponsor settings, and prizes remain subject to review. No money movement was enabled.</p><div className="mt-6 flex justify-center gap-3"><LinkButton href={createdId === "saved" ? "/challenges" : `/challenges/${createdId}`}>View Competition</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Host Control Center</LinkButton></div></Card></AppShell>;
+
+  async function submit(publish: boolean) {
+    if (!publish) return void await persistDraft();
+    const problem = validate(); if (problem) return setError(problem);
+    setSaving(true);
+    if (!draftId) { setSaving(false); return setError("Save the event draft before submitting it for review."); }
+    const id = draftId;
+    autosaveVersion.current += 1;
+    const result = await publishChallengeDraft(id, payload(true));
+    setSaving(false);
+    if (!result.ok) return setError(result.message || "Event could not be submitted for review.");
+    setError("");
+    setSubmittedId(id);
+  }
+
+  useEffect(() => {
+    if (!liveEvent || !draftId || submittedId || saving) return;
+    const timer = window.setTimeout(() => {
+      const requestVersion = ++autosaveVersion.current;
+      void updateChallengeDraft(draftId, { ...payload(false), creationStep: step }).then((result) => {
+        if (requestVersion !== autosaveVersion.current) return;
+        setAutosaveFailed(!result.ok);
+        if (!result.ok) setError("We couldn't save your changes. Check your connection and try again.");
+      }).catch(() => {
+        if (requestVersion !== autosaveVersion.current) return;
+        setAutosaveFailed(true);
+        setError("We couldn't save your changes. Check your connection and try again.");
+      });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [draftId, form, liveEvent, saving, step, submittedId]);
+
+  if (submittedId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" /><h1 className="mt-5 text-3xl font-black">Event submitted for review</h1><p className="mt-3 text-slate-600">Editing is unavailable while admin review is pending.</p><div className="mt-6 flex justify-center gap-3"><LinkButton href={`/challenges/${submittedId}`}>View Event</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Host Control Center</LinkButton></div></Card></AppShell>;
   const pageTitle = form.competitionType === "Private Challenge" ? "Create Private Challenge" : form.competitionType === "Live Event" ? "Create Live Event" : form.competitionType === "Tournament" ? "Create Tournament Challenge" : "Create Challenge";
   const pageSubtitle = form.competitionType === "Private Challenge" ? "Set invite access, participant approval, dates, media, and review-safe rules." : form.competitionType === "Live Event" ? "Build a physical-first event with venue, schedule, registration, media, and livestream details." : form.competitionType === "Tournament" ? "Plan a multi-stage tournament with rounds, advancement rules, voting or judging, finals, and review-safe winner confirmation." : "Build a normal online challenge. Private challenges, live events, and tournaments have dedicated creation flows.";
   const actions = <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
@@ -120,19 +167,11 @@ export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwners
     </div>
   </div>;
   if (form.competitionType === "Live Event") {
-    return <AppShell><div className="mx-auto max-w-[1440px]">
+    const guide = liveEventGuides[step] ?? liveEventGuides[0];
+    return <AppShell><main className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8" data-live-event-canonical-builder>
       <PageTitle title={pageTitle} subtitle={pageSubtitle} />
-      <div className="mt-7 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)_280px]">
-        <aside className="lg:sticky lg:top-24"><HostVerticalStepper steps={activeSteps} current={step} onSelect={setStep} /></aside>
-        <Card className="min-w-0 p-5 sm:p-7">
-          <div className="min-h-[470px]"><LiveEventStep step={step} form={form} update={update} userId={auth.user?.uid ?? "anonymous"} /></div>
-          {error ? <p className="mt-5 rounded-[8px] bg-red-950/50 p-4 text-red-200">{error}</p> : null}
-          <LivePublishChecklist form={form} />
-          {actions}
-        </Card>
-        <LiveBuilderGuide step={step} />
-      </div>
-    </div></AppShell>;
+      <ChallengeBuilderFrame steps={activeSteps} currentStep={step} unlockedStep={unlockedStep} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={setStep}><BuilderSurface><BuilderContent><div className="min-h-[470px]"><LiveEventStep step={step} form={form} update={update} userId={auth.user?.uid ?? "anonymous"} /></div>{error ? <p className="mt-5 rounded-[8px] border border-red-200 bg-red-50 p-4 text-red-800">{error}</p> : null}{step === activeSteps.length - 1 ? <LivePublishChecklist form={form} /> : null}</BuilderContent><BuilderFooter backDisabled={step === 0} busy={saving} finishLater={draftId ? () => void persistDraft() : undefined} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={() => { if (step < activeSteps.length - 1) { const problem = validate(); if (problem) return setError(problem); void persistDraft(true).then((saved) => { if (saved) { const next = step + 1; setUnlockedStep((current) => Math.max(current, next)); setStep(next); } }); } else void submit(true); }} final={step === activeSteps.length - 1} finalDisabled={autosaveFailed} /></BuilderSurface></ChallengeBuilderFrame>
+    </main></AppShell>;
   }
   return <AppShell><div className="mx-auto max-w-6xl" data-mobile-creator-management><PageTitle title={pageTitle} subtitle={pageSubtitle} /><Card className="mt-6 p-4 sm:p-6">
     <div className="grid gap-2 sm:grid-cols-2 lg:flex" data-mobile-builder-steps>{activeSteps.map((label, index) => <button key={label} onClick={() => index <= step && setStep(index)} className={`min-h-11 rounded-[8px] px-3 text-left text-xs font-black lg:min-w-40 ${index === step ? "bg-[var(--gold)] text-black" : "bg-[#191919] text-slate-300"}`}>{index + 1}. {label}</button>)}</div>
@@ -167,7 +206,7 @@ function LivePublishChecklist({ form }: { form: Form }) {
 }
 
 function LiveEventStep({ step, form, update, userId }: { step: number; form: Form; update: <K extends keyof Form>(key: K, value: Form[K]) => void; userId: string }) {
-  const toggle = (key: keyof Form, label: string) => <label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-white/10 px-4 py-3 font-bold"><input type="checkbox" checked={Boolean(form[key])} onChange={(event) => update(key, event.target.checked as never)} />{label}</label>;
+  const toggle = (key: keyof Form, label: string) => <label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-black/10 bg-slate-50 px-4 py-3 font-bold text-slate-950"><input type="checkbox" checked={Boolean(form[key])} onChange={(event) => update(key, event.target.checked as never)} />{label}</label>;
   if (step === 0) return <Step title="Event Basics"><Grid><Field label="Event title"><input className={inputClass} value={form.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Category"><input className={inputClass} value={form.category} onChange={(event) => update("category", event.target.value)} /></Field><Field label="Subcategory"><input className={inputClass} value={form.subcategory} onChange={(event) => update("subcategory", event.target.value)} /></Field></Grid><Field label="Full description"><textarea className={textareaClass} value={form.description} onChange={(event) => update("description", event.target.value)} /></Field><Field label="Event rules (one per line)"><textarea className={textareaClass} value={form.eventRules} onChange={(event) => update("eventRules", event.target.value)} /></Field></Step>;
   if (step === 1) return <Step title="Venue & Schedule"><Grid><Field label="Venue name"><input className={inputClass} value={form.venueName} onChange={(event) => update("venueName", event.target.value)} /></Field><Field label="Address"><input className={inputClass} value={form.eventAddress} onChange={(event) => update("eventAddress", event.target.value)} /></Field><Field label="City"><input className={inputClass} value={form.eventCity} onChange={(event) => update("eventCity", event.target.value)} /></Field><Field label="State / Region"><input className={inputClass} value={form.eventState} onChange={(event) => update("eventState", event.target.value)} /></Field><Field label="Country"><input className={inputClass} value={form.eventCountry} onChange={(event) => update("eventCountry", event.target.value)} /></Field><Field label="Timezone"><select className={inputClass} value={form.eventTimezone} onChange={(event) => update("eventTimezone", event.target.value)}><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="America/Anchorage">Alaska Time</option><option value="Pacific/Honolulu">Hawaii Time</option><option value="Africa/Lagos">WAT / Lagos</option></select></Field><Field label="Event start"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></Field><Field label="Event end"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></Field><Field label="Check-in start (optional)"><input className={inputClass} type="datetime-local" value={form.checkInStartAt} onChange={(event) => update("checkInStartAt", event.target.value)} /></Field><Field label="Check-in end (optional)"><input className={inputClass} type="datetime-local" value={form.checkInEndAt} onChange={(event) => update("checkInEndAt", event.target.value)} /></Field></Grid><p className="text-sm text-slate-400">Live Events are physical at launch. Virtual-only event mode is not available.</p></Step>;
   if (step === 2) return <Step title="Registration & Tickets"><Grid><Field label="Registration"><select className={inputClass} value={form.ticketType} onChange={(event) => update("ticketType", event.target.value)}><option value="free">Free</option><option value="paid">Paid</option></select></Field>{form.ticketType === "paid" ? <Field label="Ticket price"><input className={inputClass} type="number" min="0" step="0.01" value={form.ticketPrice} onChange={(event) => update("ticketPrice", event.target.value)} /></Field> : null}<Field label="Registration start"><input className={inputClass} type="datetime-local" value={form.registrationOpensAt} onChange={(event) => update("registrationOpensAt", event.target.value)} /></Field><Field label="Registration end"><input className={inputClass} type="datetime-local" value={form.registrationClosesAt} onChange={(event) => update("registrationClosesAt", event.target.value)} /></Field><Field label="Participant capacity"><input className={inputClass} type="number" min="2" max="50000" value={form.maxParticipants} onChange={(event) => update("maxParticipants", event.target.value)} /></Field>{toggle("approvalRequired", "Approval required")}{toggle("waitlistEnabled", "Waitlist enabled")}</Grid><Field label="Registration instructions"><textarea className={textareaClass} value={form.ticketInstructions} onChange={(event) => update("ticketInstructions", event.target.value)} /></Field><p className="text-sm text-slate-400">Paid approval remains payment first. Only provider-confirmed payment can create a paid approval request.</p></Step>;
@@ -195,7 +234,7 @@ function WizardStep({ step, form, update, userId }: { step: number; form: Form; 
   if (step === 9) return <Step title="Sponsor Readiness"><Grid>{check("allowSponsorInterest", "Allow sponsor interest")}{check("showSponsorRequestButton", "Show sponsor request button")}</Grid><Field label="Sponsor Categories"><textarea className={textareaClass} value={form.sponsorCategories} onChange={(e) => update("sponsorCategories", e.target.value)} /></Field><Field label="Visibility Areas"><textarea className={textareaClass} value={form.sponsorVisibilityAreas} onChange={(e) => update("sponsorVisibilityAreas", e.target.value)} /></Field><Card className="p-4 text-sm text-slate-300">Sponsor requests remain review-only. No sponsor capture or release is activated.</Card></Step>;
   return <Step title="Review & Publish"><div className="grid gap-3 sm:grid-cols-2">{[["Competition", form.competitionType], ["Visibility", form.visibilityMode], ["Format", form.format], ["Participants", form.maxParticipants], ["Voting", `${form.votesPerUserPerDay} vote(s)/day`], ["Winner selection", form.winnerSelection]].map(([label, value]) => <Card key={label} className="p-4"><p className="text-xs font-bold uppercase text-slate-400">{label}</p><p className="mt-1 font-black capitalize">{value.replaceAll("_", " ")}</p></Card>)}</div><Grid>{["draft", "publish", "schedule"].map((value) => <Button key={value} variant={form.launchMode === value ? "primary" : "secondary"} onClick={() => update("launchMode", value)}>{value}</Button>)}</Grid><Card className="p-4 text-sm text-slate-300">Review the competition details before saving, scheduling, or publishing.</Card></Step>;
 }
-function Step({ title, children }: { title: string; children: React.ReactNode }) { return <section className="space-y-6"><div><p className="text-xs font-black uppercase text-[var(--gold)]">Host competition builder</p><h2 className="mt-2 text-2xl font-black">{title}</h2></div>{children}</section>; }
+function Step({ title, children }: { title: string; children: React.ReactNode }) { return <section className="space-y-6 text-slate-950"><BuilderStepHeading title={title} eyebrow="Live Event Builder" />{children}</section>; }
 function Grid({ children }: { children: React.ReactNode }) { return <div className="grid gap-4 sm:grid-cols-2">{children}</div>; }
 
 function SpecializedFlowNotice({ competitionType }: { competitionType: string }) {

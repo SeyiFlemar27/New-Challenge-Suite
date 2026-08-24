@@ -327,3 +327,26 @@ export function adminTournamentActionFoundation(action: string) {
   const sensitive = ["approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation"];
   return { action, adminRequired: sensitive.includes(action), auditRequired: sensitive.includes(action), payoutProviderCalled: false, rawVoteTotalEditable: false, balanceOverwriteAllowed: false };
 }
+
+export function deriveTournamentCorrectionImpact(matches: TournamentMatchFoundation[], sourceMatchId: string) {
+  const byId = new Map(matches.map((match) => [match.id, match]));
+  const affected = new Set<string>();
+  const queue = [sourceMatchId];
+  while (queue.length) {
+    const currentId = queue.shift();
+    if (!currentId || affected.has(currentId)) continue;
+    const current = byId.get(currentId);
+    if (!current) continue;
+    affected.add(currentId);
+    [current.nextMatchId, current.loserNextMatchId, current.resetMatchId].filter(Boolean).forEach((nextId) => queue.push(String(nextId)));
+  }
+  const downstream = [...affected].filter((matchId) => matchId !== sourceMatchId).map((matchId) => byId.get(matchId)).filter((match): match is TournamentMatchFoundation => Boolean(match));
+  return {
+    sourceMatchId,
+    affectedMatchIds: [...affected],
+    downstreamMatchIds: downstream.map((match) => match.id),
+    downstreamMatches: downstream.map((match) => ({ id: match.id, roundNumber: match.roundNumber, matchNumber: match.matchNumber, bracket: match.bracket ?? "winners", status: match.status })),
+    hasResolvedDownstream: downstream.some((match) => ["confirmed", "forfeit", "bye"].includes(match.status)),
+    futureOnly: downstream.every((match) => ["pending", "ready", "waiting"].includes(match.status))
+  };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, LockKeyhole, Trophy, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -58,8 +58,10 @@ export function TournamentBuilder() {
   const [notice, setNotice] = useState("");
   const [createdId, setCreatedId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [autosaveFailed, setAutosaveFailed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
+  const saveVersion = useRef(0);
   const mediaDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
   const roundPlan = useMemo(() => buildRoundPlan(bracketSizeForParticipants(form.participantCapacity), form.resultMethod, form.thirdPlaceMethod), [form.participantCapacity, form.resultMethod, form.thirdPlaceMethod]);
   const readiness = useMemo(() => {
@@ -86,10 +88,8 @@ export function TournamentBuilder() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function saveDraft(status: "draft" | "pending_review" = "draft", quiet = false) {
-    setSaving(true);
-    setNotice("");
-    const payload = {
+  function draftPayload(status: "draft" | "pending_review" = "draft") {
+    return {
       ...form,
       configVersion: 2,
       status,
@@ -100,17 +100,37 @@ export function TournamentBuilder() {
       eligibility: { rules: form.eligibilityRules, profileRequirements: form.profileRequirements, ageRestriction: form.ageRestriction },
       sponsorship: { sponsorReady: form.sponsorReady, acceptSponsorshipProposals: form.acceptSponsorshipProposals, sponsorPlacementPreferences: form.sponsorPlacementPreferences, confirmedSponsorFundingMinor: 0 }
     };
+  }
+
+  async function saveDraft(status: "draft" | "pending_review" = "draft", quiet = false, background = false) {
+    const requestVersion = ++saveVersion.current;
+    if (!background) setSaving(true);
+    if (!quiet) setNotice("");
+    const payload = draftPayload(status);
     const result = await apiRequest<{ tournament: { id: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", body: JSON.stringify(payload) });
-    setSaving(false);
+    if (requestVersion !== saveVersion.current) return false;
+    if (!background) setSaving(false);
     if (!result.ok || !result.data) {
-      setNotice(result.message || "Tournament draft could not be saved.");
+      setAutosaveFailed(true);
+      if (!quiet || background) setNotice(result.message || "We couldn't save your changes. Check your connection and try again.");
       return false;
     }
+    setAutosaveFailed(false);
     setCreatedId(result.data.tournament.id);
-    if (status === "pending_review") setSubmitted(true);
+    if (status === "pending_review") {
+      saveVersion.current += 1;
+      setSubmitted(true);
+      setNotice("");
+    }
     if (!quiet) setNotice(status === "pending_review" ? "Tournament submitted for readiness review." : "Tournament draft saved.");
     return true;
   }
+
+  useEffect(() => {
+    if (!createdId || submitted || saving) return;
+    const timer = window.setTimeout(() => { void saveDraft("draft", true, true); }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [createdId, form, roundPlan, saving, step, submitted]);
 
   async function next() {
     if (!(await saveDraft("draft", true))) return;
@@ -155,7 +175,7 @@ export function TournamentBuilder() {
                <Button variant="secondary" disabled={step === 0 || saving} onClick={() => setStep((value) => Math.max(0, value - 1))}><ChevronLeft size={16} /> Back</Button>
                <div className="flex flex-wrap gap-3">
                  {createdId ? <Button variant="ghost" onClick={() => void finishLater()} disabled={saving}>Finish Later</Button> : null}
-                 {step < steps.length - 1 ? <Button onClick={() => void next()} disabled={saving}>{saving ? "Saving..." : "Continue"} <ChevronRight size={16} /></Button> : <Button onClick={() => void saveDraft("pending_review")} disabled={saving || !readiness.ready}><CheckCircle2 size={16} /> {saving ? "Submitting..." : "Submit for Review"}</Button>}
+                 {step < steps.length - 1 ? <Button onClick={() => void next()} disabled={saving || autosaveFailed}>{saving ? "Saving..." : "Continue"} <ChevronRight size={16} /></Button> : <Button onClick={() => void saveDraft("pending_review")} disabled={saving || autosaveFailed || !readiness.ready}><CheckCircle2 size={16} /> {saving ? "Submitting..." : "Submit for Review"}</Button>}
                </div>
              </div>
             </div>

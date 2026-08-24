@@ -51,7 +51,7 @@ has(challengeDeletion, "hardDeleteAllowed", "Challenge deletion is activity-awar
 has(challengeLifecycle, "request_admin_deletion", "Challenges with history can request admin deletion.");
 has(challengeLifecycle, "status: \"cancelled\"", "Active challenges are cancelled rather than erased.");
 
-for (const step of ["Overview", "Access", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) has(privateBuilder, `\"${step}\"`, `Private builder includes ${step}.`);
+for (const step of ["Overview", "Access", "Eligibility", "Monetization", "Media", "Schedule", "Entry & Submission", "Review", "Publish"]) has(privateBuilder, `\"${step}\"`, `Private builder includes ${step}.`);
 has(privateAccess, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "Private codes avoid ambiguous characters.");
 has(privateAccess, "Uint8Array(5)", "Private access code is five characters.");
 has(privateBuilder, "readOnly aria-label=\"Generated private challenge access code\"", "Creator cannot manually type the access code.");
@@ -60,7 +60,7 @@ has(privateBuilder, "publicPreviewEnabled", "Private challenge supports explicit
 has(publicChallenge, "!type.includes(\"private\")", "Private challenges never enter ordinary public Explore.");
 lacks(publicChallenge, "privateAccessCode\"", "Public challenge fields never expose private access codes.");
 
-for (const step of ["Event Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Challenge Format", "Voting / Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) has(liveBuilder, `\"${step}\"`, `Live builder includes ${step}.`);
+for (const step of ["Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Format", "Voting & Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) has(liveBuilder, `\"${step}\"`, `Live builder includes ${step}.`);
 has(liveBuilder, "Physical venue name", "Live events are physical-first.");
 has(liveBuilder, "paid_setup_required", "Paid ticket choice remains setup-only.");
 has(liveBuilder, "ticketCheckoutActive: false", "Live builder never enables fake ticket checkout.");

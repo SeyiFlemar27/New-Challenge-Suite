@@ -6,7 +6,7 @@ assert(existsSync(join(root, "app/admin/tournaments/page.tsx")), "Admin tourname
 assert(existsSync(join(root, "app/admin/tournaments/[id]/page.tsx")), "Admin tournament detail route must exist.");
 const api = readFileSync(join(root, "app/api/admin/tournaments/[id]/route.ts"), "utf8");
 const ops = readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8");
-assert(api.includes("requireAdminUser"), "Admin tournament API must require admin.");
+assert(api.includes("requireAdminPermission") && api.includes('"challenges.view"'), "Admin tournament API must require a server-side admin permission.");
 assert(api.includes("tournamentAuditEvents"), "Sensitive actions must write audit logs.");
 assert(ops.includes("rawVoteTotalEditable: false") && ops.includes("balanceOverwriteAllowed: false"), "Admin must not edit raw vote totals or balances.");
 assert(api.includes("payoutProviderCalled: false"), "Admin tournament center must not call payout provider.");

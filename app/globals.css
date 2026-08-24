@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Advanced builders share a light surface while legacy field groups are normalized. */
+[data-builder-surface] .text-white { color: #0f172a !important; }
+[data-builder-surface] .text-slate-300 { color: #475569 !important; }
+[data-builder-surface] .text-slate-400 { color: #64748b !important; }
+[data-builder-surface] .text-yellow-50,
+[data-builder-surface] .text-yellow-100 { color: #92400e !important; }
+[data-builder-surface] .text-emerald-200 { color: #047857 !important; }
+[data-builder-surface] [class~="border-white/10"] { border-color: rgb(15 23 42 / 0.1) !important; }
+[data-builder-surface] [class~="bg-[#141414]"],
+[data-builder-surface] [class~="bg-[#181818]"],
+[data-builder-surface] [class~="bg-black/25"],
+[data-builder-surface] [class~="bg-black/30"] { background-color: #f8fafc !important; }
+
 :root {
   --background: #f7f8fa;
   --foreground: #171717;

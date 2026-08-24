@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
-import { adminTournamentActionFoundation } from "@/lib/server/tournament-operations";
+import { adminTournamentActionFoundation, deriveTournamentCorrectionImpact } from "@/lib/server/tournament-operations";
 
 export const dynamic = "force-dynamic";
 
@@ -13,21 +13,34 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const { id } = await context.params;
   const tournamentSnap = await db.collection("tournaments").doc(id).get();
   if (!tournamentSnap.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-  const [participants, rounds, matches, submissions, votes, judges, prizePools, proposals, reports, disputes, audits] = await Promise.all([
+  const [participants, rounds, matches, submissions, votes, judges, judgeScores, prizePools, proposals, reports, disputes, audits] = await Promise.all([
     db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentRounds").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentMatches").where("tournamentId", "==", id).limit(200).get(),
     db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(200).get(),
     db.collection("tournamentVotes").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentJudges").where("tournamentId", "==", id).limit(100).get(),
+    db.collection("tournamentJudgeScores").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentPrizePools").where("tournamentId", "==", id).limit(20).get(),
     db.collection("tournamentSponsorProposals").where("tournamentId", "==", id).limit(50).get(),
     db.collection("tournamentReports").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentDisputes").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentAuditEvents").where("tournamentId", "==", id).limit(100).get()
   ]);
-  const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  return ok({ tournament: { id: tournamentSnap.id, ...tournamentSnap.data() }, participants: rows(participants), rounds: rows(rounds), matches: rows(matches), submissions: rows(submissions), votes: rows(votes), judges: rows(judges), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), audits: rows(audits) }, "Admin tournament detail loaded.");
+  const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data()
+  } as Record<string, unknown> & { id: string }));
+  const matchRows = rows(matches);
+  const impactMatchId = new URL(request.url).searchParams.get("impactMatchId") ?? "";
+  const impact = impactMatchId ? deriveTournamentCorrectionImpact(matchRows as Parameters<typeof deriveTournamentCorrectionImpact>[0], impactMatchId) : null;
+  const activity = impact ? {
+    submissions: rows(submissions).filter((item) => impact.affectedMatchIds.includes(String(item.matchId ?? ""))).length,
+    votes: rows(votes).filter((item) => impact.affectedMatchIds.includes(String(item.matchId ?? ""))).length,
+    judging: rows(judgeScores).filter((item) => impact.affectedMatchIds.includes(String(item.matchId ?? ""))).length,
+    settlementSensitive: impact.hasResolvedDownstream || ["results_under_review", "completed"].includes(String(tournamentSnap.data()?.status ?? ""))
+  } : null;
+  return ok({ tournament: { id: tournamentSnap.id, ...tournamentSnap.data() }, participants: rows(participants), rounds: rows(rounds), matches: matchRows, submissions: rows(submissions), votes: rows(votes), judges: rows(judges), judgeScores: rows(judgeScores), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), audits: rows(audits), correctionImpact: impact ? { ...impact, activity, automaticCorrectionAllowed: impact.futureOnly && !activity?.submissions && !activity?.votes && !activity?.judging && !activity?.settlementSensitive } : null }, "Admin tournament detail loaded.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
