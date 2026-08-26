@@ -1,9 +1,9 @@
-import { Building2, Radio, ShieldCheck, Swords, Trophy } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
-import { Card, LinkButton, PageTitle } from "@/components/ui";
+import { EnterpriseCreateEntry } from "@/components/enterprise/enterprise-create-entry";
 
-const types = [{ slug: "normal", label: "Normal Challenge", icon: Swords }, { slug: "private", label: "Private Challenge", icon: ShieldCheck }, { slug: "live", label: "Live Event", icon: Radio }, { slug: "tournament", label: "Tournament", icon: Trophy }];
+const supportedTypes = new Set(["normal", "private", "live", "tournament"]);
 
-export default function EnterpriseCreateChallengePage() {
-  return <AppShell><div className="mx-auto max-w-6xl"><PageTitle title="Create Challenge" subtitle="Choose organizational ownership first, then use the established challenge-type builder." icon={<Building2 className="text-[var(--gold)]" />} /><div className="mt-8 grid gap-6 lg:grid-cols-2"><Card className="p-6"><h2 className="text-2xl font-black text-slate-950">Challenge Suite Official</h2><p className="mt-2 text-sm leading-6 text-slate-600">Organizationally owned. Your account remains the creation author and initial Challenge Lead.</p><div className="mt-6 grid gap-3 sm:grid-cols-2">{types.map(({ slug, label, icon: Icon }) => <LinkButton key={slug} href={`/enterprise/challenges/create/official/${slug}`} variant="secondary"><Icon size={17} />{label}</LinkButton>)}</div></Card><Card className="p-6"><h2 className="text-2xl font-black text-slate-950">Personal Challenge</h2><p className="mt-2 text-sm leading-6 text-slate-600">Owned by your account. Personal finances remain separate from Challenge Suite organizational money.</p><div className="mt-6 grid gap-3 sm:grid-cols-2">{types.map(({ slug, label, icon: Icon }) => <LinkButton key={slug} href={`/enterprise/challenges/create/personal/${slug}`} variant="secondary"><Icon size={17} />{label}</LinkButton>)}</div></Card></div></div></AppShell>;
+export default async function EnterpriseCreateChallengePage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  const requestedType = String((await searchParams).type ?? "").toLowerCase();
+  const selectedType = supportedTypes.has(requestedType) ? requestedType as "normal" | "private" | "live" | "tournament" : null;
+  return <EnterpriseCreateEntry selectedType={selectedType} />;
 }

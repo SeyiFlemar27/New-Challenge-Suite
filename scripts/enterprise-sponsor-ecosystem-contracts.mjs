@@ -36,7 +36,8 @@ export function runEnterpriseSponsorEcosystemContract(name) {
     includesAll(sponsorShell, ['label: "Sponsor Studio"', 'label: "Discover"', 'label: "Saved"', 'label: "Sponsorships"', 'label: "Proposals"', 'label: "Deliverables"', 'label: "Analytics"', 'label: "Reports"', 'label: "Wallet"', 'label: "Settings"', 'label: "Support"', "WorkspaceSwitcher"], name);
     assert.ok(!sponsorShell.includes('label: "Campaigns"'), `${name}: Campaigns must not be a sidebar label`);
   } else if (name === "enterprise-shell-isolation") {
-    includesAll(sidebar, ["personalEconomyContext", 'workspaceContext === "enterprise"', "Enterprise Access"], name);
+    includesAll(sidebar, ["personalEconomyContext", 'routedWorkspace === "enterprise"', "workspaceForRoute"], name);
+    assert.ok(!sidebar.includes("Enterprise Access"), `${name}: legacy Enterprise access badge must not replace workspace identity`);
     assert.match(sidebar, /personalEconomyContext \? <Link href="\/dorocoins"/);
   } else if (name === "enterprise-dynamic-onboarding") {
     includesAll(enterpriseOnboarding, ["enterpriseOnboardingModules", "access.permissions.includes", "assignment_context", "Having no assignment does not block onboarding"], name);

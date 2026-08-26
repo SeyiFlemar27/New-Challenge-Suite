@@ -78,6 +78,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
     customization: sanitizeCustomization((profile.customization ?? account.customization) as any),
     initials: identity.initials,
+    avatarUrl: typeof (merged.avatarUrl ?? merged.photoURL) === "string" ? String(merged.avatarUrl ?? merged.photoURL) : null,
     premium: planAccess.isPremium,
     verified: Boolean(profile.verified || profile.emailVerified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
     emailVerified: Boolean(profile.emailVerified || profile.verified || account.emailVerified || account.verificationStatus === "verified" || user.emailVerified),
@@ -335,6 +336,3 @@ export async function PATCH(request: Request) {
     return serverError("Account type could not be selected.", error instanceof Error ? error.message : error);
   }
 }
-
-
-

@@ -7,6 +7,7 @@ import { Building2, CheckCircle2, ClipboardCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
 const initial = { fullName: "", workEmail: "", organization: "", role: "", reason: "", expectedUse: "", teamSize: "", relationship: "", message: "" };
 const useOptions = ["Challenge operations", "Private competitions", "Live events", "Tournaments", "Voting control", "Platform workflow management", "Other"];
@@ -14,6 +15,8 @@ const teamSizes = ["1-5", "6-15", "16-50", "51-100", "100+"];
 
 export default function EnterpriseApplyPage() {
   const router = useRouter();
+  const { user, loading } = useCurrentUser();
+  const enterpriseApproved = Boolean(user?.availableWorkspaces?.includes("enterprise"));
   const pathname = usePathname();
   const [form, setForm] = useState(initial);
   const [submitting, setSubmitting] = useState(false);
@@ -22,6 +25,7 @@ export default function EnterpriseApplyPage() {
   const [editId, setEditId] = useState("");
   const [expectedVersion, setExpectedVersion] = useState(0);
   const [applicationStatus, setApplicationStatus] = useState("");
+  useEffect(() => { if (enterpriseApproved) router.replace("/enterprise"); }, [enterpriseApproved, router]);
   useEffect(() => {
     const requestedId = new URLSearchParams(window.location.search).get("application");
     const editingLatest = pathname === "/enterprise/application/edit";
@@ -49,6 +53,7 @@ export default function EnterpriseApplyPage() {
     setForm(initial);
     router.push("/enterprise/status");
   }
+  if (loading || enterpriseApproved) return <AppShell><Card className="mx-auto h-64 max-w-4xl animate-pulse" /></AppShell>;
   return <AppShell><div className="mx-auto max-w-6xl">
     <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
       <div>

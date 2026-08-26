@@ -12,6 +12,7 @@ export interface CurrentUserProfile {
   email: string;
   displayName: string;
   initials: string;
+  avatarUrl?: string | null;
   role?: AppRole;
   accountType: AccountType;
   dashboardType?: string;
@@ -108,6 +109,7 @@ export function useCurrentUser() {
           email: String(auth.user.email || profile.email || ""),
           displayName,
           initials: identity.initials,
+          avatarUrl: typeof profileRecord.avatarUrl === "string" ? profileRecord.avatarUrl : typeof profileRecord.photoURL === "string" ? profileRecord.photoURL : null,
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           accountType,
           dashboardType: typeof profile.dashboardType === "string" ? profile.dashboardType : undefined,
@@ -171,5 +173,3 @@ export function useCurrentUser() {
     error
   }), [auth.loading, auth.user, currentUser, error, loadingProfile]);
 }
-
-

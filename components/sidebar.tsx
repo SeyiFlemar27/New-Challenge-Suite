@@ -7,6 +7,7 @@ import {
   Award,
   BarChart3,
   ClipboardCheck,
+  ChevronDown,
   Coins,
   Diamond,
   Gift,
@@ -22,6 +23,7 @@ import {
   LogIn,
   LogOut,
   Star,
+  Swords,
   Target,
   Trophy,
   User,
@@ -36,9 +38,10 @@ import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { logout } from "@/lib/firebase/auth-service";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { workspaceForRoute } from "@/lib/workspace-routing";
 
 type NavIcon = typeof Home;
-type NavItem = { href: string; label: string; icon: NavIcon };
+type NavItem = { href?: string; label: string; icon: NavIcon; children?: Array<{ href: string; label: string }> };
 type NavSection = { label: string; items: NavItem[] };
 type WorkspaceNavigationContext = "admin" | "enterprise" | "host" | "creator" | "sponsor" | "user";
 
@@ -186,12 +189,27 @@ const sponsorSections: NavSection[] = [
   ] }
 ];
 
-function enterpriseSections(permissions: string[]): NavSection[] {
+function enterpriseSections(permissions: string[], isAdmin: boolean): NavSection[] {
   const allowed = (permission: string) => permissions.includes(permission);
+  const canCreate = allowed("challenge.create_official") || allowed("challenge.create_personal");
   return [
-    { label: "Main", items: [{ href: "/enterprise", label: "Enterprise Studio", icon: Home }, { href: "/explore", label: "Explore", icon: LayoutGrid }, { href: "/favorites", label: "Saved", icon: Star }] },
+    { label: "Main", items: [
+      { href: "/enterprise", label: "Enterprise Studio", icon: Home },
+      { href: "/explore", label: "Explore", icon: LayoutGrid },
+      { href: "/enterprise/saved", label: "Saved", icon: Star },
+    ] },
+    ...(canCreate ? [{ label: "Create", items: [{
+      label: "Build a Challenge",
+      icon: Swords,
+      children: [
+        { href: "/enterprise/challenges/create?type=normal", label: "Normal" },
+        { href: "/enterprise/challenges/create?type=private", label: "Private" },
+        { href: "/enterprise/challenges/create?type=live", label: "Live Event" },
+        { href: "/enterprise/challenges/create?type=tournament", label: "Tournament" },
+      ],
+    }] }] : []),
     { label: "Operations", items: [
-      { href: "/enterprise/challenges", label: "Challenges", icon: Medal },
+      { href: "/enterprise/challenges", label: "Official Challenges", icon: Medal },
       { href: "/enterprise/assigned", label: "Assigned to Me", icon: ClipboardCheck },
       ...(allowed("submissions.view") ? [{ href: "/enterprise/submissions", label: "Submissions", icon: ClipboardCheck }] : []),
       ...(allowed("reviews.view") ? [{ href: "/enterprise/reviews", label: "Reviews", icon: ShieldCheck }] : []),
@@ -201,21 +219,29 @@ function enterpriseSections(permissions: string[]): NavSection[] {
       ...(allowed("finance.view") ? [{ href: "/enterprise/finance", label: "Finance", icon: ReceiptText }] : []),
       ...(allowed("sponsors.view") ? [{ href: "/enterprise/sponsorships", label: "Sponsorships", icon: Target }] : []),
     ] },
-    { label: "Community", items: [{ href: "/leaderboards", label: "Leaderboards", icon: BarChart3 }, { href: "/winners", label: "Winners", icon: Trophy }] },
+    { label: "Community", items: [
+      { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
+      { href: "/winners", label: "Winners", icon: Trophy },
+    ] },
     { label: "Internal", items: [
       ...(allowed("team.view") ? [{ href: "/enterprise/team", label: "Team", icon: UsersRound }] : []),
       ...(allowed("activity.view") ? [{ href: "/enterprise/activity", label: "Activity", icon: ClipboardCheck }] : []),
     ] },
-    { label: "Account", items: [{ href: "/profile", label: "Profile", icon: User }, { href: "/settings", label: "Settings", icon: Settings }] },
+    { label: "Account", items: [
+      { href: "/profile", label: "Profile", icon: User },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ] },
+    ...(isAdmin ? [{ label: "Administration", items: [{ href: "/admin", label: "Admin Panel", icon: ShieldCheck }] }] : []),
   ].filter((section) => section.items.length);
 }
 
-export function workspaceNavigationContext(pathname: string): WorkspaceNavigationContext {
+export function workspaceNavigationContext(pathname: string, activeWorkspace?: "personal" | "sponsor" | "enterprise", availableWorkspaces: Array<"personal" | "sponsor" | "enterprise"> = ["personal"]): WorkspaceNavigationContext {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
-  if (pathname === "/enterprise" || pathname.startsWith("/enterprise/")) return "enterprise";
+  const routedWorkspace = workspaceForRoute(pathname, activeWorkspace, availableWorkspaces);
+  if (routedWorkspace === "enterprise") return "enterprise";
+  if (routedWorkspace === "sponsor") return "sponsor";
   if (pathname === "/dashboard/host" || pathname.startsWith("/dashboard/host/") || pathname === "/host" || pathname.startsWith("/host/")) return "host";
   if (pathname === "/creator" || pathname.startsWith("/creator/")) return "creator";
-  if (pathname === "/sponsor" || pathname.startsWith("/sponsor/")) return "sponsor";
   return "user";
 }
 
@@ -252,7 +278,7 @@ function sectionsForTier(tierId: string, sponsor: boolean) {
 
 function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, tierId: string, sponsor: boolean, enterprisePermissions: string[]) {
   if (context === "admin") return isAdmin ? adminSections : [];
-  if (context === "enterprise") return enterpriseSections(enterprisePermissions);
+  if (context === "enterprise") return enterpriseSections(enterprisePermissions, isAdmin);
   if (context === "host") return hostSections;
   if (context === "creator") return creatorSections;
   if (context === "sponsor") return sponsorSections;
@@ -282,7 +308,7 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
-  const workspaceContext = workspaceNavigationContext(pathname);
+  const workspaceContext = workspaceNavigationContext(pathname, user?.activeWorkspace, user?.availableWorkspaces ?? ["personal"]);
   const sections = signedOut
     ? guestSections
     : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, effectiveTier.id, user?.accountType === "sponsor", user?.enterprisePermissions ?? []);
@@ -321,7 +347,7 @@ export function Sidebar() {
         <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
-          <NavigationSections sections={sections} activeHref={activeHref} mobile />
+          <NavigationSections sections={sections} activeHref={activeHref} pathname={pathname} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
             {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
               <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
@@ -338,12 +364,12 @@ export function Sidebar() {
           <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{workspace.name}</p></div>
         </div>
         <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-white/10 px-5 py-4" aria-label="Primary navigation">
-          <NavigationSections sections={sections} activeHref={activeHref} />
+          <NavigationSections sections={sections} activeHref={activeHref} pathname={pathname} />
         </nav>
         <div className="space-y-3 p-5">
           <WorkspaceSwitcher user={user} />
           {personalEconomyContext ? <Link href="/dorocoins" aria-label="Open DoroCoin wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins</Link> : null}
-          {personalEconomyContext ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : workspaceContext === "enterprise" ? <div className="flex min-h-11 items-center justify-center rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><ShieldCheck size={16} className="mr-2 text-[var(--gold)]" /> Enterprise Access</div> : null}
+          {personalEconomyContext ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : null}
           {!loading && !signedOut && personalEconomyContext && !user?.isSponsor ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
       </aside>
@@ -370,7 +396,19 @@ function WorkspaceNavigationLoading() {
   );
 }
 
-function NavigationSections({ sections, activeHref, mobile = false }: { sections: NavSection[]; activeHref: string; mobile?: boolean }) {
-  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => { const Icon = item.icon; const active = activeHref === item.href || (item.href === "/rewards" && activeHref.startsWith("/rewards")); return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>; })}</div></section>)}</div>;
+function NavigationSections({ sections, activeHref, pathname, mobile = false }: { sections: NavSection[]; activeHref: string; pathname: string; mobile?: boolean }) {
+  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => <NavigationItem key={item.href ?? item.label} item={item} activeHref={activeHref} pathname={pathname} />)}</div></section>)}</div>;
 }
 
+function NavigationItem({ item, activeHref, pathname }: { item: NavItem; activeHref: string; pathname: string }) {
+  const childRouteActive = Boolean(item.children?.some((child) => pathname === child.href.split("?")[0] || pathname.startsWith(child.href.split("?")[0] + "/")));
+  const [open, setOpen] = useState(childRouteActive);
+  useEffect(() => { if (childRouteActive) setOpen(true); }, [childRouteActive]);
+  const Icon = item.icon;
+  if (item.children?.length) {
+    return <div><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className={cn("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", childRouteActive && "bg-white/5 text-white")}><Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span><ChevronDown size={16} className={open ? "rotate-180 transition" : "transition"} /></button>{open ? <div className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-3">{item.children.map((child) => <Link key={child.href} href={child.href} className="flex min-h-10 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">{child.label}</Link>)}</div> : null}</div>;
+  }
+  const href = item.href ?? "#";
+  const active = activeHref === href || (href === "/rewards" && activeHref.startsWith("/rewards"));
+  return <Link href={href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={18} className="shrink-0" /><span className="min-w-0">{item.label}</span></Link>;
+}
