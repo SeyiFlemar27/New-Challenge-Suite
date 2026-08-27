@@ -55,7 +55,7 @@ export function proposalPayload(body: Record<string, unknown>, sponsorId: string
 }
 
 export async function GET(request: Request) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   try {

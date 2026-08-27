@@ -58,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const legacyEntryPaymentId = user ? `challenge_entry_${id}_${user.uid}` : null;
   const [leaderboard, sponsorshipsSnap, votesSnap, publicParticipantsSnap, participantSnap, engagementSnap, prizePoolSnap, entryPaymentSnap, legacyEntryPaymentSnap, userSubmissionSnap, entryRequestSnap, creatorProfileSnap, creatorAccountSnap] = await Promise.all([
     buildChallengeLeaderboard(db, id, { limit: 50 }),
-    db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(),
+    Promise.all([db.collection("sponsorships").where("challengeId", "==", id).limit(20).get(), db.collection("sponsorships").where("linkedChallengeId", "==", id).limit(20).get()]).then(([canonical, linked]) => ({ docs: [...canonical.docs, ...linked.docs.filter((doc) => !canonical.docs.some((item) => item.id === doc.id))] })),
     db.collection("votes").where("challengeId", "==", id).limit(500).get(),
     db.collection("challengeParticipants").where("challengeId", "==", id).limit(250).get(),
     user ? db.collection("challengeParticipants").doc(`${id}_${user.uid}`).get() : Promise.resolve(null),
@@ -72,17 +72,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     creatorId ? db.collection("users").doc(creatorId).get() : Promise.resolve(null)
   ]);
 
+  const sponsorOrganizationIds = [...new Set(sponsorshipsSnap.docs.map((doc) => String(doc.data().sponsorOrganizationId ?? doc.data().sponsorId ?? "")).filter(Boolean))];
+  const sponsorProfileSnaps = sponsorOrganizationIds.length ? await db.getAll(...sponsorOrganizationIds.map((sponsorId) => db.collection("sponsorProfiles").doc(sponsorId))) : [];
+  const sponsorProfiles = new Map(sponsorProfileSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data() ?? {}]));
   const sponsorships = sponsorshipsSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
-    .filter((item) => item.status === "approved")
-    .map((item) => ({
+    .filter((item) => ["approved", "active", "live", "completion_review"].includes(String(item.status ?? "").toLowerCase()))
+    .map((item) => {
+      const sponsorProfile = sponsorProfiles.get(String(item.sponsorOrganizationId ?? item.sponsorId ?? "")) ?? {};
+      return {
       id: item.id,
-      brandName: item.brandName ?? item.sponsorName ?? "Sponsor",
+      brandName: item.brandName ?? item.sponsorName ?? sponsorProfile.brandName ?? "Sponsor",
+      brandLogoUrl: item.brandLogoUrl ?? item.logoUrl ?? sponsorProfile.squareIconUrl ?? sponsorProfile.logoUrl ?? null,
+      sponsorRole: item.sponsorRole ?? "supporting",
+      placementId: Array.isArray((item.visibility as Record<string, unknown> | undefined)?.requestedPlacements) ? String(((item.visibility as Record<string, unknown>).requestedPlacements as unknown[])[0] ?? "challenge_sidebar") : "challenge_sidebar",
       packageName: item.packageName ?? null,
-      ctaButtonText: item.ctaButtonText ?? null,
-      ctaDestinationLink: item.ctaDestinationLink ?? null,
+      ctaButtonText: item.ctaButtonText ?? sponsorProfile.ctaButtonText ?? null,
+      ctaDestinationLink: item.ctaDestinationLink ?? sponsorProfile.ctaDestinationLink ?? null,
       status: item.status
-    }));
+      };
+    });
   const publicParticipantStatuses = new Set(["approved", "active", "joined", "checked_in", "submitted"]);
   const participants = publicParticipantsSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))

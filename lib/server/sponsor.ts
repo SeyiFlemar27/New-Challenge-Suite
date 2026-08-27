@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, type RequestUser } from "@/lib/server/auth";
 import { fail, forbidden, serverError, serverUnavailable } from "@/lib/server/responses";
 import { hasSponsorPermission, resolveSponsorOrganizationAccess, type SponsorOrganizationAccess, type SponsorPermission } from "@/lib/server/sponsor-organizations";
@@ -12,7 +12,7 @@ export type SponsorServerContext = {
   sponsorProfile: Record<string, unknown>;
 };
 
-export async function requireSponsorContext(request: Request): Promise<{ context: SponsorServerContext | null; response: Response | null }> {
+export async function requireSponsorContext(request: Request, options: { allowHistorical?: boolean } = {}): Promise<{ context: SponsorServerContext | null; response: Response | null }> {
   const { user, response } = await requireRequestUser(request);
   if (response) return { context: null, response };
   const db = getAdminDb();
@@ -21,9 +21,9 @@ export async function requireSponsorContext(request: Request): Promise<{ context
     const [userSnap, profileSnap, sponsorAccess] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
       db.collection("profiles").doc(user.uid).get(),
-      resolveSponsorOrganizationAccess(db, user.uid)
+      resolveSponsorOrganizationAccess(db, user.uid, { includeHistorical: options.allowHistorical === true })
     ]);
-    if (!sponsorAccess) return { context: null, response: forbidden("Active Sponsor workspace access is required.") };
+    if (!sponsorAccess) return { context: null, response: forbidden(options.allowHistorical ? "Sponsor account access is required." : "Active Sponsor workspace access is required.") };
     const sponsorSnap = await db.collection("sponsorProfiles").doc(sponsorAccess.organizationId).get();
     const userData = userSnap.exists ? userSnap.data() ?? {} : {};
     const profileData = profileSnap.exists ? profileSnap.data() ?? {} : {};

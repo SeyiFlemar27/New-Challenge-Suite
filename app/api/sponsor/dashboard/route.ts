@@ -1,87 +1,72 @@
 import { requireSponsorContext } from "@/lib/server/sponsor";
-import { buildSponsorReportingSummary } from "@/lib/server/sponsor-reporting";
 import { ok, serverError } from "@/lib/server/responses";
+import { activeSponsorPreview, buildSponsorAttention, sponsorStudioMetrics } from "@/lib/server/sponsor-studio";
 
 export const dynamic = "force-dynamic";
 
+function text(value: unknown, fallback = "") { return String(value ?? fallback).trim(); }
+function safeChallenge(id: string, data: Record<string, unknown>) {
+  const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
+  const publicStatus = ["approved", "published", "scheduled", "registration_open", "active", "submission_open", "voting_open"].includes(text(data.status ?? data.lifecycleStatus).toLowerCase());
+  if (!sponsorReady || !publicStatus || text(data.visibility, "public").toLowerCase().includes("private")) return null;
+  return { id, title: text(data.title, "Untitled challenge"), creatorName: text(data.creatorName, "Creator"), category: text(data.category), imageUrl: data.coverImageUrl ?? data.primaryMediaUrl ?? null, status: text(data.status ?? data.lifecycleStatus), href: "/sponsor/discover/challenges/" + id };
+}
+function safeCreator(id: string, data: Record<string, unknown>) {
+  const accountType = text(data.accountType ?? data.role).toLowerCase();
+  const creator = ["creator", "host"].includes(accountType) || data.creatorProfileEnabled === true || data.canCreateChallenges === true;
+  const sponsorReady = Boolean(data.sponsorReadyEnabled || data.sponsorReady || data.acceptingSponsors || data.openToSponsors);
+  const displayName = text(data.displayName ?? data.fullName ?? data.username);
+  if (!creator || !sponsorReady || !displayName || text(data.profileVisibility, "public") === "private") return null;
+  return { id, displayName, category: text(data.primaryCategory ?? data.category ?? data.creatorNiche), avatarUrl: data.avatarUrl ?? data.photoURL ?? null, href: "/sponsor/discover/creators/" + id };
+}
+
 export async function GET(request: Request) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
-  const { db, user, sponsorId, sponsorProfile: sponsor } = context;
+  const { db, user, sponsorId } = context;
+  const names = ["sponsorships", "proposals", "deliverables", "wallet", "analytics", "challenges", "creators"] as const;
   try {
-    const widgetNames = ["activity", "notifications", "campaigns", "proposals", "funding", "deliverables", "messages"] as const;
     const results = await Promise.allSettled([
-      db.collection("sponsorActivity").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
-      db.collection("sponsorNotifications").where("userId", "==", user.uid).orderBy("createdAt", "desc").limit(10).get(),
-      db.collection("sponsorCampaignBriefs").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorships").where("sponsorId", "==", sponsorId).limit(100).get(),
       db.collection("sponsorProposals").where("sponsorId", "==", sponsorId).limit(100).get(),
-      db.collection("sponsorContributions").where("sponsorId", "==", sponsorId).limit(100).get(),
-      db.collection("sponsorCampaignDeliverables").where("sponsorId", "==", sponsorId).limit(100).get(),
-      db.collection("sponsorConversations").where("sponsorId", "==", sponsorId).limit(100).get()
+      db.collection("sponsorDeliverables").where("sponsorId", "==", sponsorId).limit(100).get(),
+      db.collection("sponsorWallets").doc(sponsorId).get(),
+      db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", sponsorId).limit(50).get(),
+      db.collection("challenges").limit(150).get(),
+      db.collection("profiles").limit(150).get()
     ]);
     const widgetErrors: Record<string, string> = {};
     const docs = (index: number) => {
       const result = results[index];
-      if (result.status === "fulfilled") return result.value.docs;
-      widgetErrors[widgetNames[index]] = "This section could not be loaded. Retry the overview to check again.";
-      console.error("[sponsor-dashboard:widget]", { userId: user.uid, widget: widgetNames[index], message: result.reason instanceof Error ? result.reason.message : String(result.reason) });
+      if (result.status === "fulfilled" && "docs" in result.value) return result.value.docs;
+      widgetErrors[names[index]] = "This section could not be loaded.";
+      if (result.status === "rejected") console.error("[sponsor-studio:widget]", { userId: user.uid, widget: names[index], message: result.reason instanceof Error ? result.reason.message : String(result.reason) });
       return [];
     };
-    const activityDocs = docs(0);
-    const notificationDocs = docs(1);
-    const campaignDocs = docs(2);
-    const proposalDocs = docs(3);
-    const contributionDocs = docs(4);
-    const deliverableDocs = docs(5);
-    const conversationDocs = docs(6);
-    const campaigns = campaignDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const proposals = proposalDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const contributions: Array<Record<string, unknown> & { id: string }> = contributionDocs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const challengeIds = [...new Set(contributions.map((item) => String(item.challengeId ?? "")).filter(Boolean))].slice(0, 100);
-    const challengeSnaps = challengeIds.length ? await db.getAll(...challengeIds.map((id) => db.collection("challenges").doc(id))).catch((error) => {
-      widgetErrors.funding = "Funding context could not be loaded. Retry the overview to check again.";
-      console.error("[sponsor-dashboard:funding-context]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
-      return [];
-    }) : [];
-    const challenges = new Map(challengeSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
-    const settlementResults = await Promise.allSettled(challengeIds.slice(0, 50).map((id) => db.collection("challengeSettlements").where("challengeId", "==", id).limit(5).get()));
-    const settlementSnaps = settlementResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
-    if (settlementResults.some((result) => result.status === "rejected")) widgetErrors.funding = "Some funding details could not be loaded. Retry the overview to check again.";
-    const settlements = new Map<string, Record<string, unknown>>();
-    for (const snap of settlementSnaps) {
-      for (const doc of snap.docs) {
-        const data = { id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string };
-        const challengeId = String(data.challengeId ?? "");
-        const existing = settlements.get(challengeId);
-        if (!existing || String(data.createdAt ?? "") > String(existing.createdAt ?? "")) settlements.set(challengeId, data);
-      }
-    }
-    const reporting = buildSponsorReportingSummary({
-      campaigns,
-      proposals,
-      contributions,
-      deliverables: deliverableDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      challenges,
-      settlements
-    });
+    const sponsorships = docs(0).map((doc) => ({ id: doc.id, ...doc.data() }));
+    const proposals = docs(1).map((doc) => ({ id: doc.id, ...doc.data() }));
+    const deliverables = docs(2).map((doc) => ({ id: doc.id, ...doc.data() }));
+    const walletResult = results[3];
+    const wallet = walletResult.status === "fulfilled" && "data" in walletResult.value ? walletResult.value.data() ?? {} : {};
+    if (walletResult.status === "rejected") widgetErrors.wallet = "Wallet balance could not be loaded.";
+    const analytics = docs(4).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((left, right) => text(right.reconciledAt ?? right.updatedAt).localeCompare(text(left.reconciledAt ?? left.updatedAt)));
+    const attention = buildSponsorAttention({ profile: context.sponsorProfile, proposals, sponsorships, deliverables, wallet });
+    const metrics = sponsorStudioMetrics({ sponsorships, proposals, attention, wallet });
+    const challenges = docs(5).flatMap((doc) => { const item = safeChallenge(doc.id, doc.data()); return item ? [item] : []; }).slice(0, 4);
+    const creators = docs(6).flatMap((doc) => { const item = safeCreator(doc.id, doc.data()); return item ? [item] : []; }).slice(0, 4);
     return ok({
-      sponsorProfile: sponsor,
-      campaigns,
-      proposals,
-      ...reporting,
-      activity: activityDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      notifications: notificationDocs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      widgetErrors,
-      workspaceSignals: {
-        hasConversations: conversationDocs.length > 0,
-        conversationCount: conversationDocs.length,
-        unreadMessageCount: conversationDocs.reduce((total, doc) => total + Number(doc.data().unreadCount ?? 0), 0),
-        hasReportableData: campaigns.length > 0 || proposals.length > 0 || contributions.length > 0
-      }
-    }, "Sponsor dashboard loaded.");
+      sponsorProfile: { ...context.sponsorProfile, organizationStatus: context.sponsorAccess.status },
+      metrics,
+      attention,
+      sponsorships: activeSponsorPreview(sponsorships, attention),
+      recommendations: { challenges, creators, source: "canonical_discovery_relevance" },
+      performance: analytics[0] ?? null,
+      performanceState: analytics[0]?.finalized === true ? "finalized" : analytics.length ? "live" : "not_recorded",
+      widgetErrors
+    }, "Sponsor Studio loaded.");
   } catch (error) {
-    console.error("[sponsor-dashboard:get]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
-    return serverError("Sponsor dashboard could not be loaded.");
+    console.error("[sponsor-studio:get]", { userId: user.uid, message: error instanceof Error ? error.message : String(error) });
+    return serverError("Sponsor Studio could not be loaded.");
   }
 }

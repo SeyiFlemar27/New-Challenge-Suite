@@ -1,2 +1,3 @@
-﻿import { SponsorTeamPage } from "@/components/sponsor/sponsor-operations-pages";
-export default function Page() { return <SponsorTeamPage />; }
+import { redirect } from "next/navigation";
+
+export default function Page() { redirect("/sponsor/settings"); }

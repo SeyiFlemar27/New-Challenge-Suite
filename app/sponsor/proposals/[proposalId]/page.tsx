@@ -9,7 +9,7 @@ import { apiRequest } from "@/lib/api/client";
 import { label } from "@/lib/sponsor-collaboration";
 
 type Item = Record<string, unknown> & { id: string };
-type ProposalResponse = { proposal: Item; revisions: Item[]; activity: Item[]; internalNotes: Item[] };
+type ProposalResponse = { proposal: Item; revisions: Item[]; activity: Item[] };
 
 export default function SponsorProposalDetailPage() {
   const params = useParams<{ proposalId: string }>();
@@ -17,17 +17,15 @@ export default function SponsorProposalDetailPage() {
   const [proposal, setProposal] = useState<Item | null>(null);
   const [revisions, setRevisions] = useState<Item[]>([]);
   const [activity, setActivity] = useState<Item[]>([]);
-  const [notes, setNotes] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [revisionMessage, setRevisionMessage] = useState("");
-  const [internalNote, setInternalNote] = useState("");
 
   async function load() {
     setLoading(true);
     const [profileResult, proposalResult] = await Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<ProposalResponse>(`/api/sponsor/proposals/${params.proposalId}`)]);
     if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
-    if (proposalResult.ok && proposalResult.data) { setProposal(proposalResult.data.proposal); setRevisions(proposalResult.data.revisions); setActivity(proposalResult.data.activity); setNotes(proposalResult.data.internalNotes); }
+    if (proposalResult.ok && proposalResult.data) { setProposal(proposalResult.data.proposal); setRevisions(proposalResult.data.revisions); setActivity(proposalResult.data.activity); }
     else setNotice(proposalResult.message || "Proposal could not be loaded.");
     setLoading(false);
   }
@@ -40,10 +38,6 @@ export default function SponsorProposalDetailPage() {
   async function addRevision() {
     const result = await apiRequest(`/api/sponsor/proposals/${params.proposalId}/revisions`, { method: "POST", body: JSON.stringify({ status: "countered", expectedVersion: proposal?.version, sponsorMessage: revisionMessage, deliverables: proposal?.deliverables ?? [], budget: Number(proposal?.proposedBudgetCents ?? 0) / 100, startDate: proposal?.startDate, endDate: proposal?.endDate, paymentPreference: proposal?.paymentPreference }) });
     setNotice(result.message); setRevisionMessage(""); if (result.ok) void load();
-  }
-  async function addNote() {
-    const result = await apiRequest("/api/sponsor/internal-notes", { method: "POST", body: JSON.stringify({ relatedEntity: "proposal", relatedEntityId: params.proposalId, body: internalNote }) });
-    setNotice(result.message); setInternalNote(""); if (result.ok) void load();
   }
 
   if (loading) return <SponsorShell profile={profile}><Card className="h-96 animate-pulse bg-slate-100" /></SponsorShell>;
@@ -58,7 +52,7 @@ export default function SponsorProposalDetailPage() {
     <div className="mt-8 grid gap-5 lg:grid-cols-4"><Metric title="Status" value={label(proposal.status)} /><Metric title="Budget" value={`${String(proposal.currency ?? "USD")} ${Number(proposal.proposedBudgetCents ?? 0) / 100}`} /><Metric title="Dates" value={`${String(proposal.startDate || "Start pending")} - ${String(proposal.endDate || "End pending")}`} /><Metric title="Funding" value={label(proposal.fundingStatus, "Not active")} /></div>
     <Card className="mt-8 p-6"><ShieldCheck className="text-amber-700" /><h2 className="mt-3 text-2xl font-black text-slate-950">Available actions</h2><p className="mt-2 text-sm leading-6 text-slate-500">Only actions valid for this state are shown. Funding remains unavailable until both parties accept the same revision and eligibility checks pass.</p><div className="mt-5 flex flex-wrap gap-3">{status === "draft" ? <Button onClick={() => void takeAction("send")}>Send Proposal</Button> : null}{canNegotiate ? <><Button variant="secondary" onClick={() => void addRevision()}>Create Revision</Button><Button onClick={() => void takeAction("accept")}>Accept Current Revision</Button><Button variant="ghost" onClick={() => void takeAction("withdraw")}>Withdraw</Button></> : null}{canArchive ? <Button variant="ghost" onClick={() => void takeAction("archive")}>Archive</Button> : null}{!status ? <p className="text-sm text-slate-500">No action is available.</p> : null}</div></Card>
     <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_.9fr]"><Card className="p-6"><h2 className="text-2xl font-black text-slate-950">Proposal summary</h2><div className="mt-5 grid gap-3 md:grid-cols-2"><Info title="Creator" value={linkedRecord(proposal.linkedCreatorName, proposal.linkedCreatorId, "Creator selected")} /><Info title="Challenge" value={linkedRecord(proposal.linkedChallengeTitle, proposal.linkedChallengeId, "Challenge attached")} /><Info title="Payment style" value={paymentLabel(proposal.paymentPreference)} /><Info title="Deliverables" value={deliverableLabels(proposal.deliverables)} /><Info title="Prize contribution" value={money(proposal.prizeContributionCents, proposal.currency)} /><Info title="Creator sponsorship" value={money(proposal.creatorSponsorshipCents, proposal.currency)} /><Info title="Platform fee" value={money(proposal.platformFeeCents, proposal.currency)} /><Info title="Usage rights" value={String(proposal.usageRights || "Not specified")} /></div></Card><Card className="p-6"><h2 className="text-2xl font-black text-slate-950">Create a revision</h2><p className="mt-2 text-sm leading-6 text-slate-600">A new revision preserves prior terms and resets both acceptance records.</p><Field label="Sponsor message"><textarea className={textareaClass} value={revisionMessage} onChange={(event) => setRevisionMessage(event.target.value)} /></Field><Button className="mt-4" disabled={revisionMessage.length < 2 || !canNegotiate} onClick={() => void addRevision()}>Save Revision</Button></Card></div>
-    <div className="mt-8 grid gap-8 xl:grid-cols-3"><Card className="p-6 xl:col-span-2"><h2 className="text-2xl font-black text-slate-950">Negotiation timeline</h2><Timeline items={revisions} empty="No revisions yet." /></Card><Card className="p-6"><h2 className="text-2xl font-black text-slate-950">Internal Sponsor notes</h2><p className="mt-2 rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Visible only to your Sponsor team.</p><Field label="Private note"><textarea className={textareaClass} value={internalNote} onChange={(event) => setInternalNote(event.target.value)} /></Field><Button className="mt-3" disabled={internalNote.length < 2} onClick={() => void addNote()}>Save Internal Note</Button><div className="mt-5 space-y-3">{notes.length ? notes.map((note) => <Card key={note.id} className="p-3 text-sm text-slate-600">{String(note.body ?? "")}</Card>) : <p className="text-sm text-slate-500">No internal notes yet.</p>}</div></Card></div>
+    <Card className="mt-8 p-6"><h2 className="text-2xl font-black text-slate-950">Negotiation timeline</h2><Timeline items={revisions} empty="No revisions yet." /></Card>
     <Card className="mt-8 p-6"><h2 className="text-2xl font-black text-slate-950">Activity</h2><Timeline items={activity} empty="No activity yet." /></Card>
   </div></SponsorShell>;
 }

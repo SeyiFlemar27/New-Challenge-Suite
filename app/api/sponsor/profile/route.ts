@@ -169,7 +169,7 @@ async function loadSponsorContext(db: FirebaseFirestore.Firestore, uid: string) 
   const [userSnap, profileSnap, sponsorAccess] = await Promise.all([
     db.collection("users").doc(uid).get(),
     db.collection("profiles").doc(uid).get(),
-    resolveSponsorOrganizationAccess(db, uid)
+    resolveSponsorOrganizationAccess(db, uid, { includeHistorical: true })
   ]);
   const sponsorId = sponsorAccess?.organizationId ?? uid;
   const sponsorSnap = await db.collection("sponsorProfiles").doc(sponsorId).get();
@@ -226,6 +226,7 @@ export async function GET(request: Request) {
     ]);
     const sponsorProfile = {
       ...toSponsorProfile(user.uid, user.email, context.userData, context.profileData, context.sponsorData),
+      organizationStatus: context.sponsorAccess?.status ?? "active",
       hasSponsorConversations: !conversationSnap.empty,
       sponsorConversationCount: conversationSnap.size,
       hasSponsorReportableData: !campaignSnap.empty || !proposalSnap.empty || !contributionSnap.empty,

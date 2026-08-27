@@ -169,8 +169,8 @@ export function resolveSponsorWorkspaceState(profile: Record<string, unknown> = 
   else if (["submitted", "pending_review", "under_review"].includes(review)) status = review === "submitted" ? "submitted" : "pending_review";
   else status = "draft";
 
-  const canCreateCampaignBrief = profileReady && !["rejected", "suspended"].includes(status);
-  const canDiscover = approved;
+  const canCreateCampaignBrief = false;
+  const canDiscover = status !== "suspended";
   const canSendProposal = approved && hasActiveSponsorSubscription(subscriptionStatus);
   const canFund = canSendProposal;
   let nextActionLabel = "Complete Brand Profile";
@@ -181,7 +181,7 @@ export function resolveSponsorWorkspaceState(profile: Record<string, unknown> = 
   else if (status === "suspended") { nextActionLabel = "Contact Support"; nextActionHref = "/sponsor/support"; lockedReason = "Sponsor access is suspended. Contact support for the next step."; }
   else if (status === "submitted" || status === "pending_review") { nextActionLabel = "View Review Status"; lockedReason = "Your brand profile is being reviewed. Funding and proposal actions remain locked."; }
   else if (approved && !hasActiveSponsorSubscription(subscriptionStatus)) { nextActionLabel = "Choose Sponsor Plan"; nextActionHref = "/sponsor/billing"; lockedReason = "Activate an eligible sponsor plan before sending proposals or funding campaigns."; }
-  else if (approved) { nextActionLabel = "Create Campaign Brief"; nextActionHref = "/sponsor/campaigns/new"; lockedReason = null; }
+  else if (approved) { nextActionLabel = "Discover Opportunities"; nextActionHref = "/sponsor/discover?tab=challenges"; lockedReason = null; }
 
   return {
     status,

@@ -40,10 +40,10 @@ export function runSponsorPolishContract(name) {
 
   assert.match(dashboardApi, /Promise\.allSettled/);
   assert.match(dashboardApi, /widgetErrors/);
-  assert.match(dashboard, /greetingName/);
-  assert.match(dashboard, /Retry unavailable sections/);
+  assert.match(dashboard, /sponsorProfile\.brandName/);
+  assert.match(dashboard, /Try Again/);
   assert.doesNotMatch(dashboard, /mock|demo sponsor|sample campaign/i);
-  assert.match(sponsorShell, /Complete brand profile/);
+  assert.match(sponsorShell, /Sponsor Account/);
   assert.match(sponsorShell, /Reports/);
   assert.doesNotMatch(sponsorShell, /label: "Inbox"/);
 
@@ -81,7 +81,7 @@ export function runSponsorPolishContract(name) {
   assert.doesNotMatch(intro, /SponsorShell/);
   assert.match(intro, /Start Sponsor Profile/);
   assert.match(onboarding, /pending review/i);
-  assert.match(sponsorShell, /!workspace\.approved/);
+  assert.doesNotMatch(sponsorShell, /!workspace\.approved/);
   assert.match(settings, /setAppTheme/);
   assert.match(sponsorSettings, /\/settings\/appearance/);
   assert.doesNotMatch(read("components/public-site/public-shell.tsx"), /ThemeToggle|setTheme|useTheme/);

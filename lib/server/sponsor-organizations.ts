@@ -29,7 +29,7 @@ export type SponsorOrganizationAccess = {
   membershipId: string;
   role: SponsorMembershipRole;
   permissions: SponsorPermission[];
-  status: "active";
+  status: "active" | "restricted" | "suspended" | "closed";
   legacyCompatible: boolean;
 };
 
@@ -53,12 +53,18 @@ function permissionsFor(membership: Record<string, unknown>, membershipRole: Spo
   return explicit.length ? explicit : rolePermissions[membershipRole];
 }
 
-function organizationAllowed(organization: Record<string, unknown>) {
-  return !["suspended", "closed", "deleted", "restricted"].includes(String(organization.status ?? "active").toLowerCase());
+function organizationStatus(organization: Record<string, unknown>): SponsorOrganizationAccess["status"] | "deleted" {
+  const value = String(organization.status ?? "active").toLowerCase();
+  return ["restricted", "suspended", "closed", "deleted"].includes(value) ? value as SponsorOrganizationAccess["status"] | "deleted" : "active";
 }
 
-export async function resolveSponsorOrganizationAccess(db: Firestore, userId: string): Promise<SponsorOrganizationAccess | null> {
+export async function resolveSponsorOrganizationAccess(
+  db: Firestore,
+  userId: string,
+  options: { includeHistorical?: boolean } = {}
+): Promise<SponsorOrganizationAccess | null> {
   const memberships = await db.collection("sponsorMemberships").where("userId", "==", userId).limit(10).get();
+  const candidates: SponsorOrganizationAccess[] = [];
   let hasCanonicalMembership = false;
   for (const doc of memberships.docs) {
     const membership = doc.data() ?? {};
@@ -67,13 +73,21 @@ export async function resolveSponsorOrganizationAccess(db: Firestore, userId: st
     const organizationId = String(membership.sponsorOrganizationId ?? membership.organizationId ?? "");
     if (!organizationId) continue;
     const organizationSnap = await db.collection("sponsorOrganizations").doc(organizationId).get();
-    if (!organizationSnap.exists || !organizationAllowed(organizationSnap.data() ?? {})) continue;
+    if (!organizationSnap.exists) continue;
+    const organization = organizationSnap.data() ?? {};
+    const status = organizationStatus(organization);
+    if (status === "deleted" || (!options.includeHistorical && status !== "active")) continue;
     const membershipRole = role(membership.role);
-    return { organizationId, organization: { id: organizationId, ...(organizationSnap.data() ?? {}) }, membershipId: doc.id, role: membershipRole, permissions: permissionsFor(membership, membershipRole), status: "active", legacyCompatible: false };
+    candidates.push({ organizationId, organization: { id: organizationId, ...organization }, membershipId: doc.id, role: membershipRole, permissions: permissionsFor(membership, membershipRole), status, legacyCompatible: false });
   }
-
-  // A canonical pending or restricted membership must not be upgraded by the
-  // compatibility fallback used for records created before organizations.
+  if (candidates.length) {
+    candidates.sort((left, right) => {
+      const primaryDifference = Number(right.organization.primary === true) - Number(left.organization.primary === true);
+      if (primaryDifference) return primaryDifference;
+      return String(left.organization.createdAt ?? left.organizationId).localeCompare(String(right.organization.createdAt ?? right.organizationId));
+    });
+    return candidates[0];
+  }
   if (hasCanonicalMembership) return null;
 
   const [userSnap, profileSnap, sponsorProfileSnap] = await Promise.all([
@@ -83,20 +97,19 @@ export async function resolveSponsorOrganizationAccess(db: Firestore, userId: st
   ]);
   const legacy = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}), ...(sponsorProfileSnap.data() ?? {}) };
   const legacySponsor = sponsorProfileSnap.exists || legacy.accountType === "sponsor" || legacy.dashboardType === "sponsor_dashboard" || legacy.sponsorAccessStatus === "active";
-  if (!legacySponsor || ["suspended", "flagged"].includes(String(legacy.sponsorVerificationStatus ?? ""))) return null;
+  const legacyStatus: SponsorOrganizationAccess["status"] = ["suspended", "flagged"].includes(String(legacy.sponsorVerificationStatus ?? "")) ? "suspended" : "active";
+  if (!legacySponsor || (!options.includeHistorical && legacyStatus !== "active")) return null;
   const organizationId = String(legacy.sponsorOrganizationId ?? userId);
-  const membershipRole: SponsorMembershipRole = "owner";
   return {
     organizationId,
-    organization: { id: organizationId, name: legacy.brandName ?? legacy.displayName ?? "Sponsor Workspace", logoUrl: legacy.logoUrl ?? null, verificationStatus: legacy.sponsorVerificationStatus ?? "not_submitted", status: "active", legacyOwnerUserId: userId },
+    organization: { id: organizationId, name: legacy.brandName ?? legacy.displayName ?? "Sponsor Account", logoUrl: legacy.logoUrl ?? null, verificationStatus: legacy.sponsorVerificationStatus ?? "not_submitted", status: legacyStatus, legacyOwnerUserId: userId },
     membershipId: deterministicId("sponsor_membership", organizationId, userId),
-    role: membershipRole,
-    permissions: rolePermissions[membershipRole],
-    status: "active",
+    role: "owner",
+    permissions: rolePermissions.owner,
+    status: legacyStatus,
     legacyCompatible: true
   };
 }
-
 export async function ensurePrimarySponsorOrganization(db: Firestore, input: { userId: string; name: string; profile: Record<string, unknown> }) {
   const existing = await resolveSponsorOrganizationAccess(db, input.userId);
   const organizationId = existing?.organizationId ?? input.userId;

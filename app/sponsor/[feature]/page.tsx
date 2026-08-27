@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -20,7 +20,6 @@ type FeatureDefinition = {
 const features: Record<string, FeatureDefinition> = {
   campaigns: { title: "Campaigns", feature: "campaigns", icon: Megaphone, description: "Organize sponsor campaign drafts and approved challenge collaborations." },
   challenges: { title: "Sponsor Challenges", feature: "challenges", icon: Store, description: "Browse sponsor-ready challenge opportunities after sponsor approval." },
-  "create-campaign": { title: "Create Campaign", feature: "create_campaign", icon: PlusCircle, description: "Campaign creation is available through the campaign brief builder." },
   "discover-creators": { title: "Discover Creators", feature: "discover", icon: Users, description: "Creator discovery has moved to /sponsor/discover/creators." },
   events: { title: "Discover Events", feature: "discover", icon: Store, description: "Event sponsorship discovery will appear here when event opportunities are connected." },
   tournaments: { title: "Discover Tournaments", feature: "discover", icon: Target, description: "Tournament sponsorship discovery will appear here when tournament opportunities are connected." },
@@ -34,7 +33,6 @@ const features: Record<string, FeatureDefinition> = {
   insights: { title: "Audience Insights", feature: "insights", icon: PieChart, description: "Audience and campaign performance insights will appear here when reporting is implemented." },
   reports: { title: "Reports", feature: "reports", icon: BarChart3, description: "Campaign reporting remains read-only until reporting is connected." },
   billing: { title: "Budget & Billing", feature: "billing", icon: CreditCard, description: "Subscription billing is separate from campaign budgets. Sponsor money capture and release are not active." },
-  team: { title: "Team Members", feature: "team", icon: Users, description: "Manage team access when the active sponsor plan includes team seats." },
   notifications: { title: "Notifications", feature: "notifications", icon: Settings, description: "Sponsor notification history and preferences are organized here." },
   settings: { title: "Sponsor Settings", feature: "settings", icon: Settings, description: "Manage account and brand preferences through sponsor settings." }
 }

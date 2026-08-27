@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { BriefcaseBusiness, Check, ChevronDown, Handshake, LogOut, Settings, UserRound } from "lucide-react";
+import { BriefcaseBusiness, Check, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "@/lib/api/client";
 import { logout } from "@/lib/firebase/auth-service";
 import type { CurrentUserProfile } from "@/lib/hooks/use-current-user";
 
-type Workspace = "personal" | "sponsor" | "enterprise";
+type Workspace = "personal" | "enterprise";
 type SwitcherUser = Pick<CurrentUserProfile, "activeWorkspace" | "availableWorkspaces" | "displayName" | "initials" | "avatarUrl" | "planName" | "planId">;
 
 const workspaceLabels: Record<Workspace, { label: string; subtitle: string; icon: typeof UserRound }> = {
   personal: { label: "Personal Workspace", subtitle: "Personal account", icon: UserRound },
-  sponsor: { label: "Challenge Suite Sponsor", subtitle: "Sponsor Workspace", icon: Handshake },
+
   enterprise: { label: "Challenge Suite Enterprise", subtitle: "Staff Workspace", icon: BriefcaseBusiness },
 };
 
@@ -21,8 +21,8 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
   const [notice, setNotice] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const available = user?.availableWorkspaces ?? ["personal"];
-  const requested = user?.activeWorkspace ?? "personal";
+  const available = (user?.availableWorkspaces ?? ["personal"]).filter((workspace): workspace is Workspace => workspace === "personal" || workspace === "enterprise");
+  const requested = user?.activeWorkspace === "enterprise" ? "enterprise" : "personal";
   const current: Workspace = available.includes(requested) ? requested : "personal";
   const currentLabel = workspaceLabels[current];
 
@@ -55,7 +55,7 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
       setBusy(null);
       return;
     }
-    window.location.assign(workspace === "enterprise" ? "/enterprise" : workspace === "sponsor" ? "/sponsor/dashboard" : "/dashboard");
+    window.location.assign(workspace === "enterprise" ? "/enterprise" : "/dashboard");
   }
 
   const personalPlan = String(user.planName ?? user.planId ?? "").replaceAll("_", " ").trim();
@@ -67,7 +67,7 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
     </button>
     {open ? <div role="menu" aria-label="Switch workspace" className={"absolute left-0 z-[100] w-[min(88vw,320px)] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 text-[var(--foreground)] shadow-2xl " + (placement === "bottom" ? "top-full mt-2" : "bottom-full mb-2")}>
       <p className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">Switch Workspace</p>
-      {(["personal", "sponsor", "enterprise"] as Workspace[]).filter((workspace) => available.includes(workspace)).map((workspace) => {
+      {(["personal", "enterprise"] as Workspace[]).filter((workspace) => available.includes(workspace)).map((workspace) => {
         const item = workspaceLabels[workspace];
         const Icon = item.icon;
         const active = workspace === current;

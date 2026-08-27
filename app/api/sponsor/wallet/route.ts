@@ -1,11 +1,11 @@
-﻿import { ok, serverError } from "@/lib/server/responses";
+import { ok, serverError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { campaignFundingDisclaimer } from "@/lib/sponsor-finance";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   try {

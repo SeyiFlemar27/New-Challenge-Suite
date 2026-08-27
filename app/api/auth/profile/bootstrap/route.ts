@@ -1,4 +1,4 @@
-﻿import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { ensureWallet } from "@/lib/server/dorocoin";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -58,7 +58,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
   const enterpriseAccess = normalizeEnterpriseAccess(merged);
   const enterpriseAvailable = isEnterpriseAccessActive(enterpriseAccess);
   const sponsorAvailable = Boolean(sponsorAccess);
-  const availableWorkspaces = ["personal", ...(sponsorAvailable ? ["sponsor"] : []), ...(enterpriseAvailable ? ["enterprise"] : [])];
+  const availableWorkspaces = ["personal", ...(enterpriseAvailable ? ["enterprise"] : [])];
 
   return {
     uid: user.uid,
@@ -104,7 +104,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
     enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
     enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
-    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, sponsorAvailable),
+    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, false),
     availableWorkspaces,
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)

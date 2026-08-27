@@ -6,7 +6,7 @@ import { createNotification } from "@/lib/server/notifications";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, { params }: { params: Promise<{ deliverableId: string }> }) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   const permissionError = requireSponsorPermission(context, "deliverable.view");

@@ -1,33 +1,38 @@
 import { ok, serverError } from "@/lib/server/responses";
-import { buildSponsorReportingSummary } from "@/lib/server/sponsor-reporting";
-import { requireSponsorContext } from "@/lib/server/sponsor";
+import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sponsor";
+import { reconcileSponsorAnalytics } from "@/lib/server/sponsor-analytics";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  const permission = requireSponsorPermission(context, "analytics.view");
+  if (permission) return permission;
   try {
-    const [snapshotsSnap, campaignAnalyticsSnap, campaignsSnap, proposalsSnap, contributionsSnap, deliverablesSnap] = await Promise.all([
-      context.db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", context.sponsorId).limit(25).get(),
-      context.db.collection("sponsorCampaignAnalytics").where("sponsorId", "==", context.sponsorId).limit(25).get(),
-      context.db.collection("sponsorCampaignBriefs").where("sponsorId", "==", context.sponsorId).limit(100).get(),
-      context.db.collection("sponsorProposals").where("sponsorId", "==", context.sponsorId).limit(100).get(),
-      context.db.collection("sponsorContributions").where("sponsorId", "==", context.sponsorId).limit(100).get(),
-      context.db.collection("sponsorDeliverables").where("sponsorId", "==", context.sponsorId).limit(100).get()
+    const [snapshotsSnap, eventsSnap, sponsorshipsSnap] = await Promise.all([
+      context.db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", context.sponsorId).limit(100).get(),
+      context.db.collection("sponsorAnalyticsEvents").where("sponsorId", "==", context.sponsorId).limit(5000).get(),
+      context.db.collection("sponsorships").where("sponsorId", "==", context.sponsorId).limit(100).get()
     ]);
-    const summary = buildSponsorReportingSummary({
-      campaigns: campaignsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      proposals: proposalsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      contributions: contributionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      deliverables: deliverablesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    });
+    const events = eventsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const liveMetrics = reconcileSponsorAnalytics(events);
+    const snapshots = snapshotsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((left, right) => String(right.reconciledAt ?? right.updatedAt ?? "").localeCompare(String(left.reconciledAt ?? left.updatedAt ?? "")));
+    const finalized = snapshots.filter((item) => item.finalized === true);
     return ok({
-      summary,
-      snapshots: snapshotsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      campaigns: campaignAnalyticsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      dataSourceLabels: ["webhook_confirmed", "verified", "not_tracked_yet"]
+      analytics: {
+        state: finalized.length ? "finalized_available" : events.length ? "live_provisional" : "not_recorded",
+        live: { metrics: liveMetrics, provisional: true, source: "trusted_sponsor_placement_events" },
+        finalized,
+        sponsorshipCount: sponsorshipsSnap.size,
+        definitions: {
+          validImpressions: "Deduplicated Sponsor placement impressions not classified as invalid or fraudulent.",
+          uniqueCtaClicks: "Deduplicated Sponsor CTA clicks not classified as invalid or fraudulent.",
+          clickThroughRate: "Unique valid CTA clicks divided by valid impressions."
+        }
+      },
+      dataSourceLabels: ["live_provisional", "finalized_reconciled", "not_recorded"]
     }, "Sponsor analytics loaded.");
   } catch (error) {
     console.error("[sponsor-analytics:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });

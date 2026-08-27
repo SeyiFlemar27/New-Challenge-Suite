@@ -17,9 +17,9 @@ async function workspaceState(db: FirebaseFirestore.Firestore, userId: string) {
   const access = normalizeEnterpriseAccess(merged);
   const enterpriseAvailable = isEnterpriseAccessActive(access);
   const sponsorAvailable = Boolean(sponsorAccess);
-  const availableWorkspaces = ["personal", ...(sponsorAvailable ? ["sponsor"] as const : []), ...(enterpriseAvailable ? ["enterprise"] as const : [])] as const;
+  const availableWorkspaces = ["personal", ...(enterpriseAvailable ? ["enterprise"] as const : [])] as const;
   return {
-    activeWorkspace: resolveActiveWorkspace(merged, access, sponsorAvailable),
+    activeWorkspace: resolveActiveWorkspace(merged, access, false),
     availableWorkspaces,
     enterpriseAvailable,
     sponsorAvailable
@@ -42,10 +42,10 @@ export async function PATCH(request: Request) {
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const workspace = parsed.body?.workspace;
-  if (workspace !== "personal" && workspace !== "sponsor" && workspace !== "enterprise") return validationError({ workspace: "Choose an available workspace." });
+  if (workspace !== "personal" && workspace !== "enterprise") return validationError({ workspace: "Choose Personal or Enterprise workspace." });
   const current = await workspaceState(db, auth.user.uid);
   if (workspace === "enterprise" && !current.enterpriseAvailable) return fail("Enterprise workspace access is not available for this account.", 403, undefined, "ENTERPRISE_ACCESS_REQUIRED");
-  if (workspace === "sponsor" && !current.sponsorAvailable) return fail("Sponsor workspace access is not available for this account.", 403, undefined, "SPONSOR_ACCESS_REQUIRED");
+
   if (current.activeWorkspace === workspace) return ok({ ...current, activeWorkspace: workspace, idempotent: true }, "Workspace is already active.");
   const now = new Date().toISOString();
   const batch = db.batch();

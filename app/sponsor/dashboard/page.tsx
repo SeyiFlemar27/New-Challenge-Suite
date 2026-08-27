@@ -1,81 +1,100 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarClock, Handshake, Megaphone, MessageSquare, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { ArrowRight, CircleAlert, Handshake, LineChart, RefreshCw, WalletCards } from "lucide-react";
 import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
-import { SponsorShell } from "@/components/sponsor/sponsor-shell";
+import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
-import { getPlanExperience } from "@/lib/plan-access";
-import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 
-type Item = Record<string, any>;
+type RecordItem = Record<string, unknown> & { id: string };
+type Attention = { id: string; title: string; context: string; reason: string; href: string; actionLabel: string; deadline: string | null };
+type Opportunity = { id: string; title?: string; displayName?: string; creatorName?: string; category?: string; status?: string; href: string; imageUrl?: unknown; avatarUrl?: unknown };
 type DashboardResponse = {
-  sponsorProfile: Item;
-  campaigns: Item[];
-  proposals: Item[];
-  fundedChallenges: Item[];
-  metrics: Record<string, number | null>;
+  sponsorProfile: SponsorShellProfile;
+  metrics: { activeSponsorships: number; openProposals: number; needsAttention: number; walletBalanceCents: number };
+  attention: Attention[];
+  sponsorships: RecordItem[];
+  recommendations: { challenges: Opportunity[]; creators: Opportunity[]; source: string };
+  performance: RecordItem | null;
+  performanceState: "live" | "finalized" | "not_recorded";
   widgetErrors?: Record<string, string>;
-  workspaceSignals?: { hasConversations: boolean; conversationCount: number; unreadMessageCount: number; hasReportableData: boolean };
 };
 
 export default function SponsorDashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [approvalNoticeVisible, setApprovalNoticeVisible] = useState(false);
+  const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">("challenges");
 
   async function load() {
     setLoading(true); setError("");
     const result = await apiRequest<DashboardResponse>("/api/sponsor/dashboard");
     if (result.ok && result.data) setDashboard(result.data);
-    else setError(result.message || "Sponsor workspace could not be loaded.");
+    else setError(result.message || "Sponsor Studio could not be loaded.");
     setLoading(false);
   }
-  useEffect(() => { void load(); }, []);
-
-  const profile = useMemo<Item | null>(() => dashboard ? ({ ...dashboard.sponsorProfile, hasSponsorConversations: dashboard.workspaceSignals?.hasConversations, sponsorConversationCount: dashboard.workspaceSignals?.conversationCount, hasSponsorReportableData: dashboard.workspaceSignals?.hasReportableData }) : null, [dashboard]);
-  const workspace = resolveSponsorWorkspaceState(profile ?? {});
-  const experience = getPlanExperience({ planId: profile?.planId, planStatus: profile?.planStatus, accountType: "sponsor" });
-  const activeCampaigns = dashboard?.campaigns.filter((item) => ["approved", "matching", "proposal_sent", "negotiating", "accepted", "funding_required", "funded", "live", "active"].includes(String(item.status ?? "").toLowerCase())) ?? [];
-  const openProposals = dashboard?.proposals.filter((item) => !["declined", "completed", "cancelled", "archived"].includes(String(item.status ?? "").toLowerCase())) ?? [];
-  const deadlines = (dashboard?.campaigns ?? []).flatMap((campaign) => [campaign.startDate ? { label: `${campaign.campaignTitle || "Campaign"} starts`, value: campaign.startDate } : null, campaign.endDate ? { label: `${campaign.campaignTitle || "Campaign"} ends`, value: campaign.endDate } : null]).filter(Boolean).slice(0, 4) as Array<{ label: string; value: string }>;
-  const greetingName = String(profile?.brandName || profile?.legalBusinessName || profile?.contactPerson || profile?.displayName || "").trim();
-  const widgetErrors = dashboard?.widgetErrors ?? {};
-  const approvalNoticeKey = `sponsor_approval_seen_${String(profile?.sponsorOrganizationId ?? profile?.userId ?? "workspace")}`;
   useEffect(() => {
-    if (!workspace.approved) return setApprovalNoticeVisible(false);
-    setApprovalNoticeVisible(localStorage.getItem(approvalNoticeKey) !== "true");
-  }, [approvalNoticeKey, workspace.approved]);
+    const tab = new URLSearchParams(window.location.search).get("opportunities");
+    if (tab === "creators") setOpportunityTab("creators");
+    void load();
+  }, []);
 
-  function dismissApprovalNotice() {
-    localStorage.setItem(approvalNoticeKey, "true");
-    setApprovalNoticeVisible(false);
+  function selectTab(tab: "challenges" | "creators") {
+    setOpportunityTab(tab);
+    const url = new URL(window.location.href);
+    if (tab === "challenges") url.searchParams.delete("opportunities");
+    else url.searchParams.set("opportunities", tab);
+    window.history.replaceState(null, "", url.pathname + url.search);
   }
 
-  if (loading) return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl space-y-6"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <Card key={item} className="h-28 animate-pulse" />)}</div><Card className="h-72 animate-pulse" /></div></SponsorShell>;
+  if (loading) return <SponsorShell><div className="mx-auto max-w-[1320px] space-y-7"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-[8px] bg-white" />)}</div><div className="h-72 animate-pulse rounded-[8px] bg-white" /></div></SponsorShell>;
 
-  return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl">
-    <section className="rounded-[8px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">Sponsor Workspace</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">{greetingName ? `Welcome, ${greetingName}` : "Welcome"}</h1><div className="mt-4 flex flex-wrap gap-2 text-sm"><Status label={workspace.statusLabel} tone={workspace.approved ? "success" : "pending"} /><Status label={experience.badgeLabel} tone="brand" /><Status label={workspace.subscriptionStatus.replaceAll("_", " ")} tone={workspace.subscriptionStatus === "active" ? "success" : "neutral"} /></div><p className="mt-5 max-w-2xl text-base leading-7 text-slate-600"><strong className="text-slate-950">Next step:</strong> {workspace.nextActionLabel}. {workspace.lockedReason || "Your sponsor workspace is ready for campaign planning and discovery."}</p></div><div className="flex flex-wrap gap-3"><LinkButton href={workspace.nextActionHref}>{workspace.nextActionLabel}<ArrowRight size={16} /></LinkButton>{workspace.canDiscover ? <><LinkButton href="/sponsor/discover?tab=creators" variant="secondary">Discover Creators</LinkButton><LinkButton href="/sponsor/discover?tab=challenges" variant="secondary">Discover Challenges</LinkButton></> : <LinkButton href="/sponsor/onboarding" variant="secondary">Review Brand Profile</LinkButton>}</div></div></section>
+  const metrics = dashboard?.metrics ?? { activeSponsorships: 0, openProposals: 0, needsAttention: 0, walletBalanceCents: 0 };
+  const opportunities = opportunityTab === "challenges" ? dashboard?.recommendations.challenges ?? [] : dashboard?.recommendations.creators ?? [];
+  const historicalOnly = dashboard?.sponsorProfile.organizationStatus === "restricted";
+  return <SponsorShell profile={dashboard?.sponsorProfile}><div className="mx-auto max-w-[1320px]">
+    <header className="flex flex-col gap-5 border-b border-slate-200 pb-7 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Sponsor Studio</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">Welcome back, {String(dashboard?.sponsorProfile.brandName || "Sponsor")}</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Manage sponsorships, proposals and brand performance.</p></div><div className="flex flex-wrap gap-3">{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges">Discover Opportunities <ArrowRight size={16} /></LinkButton>}<LinkButton href="/sponsor/sponsorships" variant="secondary">View Sponsorships</LinkButton></div></header>
 
-    {approvalNoticeVisible ? <Card className="mt-6 border-emerald-200 bg-emerald-50 p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-emerald-950">Sponsor workspace approved</p><p className="mt-1 text-sm text-emerald-800">Your approved Sponsor workspace is ready for eligible proposals, funding, and collaboration work.</p></div><Button variant="secondary" onClick={dismissApprovalNotice}>Dismiss</Button></div></Card> : null}
+    {historicalOnly ? <div className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50 px-5 py-4"><p className="font-black text-amber-950">Historical records only</p><p className="mt-1 text-sm leading-6 text-amber-900">This Sponsor Organization is restricted. Existing sponsorships, reports, analytics and wallet history remain available, but new proposals and funding actions are disabled.</p></div> : null}
 
-    {error ? <Card className="mt-6 border-red-200 bg-red-50 p-5"><p className="font-bold text-red-800">Sponsor overview is temporarily unavailable.</p><p className="mt-2 text-sm text-red-700">{error}</p><Button className="mt-4" variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Retry overview</Button></Card> : null}
-    {Object.keys(widgetErrors).length ? <Card className="mt-6 border-amber-200 bg-amber-50 p-5"><p className="font-bold text-amber-900">Some overview sections need another try.</p><p className="mt-2 text-sm text-amber-800">The rest of your sponsor workspace remains available.</p><Button className="mt-4" variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Retry unavailable sections</Button></Card> : null}
+    {error ? <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-red-200 bg-red-50 px-5 py-4"><p className="text-sm font-bold text-red-800">{error}</p><Button variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Try Again</Button></div> : null}
 
-    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sponsor overview metrics"><Metric icon={<Megaphone />} title="Active Campaigns" value={widgetErrors.campaigns ? "Unavailable" : String(activeCampaigns.length)} detail={widgetErrors.campaigns || "Campaigns currently moving through the pipeline"} /><Metric icon={<Handshake />} title="Open Proposals" value={widgetErrors.proposals ? "Unavailable" : String(openProposals.length)} detail={widgetErrors.proposals || "Proposals that still have a next action"} /><Metric icon={<MessageSquare />} title="Unread Messages" value={widgetErrors.messages ? "Unavailable" : String(dashboard?.workspaceSignals?.unreadMessageCount ?? 0)} detail={widgetErrors.messages || "Owned sponsor conversations only"} /><Metric icon={<WalletCards />} title="Available Sponsor Funds" value={widgetErrors.funding ? "Unavailable" : formatMoney(dashboard?.metrics.confirmedSponsorFundsCents)} detail={widgetErrors.funding || "Provider-confirmed sponsor funding records"} /></section>
+    <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sponsor Studio metrics">
+      <Metric title="Active Sponsorships" value={String(metrics.activeSponsorships)} detail="Active and scheduled partnerships" />
+      <Metric title="Open Proposals" value={String(metrics.openProposals)} detail="Proposals still in progress" />
+      <Metric title="Needs Attention" value={String(metrics.needsAttention)} detail="Actions requiring your review" />
+      <Metric title="Wallet Balance" value={money(metrics.walletBalanceCents)} detail="Available Sponsor funds only" icon={<WalletCards size={18} />} />
+    </section>
 
-    <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]"><div className="space-y-6"><Card className="p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Campaign pipeline</p><h2 className="mt-2 text-2xl font-black text-slate-950">Recent campaign briefs</h2></div>{workspace.canCreateCampaignBrief ? <LinkButton href="/sponsor/campaigns/new" variant="secondary">Create Brief</LinkButton> : null}</div>{dashboard?.campaigns.length ? <div className="mt-5 divide-y divide-slate-200">{dashboard.campaigns.slice(0, 5).map((campaign) => <div key={campaign.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="truncate font-black text-slate-950">{campaign.campaignTitle || "Untitled campaign"}</p><p className="mt-1 text-sm text-slate-600">{label(campaign.status)} / Updated {formatDate(campaign.updatedAt)}</p></div><LinkButton href={`/sponsor/campaigns/${campaign.id}`} variant="ghost">View</LinkButton></div>)}</div> : <EmptyState icon={<Megaphone />} title="No active campaigns yet" body="Create your first campaign brief to start finding creators and challenge opportunities." action={workspace.canCreateCampaignBrief ? <LinkButton href="/sponsor/campaigns/new">Create Campaign Brief</LinkButton> : <LinkButton href={workspace.nextActionHref}>Complete Required Step</LinkButton>} />}</Card>
+    <div className="mt-9 grid gap-9 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)]">
+      <section><SectionTitle title="Needs Attention" href={dashboard?.attention.length === 5 ? "/sponsor/dashboard?view=attention" : undefined} />
+        {dashboard?.widgetErrors?.proposals || dashboard?.widgetErrors?.deliverables ? <WidgetError message="Some attention items could not be loaded." retry={load} /> : null}
+        {!historicalOnly && dashboard?.attention.length ? <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{dashboard.attention.map((item) => <div key={item.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-black text-slate-950">{item.title}</p><p className="mt-1 text-sm font-bold text-amber-800">{item.context}</p><p className="mt-1 text-sm leading-6 text-slate-600">{item.reason}</p>{item.deadline ? <p className="mt-1 text-xs text-slate-500">Due {date(item.deadline)}</p> : null}</div><LinkButton href={item.href} variant="ghost">{item.actionLabel} <ArrowRight size={15} /></LinkButton></div>)}</div> : <EmptyState icon={<CircleAlert />} title="Nothing needs your attention" body="New proposal responses, funding actions and deliverable reviews will appear here." />}
+      </section>
 
-      <div className="grid gap-6 md:grid-cols-2"><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Recommended creators</h2><p className="mt-2 text-sm leading-6 text-slate-600">Browse real sponsor-ready creator profiles matched through the discovery workspace.</p><LinkButton href={workspace.canDiscover ? "/sponsor/discover?tab=creators" : workspace.nextActionHref} variant="secondary" className="mt-5">{workspace.canDiscover ? "Discover Creators" : "Unlock Discovery"}</LinkButton></Card><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Recommended challenges</h2><p className="mt-2 text-sm leading-6 text-slate-600">Review published sponsor-ready challenges and their real funding eligibility.</p><LinkButton href={workspace.canDiscover ? "/sponsor/discover?tab=challenges" : workspace.nextActionHref} variant="secondary" className="mt-5">{workspace.canDiscover ? "Discover Challenges" : "Unlock Discovery"}</LinkButton></Card></div>
-    </div><aside className="space-y-6"><Card className="p-6"><ShieldCheck className="text-amber-700" /><h2 className="mt-3 text-xl font-black text-slate-950">Next steps</h2><ol className="mt-4 space-y-3 text-sm text-slate-600"><Step done={workspace.profileReady}>Complete brand profile</Step><Step done={workspace.approved}>Receive sponsor approval</Step><Step done={workspace.canCreateCampaignBrief}>Create a campaign brief</Step><Step done={openProposals.length > 0}>Open a proposal conversation</Step><Step done={Boolean(dashboard?.metrics.confirmedSponsorFundsCents)}>Confirm eligible campaign funding</Step></ol></Card><Card className="p-6"><CalendarClock className="text-amber-700" /><h2 className="mt-3 text-xl font-black text-slate-950">Upcoming deadlines</h2>{deadlines.length ? <div className="mt-4 space-y-3">{deadlines.map((item) => <div key={`${item.label}-${item.value}`} className="rounded-[8px] bg-slate-50 p-3"><p className="text-sm font-bold text-slate-900">{item.label}</p><p className="mt-1 text-xs text-slate-600">{formatDate(item.value)}</p></div>)}</div> : <p className="mt-4 text-sm leading-6 text-slate-600">No campaign deadlines yet. Dates will appear after a campaign brief is saved.</p>}</Card><Card className="p-6"><h2 className="text-xl font-black text-slate-950">Sponsor status</h2><dl className="mt-4 space-y-3 text-sm"><Row label="Brand profile" value={`${workspace.completionPercent}% complete`} /><Row label="Verification" value={workspace.statusLabel} /><Row label="Plan" value={experience.badgeLabel} /><Row label="Payment readiness" value={workspace.canFund ? "Eligible when proposal terms allow" : "Locked until requirements are met"} /></dl></Card></aside></div>
+      <section><SectionTitle title="Active Sponsorships" href="/sponsor/sponsorships" />
+        {dashboard?.widgetErrors?.sponsorships ? <WidgetError message="Sponsorships could not be loaded." retry={load} /> : dashboard?.sponsorships.length ? <div className="mt-3 space-y-3">{dashboard.sponsorships.map((item) => <Card key={item.id} className="p-4 shadow-none"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-black text-slate-950">{String(item.challengeTitle ?? item.title ?? "Sponsorship")}</p><p className="mt-1 text-xs font-bold uppercase text-amber-800">{label(item.status)}</p><p className="mt-2 text-sm text-slate-600">{label(item.sponsorRole ?? "supporting")} Sponsor</p></div><Handshake className="shrink-0 text-amber-700" size={19} /></div><Link href={"/sponsor/sponsorships/" + item.id} className="mt-4 inline-flex min-h-10 items-center text-sm font-black text-slate-950">View Sponsorship <ArrowRight className="ml-1" size={15} /></Link></Card>)}</div> : <div className="mt-3 rounded-[8px] bg-[#DCD9D2]/60 p-5"><p className="font-black text-slate-950">No active sponsorships yet.</p><p className="mt-2 text-sm leading-6 text-slate-600">Discover sponsorship-ready Challenges and Creators to start your first partnership.</p>{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges" className="mt-4">Discover Opportunities</LinkButton>}</div>}
+      </section>
+    </div>
+
+    {historicalOnly ? null : <section className="mt-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-2xl font-black text-slate-950">Recommended Opportunities</h2><p className="mt-1 text-sm text-slate-600">Real sponsorship-ready records from Discover.</p></div><Link href={"/sponsor/discover?tab=" + opportunityTab} className="text-sm font-black text-amber-800">Discover all</Link></div>
+      <div className="mt-4 inline-flex rounded-[8px] bg-slate-100 p-1" role="tablist" aria-label="Opportunity type">{(["challenges","creators"] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={opportunityTab === tab} onClick={() => selectTab(tab)} className={"min-h-10 rounded-[6px] px-5 text-sm font-black capitalize " + (opportunityTab === tab ? "bg-white text-slate-950 shadow-sm" : "text-slate-600")}>{tab}</button>)}</div>
+      {dashboard?.widgetErrors?.[opportunityTab] ? <WidgetError message={opportunityTab + " could not be loaded."} retry={load} /> : opportunities.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{opportunities.map((item) => <Link key={item.id} href={item.href} className="min-w-0 rounded-[8px] border border-slate-200 bg-white p-5 transition hover:border-amber-400"><p className="text-xs font-black uppercase text-amber-800">{item.category || (opportunityTab === "challenges" ? "Challenge" : "Creator")}</p><h3 className="mt-2 line-clamp-2 font-black text-slate-950">{item.title || item.displayName}</h3>{item.creatorName ? <p className="mt-2 truncate text-sm text-slate-600">{item.creatorName}</p> : null}<span className="mt-5 inline-flex items-center text-sm font-black">View {opportunityTab === "challenges" ? "Opportunity" : "Creator"} <ArrowRight className="ml-1" size={15} /></span></Link>)}</div> : <div className="mt-4 rounded-[8px] border border-slate-200 bg-white p-6 text-sm text-slate-600">No matching {opportunityTab} are available right now.</div>}
+    </section>}
+
+    <section className="mt-10 border-t border-slate-200 pt-8"><SectionTitle title="Performance Snapshot" href="/sponsor/analytics" />
+      <div className="mt-4 grid gap-4 sm:grid-cols-3"><Snapshot label="Valid impressions" value={metric(dashboard?.performance, "validImpressions")} /><Snapshot label="Unique CTA clicks" value={metric(dashboard?.performance, "uniqueCtaClicks")} /><Snapshot label="Participants reached" value={metric(dashboard?.performance, "participantsReached")} /></div>
+      <p className="mt-3 text-xs text-slate-500">{dashboard?.performanceState === "finalized" ? "Finalized and reconciled metrics" : dashboard?.performanceState === "live" ? "Live provisional metrics" : "Performance appears after measurable sponsored placements are active."}</p>
+    </section>
   </div></SponsorShell>;
 }
 
-function Metric({ icon, title, value, detail }: { icon: React.ReactNode; title: string; value: string; detail: string }) { return <Card className="p-5"><div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-amber-50 text-amber-800">{icon}</div><p className="mt-4 text-sm font-bold text-slate-600">{title}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p></Card>; }
-function Status({ label: text, tone }: { label: string; tone: "success" | "pending" | "brand" | "neutral" }) { const styles = tone === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : tone === "pending" ? "bg-amber-50 text-amber-800 border-amber-200" : tone === "brand" ? "bg-yellow-50 text-yellow-900 border-yellow-200" : "bg-slate-50 text-slate-700 border-slate-200"; return <span className={`rounded-full border px-3 py-1 font-bold capitalize ${styles}`}>{text}</span>; }
-function Step({ done, children }: { done: boolean; children: React.ReactNode }) { return <li className="flex gap-3"><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${done ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>{done ? "OK" : ""}</span><span>{children}</span></li>; }
-function Row({ label: name, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0"><dt className="text-slate-500">{name}</dt><dd className="text-right font-bold text-slate-900">{value}</dd></div>; }
-function label(value: unknown) { return String(value || "Draft").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-function formatMoney(value: unknown) { return typeof value === "number" && value > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100) : "No confirmed funds"; }
-function formatDate(value: unknown) { const date = new Date(String(value || "")); return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date) : "Date pending"; }
+function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon?: React.ReactNode }) { return <Card className="min-h-28 border-slate-200 bg-[#DCD9D2]/55 p-5 shadow-none"><div className="flex items-start justify-between gap-2"><p className="text-sm font-bold text-slate-600">{title}</p>{icon}</div><p className="mt-2 text-3xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></Card>; }
+function SectionTitle({ title, href }: { title: string; href?: string }) { return <div className="flex items-center justify-between gap-4"><h2 className="text-2xl font-black text-slate-950">{title}</h2>{href ? <Link href={href} className="text-sm font-black text-amber-800">View all</Link> : null}</div>; }
+function WidgetError({ message, retry }: { message: string; retry: () => Promise<void> }) { return <div className="mt-3 flex items-center justify-between gap-3 rounded-[8px] border border-amber-200 bg-amber-50 p-4"><p className="text-sm font-bold text-amber-900">{message}</p><button type="button" onClick={() => void retry()} className="shrink-0 text-sm font-black text-amber-900">Retry</button></div>; }
+function Snapshot({ label: name, value }: { label: string; value: string }) { return <div className="rounded-[8px] border border-slate-200 bg-white p-5"><LineChart size={18} className="text-amber-700" /><p className="mt-3 text-sm text-slate-600">{name}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div>; }
+function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100); }
+function date(value: string) { const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "date unavailable" : new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(parsed); }
+function label(value: unknown) { return String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function metric(item: RecordItem | null | undefined, key: string) { const source = item?.metrics && typeof item.metrics === "object" ? item.metrics as Record<string, unknown> : item; const value = Number(source?.[key]); return Number.isFinite(value) ? value.toLocaleString() : "Not recorded"; }

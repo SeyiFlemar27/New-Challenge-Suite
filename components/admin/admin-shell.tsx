@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -59,6 +59,7 @@ const groups: NavGroup[] = [
   ] },
   { label: "Sponsors & Events", items: [
     { href: "/admin/sponsors", label: "Sponsor applications", icon: ShieldCheck, permission: "sponsors.review" },
+    { href: "/admin/sponsor-operations", label: "Sponsorship operations", icon: Flag, permission: "sponsors.review" },
     { href: "/admin/sponsor-campaigns", label: "Sponsor campaigns", icon: Megaphone, permission: "sponsorCampaigns.review" },
     { href: "/admin/events", label: "Physical events", icon: Radio, permission: "challenges.view" },
     { href: "/admin/tournaments", label: "Tournament operations", icon: Trophy, permission: "challenges.view" }

@@ -2,12 +2,13 @@ import { fail, ok, readJson, serverError, validationError } from "@/lib/server/r
 import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sponsor";
 import { normalizeSponsorCapacityTerms, releaseSponsorCapacity } from "@/lib/server/sponsor-capacity";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
+import { unresolvedRequiredDeliverables } from "@/lib/server/sponsor-studio";
 
 export const dynamic = "force-dynamic";
 const issueCategories = new Set(["missing_deliverable", "placement_issue", "analytics_reporting", "funding_finance", "sponsorship_terms", "other"]);
 
 export async function GET(request: Request, { params }: { params: Promise<{ sponsorshipId: string }> }) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   const permission = requireSponsorPermission(context, "sponsorship.view");
@@ -52,6 +53,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sp
         Object.assign(next, { status: "disputed", disputeId: disputeRef.id, completionPausedAt: now });
       } else if (action === "confirm_completion") {
         if (String(sponsorship.status) !== "completion_review") throw new Error("ACTION_NOT_ALLOWED");
+        const [disputes, deliverables] = await Promise.all([
+          transaction.get(context.db.collection("sponsorDisputes").where("sponsorshipId", "==", sponsorshipId).limit(50)),
+          transaction.get(context.db.collection("sponsorDeliverables").where("relatedSponsorshipId", "==", sponsorshipId).limit(200))
+        ]);
+        if (disputes.docs.some((item) => !["resolved", "closed", "cancelled", "dismissed"].includes(String(item.data().status ?? "open").toLowerCase()))) throw new Error("COMPLETION_BLOCKED");
+        if (unresolvedRequiredDeliverables(deliverables.docs.map((item) => ({ id: item.id, ...item.data() })))) throw new Error("COMPLETION_BLOCKED");
         Object.assign(next, { status: "completed", completedAt: now, completionConfirmedBy: context.user.uid });
       } else {
         if (["completed", "cancelled", "disputed"].includes(String(sponsorship.status))) throw new Error("ACTION_NOT_ALLOWED");
@@ -91,6 +98,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sp
     if (error instanceof Error && error.message === "CANCELLATION_REASON_REQUIRED") return validationError({ reason: "Explain the cancellation request in at least 10 characters." });
     if (error instanceof Error && error.message === "DISPUTE_WINDOW_CLOSED") return fail("The ordinary completion issue window has closed. Contact Support for a financial concern.", 422, undefined, "DISPUTE_WINDOW_CLOSED");
     if (error instanceof Error && error.message === "REFUND_REVIEW_REQUIRED") return fail("This cancellation needs finance review before reserved funds can change.", 409, undefined, "REFUND_REVIEW_REQUIRED");
+    if (error instanceof Error && error.message === "COMPLETION_BLOCKED") return fail("Resolve open issues and required deliverables before confirming completion.", 422, undefined, "SPONSORSHIP_COMPLETION_BLOCKED");
     if (error instanceof Error && error.message === "ACTION_NOT_ALLOWED") return fail("This action is not available in the current sponsorship state.", 422, undefined, "SPONSORSHIP_ACTION_NOT_ALLOWED");
     console.error("[sponsor-sponsorship:patch]", { userId: context.user.uid, sponsorshipId, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsorship could not be updated.");

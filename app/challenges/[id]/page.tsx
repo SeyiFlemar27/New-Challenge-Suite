@@ -20,6 +20,7 @@ import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotin
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
 import { DynamicTranslatedText } from "@/components/i18n/dynamic-translated-text";
 import { ChallengeMilestoneCountdown } from "@/components/challenge-milestone-countdown";
+import { SponsorPlacement, type PublicSponsorPlacement } from "@/components/sponsor-placement";
 import type { DynamicTranslations } from "@/lib/i18n/dynamic-content";
 
 type ChallengeGuideSection = "overview" | "rules" | "submission" | "voting" | "prizes" | "leaderboard";
@@ -336,6 +337,7 @@ export default function ChallengeDetailPage() {
         </div>
 
         <aside className="space-y-5 xl:pt-[432px]">
+          {(Array.isArray(details?.sponsorships) ? details.sponsorships as PublicSponsorPlacement[] : []).map((item) => <SponsorPlacement key={String(item.id)} item={item} challengeId={challenge.id} />)}
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Sponsor contributions are confirmed before any public funding status updates. No investment return is promised.</p>

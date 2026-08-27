@@ -1,2 +1,3 @@
-﻿import { SponsorCampaignBuilder } from "@/components/sponsor/sponsor-campaign-builder";
-export default function NewSponsorCampaignPage() { return <SponsorCampaignBuilder />; }
+import { redirect } from "next/navigation";
+
+export default function Page() { redirect("/sponsor/proposals"); }

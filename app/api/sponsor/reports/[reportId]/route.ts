@@ -1,4 +1,4 @@
-﻿import { ok, serverError } from "@/lib/server/responses";
+import { ok, serverError } from "@/lib/server/responses";
 import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/sponsor";
 import { buildTextPdf } from "@/lib/server/simple-pdf";
 
@@ -7,7 +7,7 @@ type Params = { params: Promise<{ reportId: string }> };
 
 export async function GET(request: Request, { params }: Params) {
   const { reportId } = await params;
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   const owned = await assertSponsorOwnedDoc(context.db, "sponsorReports", reportId, context.sponsorId);

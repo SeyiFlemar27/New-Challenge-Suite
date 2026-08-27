@@ -26,15 +26,16 @@ export function runEnterpriseSponsorEcosystemContract(name) {
   const challengeDirectory = read("app/api/sponsor/discover/challenges/route.ts");
 
   if (name === "additive-workspaces") {
-    includesAll(workspace, ['workspace !== "sponsor"', "sponsorAvailable", "SPONSOR_ACCESS_REQUIRED"], name);
+    includesAll(workspace, ['workspace !== "personal" && workspace !== "enterprise"', "sponsorAvailable"], name);
+    assert.ok(!workspace.includes('workspace === "sponsor"'), `${name}: Sponsor must not be a switchable workspace`);
     includesAll(bootstrap, ['const accountType = isAdmin ? "admin" : "user"', 'const compatibilityAccountType = "user"', "sponsorOrganizationId"], name);
     assert.ok(!bootstrap.includes('const accountType = isAdmin ? "admin" : "sponsor"'), `${name}: Sponsor must not replace Personal identity`);
   } else if (name === "organization-membership") {
     includesAll(sponsorOrganizations, ["sponsorOrganizations", "sponsorMemberships", "SPONSOR_MEMBERSHIP_ROLES", "SPONSOR_PERMISSIONS"], name);
     includesAll(sponsorServer, ["resolveSponsorOrganizationAccess", "sponsorId:", "requireSponsorPermission"], name);
   } else if (name === "sponsor-navigation") {
-    includesAll(sponsorShell, ['label: "Sponsor Studio"', 'label: "Discover"', 'label: "Saved"', 'label: "Sponsorships"', 'label: "Proposals"', 'label: "Deliverables"', 'label: "Analytics"', 'label: "Reports"', 'label: "Wallet"', 'label: "Settings"', 'label: "Support"', "WorkspaceSwitcher"], name);
-    assert.ok(!sponsorShell.includes('label: "Campaigns"'), `${name}: Campaigns must not be a sidebar label`);
+    includesAll(sponsorShell, ['label: "Sponsor Studio"', 'label: "Discover"', 'label: "Saved"', 'label: "Sponsorships"', 'label: "Proposals"', 'label: "Deliverables"', 'label: "Analytics"', 'label: "Reports"', 'label: "Wallet"', 'label: "Settings"', 'label: "Support"', "Return to Challenge Suite"], name);
+    assert.ok(!sponsorShell.includes('label: "Campaigns"') && !sponsorShell.includes("WorkspaceSwitcher"), `${name}: Campaigns and the workspace switcher must not appear in Sponsor Panel`);
   } else if (name === "enterprise-shell-isolation") {
     includesAll(sidebar, ["personalEconomyContext", 'routedWorkspace === "enterprise"', "workspaceForRoute"], name);
     assert.ok(!sidebar.includes("Enterprise Access"), `${name}: legacy Enterprise access badge must not replace workspace identity`);

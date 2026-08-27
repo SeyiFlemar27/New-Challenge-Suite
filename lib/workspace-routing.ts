@@ -11,7 +11,7 @@ export type WorkspaceRouteClassification = {
 export const WORKSPACE_ROUTE_CLASSIFICATIONS: readonly WorkspaceRouteClassification[] = [
   { surface: "Admin", prefixes: ["/admin"], semantics: "admin", requiredWorkspace: null },
   { surface: "Sponsor application", prefixes: ["/sponsor/start"], semantics: "personal", requiredWorkspace: "personal" },
-  { surface: "Sponsor workspace", prefixes: ["/sponsor"], semantics: "sponsor", requiredWorkspace: "sponsor" },
+  { surface: "Sponsor panel", prefixes: ["/sponsor"], semantics: "sponsor", requiredWorkspace: null },
   { surface: "Enterprise application", prefixes: ["/enterprise/apply", "/enterprise/status", "/enterprise/application"], semantics: "shared", requiredWorkspace: null },
   { surface: "Enterprise operations", prefixes: ["/enterprise"], semantics: "enterprise", requiredWorkspace: "enterprise" },
   { surface: "Personal plans", prefixes: ["/subscriptions", "/settings/billing", "/settings/customization"], semantics: "personal", requiredWorkspace: "personal" },

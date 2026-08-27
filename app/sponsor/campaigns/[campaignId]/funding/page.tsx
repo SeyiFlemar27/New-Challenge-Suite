@@ -1,2 +1,3 @@
-﻿import { SponsorFundCampaignPage } from "@/components/sponsor/sponsor-finance-pages";
-export default function Page() { return <SponsorFundCampaignPage />; }
+import { redirect } from "next/navigation";
+
+export default function Page() { redirect("/sponsor/proposals"); }

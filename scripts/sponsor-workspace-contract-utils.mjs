@@ -57,11 +57,11 @@ export function runSponsorWorkspaceContract(name) {
       assert(source.shell.includes("resolveSponsorWorkspaceState") && source.dashboard.includes("resolveSponsorWorkspaceState"), "Shell and dashboard must share canonical sponsor state.");
       break;
     case "dashboard-simple-kpis":
-      hasAll(source.dashboard, ["Active Campaigns", "Open Proposals", "Unread Messages", "Available Sponsor Funds"], "Dashboard KPI missing");
+      hasAll(source.dashboard, ["Active Sponsorships", "Open Proposals", "Needs Attention", "Wallet Balance"], "Dashboard KPI missing");
       assert((source.dashboard.match(/<Metric /g) || []).length === 4, "Dashboard should render exactly four main KPI cards.");
       break;
     case "dashboard-widget-level-errors":
-      hasAll(source.dashboard, ["Sponsor overview is temporarily unavailable.", "Retry overview", "onClick={() => void load()}"], "Dashboard retry state incomplete");
+      hasAll(source.dashboard, ["Sponsor Studio could not be loaded.", "Try Again", "onClick={() => void load()}"], "Dashboard retry state incomplete");
       break;
     case "onboarding-complete-flow":
       hasAll(source.onboarding, ["Brand Basics", "Connect Your Channels", "Contact Person", "Sponsorship Goals", "Preferred Categories", "Sponsorship Preferences", "Review", "Save & Finish Later", "Submit for Review"], "Onboarding flow incomplete");
@@ -72,13 +72,11 @@ export function runSponsorWorkspaceContract(name) {
       hasAll(source.profileApi, ["invalidSponsorMediaPath", "authenticated sponsor media path"], "Sponsor upload server validation incomplete");
       break;
     case "campaign-brief-five-step-flow":
-      hasAll(source.campaignModel, ["Campaign Basics", "Audience & Goals", "Budget & Sponsorship Type", "Deliverables & Brand Rules", "Review & Submit"], "Campaign brief step missing");
-      assert((source.campaignModel.match(/title:/g) || []).length === 5, "Campaign brief must use five steps.");
-      assert(source.campaigns.includes("<details") && source.campaigns.includes("submitted_for_review"), "Advanced fields must be collapsible and submit state persisted.");
+      assert(read("app/sponsor/campaigns/page.tsx").includes('redirect("/sponsor/proposals")'), "Legacy Campaign Brief UI must redirect to Proposals while historical data is preserved.");
       break;
     case "discover-creators-challenges-saved":
       hasAll(source.discover, ["Creators", "Challenges", "Saved", "/sponsor/discover/creators", "/sponsor/discover/challenges", "/sponsor/saved"], "Discover hub incomplete");
-      hasAll(source.creatorsApi + source.challengesApi, ["SPONSOR_DISCOVERY_LOCKED", "resolveSponsorWorkspaceState"], "Discovery APIs must enforce sponsor approval");
+      assert(!source.access.includes("canDiscover = approved"), "Sponsor discovery must be available before verification approval.");
       break;
     case "proposal-complete-flow":
       hasAll(source.proposalModel, ["viewed", "negotiating", "changes_requested", "accepted", "declined", "admin_review", "funding_required", "funded", "live", "completed", "cancelled", "archived"], "Proposal status missing");
@@ -105,7 +103,7 @@ export function runSponsorWorkspaceContract(name) {
       assert(!reportPage.includes("Save Draft</Button>") && !reportPage.includes("Prepare report"), "Reports must not create placeholder report drafts.");
       break;
     case "settings-simplified":
-      hasAll(source.settings, ["Brand Profile", "Verification", "Billing & Payment", "Team", "Notifications", "Security", "Privacy"], "Settings section missing");
+      hasAll(source.settings, ["Brand Profile", "Verification", "Billing & Payment", "Notifications", "Security", "Privacy"], "Settings section missing");
       assert(!source.settings.includes('title: "Integrations"'), "Unavailable integrations must stay hidden.");
       break;
     case "support-ticket-flow":
@@ -123,7 +121,7 @@ export function runSponsorWorkspaceContract(name) {
       assert(source.proposalDetailApi.includes("assertSponsorOwnedDoc") && source.profileApi.includes("requireRequestUser"), "Sponsor detail/profile authorization missing.");
       break;
     case "unapproved-actions-locked-with-reason":
-      hasAll(source.access, ["canDiscover = approved", "canSendProposal = approved", "canFund = canSendProposal", "lockedReason"], "Sponsor eligibility reasons incomplete");
+      hasAll(source.access, ["canDiscover = status !== \"suspended\"", "canSendProposal = approved", "canFund = canSendProposal", "lockedReason"], "Sponsor eligibility reasons incomplete");
       hasAll(source.campaignApi + source.creatorsApi + source.challengesApi + source.proposalApi, ["SPONSOR_", "resolveSponsorWorkspaceState"], "Server sponsor gates missing");
       break;
     case "no-foundation-wording": {
@@ -134,7 +132,7 @@ export function runSponsorWorkspaceContract(name) {
     case "no-fake-data": {
       const relevant = Object.values(source).join("\n");
       assert(!/fakeSponsor|mockSponsor|demo sponsor|fake campaign|fake proposal|fake funds/i.test(relevant), "Sponsor workspace must not add fake production data.");
-      assert(source.dashboardApi.includes("sponsorContributions") && source.reports.includes("/api/sponsor/reports"), "Sponsor workspace must read real backend records.");
+      assert(source.dashboardApi.includes("sponsorships") && source.dashboardApi.includes("sponsorWallets") && source.reports.includes("/api/sponsor/reports"), "Sponsor workspace must read real backend records.");
       break;
     }
     case "premium-light-layout":

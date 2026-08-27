@@ -27,7 +27,7 @@ for (const route of ["/subscriptions", "/wallet", "/dorocoins", "/rewards", "/da
   assert(routing.includes(route), route + " must be classified as Personal-only.");
 }
 assert(routing.includes('prefixes: ["/enterprise"]') && routing.includes('requiredWorkspace: "enterprise"'), "Enterprise operational routes must require Enterprise context.");
-assert(routing.includes('prefixes: ["/sponsor"]') && routing.includes('requiredWorkspace: "sponsor"'), "Sponsor operational routes must require Sponsor context.");
+assert(routing.includes('surface: "Sponsor panel"') && routing.includes('semantics: "sponsor", requiredWorkspace: null'), "Sponsor Panel must use dedicated server-authorized context without becoming a switchable workspace.");
 assert(boundary.includes('method: "PATCH"') && boundary.includes("/api/auth/workspace"), "Cross-workspace route changes must use the canonical server API.");
 assert(boundary.includes("window.location.pathname + window.location.search + window.location.hash"), "Personal-only route switches must preserve the exact requested destination.");
 assert(boundary.includes('document.querySelector("[data-builder-surface]")') && boundary.includes("window.confirm"), "Cross-workspace routing must preserve the unsaved-work guard.");
@@ -51,7 +51,8 @@ assert(sidebar.includes("useState(childRouteActive)") && sidebar.includes("if (c
 assert(sidebar.includes('personalEconomyContext ? <Link href="/dorocoins"'), "Personal economy controls must remain available in Personal navigation.");
 assert(!sidebar.includes("Enterprise Access</div>"), "Enterprise footer must not render a redundant oversized access badge.");
 
-for (const label of ["Personal Workspace", "Challenge Suite Sponsor", "Challenge Suite Enterprise", "Staff Workspace", "Sponsor Workspace"]) assert(switcher.includes(label), "Workspace switcher missing " + label);
+for (const label of ["Personal Workspace", "Challenge Suite Enterprise", "Staff Workspace"]) assert(switcher.includes(label), "Workspace switcher missing " + label);
+assert(!switcher.includes("Challenge Suite Sponsor") && !switcher.includes("Sponsor Workspace"), "Sponsor must not appear in the Personal/Enterprise workspace switcher.");
 assert(switcher.includes("available.includes(workspace)"), "Switcher must render only server-authorized workspaces.");
 assert(switcher.includes("user.displayName") && switcher.includes("user.avatarUrl") && switcher.includes("user.initials"), "Compact footer must use the authenticated human identity.");
 assert(switcher.includes('aria-haspopup="menu"') && switcher.includes('role="menuitemradio"'), "Workspace switcher must be keyboard/assistive-technology compatible.");

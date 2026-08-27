@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const actionableStatuses = new Set(["sent", "viewed", "received", "under_review", "negotiating", "changes_requested"]);
 
 export async function GET(request: Request, { params }: { params: Promise<{ proposalId: string }> }) {
-  const { context, response } = await requireSponsorContext(request);
+  const { context, response } = await requireSponsorContext(request, { allowHistorical: true });
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
   try {
