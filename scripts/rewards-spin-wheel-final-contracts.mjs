@@ -1,0 +1,76 @@
+import assert from "node:assert/strict";
+import { read } from "./production-flow-test-utils.mjs";
+
+const rewards = read("lib/server/rewards.ts");
+const wheel = read("app/rewards/wheel/page.tsx");
+const hub = read("app/rewards/page.tsx");
+const history = read("app/rewards/history/page.tsx");
+const claim = read("app/api/rewards/claim/route.ts");
+const admin = read("app/admin/rewards/prize-wheel/page.tsx");
+const sidebar = read("components/sidebar.tsx");
+const earnings = read("app/earnings/page.tsx");
+
+assert.match(rewards, /spinCosts: \{ basic: 100, standard: 250, premium: 500 \}/);
+assert.match(wheel, /Confirm Spin/);
+assert.match(wheel, /paymentSource/);
+assert.match(wheel, /bonus_spin/);
+assert.match(wheel, /resolvedProbability/);
+assert.match(wheel, /probability \* 360/);
+assert.match(wheel, /Possible Rewards/);
+assert(!wheel.includes("RotateCcw"));
+assert(!wheel.includes("Reset"));
+assert(!wheel.includes("Unlocked"));
+assert(!wheel.includes("Locked"));
+assert(!wheel.includes("spin credit"));
+assert(!wheel.includes("NO_SPINS"));
+assert(!wheel.toLowerCase().includes("rarity"));
+assert(!wheel.toLowerCase().includes("sound"));
+assert.match(wheel, /prefers-reduced-motion/);
+assert.match(wheel, /navigator\.vibrate/);
+
+assert.match(rewards, /sourceType: "reward_spin_cash"/);
+assert.match(rewards, /db\.collection\("cashLedger"\)/);
+assert.match(rewards, /db\.collection\("cashWallets"\)/);
+assert.match(rewards, /currency: "USD"/);
+assert.match(rewards, /pendingBalanceCents: FieldValue\.increment/);
+assert.match(rewards, /externalPayoutExecuted: false/);
+assert.match(earnings, /reward_spin_cash/);
+assert(!rewards.includes("payoutProviderCalled: true"));
+
+assert.match(rewards, /prizeType === "physical_item"/);
+assert.match(rewards, /reservedQuantity: FieldValue\.increment\(1\)/);
+assert.match(rewards, /delivery_details_required/);
+assert.match(rewards, /deliveryDetailsDueAt/);
+assert.match(rewards, /deliveryCountries/);
+assert.match(rewards, /DELIVERY_COUNTRY_NOT_ELIGIBLE/);
+assert.match(history, /addressLine1/);
+assert.match(history, /postalCode/);
+assert.match(claim, /deliveryNotes/);
+assert(!history.includes("deliveryAddress"));
+
+for (const type of ["reward_points", "dorocoin", "cash", "physical_item", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"]) assert(admin.includes(`value="${type}"`), `missing structured admin prize type ${type}`);
+assert(admin.includes("Delivery countries"));
+assert(admin.includes("Total inventory"));
+assert(!admin.includes('label="Reward type"><input'));
+
+for (const heading of ["Spin & Win", "Daily streak", "Earn Points", "Achievements", "Your Rewards", "Recent Rewards"]) assert(hub.includes(heading), `missing Reward Hub section ${heading}`);
+assert(!hub.includes("Lifetime Earned"));
+assert(!hub.includes("Available rewards"));
+
+assert.match(sidebar, /label: "Build a Challenge"/);
+for (const label of ["Normal", "Private", "Live Event", "Tournament"]) assert(sidebar.includes(`label: "${label}"`));
+assert.match(sidebar, /const \[open, setOpen\] = useState\(false\)/);
+assert(!sidebar.includes("useState(childRouteActive)"));
+assert.match(sidebar, /toLocaleString\(\)\} DC/);
+assert.match(sidebar, /DoroCoins\. Open DoroCoin wallet/);
+
+assert.match(rewards, /const existingSpin = await spinRef\.get\(\)/);
+const executeSpin = rewards.slice(rewards.indexOf("export async function executeRewardSpin"));
+assert(executeSpin.indexOf("const existingSpin") < executeSpin.indexOf("chooseRewardPrize"), "idempotency lookup must precede prize selection");
+assert.match(rewards, /transaction\.get\(spinRef\)/);
+assert.match(rewards, /serverSelected: true/);
+assert(!rewards.includes("Math.random"));
+const prizeLoader = rewards.slice(rewards.indexOf("export async function loadRewardPrizes"), rewards.indexOf("export function publicPrize"));
+assert(!prizeLoader.includes("DEFAULT_REWARD_PRIZES"), "code-defined fallback prizes must not be returned as live production inventory");
+
+console.log("Rewards Spin Wheel final contracts passed.");

@@ -72,9 +72,10 @@ assert(emergency.includes('requireRecentAdminAuthentication(request, "rewards.em
 assert(emergency.includes("reason.length < 8"));
 assert(reconciliation.includes('requireAdminPermission(request, "rewards.investigate")'));
 assert(reconciliation.includes("repairPerformed: false"));
-assert(hub.includes("Reward Points have no cash value and are separate from DoroCoins"));
+assert(hub.includes("verified Challenge Suite activity"));
 assert(!hub.includes("Buy DoroCoins"));
-assert(wheel.includes("Math.floor(points / tierConfig[tier].cost)"));
-assert(!wheel.includes("if (credits <= 0)"));
+assert(wheel.includes("Math.floor(points / Math.max(1, cost))"));
+assert(wheel.includes("Confirm Spin"));
+assert(!wheel.includes("spin credit"));
 
 console.log("Rewards Economy V1 contract checks passed.");

@@ -99,6 +99,12 @@ const starterSections: NavSection[] = [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
   ] },
+  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
+    { href: "/challenges/create", label: "Normal" },
+    { href: "/private/create", label: "Private" },
+    { href: "/live/create", label: "Live Event" },
+    { href: "/tournaments/create", label: "Tournament" }
+  ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
@@ -124,6 +130,12 @@ const creatorSections: NavSection[] = [
     { href: "/dashboard", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
   ] },
+  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
+    { href: "/challenges/create", label: "Normal" },
+    { href: "/private/create", label: "Private" },
+    { href: "/live/create", label: "Live Event" },
+    { href: "/tournaments/create", label: "Tournament" }
+  ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
@@ -149,6 +161,12 @@ const hostSections: NavSection[] = [
     { href: "/dashboard/host", label: "Creator Studio", icon: Home },
     { href: "/explore", label: "Explore", icon: LayoutGrid },
   ] },
+  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
+    { href: "/host/challenges/create", label: "Normal" },
+    { href: "/host/private/create", label: "Private" },
+    { href: "/host/live/create", label: "Live Event" },
+    { href: "/host/tournaments/create", label: "Tournament" }
+  ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
     { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
@@ -368,7 +386,7 @@ export function Sidebar() {
         </nav>
         <div className="space-y-3 p-5">
           <WorkspaceSwitcher user={user} />
-          {personalEconomyContext ? <Link href="/dorocoins" aria-label="Open DoroCoin wallet" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins</Link> : null}
+          {personalEconomyContext ? <Link href="/dorocoins" aria-label={`${Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins. Open DoroCoin wallet.`} className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DC</Link> : null}
           {personalEconomyContext ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : null}
           {!loading && !signedOut && personalEconomyContext && !user?.isSponsor ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
         </div>
@@ -402,8 +420,7 @@ function NavigationSections({ sections, activeHref, pathname, mobile = false }: 
 
 function NavigationItem({ item, activeHref, pathname }: { item: NavItem; activeHref: string; pathname: string }) {
   const childRouteActive = Boolean(item.children?.some((child) => pathname === child.href.split("?")[0] || pathname.startsWith(child.href.split("?")[0] + "/")));
-  const [open, setOpen] = useState(childRouteActive);
-  useEffect(() => { if (childRouteActive) setOpen(true); }, [childRouteActive]);
+  const [open, setOpen] = useState(false);
   const Icon = item.icon;
   if (item.children?.length) {
     return <div><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className={cn("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", childRouteActive && "bg-white/5 text-white")}><Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span><ChevronDown size={16} className={open ? "rotate-180 transition" : "transition"} /></button>{open ? <div className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-3">{item.children.map((child) => <Link key={child.href} href={child.href} className="flex min-h-10 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">{child.label}</Link>)}</div> : null}</div>;
