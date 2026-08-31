@@ -6,7 +6,6 @@ import { CircleHelp, Handshake, LogOut, MessageSquare, Settings, UserRound, Wall
 import { NotificationBell } from "@/components/notification-bell";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { logout } from "@/lib/firebase/auth-service";
-import { LanguageSelector } from "@/components/i18n/language-selector";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 export function AuthenticatedTopbar() {
@@ -15,7 +14,6 @@ export function AuthenticatedTopbar() {
   return (
     <header className="sticky top-[69px] z-20 border-b border-white/10 bg-[var(--panel)] px-4 py-2.5 backdrop-blur sm:px-6 lg:top-0 lg:px-10" data-authenticated-topbar>
       <div className="mx-auto flex min-h-11 max-w-[1600px] items-center justify-end gap-2">
-        <LanguageSelector compact persistAccount />
         <Link href="/messages" className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 text-slate-300 hover:border-[var(--gold)]/40 hover:text-white" aria-label="Open messages">
           <MessageSquare size={18} />
         </Link>

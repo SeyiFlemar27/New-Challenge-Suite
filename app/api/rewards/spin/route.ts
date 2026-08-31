@@ -21,7 +21,9 @@ export const rewardSpinMessages: Record<string, string> = {
   PRIZE_OUT_OF_STOCK: "That reward became unavailable. No points were charged; please try again.",
   PRIZE_USER_WIN_LIMIT_REACHED: "You have reached the win limit for this reward. No points were charged.",
   PRIZE_DAILY_WIN_LIMIT_REACHED: "This reward reached its daily win limit. No points were charged; please try again.",
-  REWARD_BUDGET_EXHAUSTED: "This reward budget is unavailable. No points were charged."
+  REWARD_BUDGET_EXHAUSTED: "This reward budget is unavailable. No points were charged.",
+  NO_ACTIVE_WHEEL_VERSION: "This Spin tier is temporarily unavailable. No points were charged.",
+  WHEEL_VERSION_CHANGED: "This Spin tier was just updated. No points were charged; please try again."
 };
 
 export async function POST(request: Request) {

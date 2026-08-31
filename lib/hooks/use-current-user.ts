@@ -7,6 +7,23 @@ import type { AccountType, AppRole, UserPlanId } from "@/lib/types";
 import type { ProfileCustomization } from "@/lib/customization/options";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
 
+type BootstrapResult = Awaited<ReturnType<typeof fetchBootstrapProfile>>;
+let cachedBootstrap: { uid: string; result: BootstrapResult } | null = null;
+let pendingBootstrap: { uid: string; promise: Promise<BootstrapResult> } | null = null;
+
+async function loadBootstrapProfile(uid: string) {
+  if (cachedBootstrap?.uid === uid) return cachedBootstrap.result;
+  if (pendingBootstrap?.uid === uid) return pendingBootstrap.promise;
+  const promise = fetchBootstrapProfile().then((result) => {
+    if (result.ok && result.data?.user) cachedBootstrap = { uid, result };
+    return result;
+  }).finally(() => {
+    if (pendingBootstrap?.uid === uid) pendingBootstrap = null;
+  });
+  pendingBootstrap = { uid, promise };
+  return promise;
+}
+
 export interface CurrentUserProfile {
   uid: string;
   email: string;
@@ -74,6 +91,16 @@ export function useCurrentUser() {
   const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      cachedBootstrap = null;
+      setRefreshKey((current) => current + 1);
+    };
+    window.addEventListener("challenge-suite-profile-updated", refresh);
+    return () => window.removeEventListener("challenge-suite-profile-updated", refresh);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +118,7 @@ export function useCurrentUser() {
       setError(null);
 
       try {
-        const result = await fetchBootstrapProfile();
+        const result = await loadBootstrapProfile(auth.user.uid);
         if (cancelled) return;
         if (!result.ok || !result.data?.user) {
           throw new Error(result.message || "Profile could not be loaded.");
@@ -164,7 +191,7 @@ export function useCurrentUser() {
     return () => {
       cancelled = true;
     };
-  }, [auth.loading, auth.user]);
+  }, [auth.loading, auth.user, refreshKey]);
 
   return useMemo(() => ({
     user: currentUser,

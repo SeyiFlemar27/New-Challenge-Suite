@@ -298,6 +298,7 @@ export async function consumeEntryEntitlement(transaction: Transaction, db: Fire
 export async function adjustRewardPoints(db: Firestore, input: { userId: string; adminId: string; direction: "credit" | "debit"; amount: number; reason: string; confirmation: string; idempotencyKey: string }) {
   const value = amount(input.amount);
   if (!value || input.reason.trim().length < 8) throw new Error("REWARD_ADJUSTMENT_INVALID");
+  if (input.direction === "credit" && input.confirmation !== "CONFIRM REWARD CREDIT") throw new Error("REWARD_CREDIT_CONFIRMATION_REQUIRED");
   if (input.direction === "debit" && input.confirmation !== "CONFIRM REWARD DEBIT") throw new Error("REWARD_DEBIT_CONFIRMATION_REQUIRED");
   const id = deterministicId("reward_adjustment", input.userId, input.idempotencyKey);
   const now = new Date().toISOString();

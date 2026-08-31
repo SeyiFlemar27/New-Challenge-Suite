@@ -3,6 +3,7 @@ import { read } from "./production-flow-test-utils.mjs";
 
 const rewards = read("lib/server/rewards.ts");
 const wheel = read("app/rewards/wheel/page.tsx");
+const geometry = read("lib/reward-wheel-geometry.ts");
 const hub = read("app/rewards/page.tsx");
 const history = read("app/rewards/history/page.tsx");
 const claim = read("app/api/rewards/claim/route.ts");
@@ -15,7 +16,7 @@ assert.match(wheel, /Confirm Spin/);
 assert.match(wheel, /paymentSource/);
 assert.match(wheel, /bonus_spin/);
 assert.match(wheel, /resolvedProbability/);
-assert.match(wheel, /probability \* 360/);
+assert.match(geometry, /probability \* 360/);
 assert.match(wheel, /Possible Rewards/);
 assert(!wheel.includes("RotateCcw"));
 assert(!wheel.includes("Reset"));
@@ -49,8 +50,8 @@ assert.match(claim, /deliveryNotes/);
 assert(!history.includes("deliveryAddress"));
 
 for (const type of ["reward_points", "dorocoin", "cash", "physical_item", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"]) assert(admin.includes(`value="${type}"`), `missing structured admin prize type ${type}`);
-assert(admin.includes("Delivery countries"));
-assert(admin.includes("Total inventory"));
+assert(admin.includes("Delivery country codes"));
+assert(admin.includes("Inventory"));
 assert(!admin.includes('label="Reward type"><input'));
 
 for (const heading of ["Spin & Win", "Daily streak", "Earn Points", "Achievements", "Your Rewards", "Recent Rewards"]) assert(hub.includes(heading), `missing Reward Hub section ${heading}`);

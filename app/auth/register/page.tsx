@@ -9,7 +9,6 @@ import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
 import { signUpWithProfile } from "@/lib/firebase/auth-service";
 import { AuthFlowError, type SignupEmailState } from "@/lib/firebase/auth-errors";
-import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/lib/i18n/use-language";
 
 function safeInternalPath(value: string | null) {
@@ -83,7 +82,7 @@ export default function RegisterPage() {
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
       <Card className="w-full max-w-[600px] rounded-[12px] p-6 sm:p-8 lg:p-10">
-        <div className="mb-7 flex items-center justify-between gap-4"><span className="w-28" /><BrandLogo imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" /><div className="flex w-28 justify-end"><LanguageSelector compact /></div></div>
+        <div className="mb-7 flex justify-center"><BrandLogo imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow sm:h-24 sm:w-24" /></div>
         <h1 className="text-center text-3xl font-black leading-tight sm:text-4xl">{t("Create Account")}</h1>
         <p className="mx-auto mt-3 max-w-md text-center text-base leading-7 text-slate-300 sm:text-lg">{t("Join the Challenge Suite community today")}</p>
         <form className="mt-8 space-y-6" onSubmit={submit}>

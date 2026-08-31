@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from "crypto";
+import { createHash, randomInt, randomUUID } from "crypto";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { ACHIEVEMENT_CATALOG, STREAK_MILESTONES, isConsumerRewardsEligible, rewardEntitlementPayload, type RewardEntitlementType } from "@/lib/server/reward-economy";
@@ -9,6 +9,8 @@ const TIERS: RewardSpinTier[] = ["basic", "standard", "premium"];
 export type RewardSettings = { id: string; rewardsEnabled: boolean; maintenanceMode: boolean; rewardEarningPaused: boolean; rewardFulfillmentPaused: boolean; tierEnabled: Record<RewardSpinTier, boolean>; thresholds: SpinCredits; spinCosts: SpinCredits; pointsPerDoroCoin: number; pointsAccumulate: boolean; maxSpinsPerDay: number; maxSpinsPerUser: number | null; spinCreditExpiryDays: number | null; rewardPointExpiryDays: number | null; animationDurationMs: number; resultDisplayDurationMs: number; primaryCampaignId: string | null; publicWheelRules: string; campaignTerms: string; supportContact: string; kycRequiredForHighValuePrizes: boolean; emailVerificationRequired: boolean; phoneVerificationRequired: boolean; addressVerificationRequiredForPhysicalPrizes: boolean; minimumAccountAgeDays: number; updatedAt?: string | null };
 export type RewardCampaign = { id: string; campaignName: string; description: string; active: boolean; primary: boolean; startDate: string | null; endDate: string | null; associatedWheelTiers: RewardSpinTier[]; bannerImageUrl: string | null; terms: string; eligibleCountries: string[]; eligiblePlans: string[] };
 export type RewardPrize = { id: string; prizeName: string; prizeDescription: string; prizeTier: RewardSpinTier; prizeType: string; rarity: "common" | "uncommon" | "rare" | "very_rare"; fulfillmentType: "automatic" | "manual"; probabilityWeight: number; quantityType: "limited" | "unlimited"; totalQuantity: number | null; remainingQuantity: number | null; reservedQuantity: number; maximumWinsPerUser: number | null; maximumWinsPerDay: number | null; enabled: boolean; status: string; startDate: string | null; endDate: string | null; expiresAt: string | null; displayOrder: number; terms: string; campaignId: string | null; imageUrl: string | null; rewardValue: number; unit: string | null; currency: "USD" | null; economicValueCents: number; budgetId: string | null; manualFulfillmentRequired: boolean; fulfillmentInstructions: string | null; brand: string | null; model: string | null; variant: string | null; sku: string | null; deliveryCountries: string[]; shippingPolicy: string | null; customsPolicy: string | null; deliveryDetailsDeadlineDays: number; estimatedFulfillmentDays: number | null; createdByAdminId: string | null; winCount: number; cashOutEnabled: false };
+export type RewardWheelEntry = { prizeId: string; weight: number };
+export type ResolvedRewardWheel = { tier: RewardSpinTier; versionId: string | null; pointCost: number; prizes: RewardPrize[]; diagnosticCode: string | null };
 
 export function emptySpinCredits(): SpinCredits { return { basic: 0, standard: 0, premium: 0 }; }
 function n(value: unknown, fallback = 0) { const parsed = Math.floor(Number(value)); return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback; }
@@ -27,6 +29,98 @@ export const DEFAULT_REWARD_PRIZES: RewardPrize[] = [
   prize("launch-premium-150-dorocoins", "150 DoroCoins", "premium", "dorocoin", "common", 22, 150), prize("launch-premium-250-dorocoins", "250 DoroCoins", "premium", "dorocoin", "common", 18, 250), prize("launch-premium-150-points", "150 Reward Points", "premium", "reward_points", "common", 14, 150), prize("launch-premium-300-dorocoins", "300 DoroCoins", "premium", "dorocoin", "uncommon", 12, 300), prize("launch-premium-250-points", "250 Reward Points", "premium", "reward_points", "uncommon", 10, 250), prize("launch-premium-500-dorocoins", "500 DoroCoins", "premium", "dorocoin", "rare", 7, 500), prize("launch-premium-25-percent", "25% Entry Discount", "premium", "percentage_entry_discount", "rare", 5, 25, "percent"), prize("launch-premium-creator-boost", "Creator Boost Credit - 72 hours", "premium", "creator_boost", "rare", 4, 72, "hours"), prize("launch-premium-750-points", "750 Reward Points", "premium", "reward_points", "rare", 3, 750), prize("launch-premium-10-free-entry", "Free Entry Credit up to $10", "premium", "free_entry", "very_rare", 2, 1000, "cents"), prize("launch-premium-limited-badge", "Limited Reward Badge", "premium", "badge", "very_rare", 2, 1), prize("launch-premium-1000-points", "1,000 Reward Points", "premium", "reward_points", "very_rare", 1, 1000)
 ];
 
+function wheelEntrySignature(entries: RewardWheelEntry[]) {
+  return createHash("sha256").update(entries.map((entry) => `${entry.prizeId}:${entry.weight}`).join("|")).digest("hex").slice(0, 12);
+}
+
+function validVersionEntries(prizes: RewardPrize[], selectedTier: RewardSpinTier): RewardWheelEntry[] {
+  return prizes
+    .filter((item) => item.prizeTier === selectedTier && isPrizeActive(item))
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.id.localeCompare(b.id))
+    .map((item) => ({ prizeId: item.id, weight: item.probabilityWeight }));
+}
+
+export function normalizeRewardWheelEntries(value: unknown): RewardWheelEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const entry = row as Record<string, unknown>;
+    const prizeId = String(entry.prizeId ?? "").trim();
+    const weight = Number(entry.weight);
+    return prizeId && Number.isFinite(weight) && weight > 0 ? [{ prizeId, weight }] : [];
+  });
+}
+
+export async function ensureCanonicalRewardWheelConfiguration(db: Firestore) {
+  const now = new Date().toISOString();
+  return db.runTransaction(async (transaction) => {
+    const pointerRefs = TIERS.map((selectedTier) => db.collection("rewardWheelActiveVersions").doc(selectedTier));
+    const [pointerSnaps, configuredSnap, legacySnap, settingsSnap] = await Promise.all([
+      Promise.all(pointerRefs.map((ref) => transaction.get(ref))),
+      transaction.get(db.collection("rewardPrizes").where("enabled", "==", true).limit(500)),
+      transaction.get(db.collection("rewardWheelPrizes").where("enabled", "==", true).limit(500)),
+      transaction.get(db.collection("rewardSettings").doc("default")),
+    ]);
+    if (pointerSnaps.every((snap) => snap.exists)) return { seeded: false, migrated: false };
+
+    const configured = configuredSnap.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data()));
+    const legacy = legacySnap.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data()));
+    const absent = configured.length === 0 && legacy.length === 0;
+    const source = configured.length ? configured : legacy.length ? legacy : DEFAULT_REWARD_PRIZES;
+    const sourceType = absent ? "starter" : configured.length ? "configured_prizes" : "legacy_prizes";
+    const configuredSettings = normalizeRewardSettings(settingsSnap.exists ? { id: settingsSnap.id, ...settingsSnap.data() } : null);
+
+    if (absent) {
+      for (const item of DEFAULT_REWARD_PRIZES) {
+        transaction.set(db.collection("rewardPrizes").doc(item.id), {
+          ...item,
+          wheelSeedVersion: "starter-wheel-v1",
+          createdAt: now,
+          updatedAt: now,
+          createdByAdminId: "system:starter-wheel-v1",
+        });
+      }
+    }
+
+    for (let index = 0; index < TIERS.length; index += 1) {
+      if (pointerSnaps[index].exists) continue;
+      const selectedTier = TIERS[index];
+      const entries = validVersionEntries(source, selectedTier);
+      if (!entries.length) continue;
+      const versionId = absent ? `starter-wheel-v1-${selectedTier}` : `migrated-wheel-${selectedTier}-${wheelEntrySignature(entries)}`;
+      transaction.set(db.collection("rewardWheelVersions").doc(versionId), {
+        id: versionId,
+        tier: selectedTier,
+        pointCost: configuredSettings.spinCosts[selectedTier],
+        entries,
+        status: "published",
+        immutable: true,
+        source: sourceType,
+        publishedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      transaction.set(pointerRefs[index], { tier: selectedTier, versionId, activatedAt: now, source: sourceType });
+      transaction.set(db.collection("rewardAuditLogs").doc(deterministicId("reward_wheel_activation", versionId)), {
+        id: deterministicId("reward_wheel_activation", versionId),
+        action: absent ? "reward_wheel_starter_seeded" : "reward_wheel_existing_config_versioned",
+        wheelVersionId: versionId,
+        tier: selectedTier,
+        source: sourceType,
+        createdAt: now,
+      });
+    }
+    transaction.set(db.collection("rewardMigrations").doc("starter-wheel-v1"), {
+      id: "starter-wheel-v1",
+      status: absent ? "seeded" : "existing_configuration_versioned",
+      source: sourceType,
+      completedAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    return { seeded: absent, migrated: !absent };
+  });
+}
+
 export function normalizeRewardSettings(data?: Record<string, unknown> | null): RewardSettings { const costs = normalizeSpinCredits(data?.spinCosts ?? data?.thresholds ?? data?.spinThresholds); const raw = data?.tierEnabled && typeof data.tierEnabled === "object" ? data.tierEnabled as Record<string, unknown> : {}; const spinCosts = { basic: costs.basic || 100, standard: costs.standard || 250, premium: costs.premium || 500 }; return { ...DEFAULT_REWARD_SETTINGS, id: String(data?.id ?? "default"), rewardsEnabled: data?.rewardsEnabled !== false, maintenanceMode: Boolean(data?.maintenanceMode), rewardEarningPaused: Boolean(data?.rewardEarningPaused), rewardFulfillmentPaused: Boolean(data?.rewardFulfillmentPaused), tierEnabled: { basic: raw.basic !== false, standard: raw.standard !== false, premium: raw.premium !== false }, thresholds: spinCosts, spinCosts, animationDurationMs: n(data?.animationDurationMs, 4200), resultDisplayDurationMs: n(data?.resultDisplayDurationMs, 7000), primaryCampaignId: typeof data?.primaryCampaignId === "string" && data.primaryCampaignId ? data.primaryCampaignId : null, publicWheelRules: String(data?.publicWheelRules ?? DEFAULT_REWARD_SETTINGS.publicWheelRules), campaignTerms: String(data?.campaignTerms ?? DEFAULT_REWARD_SETTINGS.campaignTerms), supportContact: String(data?.supportContact ?? DEFAULT_REWARD_SETTINGS.supportContact), emailVerificationRequired: Boolean(data?.emailVerificationRequired), phoneVerificationRequired: Boolean(data?.phoneVerificationRequired), addressVerificationRequiredForPhysicalPrizes: data?.addressVerificationRequiredForPhysicalPrizes !== false, minimumAccountAgeDays: n(data?.minimumAccountAgeDays), updatedAt: iso(data?.updatedAt) }; }
 export async function getRewardSettings(db: Firestore) { const snap = await db.collection("rewardSettings").doc("default").get(); return normalizeRewardSettings(snap.exists ? { id: snap.id, ...snap.data() } : null); }
 export function normalizeRewardCampaign(id: string, data?: Record<string, unknown> | null): RewardCampaign { if (!data) return DEFAULT_REWARD_CAMPAIGN; return { id, campaignName: String(data.campaignName ?? data.name ?? "Rewards Campaign"), description: String(data.description ?? ""), active: data.active !== false, primary: Boolean(data.primary), startDate: iso(data.startDate), endDate: iso(data.endDate), associatedWheelTiers: Array.isArray(data.associatedWheelTiers) ? data.associatedWheelTiers.map(tier) : TIERS, bannerImageUrl: typeof data.bannerImageUrl === "string" ? data.bannerImageUrl : null, terms: String(data.terms ?? DEFAULT_REWARD_SETTINGS.campaignTerms), eligibleCountries: Array.isArray(data.eligibleCountries) ? data.eligibleCountries.map(String) : [], eligiblePlans: Array.isArray(data.eligiblePlans) ? data.eligiblePlans.map(String) : [] }; }
@@ -38,19 +132,157 @@ export function availablePrizesForTier(prizes: RewardPrize[], selectedTier: Rewa
 export function chooseRewardPrize(prizes: RewardPrize[], selectedTier: RewardSpinTier, now = Date.now(), campaignId?: string | null, country?: string | null) { const available = availablePrizesForTier(prizes, selectedTier, now, campaignId, country); const scaled = available.map((item) => ({ item, weight: Math.max(0, Math.round(item.probabilityWeight * 1000)) })); const total = scaled.reduce((sum, item) => sum + item.weight, 0); if (!available.length || total <= 0) return null; let cursor = randomInt(total); for (const entry of scaled) { if (cursor < entry.weight) return entry.item; cursor -= entry.weight; } return available.at(-1) ?? null; }
 export function rewardPrizesNeedSetup(prizes: RewardPrize[]) { return prizes.length === 0; }
 export async function loadRewardPrizes(db: Firestore) { const snap = await db.collection("rewardPrizes").where("enabled", "==", true).limit(500).get(); const configured = snap.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data())); if (configured.length) return configured; const legacy = await db.collection("rewardWheelPrizes").where("enabled", "==", true).limit(500).get(); return legacy.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data())); }
+export async function resolveRewardWheel(db: Firestore, selectedTier: RewardSpinTier, settings: RewardSettings, country?: string | null, campaignId?: string | null, configurationEnsured = false): Promise<ResolvedRewardWheel> {
+  if (!configurationEnsured) await ensureCanonicalRewardWheelConfiguration(db);
+  const pointerSnap = await db.collection("rewardWheelActiveVersions").doc(selectedTier).get();
+  if (!pointerSnap.exists) return { tier: selectedTier, versionId: null, pointCost: settings.spinCosts[selectedTier], prizes: [], diagnosticCode: "NO_ACTIVE_WHEEL_VERSION" };
+  const versionId = String(pointerSnap.data()?.versionId ?? "");
+  const versionSnap = versionId ? await db.collection("rewardWheelVersions").doc(versionId).get() : null;
+  if (!versionSnap?.exists) return { tier: selectedTier, versionId, pointCost: settings.spinCosts[selectedTier], prizes: [], diagnosticCode: "ACTIVE_WHEEL_VERSION_MISSING" };
+  const entries = normalizeRewardWheelEntries(versionSnap.data()?.entries);
+  if (!entries.length) return { tier: selectedTier, versionId, pointCost: n(versionSnap.data()?.pointCost, settings.spinCosts[selectedTier]), prizes: [], diagnosticCode: "ACTIVE_WHEEL_EMPTY" };
+  const resolved = await Promise.all(entries.map(async (entry) => {
+    const current = await db.collection("rewardPrizes").doc(entry.prizeId).get();
+    const source = current.exists ? current : await db.collection("rewardWheelPrizes").doc(entry.prizeId).get();
+    if (!source.exists) return null;
+    return { ...normalizeRewardPrize(source.id, source.data() ?? {}), prizeTier: selectedTier, probabilityWeight: entry.weight };
+  }));
+  const prizes = availablePrizesForTier(resolved.filter((item): item is RewardPrize => Boolean(item)), selectedTier, Date.now(), campaignId, country);
+  return {
+    tier: selectedTier,
+    versionId,
+    pointCost: n(versionSnap.data()?.pointCost, settings.spinCosts[selectedTier]),
+    prizes,
+    diagnosticCode: prizes.length ? null : "EMPTY_ELIGIBLE_REWARD_POOL",
+  };
+}
 export function publicPrize(item: RewardPrize, resolvedProbability?: number) { return { id: item.id, prizeName: item.prizeName, prizeDescription: item.prizeDescription, prizeTier: item.prizeTier, prizeType: item.prizeType, fulfillmentType: item.fulfillmentType, imageUrl: item.imageUrl, terms: item.terms, manualFulfillmentRequired: item.manualFulfillmentRequired, displayOrder: item.displayOrder, rewardValue: item.rewardValue, unit: item.unit, currency: item.currency, brand: item.brand, model: item.model, variant: item.variant, deliveryCountries: item.prizeType === "physical_item" ? item.deliveryCountries : undefined, deliveryDetailsDeadlineDays: item.prizeType === "physical_item" ? item.deliveryDetailsDeadlineDays : undefined, resolvedProbability: resolvedProbability === undefined ? undefined : Number(resolvedProbability.toFixed(6)), cashOutEnabled: false }; }
-function publicPrizePool(items: RewardPrize[]) { const total = items.reduce((sum, item) => sum + item.probabilityWeight, 0); return items.map((item) => publicPrize(item, total ? item.probabilityWeight / total : 0)); }
+export function publicPrizePool(items: RewardPrize[]) { const total = items.reduce((sum, item) => sum + item.probabilityWeight, 0); return items.map((item) => publicPrize(item, total ? item.probabilityWeight / total : 0)); }
 export function tierDefinitions(settings: RewardSettings) { return TIERS.map((id) => ({ id, label: `${id[0].toUpperCase()}${id.slice(1)} Spin`, spinTier: id, pointsRequired: settings.spinCosts[id], pointCost: settings.spinCosts[id], enabled: settings.tierEnabled[id] })); }
 export function rewardPointReturnRatio(prizes: RewardPrize[], selectedTier: RewardSpinTier, pointCost: number) { const pool = prizes.filter((item) => item.prizeTier === selectedTier && item.enabled && item.status !== "retired" && item.probabilityWeight > 0); const totalWeight = pool.reduce((sum, item) => sum + item.probabilityWeight, 0); const expectedPoints = totalWeight ? pool.reduce((sum, item) => sum + (item.prizeType === "reward_points" ? item.rewardValue * item.probabilityWeight / totalWeight : 0), 0) : 0; const ratio = pointCost > 0 ? expectedPoints / pointCost : Number.POSITIVE_INFINITY; return { expectedPoints, ratio, warning: ratio >= 0.85, blocked: ratio >= 1 }; }
 
+export type RewardWheelVersionRecord = {
+  id: string;
+  tier: RewardSpinTier;
+  pointCost: number;
+  entries: RewardWheelEntry[];
+  status: "draft" | "published" | "retired";
+  immutable: boolean;
+  reason: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  publishedAt: string | null;
+};
+
+export function normalizeRewardWheelVersion(id: string, data?: Record<string, unknown> | null): RewardWheelVersionRecord {
+  const status = data?.status === "published" || data?.status === "retired" ? data.status : "draft";
+  return {
+    id,
+    tier: tier(data?.tier),
+    pointCost: n(data?.pointCost),
+    entries: normalizeRewardWheelEntries(data?.entries),
+    status,
+    immutable: data?.immutable === true || status === "published",
+    reason: typeof data?.reason === "string" && data.reason ? data.reason : null,
+    createdAt: iso(data?.createdAt),
+    updatedAt: iso(data?.updatedAt),
+    publishedAt: iso(data?.publishedAt),
+  };
+}
+
+export function validateRewardWheelVersionInput(prizes: RewardPrize[], input: { tier: RewardSpinTier; pointCost: number; entries: RewardWheelEntry[] }) {
+  const pointCost = Number(input.pointCost);
+  const entries = normalizeRewardWheelEntries(input.entries);
+  const ids = new Set<string>();
+  if (!Number.isInteger(pointCost) || pointCost <= 0) throw new Error("WHEEL_POINT_COST_INVALID");
+  if (!entries.length) throw new Error("WHEEL_ENTRIES_REQUIRED");
+  for (const entry of entries) {
+    if (ids.has(entry.prizeId)) throw new Error("WHEEL_DUPLICATE_PRIZE");
+    ids.add(entry.prizeId);
+    const item = prizes.find((prizeItem) => prizeItem.id === entry.prizeId);
+    if (!item || item.prizeTier !== input.tier || !isPrizeActive(item)) throw new Error("WHEEL_PRIZE_UNAVAILABLE");
+  }
+  const resolved = entries.map((entry) => ({ ...prizes.find((item) => item.id === entry.prizeId)!, probabilityWeight: entry.weight }));
+  const economics = rewardPointReturnRatio(resolved, input.tier, pointCost);
+  return { tier: input.tier, pointCost, entries, prizes: resolved, economics };
+}
+
+export async function loadAdminRewardWheelConfiguration(db: Firestore) {
+  await ensureCanonicalRewardWheelConfiguration(db);
+  const [settings, prizeSnap, versionSnap, ...pointerSnaps] = await Promise.all([
+    getRewardSettings(db),
+    db.collection("rewardPrizes").limit(500).get(),
+    db.collection("rewardWheelVersions").limit(200).get(),
+    ...TIERS.map((selectedTier) => db.collection("rewardWheelActiveVersions").doc(selectedTier).get()),
+  ]);
+  const prizes = prizeSnap.docs.map((doc) => normalizeRewardPrize(doc.id, doc.data()));
+  const versions = versionSnap.docs.map((doc) => normalizeRewardWheelVersion(doc.id, doc.data()));
+  const activeVersionIds = Object.fromEntries(TIERS.map((selectedTier, index) => [selectedTier, String(pointerSnaps[index].data()?.versionId ?? "") || null]));
+  return { settings, prizes, versions, activeVersionIds };
+}
+
+export async function saveRewardWheelDraft(db: Firestore, input: { adminId: string; versionId?: string | null; tier: RewardSpinTier; pointCost: number; entries: RewardWheelEntry[]; reason: string }) {
+  const prizes = await loadRewardPrizes(db);
+  const validated = validateRewardWheelVersionInput(prizes, input);
+  const now = new Date().toISOString();
+  const versionRef = input.versionId ? db.collection("rewardWheelVersions").doc(input.versionId) : db.collection("rewardWheelVersions").doc();
+  return db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(versionRef);
+    if (existing.exists && normalizeRewardWheelVersion(existing.id, existing.data()).immutable) throw new Error("WHEEL_VERSION_IMMUTABLE");
+    const version = {
+      id: versionRef.id,
+      tier: validated.tier,
+      pointCost: validated.pointCost,
+      entries: validated.entries,
+      status: "draft",
+      immutable: false,
+      reason: input.reason.trim().slice(0, 500) || null,
+      createdByAdminId: existing.data()?.createdByAdminId ?? input.adminId,
+      updatedByAdminId: input.adminId,
+      createdAt: existing.data()?.createdAt ?? now,
+      updatedAt: now,
+      publishedAt: null,
+    };
+    transaction.set(versionRef, version);
+    const auditRef = db.collection("rewardAuditLogs").doc();
+    transaction.create(auditRef, { id: auditRef.id, action: existing.exists ? "reward_wheel_draft_updated" : "reward_wheel_draft_created", wheelVersionId: versionRef.id, tier: validated.tier, adminId: input.adminId, createdAt: now });
+    return { version: normalizeRewardWheelVersion(versionRef.id, version), economics: validated.economics };
+  });
+}
+
+export async function publishRewardWheelVersion(db: Firestore, input: { adminId: string; versionId: string; reason: string; confirmation: string }) {
+  if (input.confirmation !== "PUBLISH REWARD WHEEL") throw new Error("WHEEL_PUBLISH_CONFIRMATION_REQUIRED");
+  if (input.reason.trim().length < 8) throw new Error("WHEEL_PUBLISH_REASON_REQUIRED");
+  const versionRef = db.collection("rewardWheelVersions").doc(input.versionId);
+  const now = new Date().toISOString();
+  return db.runTransaction(async (transaction) => {
+    const versionSnap = await transaction.get(versionRef);
+    if (!versionSnap.exists) throw new Error("WHEEL_VERSION_NOT_FOUND");
+    const version = normalizeRewardWheelVersion(versionSnap.id, versionSnap.data());
+    const pointerRef = db.collection("rewardWheelActiveVersions").doc(version.tier);
+    const pointerSnap = await transaction.get(pointerRef);
+    if (version.status === "published" && pointerSnap.data()?.versionId === version.id) return { version, idempotent: true };
+    if (version.immutable) throw new Error("WHEEL_VERSION_IMMUTABLE");
+    const prizeSnaps = await Promise.all(version.entries.map((entry) => transaction.get(db.collection("rewardPrizes").doc(entry.prizeId))));
+    const prizes = prizeSnaps.filter((snap) => snap.exists).map((snap) => normalizeRewardPrize(snap.id, snap.data() ?? {}));
+    const validated = validateRewardWheelVersionInput(prizes, version);
+    if (validated.economics.blocked) throw new Error("WHEEL_REWARD_POINT_RETURN_BLOCKED");
+    transaction.set(versionRef, { status: "published", immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now, publishedByAdminId: input.adminId }, { merge: true });
+    transaction.set(pointerRef, { tier: version.tier, versionId: version.id, activatedAt: now, activatedByAdminId: input.adminId });
+    const auditRef = db.collection("rewardAuditLogs").doc(deterministicId("reward_wheel_publish", version.id));
+    transaction.create(auditRef, { id: auditRef.id, action: "reward_wheel_version_published", wheelVersionId: version.id, tier: version.tier, reason: input.reason.trim().slice(0, 500), adminId: input.adminId, createdAt: now });
+    return { version: { ...version, status: "published" as const, immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now }, economics: validated.economics, idempotent: false };
+  });
+}
+
 export async function buildRewardSummary(db: Firestore, userId: string) {
   const [settings, userSnap, profileSnap, accountSnap, legacySnap, historySnap, claimsSnap, streakSnap, achievementsSnap, entitlementsSnap, ledgerSnap] = await Promise.all([getRewardSettings(db), db.collection("users").doc(userId).get(), db.collection("profiles").doc(userId).get(), db.collection("rewardAccounts").doc(userId).get(), db.collection("userRewards").doc(userId).get(), db.collection("spinResults").where("userId", "==", userId).limit(50).get(), db.collection("rewardClaims").where("userId", "==", userId).limit(50).get(), db.collection("rewardStreaks").doc(userId).get(), db.collection("rewardAchievements").where("userId", "==", userId).limit(100).get(), db.collection("rewardEntitlements").where("userId", "==", userId).limit(100).get(), db.collection("rewardLedgerEntries").where("userId", "==", userId).limit(100).get()]);
-  const campaign = await getActiveRewardCampaign(db, settings); const prizes = await loadRewardPrizes(db); const profile = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) }; const account = accountSnap.data() ?? {}; const legacy = legacySnap.data() ?? {}; const points = n(account.availablePoints ?? legacy.availableRewardPoints ?? userSnap.data()?.voterPoints); const timeZone = String(profile.timeZone ?? profile.timezone ?? "UTC"); const country = String(profile.countryCode ?? profile.country ?? "").toUpperCase(); const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); const activitySnap = await db.collection("rewardActivityDays").doc(deterministicId("reward_activity", userId, today)).get();
+  const campaign = await getActiveRewardCampaign(db, settings); const profile = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) }; const account = accountSnap.data() ?? {}; const legacy = legacySnap.data() ?? {}; const points = n(account.availablePoints ?? legacy.availableRewardPoints ?? userSnap.data()?.voterPoints); const timeZone = String(profile.timeZone ?? profile.timezone ?? "UTC"); const country = String(profile.countryCode ?? profile.country ?? "").toUpperCase(); await ensureCanonicalRewardWheelConfiguration(db); const wheels = await Promise.all(TIERS.map((selectedTier) => resolveRewardWheel(db, selectedTier, settings, country, campaign.id, true))); const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); const activitySnap = await db.collection("rewardActivityDays").doc(deterministicId("reward_activity", userId, today)).get();
   const entitlements = entitlementsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const currentStreak = n(streakSnap.data()?.currentStreak); const nextMilestone = STREAK_MILESTONES.find((item) => item.days > currentStreak) ?? null; const earnedAchievements = new Set(achievementsSnap.docs.map((doc) => String(doc.data().achievementId ?? doc.id))); const counters = account.counters && typeof account.counters === "object" ? account.counters as Record<string, unknown> : {};
   const achievementProgress = ACHIEVEMENT_CATALOG.map((item) => ({ id: item.id, current: Math.min(item.threshold, n(counters[item.counter])), target: item.threshold, points: item.points, badgeId: item.badgeId, earned: earnedAchievements.has(item.id) }));
   const availableEntitlements = entitlements.filter((item) => ["available", "reserved"].includes(String(item.status)));
-  return { settings, campaign, points, availableRewardPoints: points, lifetimeRewardPoints: n(account.lifetimeEarned ?? legacy.lifetimeRewardPoints), rewardDebt: n(account.rewardDebt ?? legacy.rewardDebt), tiers: tierDefinitions(settings), spinAffordability: Object.fromEntries(TIERS.map((id) => [id, points >= settings.spinCosts[id]])), prizeSetupRequired: false, prizes: Object.fromEntries(TIERS.map((id) => [id, publicPrizePool(availablePrizesForTier(prizes, id, Date.now(), campaign.id, country))])), history: historySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), claims: claimsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), ledger: ledgerSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), recentRewards: historySnap.docs.slice(0, 5).map((doc) => ({ id: doc.id, ...doc.data() })), streak: { current: currentStreak, longest: n(streakSnap.data()?.longestStreak), lastCheckInDay: streakSnap.data()?.lastCheckInDay ?? null, eligibleToday: activitySnap.exists, checkedInToday: streakSnap.data()?.lastCheckInDay === today, checkInAwardsPoints: false, nextMilestone }, achievements: achievementProgress, entitlements: availableEntitlements, bonusSpins: availableEntitlements.filter((item) => item.type === "bonus_spin"), accountEligibility: isConsumerRewardsEligible(profile), safety: { pointsSource: "server_confirmed_eligible_activity_only", pointsPurchasable: false, clientCanGrantPoints: false, serverSelectsPrize: true, directProviderPayoutEnabled: false, rewardSelectionExposedToBrowser: false, planBasedOdds: false } };
+  return { settings, campaign, points, availableRewardPoints: points, lifetimeRewardPoints: n(account.lifetimeEarned ?? legacy.lifetimeRewardPoints), rewardDebt: n(account.rewardDebt ?? legacy.rewardDebt), tiers: wheels.map((wheel) => ({ id: wheel.tier, label: `${wheel.tier[0].toUpperCase()}${wheel.tier.slice(1)} Spin`, spinTier: wheel.tier, pointsRequired: wheel.pointCost, pointCost: wheel.pointCost, enabled: settings.tierEnabled[wheel.tier] })), spinAffordability: Object.fromEntries(wheels.map((wheel) => [wheel.tier, points >= wheel.pointCost])), prizeSetupRequired: wheels.some((wheel) => !wheel.prizes.length), wheelVersions: Object.fromEntries(wheels.map((wheel) => [wheel.tier, { versionId: wheel.versionId, pointCost: wheel.pointCost, diagnosticCode: wheel.diagnosticCode }])), prizes: Object.fromEntries(wheels.map((wheel) => [wheel.tier, publicPrizePool(wheel.prizes)])), history: historySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), claims: claimsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), ledger: ledgerSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })), recentRewards: historySnap.docs.slice(0, 5).map((doc) => ({ id: doc.id, ...doc.data() })), streak: { current: currentStreak, longest: n(streakSnap.data()?.longestStreak), lastCheckInDay: streakSnap.data()?.lastCheckInDay ?? null, eligibleToday: activitySnap.exists, checkedInToday: streakSnap.data()?.lastCheckInDay === today, checkInAwardsPoints: false, nextMilestone }, achievements: achievementProgress, entitlements: availableEntitlements, bonusSpins: availableEntitlements.filter((item) => item.type === "bonus_spin"), accountEligibility: isConsumerRewardsEligible(profile), safety: { pointsSource: "server_confirmed_eligible_activity_only", pointsPurchasable: false, clientCanGrantPoints: false, serverSelectsPrize: true, directProviderPayoutEnabled: false, rewardSelectionExposedToBrowser: false, planBasedOdds: false } };
 }
 
 // Kept for webhook compatibility: purchasing DoroCoins never earns Reward Points.
@@ -66,18 +298,19 @@ export async function executeRewardSpin(db: Firestore, input: { userId: string; 
   const [settings, profileSnap, userSnap] = await Promise.all([getRewardSettings(db), db.collection("profiles").doc(input.userId).get(), db.collection("users").doc(input.userId).get()]);
   const campaign = await getActiveRewardCampaign(db, settings);
   const country = String(profileSnap.data()?.countryCode ?? profileSnap.data()?.country ?? userSnap.data()?.countryCode ?? userSnap.data()?.country ?? "").trim().toUpperCase();
-  const allPrizes = await loadRewardPrizes(db);
-  const prizes = availablePrizesForTier(allPrizes, input.tier, Date.now(), campaign.id, country);
+  const wheel = await resolveRewardWheel(db, input.tier, settings, country, campaign.id);
+  const allPrizes = wheel.prizes;
+  const prizes = wheel.prizes;
   const selected = chooseRewardPrize(prizes, input.tier, Date.now(), campaign.id, country);
   if (!selected) throw new Error("NO_AVAILABLE_PRIZES");
-  if (rewardPointReturnRatio(prizes, input.tier, settings.spinCosts[input.tier]).blocked) throw new Error("REWARD_POINT_RETURN_RATIO_BLOCKED");
-  const selectedConfiguredSnap = await db.collection("rewardPrizes").doc(selected.id).get(); const selectedCollection = selectedConfiguredSnap.exists ? "rewardPrizes" : "rewardWheelPrizes"; const now = new Date().toISOString(); const paymentSource = input.paymentSource === "bonus_spin" ? "bonus_spin" : "points"; const versionId = `launch-v1-${input.tier}`; const winDay = now.slice(0, 10); const userWinRef = db.collection("rewardPrizeUserWins").doc(deterministicId("reward_prize_user_wins", selected.id, input.userId)); const dailyWinRef = db.collection("rewardPrizeDailyWins").doc(deterministicId("reward_prize_daily_wins", selected.id, winDay));
+  if (rewardPointReturnRatio(prizes, input.tier, wheel.pointCost).blocked) throw new Error("REWARD_POINT_RETURN_RATIO_BLOCKED");
+  const selectedConfiguredSnap = await db.collection("rewardPrizes").doc(selected.id).get(); const selectedCollection = selectedConfiguredSnap.exists ? "rewardPrizes" : "rewardWheelPrizes"; const now = new Date().toISOString(); const paymentSource = input.paymentSource === "bonus_spin" ? "bonus_spin" : "points"; const versionId = wheel.versionId ?? `unavailable-${input.tier}`; const winDay = now.slice(0, 10); const userWinRef = db.collection("rewardPrizeUserWins").doc(deterministicId("reward_prize_user_wins", selected.id, input.userId)); const dailyWinRef = db.collection("rewardPrizeDailyWins").doc(deterministicId("reward_prize_daily_wins", selected.id, winDay));
   const result = await db.runTransaction(async (transaction) => {
-    const accountRef = db.collection("rewardAccounts").doc(input.userId); const legacyRef = db.collection("userRewards").doc(input.userId); const userRef = db.collection("users").doc(input.userId); const profileRef = db.collection("profiles").doc(input.userId); const prizeRef = db.collection(selectedCollection).doc(selected.id); const budgetRef = selected.budgetId ? db.collection("rewardBudgets").doc(selected.budgetId) : null; const bonusRef = paymentSource === "bonus_spin" && input.bonusEntitlementId ? db.collection("rewardEntitlements").doc(input.bonusEntitlementId) : null;
-    const [existing, accountSnap, legacySnap, userSnap, profileSnap, prizeSnap, budgetSnap, bonusSnap, userWinSnap, dailyWinSnap] = await Promise.all([transaction.get(spinRef), transaction.get(accountRef), transaction.get(legacyRef), transaction.get(userRef), transaction.get(profileRef), prizeRef ? transaction.get(prizeRef) : Promise.resolve(null), budgetRef ? transaction.get(budgetRef) : Promise.resolve(null), bonusRef ? transaction.get(bonusRef) : Promise.resolve(null), transaction.get(userWinRef), transaction.get(dailyWinRef)]);
+    const accountRef = db.collection("rewardAccounts").doc(input.userId); const legacyRef = db.collection("userRewards").doc(input.userId); const userRef = db.collection("users").doc(input.userId); const profileRef = db.collection("profiles").doc(input.userId); const prizeRef = db.collection(selectedCollection).doc(selected.id); const budgetRef = selected.budgetId ? db.collection("rewardBudgets").doc(selected.budgetId) : null; const bonusRef = paymentSource === "bonus_spin" && input.bonusEntitlementId ? db.collection("rewardEntitlements").doc(input.bonusEntitlementId) : null; const wheelPointerRef = db.collection("rewardWheelActiveVersions").doc(input.tier); const wheelVersionRef = db.collection("rewardWheelVersions").doc(versionId);
+    const [existing, accountSnap, legacySnap, userSnap, profileSnap, prizeSnap, budgetSnap, bonusSnap, userWinSnap, dailyWinSnap, wheelPointerSnap, wheelVersionSnap] = await Promise.all([transaction.get(spinRef), transaction.get(accountRef), transaction.get(legacyRef), transaction.get(userRef), transaction.get(profileRef), prizeRef ? transaction.get(prizeRef) : Promise.resolve(null), budgetRef ? transaction.get(budgetRef) : Promise.resolve(null), bonusRef ? transaction.get(bonusRef) : Promise.resolve(null), transaction.get(userWinRef), transaction.get(dailyWinRef), transaction.get(wheelPointerRef), transaction.get(wheelVersionRef)]);
     if (existing.exists) return { alreadyProcessed: true, spin: { id: existing.id, ...existing.data() } };
-    if (!settings.rewardsEnabled || settings.maintenanceMode) throw new Error("REWARDS_DISABLED"); if (settings.rewardFulfillmentPaused) throw new Error("REWARD_FULFILLMENT_PAUSED"); if (!settings.tierEnabled[input.tier]) throw new Error("WHEEL_DISABLED"); const eligibility = isConsumerRewardsEligible({ ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) }); if (!eligibility.eligible) throw new Error(eligibility.restricted ? "REWARDS_ACCOUNT_RESTRICTED" : "REWARDS_ACCOUNT_NOT_ELIGIBLE");
-    const account = accountSnap.data() ?? {}; const legacy = legacySnap.data() ?? {}; const previousPoints = n(account.availablePoints ?? legacy.availableRewardPoints ?? userSnap.data()?.voterPoints); if (n(account.rewardDebt ?? legacy.rewardDebt)) throw new Error("REWARD_DEBT_ACTIVE"); const pointCost = settings.spinCosts[input.tier]; if (paymentSource === "points" && previousPoints < pointCost) throw new Error("INSUFFICIENT_REWARD_POINTS");
+    if (!settings.rewardsEnabled || settings.maintenanceMode) throw new Error("REWARDS_DISABLED"); if (settings.rewardFulfillmentPaused) throw new Error("REWARD_FULFILLMENT_PAUSED"); if (!settings.tierEnabled[input.tier]) throw new Error("WHEEL_DISABLED"); if (!wheel.versionId || !wheelPointerSnap.exists || wheelPointerSnap.data()?.versionId !== versionId || !wheelVersionSnap.exists) throw new Error("WHEEL_VERSION_CHANGED"); const eligibility = isConsumerRewardsEligible({ ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) }); if (!eligibility.eligible) throw new Error(eligibility.restricted ? "REWARDS_ACCOUNT_RESTRICTED" : "REWARDS_ACCOUNT_NOT_ELIGIBLE");
+    const account = accountSnap.data() ?? {}; const legacy = legacySnap.data() ?? {}; const previousPoints = n(account.availablePoints ?? legacy.availableRewardPoints ?? userSnap.data()?.voterPoints); if (n(account.rewardDebt ?? legacy.rewardDebt)) throw new Error("REWARD_DEBT_ACTIVE"); const pointCost = wheel.pointCost; if (paymentSource === "points" && previousPoints < pointCost) throw new Error("INSUFFICIENT_REWARD_POINTS");
     if (paymentSource === "bonus_spin") { if (!bonusSnap?.exists || bonusSnap.data()?.userId !== input.userId || bonusSnap.data()?.type !== "bonus_spin" || bonusSnap.data()?.status !== "available") throw new Error("BONUS_SPIN_UNAVAILABLE"); if (bonusSnap.data()?.tier && bonusSnap.data()?.tier !== input.tier) throw new Error("BONUS_SPIN_TIER_MISMATCH"); if (bonusSnap.data()?.expiresAt && Date.parse(String(bonusSnap.data()?.expiresAt)) <= Date.now()) throw new Error("BONUS_SPIN_EXPIRED"); }
     let selectedPrize = selected; if (prizeRef) { if (!prizeSnap?.exists) throw new Error("PRIZE_NOT_FOUND"); selectedPrize = normalizeRewardPrize(prizeSnap.id, prizeSnap.data() ?? {}); if (!isPrizeActive(selectedPrize, Date.now(), campaign.id) || !prizeDeliveryEligible(selectedPrize, country)) throw new Error("PRIZE_UNAVAILABLE"); if (selectedPrize.quantityType === "limited") { const remaining = n(selectedPrize.remainingQuantity); if (!remaining) throw new Error("PRIZE_OUT_OF_STOCK"); transaction.set(prizeRef, { remainingQuantity: remaining - 1, reservedQuantity: FieldValue.increment(1), winCount: selectedPrize.winCount + 1, updatedAt: now }, { merge: true }); } else transaction.set(prizeRef, { winCount: selectedPrize.winCount + 1, updatedAt: now }, { merge: true }); }
     const userWins = n(userWinSnap.data()?.wins); const dailyWins = n(dailyWinSnap.data()?.wins); if (selectedPrize.maximumWinsPerUser && userWins >= selectedPrize.maximumWinsPerUser) throw new Error("PRIZE_USER_WIN_LIMIT_REACHED"); if (selectedPrize.maximumWinsPerDay && dailyWins >= selectedPrize.maximumWinsPerDay) throw new Error("PRIZE_DAILY_WIN_LIMIT_REACHED"); transaction.set(userWinRef, { prizeId: selectedPrize.id, userId: input.userId, wins: userWins + 1, updatedAt: now }, { merge: true }); transaction.set(dailyWinRef, { prizeId: selectedPrize.id, day: winDay, wins: dailyWins + 1, updatedAt: now }, { merge: true });

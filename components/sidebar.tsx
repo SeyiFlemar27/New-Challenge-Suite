@@ -13,7 +13,6 @@ import {
   Gift,
   Home,
   LayoutGrid,
-  LockKeyhole,
   Medal,
   Menu,
   Radio,
@@ -107,7 +106,6 @@ const starterSections: NavSection[] = [
   ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
@@ -138,7 +136,6 @@ const creatorSections: NavSection[] = [
   ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/creator/private-challenges", label: "Private Challenges", icon: LockKeyhole },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
@@ -169,9 +166,6 @@ const hostSections: NavSection[] = [
   ] }] },
   { label: "Challenges", items: [
     { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/host/private", label: "Private Challenges", icon: LockKeyhole },
-    { href: "/host/live-events", label: "Live Event Challenges", icon: Radio },
-    { href: "/host/tournaments", label: "Tournament Challenges", icon: Award },
     { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
     { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck }
   ] },
