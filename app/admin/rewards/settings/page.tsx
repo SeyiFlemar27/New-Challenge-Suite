@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
-import { AdminShell } from "@/components/admin/admin-shell";
 import { Button, Card, Field, inputClass, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
@@ -22,7 +21,7 @@ export default function RewardSettingsPage() {
     setMessage(result.message);
   }
 
-  return <AdminShell>
+  return <>
     <PageTitle title="Reward Settings" subtitle="Configure thresholds, limits, campaign rules, maintenance, and reward safety." icon={<Settings />} />
     {message ? <Card className="mt-6 p-4 text-yellow-100">{message}</Card> : null}
     <Card className="mt-8 p-6">
@@ -31,7 +30,6 @@ export default function RewardSettingsPage() {
         <Field label="Standard threshold"><input className={inputClass} type="number" value={settings.thresholds?.standard ?? 250} onChange={(event) => setSettings({ ...settings, thresholds: { ...settings.thresholds, standard: Number(event.target.value) } })} /></Field>
         <Field label="Premium threshold"><input className={inputClass} type="number" value={settings.thresholds?.premium ?? 500} onChange={(event) => setSettings({ ...settings, thresholds: { ...settings.thresholds, premium: Number(event.target.value) } })} /></Field>
         <Field label="Points per DoroCoin"><input className={inputClass} type="number" value={settings.pointsPerDoroCoin ?? 1} onChange={(event) => setSettings({ ...settings, pointsPerDoroCoin: Number(event.target.value) })} /></Field>
-        <Field label="Daily spin limit"><input className={inputClass} type="number" value={settings.maxSpinsPerDay ?? 10} onChange={(event) => setSettings({ ...settings, maxSpinsPerDay: Number(event.target.value) })} /></Field>
         <Field label="Support contact"><input className={inputClass} value={settings.supportContact ?? ""} onChange={(event) => setSettings({ ...settings, supportContact: event.target.value })} /></Field>
       </div>
       <Field label="Public wheel rules"><textarea className={textareaClass} value={settings.publicWheelRules ?? ""} onChange={(event) => setSettings({ ...settings, publicWheelRules: event.target.value })} /></Field>
@@ -42,5 +40,5 @@ export default function RewardSettingsPage() {
       </div>
       <Button onClick={save} className="mt-6">Save settings</Button>
     </Card>
-  </AdminShell>;
+  </>;
 }

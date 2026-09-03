@@ -3,29 +3,44 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { writeAuditLog } from "@/lib/server/audit";
 import { effectiveTaskState, operationalTaskId, taskDeadline } from "@/lib/server/admin-operations";
 import { requireAdminPermission } from "@/lib/server/auth";
+import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
 const updateSchema = z.object({ taskId: z.string().min(1), action: z.enum(["assign_to_me", "assign", "reassign", "unassign", "start", "wait_user", "wait_provider", "escalate", "resolve", "dismiss", "add_note"]), assigneeId: z.string().optional(), reason: z.string().trim().max(1000).optional(), note: z.string().trim().max(2000).optional() });
-const sources = [
-  ["sponsor_application", "sponsorProfiles", ["submitted", "pending_review"]], ["challenge_review", "challenges", ["pending_review", "flagged"]],
-  ["submission_review", "submissions", ["pending_review", "flagged"]], ["winner_confirmation", "winners", ["pending_admin_review"]],
-  ["withdrawal_review", "withdrawalRequests", ["pending_review", "needs_kyc"]], ["refund_review", "refundCases", ["pending_review", "approved"]],
-  ["chargeback", "chargebackCases", ["submitted", "needs_response"]], ["dispute", "disputes", ["submitted", "under_review"]],
-  ["appeal", "appeals", ["submitted", "under_review"]], ["critical_safety_report", "safetyReports", ["submitted", "triaged"]],
-  ["support_ticket", "supportTickets", ["submitted", "acknowledged", "assigned", "in_progress"]], ["failed_lifecycle_transition", "backgroundJobs", ["failed", "needs_attention"]]
-] as const;
+const sources: ReadonlyArray<readonly [string, string, readonly string[], AdminPermission]> = [
+  ["sponsor_application", "sponsorProfiles", ["submitted", "pending_review"], "sponsors.view"],
+  ["challenge_review", "challenges", ["pending_review", "flagged"], "challenges.view"],
+  ["submission_review", "submissions", ["pending_review", "flagged"], "submissions.view"],
+  ["winner_confirmation", "winners", ["pending_admin_review"], "winners.view"],
+  ["withdrawal_review", "withdrawalRequests", ["pending_review", "needs_kyc"], "withdrawals.review"],
+  ["refund_review", "refundCases", ["pending_review", "approved"], "refunds.request"],
+  ["chargeback", "chargebackCases", ["submitted", "needs_response"], "chargebacks.review"],
+  ["dispute", "disputes", ["submitted", "under_review"], "disputes.review"],
+  ["appeal", "appeals", ["submitted", "under_review"], "appeals.review"],
+  ["critical_safety_report", "safetyReports", ["submitted", "triaged"], "safetyReports.review"],
+  ["support_ticket", "supportTickets", ["submitted", "acknowledged", "assigned", "in_progress"], "tickets.view"],
+  ["failed_lifecycle_transition", "backgroundJobs", ["failed", "needs_attention"], "jobs.view"]
+];
+
+const actionPermissions: Record<z.infer<typeof updateSchema>["action"], AdminPermission> = {
+  assign_to_me: "admin.actionCentre.assign", assign: "admin.actionCentre.assign", reassign: "admin.actionCentre.assign", unassign: "admin.actionCentre.assign",
+  start: "admin.actionCentre.manage", wait_user: "admin.actionCentre.manage", wait_provider: "admin.actionCentre.manage", add_note: "admin.actionCentre.manage",
+  escalate: "admin.actionCentre.escalate", resolve: "admin.actionCentre.resolve", dismiss: "admin.actionCentre.resolve"
+};
 
 export async function GET(request: Request) {
   const { user, response } = await requireAdminPermission(request, "admin.actionCentre.view"); if (response) return response;
   const db = getAdminDb(); if (!db) return serverUnavailable("Action Centre");
   try {
-    const snapshots = await Promise.all(sources.map(([, collection]) => db.collection(collection).limit(150).get()));
+    const visibleSources = sources.filter(([, , , permission]) => hasAdminPermission(user?.adminPermissions, permission));
+    const snapshots = await Promise.all(visibleSources.map(([, collection]) => db.collection(collection).limit(150).get()));
     const batch = db.batch(); let writes = 0;
     snapshots.forEach((snapshot, index) => snapshot.docs.forEach((doc) => {
-      const [sourceType, collection, statuses] = sources[index]; const data = doc.data(); const status = String(data.status ?? data.adminReviewStatus ?? data.sponsorVerificationStatus ?? "");
+      const [sourceType, collection, statuses] = visibleSources[index]; const data = doc.data(); const status = String(data.status ?? data.adminReviewStatus ?? data.sponsorVerificationStatus ?? "");
       if (!statuses.includes(status as never)) return;
       const id = operationalTaskId(sourceType, doc.id); const ref = db.collection("adminActionTasks").doc(id);
-      batch.set(ref, { id, sourceType, sourceCollection: collection, sourceId: doc.id, title: data.title ?? data.subject ?? data.brandName ?? sourceType.replaceAll("_", " "), reason: `Source record is ${status.replaceAll("_", " ")}.`, state: "unassigned", priority: sourceType.includes("critical") || sourceType.includes("failed") || sourceType === "chargeback" ? "critical" : "normal", slaDueAt: taskDeadline(sourceType, data.createdAt), createdAt: data.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true }); writes += 1;
+      const refreshedAt = new Date().toISOString();
+      batch.set(ref, { id, sourceType, sourceCollection: collection, sourceId: doc.id, sourceStatus: status, title: data.title ?? data.subject ?? data.brandName ?? sourceType.replaceAll("_", " "), reason: `Source record is ${status.replaceAll("_", " ")}.`, priority: sourceType.includes("critical") || sourceType.includes("failed") || sourceType === "chargeback" ? "critical" : "normal", slaDueAt: taskDeadline(sourceType, data.createdAt), createdAt: data.createdAt ?? refreshedAt, lastSourceRefreshAt: refreshedAt }, { merge: true }); writes += 1;
     }));
     if (writes) await batch.commit();
     const tasks = await db.collection("adminActionTasks").orderBy("updatedAt", "desc").limit(300).get();
@@ -34,9 +49,10 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { user, response } = await requireAdminPermission(request, "admin.actionCentre.view"); if (response) return response;
-  const db = getAdminDb(); if (!db) return serverUnavailable("Action Centre"); const body = await readJson(request); if (body.response) return body.response;
+  const body = await readJson(request); if (body.response) return body.response;
   const parsed = updateSchema.safeParse(body.body); if (!parsed.success) return validationError({ request: parsed.error.issues[0]?.message ?? "Invalid task update." });
+  const { user, response } = await requireAdminPermission(request, actionPermissions[parsed.data.action]); if (response) return response;
+  const db = getAdminDb(); if (!db) return serverUnavailable("Action Centre");
   const { taskId, action, assigneeId, reason, note } = parsed.data;
   if (["escalate", "resolve", "dismiss", "reassign"].includes(action) && !reason) return validationError({ reason: "A reason is required for this action." });
   if (action === "add_note" && !note) return validationError({ note: "Enter an internal staff note." });

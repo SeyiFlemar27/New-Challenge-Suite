@@ -13,11 +13,11 @@ export const dynamic = "force-dynamic";
 
 type RecordData = Record<string, unknown> & { id: string };
 
-function records(snapshot: FirebaseFirestore.QuerySnapshot) {
+function records(snapshot: AdminRecordSnapshot) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as RecordData));
 }
 
-function safeUser(record: RecordData, doroBalance = 0, cashBalanceCents = 0) {
+function safeUser(record: RecordData, balances?: { doroBalance: number; cashBalanceCents: number }) {
   const tier = getEffectiveTier(record);
   return {
     id: record.id,
@@ -29,8 +29,7 @@ function safeUser(record: RecordData, doroBalance = 0, cashBalanceCents = 0) {
     subscriptionStatus: record.subscriptionStatus ?? record.planStatus ?? "none",
     sponsorStatus: record.sponsorVerificationStatus ?? "not_submitted",
     hostStatus: record.hostVerificationStatus ?? "not_submitted",
-    doroCoinBalance: doroBalance,
-    cashBalanceCents,
+    ...(balances ? { doroCoinBalance: balances.doroBalance, cashBalanceCents: balances.cashBalanceCents } : {}),
     riskStatus: record.riskStatus ?? "clear",
     isAdmin: Boolean(record.isAdmin || record.role === "admin"),
     suspended: Boolean(record.suspended),
@@ -39,41 +38,49 @@ function safeUser(record: RecordData, doroBalance = 0, cashBalanceCents = 0) {
   };
 }
 
+type AdminRecordSnapshot = { docs: FirebaseFirestore.QueryDocumentSnapshot[] };
+
+async function permittedSnapshot(db: FirebaseFirestore.Firestore, permissions: readonly string[] | undefined, permission: AdminPermission, collection: string, limit: number): Promise<AdminRecordSnapshot> {
+  if (!hasAdminPermission(permissions, permission)) return { docs: [] };
+  return db.collection(collection).limit(limit).get();
+}
+
 export async function GET(request: Request) {
   const { user, response } = await requireAdminPermission(request, "admin.dashboard.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin operations");
   try {
+    const permissions = user.adminPermissions;
     const snapshots = await Promise.all([
-      db.collection("sponsorProfiles").limit(150).get(),
-      db.collection("users").limit(250).get(),
-      db.collection("challenges").limit(200).get(),
-      db.collection("submissions").limit(250).get(),
-      db.collection("challengeParticipants").limit(250).get(),
-      db.collection("winners").limit(150).get(),
-      db.collection("withdrawalRequests").limit(150).get(),
-      db.collection("auditLogs").limit(200).get(),
-      db.collection("disputes").limit(100).get(),
-      db.collection("prizePools").limit(150).get(),
-      db.collection("adminNotes").limit(250).get(),
-      db.collection("doroCoinWallets").limit(250).get(),
-      db.collection("doroCoinTransactions").limit(300).get(),
-      db.collection("cashWallets").limit(250).get(),
-      db.collection("cashLedger").limit(300).get(),
-      db.collection("liveEvents").limit(200).get(),
-      db.collection("tournaments").limit(200).get(),
-      db.collection("notifications").limit(200).get(),
-      db.collection("supportTickets").limit(200).get(),
-      db.collection("announcements").limit(100).get(),
-      db.collection("predictionRecords").limit(200).get(),
-      db.collection("rewardSpinHistory").limit(200).get(),
-      db.collection("rewardWheelPrizes").limit(200).get(),
-      db.collection("kycMetadata").limit(200).get(),
-      db.collection("predictionSettlementReviews").limit(200).get(),
-      db.collection("adVoteRewardLogs").limit(200).get(),
-      db.collection(ENTERPRISE_APPLICATION_COLLECTION).limit(200).get(),
-      db.collection("mediaUploads").limit(200).get()
+      permittedSnapshot(db, permissions, "sponsors.view", "sponsorProfiles", 150),
+      permittedSnapshot(db, permissions, "users.view", "users", 250),
+      permittedSnapshot(db, permissions, "challenges.view", "challenges", 200),
+      permittedSnapshot(db, permissions, "submissions.view", "submissions", 250),
+      permittedSnapshot(db, permissions, "participants.view", "challengeParticipants", 250),
+      permittedSnapshot(db, permissions, "winners.view", "winners", 150),
+      permittedSnapshot(db, permissions, "withdrawals.review", "withdrawalRequests", 150),
+      permittedSnapshot(db, permissions, "auditLogs.viewRaw", "auditLogs", 200),
+      permittedSnapshot(db, permissions, "disputes.review", "disputes", 100),
+      permittedSnapshot(db, permissions, "finance.view", "prizePools", 150),
+      permittedSnapshot(db, permissions, "auditLogs.viewRaw", "adminNotes", 250),
+      permittedSnapshot(db, permissions, "finance.view", "doroCoinWallets", 250),
+      permittedSnapshot(db, permissions, "finance.view", "doroCoinTransactions", 300),
+      permittedSnapshot(db, permissions, "finance.view", "cashWallets", 250),
+      permittedSnapshot(db, permissions, "finance.view", "cashLedger", 300),
+      permittedSnapshot(db, permissions, "challenges.view", "liveEvents", 200),
+      permittedSnapshot(db, permissions, "challenges.view", "tournaments", 200),
+      permittedSnapshot(db, permissions, "content.preview", "notifications", 200),
+      permittedSnapshot(db, permissions, "tickets.view", "supportTickets", 200),
+      permittedSnapshot(db, permissions, "content.preview", "announcements", 100),
+      permittedSnapshot(db, permissions, "finance.view", "predictionRecords", 200),
+      permittedSnapshot(db, permissions, "rewards.investigate", "rewardSpinHistory", 200),
+      permittedSnapshot(db, permissions, "rewards.view", "rewardWheelPrizes", 200),
+      permittedSnapshot(db, permissions, "users.requireVerification", "kycMetadata", 200),
+      permittedSnapshot(db, permissions, "finance.view", "predictionSettlementReviews", 200),
+      permittedSnapshot(db, permissions, "finance.view", "adVoteRewardLogs", 200),
+      permittedSnapshot(db, permissions, "challenges.review", ENTERPRISE_APPLICATION_COLLECTION, 200),
+      permittedSnapshot(db, permissions, "submissions.review", "mediaUploads", 200)
     ]);
     const [sponsorSnap, userSnap, challengeSnap, submissionSnap, participantSnap, winnerSnap, withdrawalSnap, auditSnap, disputeSnap, prizePoolSnap, adminNoteSnap, doroWalletSnap, doroTransactionSnap, cashWalletSnap, cashLedgerSnap, liveEventSnap, tournamentSnap, notificationSnap, supportSnap, announcementSnap, predictionSnap, rewardSpinSnap, prizeWheelSnap, kycSnap, predictionSettlementSnap, adRewardSnap, enterpriseLeadSnap, mediaUploadSnap] = snapshots;
     const notes = new Map(records(adminNoteSnap).map((item) => [`${item.targetType}_${item.targetId}`, item]));
@@ -268,7 +275,7 @@ export async function GET(request: Request) {
         safety: { automaticPayouts: "Disabled", withdrawals: "Review only", sponsorRelease: "Disabled", prizePoolRelease: "Disabled", kycProcessing: "Not active", doroCoinConversion: "Disabled", adRewards: "Verification required" }
       },
       sponsors: hasAdminPermission(user.adminPermissions, "sponsors.view") ? sponsors : [],
-      hosts: hasAdminPermission(user.adminPermissions, "users.view") ? hosts.map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), organizationName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "", ownerName: item.displayName ?? item.name ?? "", location: item.location ?? item.country ?? "", eventType: item.hostType ?? "", competitionSize: item.competitionSize ?? "", riskFlags: item.riskFlags ?? [] })) : [],
+      hosts: hasAdminPermission(user.adminPermissions, "users.view") ? hosts.map((item) => ({ ...safeUser(item, hasAdminPermission(user.adminPermissions, "finance.view") ? { doroBalance: doroMap.get(item.id) ?? 0, cashBalanceCents: Number(cashMap.get(item.id)?.availableBalanceCents ?? 0) } : undefined), organizationName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "", ownerName: item.displayName ?? item.name ?? "", location: item.location ?? item.country ?? "", eventType: item.hostType ?? "", competitionSize: item.competitionSize ?? "", riskFlags: item.riskFlags ?? [] })) : [],
       challenges,
       submissions: hasAdminPermission(user.adminPermissions, "submissions.view") ? submissions : [],
       participants: hasAdminPermission(user.adminPermissions, "participants.review") ? participants : [],
@@ -287,8 +294,8 @@ export async function GET(request: Request) {
         tournamentCount: tournaments.length,
         exportsEnabled: false
       },
-      users: hasAdminPermission(user.adminPermissions, "users.view") ? users.map((item) => safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0))) : [],
-      creators: hasAdminPermission(user.adminPermissions, "users.view") ? users.filter((item) => item.accountType === "creator" || item.role === "creator" || item.planId === "creator").map((item) => ({ ...safeUser(item, doroMap.get(item.id) ?? 0, Number(cashMap.get(item.id)?.availableBalanceCents ?? 0)), createdChallengeCount: Number(item.createdChallengeCount ?? 0), submissionVolume: Number(item.submissionCount ?? 0), boostsUsed: Number(item.boostsUsed ?? 0), sponsorReadyCount: Number(item.sponsorReadyCount ?? 0), riskFlags: item.riskFlags ?? [] })) : [],
+      users: hasAdminPermission(user.adminPermissions, "users.view") ? users.map((item) => safeUser(item, hasAdminPermission(user.adminPermissions, "finance.view") ? { doroBalance: doroMap.get(item.id) ?? 0, cashBalanceCents: Number(cashMap.get(item.id)?.availableBalanceCents ?? 0) } : undefined)) : [],
+      creators: hasAdminPermission(user.adminPermissions, "users.view") ? users.filter((item) => item.accountType === "creator" || item.role === "creator" || item.planId === "creator").map((item) => ({ ...safeUser(item, hasAdminPermission(user.adminPermissions, "finance.view") ? { doroBalance: doroMap.get(item.id) ?? 0, cashBalanceCents: Number(cashMap.get(item.id)?.availableBalanceCents ?? 0) } : undefined), createdChallengeCount: Number(item.createdChallengeCount ?? 0), submissionVolume: Number(item.submissionCount ?? 0), boostsUsed: Number(item.boostsUsed ?? 0), sponsorReadyCount: Number(item.sponsorReadyCount ?? 0), riskFlags: item.riskFlags ?? [] })) : [],
       hostWorkspaces: hasAdminPermission(user.adminPermissions, "users.view") ? hosts.map((item) => ({ id: item.id, workspaceName: item.organizationName ?? item.hostOrganizationName ?? item.displayName ?? "Host workspace", ownerName: item.displayName ?? item.name ?? "", verificationStatus: item.hostVerificationStatus ?? "not_submitted", planStatus: item.subscriptionStatus ?? item.planStatus ?? "none", events: Number(item.eventCount ?? 0), tournaments: Number(item.tournamentCount ?? 0), participants: Number(item.participantCount ?? 0), teamSeats: Number(item.teamSeats ?? 1), reports: Number(item.reportCount ?? 0), riskFlags: item.riskFlags ?? [] })) : [],
       sponsorBrands: hasAdminPermission(user.adminPermissions, "sponsors.view") ? sponsors : [],
       events,

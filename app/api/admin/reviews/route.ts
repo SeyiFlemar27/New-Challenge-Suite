@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission, requireAdminUser } from "@/lib/server/auth";
+import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
@@ -12,11 +13,12 @@ export async function GET(request: Request) {
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin reviews");
+  const empty = { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
   const [sponsors, challenges, sponsorships, prizePools] = await Promise.all([
-    db.collection("sponsorProfiles").where("sponsorVerificationStatus", "==", "pending_review").limit(100).get(),
-    db.collection("challenges").where("adminReviewRequired", "==", true).limit(100).get(),
-    db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get(),
-    db.collection("prizePools").limit(100).get()
+    hasAdminPermission(user?.adminPermissions, "sponsors.review") ? db.collection("sponsorProfiles").where("sponsorVerificationStatus", "==", "pending_review").limit(100).get() : Promise.resolve(empty),
+    hasAdminPermission(user?.adminPermissions, "challenges.review") ? db.collection("challenges").where("adminReviewRequired", "==", true).limit(100).get() : Promise.resolve(empty),
+    hasAdminPermission(user?.adminPermissions, "sponsorCampaigns.review") ? db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get() : Promise.resolve(empty),
+    hasAdminPermission(user?.adminPermissions, "finance.view") ? db.collection("prizePools").limit(100).get() : Promise.resolve(empty)
   ]);
   return ok({
     sponsors: sponsors.docs.map((doc) => ({ id: doc.id, brandName: doc.data().brandName ?? "", status: doc.data().sponsorVerificationStatus })),
@@ -38,10 +40,6 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { user, response } = await requireAdminUser(request);
-  if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Admin reviews");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const type = String(parsed.body?.type ?? "");
@@ -50,6 +48,11 @@ export async function PATCH(request: Request) {
   if (!reviewTypes.has(type)) return validationError({ type: "Select a valid review type." });
   if (!reviewActions.has(action)) return validationError({ action: "Select approve or reject." });
   if (!id) return validationError({ id: "Review record ID is required." });
+  const permissionByType: Record<string, AdminPermission> = { sponsor: "sponsors.approve", challenge: "challenges.review", sponsorship: "sponsorCampaigns.review" };
+  const { user, response } = await requireAdminPermission(request, permissionByType[type]);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Admin reviews");
   const now = new Date().toISOString();
 
   if (type === "sponsor") {

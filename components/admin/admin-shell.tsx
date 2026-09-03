@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  Activity, BarChart3, Bell, BookOpenCheck, Boxes, BriefcaseBusiness, ClipboardCheck,
-  Coins, Database, FileClock, Flag, FolderCog, Home, Landmark, LifeBuoy, ListChecks, Menu,
+  Activity, BriefcaseBusiness, ClipboardCheck, FileClock, Flag, FolderCog, Gift, Home, Landmark, LifeBuoy, ListChecks, Menu,
   Megaphone, Radio, RefreshCw, Search, Settings, ShieldCheck, SlidersHorizontal,
   Trophy, UserCog, UsersRound, WalletCards, X
 } from "lucide-react";
@@ -22,77 +21,62 @@ type NavGroup = { label: string; items: NavItem[] };
 type AdminAccess = { authorized: boolean; roles: string[]; permissions: AdminPermission[]; developerToolsAvailable: boolean; secondFactorRequired: boolean; secondFactorVerified: boolean };
 
 const groups: NavGroup[] = [
-  { label: "Dashboard", items: [{ href: "/admin", label: "Overview", icon: Home, permission: "admin.dashboard.view" }] },
-  { label: "Action Centre", items: [{ href: "/admin/action-centre", label: "Tasks requiring action", icon: ListChecks, permission: "admin.actionCentre.view" }] },
+  { label: "Overview", items: [
+    { href: "/admin", label: "Dashboard", icon: Home, permission: "admin.dashboard.view" },
+    { href: "/admin/action-centre", label: "Action Centre", icon: ListChecks, permission: "admin.actionCentre.view" }
+  ] },
   { label: "People", items: [
-    { href: "/admin/people/users", label: "All users", icon: UsersRound, permission: "users.view" },
-    { href: "/admin/creators", label: "Creators and hosts", icon: UserCog, permission: "users.view" },
-    { href: "/admin/sponsor-brands", label: "Sponsors", icon: ShieldCheck, permission: "sponsors.view" },
-    { href: "/admin/host-workspaces", label: "Host workspaces", icon: BriefcaseBusiness, permission: "users.view" },
-    { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" },
-    { href: "/admin/people/admin-team", label: "Admin team", icon: Boxes, permission: "roles.manage" }
+    { href: "/admin/people/users", label: "Users", icon: UsersRound, permission: "users.view" },
+    { href: "/admin/people/admin-team", label: "Admin Team", icon: UserCog, permission: "roles.manage" },
+    { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" }
   ] },
   { label: "Challenges", items: [
-    { href: "/admin/challenges", label: "All challenges", icon: Trophy, permission: "challenges.view" },
+    { href: "/admin/challenges", label: "All Challenges", icon: Trophy, permission: "challenges.view" },
+    { href: "/admin/review", label: "Review Queue", icon: ListChecks, permission: "challenges.review" },
     { href: "/admin/submissions", label: "Submissions", icon: ClipboardCheck, permission: "submissions.view" },
-    { href: "/admin/participants", label: "Participants", icon: UsersRound, permission: "participants.review" },
-    { href: "/admin/winners", label: "Winners", icon: Trophy, permission: "winners.review" },
-    { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "challenges.view" },
-    { href: "/admin/tournaments", label: "Tournaments", icon: Trophy, permission: "challenges.view" },
-    { href: "/admin/events", label: "Live events", icon: Radio, permission: "challenges.view" }
+    { href: "/admin/prize-approvals", label: "Prize Approvals", icon: ClipboardCheck, permission: "winners.review" }
   ] },
-  { label: "Money", items: [
-    { href: "/admin/finance", label: "Finance overview", icon: Landmark, permission: "finance.view" },
+  { label: "Finance", items: [
+    { href: "/admin/finance", label: "Overview", icon: Landmark, permission: "finance.view" },
     { href: "/admin/cash-ledger", label: "Transactions", icon: WalletCards, permission: "finance.view" },
-    { href: "/admin/prize-approvals", label: "Prize funding", icon: ClipboardCheck, permission: "finance.view" },
     { href: "/admin/settlements", label: "Settlements", icon: Landmark, permission: "settlements.prepare" },
     { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark, permission: "withdrawals.review" },
     { href: "/admin/refunds", label: "Refunds", icon: FileClock, permission: "refunds.request" },
-    { href: "/admin/dorocoin", label: "Spin Credits", icon: Coins, permission: "finance.view" }
+    { href: "/admin/chargebacks", label: "Chargebacks", icon: Flag, permission: "chargebacks.review" },
+  ] },
+  { label: "Sponsors", items: [
+    { href: "/admin/sponsor-brands", label: "Organizations", icon: BriefcaseBusiness, permission: "sponsors.view" },
+    { href: "/admin/sponsors", label: "Applications", icon: ShieldCheck, permission: "sponsors.review" },
+    { href: "/admin/sponsor-campaigns", label: "Sponsorships", icon: Megaphone, permission: "sponsorCampaigns.review" },
+    { href: "/admin/sponsor-operations", label: "Operations", icon: Flag, permission: "sponsors.review" }
+  ] },
+  { label: "Rewards", items: [
+    { href: "/admin/rewards", label: "Overview", icon: Trophy, permission: "rewards.view" },
+    { href: "/admin/rewards/prize-wheel", label: "Prize Wheel", icon: RefreshCw, permission: "rewards.view" },
+    { href: "/admin/rewards/prize-wheel#prize-catalog", label: "Prize Catalog", icon: Gift, permission: "rewards.view" },
+    { href: "/admin/rewards/fulfilment", label: "Fulfilment", icon: ClipboardCheck, permission: "rewards.fulfil" },
+    { href: "/admin/rewards/campaigns", label: "Campaigns", icon: Megaphone, permission: "rewards.view" },
+    { href: "/admin/rewards/adjustments", label: "Adjustments", icon: SlidersHorizontal, permission: "rewards.adjustUser" }
   ] },
   { label: "Safety & Support", items: [
-    { href: "/admin/safety-support/support-tickets", label: "Support tickets", icon: LifeBuoy, permission: "tickets.view" },
-    { href: "/admin/safety-support/disputes", label: "Formal disputes", icon: Flag, permission: "disputes.review" },
+    { href: "/admin/safety-support/support-tickets", label: "Support", icon: LifeBuoy, permission: "tickets.view" },
+    { href: "/admin/safety-support/disputes", label: "Disputes", icon: Flag, permission: "disputes.review" },
     { href: "/admin/safety-support/appeals", label: "Appeals", icon: FileClock, permission: "appeals.review" },
-    { href: "/admin/safety-support/safety-reports", label: "Safety reports", icon: ShieldCheck, permission: "safetyReports.review" },
-    { href: "/admin/media-moderation", label: "Flagged media", icon: ClipboardCheck, permission: "submissions.review" }
+    { href: "/admin/safety-support/safety-reports", label: "Safety Reports", icon: ShieldCheck, permission: "safetyReports.review" },
+    { href: "/admin/media-moderation", label: "Media Moderation", icon: ClipboardCheck, permission: "submissions.review" },
+    { href: "/admin/risk", label: "Risk & Fraud", icon: ShieldCheck, permission: "safetyReports.review" }
   ] },
-  { label: "Sponsors & Events", items: [
-    { href: "/admin/sponsors", label: "Sponsor applications", icon: ShieldCheck, permission: "sponsors.review" },
-    { href: "/admin/sponsor-operations", label: "Sponsorship operations", icon: Flag, permission: "sponsors.review" },
-    { href: "/admin/sponsor-campaigns", label: "Sponsor campaigns", icon: Megaphone, permission: "sponsorCampaigns.review" },
-    { href: "/admin/events", label: "Physical events", icon: Radio, permission: "challenges.view" },
-    { href: "/admin/tournaments", label: "Tournament operations", icon: Trophy, permission: "challenges.view" }
-  ] },
-  { label: "Communications", items: [
+  { label: "Content", items: [
     { href: "/admin/announcements", label: "Announcements", icon: Megaphone, permission: "content.edit" },
-    { href: "/admin/notifications", label: "Delivery logs", icon: Bell, permission: "content.preview" },
-    { href: "/admin/enterprise-applications", label: "Enterprise Applications", icon: BriefcaseBusiness, permission: "challenges.review" },
-    { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: BriefcaseBusiness, permission: "tickets.view" },
-    { href: "/admin/contact-requests", label: "Contact Requests", icon: LifeBuoy, permission: "tickets.view" }
-  ] },
-  { label: "Analytics & Content", items: [
-    { href: "/admin/reports", label: "Analytics overview", icon: BarChart3, permission: "admin.dashboard.view" },
-    { href: "/admin/public-content", label: "Website content", icon: Megaphone, permission: "content.edit" },
     { href: "/admin/categories", label: "Categories", icon: FolderCog, permission: "content.edit" },
-    { href: "/admin/rewards", label: "Reward campaigns", icon: Trophy, permission: "content.edit" },
-    { href: "/admin/rewards/prize-wheel", label: "Spin Wheel", icon: RefreshCw, permission: "content.edit" }
   ] },
-  { label: "Settings", items: [
-    { href: "/admin/settings", label: "General settings", icon: Settings, permission: "settings.view" },
-    { href: "/admin/help", label: "Help Centre", icon: LifeBuoy, permission: "admin.dashboard.view" },
-    { href: "/admin/voting-rules", label: "Voting rules", icon: ListChecks, permission: "settings.editVoting" },
-    { href: "/admin/revenue-rules", label: "Prize and revenue rules", icon: BookOpenCheck, permission: "settings.editFinancial" },
-    { href: "/admin/roles", label: "Admin roles", icon: Boxes, permission: "roles.manage" }
+  { label: "Platform", items: [
+    { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings.view" },
+    { href: "/admin/audit-logs", label: "Audit Logs", icon: FileClock, permission: "auditLogs.viewRaw" }
   ] },
-  { label: "Developer Tools", items: [
-    { href: "/admin/developer-tools/economy-rules", label: "Economy Rules", icon: Coins, permission: "developerTools.view", developerOnly: true },
-    { href: "/admin/developer-tools/system-status", label: "System status", icon: Activity, permission: "systemDiagnostics.view", developerOnly: true },
-    { href: "/admin/developer-tools/background-jobs", label: "Background jobs", icon: RefreshCw, permission: "jobs.view", developerOnly: true },
-    { href: "/admin/developer-tools/feature-readiness", label: "Feature readiness", icon: SlidersHorizontal, permission: "systemDiagnostics.view", developerOnly: true },
-    { href: "/admin/feature-flags", label: "Feature controls", icon: SlidersHorizontal, permission: "featureControls.manage", developerOnly: true },
-    { href: "/admin/audit-logs", label: "Technical audit logs", icon: FileClock, permission: "auditLogs.viewRaw", developerOnly: true },
-    { href: "/admin/qa-data", label: "QA tools", icon: Database, permission: "qaTools.use", developerOnly: true }
+  { label: "System", items: [
+    { href: "/admin/developer-tools/system-status", label: "Status", icon: Activity, permission: "systemDiagnostics.view", developerOnly: true },
+    { href: "/admin/developer-tools/background-jobs", label: "Jobs", icon: RefreshCw, permission: "jobs.view", developerOnly: true },
   ] }
 ];
 
@@ -105,6 +89,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [accessDetails, setAccessDetails] = useState<AdminAccess | null>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const { user, loading, signedOut } = useCurrentUser();
+  const environmentLabel = process.env.NODE_ENV === "production" ? "Production" : process.env.NODE_ENV === "test" ? "Test" : "Development";
 
   useEffect(() => {
     if (loading) return;
@@ -174,7 +159,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <aside className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[var(--panel)] p-5 lg:block">
         <div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Internal</p><p className="font-black">Admin Workspace</p></div></div>
         {navigation}
-        <div className="mt-8 border-t border-white/10 pt-5"><p className="text-sm font-bold">{user?.displayName || "Administrator"}</p><p className="mt-1 text-xs text-slate-500">Authorized administrator</p></div>
+        <div className="mt-8 border-t border-white/10 pt-5"><p className="text-sm font-bold">{user?.displayName || "Administrator"}</p><p className="mt-1 text-xs text-slate-500">{accessDetails?.roles.map((role) => role.replaceAll("_", " ")).join(", ") || "Authorized administrator"}</p><p className="mt-2 text-xs text-slate-500">Sensitive actions require recent authentication. MFA is not currently verified by this console.</p></div>
       </aside>
       <main id="admin-workspace" className="admin-workspace px-5 py-7 sm:px-8 lg:ml-[330px] lg:px-10">
         <div className="mx-auto max-w-[1500px]">
@@ -187,7 +172,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <div className="flex flex-wrap gap-2">
               <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold">View live site</Link>
               <button type="button" onClick={() => window.dispatchEvent(new Event("admin:refresh"))} className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] border border-black/10 bg-white" aria-label="Refresh admin data"><RefreshCw size={16} /></button>
-              <span className="inline-flex min-h-11 items-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold"><Activity size={15} className="mr-2 text-amber-600" /> {user?.displayName || "Admin"}</span>
+              <span className="inline-flex min-h-11 items-center rounded-[8px] border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-950"><Activity size={15} className="mr-2 text-amber-600" /> {environmentLabel}</span>
+              <span className="inline-flex min-h-11 items-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold">{user?.displayName || "Admin"}</span>
             </div>
           </div>
           {children}

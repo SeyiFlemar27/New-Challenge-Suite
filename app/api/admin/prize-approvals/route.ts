@@ -1,10 +1,10 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { serializeProposal } from "@/lib/server/prize-approvals";
 import { ok, serverUnavailable } from "@/lib/server/responses";
 
 export async function GET(request: Request) {
-  const { response } = await requireAdminUser(request);
+  const { response } = await requireAdminPermission(request, "winners.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin prize approvals");

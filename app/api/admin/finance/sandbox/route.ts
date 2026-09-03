@@ -1,11 +1,11 @@
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson } from "@/lib/server/responses";
 import { assertSandboxAllowed, sandboxProviderFoundation } from "@/lib/server/financial/sandbox";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { response } = await requireAdminUser(request);
+  const { response } = await requireAdminPermission(request, "qaTools.use");
   if (response) return response;
   const guard = assertSandboxAllowed();
   if (!guard.allowed) return fail("Financial sandbox controls are not available in production.", 403, guard, "SANDBOX_DISABLED_IN_PRODUCTION");
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { response } = await requireAdminUser(request);
+  const { response } = await requireAdminPermission(request, "qaTools.use");
   if (response) return response;
   const guard = assertSandboxAllowed();
   if (!guard.allowed) return fail("Financial sandbox controls are not available in production.", 403, guard, "SANDBOX_DISABLED_IN_PRODUCTION");

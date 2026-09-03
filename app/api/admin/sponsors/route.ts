@@ -1,11 +1,11 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { user, response } = await requireAdminUser(request);
+  const { user, response } = await requireAdminPermission(request, "sponsors.view");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Sponsor admin");

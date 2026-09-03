@@ -43,8 +43,8 @@ assert(proposalRoute.includes("ledgerEntriesCreated: false"), "winner proposal m
 assert(proposalRoute.includes("cashBalancesCredited: false"), "winner proposal must not credit cash balances.");
 assert(proposalRoute.includes("payoutProviderCalled: false"), "winner proposal must not call payout provider.");
 
-assert(adminQueueRoute.includes("requireAdminUser"), "admin prize queue must require admin.");
-assert(adminListRoute.includes("requireAdminUser"), "admin challenge proposal list must require admin.");
+assert(adminQueueRoute.includes('requireAdminPermission(request, "winners.view")'), "admin prize queue must require winner read permission.");
+assert(adminListRoute.includes('requireAdminPermission(request, "winners.view")'), "admin challenge proposal list must require winner read permission.");
 assert(previewRoute.includes("requireAdminPermission"), "payout preview must require admin finance permission.");
 assert(approveRoute.includes("requireRecentAdminAuthentication"), "approval must require recent admin authentication.");
 assert(rejectRoute.includes("requireAdminPermission"), "reject must require admin winner-review permission.");
@@ -52,7 +52,7 @@ assert(changesRoute.includes("requireAdminPermission"), "request changes must re
 assert(approveRoute.includes("createInternalChallengeSettlement"), "approval must call the idempotent internal settlement service.");
 assert(approveRoute.includes("buildConfirmedSettlementPreview"), "admin approval must build a confirmed-source settlement preview.");
 assert(settlement.includes("idempotent: true"), "internal settlement must be idempotent.");
-assert(settlement.includes("pendingBalanceCents: FieldValue.increment(credit.netAmountCents)"), "admin approval must credit pending internal wallet balances.");
+assert(settlement.includes('pendingBalanceCents: FieldValue.increment(credit.status === "pending_hold" ? 0 : credit.netAmountCents)'), "admin approval must credit the correct pending internal wallet bucket.");
 assert(approveRoute.includes("payoutProviderCalled: false"), "admin approval must not call payout provider.");
 assert(approveRoute.includes("payoutMarkedPaid: false"), "admin approval must not mark payouts paid.");
 assert(approveRoute.includes("kycStillRequiredBeforeWithdrawal: false"), "admin approval must follow the KYC-free launch policy.");
@@ -67,8 +67,8 @@ assert(settlement.includes("confirmedPaymentSourcesOnly: true"), "settlement mus
 
 assert(payout.includes("CASH_EARNING_HOLD_HOURS = 72"), "current 72-hour hold constant must exist.");
 assert(helper.includes("holdUntilFromApproval") && helper.includes("CASH_EARNING_HOLD_HOURS"), "preview/finalization must calculate holdUntil from approval using the current hold.");
-assert(settlement.includes("balanceBucket: \"pending\""), "winner funds must enter pending bucket only.");
-assert(settlement.includes("status: \"pending_review\""), "internal credits must remain pending review.");
+assert(settlement.includes('balanceBucket: status === "pending_hold" ? "locked" : "pending"'), "winner funds must enter pending or configured hold bucket only.");
+assert(settlement.includes('status: status === "pending_hold" ? "pending_hold" : "pending_review"'), "internal credits must remain pending review or pending hold.");
 assert(settlement.includes("paid: false") && settlement.includes("withdrawn: false"), "settlement must not mark credits paid or withdrawn.");
 assert(wallet.includes('kycRequired: isKycRequiredForAction("withdrawalRequest")'), "withdrawal architecture must use the centralized KYC policy.");
 assert(wallet.includes("DoroCoins are internal platform credits. They cannot be withdrawn or converted to cash."), "DoroCoins must remain non-cash.");

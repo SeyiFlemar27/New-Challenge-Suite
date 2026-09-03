@@ -16,7 +16,7 @@ const finalizeRoute = read("app/api/admin/challenges/[id]/winner-proposals/[prop
 
 assert(exists("app/admin/prize-approvals/[proposalId]/page.tsx"), "admin prize approval detail route must exist.");
 assert(queuePage.includes("/admin/prize-approvals/${proposal.id}"), "queue rows must link to detail page.");
-assert(detailRoute.includes("requireAdminUser"), "detail API route must require admin.");
+assert(detailRoute.includes('requireAdminPermission(request, "winners.view")'), "detail API route must require winner read permission.");
 assert(detailRoute.includes("getAdminPrizeApprovalDetail"), "detail API route must use safe detail helper.");
 
 assert(detailPage.includes("Challenge Overview"), "detail page must show challenge overview.");
@@ -33,10 +33,10 @@ assert(detailPage.includes("Admin note is required"), "detail page must require 
 assert(detailPage.includes("no bank transfer or payout provider is called"), "detail page must not imply payout execution.");
 assert(!detailPage.includes("Winners paid") && !detailPage.includes("Funds released") && !detailPage.includes("Payout sent"), "detail page must not claim payout completion.");
 
-assert(approveRoute.includes("requireAdminUser"), "approve route must require admin.");
-assert(rejectRoute.includes("requireAdminUser"), "reject route must require admin.");
-assert(changesRoute.includes("requireAdminUser"), "request changes route must require admin.");
-assert(finalizeRoute.includes("requireAdminUser"), "finalize route must require admin.");
+assert(approveRoute.includes('requireRecentAdminAuthentication(request, "settlements.approve")'), "approve route must require recent settlement approval authorization.");
+assert(rejectRoute.includes('requireAdminPermission(request, "winners.review")'), "reject route must require winner-review permission.");
+assert(changesRoute.includes('requireAdminPermission(request, "winners.review")'), "request changes route must require winner-review permission.");
+assert(finalizeRoute.includes('requireRecentAdminAuthentication(request, "settlements.approve")'), "finalize route must require recent settlement approval authorization.");
 assert(approveRoute.includes("payoutProviderCalled: false"), "approve route must not call payout provider.");
 assert(rejectRoute.includes("ledgerEntriesCreated: false"), "reject route must not create ledger entries.");
 assert(changesRoute.includes("ledgerEntriesCreated: false"), "request changes route must not create ledger entries.");

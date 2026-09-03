@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { deterministicId } from "@/lib/server/idempotency";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 
@@ -10,7 +10,7 @@ const ALLOWED_STATUSES = ["claim_under_review", "approved", "shipped", "fulfille
 const INVENTORY_RELEASE_STATUSES = new Set(["shipped", "fulfilled", "cancelled"]);
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ claimId: string }> }) {
-  const { user, response } = await requireAdminUser(request);
+  const { user, response } = await requireRecentAdminAuthentication(request, "rewards.fulfil");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin reward claims");

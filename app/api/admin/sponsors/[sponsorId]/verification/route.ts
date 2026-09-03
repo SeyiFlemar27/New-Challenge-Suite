@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireAdminUser } from "@/lib/server/auth";
+import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ const schema = z.object({
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ sponsorId: string }> }) {
-  const { user, response } = await requireAdminUser(request);
+  const { user, response } = await requireRecentAdminAuthentication(request, "sponsors.approve");
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Sponsor verification");
