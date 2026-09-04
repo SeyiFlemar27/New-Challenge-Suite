@@ -27,7 +27,6 @@ const groups: NavGroup[] = [
   ] },
   { label: "People", items: [
     { href: "/admin/people/users", label: "Users", icon: UsersRound, permission: "users.view" },
-    { href: "/admin/people/admin-team", label: "Admin Team", icon: UserCog, permission: "roles.manage" },
     { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" }
   ] },
   { label: "Challenges", items: [
@@ -42,7 +41,6 @@ const groups: NavGroup[] = [
     { href: "/admin/settlements", label: "Settlements", icon: Landmark, permission: "settlements.prepare" },
     { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark, permission: "withdrawals.review" },
     { href: "/admin/refunds", label: "Refunds", icon: FileClock, permission: "refunds.request" },
-    { href: "/admin/chargebacks", label: "Chargebacks", icon: Flag, permission: "chargebacks.review" },
   ] },
   { label: "Sponsors", items: [
     { href: "/admin/sponsor-brands", label: "Organizations", icon: BriefcaseBusiness, permission: "sponsors.view" },
@@ -53,9 +51,8 @@ const groups: NavGroup[] = [
   { label: "Rewards", items: [
     { href: "/admin/rewards", label: "Overview", icon: Trophy, permission: "rewards.view" },
     { href: "/admin/rewards/prize-wheel", label: "Prize Wheel", icon: RefreshCw, permission: "rewards.view" },
-    { href: "/admin/rewards/prize-wheel#prize-catalog", label: "Prize Catalog", icon: Gift, permission: "rewards.view" },
+    { href: "/admin/rewards/prize-catalog", label: "Prize Catalog", icon: Gift, permission: "rewards.view" },
     { href: "/admin/rewards/fulfilment", label: "Fulfilment", icon: ClipboardCheck, permission: "rewards.fulfil" },
-    { href: "/admin/rewards/campaigns", label: "Campaigns", icon: Megaphone, permission: "rewards.view" },
     { href: "/admin/rewards/adjustments", label: "Adjustments", icon: SlidersHorizontal, permission: "rewards.adjustUser" }
   ] },
   { label: "Safety & Support", items: [
@@ -63,14 +60,13 @@ const groups: NavGroup[] = [
     { href: "/admin/safety-support/disputes", label: "Disputes", icon: Flag, permission: "disputes.review" },
     { href: "/admin/safety-support/appeals", label: "Appeals", icon: FileClock, permission: "appeals.review" },
     { href: "/admin/safety-support/safety-reports", label: "Safety Reports", icon: ShieldCheck, permission: "safetyReports.review" },
-    { href: "/admin/media-moderation", label: "Media Moderation", icon: ClipboardCheck, permission: "submissions.review" },
-    { href: "/admin/risk", label: "Risk & Fraud", icon: ShieldCheck, permission: "safetyReports.review" }
   ] },
   { label: "Content", items: [
     { href: "/admin/announcements", label: "Announcements", icon: Megaphone, permission: "content.edit" },
     { href: "/admin/categories", label: "Categories", icon: FolderCog, permission: "content.edit" },
   ] },
   { label: "Platform", items: [
+    { href: "/admin/people/admin-team", label: "Admin Team", icon: UserCog, permission: "roles.manage" },
     { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings.view" },
     { href: "/admin/audit-logs", label: "Audit Logs", icon: FileClock, permission: "auditLogs.viewRaw" }
   ] },

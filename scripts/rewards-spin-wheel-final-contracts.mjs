@@ -8,6 +8,7 @@ const hub = read("app/rewards/page.tsx");
 const history = read("app/rewards/history/page.tsx");
 const claim = read("app/api/rewards/claim/route.ts");
 const admin = read("app/admin/rewards/prize-wheel/page.tsx");
+const prizeCatalog = read("app/admin/rewards/prize-catalog/page.tsx");
 const sidebar = read("components/sidebar.tsx");
 const earnings = read("app/earnings/page.tsx");
 
@@ -49,10 +50,11 @@ assert.match(history, /postalCode/);
 assert.match(claim, /deliveryNotes/);
 assert(!history.includes("deliveryAddress"));
 
-for (const type of ["reward_points", "dorocoin", "cash", "physical_item", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"]) assert(admin.includes(`value="${type}"`), `missing structured admin prize type ${type}`);
-assert(admin.includes("Delivery country codes"));
-assert(admin.includes("Inventory"));
-assert(!admin.includes('label="Reward type"><input'));
+for (const type of ["reward_points", "dorocoin", "cash", "physical_item", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"]) assert(prizeCatalog.includes(`value="${type}"`), `missing structured Prize Catalog type ${type}`);
+assert(prizeCatalog.includes("Delivery country codes"));
+assert(prizeCatalog.includes("Available quantity"));
+assert(!prizeCatalog.includes('label="Reward type"><input'));
+assert(!admin.includes("Create Prize"), "Prize creation must not be embedded in Wheel configuration");
 
 for (const heading of ["Spin & Win", "Daily streak", "Earn Points", "Achievements", "Your Rewards", "Recent Rewards"]) assert(hub.includes(heading), `missing Reward Hub section ${heading}`);
 assert(!hub.includes("Lifetime Earned"));

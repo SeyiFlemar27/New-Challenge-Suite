@@ -23,7 +23,7 @@ export const rewardSpinMessages: Record<string, string> = {
   PRIZE_DAILY_WIN_LIMIT_REACHED: "This reward reached its daily win limit. No points were charged; please try again.",
   REWARD_BUDGET_EXHAUSTED: "This reward budget is unavailable. No points were charged.",
   NO_ACTIVE_WHEEL_VERSION: "This Spin tier is temporarily unavailable. No points were charged.",
-  WHEEL_VERSION_CHANGED: "This Spin tier was just updated. No points were charged; please try again."
+  WHEEL_VERSION_CHANGED: "This Wheel was updated. Review the latest rewards and chances before spinning. No points were charged."
 };
 
 export async function POST(request: Request) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const tier = String(parsed.body?.tier ?? "basic") as RewardSpinTier;
   if (!["basic", "standard", "premium"].includes(tier)) return fail("Select a valid Spin tier.", 400, undefined, "INVALID_REWARD_TIER");
   try {
-    return ok(await executeRewardSpin(db, { userId: user.uid, tier, idempotencyKey: String(parsed.body?.idempotencyKey ?? "").slice(0, 140) || null, paymentSource: parsed.body?.paymentSource === "bonus_spin" ? "bonus_spin" : "points", bonusEntitlementId: typeof parsed.body?.bonusEntitlementId === "string" ? parsed.body.bonusEntitlementId : null }), "Spin confirmed. Your reward was selected securely.");
+    return ok(await executeRewardSpin(db, { userId: user.uid, tier, displayedVersionId: String(parsed.body?.displayedVersionId ?? "").slice(0, 180), idempotencyKey: String(parsed.body?.idempotencyKey ?? "").slice(0, 140) || null, paymentSource: parsed.body?.paymentSource === "bonus_spin" ? "bonus_spin" : "points", bonusEntitlementId: typeof parsed.body?.bonusEntitlementId === "string" ? parsed.body.bonusEntitlementId : null }), "Spin confirmed. Your reward was selected securely.");
   } catch (error) {
     const code = error instanceof Error ? error.message : "SPIN_FAILED";
     return code in rewardSpinMessages ? fail(rewardSpinMessages[code], 409, undefined, code) : serverError("We could not complete this Spin. No Reward Points were charged.", code);

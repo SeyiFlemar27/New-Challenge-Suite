@@ -3,33 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CheckCircle2, Gift, History, Trophy, WalletCards, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { RewardWheelVisual } from "@/components/rewards/reward-wheel-visual";
 import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { buildRewardWheelSegments, rewardWheelLandingRotation } from "@/lib/reward-wheel-geometry";
+import type { PublicRewardWheelConfig } from "@/lib/reward-wheel-contracts";
 
 const tiers = ["basic", "standard", "premium"] as const;
 type RewardTier = (typeof tiers)[number];
 type RewardPrize = { id: string; prizeName: string; prizeDescription?: string; prizeType?: string; rewardValue?: number; resolvedProbability?: number };
 type BonusSpin = { id: string; tier?: string };
-type SummaryData = { settings?: { rewardsEnabled?: boolean; maintenanceMode?: boolean; tierEnabled?: Record<string, boolean> }; wheelVersions?: Record<string, { versionId?: string | null; pointCost?: number; diagnosticCode?: string | null }>; prizes?: Record<string, RewardPrize[]>; availableRewardPoints?: number; bonusSpins?: BonusSpin[] };
+type SummaryData = { settings?: { rewardsEnabled?: boolean; maintenanceMode?: boolean; tierEnabled?: Record<string, boolean> }; wheelConfigs?: Partial<Record<RewardTier, PublicRewardWheelConfig | null>>; wheelVersions?: Record<string, { versionId?: string | null; pointCost?: number; diagnosticCode?: string | null }>; availableRewardPoints?: number; bonusSpins?: BonusSpin[] };
 type SpinResult = RewardPrize & { prizeId?: string; fulfillmentStatus?: string };
 type SpinResponse = { spin?: SpinResult };
 
 const tierLabels: Record<RewardTier, string> = { basic: "Basic", standard: "Standard", premium: "Premium" };
-const fallbackCosts: Record<RewardTier, number> = { basic: 100, standard: 250, premium: 500 };
-const palette = [
-  { color: "#f6c64b", textColor: "#17120a" },
-  { color: "#25231f", textColor: "#f8e7b3" },
-  { color: "#d2a94b", textColor: "#15100a" },
-  { color: "#f0dfad", textColor: "#18120b" },
-  { color: "#171717", textColor: "#f6c64b" }
-];
-const center = 50;
-const radius = 49;
-
-function polar(angle: number, distance = radius) { const radians = (angle - 90) * Math.PI / 180; return { x: center + distance * Math.cos(radians), y: center + distance * Math.sin(radians) }; }
-function arc(startAngle: number, endAngle: number) { const start = polar(endAngle); const end = polar(startAngle); return [`M ${center} ${center}`, `L ${start.x} ${start.y}`, `A ${radius} ${radius} 0 ${endAngle - startAngle > 180 ? 1 : 0} 0 ${end.x} ${end.y}`, "Z"].join(" "); }
-function shortLabel(value: string) { return value.length > 15 ? `${value.slice(0, 12)}...` : value; }
 function rewardAction(type?: string) { if (type === "cash") return { href: "/earnings", label: "View Earnings" }; if (type === "physical_item") return { href: "/rewards/history", label: "Add Delivery Details" }; if (["free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"].includes(String(type))) return { href: "/rewards", label: "View Your Rewards" }; if (type === "dorocoin") return { href: "/dorocoins", label: "View DoroCoins" }; return { href: "/rewards/history", label: "View Reward History" }; }
 function prizeAmount(prize: RewardPrize) { if (prize.prizeType === "cash") return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(prize.rewardValue ?? 0) / 100); if (prize.prizeType === "dorocoin") return `${Number(prize.rewardValue ?? 0).toLocaleString()} DC`; return prize.prizeName; }
 
@@ -47,12 +35,13 @@ export default function RewardWheelPage() {
   const timeoutRef = useRef<number | null>(null);
 
   function load() { apiRequest<SummaryData>("/api/rewards/summary").then((response) => { if (response.ok) { setData(response.data ?? null); setMessage(""); } else setMessage(response.message || "Rewards could not load."); }); }
-  useEffect(() => { load(); const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const sync = () => setReducedMotion(media.matches); sync(); media.addEventListener?.("change", sync); return () => { media.removeEventListener?.("change", sync); if (timeoutRef.current) window.clearTimeout(timeoutRef.current); }; }, []);
+  useEffect(() => { load(); const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const sync = () => setReducedMotion(media.matches); const refreshOnFocus = () => load(); sync(); media.addEventListener?.("change", sync); window.addEventListener("focus", refreshOnFocus); return () => { media.removeEventListener?.("change", sync); window.removeEventListener("focus", refreshOnFocus); if (timeoutRef.current) window.clearTimeout(timeoutRef.current); }; }, []);
 
   const points = Number(data?.availableRewardPoints ?? 0);
-  const cost = Number(data?.wheelVersions?.[tier]?.pointCost ?? fallbackCosts[tier]);
-  const prizes = data?.prizes?.[tier] ?? [];
-  const slices = useMemo(() => buildRewardWheelSegments(prizes).map((slice, index) => ({ ...slice, ...palette[index % palette.length] })), [prizes]);
+  const activeConfig = data?.wheelConfigs?.[tier] ?? null;
+  const cost = Number(activeConfig?.pointCost ?? 0);
+  const prizes = useMemo(() => (activeConfig?.entries ?? []).map((entry) => ({ id: entry.prizeId, prizeName: entry.displayName, prizeType: entry.prizeType, resolvedProbability: entry.exactProbability })), [activeConfig]);
+  const slices = useMemo(() => buildRewardWheelSegments(prizes), [prizes]);
   const wheelDiagnostic = data?.wheelVersions?.[tier]?.diagnosticCode ?? null;
   const tierBonus = (data?.bonusSpins ?? []).find((item) => !item.tier || item.tier === tier);
   const affordableSpins = Math.floor(points / Math.max(1, cost));
@@ -62,9 +51,9 @@ export default function RewardWheelPage() {
   function openConfirmation() { if (!canOpenConfirmation) return; setPaymentSource(tierBonus ? "bonus_spin" : "points"); setConfirming(true); setMessage(""); }
   async function spin() {
     setRequesting(true); setConfirming(false); setResult(null); setMessage("Confirming your Spin...");
-    const response = await apiRequest<SpinResponse>("/api/rewards/spin", { method: "POST", body: JSON.stringify({ tier, idempotencyKey: crypto.randomUUID(), paymentSource, bonusEntitlementId: paymentSource === "bonus_spin" ? tierBonus?.id : null }) });
+    const response = await apiRequest<SpinResponse>("/api/rewards/spin", { method: "POST", body: JSON.stringify({ tier, displayedVersionId: activeConfig?.versionId, idempotencyKey: crypto.randomUUID(), paymentSource, bonusEntitlementId: paymentSource === "bonus_spin" ? tierBonus?.id : null }) });
     setRequesting(false);
-    if (!response.ok) { setMessage(response.message || "This Spin could not be completed. No Reward Points were charged."); return; }
+    if (!response.ok) { if (response.code === "WHEEL_VERSION_CHANGED") load(); setMessage(response.message || "This Spin could not be completed. No Reward Points were charged."); return; }
     const spinResult = response.data?.spin;
     if (!spinResult) { setMessage("The confirmed reward could not be displayed. Open Reward History to review it safely."); load(); return; }
     const selected = slices.find((slice) => slice.id === String(spinResult?.prizeId)) ?? slices[0];
@@ -78,9 +67,9 @@ export default function RewardWheelPage() {
     {message ? <Card className="mt-6 p-4 text-sm font-bold" role="status">{message}</Card> : null}
     <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Card className="overflow-hidden p-5 sm:p-8">
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Spin tiers">{tiers.map((item) => <button key={item} type="button" role="tab" aria-selected={tier === item} onClick={() => { setTier(item); setResult(null); }} disabled={requesting || spinning} className={`min-h-11 flex-1 rounded-[8px] border px-4 text-sm font-black ${tier === item ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/5"}`}>{tierLabels[item]} · {Number(data?.wheelVersions?.[item]?.pointCost ?? fallbackCosts[item])} points</button>)}</div>
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Spin tiers">{tiers.map((item) => <button key={item} type="button" role="tab" aria-selected={tier === item} onClick={() => { setTier(item); setResult(null); }} disabled={requesting || spinning} className={`min-h-11 flex-1 rounded-[8px] border px-4 text-sm font-black ${tier === item ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/5"}`}>{tierLabels[item]}{data?.wheelConfigs?.[item] ? ` · ${data.wheelConfigs[item]!.pointCost} points` : " · Unavailable"}</button>)}</div>
         <div className="mx-auto mt-8 w-full max-w-[560px]">
-          <div className="relative aspect-square">{!data ? <div className="absolute inset-0 animate-pulse rounded-full border border-[var(--line)] bg-[var(--panel-2)]" aria-label="Loading reward wheel" /> : slices.length ? <><div className="absolute left-1/2 top-0 z-10 h-0 w-0 -translate-x-1/2 border-x-[14px] border-t-[26px] border-x-transparent border-t-[var(--gold)]" aria-hidden="true" /><svg viewBox="0 0 100 100" className="h-full w-full drop-shadow-2xl" style={{ transform: `rotate(${rotation}deg)`, transition: spinning ? "transform 4.2s cubic-bezier(.12,.7,.08,1)" : "none" }} aria-label={`${tierLabels[tier]} reward wheel`} role="img">{slices.map((slice) => { const label = polar(slice.midpoint, 32); return <g key={slice.id}><path d={arc(slice.startAngle, slice.endAngle)} fill={slice.color} stroke="#f7df9b" strokeWidth="0.35" /><text x={label.x} y={label.y} fill={slice.textColor} fontSize="3.1" fontWeight="800" textAnchor="middle" dominantBaseline="middle" transform={`rotate(${slice.midpoint} ${label.x} ${label.y})`}>{shortLabel(slice.prizeName)}</text></g>; })}<circle cx="50" cy="50" r="9" fill="#111" stroke="#f6c64b" strokeWidth="1" /><text x="50" y="50" fill="#f6c64b" fontSize="3.4" fontWeight="900" textAnchor="middle" dominantBaseline="middle">SPIN</text></svg></> : <div className="absolute inset-0 flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-2)] p-10 text-center"><div><AlertCircle className="mx-auto text-amber-500" /><p className="mt-3 font-black">This Spin tier is temporarily unavailable.</p><p className="mt-2 text-sm text-[var(--muted)]">Its published reward pool needs attention. No points will be charged.</p>{wheelDiagnostic ? <p className="sr-only">Diagnostic: {wheelDiagnostic}</p> : null}</div></div>}</div>
+          <div className="relative aspect-square">{!data ? <div className="absolute inset-0 animate-pulse rounded-full border border-[var(--line)] bg-[var(--panel-2)]" aria-label="Loading reward wheel" /> : slices.length ? <RewardWheelVisual items={prizes} label={`${tierLabels[tier]} reward wheel`} rotation={rotation} spinning={spinning} /> : <div className="absolute inset-0 flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-2)] p-10 text-center"><div><AlertCircle className="mx-auto text-amber-500" /><p className="mt-3 font-black">Spin & Win is temporarily unavailable.</p><p className="mt-2 text-sm text-[var(--muted)]">Its published reward pool needs attention. No points will be charged.</p>{wheelDiagnostic ? <p className="sr-only">Diagnostic: {wheelDiagnostic}</p> : null}</div></div>}</div>
           <div className="mt-6 text-center"><p className="text-sm text-slate-400">{tierBonus ? "A Bonus Spin is available." : points >= cost ? `${affordableSpins} ${affordableSpins === 1 ? "Spin" : "Spins"} available with your current points.` : `Need ${(cost - points).toLocaleString()} more Reward Points.`}</p><Button onClick={openConfirmation} disabled={!canOpenConfirmation} className="mt-4 min-w-56"><Trophy size={18} /> {requesting ? "Confirming..." : spinning ? "Spinning..." : `Spin ${tierLabels[tier]}`}</Button></div>
         </div>
       </Card>

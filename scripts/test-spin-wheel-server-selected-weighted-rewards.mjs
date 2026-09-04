@@ -11,5 +11,5 @@ assert(rewards.includes("probabilityWeight"));
 assert(rewards.includes("serverSelected: true"));
 assert(route.includes("executeRewardSpin"));
 assert(!route.includes("prizeId"));
-assert(admin.includes("requireAdminUser"));
+assert(admin.includes('requireAdminPermission(request, "rewards.configure")'));
 console.log("Spin Wheel server-selected weighted reward checks passed.");
