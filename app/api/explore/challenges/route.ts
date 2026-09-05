@@ -56,7 +56,7 @@ function completedWithinExploreWindow(challenge: Record<string, unknown>, phase:
 function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseSummary) {
   const status = text(challenge.status ?? challenge.lifecycleStatus).toLowerCase();
   if (["draft", "cancelled", "canceled", "deleted", "rejected", "hidden", "admin_removed", "pending_review"].includes(status)) return false;
-  if (["voting_closed", "completed", "winners_announced"].includes(phase.phase)) return completedWithinExploreWindow(challenge, phase);
+  if (["completed", "winners_announced"].includes(phase.phase)) return completedWithinExploreWindow(challenge, phase);
   if (["cancelled", "draft", "pending_review"].includes(phase.phase)) return false;
   return true;
 }
@@ -186,8 +186,10 @@ export async function GET(request: NextRequest) {
         updatedAt: toIso(raw.updatedAt ?? raw.publishedAt ?? raw.createdAt),
         registrationDeadline: toIso(raw.registrationDeadline ?? raw.registrationEndAt ?? raw.registrationClosesAt) ?? raw.registrationDeadline,
         submissionDeadline: toIso(raw.submissionDeadline ?? raw.submissionEndAt ?? raw.submissionClosesAt) ?? raw.submissionDeadline,
-        participantCount: Number(raw.participantCount ?? raw.participants ?? 0),
-        voteCount: Number(raw.voteCount ?? 0),
+        participantCount: raw.hideParticipantList === true ? null : Number(raw.participantCount ?? raw.participants ?? 0),
+        voteCount: raw.hideVoteTotals === true ? null : Number(raw.voteCount ?? 0),
+        participantCountVisible: raw.hideParticipantList !== true,
+        voteTotalsVisible: raw.hideVoteTotals !== true,
         saveCount: Number(raw.saveCount ?? raw.savedCount ?? 0),
         phaseSummary: phase,
         hasResults: hasResults(raw),

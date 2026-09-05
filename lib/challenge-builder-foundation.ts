@@ -18,7 +18,7 @@ export type BuilderPlan = "free" | "creator" | "pro" | "host" | "enterprise";
 export const CHALLENGE_TYPE_OPTIONS: Array<{ id: BuilderChallengeType; title: string; requirement: string }> = [
   { id: "normal", title: "Normal Challenge", requirement: "Available on every plan." },
   { id: "private", title: "Private Challenge", requirement: "Requires Creator plan or higher." },
-  { id: "tournament", title: "Tournament Challenge", requirement: "Requires Pro plan or higher." },
+  { id: "tournament", title: "Tournament Challenge", requirement: "Requires Creator or Host access." },
   { id: "live_event", title: "Live Event Challenge", requirement: "Requires Host plan or Enterprise." }
 ];
 

@@ -83,7 +83,7 @@ export const customizationOptions = {
   dashboardStyles: [
     { id: "classic_dark", name: "Classic Dark", category: "dashboardStyle", requiredPlan: "free", previewClass: "bg-[#121212]" },
     { id: "gold_accent", name: "Gold Accent", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-yellow-400/10" },
-    { id: "compact_pro", name: "Compact Pro", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-[#171717]" },
+    { id: "compact_pro", name: "Compact Creator", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-[#171717]" },
     { id: "glass_arena", name: "Glass Arena", category: "dashboardStyle", requiredPlan: "premium", previewClass: "bg-white/10" },
     { id: "creator_studio", name: "Creator Studio", category: "dashboardStyle", requiredPlan: "creator_pro", previewClass: "bg-fuchsia-400/10" },
   ],
@@ -100,7 +100,7 @@ export const customizationOptions = {
     { id: "gold_vote", name: "Gold Vote", description: "Premium gold voting feedback.", category: "celebrationEffect", requiredPlan: "premium", previewClass: "bg-yellow-400/20" },
     { id: "fire_vote", name: "Fire Vote", description: "High-energy voting flare.", category: "celebrationEffect", requiredPlan: "premium", previewClass: "bg-orange-500/20" },
     { id: "diamond_vote", name: "Diamond Vote", description: "Diamond-style premium vote effect.", category: "celebrationEffect", requiredPlan: "premium", previewClass: "bg-sky-300/20" },
-    { id: "crown_vote", name: "Crown Vote", description: "Creator Pro vote signal.", category: "celebrationEffect", requiredPlan: "creator_pro", previewClass: "bg-fuchsia-400/20" },
+    { id: "crown_vote", name: "Crown Vote", description: "Creator celebration effect.", category: "celebrationEffect", requiredPlan: "creator_pro", previewClass: "bg-fuchsia-400/20" },
     { id: "champion_vote", name: "Champion Vote", description: "Elite host and champion vote treatment.", category: "celebrationEffect", requiredPlan: "verified_host", previewClass: "bg-emerald-400/20" }
   ]
 } satisfies Record<string, CustomizationOption[]>;

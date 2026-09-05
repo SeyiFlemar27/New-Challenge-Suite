@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   const planId = parsed.body?.planId;
   const plan = getSubscriptionPlan(planId);
   if (!plan || plan.id === "free") return validationError({ planId: "Select a valid paid subscription plan." });
-  if (plan.id === "pro") return fail("Pro is a legacy plan and is no longer available for new checkout. Choose Creator, Host, or Enterprise.", 409, undefined, "PLAN_NOT_AVAILABLE");
+  if (plan.id === "pro") return fail("This legacy plan is no longer available for new checkout. Choose Creator or Host.", 409, undefined, "PLAN_NOT_AVAILABLE");
   let db: ReturnType<typeof getAdminDb>;
   try {
     db = getAdminDb();

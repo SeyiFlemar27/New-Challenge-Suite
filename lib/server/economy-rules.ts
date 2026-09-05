@@ -54,7 +54,7 @@ export const ECONOMY_V1_RULES = {
     { id: "rookie", name: "Rookie Creator", minimumScore: 0, benefits: ["standard_creator_tools"] },
     { id: "rising_star", name: "Rising Star", minimumScore: 100, benefits: ["standard_creator_tools", "growth_insights"] },
     { id: "verified", name: "Verified Creator", minimumScore: 250, requiresVerification: true, benefits: ["verified_creator_badge", "sponsor_discovery_eligibility"] },
-    { id: "pro", name: "Pro Creator", minimumScore: 500, benefits: ["advanced_creator_analytics", "growth_wallet_allocation"] },
+    { id: "pro", name: "Advanced Creator", minimumScore: 500, benefits: ["advanced_creator_analytics", "growth_wallet_allocation"] },
     { id: "elite", name: "Elite Creator", minimumScore: 1_000, benefits: ["featured_placement_eligibility", "creator_collaboration_tools"] },
     { id: "hall_of_fame", name: "Hall of Fame Creator", minimumScore: 2_500, benefits: ["priority_creator_review", "hall_of_fame_recognition"] }
   ]

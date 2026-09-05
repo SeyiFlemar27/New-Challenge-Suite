@@ -1,14 +1,4 @@
-const PUBLIC_CHALLENGE_STATUSES = new Set([
-  "published",
-  "scheduled",
-  "active",
-  "registration_open",
-  "submission_open",
-  "voting_open",
-  "voting_closed",
-  "winners_announced",
-  "completed"
-]);
+import { isPublicChallengeStatus } from "@/lib/challenge-status";
 
 const PUBLIC_SUBMISSION_STATUSES = new Set(["approved", "active", "winner"]);
 
@@ -93,7 +83,7 @@ export function isPublicChallenge(id: string, data: Record<string, unknown>) {
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();
   const visibility = String(data.visibility ?? "public").toLowerCase();
   const type = String(data.type ?? "").toLowerCase();
-  return PUBLIC_CHALLENGE_STATUSES.has(status)
+  return isPublicChallengeStatus(status)
     && visibility === "public"
     && !type.includes("private") && !type.includes("exclusive") && !type.includes("invite")
     && data.publicVisibility !== false
@@ -110,7 +100,7 @@ export function isPublicSubmission(id: string, data: Record<string, unknown>) {
 }
 
 export function publicChallengeFields(data: Record<string, unknown>) {
-  return pick(data, [
+  const result = pick(data, [
     "title", "shortDescription", "description", "category", "subcategory", "type", "visibility", "status", "lifecycleStatus", "builderVersion",
     "computedStatus", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
     "votingStartsAt", "votingDeadline", "votingEndsAt", "winnerAnnouncementAt", "acceptedSubmissionTypes",
@@ -127,6 +117,12 @@ export function publicChallengeFields(data: Record<string, unknown>) {
     "confirmedPredictionPoolCents", "confirmedPredictionCount",
     "publishedAt", "createdAt", "updatedAt"
   ]);
+  if (data.hideParticipantList === true) delete result.participantCount;
+  if (data.hideVoteTotals === true) {
+    delete result.voteCount;
+    delete result.weightedVoteCount;
+  }
+  return result;
 }
 
 export function publicSubmissionFields(data: Record<string, unknown>) {

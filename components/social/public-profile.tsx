@@ -9,7 +9,7 @@ import { apiRequest } from "@/lib/api/client";
 type Item = Record<string, any>;
 type SocialProfileData = {
   profile: Item;
-  stats: Record<string, number>;
+  stats: Record<string, number | null>;
   created: Item[];
   participating: Item[];
   entries: Item[];
@@ -20,7 +20,7 @@ type SocialProfileData = {
 
 const tabs = ["created", "participating", "entries", "wins", "activity", "about"];
 
-function valueOf(stats: Record<string, number>, ...keys: string[]) {
+function valueOf(stats: Record<string, number | null>, ...keys: string[]) {
   for (const key of keys) {
     if (typeof stats[key] === "number") return stats[key];
   }
@@ -95,8 +95,8 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
               <Stat label="Total Points" value={valueOf(stats, "totalPoints", "points")} />
               <Stat label="Submissions" value={valueOf(stats, "entryCount", "submissions")} />
               <Stat label="Wins" value={valueOf(stats, "winCount", "wins")} />
-              <Stat label="Followers" value={valueOf(stats, "followerCount", "followers")} href={`/profile/${username}/followers`} />
-              <Stat label="Following" value={valueOf(stats, "followingCount", "following")} href={`/profile/${username}/following`} />
+              {profile.showFollowerConnections ? <Stat label="Followers" value={valueOf(stats, "followerCount", "followers")} href={`/profile/${username}/followers`} /> : null}
+              {profile.showFollowerConnections ? <Stat label="Following" value={valueOf(stats, "followingCount", "following")} href={`/profile/${username}/following`} /> : null}
             </div>
           </div>
         </Card>
@@ -106,7 +106,7 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
         </nav>
         {notice ? <p className="mt-4 rounded-[8px] bg-[#191919] p-3 text-sm text-slate-300">{notice}</p> : null}
 
-        {section === "about" ? <About profile={profile} badges={data.badges} /> : ["followers", "following"].includes(section) ? <ConnectionList title={section} profiles={connections} /> : <ContentGrid section={section} username={username} items={activeItems} badges={data.badges} />}
+        {section === "about" ? <About profile={profile} badges={data.badges} /> : ["followers", "following"].includes(section) ? profile.showFollowerConnections ? <ConnectionList title={section} profiles={connections} /> : <Card className="mt-8 p-8 text-center text-slate-400">Connections are private.</Card> : <ContentGrid section={section} username={username} items={activeItems} badges={data.badges} />}
       </div>
     </AppShell>
   );

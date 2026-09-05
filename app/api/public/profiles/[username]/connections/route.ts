@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { findProfileByUsername } from "@/lib/server/social-profile";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { getOptionalRequestUser } from "@/lib/server/auth";
+import { canViewProfileConnections } from "@/lib/server/profile-privacy";
 
 export async function GET(request: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -10,8 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
   const target = await findProfileByUsername(db, username);
   if (!target) return fail("Profile not found.", 404, undefined, "NOT_FOUND");
   const viewer = await getOptionalRequestUser(request);
-  const privacy = target.data()?.privacySettings as Record<string, unknown> | undefined;
-  if (privacy?.showFollowersFollowing === false && viewer?.uid !== target.id) {
+  if (!canViewProfileConnections(target.data() ?? {}, viewer?.uid === target.id)) {
     return fail("This connection list is private.", 403, undefined, "PERMISSION_DENIED");
   }
   const mode = new URL(request.url).searchParams.get("mode") === "following" ? "following" : "followers";

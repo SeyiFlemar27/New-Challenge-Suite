@@ -93,6 +93,7 @@ export function resolveChallengeLeaderboardStatus(challenge: Record<string, unkn
 }
 
 export function resolveLeaderboardVisibilityMode(challenge: Record<string, unknown>): LeaderboardVisibilityMode {
+  if (challenge.hideRankings === true) return "hidden_until_close";
   const value = String(challenge.leaderboardVisibilityMode ?? challenge.leaderboardVisibility ?? "public_live").toLowerCase();
   if (["public_live", "hidden_until_close", "top_10_only", "private_review"].includes(value)) return value as LeaderboardVisibilityMode;
   return "public_live";
@@ -221,7 +222,10 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     return isPublicSubmission(doc.id, data) ? [{ id: doc.id, ...data } as Record<string, unknown>] : [];
   });
   const allEntries = visible || options.includeEligibleEntries ? rankSubmissions(rawSubmissions) : [];
-  const visibleEntries = visibilityMode === "top_10_only" ? allEntries.slice(0, 10) : allEntries;
+  const rankedEntries = visibilityMode === "top_10_only" ? allEntries.slice(0, 10) : allEntries;
+  const visibleEntries = challenge.hideVoteTotals === true
+    ? rankedEntries.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
+    : rankedEntries;
   const start = (page - 1) * pageSize;
   return {
     type: "challenge",

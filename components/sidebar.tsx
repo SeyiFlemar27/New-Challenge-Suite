@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { BrandLogo, planBadgeLabel } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
-import { getEffectiveTier } from "@/lib/plan-access";
+import { getEffectiveTier, getPersonalCapabilities, type PersonalCapabilities } from "@/lib/plan-access";
 import { logout } from "@/lib/firebase/auth-service";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { workspaceForRoute } from "@/lib/workspace-routing";
@@ -43,27 +43,6 @@ type NavIcon = typeof Home;
 type NavItem = { href?: string; label: string; icon: NavIcon; children?: Array<{ href: string; label: string }> };
 type NavSection = { label: string; items: NavItem[] };
 type WorkspaceNavigationContext = "admin" | "enterprise" | "host" | "creator" | "sponsor" | "user";
-
-const competitorSections: NavSection[] = [
-  { label: "Main", items: [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/explore", label: "Explore", icon: LayoutGrid },
-    { href: "/favorites", label: "Saved", icon: Star },
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift },
-  ] },
-  { label: "Compete", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
-    { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
-    { href: "/winners", label: "Winners", icon: Trophy }
-  ] },
-  { label: "Account", items: [
-    { href: "/profile", label: "Profile", icon: User },
-    { href: "/settings", label: "Settings", icon: Settings }
-  ] }
-];
 
 const guestSections: NavSection[] = [
   { label: "Discover", items: [
@@ -93,94 +72,50 @@ const adminSections: NavSection[] = [
   ] }
 ];
 
-const starterSections: NavSection[] = [
-  { label: "Main", items: [
-    { href: "/dashboard", label: "Creator Studio", icon: Home },
-    { href: "/explore", label: "Explore", icon: LayoutGrid },
-  ] },
-  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
-    { href: "/challenges/create", label: "Normal" },
-    { href: "/private/create", label: "Private" },
-    { href: "/live/create", label: "Live Event" },
-    { href: "/tournaments/create", label: "Tournament" }
-  ] }] },
-  { label: "Challenges", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
-    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
-  ] },
-  { label: "Creator", items: [
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
-    { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
-  ] },
-  { label: "Finance", items: [
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift }
-  ] },
-  { label: "Account", items: [
-    { href: "/settings", label: "Settings", icon: Settings }
-  ] }
-];
+function personalSections(capabilities: PersonalCapabilities, context: WorkspaceNavigationContext, dashboardName: string): NavSection[] {
+  const hostContext = context === "host" && capabilities.canManageHostOperations;
+  const creatorContext = context === "creator" || capabilities.canCreatePrivateChallenge;
+  const createChildren = [
+    capabilities.canCreateNormalChallenge ? { href: hostContext ? "/host/challenges/create" : "/challenges/create", label: "Normal" } : null,
+    capabilities.canCreatePrivateChallenge ? { href: hostContext ? "/host/private/create" : "/private/create", label: "Private" } : null,
+    capabilities.canCreateTournament ? { href: hostContext ? "/host/tournaments/create" : "/tournaments/create", label: "Tournament" } : null,
+    capabilities.canCreateLiveEvent ? { href: "/host/live/create", label: "Live Event" } : null
+  ].filter((item): item is { href: string; label: string } => Boolean(item));
+  const homeLabel = hostContext ? "Host Control Center" : creatorContext ? "Creator Studio" : dashboardName === "Competitor Dashboard" ? "Home" : dashboardName;
+  const homeHref = hostContext ? "/dashboard/host" : "/dashboard";
+  const submissionsHref = hostContext ? "/host/submissions" : "/creator/submissions";
 
-const creatorSections: NavSection[] = [
-  { label: "Main", items: [
-    { href: "/dashboard", label: "Creator Studio", icon: Home },
-    { href: "/explore", label: "Explore", icon: LayoutGrid },
-  ] },
-  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
-    { href: "/challenges/create", label: "Normal" },
-    { href: "/private/create", label: "Private" },
-    { href: "/live/create", label: "Live Event" },
-    { href: "/tournaments/create", label: "Tournament" }
-  ] }] },
-  { label: "Challenges", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
-    { href: "/creator/submissions", label: "Submissions", icon: ClipboardCheck }
-  ] },
-  { label: "Creator", items: [
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 },
-    { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
-  ] },
-  { label: "Finance", items: [
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift }
-  ] },
-  { label: "Account", items: [
-    { href: "/settings", label: "Settings", icon: Settings }
-  ] }
-];
-
-const hostSections: NavSection[] = [
-  { label: "Main", items: [
-    { href: "/dashboard/host", label: "Creator Studio", icon: Home },
-    { href: "/explore", label: "Explore", icon: LayoutGrid },
-  ] },
-  { label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: [
-    { href: "/host/challenges/create", label: "Normal" },
-    { href: "/host/private/create", label: "Private" },
-    { href: "/host/live/create", label: "Live Event" },
-    { href: "/host/tournaments/create", label: "Tournament" }
-  ] }] },
-  { label: "Challenges", items: [
-    { href: "/challenges", label: "Challenges", icon: Medal },
-    { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
-    { href: "/host/submissions", label: "Submissions", icon: ClipboardCheck }
-  ] },
-  { label: "Creator", items: [
-    { href: "/creator/analytics", label: "Creator Analytics", icon: BarChart3 }
-  ] },
-  { label: "Finance", items: [
-    { href: "/earnings", label: "Earnings", icon: ReceiptText },
-    { href: "/dorocoins", label: "DoroCoins", icon: Coins },
-    { href: "/rewards", label: "Rewards", icon: Gift }
-  ] },
-  { label: "Account", items: [
-    { href: "/settings", label: "Settings", icon: Settings }
-  ] }
-];
+  return [
+    { label: "Main", items: [
+      { href: homeHref, label: homeLabel, icon: Home },
+      { href: "/explore", label: "Explore", icon: LayoutGrid },
+      { href: "/favorites", label: "Saved", icon: Star }
+    ] },
+    ...(createChildren.length ? [{ label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: createChildren }] }] : []),
+    { label: "Challenges", items: [
+      { href: "/my-challenges", label: "My Challenges", icon: Medal },
+      { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
+      ...(creatorContext ? [{ href: submissionsHref, label: "Submissions", icon: ClipboardCheck }] : [])
+    ] },
+    { label: "Performance", items: [
+      ...(capabilities.canUseCreatorAnalytics ? [{ href: "/creator/analytics", label: "Analytics", icon: BarChart3 }] : []),
+      { href: "/leaderboards", label: "Leaderboards", icon: BarChart3 },
+      { href: "/winners", label: "Winners", icon: Trophy }
+    ] },
+    ...((capabilities.canReceiveNewSponsorProposals || capabilities.canManageExistingSponsorObligations) ? [{ label: "Creator", items: [
+      { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
+    ] }] : []),
+    { label: "Finance & Rewards", items: [
+      { href: "/earnings", label: "Earnings", icon: ReceiptText },
+      { href: "/rewards", label: "Rewards", icon: Gift },
+      { href: "/dorocoins", label: "DoroCoins", icon: Coins }
+    ] },
+    { label: "Account", items: [
+      { href: "/profile", label: "Profile", icon: User },
+      { href: "/settings", label: "Settings", icon: Settings }
+    ] }
+  ];
+}
 const sponsorSections: NavSection[] = [
   { label: "Overview", items: [
     { href: "/sponsor/dashboard", label: "Sponsor Dashboard", icon: Home },
@@ -269,7 +204,7 @@ function activeNavigationHref(pathname: string) {
   if (pathname.startsWith("/host/")) return pathname;
   if (pathname.startsWith("/creator/")) return pathname;
   if (pathname === "/my-entries") return "/my-entries";
-  if (pathname === "/my-challenges") return "/challenges";
+  if (pathname === "/my-challenges") return "/my-challenges";
   if (pathname === "/challenges" || pathname.startsWith("/challenges/")) return "/challenges";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "/profile";
   if (pathname === "/rewards" || pathname.startsWith("/rewards/")) return "/rewards";
@@ -280,30 +215,21 @@ function activeNavigationHref(pathname: string) {
   return pathname;
 }
 
-function sectionsForTier(tierId: string, sponsor: boolean) {
-  if (sponsor) return sponsorSections;
-  if (tierId === "host" || tierId === "enterprise") return hostSections;
-  if (tierId === "creator" || tierId === "pro") return creatorSections;
-  if (tierId === "creator_starter" || tierId === "host_starter") return starterSections;
-  return competitorSections;
-}
-
-function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, tierId: string, sponsor: boolean, enterprisePermissions: string[]) {
+function sectionsForWorkspace(context: WorkspaceNavigationContext, isAdmin: boolean, capabilities: PersonalCapabilities, sponsor: boolean, enterprisePermissions: string[], dashboardName: string) {
   if (context === "admin") return isAdmin ? adminSections : [];
   if (context === "enterprise") return enterpriseSections(enterprisePermissions, isAdmin);
-  if (context === "host") return hostSections;
-  if (context === "creator") return creatorSections;
   if (context === "sponsor") return sponsorSections;
-  return sectionsForTier(tierId, sponsor);
+  if (sponsor) return sponsorSections;
+  return personalSections(capabilities, context, dashboardName);
 }
 
-function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean, fallbackName: string) {
+function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean, fallbackName: string, capabilities: PersonalCapabilities) {
   if (context === "admin") return isAdmin
     ? { name: "Admin Command Center", homeHref: "/admin" }
     : { name: "Challenge Suite", homeHref: "/dashboard" };
   if (context === "enterprise") return { name: "Enterprise Studio", homeHref: "/enterprise" };
-  if (context === "host") return { name: "Host Control Center", homeHref: "/dashboard/host" };
-  if (context === "creator") return { name: "Creator Studio", homeHref: "/dashboard" };
+  if (context === "host" && capabilities.canManageHostOperations) return { name: "Host Control Center", homeHref: "/dashboard/host" };
+  if (context === "creator" || capabilities.canCreatePrivateChallenge) return { name: "Creator Studio", homeHref: "/dashboard" };
   if (context === "sponsor") return { name: "Sponsor Dashboard", homeHref: "/sponsor/dashboard" };
   return { name: fallbackName, homeHref: "/dashboard" };
 }
@@ -320,11 +246,19 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
+  const capabilities = getPersonalCapabilities({
+    planId: user?.planId,
+    planStatus: user?.planStatus,
+    legacyPlanId: user?.legacyPlanId,
+    accountType: user?.accountType,
+    selectedAccountType: user?.selectedAccountType,
+    role: user?.role
+  });
   const workspaceContext = workspaceNavigationContext(pathname, user?.activeWorkspace, user?.availableWorkspaces ?? ["personal"]);
   const sections = signedOut
     ? guestSections
-    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, effectiveTier.id, user?.accountType === "sponsor", user?.enterprisePermissions ?? []);
-  const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName);
+    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, capabilities, user?.accountType === "sponsor", user?.enterprisePermissions ?? [], effectiveTier.dashboardName);
+  const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName, capabilities);
   const activeHref = activeNavigationHref(pathname);
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
   const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;

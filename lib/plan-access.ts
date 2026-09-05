@@ -42,6 +42,32 @@ export interface PlanAccess {
   sponsorCampaignLimit: number;
 }
 
+export interface ChallengeQuota {
+  limit: number | null;
+  period: "lifetime" | "month";
+}
+
+export interface PersonalCapabilities {
+  canCreateNormalChallenge: boolean;
+  normalChallengeQuota: ChallengeQuota;
+  canCreatePrivateChallenge: boolean;
+  privateChallengeQuota: ChallengeQuota;
+  canCreateTournament: boolean;
+  tournamentQuota: ChallengeQuota;
+  canCreateLiveEvent: boolean;
+  liveEventQuota: ChallengeQuota;
+  monthlyBoostQuota: number;
+  canUseCreatorAnalytics: boolean;
+  canReceiveNewSponsorProposals: boolean;
+  canManageExistingSponsorObligations: boolean;
+  canManageParticipants: boolean;
+  canManageVoting: boolean;
+  canManageHostOperations: boolean;
+  canManageExistingPremiumChallenges: boolean;
+  canUseTeam: boolean;
+  canWithdraw: boolean;
+}
+
 export type PlanFeature =
   | "private_challenges"
   | "sponsor_challenges"
@@ -191,16 +217,16 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
   },
   pro: {
     planId: "pro",
-    dashboardName: "Performance Hub",
-    dashboardSubtitle: "Run ranked challenges, study performance, amplify standout work, and build ranking history.",
-    badgeLabel: "Pro",
-    challengeLimitLabel: "Unlimited basic and group challenges",
-    privateChallengeLimitLabel: "5 private challenges / month",
-    monthlyChallengeLimit: null,
-    monthlyPrivateChallengeLimit: 5,
+    dashboardName: "Creator Studio",
+    dashboardSubtitle: "Create challenges, review performance, and manage sponsor-ready work.",
+    badgeLabel: "Creator",
+    challengeLimitLabel: "3 challenges / month",
+    privateChallengeLimitLabel: "1 private challenge / month",
+    monthlyChallengeLimit: 3,
+    monthlyPrivateChallengeLimit: 1,
     teamMemberLimit: 0,
-    monthlyBoostLimit: 3,
-    voteMultiplierLimit: 3,
+    monthlyBoostLimit: 2,
+    voteMultiplierLimit: 0,
     features: {
       ...noFeatures,
       private_challenges: true,
@@ -208,8 +234,8 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
       creator_analytics: true,
       performance_analytics: true,
       boosts: true,
-      vote_multipliers: true,
-      ranked_challenges: true,
+      vote_multipliers: false,
+      ranked_challenges: false,
       join_tournaments: true,
       revenue_overview: true
     }
@@ -225,7 +251,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     monthlyPrivateChallengeLimit: null,
     teamMemberLimit: 3,
     monthlyBoostLimit: 5,
-    voteMultiplierLimit: 5,
+    voteMultiplierLimit: 0,
     features: {
       ...noFeatures,
       private_challenges: true,
@@ -233,7 +259,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
       creator_analytics: true,
       performance_analytics: true,
       boosts: true,
-      vote_multipliers: true,
+      vote_multipliers: false,
       ranked_challenges: true,
       join_tournaments: true,
       host_control_center: true,
@@ -259,7 +285,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     monthlyPrivateChallengeLimit: null,
     teamMemberLimit: 999,
     monthlyBoostLimit: 5,
-    voteMultiplierLimit: 20,
+    voteMultiplierLimit: 0,
     features: {
       ...noFeatures,
       private_challenges: true,
@@ -267,7 +293,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
       creator_analytics: true,
       performance_analytics: true,
       boosts: true,
-      vote_multipliers: true,
+      vote_multipliers: false,
       ranked_challenges: true,
       join_tournaments: true,
       host_control_center: true,
@@ -393,9 +419,9 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isVerifiedHost: false,
     activeChallengeLimit: 3,
     privateChallengeLimit: 1,
-    dailyFreeVoteLimit: 5,
+    dailyFreeVoteLimit: 1,
     monthlyBoostLimit: 2,
-    voteMultiplierLimit: 1,
+    voteMultiplierLimit: 0,
     canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
@@ -404,9 +430,9 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canSendSponsorProposals: false,
     canHostLiveEvents: false,
     liveEventCapacity: 0,
-    canManageTournaments: false,
+    canManageTournaments: true,
     canAccessPremiumChallenges: false,
-    canUseAdvancedAnalytics: false,
+    canUseAdvancedAnalytics: true,
     canUseSponsorDashboard: false,
     canCreateSponsorCampaigns: false,
     canSponsorChallenges: false,
@@ -415,7 +441,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
   pro: {
     planId: "premium",
     normalizedPlanId: "pro",
-    planName: "Pro",
+    planName: "Creator",
     accountType: "user",
     isPremium: true,
     isCreator: true,
@@ -430,9 +456,9 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isVerifiedHost: false,
     activeChallengeLimit: 1000,
     privateChallengeLimit: 5,
-    dailyFreeVoteLimit: 20,
-    monthlyBoostLimit: 3,
-    voteMultiplierLimit: 3,
+    dailyFreeVoteLimit: 1,
+    monthlyBoostLimit: 2,
+    voteMultiplierLimit: 0,
     canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
@@ -441,7 +467,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     canSendSponsorProposals: true,
     canHostLiveEvents: false,
     liveEventCapacity: 0,
-    canManageTournaments: false,
+    canManageTournaments: true,
     canAccessPremiumChallenges: true,
     canUseAdvancedAnalytics: true,
     canUseSponsorDashboard: false,
@@ -467,9 +493,9 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isVerifiedHost: true,
     activeChallengeLimit: 1000,
     privateChallengeLimit: 1000,
-    dailyFreeVoteLimit: 50,
+    dailyFreeVoteLimit: 1,
     monthlyBoostLimit: 5,
-    voteMultiplierLimit: 5,
+    voteMultiplierLimit: 0,
     canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
@@ -504,9 +530,9 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isVerifiedHost: true,
     activeChallengeLimit: 1000,
     privateChallengeLimit: 1000,
-    dailyFreeVoteLimit: 100,
+    dailyFreeVoteLimit: 1,
     monthlyBoostLimit: 5,
-    voteMultiplierLimit: 20,
+    voteMultiplierLimit: 0,
     canCreatePaidChallenges: true,
     canCreatePrivateChallenges: true,
     canCreatePrizeChallenges: true,
@@ -673,6 +699,49 @@ export function getUserPlanAccess(profile: Record<string, unknown> = {}): PlanAc
   };
 }
 
+function hasActivePersonalPlan(status: string) {
+  return ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(status.toLowerCase());
+}
+
+export function getPersonalCapabilities(profile: Record<string, unknown> = {}): PersonalCapabilities {
+  const requestedPlan = normalizePlanId(profile.planId ?? profile.subscriptionPlan);
+  const historicalPlan = normalizePlanId(profile.previousPlanId ?? profile.legacyPlanId ?? requestedPlan);
+  const accountType = normalizeAccountType(profile);
+  const rawStatus = profile.planStatus ?? profile.subscriptionStatus ?? profile.stripeStatus;
+  const status = typeof rawStatus === "string" ? rawStatus : requestedPlan === "free" ? "active" : "inactive";
+  const active = hasActivePersonalPlan(status);
+  const visiblePlan = requestedPlan === "pro" ? "creator" : requestedPlan;
+  const creator = active && visiblePlan === "creator";
+  const host = active && (visiblePlan === "host" || visiblePlan === "enterprise");
+  const personal = accountType !== "sponsor";
+  const hadPremiumPersonalPlan = personal && [requestedPlan, historicalPlan].some((plan) => ["creator", "pro", "host", "enterprise"].includes(plan));
+
+  return {
+    canCreateNormalChallenge: personal,
+    normalChallengeQuota: host
+      ? { limit: null, period: "month" }
+      : creator
+        ? { limit: 3, period: "month" }
+        : { limit: 3, period: "lifetime" },
+    canCreatePrivateChallenge: personal && (creator || host),
+    privateChallengeQuota: host ? { limit: null, period: "month" } : { limit: creator ? 1 : 0, period: "month" },
+    canCreateTournament: personal && (creator || host),
+    tournamentQuota: host ? { limit: null, period: "month" } : { limit: creator ? 1 : 0, period: "month" },
+    canCreateLiveEvent: personal && host,
+    liveEventQuota: { limit: host ? null : 0, period: "month" },
+    monthlyBoostQuota: host ? 5 : creator ? 2 : 0,
+    canUseCreatorAnalytics: personal && (creator || host),
+    canReceiveNewSponsorProposals: personal && (creator || host),
+    canManageExistingSponsorObligations: personal && (creator || host || hadPremiumPersonalPlan),
+    canManageParticipants: personal,
+    canManageVoting: personal,
+    canManageHostOperations: personal && host,
+    canManageExistingPremiumChallenges: personal && (creator || host || hadPremiumPersonalPlan),
+    canUseTeam: personal && host,
+    canWithdraw: personal
+  };
+}
+
 export function getPlanExperience(profile: Record<string, unknown> = {}): PlanExperience {
   const access = getUserPlanAccess(profile);
   const active = ["active", "trial", "trialing", "payment_warning_1", "payment_warning_2"].includes(access.planStatus);
@@ -690,7 +759,8 @@ export function getPlanExperience(profile: Record<string, unknown> = {}): PlanEx
       features: { ...noFeatures, sponsor_command_center: true }
     };
   }
-  return planExperiences[active ? access.normalizedPlanId : "free"];
+  const visiblePlan = access.normalizedPlanId === "pro" ? "creator" : access.normalizedPlanId;
+  return planExperiences[active ? visiblePlan : "free"];
 }
 
 export function getEffectiveTier(profile: Record<string, unknown> = {}): EffectiveTier {
@@ -722,13 +792,14 @@ export function getEffectiveTier(profile: Record<string, unknown> = {}): Effecti
   }
 
   if (paid) {
-    const experience = planExperiences[planId];
-    const id = planId === "creator" || planId === "pro" || planId === "host" || planId === "enterprise" ? planId : "free_competitor";
-    const paidDisplayName = planId === "host" ? "Host Plan" : `${experience.badgeLabel} Plan`;
-    const paidMemberLabel = planId === "host" ? "Host" : `${experience.badgeLabel} Member`;
+    const visiblePlanId = planId === "pro" ? "creator" : planId;
+    const experience = planExperiences[visiblePlanId];
+    const id = visiblePlanId === "creator" || visiblePlanId === "host" || visiblePlanId === "enterprise" ? visiblePlanId : "free_competitor";
+    const paidDisplayName = visiblePlanId === "host" ? "Host Plan" : `${experience.badgeLabel} Plan`;
+    const paidMemberLabel = visiblePlanId === "host" ? "Host" : `${experience.badgeLabel} Member`;
     return {
       id,
-      planId,
+      planId: visiblePlanId,
       accountIntent,
       paid: true,
       displayName: paidDisplayName,
@@ -855,13 +926,11 @@ export function canAccessChallenge(profile: Record<string, unknown>, challenge: 
 
 export function canCreateChallenge(profile: Record<string, unknown>, challengeInput: Record<string, unknown>, activeChallengeCount: number) {
   const access = getUserPlanAccess(profile);
+  const capabilities = getPersonalCapabilities(profile);
+  void activeChallengeCount;
   const publishing = Boolean(challengeInput.publish) || !["", "draft"].includes(String(challengeInput.status ?? "").toLowerCase());
   if (!publishing) return { allowed: true, code: null, message: "Drafts are allowed." };
-  if (access.isSponsor) return { allowed: false, code: "USER_ACCOUNT_REQUIRED", message: "Sponsors manage campaigns from the Brand Command Center. Challenge creation is for user, creator, pro, host, and enterprise accounts." };
-
-  if (activeChallengeCount >= access.activeChallengeLimit) {
-    return { allowed: false, code: "PLAN_LIMIT_REACHED", message: `Your ${access.planName} plan allows ${access.activeChallengeLimit} active challenge${access.activeChallengeLimit === 1 ? "" : "s"}.` };
-  }
+  if (access.isSponsor) return { allowed: false, code: "USER_ACCOUNT_REQUIRED", message: "Sponsors manage campaigns from the Brand Command Center. Challenge creation is available from a personal Creator or Host workspace." };
 
   const type = String(challengeInput.type ?? challengeInput.visibility ?? "public").toLowerCase();
   const format = String(challengeInput.competitionFormat ?? "").toLowerCase();
@@ -879,13 +948,13 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   const enterpriseProgram = format.includes("program") || format.includes("campaign");
   const prize = prizePool > 0 || Boolean(challengeInput.prizePoolEnabled || challengeInput.cashPayoutsEnabled) || (prizeType && !prizeType.includes("bragging"));
 
-  if (tournament && !access.canManageTournaments) return { allowed: false, code: "HOST_REQUIRED", message: "Tournament and bracket creation require Host or Enterprise access." };
+  if (tournament && !capabilities.canCreateTournament) return { allowed: false, code: "CREATOR_REQUIRED", message: "Tournament creation requires Creator or Host access." };
   if (enterpriseProgram && !access.isEnterprise) return { allowed: false, code: "ENTERPRISE_REQUIRED", message: "Program and campaign challenge builders require Enterprise access." };
-  if ((oneVsOne || liveEvent) && !access.isHost) return { allowed: false, code: "HOST_REQUIRED", message: "1v1 and live-event challenge tools require Host access." };
-  if (ranked && !access.isPro) return { allowed: false, code: "PRO_REQUIRED", message: "Ranked challenge creation requires Pro access." };
+  if ((oneVsOne || liveEvent) && !capabilities.canCreateLiveEvent) return { allowed: false, code: "HOST_REQUIRED", message: "Live-event challenge tools require Host access." };
+  if (ranked && !capabilities.canCreateTournament) return { allowed: false, code: "CREATOR_REQUIRED", message: "Ranked competition tools require Creator or Host access." };
   if (paid && !access.canCreatePaidChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to submit paid-entry challenges for review." };
-  if (privateChallenge && !access.canCreatePrivateChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish private or exclusive challenges." };
-  if (premiumOnly && !access.canAccessPremiumChallenges) return { allowed: false, code: "PRO_REQUIRED", message: "Pro access is required to publish premium-only challenges." };
+  if (privateChallenge && !capabilities.canCreatePrivateChallenge) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator or Host access is required to publish private challenges." };
+  if (premiumOnly && !capabilities.canCreatePrivateChallenge) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator or Host access is required to publish restricted challenges." };
   if (prize && !access.canCreatePrizeChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish sponsor-funded prize or product-prize challenges." };
   if (sponsored && !access.canCreateSponsoredChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish sponsor-ready challenges." };
 
@@ -893,9 +962,7 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
 }
 
 export function getVoteWeight(profile: Record<string, unknown> = {}, weightedVotes = true) {
-  if (!weightedVotes) return 1;
-  const access = getUserPlanAccess(profile);
-  const multiplier = Number(access.voteMultiplierLimit ?? 0);
-  if (multiplier <= 0) return 1;
-  return Math.max(1, Math.min(multiplier, 20));
+  void profile;
+  void weightedVotes;
+  return 1;
 }

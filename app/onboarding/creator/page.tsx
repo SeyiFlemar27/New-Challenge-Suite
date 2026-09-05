@@ -23,7 +23,7 @@ export default function CreatorOnboardingPage() {
   const router = useRouter();
   const { user, loading } = useCurrentUser();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ niche: "", profileGoal: "", challengeType: "Community challenge", audience: "" });
+  const [form, setForm] = useState({ niche: "", profileGoal: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
@@ -59,17 +59,15 @@ export default function CreatorOnboardingPage() {
         <AccessCard icon={<Compass />} title="Community participation" body="Keep exploring, joining, voting, saving, and tracking your own entries." />
         <AccessCard icon={<BarChart3 />} title="Creator performance" body="Review submissions and creator analytics from your studio." />
         <AccessCard icon={<Rocket />} title="Monthly boost" body="Use your included monthly boost on an eligible challenge." />
-        <Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:col-span-2"><div className="flex items-start gap-3"><WalletCards className="mt-0.5 shrink-0 text-[var(--gold)]" /><p className="text-sm leading-6 text-slate-300">Wallet and earnings remain review-only. Withdrawals and payouts are not active.</p></div></Card>
+        <Card className="border-yellow-500/20 bg-yellow-500/5 p-5 sm:col-span-2"><div className="flex items-start gap-3"><WalletCards className="mt-0.5 shrink-0 text-[var(--gold)]" /><p className="text-sm leading-6 text-slate-300">Wallet earnings remain server-confirmed. Withdrawals follow the platform review and verification flow.</p></div></Card>
       </div> : null}
 
       {step === 2 ? <Card className="p-6 sm:p-8"><div className="grid gap-6">
         <Field label="Creator niche or category"><input className={inputClass} value={form.niche} onChange={(event) => update("niche", event.target.value)} placeholder="Fitness, music, design..." /></Field>
         <Field label="What do you want to build?"><input className={inputClass} value={form.profileGoal} onChange={(event) => update("profileGoal", event.target.value)} placeholder="A trusted competition community..." /></Field>
-        <Field label="Primary challenge type"><select className={inputClass} value={form.challengeType} onChange={(event) => update("challengeType", event.target.value)}><option>Community challenge</option><option>Creative showcase</option><option>Skill competition</option><option>Educational challenge</option></select></Field>
-        <Field label="Audience or community"><input className={inputClass} value={form.audience} onChange={(event) => update("audience", event.target.value)} placeholder="Who do you want to bring together?" /></Field>
       </div></Card> : null}
 
-      {step === 3 ? <Card className="p-6 sm:p-8"><div className="grid gap-3 sm:grid-cols-2">{unlockedTools.map((tool) => <div key={tool} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.025] px-4"><Check size={17} className="shrink-0 text-[var(--gold)]" /><span className="font-bold">{tool}</span></div>)}</div><p className="mt-6 border-t border-white/10 pt-5 text-sm leading-6 text-slate-400">Tournament, live-event, participant, and advanced voting controls remain Host tools.</p></Card> : null}
+      {step === 3 ? <Card className="p-6 sm:p-8"><div className="grid gap-3 sm:grid-cols-2">{unlockedTools.map((tool) => <div key={tool} className="flex min-h-14 items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.025] px-4"><Check size={17} className="shrink-0 text-[var(--gold)]" /><span className="font-bold">{tool}</span></div>)}</div><p className="mt-6 border-t border-white/10 pt-5 text-sm leading-6 text-slate-400">Creator includes Normal, Private, and Tournament creation within monthly quotas. Live Events and advanced host operations require Host.</p></Card> : null}
 
       {step === 4 ? <div className="grid gap-4">
         <ActionCard title="Create your first challenge" body="Start with the Creator challenge builder." href="/challenges/create" onChoose={() => void complete("/challenges/create")} />

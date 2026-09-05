@@ -3,6 +3,7 @@ import { requireSponsorContext } from "@/lib/server/sponsor";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
 import { canStartConversation } from "@/lib/server/messaging-permissions";
+import { newConversationPrivacy } from "@/lib/server/profile-privacy";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,15 @@ export async function POST(request: Request) {
     const source = cleanText(body.source).slice(0, 80) || (body.challengeId ? "opportunity" : "discovery_card");
     const permission = canStartConversation({ senderType: "sponsor", recipientType: "creator", source: source === "profile" || source === "challenge" || source === "opportunity" || source === "invite" ? source : "discovery_card" });
     if (!permission.allowed) return validationError({ recipientId: "This conversation must start from an allowed profile, challenge, opportunity, invite, or discovery context." });
+    const [recipientUserSnap, recipientProfileSnap] = await Promise.all([
+      context.db.collection("users").doc(recipientId).get(),
+      context.db.collection("profiles").doc(recipientId).get()
+    ]);
+    if (!recipientUserSnap.exists && !recipientProfileSnap.exists) return validationError({ recipientId: "This creator is not available." });
+    const recipient = { ...(recipientUserSnap.data() ?? {}), ...(recipientProfileSnap.data() ?? {}) };
+    if (recipient.accountStatus === "suspended" || recipient.messagingDisabled === true) return validationError({ recipientId: "This creator cannot receive messages." });
+    const privacy = newConversationPrivacy(recipient, "sponsor");
+    if (!privacy.allowed) return validationError({ recipientId: privacy.message });
     const conversation = { id: conversationId, sponsorId: context.user.uid, ownerUid: context.user.uid, recipientId, relatedProposalId: cleanText(body.proposalId).slice(0, 120) || null, relatedCampaignId: cleanText(body.campaignId).slice(0, 120) || null, relatedChallengeId: cleanText(body.challengeId).slice(0, 120) || null, title: cleanText(body.title, "Sponsor conversation").slice(0, 180), conversationStartSource: source, manualRecipientIdEntryAllowed: false, lastMessagePreview: messageBody.slice(0, 180), unreadCountFoundation: 0, status: "active", updatedAt: now, updatedBy: context.user.uid, createdAt: now, createdBy: context.user.uid };
     const messageRef = context.db.collection("sponsorMessages").doc();
     const attachments = safeAttachments(body.attachments, conversationId, context.user.uid);

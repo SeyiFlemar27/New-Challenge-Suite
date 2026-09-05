@@ -106,12 +106,11 @@ export default function DashboardPage() {
   const creatorVotes = hostedChallenges.reduce((sum, challenge) => sum + numberField(challenge, ["voteCount", "weightedVoteCount", "votes"]), 0);
   const tierFeatures = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { title: "Challenges", body: "Create and manage your public challenges.", icon: Swords, active: true, href: "/challenges" },
-        { title: "Challenges", body: "Draft, publish, and track your Free Basic Challenge activity.", icon: Trophy, active: true, href: "/challenges" },
+        { title: "Normal Challenges", body: "Create and manage Normal Challenges within your free lifetime allowance.", icon: Swords, active: true, href: "/my-challenges" },
         { title: "Explore Challenges", body: "Find public challenges to join, vote in, or follow.", icon: Vote, active: true, href: "/explore" }
       ] : [
-        { title: "Challenges", body: "Create and manage your public challenges.", icon: Swords, active: true, href: "/challenges" },
-        { title: "Challenges & Submissions", body: "Track your public challenges and review the entries they receive.", icon: Trophy, active: true, href: "/challenges" }
+        { title: "Normal Challenges", body: "Create and manage Normal Challenges within your free lifetime allowance.", icon: Swords, active: true, href: "/my-challenges" },
+        { title: "My Entries", body: "Track the challenges you joined and the entries you submitted.", icon: Trophy, active: true, href: "/my-entries" }
       ]
     : planExperience.planId === "creator"
       ? [
@@ -119,17 +118,11 @@ export default function DashboardPage() {
           { title: "Sponsor Ready", body: "Prepare eligible challenges for future sponsor interest.", icon: Rocket, active: true, href: "/creator/sponsor-ready" },
           { title: "Creator Earnings", body: "View approved real-money earnings and payout status.", icon: ShieldCheck, active: true, href: "/earnings" }
         ]
-      : planExperience.planId === "pro"
-        ? [
-            { title: "Performance Analytics", body: "Study ranking history, highlighted submissions, votes, and challenge performance.", icon: Activity, active: true },
-            { title: "Ranked Challenges", body: "Create ranked formats and join tournament experiences when available.", icon: Trophy, active: true },
-            { title: "Amplification", body: `${planExperience.monthlyBoostLimit} boosts per month and vote multipliers up to ${planExperience.voteMultiplierLimit}x.`, icon: Rocket, active: true }
-          ]
-        : planExperience.planId === "host"
+      : planExperience.planId === "host"
           ? [
               { title: "Competition Operations", body: "Manage participants, submission review, voting controls, tournaments, and live-event setup.", icon: Radio, active: true, href: "/dashboard/host" },
               { title: "Host Team", body: `Team workspace for up to ${planExperience.teamMemberLimit} members. Invitations require setup before sending.`, icon: UsersRound, active: true, href: "/host/team" },
-              { title: "Revenue Overview", body: "Read-only sponsorship and revenue review. Transfers and withdrawals remain inactive.", icon: ShieldCheck, active: true }
+              { title: "Revenue Overview", body: "Review server-confirmed sponsorship revenue, earnings, and withdrawal status.", icon: ShieldCheck, active: true, href: "/earnings" }
             ]
           : [
               { title: "Programs & Campaigns", body: "Coordinate branded programs, campaigns, and large competition workspaces.", icon: Crown, active: true },
@@ -138,12 +131,12 @@ export default function DashboardPage() {
             ];
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
-        { href: "/challenges", label: "Challenges", variant: "primary" as const },
-        { href: "/challenges", label: "Challenges", variant: "secondary" as const },
+        { href: "/challenges/create", label: "Build a Normal Challenge", variant: "primary" as const },
+        { href: "/my-entries", label: "My Entries", variant: "secondary" as const },
         { href: "/explore", label: "Explore Challenges", variant: "ghost" as const }
       ] : [
-        { href: "/challenges", label: "Challenges", variant: "primary" as const },
-        { href: "/challenges", label: "Challenges", variant: "secondary" as const }
+        { href: "/challenges/create", label: "Build a Normal Challenge", variant: "primary" as const },
+        { href: "/my-challenges", label: "My Challenges", variant: "secondary" as const }
       ]
     : planExperience.planId === "creator"
       ? [
@@ -151,13 +144,7 @@ export default function DashboardPage() {
           { href: "/challenges", label: "Challenges", variant: "secondary" as const },
           { href: "/creator/private-challenges", label: "Private Challenges", variant: "ghost" as const }
         ]
-      : planExperience.planId === "pro"
-        ? [
-            { href: "/challenges", label: "Challenges", variant: "primary" as const },
-            { href: "/leaderboards", label: "Performance & Rank", variant: "secondary" as const },
-            { href: "/profile", label: "Highlight Profile", variant: "ghost" as const }
-          ]
-        : [
+      : [
             { href: "/dashboard/host", label: planExperience.planId === "enterprise" ? "Open Command Center" : "Open Host Controls", variant: "primary" as const },
             { href: "/challenges", label: "Challenges", variant: "secondary" as const },
             { href: "/earnings", label: "Revenue Overview", variant: "ghost" as const }
@@ -177,13 +164,7 @@ export default function DashboardPage() {
           { icon: <Award />, title: "Drafts", value: creatorDrafts.length, label: "Unpublished setup" },
           { icon: <Vote />, title: "Votes Received", value: creatorVotes, label: "Across creator challenges" }
         ]
-      : planExperience.planId === "pro"
-        ? [
-            { icon: <Trophy />, title: "Performance Points", value: dashboard?.stats.totalPoints ?? 0, label: "Ranking performance" },
-            { icon: <Activity />, title: "Submissions", value: dashboard?.stats.submissionCount ?? 0, label: "Portfolio activity" },
-            { icon: <Rocket />, title: "Monthly Boosts", value: planExperience.monthlyBoostLimit, label: `${planExperience.voteMultiplierLimit}x vote limit` }
-          ]
-        : [
+      : [
             { icon: <Swords />, title: planExperience.planId === "enterprise" ? "Active Programs" : "Active Competitions", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
             { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit, label: "Team seats" },
             { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational access" }
@@ -227,7 +208,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (planExperience.planId === "creator" || planExperience.planId === "pro") {
+  if (planExperience.planId === "creator") {
     const cashWallet = dashboard?.cashWallet as { availableBalanceCents?: number; pendingBalanceCents?: number } | null | undefined;
     return <AppShell><CreatorStudio displayName={dashboard?.user.displayName ?? ""} challenges={hostedChallenges} availableEarningsCents={Number(cashWallet?.availableBalanceCents ?? 0)} pendingEarningsCents={Number(cashWallet?.pendingBalanceCents ?? 0)} /></AppShell>;
   }

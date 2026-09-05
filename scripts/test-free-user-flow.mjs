@@ -14,7 +14,14 @@ const challengeAccessSource = readFileSync(join(root, "lib/server/challenge-acce
 await writeFile(join(tempDir, "challenge-access.ts"), challengeAccessSource, "utf8");
 
 const publicChallengeSource = readFileSync(join(root, "lib/server/public-challenge.ts"), "utf8");
-await writeFile(join(tempDir, "public-challenge.ts"), publicChallengeSource, "utf8");
+const challengeStatusSource = readFileSync(join(root, "lib/challenge-status.ts"), "utf8");
+const publicStatusMatch = challengeStatusSource.match(/export const PUBLIC_CHALLENGE_STATUS_VALUES = (\[[\s\S]*?\]) as const;/);
+assert(publicStatusMatch, "canonical public challenge status values must be exported");
+const standalonePublicChallengeSource = publicChallengeSource.replace(
+  'import { isPublicChallengeStatus } from "@/lib/challenge-status";',
+  `const PUBLIC_CHALLENGE_STATUS_VALUES = ${publicStatusMatch[1]};\nconst PUBLIC_STATUS_SET = new Set(PUBLIC_CHALLENGE_STATUS_VALUES);\nfunction isPublicChallengeStatus(value) { return PUBLIC_STATUS_SET.has(String(value ?? "").toLowerCase()); }`
+);
+await writeFile(join(tempDir, "public-challenge.ts"), standalonePublicChallengeSource, "utf8");
 
 const planAccessSource = readFileSync(join(root, "lib/plan-access.ts"), "utf8")
   .replace('import type { AccountType, ProductPlanId as BlueprintPlanId, SponsorProductPlanId, UserProductPlanId } from "@/lib/types";', [
@@ -32,7 +39,7 @@ const {
   userOwnsChallenge
 } = await import(pathToFileURL(join(tempDir, "challenge-access.ts")).href);
 const { isPublicChallenge } = await import(pathToFileURL(join(tempDir, "public-challenge.ts")).href);
-const { canAccessChallenge, canCreateChallenge, getUserPlanAccess } = await import(pathToFileURL(join(tempDir, "plan-access.ts")).href);
+const { canAccessChallenge, canCreateChallenge, getPersonalCapabilities, getUserPlanAccess } = await import(pathToFileURL(join(tempDir, "plan-access.ts")).href);
 
 function mockDb(approvedKeys = new Set()) {
   return {
@@ -60,6 +67,7 @@ assert.equal(freeAccess.normalizedPlanId, "free");
 assert.equal(freeAccess.activeChallengeLimit, 3);
 assert.equal(freeAccess.canCreatePaidChallenges, false);
 assert.equal(freeAccess.canCreatePrivateChallenges, false);
+assert.deepEqual(getPersonalCapabilities(freeProfile).normalChallengeQuota, { limit: 3, period: "lifetime" });
 
 assert.equal(isPublicChallenge("public-challenge", { status: "published", visibility: "public" }), true);
 assert.equal(isPublicChallenge("draft-challenge", { status: "draft", visibility: "public" }), false);
@@ -97,13 +105,18 @@ assert.equal(canAccessChallenge(freeProfile, accessContext.challenge).allowed, t
 let creation = canCreateChallenge(freeProfile, { publish: true, status: "published", type: "public", prizeType: "bragging_rights" }, 2);
 assert.equal(creation.allowed, true);
 creation = canCreateChallenge(freeProfile, { publish: true, status: "published", type: "public", prizeType: "bragging_rights" }, 3);
-assert.equal(creation.allowed, false);
-assert.equal(creation.code, "PLAN_LIMIT_REACHED");
+assert.equal(creation.allowed, true, "historical quota enforcement belongs to the server route with authoritative challenge history");
+const createRouteSource = readFileSync(join(root, "app/api/challenges/route.ts"), "utf8");
+const publishRouteSource = readFileSync(join(root, "app/api/challenges/[id]/publish/route.ts"), "utf8");
+for (const source of [createRouteSource, publishRouteSource]) {
+  assert(source.includes("FREE_BASIC_CHALLENGE_LIFETIME_LIMIT"), "Free lifetime quota must remain server-enforced");
+  assert(source.includes("freeBasicUsage"), "Free lifetime quota must use authoritative owned-challenge history");
+}
 creation = canCreateChallenge(freeProfile, { publish: true, status: "published", type: "private", prizeType: "bragging_rights" }, 0);
 assert.equal(creation.allowed, false);
 creation = canCreateChallenge(freeProfile, { publish: true, status: "published", type: "public", entryFee: 5 }, 0);
 assert.equal(creation.allowed, false);
-assert.equal(creation.code, "PAID_ENTRY_DISABLED");
+assert.equal(creation.code, "CREATOR_REQUIRED");
 
 await rm(tempDir, { recursive: true, force: true });
 console.log("Free-user backend flow constraints validated.");

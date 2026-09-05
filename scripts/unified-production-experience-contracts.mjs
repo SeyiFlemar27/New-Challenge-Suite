@@ -5,7 +5,7 @@ const read = (path) => readFileSync(path, "utf8");
 
 const studio = read("components/creator/creator-studio.tsx");
 const dashboard = read("app/dashboard/page.tsx");
-assert(dashboard.includes("<CreatorStudio"), "Creator and Pro dashboards must use Creator Studio");
+assert(dashboard.includes("<CreatorStudio"), "Creator dashboards must use Creator Studio");
 for (const copy of ["Creator Studio", "Active Challenges", "Participants", "Submissions", "Available Earnings", "Today", "Your Challenges", "Performance", "Earnings"]) {
   assert(studio.includes(copy), `Creator Studio is missing ${copy}`);
 }
@@ -13,21 +13,18 @@ assert(studio.includes("slice(0, 3)"), "Creator Studio attention and challenge p
 assert(studio.includes("ACTIVE_KPI_STATUSES") && studio.includes('new Set(["active", "submission_open", "voting_open", "voting_closed"])'), "Creator Studio KPIs must use the canonical active status set");
 
 const sidebar = read("components/sidebar.tsx");
-const creatorStart = sidebar.indexOf("const creatorSections");
+const creatorStart = sidebar.indexOf("function personalSections");
 const sponsorStart = sidebar.indexOf("const sponsorSections");
 const creatorNavigation = sidebar.slice(creatorStart, sponsorStart);
-for (const required of ["Creator Studio", "Explore", "Challenges", "My Entries", "Submissions", "Creator Analytics", "Earnings", "DoroCoins", "Rewards", "Settings"]) {
+for (const required of ["Creator Studio", "Explore", "Saved", "My Challenges", "My Entries", "Submissions", "Analytics", "Leaderboards", "Winners", "Earnings", "DoroCoins", "Rewards", "Profile", "Settings"]) {
   assert(creatorNavigation.includes(required), `Creator/Host navigation is missing ${required}`);
 }
-for (const retired of ["Monthly Boosts", "Saved", "Sponsor-Ready", "Leaderboards", "Winners", "Profile"]) {
+for (const retired of ["Monthly Boosts", "Sponsor-Ready", "Creator Pro", "Vote multiplier"]) {
   assert(!creatorNavigation.includes(retired), `Creator/Host navigation must not permanently include ${retired}`);
-}
-for (const hostDiscovery of ["Private Challenges", "Live Event Challenges", "Tournament Challenges"]) {
-  assert(creatorNavigation.includes(hostDiscovery), `Host discovery must retain ${hostDiscovery}`);
 }
 
 const planAccess = read("lib/plan-access.ts");
-for (const allowance of ["monthlyBoostLimit: 0", "monthlyBoostLimit: 2", "monthlyBoostLimit: 3", "monthlyBoostLimit: 5"]) {
+for (const allowance of ["monthlyBoostLimit: 0", "monthlyBoostLimit: 2", "monthlyBoostLimit: 5"]) {
   assert(planAccess.includes(allowance), `Missing monthly boost allowance ${allowance}`);
 }
 const boostModel = read("lib/monthly-boost.ts");

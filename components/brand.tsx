@@ -21,7 +21,7 @@ export function planBadgeLabel(planId?: UserPlanId | string | null) {
     case "pro":
     case "premium":
     case "competitor":
-      return "Pro";
+      return "Creator";
     case "host":
     case "verified_host":
     case "executive_host":

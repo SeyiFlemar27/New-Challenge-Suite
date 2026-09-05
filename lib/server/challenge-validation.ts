@@ -89,8 +89,8 @@ export const serverChallengeCreateSchema = z.object({
     allowFreeVotes: z.coerce.boolean().default(true),
     allowPaidVotes: z.coerce.boolean().optional(),
     allowDoroCoinVotes: z.coerce.boolean().optional(),
-    weightedVotes: z.coerce.boolean().default(true)
-  }).default({ allowFreeVotes: true, allowPaidVotes: true, weightedVotes: true }),
+    weightedVotes: z.coerce.boolean().transform(() => false).default(false)
+  }).default({ allowFreeVotes: true, allowPaidVotes: true, weightedVotes: false }),
   requiresSubmissionApproval: z.coerce.boolean().default(false),
   requiresParticipantApproval: z.coerce.boolean().default(false),
   participationMode: z.enum(["open", "approval"]).default("open"),
@@ -218,7 +218,7 @@ export const serverChallengeCreateSchema = z.object({
     maxFileSizeMb: z.coerce.number().int().min(1).max(500).default(25),
     maxVideoDurationSeconds: z.coerce.number().int().min(0).max(14400).default(0),
     allowResubmission: z.coerce.boolean().default(false),
-    votesPerUserPerDay: z.coerce.number().int().min(0).max(100).default(1),
+    votesPerUserPerDay: z.coerce.number().int().transform(() => 1).default(1),
     showVoteCount: z.coerce.boolean().default(true),
     showLeaderboard: z.coerce.boolean().default(true),
     winnerSelection: z.enum(["highest_votes", "judge_selection", "hybrid", "manual"]).default("highest_votes"),

@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Compass, LayoutDashboard, Trophy, 
 import { Button } from "@/components/ui";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { apiRequest } from "@/lib/api/client";
-import { getEffectiveTier } from "@/lib/plan-access";
+import { getPersonalCapabilities } from "@/lib/plan-access";
 
 type TourStep = { title: string; body: string; icon: typeof Compass };
 
@@ -21,6 +21,12 @@ const creatorSteps: TourStep[] = [
   { title: "Create your first challenge", body: "Launch a challenge from the guided builder while money features remain review-safe.", icon: Trophy },
   { title: "Manage submissions", body: "Track your challenges and review the entries they receive from one focused workspace.", icon: LayoutDashboard },
   { title: "Grow with creator tools", body: "Use your profile, creator analytics, and challenge history to build a recognizable community.", icon: UserRound }
+];
+const creatorIntentSteps: TourStep[] = [
+  competitorSteps[0],
+  { title: "Build a Normal Challenge", body: "Your free account can create Normal Challenges within its lifetime allowance. Creator tools unlock only after plan activation.", icon: Trophy },
+  competitorSteps[1],
+  competitorSteps[4]
 ];
 const hostSteps: TourStep[] = [
   { title: "Welcome to Host Control Center", body: "Run competitions with participant, submission, voting, and reporting tools.", icon: LayoutDashboard },
@@ -41,18 +47,19 @@ export function ProductWalkthrough() {
   const [step, setStep] = useState(0);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
+  const capabilities = getPersonalCapabilities({ planId: user?.planId, planStatus: user?.planStatus, legacyPlanId: user?.legacyPlanId, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
   const steps = useMemo(
     () =>
       user?.accountType === "sponsor"
         ? sponsorSteps
-        : user?.selectedAccountType === "host" || tier.id === "host"
+        : capabilities.canManageHostOperations
           ? hostSteps
-          : user?.selectedAccountType === "creator" ||
-              ["creator_starter", "creator"].includes(tier.id)
+          : capabilities.canUseCreatorAnalytics
             ? creatorSteps
+            : user?.selectedAccountType === "creator" || user?.selectedAccountType === "host"
+              ? creatorIntentSteps
             : competitorSteps,
-    [tier.id, user?.accountType, user?.selectedAccountType]
+    [capabilities.canManageHostOperations, capabilities.canUseCreatorAnalytics, user?.accountType, user?.selectedAccountType]
   );
 
   useEffect(() => {

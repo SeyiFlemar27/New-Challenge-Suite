@@ -121,7 +121,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     const message = error instanceof Error ? error.message : "Challenge could not be joined.";
     if (message === "PREMIUM_REQUIRED") return fail("Premium membership is required to join this challenge.", 403, undefined, "PREMIUM_REQUIRED");
-    if (message === "CREATOR_PRO_REQUIRED") return fail("Creator Pro is required to join this private or exclusive challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
+    if (message === "CREATOR_PRO_REQUIRED") return fail("Creator or Host access is required to join this private challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
     if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     if (message === "SELF_ENTRY_NOT_ALLOWED") return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
     if (message === "ENTRY_REQUEST_REQUIRED") return fail("Request entry before joining this challenge.", 409, { action: "request_entry", requestUrl: `/api/challenges/${id}/entry-request` }, "ENTRY_REQUEST_REQUIRED");

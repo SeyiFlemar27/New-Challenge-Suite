@@ -1,9 +1,10 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { toPublicProfile } from "@/lib/server/public-profile";
-import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, isPublicSubmission, isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields, publicSubmissionFields } from "@/lib/server/public-challenge";
 import { isDemoProfileContent, isExplicitDemoEnvironment } from "@/lib/profile-identity";
 import { calculateCreatorLevel } from "@/lib/server/economy-rules";
+import { canViewProfileConnections, profilePrivacySettings } from "@/lib/server/profile-privacy";
 
 export async function findProfileByUsername(db: Firestore, username: string) {
   const normalized = username.replace(/^@/, "").trim().toLowerCase();
@@ -23,7 +24,7 @@ export function derivedBadges(profile: Record<string, unknown>, stored: Array<Re
   };
   if (profile.verified || profile.verificationStatus === "verified") add("verified-user", "Verified User", "verification");
   if (plan.isCreator) add("creator-plan", "Creator Badge", "plan");
-  if (plan.isPro) add("pro-plan", "Pro Badge", "plan");
+  if (plan.isPro && !plan.isCreator) add("creator-plan", "Creator Badge", "plan");
   if (plan.isHost) add("host-plan", "Host tools", "host");
   if (plan.isSponsor && profile.sponsorVerificationStatus === "approved") add("verified-sponsor", "Verified Sponsor", "sponsor");
   return badges;
@@ -46,12 +47,23 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
   ]);
   const merged = { ...(accountSnap.data() ?? {}), ...(profileSnap.data() ?? {}) };
   if (!isExplicitDemoEnvironment() && isQaDemoOrPlaceholderProfile(profileSnap.id, merged)) return null;
-  const privacy = (merged.privacySettings && typeof merged.privacySettings === "object" ? merged.privacySettings : {}) as Record<string, unknown>;
+  const privacy = profilePrivacySettings(merged);
+  const connectionsVisible = canViewProfileConnections(merged, viewerId === userId);
   const profile = toPublicProfile(userId, merged);
-  const created = challengesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) } as Record<string, unknown>));
-  const participating = privacy.showParticipatedChallenges === false ? [] : participantsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
-  const entries = submissionsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
-  const wins = privacy.showWins === false ? [] : winnersSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const created = challengesSnap.docs.filter((doc) => isPublicChallenge(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) } as Record<string, unknown>));
+  const participantRecords = participantsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const winnerRecords = winnersSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const submissionRecords = submissionsSnap.docs.filter((doc) => isPublicSubmission(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicSubmissionFields(doc.data()) } as Record<string, unknown>));
+  const relatedChallengeIds = [...new Set([...participantRecords, ...winnerRecords, ...submissionRecords].map((item) => String(item.challengeId ?? "")).filter(Boolean))];
+  const relatedChallengeSnaps = relatedChallengeIds.length ? await db.getAll(...relatedChallengeIds.map((id) => db.collection("challenges").doc(id))) : [];
+  const publicRelatedChallenges = new Map(relatedChallengeSnaps.filter((snap) => snap.exists && isPublicChallenge(snap.id, snap.data() ?? {})).map((snap) => [snap.id, publicChallengeFields(snap.data() ?? {})]));
+  const participating = privacy.showParticipatedChallenges === false ? [] : participantRecords.flatMap((item) => {
+    const challengeId = String(item.challengeId ?? "");
+    const challenge = publicRelatedChallenges.get(challengeId);
+    return challenge ? [{ id: challengeId, ...challenge }] : [];
+  });
+  const entries = submissionRecords.filter((item) => publicRelatedChallenges.has(String(item.challengeId ?? "")));
+  const wins = privacy.showWins === false ? [] : winnerRecords.filter((item) => publicRelatedChallenges.has(String(item.challengeId ?? "")));
   const storedBadges = badgesSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data()) && !isDemoProfileContent(doc.data().title ?? doc.data().name) && !isDemoProfileContent(doc.data().description)).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const badges = derivedBadges(merged, storedBadges);
   const completedChallenges = created.filter((item) => ["completed", "winners_announced", "settled"].includes(String(item.status ?? item.lifecycleStatus ?? ""))).length;
@@ -75,13 +87,14 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
       categories: Array.isArray(merged.categoryInterests) ? merged.categoryInterests : [],
       profileVisibility: merged.profileVisibility ?? "public",
       allowMessages: privacy.allowMessages !== false,
+      showFollowerConnections: connectionsVisible,
       isOwner: viewerId === userId,
       isFollowing: Boolean(viewerFollowSnap?.exists),
       creatorLevel
     },
     stats: {
-      followerCount: followersSnap.size,
-      followingCount: followingSnap.size,
+      followerCount: connectionsVisible ? followersSnap.size : null,
+      followingCount: connectionsVisible ? followingSnap.size : null,
       createdChallengeCount: created.length,
       participatedChallengeCount: participating.length,
       entryCount: entries.length,

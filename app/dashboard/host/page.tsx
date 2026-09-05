@@ -131,7 +131,7 @@ export default function HostControlCenterPage() {
     <PlanFeatureGate feature="host_control_center" requiredPlan="Host" title="Host tools are available on the Host Plan" allowPendingPreview={pendingCheckoutReturn}>
       <AppShell>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <PageTitle title="Creator Studio" subtitle="Manage your challenges, track what needs attention, and keep each competition moving." />
+          <PageTitle title="Host Control Center" subtitle="Manage your challenges, track what needs attention, and keep each competition moving." />
           {hostAction("Create Competition", "/challenges/create", "primary", "w-full sm:w-auto")}
         </div>
 

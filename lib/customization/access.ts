@@ -68,7 +68,7 @@ export function validateCustomizationForProfile(profile: Record<string, unknown>
   ];
   const denied = checks.find((check) => !check.allowed);
   if (denied) return denied;
-  if ((customization.publicProfileThemeId || customization.creatorBrandColorId) && !plan.canUseCreatorBranding) return { allowed: false, code: "CREATOR_PRO_REQUIRED", message: "Creator branding requires Creator Pro." };
+  if ((customization.publicProfileThemeId || customization.creatorBrandColorId) && !plan.canUseCreatorBranding) return { allowed: false, code: "CREATOR_PRO_REQUIRED", message: "Creator branding requires an eligible Creator or Host plan." };
   if (customization.hostBadgeStyleId && !plan.canUseVerifiedHostBranding) return { allowed: false, code: "HOST_BADGE_REQUIRED", message: "Host branding requires eligible host access." };
   return { allowed: true, code: null, message: "Customization allowed." };
 }

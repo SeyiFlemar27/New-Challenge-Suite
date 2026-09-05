@@ -14,25 +14,27 @@ const sponsorPlans = read("app/sponsor/plans/page.tsx");
 const sponsorFinance = read("components/sponsor/sponsor-finance-pages.tsx");
 const sponsorShell = read("components/sponsor/sponsor-shell.tsx");
 
-const hostStart = sidebar.indexOf("const hostSections");
+const hostStart = sidebar.indexOf("function personalSections");
 const sponsorStart = sidebar.indexOf("const sponsorSections");
 const activeStart = sidebar.indexOf("function activeNavigationHref");
-assert(hostStart >= 0 && sponsorStart > hostStart, "Host sidebar section must exist before sponsor section.");
+assert(hostStart >= 0 && sponsorStart > hostStart, "Capability-aware personal sidebar must exist before sponsor section.");
 const hostSection = sidebar.slice(hostStart, sponsorStart);
 assert(!hostSection.includes('label: "Create Challenge"'), "Host sidebar must not contain standalone Create Challenge.");
 assert(!hostSection.includes('label: "Create Private Challenge"'), "Host sidebar must not contain standalone Create Private Challenge.");
 assert(!hostSection.includes('label: "Create Live Event"'), "Host sidebar must not contain standalone Create Live Event.");
 assert(!hostSection.includes('label: "Create Tournament"'), "Host sidebar must not contain standalone Create Tournament.");
 assert(!hostSection.includes('label: "Create Hybrid"') && !hostSection.includes('Hybrid Competition'), "Hybrid must not be exposed as a standalone host sidebar item.");
-for (const label of ['label: "Challenges"', 'label: "Private Challenges"', 'label: "Live Events"', 'label: "Tournaments"']) assert(hostSection.includes(label), `Host sidebar missing ${label}.`);
-assert(sidebar.includes('href: "/host/challenges"') && sidebar.includes('href: "/host/private"') && sidebar.includes('href: "/host/live-events"') && sidebar.includes('href: "/host/tournaments"'), "Host sidebar must route to management pages.");
+for (const label of ['label: "My Challenges"', 'label: "My Entries"', 'label: "Submissions"']) assert(hostSection.includes(label), `Personal sidebar missing ${label}.`);
+for (const builder of ['label: "Normal"', 'label: "Private"', 'label: "Tournament"', 'label: "Live Event"']) assert(hostSection.includes(builder), `Capability-aware builder menu missing ${builder}.`);
+assert(hostSection.includes('capabilities.canCreatePrivateChallenge') && hostSection.includes('capabilities.canCreateTournament') && hostSection.includes('capabilities.canCreateLiveEvent'), "Builder navigation must remain entitlement-driven.");
+for (const route of ['"/host/challenges/create"', '"/host/private/create"', '"/host/live/create"', '"/host/tournaments/create"']) assert(hostSection.includes(route), `Host builder route missing ${route}.`);
 
 assert(existsSync(join(root, "app/host/challenges/page.tsx")), "Host Challenges page must exist.");
 assert(existsSync(join(root, "app/host/private/page.tsx")), "Host Private Challenges page must exist.");
 assert(existsSync(join(root, "app/host/live-events/page.tsx")), "Host Live Events page must exist.");
 assert(existsSync(join(root, "app/host/tournaments/page.tsx")), "Host Tournaments page must exist.");
 
-for (const phrase of ["Cover image", "Promo flyer / poster", "Intro video / trailer", "Browse cover image", "Browse promo asset", "Browse trailer video"]) assert(builder.includes(phrase), `Builder upload step missing ${phrase}.`);
+for (const phrase of ["Cover image", "Image 2", "Image 3", "Intro video / trailer", "Upload image", "Upload video"]) assert(builder.includes(phrase), `Builder upload step missing ${phrase}.`);
 assert(builder.includes("UploadGallery") && builder.includes("MediaBrandingStep"), "Builder upload style must be shared between public and private builders.");
 assert(!/(Fiverr|gig|buyer|seller)/i.test(builder), "Builder copy must not use marketplace wording.");
 
@@ -44,7 +46,7 @@ assert(sponsorChallenges.includes("sponsor-discovery-list") && sponsorCreators.i
 assert(!sponsorChallenges.includes("xl:grid-cols-3") && !sponsorCreators.includes("xl:grid-cols-3"), "Sponsor discovery pages should not use messy card grids.");
 assert(!sponsorPlans.includes("Comparison") && !sponsorPlans.includes("comparisonRows") && !sponsorPlans.includes("faq"), "Sponsor plans page must not include long comparison or FAQ sections.");
 assert(sponsorPlans.includes("Sponsor subscriptions unlock platform tools. Campaign budgets and prize contributions are handled separately."), "Sponsor plans must include concise budget separation note.");
-assert(sponsorFinance.includes("Billing and invoices") && sponsorFinance.includes("Invoices") && sponsorFinance.includes("No invoices yet"), "Billing page must include an invoices tab and empty state.");
+assert(sponsorFinance.includes("Billing & Plan") && sponsorFinance.includes("Invoices & Receipts") && sponsorFinance.includes("No invoices or receipts yet"), "Billing page must include an invoices tab and empty state.");
 assert(!sponsorFinance.includes("fake invoice") && !sponsorFinance.includes("Download PDF</Button>"), "Billing UX must not show fake downloads on main billing page.");
 assert(!sponsorShell.includes('label: "Milestones"') && !sponsorShell.includes('label: "Templates"'), "Sponsor sidebar should not promote milestone/template clutter.");
 

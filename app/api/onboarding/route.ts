@@ -20,7 +20,7 @@ const hostSchema = z.object({
   logoUrl: z.string().trim().url().optional().or(z.literal("")),
   hostType: z.string().trim().min(2).max(80),
   competitionSize: z.enum(["under_50", "50_200", "200_1000", "1000_plus"]),
-  votingPreference: z.enum(["public", "dorocoin", "judge", "hybrid", "manual"]),
+  votingPreference: z.enum(["public", "credits", "dorocoin", "judge", "hybrid", "manual"]).transform((value) => value === "dorocoin" ? "credits" : value),
   eventMode: z.enum(["online", "physical", "hybrid", "unsure"]),
   revenueAcknowledged: z.literal(true)
 });

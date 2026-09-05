@@ -1,6 +1,7 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createNotification } from "@/lib/server/notifications";
+import { newConversationPrivacy, type MessagePrivacyAudience } from "@/lib/server/profile-privacy";
 
 export const MESSAGE_START_SOURCES = ["profile", "challenge", "opportunity", "invite", "discovery_card", "existing_conversation"] as const;
 export type MessageStartSource = (typeof MESSAGE_START_SOURCES)[number];
@@ -51,20 +52,26 @@ function profileSummary(id: string, profile: Record<string, unknown>) {
   };
 }
 
-export async function assertUsersCanMessage(db: Firestore, senderId: string, recipientId: string) {
+export async function assertUsersCanMessage(db: Firestore, senderId: string, recipientId: string, options: { newConversation?: boolean; audience?: MessagePrivacyAudience } = {}) {
   if (!recipientId || senderId === recipientId) throw messageError("INVALID_RECIPIENT", "Choose another Challenge Suite member.");
-  const [senderSnap, recipientSnap] = await Promise.all([
+  const [senderSnap, recipientSnap, senderProfileSnap, recipientProfileSnap] = await Promise.all([
     db.collection("users").doc(senderId).get(),
-    db.collection("users").doc(recipientId).get()
+    db.collection("users").doc(recipientId).get(),
+    db.collection("profiles").doc(senderId).get(),
+    db.collection("profiles").doc(recipientId).get()
   ]);
-  if (!recipientSnap.exists) throw messageError("RECIPIENT_NOT_FOUND", "This member is not available.");
-  const sender = senderSnap.data() ?? {};
-  const recipient = recipientSnap.data() ?? {};
+  if (!recipientSnap.exists && !recipientProfileSnap.exists) throw messageError("RECIPIENT_NOT_FOUND", "This member is not available.");
+  const sender = { ...(senderSnap.data() ?? {}), ...(senderProfileSnap.data() ?? {}) };
+  const recipient = { ...(recipientSnap.data() ?? {}), ...(recipientProfileSnap.data() ?? {}) };
   if (blockedIds(sender).has(recipientId) || blockedIds(recipient).has(senderId)) {
     throw messageError("MESSAGING_BLOCKED", "Messaging is unavailable between these accounts.");
   }
   if (recipient.accountStatus === "suspended" || recipient.messagingDisabled === true) {
     throw messageError("RECIPIENT_UNAVAILABLE", "This member cannot receive messages.");
+  }
+  if (options.newConversation) {
+    const permission = newConversationPrivacy(recipient, options.audience ?? "general");
+    if (!permission.allowed) throw messageError(permission.code, permission.message);
   }
   return { sender: profileSummary(senderId, sender), recipient: profileSummary(recipientId, recipient) };
 }
@@ -121,7 +128,7 @@ export async function startConversation(db: Firestore, input: {
   if (!MESSAGE_START_SOURCES.includes(input.source) || input.source === "existing_conversation") {
     throw messageError("INVALID_MESSAGE_SOURCE", "Open messaging from a member profile, challenge, invite, or discovery page.");
   }
-  const participants = await assertUsersCanMessage(db, input.senderId, input.recipientId);
+  const participants = await assertUsersCanMessage(db, input.senderId, input.recipientId, { newConversation: true, audience: "general" });
   const conversationId = conversationIdForUsers(input.senderId, input.recipientId);
   const conversationRef = db.collection("conversations").doc(conversationId);
   const existing = await conversationRef.get();

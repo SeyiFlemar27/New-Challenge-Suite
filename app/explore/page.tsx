@@ -190,7 +190,7 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
       <h2 className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{challenge.title}</h2>
       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{challenge.shortDescription || challenge.description}</p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-slate-400">
-        <span className="flex items-center gap-1"><Users size={14} /> {Number(challenge.participantCount ?? 0).toLocaleString()} joined</span>
+        {challenge.participantCountVisible !== false ? <span className="flex items-center gap-1"><Users size={14} /> {Number(challenge.participantCount ?? 0).toLocaleString()} joined</span> : null}
         <span className="flex items-center gap-1"><Trophy size={14} /> {String(challenge.category ?? "General")}</span>
         <span className="col-span-2 flex items-center gap-1"><CalendarDays size={14} /> {publicPhaseLabel(phase.label)} / {formatShortDate(challenge.submissionDeadline) ?? "Timeline on detail"}</span>
       </div>

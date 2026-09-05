@@ -165,11 +165,11 @@ const activeDashboardStatuses = new Set<CanonicalChallengeStatus | LegacyChallen
   "submission_open",
   "submission_closed",
   "voting_not_open",
+  "voting_pending",
   "voting_open",
   "voting_closed",
   "under_review",
   "published",
-  "registration_open",
   "voting",
   "upcoming"
 ]);
@@ -192,8 +192,8 @@ const boostEligibleStatuses = new Set<CanonicalChallengeStatus | LegacyChallenge
   "active"
 ]);
 
-const publicChallengeStatuses = new Set<CanonicalChallengeStatus | LegacyChallengeStatus>([
-  "pending_review",
+export const PUBLIC_CHALLENGE_STATUS_VALUES = [
+  "approved",
   "scheduled",
   "registration_not_open",
   "registration_open",
@@ -202,16 +202,19 @@ const publicChallengeStatuses = new Set<CanonicalChallengeStatus | LegacyChallen
   "submission_open",
   "submission_closed",
   "voting_not_open",
+  "voting_pending",
   "voting_open",
   "voting_closed",
   "under_review",
+  "results_review",
   "winners_announced",
   "completed",
   "published",
-  "registration_open",
   "voting",
   "upcoming"
-]);
+] as const;
+
+const publicChallengeStatuses = new Set<string>(PUBLIC_CHALLENGE_STATUS_VALUES);
 
 const votableSubmissionStatuses = new Set(["active", "approved", "winner"]);
 const unavailableSubmissionStatuses = new Set(["draft", "submitted", "pending_review", "pending_approval", "rejected", "flagged", "removed", "private", "withdrawn", "disqualified", "eliminated"]);
@@ -269,7 +272,7 @@ export function isChallengeEligibleForSponsorship(status: unknown) {
 }
 
 export function isPublicChallengeStatus(status: unknown) {
-  return publicChallengeStatuses.has(String(status ?? "").toLowerCase() as CanonicalChallengeStatus | LegacyChallengeStatus);
+  return publicChallengeStatuses.has(String(status ?? "").toLowerCase());
 }
 
 export function normalizeSubmissionLifecycleStatus(status: unknown) {
@@ -831,9 +834,6 @@ function numberOrNull(value: unknown) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
-
-
 
 
 

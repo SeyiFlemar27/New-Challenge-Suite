@@ -1,4 +1,4 @@
-import { getUserPlanAccess } from "@/lib/plan-access";
+import { getPersonalCapabilities, getUserPlanAccess } from "@/lib/plan-access";
 
 export type TournamentPermissionProfile = Record<string, unknown> & { uid?: string; id?: string; role?: string; accountType?: string };
 export type TournamentManagementRole = "host" | "manager" | "participant_manager" | "submission_reviewer" | "moderator" | "judge_coordinator" | "finance_viewer";
@@ -8,15 +8,10 @@ function isApprovedEnterprise(profile: TournamentPermissionProfile) {
   return access.isEnterprise && String(profile.enterpriseAccessStatus ?? profile.enterpriseApprovalStatus ?? "").toLowerCase() === "approved";
 }
 
-function isAllowedPremiumCreator(profile: TournamentPermissionProfile) {
-  const access = getUserPlanAccess(profile);
-  return access.isCreator && access.normalizedPlanId !== "free";
-}
-
 export function canCreateTournament(profile: TournamentPermissionProfile) {
   const access = getUserPlanAccess(profile);
-  const allowed = Boolean(access.isHost || isApprovedEnterprise(profile) || isAllowedPremiumCreator(profile));
-  return { allowed, reason: allowed ? "eligible_tournament_host" : access.isSponsor ? "sponsors_cannot_host_or_compete" : "tournament_hosting_requires_host_enterprise_or_allowed_premium_creator" };
+  const allowed = Boolean(getPersonalCapabilities(profile).canCreateTournament || isApprovedEnterprise(profile));
+  return { allowed, reason: allowed ? "eligible_tournament_creator_or_host" : access.isSponsor ? "sponsors_cannot_host_or_compete" : "tournament_creation_requires_creator_or_host" };
 }
 
 export function canEditTournament(profile: TournamentPermissionProfile, tournament: Record<string, unknown>) {

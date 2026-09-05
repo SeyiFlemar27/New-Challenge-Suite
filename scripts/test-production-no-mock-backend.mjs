@@ -20,7 +20,14 @@ function assertIncludes(source, value, message) {
 }
 
 const publicChallengeSource = read("lib/server/public-challenge.ts");
-await writeFile(join(tempDir, "public-challenge.ts"), publicChallengeSource, "utf8");
+const challengeStatusSource = read("lib/challenge-status.ts");
+const publicStatusMatch = challengeStatusSource.match(/export const PUBLIC_CHALLENGE_STATUS_VALUES = (\[[\s\S]*?\]) as const;/);
+assert(publicStatusMatch, "canonical public challenge status values must be exported");
+const standalonePublicChallengeSource = publicChallengeSource.replace(
+  'import { isPublicChallengeStatus } from "@/lib/challenge-status";',
+  `const PUBLIC_CHALLENGE_STATUS_VALUES = ${publicStatusMatch[1]};\nconst PUBLIC_STATUS_SET = new Set(PUBLIC_CHALLENGE_STATUS_VALUES);\nfunction isPublicChallengeStatus(value) { return PUBLIC_STATUS_SET.has(String(value ?? "").toLowerCase()); }`
+);
+await writeFile(join(tempDir, "public-challenge.ts"), standalonePublicChallengeSource, "utf8");
 const { isQaOrDemoRecord, isPublicChallenge, isPublicSubmission, isQaDemoOrPlaceholderProfile } = await import(pathToFileURL(join(tempDir, "public-challenge.ts")).href);
 
 assert.equal(isQaOrDemoRecord("real-id", { title: "The Ultimate Showdown" }), true, "known mock challenge title must be non-production");
