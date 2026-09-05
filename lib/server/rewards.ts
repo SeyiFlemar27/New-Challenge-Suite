@@ -210,7 +210,7 @@ export function normalizeRewardWheelVersion(id: string, data?: Record<string, un
   };
 }
 
-export function validateRewardWheelVersionInput(prizes: RewardPrize[], input: { tier: RewardSpinTier; pointCost: number; entries: RewardWheelEntry[] }, options: { requireExactTotal?: boolean } = {}) {
+export function validateRewardWheelVersionInput(prizes: RewardPrize[], input: { tier: RewardSpinTier; pointCost: number; entries: RewardWheelEntry[] }, options: { requireExactTotal?: boolean; allowEmptyDraft?: boolean } = {}) {
   const pointCost = Number(input.pointCost);
   const rawEntries = normalizeRewardWheelEntries(input.entries);
   const explicitUnits = rawEntries.length > 0 && rawEntries.every((entry) => Number.isInteger(entry.probabilityUnits) && Number(entry.probabilityUnits) > 0);
@@ -218,7 +218,7 @@ export function validateRewardWheelVersionInput(prizes: RewardPrize[], input: { 
   const entries = probabilityEntries.map((entry) => ({ prizeId: entry.prizeId, weight: entry.probabilityUnits, probabilityUnits: entry.probabilityUnits }));
   const ids = new Set<string>();
   if (pointCost !== REWARD_WHEEL_POINT_COSTS[input.tier]) throw new Error("WHEEL_POINT_COST_LOCKED");
-  if (!entries.length) throw new Error("WHEEL_ENTRIES_REQUIRED");
+  if (!entries.length && !options.allowEmptyDraft) throw new Error("WHEEL_ENTRIES_REQUIRED");
   if (options.requireExactTotal && explicitUnits && entries.reduce((sum, entry) => sum + entry.probabilityUnits, 0) !== REWARD_WHEEL_PROBABILITY_UNITS) throw new Error("WHEEL_PROBABILITY_TOTAL_INVALID");
   for (const entry of entries) {
     if (ids.has(entry.prizeId)) throw new Error("WHEEL_DUPLICATE_PRIZE");
@@ -251,7 +251,7 @@ export async function loadAdminRewardWheelConfiguration(db: Firestore) {
 
 export async function saveRewardWheelDraft(db: Firestore, input: { adminId: string; versionId?: string | null; tier: RewardSpinTier; pointCost: number; entries: RewardWheelEntry[]; reason: string; expectedRevision?: number | null }) {
   const prizes = await loadRewardPrizes(db);
-  const validated = validateRewardWheelVersionInput(prizes, input);
+  const validated = validateRewardWheelVersionInput(prizes, input, { allowEmptyDraft: true });
   const now = new Date().toISOString();
   const versionRef = input.versionId ? db.collection("rewardWheelVersions").doc(input.versionId) : db.collection("rewardWheelVersions").doc();
   return db.runTransaction(async (transaction) => {
@@ -311,16 +311,30 @@ export async function publishRewardWheelVersion(db: Firestore, input: { adminId:
     const pointerSnap = await transaction.get(pointerRef);
     if (version.status === "published" && pointerSnap.data()?.versionId === version.id) return { version, idempotent: true };
     if (version.immutable) throw new Error("WHEEL_VERSION_IMMUTABLE");
+    const previousVersionId = typeof pointerSnap.data()?.versionId === "string" ? String(pointerSnap.data()?.versionId) : null;
+    const previousVersionSnap = previousVersionId && previousVersionId !== version.id
+      ? await transaction.get(db.collection("rewardWheelVersions").doc(previousVersionId))
+      : null;
     const prizeSnaps = await Promise.all(version.entries.map((entry) => transaction.get(db.collection("rewardPrizes").doc(entry.prizeId))));
     const prizes = prizeSnaps.filter((snap) => snap.exists).map((snap) => normalizeRewardPrize(snap.id, snap.data() ?? {}));
     const validated = validateRewardWheelVersionInput(prizes, version, { requireExactTotal: true });
     const cashBudgets = await Promise.all(validated.prizes.filter((prizeItem) => prizeItem.prizeType === "cash").map((prizeItem) => transaction.get(db.collection("rewardBudgets").doc(prizeItem.budgetId!))));
     if (cashBudgets.some((budgetSnap, index) => !budgetSnap.exists || n(budgetSnap.data()?.remainingExposureCents) < validated.prizes.filter((prizeItem) => prizeItem.prizeType === "cash")[index].economicValueCents)) throw new Error("WHEEL_CASH_BUDGET_INVALID");
     if (validated.economics.blocked) throw new Error("WHEEL_REWARD_POINT_RETURN_BLOCKED");
+    const previousEntries = previousVersionSnap?.exists ? normalizeRewardWheelVersion(previousVersionSnap.id, previousVersionSnap.data()).entries : [];
+    const previousByPrize = new Map(rewardWheelEntriesAsProbabilityUnits(previousEntries).map((entry) => [entry.prizeId, entry.probabilityUnits]));
+    const nextByPrize = new Map(validated.entries.map((entry) => [entry.prizeId, entry.probabilityUnits]));
+    const changeSummary = {
+      addedPrizeIds: [...nextByPrize.keys()].filter((prizeId) => !previousByPrize.has(prizeId)),
+      removedPrizeIds: [...previousByPrize.keys()].filter((prizeId) => !nextByPrize.has(prizeId)),
+      changedProbabilityPrizeIds: [...nextByPrize.keys()].filter((prizeId) => previousByPrize.has(prizeId) && previousByPrize.get(prizeId) !== nextByPrize.get(prizeId)),
+      previousRewardCount: previousEntries.length,
+      nextRewardCount: validated.entries.length,
+    };
     transaction.set(versionRef, { entries: validated.entries, status: "published", immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now, publishedByAdminId: input.adminId }, { merge: true });
     transaction.set(pointerRef, { tier: version.tier, versionId: version.id, activatedAt: now, activatedByAdminId: input.adminId });
     const auditRef = db.collection("rewardAuditLogs").doc(deterministicId("reward_wheel_publish", version.id));
-    transaction.create(auditRef, { id: auditRef.id, action: "reward_wheel_version_published", wheelVersionId: version.id, previousWheelVersionId: typeof pointerSnap.data()?.versionId === "string" ? pointerSnap.data()?.versionId : null, tier: version.tier, reason: input.reason.trim().slice(0, 500), adminId: input.adminId, probabilityUnitsTotal: REWARD_WHEEL_PROBABILITY_UNITS, createdAt: now });
+    transaction.create(auditRef, { id: auditRef.id, action: "reward_wheel_version_published", wheelVersionId: version.id, previousWheelVersionId: previousVersionId, tier: version.tier, reason: input.reason.trim().slice(0, 500), changeSummary, adminId: input.adminId, probabilityUnitsTotal: REWARD_WHEEL_PROBABILITY_UNITS, createdAt: now });
     return { version: { ...version, entries: validated.entries, status: "published" as const, immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now }, economics: validated.economics, idempotent: false };
   });
 }

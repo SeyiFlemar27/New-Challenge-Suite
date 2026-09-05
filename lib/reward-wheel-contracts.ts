@@ -13,6 +13,45 @@ export type RewardWheelProbabilityEntry = {
   probabilityUnits: number;
 };
 
+export type AdminWheelEntry = {
+  prizeId: string;
+  weight: number;
+  probabilityUnits?: number;
+};
+
+export type AdminWheelDraft = {
+  id: string;
+  tier: RewardWheelTier;
+  pointCost: number;
+  entries: AdminWheelEntry[];
+  status: "draft" | "published" | "retired";
+  immutable: boolean;
+  reason?: string | null;
+  revision: number;
+  updatedAt?: string | null;
+  publishedAt?: string | null;
+  publishedByAdminId?: string | null;
+};
+
+export type AdminWheelPreview = {
+  tier: RewardWheelTier;
+  pointCost: number;
+  rewardCount: number;
+  probabilityUnitsTotal: number;
+};
+
+export type AdminWheelPublishRequest = {
+  action: "publish";
+  versionId: string;
+  reason: string;
+  confirmation: "PUBLISH REWARD WHEEL";
+};
+
+export type AdminWheelPublishResponse = {
+  version: AdminWheelDraft;
+  idempotent: boolean;
+};
+
 export type PublicRewardWheelEntry = RewardWheelProbabilityEntry & {
   displayName: string;
   shortLabel: string;
