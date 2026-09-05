@@ -134,9 +134,13 @@ export async function resolveRewardWheel(db: Firestore, selectedTier: RewardSpin
   const versionId = String(pointerSnap.data()?.versionId ?? "");
   const versionSnap = versionId ? await db.collection("rewardWheelVersions").doc(versionId).get() : null;
   if (!versionSnap?.exists) return { tier: selectedTier, versionId, pointCost: REWARD_WHEEL_POINT_COSTS[selectedTier], prizes: [], diagnosticCode: "ACTIVE_WHEEL_VERSION_MISSING" };
-  const entries = normalizeRewardWheelEntries(versionSnap.data()?.entries);
+  const version = normalizeRewardWheelVersion(versionSnap.id, versionSnap.data());
+  const entries = version.entries;
   if (!entries.length) return { tier: selectedTier, versionId, pointCost: REWARD_WHEEL_POINT_COSTS[selectedTier], prizes: [], diagnosticCode: "ACTIVE_WHEEL_EMPTY" };
+  const snapshotsById = new Map(version.rewardSnapshots.map((snapshot) => [snapshot.id, snapshot]));
   const resolved = await Promise.all(entries.map(async (entry) => {
+    const snapshot = snapshotsById.get(entry.prizeId);
+    if (snapshot) return { ...snapshot, prizeTier: selectedTier, probabilityWeight: entry.weight };
     const current = await db.collection("rewardPrizes").doc(entry.prizeId).get();
     const source = current.exists ? current : await db.collection("rewardWheelPrizes").doc(entry.prizeId).get();
     if (!source.exists) return null;
@@ -182,6 +186,7 @@ export type RewardWheelVersionRecord = {
   tier: RewardSpinTier;
   pointCost: number;
   entries: RewardWheelEntry[];
+  rewardSnapshots: RewardPrize[];
   status: "draft" | "published" | "retired";
   immutable: boolean;
   reason: string | null;
@@ -199,6 +204,11 @@ export function normalizeRewardWheelVersion(id: string, data?: Record<string, un
     tier: tier(data?.tier),
     pointCost: REWARD_WHEEL_POINT_COSTS[tier(data?.tier)],
     entries: normalizeRewardWheelEntries(data?.entries),
+    rewardSnapshots: Array.isArray(data?.rewardSnapshots)
+      ? data.rewardSnapshots.flatMap((snapshot) => snapshot && typeof snapshot === "object"
+        ? [normalizeRewardPrize(String((snapshot as Record<string, unknown>).id ?? ""), snapshot as Record<string, unknown>)]
+        : []).filter((snapshot) => Boolean(snapshot.id))
+      : [],
     status,
     immutable: data?.immutable === true || status === "published",
     reason: typeof data?.reason === "string" && data.reason ? data.reason : null,
@@ -224,13 +234,13 @@ export function validateRewardWheelVersionInput(prizes: RewardPrize[], input: { 
     if (ids.has(entry.prizeId)) throw new Error("WHEEL_DUPLICATE_PRIZE");
     ids.add(entry.prizeId);
     const item = prizes.find((prizeItem) => prizeItem.id === entry.prizeId);
-    if (!item || item.prizeTier !== input.tier || !isPrizeActive(item)) throw new Error("WHEEL_PRIZE_UNAVAILABLE");
+    if (!item || !isPrizeActive(item)) throw new Error("WHEEL_PRIZE_UNAVAILABLE");
     if (item.prizeType === "cash" && (!item.budgetId || item.economicValueCents <= 0 || item.currency !== "USD")) throw new Error("WHEEL_CASH_BUDGET_INVALID");
     if (item.prizeType === "physical_item" && (item.quantityType !== "limited" || !item.remainingQuantity || !item.deliveryCountries.length || !item.shippingPolicy || !item.customsPolicy || !item.fulfillmentInstructions)) throw new Error("WHEEL_PHYSICAL_FULFILLMENT_INVALID");
     if (item.prizeType === "percentage_entry_discount" && !item.maximumDiscountCents) throw new Error("WHEEL_ENTRY_DISCOUNT_CAP_REQUIRED");
   }
   if (options.requireExactTotal && ids.size < 4) throw new Error("WHEEL_MINIMUM_REWARDS_REQUIRED");
-  const resolved = entries.map((entry) => ({ ...prizes.find((item) => item.id === entry.prizeId)!, probabilityWeight: entry.weight }));
+  const resolved = entries.map((entry) => ({ ...prizes.find((item) => item.id === entry.prizeId)!, prizeTier: input.tier, probabilityWeight: entry.weight }));
   const economics = rewardPointReturnRatio(resolved, input.tier, pointCost);
   return { tier: input.tier, pointCost, entries, prizes: resolved, economics };
 }
@@ -298,9 +308,8 @@ export async function cloneRewardWheelVersionAsDraft(db: Firestore, input: { adm
   });
 }
 
-export async function publishRewardWheelVersion(db: Firestore, input: { adminId: string; versionId: string; reason: string; confirmation: string }) {
+export async function publishRewardWheelVersion(db: Firestore, input: { adminId: string; versionId: string; reason: string; confirmation: string; expectedRevision?: number | null; expectedActiveVersionId?: string | null }) {
   if (input.confirmation !== "PUBLISH REWARD WHEEL") throw new Error("WHEEL_PUBLISH_CONFIRMATION_REQUIRED");
-  if (input.reason.trim().length < 8) throw new Error("WHEEL_PUBLISH_REASON_REQUIRED");
   const versionRef = db.collection("rewardWheelVersions").doc(input.versionId);
   const now = new Date().toISOString();
   return db.runTransaction(async (transaction) => {
@@ -309,9 +318,11 @@ export async function publishRewardWheelVersion(db: Firestore, input: { adminId:
     const version = normalizeRewardWheelVersion(versionSnap.id, versionSnap.data());
     const pointerRef = db.collection("rewardWheelActiveVersions").doc(version.tier);
     const pointerSnap = await transaction.get(pointerRef);
-    if (version.status === "published" && pointerSnap.data()?.versionId === version.id) return { version, idempotent: true };
+    if (version.status === "published" && pointerSnap.data()?.versionId === version.id) return { version, activeVersionId: version.id, idempotent: true };
     if (version.immutable) throw new Error("WHEEL_VERSION_IMMUTABLE");
+    if (input.expectedRevision !== null && input.expectedRevision !== undefined && version.revision !== input.expectedRevision) throw new Error("WHEEL_DRAFT_CONFLICT");
     const previousVersionId = typeof pointerSnap.data()?.versionId === "string" ? String(pointerSnap.data()?.versionId) : null;
+    if (input.expectedActiveVersionId !== undefined && previousVersionId !== input.expectedActiveVersionId) throw new Error("WHEEL_PUBLISH_CONFLICT");
     const previousVersionSnap = previousVersionId && previousVersionId !== version.id
       ? await transaction.get(db.collection("rewardWheelVersions").doc(previousVersionId))
       : null;
@@ -331,11 +342,15 @@ export async function publishRewardWheelVersion(db: Firestore, input: { adminId:
       previousRewardCount: previousEntries.length,
       nextRewardCount: validated.entries.length,
     };
-    transaction.set(versionRef, { entries: validated.entries, status: "published", immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now, publishedByAdminId: input.adminId }, { merge: true });
+    const rewardSnapshots = validated.prizes.map((prizeItem) => ({
+      ...prizeItem,
+      probabilityWeight: validated.entries.find((entry) => entry.prizeId === prizeItem.id)?.weight ?? prizeItem.probabilityWeight,
+    }));
+    transaction.set(versionRef, { entries: validated.entries, rewardSnapshots, status: "published", immutable: true, reason: input.reason.trim().slice(0, 500) || null, publishedAt: now, updatedAt: now, publishedByAdminId: input.adminId }, { merge: true });
     transaction.set(pointerRef, { tier: version.tier, versionId: version.id, activatedAt: now, activatedByAdminId: input.adminId });
     const auditRef = db.collection("rewardAuditLogs").doc(deterministicId("reward_wheel_publish", version.id));
-    transaction.create(auditRef, { id: auditRef.id, action: "reward_wheel_version_published", wheelVersionId: version.id, previousWheelVersionId: previousVersionId, tier: version.tier, reason: input.reason.trim().slice(0, 500), changeSummary, adminId: input.adminId, probabilityUnitsTotal: REWARD_WHEEL_PROBABILITY_UNITS, createdAt: now });
-    return { version: { ...version, entries: validated.entries, status: "published" as const, immutable: true, reason: input.reason.trim().slice(0, 500), publishedAt: now, updatedAt: now }, economics: validated.economics, idempotent: false };
+    transaction.create(auditRef, { id: auditRef.id, action: "reward_wheel_version_published", wheelVersionId: version.id, previousWheelVersionId: previousVersionId, tier: version.tier, reason: input.reason.trim().slice(0, 500) || null, changeSummary, adminId: input.adminId, probabilityUnitsTotal: REWARD_WHEEL_PROBABILITY_UNITS, createdAt: now });
+    return { version: { ...version, entries: validated.entries, rewardSnapshots, status: "published" as const, immutable: true, reason: input.reason.trim().slice(0, 500) || null, publishedAt: now, updatedAt: now }, activeVersionId: version.id, economics: validated.economics, idempotent: false };
   });
 }
 
@@ -432,7 +447,7 @@ export async function executeRewardSpin(db: Firestore, input: { userId: string; 
     if (!settings.rewardsEnabled || settings.maintenanceMode) throw new Error("REWARDS_DISABLED"); if (settings.rewardFulfillmentPaused) throw new Error("REWARD_FULFILLMENT_PAUSED"); if (!settings.tierEnabled[input.tier]) throw new Error("WHEEL_DISABLED"); if (!wheel.versionId || input.displayedVersionId !== versionId || !wheelPointerSnap.exists || wheelPointerSnap.data()?.versionId !== versionId || !wheelVersionSnap.exists) throw new Error("WHEEL_VERSION_CHANGED"); const eligibility = isConsumerRewardsEligible({ ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) }); if (!eligibility.eligible) throw new Error(eligibility.restricted ? "REWARDS_ACCOUNT_RESTRICTED" : "REWARDS_ACCOUNT_NOT_ELIGIBLE");
     const account = accountSnap.data() ?? {}; const legacy = legacySnap.data() ?? {}; const previousPoints = n(account.availablePoints ?? legacy.availableRewardPoints ?? userSnap.data()?.voterPoints); if (n(account.rewardDebt ?? legacy.rewardDebt)) throw new Error("REWARD_DEBT_ACTIVE"); const pointCost = wheel.pointCost; if (paymentSource === "points" && previousPoints < pointCost) throw new Error("INSUFFICIENT_REWARD_POINTS");
     if (paymentSource === "bonus_spin") { if (!bonusSnap?.exists || bonusSnap.data()?.userId !== input.userId || bonusSnap.data()?.type !== "bonus_spin" || bonusSnap.data()?.status !== "available") throw new Error("BONUS_SPIN_UNAVAILABLE"); if (bonusSnap.data()?.tier && bonusSnap.data()?.tier !== input.tier) throw new Error("BONUS_SPIN_TIER_MISMATCH"); if (bonusSnap.data()?.expiresAt && Date.parse(String(bonusSnap.data()?.expiresAt)) <= Date.now()) throw new Error("BONUS_SPIN_EXPIRED"); }
-    let selectedPrize = selected; if (prizeRef) { if (!prizeSnap?.exists) throw new Error("PRIZE_NOT_FOUND"); selectedPrize = normalizeRewardPrize(prizeSnap.id, prizeSnap.data() ?? {}); if (!isPrizeActive(selectedPrize, Date.now(), campaign.id) || !prizeDeliveryEligible(selectedPrize, country)) throw new Error("PRIZE_UNAVAILABLE"); if (selectedPrize.quantityType === "limited") { const remaining = n(selectedPrize.remainingQuantity); if (!remaining) throw new Error("PRIZE_OUT_OF_STOCK"); transaction.set(prizeRef, { remainingQuantity: remaining - 1, reservedQuantity: FieldValue.increment(1), winCount: selectedPrize.winCount + 1, updatedAt: now }, { merge: true }); } else transaction.set(prizeRef, { winCount: selectedPrize.winCount + 1, updatedAt: now }, { merge: true }); }
+    let selectedPrize = selected; if (prizeRef) { if (!prizeSnap?.exists) throw new Error("PRIZE_NOT_FOUND"); const currentPrize = normalizeRewardPrize(prizeSnap.id, prizeSnap.data() ?? {}); selectedPrize = { ...selected, remainingQuantity: currentPrize.remainingQuantity, reservedQuantity: currentPrize.reservedQuantity, winCount: currentPrize.winCount }; if (!prizeDeliveryEligible(selectedPrize, country)) throw new Error("PRIZE_UNAVAILABLE"); if (selectedPrize.quantityType === "limited") { const remaining = n(currentPrize.remainingQuantity); if (!remaining) throw new Error("PRIZE_OUT_OF_STOCK"); transaction.set(prizeRef, { remainingQuantity: remaining - 1, reservedQuantity: FieldValue.increment(1), winCount: currentPrize.winCount + 1, updatedAt: now }, { merge: true }); } else transaction.set(prizeRef, { winCount: currentPrize.winCount + 1, updatedAt: now }, { merge: true }); }
     const userWins = n(userWinSnap.data()?.wins); const dailyWins = n(dailyWinSnap.data()?.wins); if (selectedPrize.maximumWinsPerUser && userWins >= selectedPrize.maximumWinsPerUser) throw new Error("PRIZE_USER_WIN_LIMIT_REACHED"); if (selectedPrize.maximumWinsPerDay && dailyWins >= selectedPrize.maximumWinsPerDay) throw new Error("PRIZE_DAILY_WIN_LIMIT_REACHED"); transaction.set(userWinRef, { prizeId: selectedPrize.id, userId: input.userId, wins: userWins + 1, updatedAt: now }, { merge: true }); transaction.set(dailyWinRef, { prizeId: selectedPrize.id, day: winDay, wins: dailyWins + 1, updatedAt: now }, { merge: true });
     if (budgetRef) { if (!budgetSnap?.exists) throw new Error("REWARD_BUDGET_NOT_FOUND"); const remaining = n(budgetSnap.data()?.remainingExposureCents); if (remaining < selectedPrize.economicValueCents) throw new Error("REWARD_BUDGET_EXHAUSTED"); transaction.set(budgetRef, { remainingExposureCents: remaining - selectedPrize.economicValueCents, reservedExposureCents: FieldValue.increment(selectedPrize.economicValueCents), updatedAt: now }, { merge: true }); }
     const rewardPointPrize = selectedPrize.prizeType === "reward_points" ? n(selectedPrize.rewardValue) : 0; const debit = paymentSource === "points" ? pointCost : 0; const nextPoints = previousPoints - debit + rewardPointPrize;

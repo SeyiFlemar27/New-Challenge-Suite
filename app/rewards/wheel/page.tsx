@@ -7,7 +7,7 @@ import { RewardWheelVisual } from "@/components/rewards/reward-wheel-visual";
 import { Button, Card, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { buildRewardWheelSegments, rewardWheelLandingRotation } from "@/lib/reward-wheel-geometry";
-import type { PublicRewardWheelConfig } from "@/lib/reward-wheel-contracts";
+import { REWARD_WHEEL_POINT_COSTS, type PublicRewardWheelConfig } from "@/lib/reward-wheel-contracts";
 
 const tiers = ["basic", "standard", "premium"] as const;
 type RewardTier = (typeof tiers)[number];
@@ -39,7 +39,7 @@ export default function RewardWheelPage() {
 
   const points = Number(data?.availableRewardPoints ?? 0);
   const activeConfig = data?.wheelConfigs?.[tier] ?? null;
-  const cost = Number(activeConfig?.pointCost ?? 0);
+  const cost = Number(activeConfig?.pointCost ?? REWARD_WHEEL_POINT_COSTS[tier]);
   const prizes = useMemo(() => (activeConfig?.entries ?? []).map((entry) => ({ id: entry.prizeId, prizeName: entry.displayName, prizeType: entry.prizeType, resolvedProbability: entry.exactProbability })), [activeConfig]);
   const slices = useMemo(() => buildRewardWheelSegments(prizes), [prizes]);
   const wheelDiagnostic = data?.wheelVersions?.[tier]?.diagnosticCode ?? null;
@@ -67,7 +67,7 @@ export default function RewardWheelPage() {
     {message ? <Card className="mt-6 p-4 text-sm font-bold" role="status">{message}</Card> : null}
     <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Card className="overflow-hidden p-5 sm:p-8">
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Spin tiers">{tiers.map((item) => <button key={item} type="button" role="tab" aria-selected={tier === item} onClick={() => { setTier(item); setResult(null); }} disabled={requesting || spinning} className={`min-h-11 flex-1 rounded-[8px] border px-4 text-sm font-black ${tier === item ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/5"}`}>{tierLabels[item]}{data?.wheelConfigs?.[item] ? ` · ${data.wheelConfigs[item]!.pointCost} points` : " · Unavailable"}</button>)}</div>
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Spin tiers">{tiers.map((item) => <button key={item} type="button" role="tab" aria-selected={tier === item} onClick={() => { setTier(item); setResult(null); }} disabled={requesting || spinning} className={`min-h-11 flex-1 rounded-[8px] border px-4 text-sm font-black ${tier === item ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/5"}`}><span className="block">{tierLabels[item]}</span><span className="mt-1 block text-xs font-bold opacity-75">{REWARD_WHEEL_POINT_COSTS[item]} points</span></button>)}</div>
         <div className="mx-auto mt-8 w-full max-w-[560px]">
           <div className="relative aspect-square">{!data ? <div className="absolute inset-0 animate-pulse rounded-full border border-[var(--line)] bg-[var(--panel-2)]" aria-label="Loading reward wheel" /> : slices.length ? <RewardWheelVisual items={prizes} label={`${tierLabels[tier]} reward wheel`} rotation={rotation} spinning={spinning} /> : <div className="absolute inset-0 flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-2)] p-10 text-center"><div><AlertCircle className="mx-auto text-amber-500" /><p className="mt-3 font-black">Spin & Win is temporarily unavailable.</p><p className="mt-2 text-sm text-[var(--muted)]">Its published reward pool needs attention. No points will be charged.</p>{wheelDiagnostic ? <p className="sr-only">Diagnostic: {wheelDiagnostic}</p> : null}</div></div>}</div>
           <div className="mt-6 text-center"><p className="text-sm text-slate-400">{tierBonus ? "A Bonus Spin is available." : points >= cost ? `${affordableSpins} ${affordableSpins === 1 ? "Spin" : "Spins"} available with your current points.` : `Need ${(cost - points).toLocaleString()} more Reward Points.`}</p><Button onClick={openConfirmation} disabled={!canOpenConfirmation} className="mt-4 min-w-56"><Trophy size={18} /> {requesting ? "Confirming..." : spinning ? "Spinning..." : `Spin ${tierLabels[tier]}`}</Button></div>

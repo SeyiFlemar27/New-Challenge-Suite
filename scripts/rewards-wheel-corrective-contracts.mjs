@@ -83,9 +83,10 @@ assert.ok(!adminWheel.includes("Create Prize"), "Prize creation must remain in t
 assert.match(prizeCatalog, /Prize Catalog/);
 assert.match(prizeCatalog, /Create Prize/);
 assert.match(prizeCatalog, /budget ID/i);
-assert.match(prizeCatalog, /Delivery country codes/);
-assert.match(wheelApi, /requireAdminPermission\(request, "rewards\.configure"\)/);
-assert.match(wheelApi, /requireRecentAdminAuthentication\(request, "rewards\.publish"\)/);
+assert.ok(!prizeCatalog.includes('<option value="physical_item">'));
+assert.ok(!prizeCatalog.includes('<option value="badge">'));
+assert.match(wheelApi, /requireAdminPermission\(request, action === "publish" \? "rewards\.publish" : "rewards\.configure"\)/);
+assert.ok(!wheelApi.includes('requireRecentAdminAuthentication(request, "rewards.publish")'));
 assert.match(wheelApi, /expectedRevision/);
 assert.match(wheelApi, /revalidatePath\("\/rewards\/wheel"\)/);
 assert.match(rewards, /status: "published", immutable: true/);

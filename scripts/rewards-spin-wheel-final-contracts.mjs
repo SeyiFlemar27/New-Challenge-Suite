@@ -48,8 +48,8 @@ assert.ok(!history.includes("physical_item"));
 
 for (const type of ["reward_points", "dorocoin", "cash", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin"]) assert(prizeCatalog.includes(`value="${type}"`), `missing structured Prize Catalog type ${type}`);
 for (const removedType of ["physical_item", "badge"]) assert(!prizeCatalog.includes(`value="${removedType}"`), `removed Reward type is still active: ${removedType}`);
-assert(prizeCatalog.includes("Delivery country codes"));
-assert(prizeCatalog.includes("Available quantity"));
+assert(!prizeCatalog.includes("Delivery country codes"));
+assert(!prizeCatalog.includes("Available quantity"));
 assert(!prizeCatalog.includes('label="Reward type"><input'));
 assert(!admin.includes("Create Prize"), "Prize creation must not be embedded in Wheel configuration");
 

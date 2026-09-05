@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { revalidatePath } from "next/cache";
-import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
+import { requireAdminPermission } from "@/lib/server/auth";
 import { cloneRewardWheelVersionAsDraft, loadAdminRewardWheelConfiguration, publishRewardWheelVersion, saveRewardWheelDraft, type RewardSpinTier } from "@/lib/server/rewards";
 import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server/responses";
 
@@ -13,11 +13,11 @@ const messages: Record<string, string> = {
   WHEEL_MINIMUM_REWARDS_REQUIRED: "Add at least four unique available Prizes before publishing.",
   WHEEL_PROBABILITY_TOTAL_INVALID: "Winning chances must total exactly 100%.",
   WHEEL_DUPLICATE_PRIZE: "Each prize can appear only once in a wheel version.",
-  WHEEL_PRIZE_UNAVAILABLE: "Every wheel entry must reference an active prize in the selected tier.",
+  WHEEL_PRIZE_UNAVAILABLE: "Every Wheel entry must reference an active supported Prize.",
   WHEEL_VERSION_IMMUTABLE: "Published wheel versions cannot be edited. Create a new draft instead.",
   WHEEL_VERSION_NOT_FOUND: "This wheel version is no longer available.",
   WHEEL_PUBLISH_CONFIRMATION_REQUIRED: "Enter the publish confirmation exactly as shown.",
-  WHEEL_PUBLISH_REASON_REQUIRED: "Enter a clear publish reason of at least eight characters.",
+  WHEEL_PUBLISH_CONFLICT: "The active Wheel changed while you were reviewing this Draft. Review the latest version before publishing.",
   WHEEL_REWARD_POINT_RETURN_BLOCKED: "Publishing is blocked because expected Reward Point return reaches or exceeds the Spin cost.",
   WHEEL_DRAFT_CONFLICT: "This Draft changed while you were editing it. Review the latest version before continuing.",
   WHEEL_CASH_BUDGET_INVALID: "A Cash Prize needs a valid funded budget before it can be published.",
@@ -38,13 +38,13 @@ export async function POST(request: Request) {
   if (parsed.response) return parsed.response;
   const body = parsed.body ?? {};
   const action = body.action === "publish" ? "publish" : body.action === "clone_version" ? "clone_version" : "save_draft";
-  const auth = action === "publish" ? await requireRecentAdminAuthentication(request, "rewards.publish") : await requireAdminPermission(request, "rewards.configure");
+  const auth = await requireAdminPermission(request, action === "publish" ? "rewards.publish" : "rewards.configure");
   if (auth.response) return auth.response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin reward wheels");
   try {
     if (action === "publish") {
-      const result = await publishRewardWheelVersion(db, { adminId: auth.user.uid, versionId: String(body.versionId ?? ""), reason: String(body.reason ?? ""), confirmation: String(body.confirmation ?? "") });
+      const result = await publishRewardWheelVersion(db, { adminId: auth.user.uid, versionId: String(body.versionId ?? ""), reason: String(body.reason ?? ""), confirmation: String(body.confirmation ?? ""), expectedRevision: Number.isInteger(body.expectedRevision) ? Number(body.expectedRevision) : null, expectedActiveVersionId: typeof body.expectedActiveVersionId === "string" ? body.expectedActiveVersionId : body.expectedActiveVersionId === null ? null : undefined });
       revalidatePath("/rewards");
       revalidatePath("/rewards/wheel");
       revalidatePath("/admin/rewards/prize-wheel");

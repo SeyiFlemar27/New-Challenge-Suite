@@ -45,11 +45,14 @@ export type AdminWheelPublishRequest = {
   versionId: string;
   reason: string;
   confirmation: "PUBLISH REWARD WHEEL";
+  expectedRevision: number;
+  expectedActiveVersionId: string | null;
 };
 
 export type AdminWheelPublishResponse = {
   version: AdminWheelDraft;
   idempotent: boolean;
+  activeVersionId: string;
 };
 
 export type PublicRewardWheelEntry = RewardWheelProbabilityEntry & {
