@@ -23,6 +23,7 @@ export const rewardSpinMessages: Record<string, string> = {
   PRIZE_DAILY_WIN_LIMIT_REACHED: "This reward reached its daily win limit. No points were charged; please try again.",
   REWARD_BUDGET_EXHAUSTED: "This reward budget is unavailable. No points were charged.",
   NO_ACTIVE_WHEEL_VERSION: "This Spin tier is temporarily unavailable. No points were charged.",
+  WHEEL_MINIMUM_REWARDS_REQUIRED: "This Spin tier is temporarily unavailable while its reward pool is being reviewed. No points were charged.",
   WHEEL_VERSION_CHANGED: "This Wheel was updated. Review the latest rewards and chances before spinning. No points were charged."
 };
 

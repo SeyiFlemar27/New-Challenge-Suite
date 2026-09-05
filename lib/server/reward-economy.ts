@@ -7,6 +7,7 @@ export const REWARDABLE_EVENT_TYPES = [
   "approved_submission",
   "challenge_participation_completed",
   "valid_free_vote",
+  "dorocoin_purchase",
   "challenge_first_place",
   "challenge_second_place",
   "challenge_third_place",
@@ -24,6 +25,7 @@ export const DEFAULT_REWARD_RULES: Record<RewardableEventType, { points: number;
   approved_submission: { points: 50, once: false },
   challenge_participation_completed: { points: 75, once: false },
   valid_free_vote: { points: 5, once: false, dailyCap: 50 },
+  dorocoin_purchase: { points: 1, once: false },
   challenge_first_place: { points: 250, once: false },
   challenge_second_place: { points: 150, once: false },
   challenge_third_place: { points: 100, once: false },
@@ -91,7 +93,7 @@ function badgePayload(userId: string, badgeId: string, sourceType: string, sourc
   return { id: deterministicId("reward_badge", userId, badgeId), userId, badgeId, source: sourceType, sourceId, status: "earned", displayPublicly: false, earnedAt: now, createdAt: now, updatedAt: now };
 }
 
-export async function grantRewardPointsForEvent(db: Firestore, input: { userId: string; eventType: RewardableEventType; sourceId: string; sourceEventKey?: string; metadata?: Record<string, unknown>; occurredAt?: string }) {
+export async function grantRewardPointsForEvent(db: Firestore, input: { userId: string; eventType: RewardableEventType; sourceId: string; sourceEventKey?: string; units?: number; metadata?: Record<string, unknown>; occurredAt?: string }) {
   if (!REWARDABLE_EVENT_TYPES.includes(input.eventType)) throw new Error("REWARD_EVENT_TYPE_NOT_REGISTERED");
   const now = input.occurredAt ?? new Date().toISOString();
   const eventKey = input.sourceEventKey ?? `${input.eventType}:${input.sourceId}:${input.userId}`;
@@ -105,7 +107,9 @@ export async function grantRewardPointsForEvent(db: Firestore, input: { userId: 
   const settings = settingsSnap.data() ?? {};
   const defaultRule = DEFAULT_REWARD_RULES[input.eventType];
   const rule = ruleSnap.data() ?? {};
-  const configuredPoints = amount(rule.points ?? defaultRule.points);
+  const units = input.eventType === "dorocoin_purchase" ? amount(input.units) : 1;
+  if (input.eventType === "dorocoin_purchase" && units <= 0) throw new Error("REWARD_EVENT_UNITS_INVALID");
+  const configuredPoints = amount(rule.points ?? defaultRule.points) * units;
   const active = rule.active !== false;
   const seedProfile = { ...(profileSeedSnap.data() ?? {}), ...(userSeedSnap.data() ?? {}) };
   const timeZone = String(seedProfile.timeZone ?? seedProfile.timezone ?? settings.accountTimeZone ?? "UTC");
@@ -149,7 +153,7 @@ export async function grantRewardPointsForEvent(db: Firestore, input: { userId: 
     const nextBalance = previousBalance + spendableCredit;
     const nextDebt = previousDebt - debtPaid;
 
-    transaction.create(eventRef, { id: eventId, userId: input.userId, eventType: input.eventType, sourceId: input.sourceId, sourceEventKey: eventKey, ruleVersionId: String(rule.versionId ?? "launch-v1"), status: baseAward > 0 ? "processed" : settings.rewardEarningPaused === true ? "earning_paused" : active ? "cap_reached" : "rule_inactive", pointsAwarded: baseAward, metadata: input.metadata ?? {}, createdAt: now });
+    transaction.create(eventRef, { id: eventId, userId: input.userId, eventType: input.eventType, sourceId: input.sourceId, sourceEventKey: eventKey, ruleVersionId: String(rule.versionId ?? "launch-v1"), units, status: baseAward > 0 ? "processed" : settings.rewardEarningPaused === true ? "earning_paused" : active ? "cap_reached" : "rule_inactive", pointsAwarded: baseAward, metadata: input.metadata ?? {}, createdAt: now });
     if (MEANINGFUL_ACTIVITY.has(input.eventType as MeaningfulRewardActivity)) {
       const activityRef = db.collection("rewardActivityDays").doc(deterministicId("reward_activity", input.userId, dayKey));
       transaction.set(activityRef, { id: activityRef.id, userId: input.userId, dayKey, timeZone, eventTypes: FieldValue.arrayUnion(input.eventType), lastActivityAt: now, updatedAt: now }, { merge: true });
@@ -239,14 +243,14 @@ export async function checkInRewardStreak(db: Firestore, userId: string, nowDate
   });
 }
 
-export function entitlementExpiry(type: RewardEntitlementType, now = new Date()) {
-  if (type === "badge") return null;
-  const days = type === "creator_boost" ? 60 : 30;
-  return new Date(now.getTime() + days * 86400000).toISOString();
+export function entitlementExpiry(value?: string | null) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
-export function rewardEntitlementPayload(input: { id: string; userId: string; type: RewardEntitlementType; sourceId: string; value?: number; unit?: string; tier?: string; metadata?: Record<string, unknown>; now: string }) {
-  return { id: input.id, userId: input.userId, type: input.type, sourceType: "reward", sourceId: input.sourceId, value: amount(input.value), unit: input.unit ?? null, tier: input.tier ?? null, status: "available", reservationId: null, reservedUntil: null, consumedAt: null, expiresAt: entitlementExpiry(input.type, new Date(input.now)), metadata: input.metadata ?? {}, transferable: false, withdrawable: false, cashOutEnabled: false, createdAt: input.now, updatedAt: input.now };
+export function rewardEntitlementPayload(input: { id: string; userId: string; type: RewardEntitlementType; sourceId: string; value?: number; unit?: string; tier?: string; maximumFeeCents?: number | null; expiresAt?: string | null; metadata?: Record<string, unknown>; now: string }) {
+  return { id: input.id, userId: input.userId, type: input.type, sourceType: "reward", sourceId: input.sourceId, value: amount(input.value), unit: input.unit ?? null, tier: input.tier ?? null, maximumFeeCents: input.maximumFeeCents == null ? null : amount(input.maximumFeeCents), status: "available", reservationId: null, reservedUntil: null, consumedAt: null, expiresAt: entitlementExpiry(input.expiresAt), metadata: input.metadata ?? {}, transferable: false, withdrawable: false, cashOutEnabled: false, createdAt: input.now, updatedAt: input.now };
 }
 
 export function calculateEntryEntitlement(input: { type: RewardEntitlementType; value: number; feeCents: number; maximumFeeCents?: number | null }) {
@@ -254,7 +258,7 @@ export function calculateEntryEntitlement(input: { type: RewardEntitlementType; 
   const value = amount(input.value);
   if (input.type === "free_entry") return fee <= amount(input.maximumFeeCents ?? value) ? { eligible: true, discountCents: fee, payableCents: 0 } : { eligible: false, discountCents: 0, payableCents: fee };
   if (input.type === "fixed_entry_discount") { const discountCents = Math.min(value, fee); return { eligible: true, discountCents, payableCents: fee - discountCents }; }
-  if (input.type === "percentage_entry_discount") { const discountCents = Math.min(fee, Math.floor(fee * Math.min(100, value) / 100)); return { eligible: true, discountCents, payableCents: fee - discountCents }; }
+  if (input.type === "percentage_entry_discount") { const percentageDiscount = Math.floor(fee * Math.min(100, value) / 100); const discountCents = Math.min(fee, percentageDiscount, input.maximumFeeCents == null ? percentageDiscount : amount(input.maximumFeeCents)); return { eligible: true, discountCents, payableCents: fee - discountCents }; }
   return { eligible: false, discountCents: 0, payableCents: fee };
 }
 

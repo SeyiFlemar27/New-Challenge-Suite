@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 
 const messages: Record<string, string> = {
   WHEEL_POINT_COST_INVALID: "Enter a whole-number Spin cost greater than zero.",
+  WHEEL_POINT_COST_LOCKED: "Spin costs are fixed at 100, 250, and 500 Reward Points for Basic, Standard, and Premium.",
   WHEEL_ENTRIES_REQUIRED: "Add at least one available Prize.",
+  WHEEL_MINIMUM_REWARDS_REQUIRED: "Add at least four unique available Prizes before publishing.",
   WHEEL_PROBABILITY_TOTAL_INVALID: "Winning chances must total exactly 100%.",
   WHEEL_DUPLICATE_PRIZE: "Each prize can appear only once in a wheel version.",
   WHEEL_PRIZE_UNAVAILABLE: "Every wheel entry must reference an active prize in the selected tier.",
@@ -20,6 +22,7 @@ const messages: Record<string, string> = {
   WHEEL_DRAFT_CONFLICT: "This Draft changed while you were editing it. Review the latest version before continuing.",
   WHEEL_CASH_BUDGET_INVALID: "A Cash Prize needs a valid funded budget before it can be published.",
   WHEEL_PHYSICAL_FULFILLMENT_INVALID: "A Physical Prize needs inventory, delivery countries, and fulfilment details before it can be published.",
+  WHEEL_ENTRY_DISCOUNT_CAP_REQUIRED: "A percentage entry discount needs a maximum discount amount.",
 };
 
 export async function GET(request: Request) {

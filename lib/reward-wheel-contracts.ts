@@ -2,6 +2,12 @@ export const REWARD_WHEEL_PROBABILITY_UNITS = 1_000_000;
 
 export type RewardWheelTier = "basic" | "standard" | "premium";
 
+export const REWARD_WHEEL_POINT_COSTS: Record<RewardWheelTier, number> = {
+  basic: 100,
+  standard: 250,
+  premium: 500,
+};
+
 export type RewardWheelProbabilityEntry = {
   prizeId: string;
   probabilityUnits: number;

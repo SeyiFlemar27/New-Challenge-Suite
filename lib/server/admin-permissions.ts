@@ -18,7 +18,7 @@ export const ADMIN_PERMISSIONS = [
   "settings.view", "settings.editGeneral", "settings.editFinancial", "settings.editVoting", "settings.editPlans",
   "settings.editIntegrations", "roles.manage", "developerTools.view", "featureControls.manage",
   "systemDiagnostics.view", "jobs.view", "jobs.retry", "auditLogs.viewRaw", "qaTools.use",
-  "rewards.view", "rewards.configure", "rewards.publish", "rewards.adjustUser", "rewards.investigate", "rewards.fulfil", "rewards.emergencyControl"
+  "rewards.view", "rewards.configure", "rewards.publish", "rewards.adjustUser", "rewards.manualGrant", "rewards.investigate", "rewards.fulfil", "rewards.emergencyControl"
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];

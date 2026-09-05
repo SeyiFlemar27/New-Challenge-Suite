@@ -3,16 +3,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Award, CalendarCheck, Gift, History, Sparkles, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Card, LinkButton, PageTitle } from "@/components/ui";
+import { Button, Card, inputClass, LinkButton, PageTitle } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 type Summary = {
   availableRewardPoints?: number;
   streak?: { current?: number; eligibleToday?: boolean; checkedInToday?: boolean; nextMilestone?: { days: number; points: number } | null };
   achievements?: Array<{ id: string; current: number; target: number; points: number; earned: boolean }>;
-  entitlements?: Array<{ id: string; type?: string; value?: number; status?: string }>;
+  entitlements?: Array<{ id: string; type?: string; value?: number; status?: string; expiresAt?: string | null }>;
   recentRewards?: Array<{ id: string; prizeName?: string; prizeType?: string; createdAt?: string }>;
 };
+
+type BoostChallenge = { id: string; title: string; status: string };
 
 const tiers = [
   { id: "basic", label: "Basic Spin", cost: 100 },
@@ -24,6 +26,10 @@ export default function RewardsPage() {
   const [data, setData] = useState<Summary | null>(null);
   const [message, setMessage] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
+  const [boostEntitlementId, setBoostEntitlementId] = useState("");
+  const [boostChallenges, setBoostChallenges] = useState<BoostChallenge[]>([]);
+  const [selectedBoostChallenge, setSelectedBoostChallenge] = useState("");
+  const [boostBusy, setBoostBusy] = useState(false);
 
   function load() {
     apiRequest<Summary>("/api/rewards/summary").then((result) => result.ok ? setData(result.data ?? null) : setMessage(result.message));
@@ -37,6 +43,34 @@ export default function RewardsPage() {
     setMessage(result.message || (result.ok ? "Check-in recorded." : "Check-in could not be completed."));
     setCheckingIn(false);
     if (result.ok) load();
+  }
+
+  async function openCreatorBoost(entitlementId: string) {
+    setBoostBusy(true);
+    setMessage("");
+    const result = await apiRequest<{ challenges: BoostChallenge[] }>(`/api/rewards/creator-boost?entitlementId=${encodeURIComponent(entitlementId)}`);
+    setBoostBusy(false);
+    if (!result.ok) { setMessage(result.message); return; }
+    const challenges = result.data?.challenges ?? [];
+    setBoostEntitlementId(entitlementId);
+    setBoostChallenges(challenges);
+    setSelectedBoostChallenge(challenges[0]?.id ?? "");
+    if (!challenges.length) setMessage("You do not have an eligible Scheduled or Active challenge yet. Your Creator Boost remains available.");
+  }
+
+  async function applyCreatorBoost() {
+    if (!boostEntitlementId || !selectedBoostChallenge) return;
+    setBoostBusy(true);
+    setMessage("");
+    const result = await apiRequest("/api/rewards/creator-boost", { method: "POST", body: JSON.stringify({ entitlementId: boostEntitlementId, challengeId: selectedBoostChallenge }) });
+    setBoostBusy(false);
+    setMessage(result.message);
+    if (result.ok) {
+      setBoostEntitlementId("");
+      setBoostChallenges([]);
+      setSelectedBoostChallenge("");
+      load();
+    }
   }
 
   const points = Number(data?.availableRewardPoints ?? 0);
@@ -80,7 +114,20 @@ export default function RewardsPage() {
       <Card className="mt-6 p-6"><h2 className="text-xl font-black">Earn Points</h2><p className="mt-2 text-sm text-slate-400">Points are recorded only after the qualifying activity is confirmed by Challenge Suite.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{["Complete your profile", "Verify your account", "Submit an approved entry", "Complete a challenge", "Cast a valid free vote", "Earn an official placement"].map((method) => <div key={method} className="rounded-[8px] border border-white/10 p-4 text-sm font-bold">{method}</div>)}</div></Card>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card className="p-6"><h2 className="text-xl font-black">Achievements</h2><div className="mt-5 space-y-4">{data.achievements?.map((achievement) => <div key={achievement.id}><div className="flex items-center justify-between gap-4 text-sm"><span className="font-bold capitalize">{achievement.id.replaceAll("-", " ")}</span><span className="text-slate-400">{achievement.earned ? "Earned" : `${achievement.current}/${achievement.target}`}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--gold)]" style={{ width: `${Math.min(100, achievement.target ? achievement.current / achievement.target * 100 : 0)}%` }} /></div></div>)}</div></Card>
-        <Card className="p-6"><h2 className="text-xl font-black">Your Rewards</h2>{data.entitlements?.length ? <div className="mt-5 space-y-3">{data.entitlements.map((item) => <div key={item.id} className="rounded-[8px] border border-white/10 p-4"><p className="font-bold capitalize">{String(item.type ?? "reward").replaceAll("_", " ")}</p><p className="mt-1 text-xs text-slate-400">Available to use through the applicable Challenge Suite flow.</p></div>)}</div> : <p className="mt-2 text-sm text-slate-400">Entry discounts, boosts, Bonus Spins, and badges you win will appear here.</p>}</Card>
+        <Card className="p-6">
+          <h2 className="text-xl font-black">Your Rewards</h2>
+          {data.entitlements?.length ? <div className="mt-5 space-y-3">{data.entitlements.map((item) => <div key={item.id} className="rounded-[8px] border border-white/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><div className="flex flex-wrap items-center gap-2"><p className="font-bold capitalize">{String(item.type ?? "reward").replaceAll("_", " ")}</p><span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black uppercase text-slate-400">{String(item.status ?? "available").replaceAll("_", " ")}</span></div><p className="mt-1 text-xs text-slate-400">{item.type === "creator_boost" ? "Apply one 3-day discovery boost to an eligible challenge you own." : "Use this reward through its applicable Challenge Suite flow."}</p></div>
+              {item.type === "creator_boost" && item.status === "available" ? <Button variant="secondary" onClick={() => openCreatorBoost(item.id)} disabled={boostBusy}>Apply</Button> : null}
+            </div>
+            {item.type === "creator_boost" && boostEntitlementId === item.id && boostChallenges.length ? <div className="mt-4 border-t border-white/10 pt-4">
+              <label className="text-xs font-black uppercase text-slate-400" htmlFor={`boost-challenge-${item.id}`}>Eligible challenge</label>
+              <select id={`boost-challenge-${item.id}`} className={`${inputClass} mt-2`} value={selectedBoostChallenge} onChange={(event) => setSelectedBoostChallenge(event.target.value)}>{boostChallenges.map((challenge) => <option key={challenge.id} value={challenge.id}>{challenge.title}</option>)}</select>
+              <div className="mt-3 flex flex-wrap gap-2"><Button onClick={applyCreatorBoost} disabled={boostBusy || !selectedBoostChallenge}>{boostBusy ? "Applying..." : "Apply 3-day Boost"}</Button><Button variant="secondary" onClick={() => { setBoostEntitlementId(""); setBoostChallenges([]); setSelectedBoostChallenge(""); }}>Cancel</Button></div>
+            </div> : null}
+          </div>)}</div> : <p className="mt-2 text-sm text-slate-400">Entry discounts, boosts, Bonus Spins, and badges you win will appear here.</p>}
+        </Card>
       </div>
       <Card className="mt-6 p-6"><div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black">Recent Rewards</h2><LinkButton href="/rewards/history" variant="secondary">View History</LinkButton></div>{data.recentRewards?.length ? <div className="mt-5 divide-y divide-white/10">{data.recentRewards.map((item) => <div key={item.id} className="flex items-center justify-between gap-4 py-4"><span className="font-bold">{item.prizeName}</span><span className="text-sm text-slate-400">{item.createdAt ?? "Recorded"}</span></div>)}</div> : <p className="mt-4 text-sm text-slate-400">Your confirmed Spin results will appear here.</p>}</Card>
     </> : null}

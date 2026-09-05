@@ -55,8 +55,11 @@ const BOOST_RANKING_BLOCKED = new Set(["draft", "pending_review", "changes_reque
 export function hasActiveMonthlyBoost(challenge: Record<string, unknown>, now = new Date()) {
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
   if (BOOST_RANKING_BLOCKED.has(status) || challenge.deleted === true || challenge.publicVisibility === false || challenge.moderationBlocked === true) return false;
-  const endsAt = Date.parse(String(challenge.monthlyBoostEndsAt ?? challenge.boostEndsAt ?? challenge.boostedUntil ?? ""));
-  return Number.isFinite(endsAt) && endsAt > now.getTime();
+  const endsAt = [challenge.monthlyBoostEndsAt, challenge.rewardBoostEndsAt, challenge.boostEndsAt, challenge.boostedUntil]
+    .map((value) => Date.parse(String(value ?? "")))
+    .filter(Number.isFinite)
+    .reduce((latest, value) => Math.max(latest, value), 0);
+  return endsAt > now.getTime();
 }
 
 export function monthlyBoostRankingWeight(challenge: Record<string, unknown>, now = new Date()) {

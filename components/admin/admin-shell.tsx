@@ -53,6 +53,7 @@ const groups: NavGroup[] = [
     { href: "/admin/rewards/prize-wheel", label: "Prize Wheel", icon: RefreshCw, permission: "rewards.view" },
     { href: "/admin/rewards/prize-catalog", label: "Prize Catalog", icon: Gift, permission: "rewards.view" },
     { href: "/admin/rewards/fulfilment", label: "Fulfilment", icon: ClipboardCheck, permission: "rewards.fulfil" },
+    { href: "/admin/rewards/manual-grant", label: "Manual Grant", icon: Gift, permission: "rewards.manualGrant" },
     { href: "/admin/rewards/adjustments", label: "Adjustments", icon: SlidersHorizontal, permission: "rewards.adjustUser" }
   ] },
   { label: "Safety & Support", items: [

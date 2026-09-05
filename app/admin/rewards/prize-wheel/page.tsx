@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, Equal, Gift, History, Plus, S
 import { RewardWheelVisual } from "@/components/rewards/reward-wheel-visual";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
-import { REWARD_WHEEL_PROBABILITY_UNITS, distributeProbabilityUnits, probabilityPercent, probabilityUnitsFromPercent, probabilityUnitsFromRelativeWeights } from "@/lib/reward-wheel-contracts";
+import { REWARD_WHEEL_POINT_COSTS, REWARD_WHEEL_PROBABILITY_UNITS, distributeProbabilityUnits, probabilityPercent, probabilityUnitsFromPercent, probabilityUnitsFromRelativeWeights } from "@/lib/reward-wheel-contracts";
 
 const tiers = ["basic", "standard", "premium"] as const;
 type Tier = (typeof tiers)[number];
@@ -16,8 +16,8 @@ type WheelData = { prizes: Prize[]; versions: Version[]; activeVersionIds: Recor
 type DraftResponse = { version: Version };
 type EditableEntry = { prizeId: string; probabilityUnits: number };
 
-const fallbackCosts: Record<Tier, number> = { basic: 100, standard: 250, premium: 500 };
 const tierLabels: Record<Tier, string> = { basic: "Basic", standard: "Standard", premium: "Premium" };
+const supportedRewardTypes = new Set(["reward_points", "dorocoin", "cash", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin"]);
 
 function editableEntries(entries: Entry[]): EditableEntry[] {
   if (entries.length && entries.every((entry) => Number.isInteger(entry.probabilityUnits) && Number(entry.probabilityUnits) > 0)) return entries.map((entry) => ({ prizeId: entry.prizeId, probabilityUnits: Number(entry.probabilityUnits) }));
@@ -25,6 +25,7 @@ function editableEntries(entries: Entry[]): EditableEntry[] {
 }
 
 function prizeAvailability(prize: Prize) {
+  if (!supportedRewardTypes.has(prize.prizeType)) return { available: false, reason: "This reward type is not supported in the current Wheel release." };
   if (!prize.enabled || prize.status !== "active") return { available: false, reason: "Prize is not active." };
   if (prize.rewardValue <= 0) return { available: false, reason: "Prize value is incomplete." };
   if (prize.prizeType === "cash" && (!prize.budgetId || !Number(prize.economicValueCents))) return { available: false, reason: "A funded Cash budget is required." };
@@ -39,7 +40,7 @@ export default function AdminPrizeWheelPage() {
   const [selectedTier, setSelectedTier] = useState<Tier>("basic");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
-  const [pointCost, setPointCost] = useState(100);
+  const pointCost = REWARD_WHEEL_POINT_COSTS[selectedTier];
   const [entries, setEntries] = useState<EditableEntry[]>([]);
   const [message, setMessage] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -68,10 +69,9 @@ export default function AdminPrizeWheelPage() {
     if (!data) return;
     const source = draftVersion ?? activeVersion;
     const nextEntries = editableEntries(source?.entries ?? []);
-    const nextCost = source?.pointCost || fallbackCosts[selectedTier];
-    setDraftId(draftVersion?.id ?? null); setRevision(draftVersion?.revision ?? 0); setPointCost(nextCost); setEntries(nextEntries); setMessage(""); setSaveState("idle");
-    lastSavedRef.current = JSON.stringify({ pointCost: nextCost, entries: nextEntries }); initializedRef.current = true;
-  }, [activeVersion, data, draftVersion, selectedTier]);
+    setDraftId(draftVersion?.id ?? null); setRevision(draftVersion?.revision ?? 0); setEntries(nextEntries); setMessage(""); setSaveState("idle");
+    lastSavedRef.current = JSON.stringify({ pointCost, entries: nextEntries }); initializedRef.current = true;
+  }, [activeVersion, data, draftVersion, pointCost, selectedTier]);
 
   const includedPrizes = entries.map((entry) => ({ entry, prize: tierPrizes.find((prize) => prize.id === entry.prizeId) })).filter((row): row is { entry: EditableEntry; prize: Prize } => Boolean(row.prize));
   const totalUnits = entries.reduce((sum, entry) => sum + entry.probabilityUnits, 0);
@@ -81,7 +81,7 @@ export default function AdminPrizeWheelPage() {
   const expectedRewardPoints = previewItems.reduce((sum, item) => sum + (item.prizeType === "reward_points" ? item.rewardValue * Number(item.resolvedProbability) : 0), 0);
   const returnRatio = pointCost > 0 ? expectedRewardPoints / pointCost : 0;
   const highRisk = includedPrizes.some(({ prize }) => ["cash", "physical_item"].includes(prize.prizeType));
-  const canPublish = Boolean(draftId && entries.length && entries.every((entry) => entry.probabilityUnits > 0) && exactTotal && returnRatio < 1 && Number.isInteger(pointCost) && pointCost > 0);
+  const canPublish = Boolean(draftId && entries.length >= 4 && entries.every((entry) => entry.probabilityUnits > 0) && exactTotal && returnRatio < 1);
   const signature = JSON.stringify({ pointCost, entries });
 
   useEffect(() => {
@@ -111,27 +111,27 @@ export default function AdminPrizeWheelPage() {
   return <>
     <PageTitle title="Spin Wheel Configuration" subtitle="Configure the rewards and winning chances for each Spin tier." icon={<Gift />} />
     {message ? <Card className="mt-5 p-4 text-sm font-bold" role="status">{message}</Card> : null}
-    <div className="mt-6 grid gap-3 md:grid-cols-3" role="tablist" aria-label="Wheel tiers">{tiers.map((item) => { const itemActive = data?.activeVersionIds?.[item]; const itemDraft = data?.versions.some((version) => version.tier === item && version.status === "draft"); const itemCost = data?.versions.find((version) => version.id === itemActive)?.pointCost; return <button key={item} type="button" role="tab" aria-selected={selectedTier === item} onClick={() => { initializedRef.current = false; setSelectedTier(item); }} className={`min-h-24 rounded-[8px] border p-4 text-left ${selectedTier === item ? "border-[var(--gold)] bg-amber-50" : "border-[var(--line)] bg-[var(--panel)]"}`}><strong className="block text-lg">{tierLabels[item]}</strong><span className="mt-1 block text-sm">{itemCost ? `${itemCost.toLocaleString()} points` : "No active cost"}</span><span className="mt-2 block text-xs font-bold text-[var(--muted)]">{itemDraft ? "Draft" : itemActive ? "Published" : "Not configured"}</span></button>; })}</div>
+    <div className="mt-6 grid gap-3 md:grid-cols-3" role="tablist" aria-label="Wheel tiers">{tiers.map((item) => { const itemActive = data?.activeVersionIds?.[item]; const itemDraft = data?.versions.some((version) => version.tier === item && version.status === "draft"); const itemCost = REWARD_WHEEL_POINT_COSTS[item]; return <button key={item} type="button" role="tab" aria-selected={selectedTier === item} onClick={() => { initializedRef.current = false; setSelectedTier(item); }} className={`min-h-24 rounded-[8px] border p-4 text-left ${selectedTier === item ? "border-[var(--gold)] bg-amber-50" : "border-[var(--line)] bg-[var(--panel)]"}`}><strong className="block text-lg">{tierLabels[item]}</strong><span className="mt-1 block text-sm">{itemCost ? `${itemCost.toLocaleString()} points` : "No active cost"}</span><span className="mt-2 block text-xs font-bold text-[var(--muted)]">{itemDraft ? "Draft" : itemActive ? "Published" : "Not configured"}</span></button>; })}</div>
 
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)]">
       <div className="space-y-6">
         <Card className="p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-black uppercase text-[var(--gold)]">1 Rewards</p><h2 className="mt-2 text-xl font-black">Rewards on this Wheel</h2><p className="mt-1 text-sm text-[var(--muted)]">Only included Catalog Prizes appear here.</p></div><Button onClick={() => setPickerOpen(true)}><Plus size={17} /> Add Reward</Button></div>
           <div className="mt-5 space-y-3">{includedPrizes.map(({ prize }) => <div key={prize.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[var(--line)] p-4"><div><strong>{prize.prizeName}</strong><span className="mt-1 block text-xs capitalize text-[var(--muted)]">{prize.prizeType.replaceAll("_", " ")}</span></div><button type="button" onClick={() => removePrize(prize.id)} className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--line)]" aria-label={`Remove ${prize.prizeName}`}><Trash2 size={17} /></button></div>)}</div>
-          {!includedPrizes.length ? <div className="mt-5 rounded-[8px] border border-dashed border-[var(--line)] p-8 text-center"><Gift className="mx-auto text-[var(--gold)]" /><h3 className="mt-3 font-black">No rewards on this Wheel yet</h3><p className="mt-2 text-sm text-[var(--muted)]">Add at least one Prize to begin.</p></div> : null}
+          {!includedPrizes.length ? <div className="mt-5 rounded-[8px] border border-dashed border-[var(--line)] p-8 text-center"><Gift className="mx-auto text-[var(--gold)]" /><h3 className="mt-3 font-black">No rewards on this Wheel yet</h3><p className="mt-2 text-sm text-[var(--muted)]">Add at least four unique Prizes to publish.</p></div> : includedPrizes.length < 4 ? <p className="mt-4 text-sm font-bold text-amber-700">Add {4 - includedPrizes.length} more unique {includedPrizes.length === 3 ? "Prize" : "Prizes"} before publishing.</p> : null}
           <LinkButton className="mt-5" href="/admin/rewards/prize-catalog" variant="secondary">Manage Prize Catalog</LinkButton>
         </Card>
 
         <Card className="p-5 sm:p-6"><p className="text-xs font-black uppercase text-[var(--gold)]">2 Chances</p><div className="mt-2 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-black">Set Winning Chances</h2><p className="mt-1 text-sm text-[var(--muted)]">Enter exact percentages. The published total must equal 100%.</p></div><Button variant="secondary" onClick={() => setEntries(distributeProbabilityUnits(entries.map((entry) => entry.prizeId)))} disabled={!entries.length}><Equal size={17} /> Distribute Evenly</Button></div>
           <div className="mt-5 space-y-3">{includedPrizes.map(({ entry, prize }) => <div key={prize.id} className="grid items-center gap-3 rounded-[8px] border border-[var(--line)] p-4 sm:grid-cols-[minmax(0,1fr)_130px]"><label className="font-bold" htmlFor={`chance-${prize.id}`}>{prize.prizeName}</label><div className="relative"><input id={`chance-${prize.id}`} className={`${inputClass} pr-9 text-right tabular-nums`} type="number" min="0" max="100" step="0.0001" value={Number(probabilityPercent(entry.probabilityUnits).toFixed(4))} onChange={(event) => setChance(prize.id, Number(event.target.value))} /><span className="pointer-events-none absolute right-3 top-3 text-sm font-bold">%</span></div>{entry.probabilityUnits === 0 ? <p className="text-sm text-amber-700 sm:col-span-2">A 0% Prize will not appear. Remove it or assign a winning chance.</p> : null}</div>)}</div>
           <div className={`mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border p-4 ${exactTotal ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-950"}`}><strong>Total</strong><strong className="text-xl tabular-nums">{totalPercent.toFixed(4)}%</strong><span className="basis-full text-sm">{exactTotal ? "Winning chances are fully allocated." : totalUnits > REWARD_WHEEL_PROBABILITY_UNITS ? `Reduce the chances by ${(totalPercent - 100).toFixed(4)}% before publishing.` : `Allocate the remaining ${(100 - totalPercent).toFixed(4)}% before publishing.`}</span></div>
-          <Field label="Spin Cost"><div className="mt-2 flex items-center gap-3"><input className={`${inputClass} max-w-40`} type="number" min="1" step="1" value={pointCost} onChange={(event) => setPointCost(Number(event.target.value))} /><span className="text-sm font-bold">Reward Points</span></div></Field>
+          <Field label="Spin Cost"><div className="mt-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-4 py-3"><strong>{pointCost.toLocaleString()} Reward Points</strong><span className="mt-1 block text-xs text-[var(--muted)]">Spin costs are fixed for this tier.</span></div></Field>
           <button type="button" onClick={() => setAdvanced((value) => !value)} className="mt-5 flex min-h-11 items-center gap-2 text-sm font-bold" aria-expanded={advanced}><ChevronDown size={17} className={advanced ? "rotate-180" : ""} /> Advanced Configuration</button>{advanced ? <div className="rounded-[8px] border border-[var(--line)] p-4 text-sm"><p>Canonical precision: {REWARD_WHEEL_PROBABILITY_UNITS.toLocaleString()} units = 100%.</p><div className="mt-3 space-y-2">{includedPrizes.map(({ entry, prize }) => <div key={prize.id} className="flex justify-between gap-3"><span>{prize.prizeName}</span><span className="tabular-nums">{entry.probabilityUnits.toLocaleString()} units</span></div>)}</div></div> : null}
           <p className="mt-4 text-sm text-[var(--muted)]" aria-live="polite">{saveState === "saving" ? "Saving Draft..." : saveState === "saved" ? "Draft saved" : saveState === "error" ? "Draft could not be saved. Review the message above and retry." : draftVersion ? "Draft ready" : "Changes will create a Draft automatically."}</p>
         </Card>
       </div>
 
       <div className="space-y-6 xl:sticky xl:top-6">
-        <Card className="p-5 sm:p-6"><p className="text-xs font-black uppercase text-[var(--gold)]">3 Review</p><h2 className="mt-2 text-xl font-black">Real Wheel Preview</h2><p className="mt-1 text-sm text-[var(--muted)]">This preview never creates a Spin, debit, award, or reservation.</p>{previewItems.length ? <div className="mx-auto mt-5 w-full max-w-[390px]"><RewardWheelVisual items={previewItems} label={`${tierLabels[selectedTier]} Draft Wheel preview`} showPointer={false} centerLabel="PREVIEW" /></div> : <div className="mt-5 aspect-square max-h-[390px] rounded-full border border-dashed border-[var(--line)] p-10 text-center text-sm text-[var(--muted)] grid place-items-center">Add rewards with positive chances to preview the Wheel.</div>}
+        <Card className="p-5 sm:p-6"><p className="text-xs font-black uppercase text-[var(--gold)]">3 Review</p><h2 className="mt-2 text-xl font-black">Real Wheel Preview</h2><p className="mt-1 text-sm text-[var(--muted)]">This preview never creates a Spin, debit, award, or reservation.</p>{previewItems.length ? <div className="mx-auto mt-5 w-full max-w-[390px]"><RewardWheelVisual items={previewItems} label={`${tierLabels[selectedTier]} Draft Wheel preview`} showPointer={false} centerLabel="PREVIEW" showAccessibleProbabilities /></div> : <div className="mt-5 aspect-square max-h-[390px] rounded-full border border-dashed border-[var(--line)] p-10 text-center text-sm text-[var(--muted)] grid place-items-center">Add rewards with positive chances to preview the Wheel.</div>}
           <dl className="mt-5 grid grid-cols-2 gap-4 text-sm"><div><dt className="text-[var(--muted)]">Spin Cost</dt><dd className="mt-1 font-black">{pointCost.toLocaleString()} points</dd></div><div><dt className="text-[var(--muted)]">Rewards</dt><dd className="mt-1 font-black">{includedPrizes.length}</dd></div><div><dt className="text-[var(--muted)]">Total Chance</dt><dd className="mt-1 font-black">{totalPercent.toFixed(4)}%</dd></div><div><dt className="text-[var(--muted)]">Status</dt><dd className="mt-1 font-black">{canPublish ? "Ready to publish" : "Needs attention"}</dd></div></dl>
           <button type="button" onClick={() => setEconomicsOpen((value) => !value)} className="mt-5 flex min-h-11 items-center gap-2 text-sm font-bold" aria-expanded={economicsOpen}><ChevronDown size={17} className={economicsOpen ? "rotate-180" : ""} /> Economic Analysis</button>{economicsOpen ? <div className="rounded-[8px] border border-[var(--line)] p-4"><dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-[var(--muted)]">Expected Reward Points</dt><dd className="font-black">{expectedRewardPoints.toFixed(2)}</dd></div><div><dt className="text-[var(--muted)]">Point return ratio</dt><dd className="font-black">{(returnRatio * 100).toFixed(2)}%</dd></div></dl>{returnRatio >= 1 ? <p className="mt-4 flex gap-2 text-sm text-red-700"><AlertTriangle size={17} /> Publishing is blocked at a 100% or greater Reward Point return.</p> : returnRatio >= .85 ? <p className="mt-4 flex gap-2 text-sm text-amber-700"><AlertTriangle size={17} /> Review the high Reward Point return.</p> : <p className="mt-4 flex gap-2 text-sm text-emerald-700"><CheckCircle2 size={17} /> Reward Point guardrail passed.</p>}</div> : null}
         </Card>

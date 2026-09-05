@@ -27,7 +27,7 @@ function arc(startAngle: number, endAngle: number) {
   return [`M ${center} ${center}`, `L ${start.x} ${start.y}`, `A ${radius} ${radius} 0 ${endAngle - startAngle > 180 ? 1 : 0} 0 ${end.x} ${end.y}`, "Z"].join(" ");
 }
 
-export function RewardWheelVisual({ items, label, rotation = 0, spinning = false, showPointer = true, centerLabel = "SPIN" }: { items: WheelItem[]; label: string; rotation?: number; spinning?: boolean; showPointer?: boolean; centerLabel?: string }) {
+export function RewardWheelVisual({ items, label, rotation = 0, spinning = false, showPointer = true, centerLabel = "SPIN", showAccessibleProbabilities = false }: { items: WheelItem[]; label: string; rotation?: number; spinning?: boolean; showPointer?: boolean; centerLabel?: string; showAccessibleProbabilities?: boolean }) {
   const segments = useMemo(() => buildRewardWheelSegments(items), [items]);
   if (!segments.length) return null;
 
@@ -47,6 +47,6 @@ export function RewardWheelVisual({ items, label, rotation = 0, spinning = false
       <circle cx="50" cy="50" r="9" fill="#111" stroke="#f6c64b" strokeWidth="1" />
       <text x="50" y="50" fill="#f6c64b" fontSize="3.4" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{centerLabel}</text>
     </svg>
-    <ul className="sr-only">{segments.map((segment) => <li key={segment.id}>{segment.prizeName}: {(segment.probability * 100).toFixed(4)}%</li>)}</ul>
+    <ul className="sr-only">{segments.map((segment) => <li key={segment.id}>{segment.prizeName}{showAccessibleProbabilities ? `: ${(segment.probability * 100).toFixed(4)}%` : ""}</li>)}</ul>
   </div>;
 }

@@ -23,22 +23,12 @@ const currentUser = read("lib/hooks/use-current-user.ts");
 const provider = read("components/i18n/i18n-provider.tsx");
 const languageHook = read("lib/i18n/use-language.ts");
 
-const starterTable = rewards.slice(rewards.indexOf("export const DEFAULT_REWARD_PRIZES"), rewards.indexOf("function wheelEntrySignature"));
-for (const marker of [
-  '"launch-basic-20-dorocoins", "20 DoroCoins", "basic", "dorocoin", "common", 30',
-  '"launch-basic-250-points", "250 Reward Points", "basic", "reward_points", "very_rare", 1',
-  '"launch-standard-75-dorocoins", "75 DoroCoins", "standard", "dorocoin", "common", 26',
-  '"launch-standard-5-free-entry", "Free Entry Credit up to $5", "standard", "free_entry", "very_rare", 1',
-  '"launch-premium-150-dorocoins", "150 DoroCoins", "premium", "dorocoin", "common", 22',
-  '"launch-premium-1000-points", "1,000 Reward Points", "premium", "reward_points", "very_rare", 1',
-]) assert.ok(starterTable.includes(marker), `missing safe starter entry ${marker}`);
-assert.ok(!starterTable.includes('"cash"'), "starter wheel must not invent a Cash prize");
-assert.ok(!starterTable.includes('"physical_item"'), "starter wheel must not invent a physical prize");
+assert.ok(!rewards.includes("DEFAULT_REWARD_PRIZES"), "production must not contain hardcoded fallback rewards");
 assert.match(rewards, /rewardWheelActiveVersions/);
 assert.match(rewards, /rewardWheelVersions/);
 assert.match(rewards, /pointerSnaps\.every\(\(snap\) => snap\.exists\)/);
 assert.match(rewards, /if \(pointerSnaps\[index\]\.exists\) continue/);
-assert.match(rewards, /source = configured\.length \? configured : legacy\.length \? legacy : DEFAULT_REWARD_PRIZES/);
+assert.match(rewards, /if \(absent\) return \{ seeded: false, migrated: false, setupRequired: true \}/);
 assert.match(rewards, /resolveRewardWheel/);
 assert.match(rewards, /const prizes = wheel\.prizes/);
 assert.match(rewards, /const pointCost = wheel\.pointCost/);
@@ -100,6 +90,8 @@ assert.match(wheelApi, /expectedRevision/);
 assert.match(wheelApi, /revalidatePath\("\/rewards\/wheel"\)/);
 assert.match(rewards, /status: "published", immutable: true/);
 assert.match(rewards, /WHEEL_ENTRIES_REQUIRED/);
+assert.match(rewards, /WHEEL_MINIMUM_REWARDS_REQUIRED/);
+assert.match(rewards, /options\.requireExactTotal && ids\.size < 4/);
 assert.match(rewards, /WHEEL_PROBABILITY_TOTAL_INVALID/);
 assert.match(rewards, /WHEEL_DRAFT_CONFLICT/);
 assert.match(rewards, /WHEEL_REWARD_POINT_RETURN_BLOCKED/);

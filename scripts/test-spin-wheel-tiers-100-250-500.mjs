@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
 
 const rewards = read("lib/server/rewards.ts");
+const contracts = read("lib/reward-wheel-contracts.ts");
 const wheel = read("app/rewards/wheel/page.tsx");
 
-assert(rewards.includes("thresholds: { basic: 100, standard: 250, premium: 500 }"));
+assert(contracts.includes("basic: 100"));
+assert(contracts.includes("standard: 250"));
+assert(contracts.includes("premium: 500"));
+assert(rewards.includes("thresholds: REWARD_WHEEL_POINT_COSTS"));
 assert(wheel.includes("activeConfig?.pointCost"));
 assert(wheel.includes("wheelConfigs"));
 assert(!wheel.includes("fallbackCosts"));

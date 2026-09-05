@@ -4,13 +4,30 @@ import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import { Button, Card, Field, inputClass, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { REWARD_WHEEL_POINT_COSTS } from "@/lib/reward-wheel-contracts";
+
+type RewardSettings = {
+  rewardsEnabled: boolean;
+  maintenanceMode: boolean;
+  tierEnabled: Record<keyof typeof REWARD_WHEEL_POINT_COSTS, boolean>;
+  supportContact: string;
+  publicWheelRules: string;
+};
+
+const initialSettings: RewardSettings = {
+  rewardsEnabled: true,
+  maintenanceMode: false,
+  tierEnabled: { basic: true, standard: true, premium: true },
+  supportContact: "",
+  publicWheelRules: "",
+};
 
 export default function RewardSettingsPage() {
-  const [settings, setSettings] = useState<any>({ thresholds: { basic: 100, standard: 250, premium: 500 }, tierEnabled: { basic: true, standard: true, premium: true } });
+  const [settings, setSettings] = useState<RewardSettings>(initialSettings);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    apiRequest<any>("/api/admin/rewards/settings").then((result) => result.ok && setSettings(result.data?.settings));
+    apiRequest<{ settings: RewardSettings }>("/api/admin/rewards/settings").then((result) => result.ok && result.data?.settings && setSettings(result.data.settings));
   }, []);
 
   async function save() {
@@ -22,14 +39,11 @@ export default function RewardSettingsPage() {
   }
 
   return <>
-    <PageTitle title="Reward Settings" subtitle="Configure thresholds, limits, campaign rules, maintenance, and reward safety." icon={<Settings />} />
+    <PageTitle title="Reward Settings" subtitle="Configure availability, support, campaign rules, and reward safety." icon={<Settings />} />
     {message ? <Card className="mt-6 p-4 text-yellow-100">{message}</Card> : null}
     <Card className="mt-8 p-6">
       <div className="grid gap-5 md:grid-cols-3">
-        <Field label="Basic threshold"><input className={inputClass} type="number" value={settings.thresholds?.basic ?? 100} onChange={(event) => setSettings({ ...settings, thresholds: { ...settings.thresholds, basic: Number(event.target.value) } })} /></Field>
-        <Field label="Standard threshold"><input className={inputClass} type="number" value={settings.thresholds?.standard ?? 250} onChange={(event) => setSettings({ ...settings, thresholds: { ...settings.thresholds, standard: Number(event.target.value) } })} /></Field>
-        <Field label="Premium threshold"><input className={inputClass} type="number" value={settings.thresholds?.premium ?? 500} onChange={(event) => setSettings({ ...settings, thresholds: { ...settings.thresholds, premium: Number(event.target.value) } })} /></Field>
-        <Field label="Points per DoroCoin"><input className={inputClass} type="number" value={settings.pointsPerDoroCoin ?? 1} onChange={(event) => setSettings({ ...settings, pointsPerDoroCoin: Number(event.target.value) })} /></Field>
+        {(Object.entries(REWARD_WHEEL_POINT_COSTS) as Array<[keyof typeof REWARD_WHEEL_POINT_COSTS, number]>).map(([tier, cost]) => <div key={tier} className="rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] p-4"><span className="text-xs font-black uppercase text-[var(--muted)]">{tier} Spin</span><strong className="mt-2 block text-xl">{cost.toLocaleString()} points</strong><span className="mt-1 block text-xs text-[var(--muted)]">Fixed platform cost</span><label className="mt-4 flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={settings.tierEnabled[tier] !== false} onChange={(event) => setSettings({ ...settings, tierEnabled: { ...settings.tierEnabled, [tier]: event.target.checked } })} /> Tier enabled</label></div>)}
         <Field label="Support contact"><input className={inputClass} value={settings.supportContact ?? ""} onChange={(event) => setSettings({ ...settings, supportContact: event.target.value })} /></Field>
       </div>
       <Field label="Public wheel rules"><textarea className={textareaClass} value={settings.publicWheelRules ?? ""} onChange={(event) => setSettings({ ...settings, publicWheelRules: event.target.value })} /></Field>

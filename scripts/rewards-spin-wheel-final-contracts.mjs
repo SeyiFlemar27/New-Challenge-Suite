@@ -12,7 +12,7 @@ const prizeCatalog = read("app/admin/rewards/prize-catalog/page.tsx");
 const sidebar = read("components/sidebar.tsx");
 const earnings = read("app/earnings/page.tsx");
 
-assert.match(rewards, /spinCosts: \{ basic: 100, standard: 250, premium: 500 \}/);
+assert.match(rewards, /spinCosts: REWARD_WHEEL_POINT_COSTS/);
 assert.match(wheel, /Confirm Spin/);
 assert.match(wheel, /paymentSource/);
 assert.match(wheel, /bonus_spin/);
@@ -39,18 +39,15 @@ assert.match(rewards, /externalPayoutExecuted: false/);
 assert.match(earnings, /reward_spin_cash/);
 assert(!rewards.includes("payoutProviderCalled: true"));
 
-assert.match(rewards, /prizeType === "physical_item"/);
-assert.match(rewards, /reservedQuantity: FieldValue\.increment\(1\)/);
-assert.match(rewards, /delivery_details_required/);
-assert.match(rewards, /deliveryDetailsDueAt/);
-assert.match(rewards, /deliveryCountries/);
-assert.match(rewards, /DELIVERY_COUNTRY_NOT_ELIGIBLE/);
-assert.match(history, /addressLine1/);
-assert.match(history, /postalCode/);
-assert.match(claim, /deliveryNotes/);
-assert(!history.includes("deliveryAddress"));
+assert.match(rewards, /SUPPORTED_SPIN_REWARD_TYPES/);
+assert.match(history, /Reward Point credits and debits/);
+assert.match(history, /Reward Grant/);
+assert.match(history, /Entitlement/);
+assert.match(history, /Fulfillment/);
+assert.ok(!history.includes("physical_item"));
 
-for (const type of ["reward_points", "dorocoin", "cash", "physical_item", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin", "badge"]) assert(prizeCatalog.includes(`value="${type}"`), `missing structured Prize Catalog type ${type}`);
+for (const type of ["reward_points", "dorocoin", "cash", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin"]) assert(prizeCatalog.includes(`value="${type}"`), `missing structured Prize Catalog type ${type}`);
+for (const removedType of ["physical_item", "badge"]) assert(!prizeCatalog.includes(`value="${removedType}"`), `removed Reward type is still active: ${removedType}`);
 assert(prizeCatalog.includes("Delivery country codes"));
 assert(prizeCatalog.includes("Available quantity"));
 assert(!prizeCatalog.includes('label="Reward type"><input'));
