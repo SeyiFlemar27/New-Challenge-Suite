@@ -29,7 +29,7 @@ for (const route of ["/subscriptions", "/wallet", "/dorocoins", "/rewards", "/da
 assert(routing.includes('prefixes: ["/enterprise"]') && routing.includes('requiredWorkspace: "enterprise"'), "Enterprise operational routes must require Enterprise context.");
 assert(routing.includes('surface: "Sponsor panel"') && routing.includes('semantics: "sponsor", requiredWorkspace: null'), "Sponsor Panel must use dedicated server-authorized context without becoming a switchable workspace.");
 assert(boundary.includes('method: "PATCH"') && boundary.includes("/api/auth/workspace"), "Cross-workspace route changes must use the canonical server API.");
-assert(boundary.includes("window.location.pathname + window.location.search + window.location.hash"), "Personal-only route switches must preserve the exact requested destination.");
+assert(boundary.includes('detail: { source: "workspace-switch" }'), "Workspace reconciliation must refresh canonical profile state without replacing the requested deep link.");
 assert(boundary.includes('document.querySelector("[data-builder-surface]")') && boundary.includes("window.confirm"), "Cross-workspace routing must preserve the unsaved-work guard.");
 assert(switcher.includes('document.querySelector("[data-builder-surface]")') && switcher.includes("window.confirm"), "Explicit workspace switching must preserve the unsaved-work guard.");
 assert(workspaceApi.includes("enterpriseAvailable") && workspaceApi.includes("sponsorAvailable"), "Workspace switching must remain server-authorized.");
@@ -45,7 +45,7 @@ for (const forbidden of ["Host Control Center", "Creator Studio", "My Entries", 
   assert(!enterpriseNavigation.includes(forbidden), "Enterprise navigation must not include " + forbidden);
 }
 assert(enterpriseNavigation.includes('allowed("finance.view")') && enterpriseNavigation.includes('allowed("sponsors.view")'), "Sensitive Enterprise navigation must be permission-gated.");
-assert(enterpriseNavigation.includes("canCreate ?") && enterpriseNavigation.includes('challenge.create_official') && enterpriseNavigation.includes('challenge.create_personal'), "Build a Challenge must be hidden without creation permission.");
+assert(enterpriseNavigation.includes("canCreate ?") && enterpriseNavigation.includes('challenge.create_official') && !enterpriseNavigation.includes('challenge.create_personal'), "Build a Challenge must use official Enterprise creation permission only.");
 for (const label of ["Normal", "Private", "Live Event", "Tournament"]) assert(enterpriseNavigation.includes('label: "' + label + '"'), "Build a Challenge missing " + label);
 assert(sidebar.includes("useState(childRouteActive)") && sidebar.includes("if (childRouteActive) setOpen(true)"), "Build a Challenge must be collapsed by default and expand for an active creation route.");
 assert(sidebar.includes('personalEconomyContext ? <Link href="/dorocoins"'), "Personal economy controls must remain available in Personal navigation.");
@@ -61,9 +61,9 @@ assert(topbar.includes('personalContext ? <MenuLink href="/subscriptions"') && t
 
 assert(settings.includes('user?.activeWorkspace === "enterprise"') && settings.includes('item.href !== "/settings/billing"') && settings.includes('item.href !== "/settings/wallet"'), "Enterprise Settings must exclude Personal billing and wallet categories.");
 assert(createPage.includes("selectedType") && createPage.includes("searchParams"), "Enterprise type child routes must carry the selected challenge type into ownership selection.");
-assert(createEntry.includes("/api/enterprise/workspace") && createEntry.includes("challenge.create_official") && createEntry.includes("challenge.create_personal"), "Ownership selection must be permission-authorized.");
+assert(createEntry.includes("/api/enterprise/workspace") && createEntry.includes("challenge.create_official") && !createEntry.includes("challenge.create_personal"), "Enterprise creation must be authorized by official creation permission only.");
 assert(createEntry.includes('visibleTypes = selectedType ?'), "Selected sidebar challenge type must skip duplicate type selection.");
-assert(createEntry.includes("/enterprise/challenges/create/official/") && createEntry.includes("/enterprise/challenges/create/personal/"), "Ownership selection must open the canonical selected builder.");
+assert(createEntry.includes("/enterprise/challenges/create/official/") && !createEntry.includes("/enterprise/challenges/create/personal/"), "Enterprise creation must open only organizationally owned builders.");
 
 assert(enterprisePage.includes('availableWorkspaces?.includes("enterprise")'), "Approved Enterprise access must suppress application marketing using revalidated workspace access.");
 assert(enterprisePage.includes(">Build a Challenge</LinkButton>"), "Enterprise Studio must expose the canonical creation action only through its permission branch.");
@@ -71,7 +71,7 @@ assert(applyPage.includes('router.replace("/enterprise")') && applyPage.includes
 assert(enterpriseSection.includes("No work is assigned to you right now."), "Assignment-capable staff need a stable zero-assignment empty state.");
 assert(enterpriseSaved.includes("officialChallenge") && enterpriseSaved.includes("Personal favorites stay in Personal Workspace"), "Enterprise Saved must exclude Personal favorites.");
 assert(sponsorShell.includes("Sponsor Studio") && sponsorShell.includes("/sponsor/wallet"), "Sponsor navigation and Sponsor Wallet must remain intact.");
-assert(sidebar.includes("sectionsForTier") && sidebar.includes("personalEconomyContext"), "Personal workspace navigation and economy controls must remain intact.");
+assert(sidebar.includes("personalSections") && sidebar.includes("personalEconomyContext"), "Personal workspace navigation and economy controls must remain intact.");
 assert(mobileFooter.includes("workspaceForRoute") && mobileFooter.includes("enterpriseFooterSections") && mobileFooter.includes("sponsorFooterSections"), "Mobile footer links must follow the same workspace classifier as desktop navigation.");
 assert(mobileFooter.includes("if (loading && !signedOut) return null"), "Mobile footer must not flash Personal links before workspace context loads.");
 

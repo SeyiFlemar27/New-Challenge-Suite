@@ -32,8 +32,11 @@ export function canEditEnterpriseApplication(record: Record<string, unknown>) {
   return isEnterpriseApplication(record) && editableEnterpriseApplicationStatuses.has(enterpriseApplicationStatus(record));
 }
 
-export function canResubmitEnterpriseApplication(record: Record<string, unknown>) {
-  return isEnterpriseApplication(record) && resubmittableEnterpriseApplicationStatuses.has(enterpriseApplicationStatus(record));
+export function canResubmitEnterpriseApplication(record: Record<string, unknown>, now = Date.now()) {
+  if (!isEnterpriseApplication(record) || !resubmittableEnterpriseApplicationStatuses.has(enterpriseApplicationStatus(record))) return false;
+  if (record.reapplyAllowed === false) return false;
+  const reapplyAfter = typeof record.reapplyAfter === "string" ? Date.parse(record.reapplyAfter) : Number.NaN;
+  return !Number.isFinite(reapplyAfter) || reapplyAfter <= now;
 }
 
 export function enterpriseApplicationVersion(record: Record<string, unknown>) {

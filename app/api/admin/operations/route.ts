@@ -7,7 +7,7 @@ import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-per
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { createNotification } from "@/lib/server/notifications";
 import { ENTERPRISE_APPLICATION_COLLECTION, ENTERPRISE_APPLICATION_REVISION_COLLECTION, ENTERPRISE_APPLICATION_TYPE, enterpriseApplicationRevisionId, enterpriseApplicationVersion } from "@/lib/server/enterprise-applications";
-import { isEnterpriseRole, isEnterpriseScope, rolePermissions } from "@/lib/enterprise-access";
+import { CHALLENGE_SUITE_ENTERPRISE_ID, isEnterpriseRole, isEnterpriseScope, rolePermissions } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
 
@@ -363,10 +363,10 @@ const allowedActions: Record<string, Set<string>> = {
   participant: new Set(["approve", "reject", "disqualify", "reinstate", "flag", "add_note"]),
   winner: new Set(["approve", "hold", "request_review", "flag", "add_note"]),
   withdrawal: new Set(["approve", "second_approve", "reject", "request_info", "mark_paid", "add_note"]),
-  enterprise: new Set(["approve", "reject", "request_info", "add_note"])
+  enterprise: new Set(["approve", "reject", "request_info", "suspend_access", "revoke_access", "restore_access", "add_note"])
 };
 
-const reasonRequired = new Set(["reject", "request_changes", "suspend", "flag", "disqualify", "hold", "request_review", "request_info"]);
+const reasonRequired = new Set(["reject", "request_changes", "suspend", "suspend_access", "revoke_access", "restore_access", "flag", "disqualify", "hold", "request_review", "request_info"]);
 
 function permissionForAction(type: string, action: string): AdminPermission {
   if (action === "add_note") return type === "withdrawal" ? "withdrawals.review" : type === "sponsor" ? "sponsors.review" : "challenges.review";
@@ -460,6 +460,46 @@ export async function PATCH(request: Request) {
       await Promise.all([userRef.set(update, { merge: true }), profileRef.set(update, { merge: true })]);
     } else if (type === "enterprise") {
       const ref = db.collection(ENTERPRISE_APPLICATION_COLLECTION).doc(id);
+      if (["suspend_access", "revoke_access", "restore_access"].includes(action)) {
+        const targetAccessStatus = action === "suspend_access" ? "suspended" : action === "revoke_access" ? "revoked" : "active";
+        let affectedUserId = "";
+        let priorAccessStatus = "active";
+        let accessChangeVersion = 1;
+        let changed = false;
+        await db.runTransaction(async (transaction) => {
+          const applicationSnap = await transaction.get(ref);
+          if (!applicationSnap.exists || applicationSnap.data()?.applicationType !== ENTERPRISE_APPLICATION_TYPE) throw new Error("NOT_FOUND");
+          const application = applicationSnap.data() ?? {};
+          const previousAccessChangeVersion = Number(application.accessChangeVersion ?? 0);
+          accessChangeVersion = Number.isInteger(previousAccessChangeVersion) && previousAccessChangeVersion >= 0
+            ? previousAccessChangeVersion + 1
+            : 1;
+          if (String(application.status ?? "") !== "approved") throw new Error("INVALID_STATE");
+          affectedUserId = String(application.userId ?? "");
+          if (!affectedUserId) throw new Error("APPLICATION_ACCOUNT_REQUIRED");
+          const userRef = db.collection("users").doc(affectedUserId);
+          const profileRef = db.collection("profiles").doc(affectedUserId);
+          const [accountSnap, profileSnap] = await Promise.all([transaction.get(userRef), transaction.get(profileRef)]);
+          const merged = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) };
+          const staffAccess = merged.staffAccess && typeof merged.staffAccess === "object" ? merged.staffAccess as Record<string, unknown> : {};
+          priorAccessStatus = String(staffAccess.status ?? merged.enterpriseStaffStatus ?? "active");
+          if (priorAccessStatus === targetAccessStatus) return;
+          changed = true;
+          const accessUpdate = {
+            enterpriseStaffStatus: targetAccessStatus,
+            enterpriseAccessExpiresAt: action === "restore_access" ? null : merged.enterpriseAccessExpiresAt ?? staffAccess.expiresAt ?? null,
+            staffAccess: { ...staffAccess, status: targetAccessStatus, expiresAt: action === "restore_access" ? null : staffAccess.expiresAt ?? merged.enterpriseAccessExpiresAt ?? null },
+            ...(targetAccessStatus === "active" ? {} : { activeWorkspace: "personal", lastWorkspace: "personal" }),
+            updatedAt: now,
+          };
+          transaction.set(userRef, accessUpdate, { merge: true });
+          transaction.set(profileRef, accessUpdate, { merge: true });
+          transaction.set(ref, { accessStatus: targetAccessStatus, accessChangeVersion, reapplyAllowed: action === "revoke_access" ? parsed.body?.reapplyAllowed === true : application.reapplyAllowed ?? true, reapplyAfter: action === "revoke_access" ? parsed.body?.reapplyAfter ?? null : application.reapplyAfter ?? null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), { type: `enterprise_access_${targetAccessStatus}`, status: targetAccessStatus, at: now, message: reason }], updatedAt: now }, { merge: true });
+          transaction.create(db.collection("auditLogs").doc(`${id}_access_${accessChangeVersion}`), { id: `${id}_access_${accessChangeVersion}`, actorId: user.uid, actorType: "admin", action: `enterprise_access_${targetAccessStatus}`, targetType: "enterprise_membership", targetId: affectedUserId, before: { status: priorAccessStatus }, after: { status: targetAccessStatus }, reason, metadata: { applicationId: id }, createdAt: now });
+        });
+        if (changed) await createNotification(db, { userId: affectedUserId, type: `enterprise_access_${targetAccessStatus}`, title: targetAccessStatus === "active" ? "Enterprise access restored" : targetAccessStatus === "suspended" ? "Enterprise access suspended" : "Enterprise access revoked", body: targetAccessStatus === "active" ? "Your Enterprise workspace is available again." : `${reason} Your Personal Workspace remains available.`, actionUrl: targetAccessStatus === "active" ? "/enterprise" : "/dashboard", idempotencyKey: `${id}_access_${accessChangeVersion}` });
+        return ok({ type, id, action, previousStatus: priorAccessStatus, newStatus: targetAccessStatus, idempotent: !changed }, changed ? "Enterprise access updated." : "Enterprise access already has this status.");
+      }
       const requestedRole = parsed.body?.enterpriseRole;
       const requestedScope = parsed.body?.enterpriseScope;
       const enterpriseRole = isEnterpriseRole(requestedRole) ? requestedRole : "operations";
@@ -468,17 +508,32 @@ export async function PATCH(request: Request) {
       const permissionRemovals = Array.isArray(parsed.body?.permissionRemovals) ? parsed.body.permissionRemovals : [];
       const enterprisePermissions = rolePermissions(enterpriseRole, permissionAdditions, permissionRemovals);
       const expectedVersion = Number(parsed.body?.expectedVersion ?? parsed.body?.currentRevision ?? 0);
+      const rawExpiresAt = parsed.body?.enterpriseExpiresAt;
+      const parsedExpiresAt = rawExpiresAt === null || rawExpiresAt === undefined || rawExpiresAt === "" ? null : Date.parse(String(rawExpiresAt));
+      if (parsedExpiresAt !== null && !Number.isFinite(parsedExpiresAt)) return validationError({ enterpriseExpiresAt: "Enter a valid expiration, or leave it blank for no expiration." });
+      const enterpriseExpiresAt = parsedExpiresAt === null ? null : new Date(parsedExpiresAt).toISOString();
+      const reapplyAllowed = parsed.body?.reapplyAllowed !== false;
+      const rawReapplyAfter = parsed.body?.reapplyAfter;
+      const parsedReapplyAfter = rawReapplyAfter === null || rawReapplyAfter === undefined || rawReapplyAfter === "" ? null : Date.parse(String(rawReapplyAfter));
+      if (parsedReapplyAfter !== null && !Number.isFinite(parsedReapplyAfter)) return validationError({ reapplyAfter: "Enter a valid reapplication date, or leave it blank." });
+      const reapplyAfter = parsedReapplyAfter === null ? null : new Date(parsedReapplyAfter).toISOString();
+      if (enterpriseExpiresAt && Date.parse(enterpriseExpiresAt) <= Date.now()) return validationError({ enterpriseExpiresAt: "Expiration must be in the future, or left blank for no expiration." });
       let applicantId = "";
       let previousAccountType = "user";
+      let idempotentApproval = false;
       await db.runTransaction(async (transaction) => {
         const applicationSnap = await transaction.get(ref);
         if (!applicationSnap.exists || applicationSnap.data()?.applicationType !== ENTERPRISE_APPLICATION_TYPE) throw new Error("NOT_FOUND");
         const application = applicationSnap.data() ?? {};
         previousStatus = String(application.status ?? "pending");
-        if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) throw new Error("INVALID_STATE");
         const currentVersion = enterpriseApplicationVersion(application);
-        if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) throw new Error("STALE_APPLICATION_VERSION");
         applicantId = String(application.userId ?? "");
+        if (action === "approve" && previousStatus === "approved" && Number(application.reviewedRevision ?? 0) === currentVersion) {
+          idempotentApproval = true;
+          return;
+        }
+        if (!["pending", "in_review", "needs_info", "requested_changes"].includes(previousStatus)) throw new Error("INVALID_STATE");
+        if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) throw new Error("STALE_APPLICATION_VERSION");
         if (!applicantId) throw new Error("APPLICATION_ACCOUNT_REQUIRED");
         const userRef = db.collection("users").doc(applicantId);
         const profileRef = db.collection("profiles").doc(applicantId);
@@ -494,25 +549,27 @@ export async function PATCH(request: Request) {
         if (action === "approve") existingWorkspaces.add("enterprise");
         const staffAccess = action === "approve" ? {
           status: "active", role: enterpriseRole, scope: enterpriseScope,
+          membershipId: `enterprise_membership_${applicantId}`, enterpriseId: CHALLENGE_SUITE_ENTERPRISE_ID,
           department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
           permissions: enterprisePermissions,
           categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
           regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
-          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid
+          onboardingComplete: false, expiresAt: enterpriseExpiresAt, provisionedAt: now, provisionedBy: user.uid
         } : null;
         const event = { type: `admin_${action}`, status, at: now, message: action === "approve" ? "Enterprise access approved." : action === "request_info" ? "More information requested." : "Application not approved." };
         const accessUpdate = {
           enterpriseAccessStatus: status, enterpriseApprovalStatus: status, enterpriseApplicationId: id,
           enterpriseApprovedAt: action === "approve" ? now : null, enterpriseApprovedBy: action === "approve" ? user.uid : null,
-          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, staffAccess } : {}),
+          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseId: CHALLENGE_SUITE_ENTERPRISE_ID, enterpriseMembershipId: staffAccess!.membershipId, enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseAccessExpiresAt: enterpriseExpiresAt, enterpriseOnboardingComplete: false, staffAccess } : {}),
           updatedAt: now
         };
-        transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
+        transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, reapplyAllowed: action === "reject" ? reapplyAllowed : application.reapplyAllowed ?? true, reapplyAfter: action === "reject" ? reapplyAfter : application.reapplyAfter ?? null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
         transaction.set(userRef, accessUpdate, { merge: true });
         transaction.set(profileRef, accessUpdate, { merge: true });
         transaction.set(db.collection(ENTERPRISE_APPLICATION_REVISION_COLLECTION).doc(enterpriseApplicationRevisionId(id, currentVersion)), { decisionStatus: status, decidedAt: now, decidedBy: user.uid, decisionReason: reason || null }, { merge: true });
         transaction.create(db.collection("auditLogs").doc(`${id}_v${currentVersion}_${action}`), { id: `${id}_v${currentVersion}_${action}`, actorId: user.uid, actorType: "admin", action: `enterprise_application_${action}`, targetType: "enterprise_application", targetId: id, before: { status: previousStatus, version: currentVersion }, after: { status, reviewedRevision: currentVersion }, reason: reason || event.message, metadata: {}, createdAt: now });
       });
+      if (idempotentApproval) return ok({ type, id, action, previousStatus: "approved", newStatus: "approved", idempotent: true }, "Enterprise access is already approved.");
       const notificationCopy = action === "approve" ? { type: "enterprise_application_approved", title: "Enterprise access approved", body: "Your Enterprise workspace is ready." } : action === "request_info" ? { type: "enterprise_application_needs_info", title: "More information needed", body: "Please update your Enterprise application." } : { type: "enterprise_application_rejected", title: "Enterprise application not approved", body: "Contact support if you have questions." };
       await createNotification(db, { userId: applicantId, ...notificationCopy, targetId: id });
       if (action === "approve") {

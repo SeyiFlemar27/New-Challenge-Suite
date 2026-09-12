@@ -27,7 +27,9 @@ const groups: NavGroup[] = [
   ] },
   { label: "People", items: [
     { href: "/admin/people/users", label: "Users", icon: UsersRound, permission: "users.view" },
-    { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" }
+    { href: "/admin/kyc", label: "Verification", icon: ShieldCheck, permission: "users.requireVerification" },
+    { href: "/admin/enterprise-applications", label: "Enterprise Applications", icon: BriefcaseBusiness, permission: "challenges.review" },
+    { href: "/admin/enterprise-leads", label: "Enterprise Leads", icon: FolderCog, permission: "challenges.review" }
   ] },
   { label: "Challenges", items: [
     { href: "/admin/challenges", label: "All Challenges", icon: Trophy, permission: "challenges.view" },
@@ -58,6 +60,7 @@ const groups: NavGroup[] = [
   ] },
   { label: "Safety & Support", items: [
     { href: "/admin/safety-support/support-tickets", label: "Support", icon: LifeBuoy, permission: "tickets.view" },
+    { href: "/admin/contact-requests", label: "Contact Requests", icon: LifeBuoy, permission: "tickets.view" },
     { href: "/admin/safety-support/disputes", label: "Disputes", icon: Flag, permission: "disputes.review" },
     { href: "/admin/safety-support/appeals", label: "Appeals", icon: FileClock, permission: "appeals.review" },
     { href: "/admin/safety-support/safety-reports", label: "Safety Reports", icon: ShieldCheck, permission: "safetyReports.review" },

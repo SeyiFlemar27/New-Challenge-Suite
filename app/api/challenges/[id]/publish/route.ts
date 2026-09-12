@@ -24,6 +24,7 @@ import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payload";
 import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
+import { CHALLENGE_SUITE_ENTERPRISE_ID, ENTERPRISE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -56,9 +57,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   );
   if (normalizeBuilderChallengeType(rawBody.challengeType ?? rawBody.type) !== lockedType) return fail("Challenge type can't be changed after the draft is created.", 409, undefined, "CHALLENGE_TYPE_LOCKED");
   const planProfile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
-  const planAccess = getUserPlanAccess(planProfile);
-  const planExperience = getPlanExperience(planProfile);
-  const monetizationAccess = getChallengeMonetizationAccess(planProfile);
+  const officialChallenge = current.officialChallenge === true || current.ownershipType === "challenge_suite_official";
+  const enterpriseAccess = normalizeEnterpriseAccess(planProfile);
+  if (officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || String(current.organizationOwnerId ?? CHALLENGE_SUITE_ENTERPRISE_ID) !== enterpriseAccess?.enterpriseId)) return fail("Your current Enterprise access cannot submit this official challenge.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
+  const entitlementProfile = officialChallenge ? { ...planProfile, planId: "enterprise", planStatus: "active" } : planProfile;
+  const planAccess = getUserPlanAccess(entitlementProfile);
+  const planExperience = getPlanExperience(entitlementProfile);
+  const monetizationAccess = getChallengeMonetizationAccess(entitlementProfile);
   const rawMonetization = rawBody.monetization && typeof rawBody.monetization === "object" ? rawBody.monetization as Record<string, unknown> : {};
   const mediaSummary = {
     coverReady: Boolean(rawBody.coverImageUrl && rawBody.coverImagePath),
@@ -152,6 +157,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     paidEntryRequested: monetizationIntent.paidEntryRequested,
     entryFeeValid: !monetizationIntent.paidEntryRequested || paidEntryValidation.valid
   });
+  if (officialChallenge) {
+    const officialSnapshot = await db.collection("challenges").where("organizationOwnerId", "==", CHALLENGE_SUITE_ENTERPRISE_ID).limit(ENTERPRISE_LIMITS.activeOfficialChallenges + 1).get();
+    const activeOfficialCount = officialSnapshot.docs.filter((doc) => doc.id !== id && shouldCountAgainstActiveChallengeLimit(doc.data().status)).length;
+    if (activeOfficialCount >= ENTERPRISE_LIMITS.activeOfficialChallenges) return rejectPublish("The Enterprise active official challenge limit has been reached. Contact an Admin before submitting more official work.", 409, { limit: ENTERPRISE_LIMITS.activeOfficialChallenges }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
+  }
   if (sharedBlocker) {
     const status = sharedBlocker.code === "PERMISSION_DENIED" || sharedBlocker.code === "PLAN_ACCESS_DENIED" ? 403 : sharedBlocker.code === "MISSING_REQUIRED_DETAILS" || sharedBlocker.code === "INVALID_TIMELINE" || sharedBlocker.code === "MEDIA_REQUIRED" || sharedBlocker.code === "PAID_ENTRY_INVALID" || sharedBlocker.code === "PRIZE_CONFIGURATION_INVALID" ? 422 : 409;
     return rejectPublish(sharedBlocker.message, status, { publishValidation, fieldErrors: Object.fromEntries(publishValidation.errors.map((issue) => [issue.field, issue.message])) }, sharedBlocker.code);
@@ -159,7 +169,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
-  const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
+  const creationAccess = canCreateChallenge(entitlementProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
 
   const sponsorEnabled = Boolean((body.sponsorEnabled || monetizationIntent.sponsorReady) && planAccess.canCreateSponsoredChallenges);

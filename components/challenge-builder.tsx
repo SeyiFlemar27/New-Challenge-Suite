@@ -144,13 +144,16 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
   };
 }
 
-export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; draftId?: string; enterpriseOwnership?: "official" | "personal" }) {
+export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; draftId?: string; enterpriseOwnership?: "official" }) {
   const router = useRouter();
   const { user, loading } = useCurrentUser();
-  const planProfile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
+  const enterpriseContext = enterpriseOwnership === "official";
+  const planProfile = enterpriseContext
+    ? { planId: "enterprise", planStatus: "active", accountType: "user" }
+    : { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
-  const enterpriseApproved = planAccess.isEnterprise && String((user as any)?.enterpriseAccessStatus ?? (user as any)?.enterpriseApprovalStatus ?? "").toLowerCase() === "approved";
+  const enterpriseApproved = enterpriseContext && Boolean(user?.availableWorkspaces?.includes("enterprise"));
   const monetizationEligible = planAccess.isCreator || planAccess.isHost || enterpriseApproved;
   const isFreePublic = mode === "public" && planExperience.planId === "free" && (user?.selectedAccountType ?? user?.role ?? user?.accountType) !== "sponsor";
   const privateLocked = mode === "private" && !planAccess.canCreatePrivateChallenges;
@@ -318,7 +321,7 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
       category: form.category,
       type: privateMode ? "Private Challenge" : "Public Challenge",
       officialChallenge: enterpriseOwnership === "official",
-      ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : enterpriseOwnership === "personal" ? "enterprise_personal" : "creator_personal",
+      ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : "creator_personal",
       visibility: privateMode ? "private" : "public",
       acceptedSubmissionTypes: form.submissionTypes,
       competitionFormat: privateMode ? "Invite-only Entry Competition" : "Entry Competition",

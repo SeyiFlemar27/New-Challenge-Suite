@@ -1,2 +1,2 @@
-import { ChallengeBuilder } from "@/components/challenge-builder";
-export default function Page() { return <ChallengeBuilder mode="public" enterpriseOwnership="personal" />; }
+import { redirect } from "next/navigation";
+export default function Page() { redirect("/challenges/create"); }

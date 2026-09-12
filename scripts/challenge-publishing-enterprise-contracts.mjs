@@ -78,7 +78,7 @@ assert.match(sources.enterprisePage, /enterpriseAccessStatus/);
 assert.match(sources.topbar, /WorkspaceSwitcher/);
 assert.doesNotMatch(sources.topbar, /canSwitchEnterpriseRole/);
 assert.match(sources.adminUi, /"enterprise-applications": \[\{ action: "approve"/);
-assert.match(sources.adminApi, /enterprise: new Set\(\["approve", "reject", "request_info", "add_note"\]\)/);
+assert.match(sources.adminApi, /enterprise: new Set\(\["approve", "reject", "request_info", "suspend_access", "revoke_access", "restore_access", "add_note"\]\)/);
 assert.match(sources.adminApi, /enterpriseAccessStatus: status/);
 assert.match(sources.adminApi, /enterprise_application_approved/);
 assert.match(sources.adminApi, /writeAuditLog/);

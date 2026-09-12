@@ -138,7 +138,7 @@ const sponsorSections: NavSection[] = [
 
 function enterpriseSections(permissions: string[], isAdmin: boolean): NavSection[] {
   const allowed = (permission: string) => permissions.includes(permission);
-  const canCreate = allowed("challenge.create_official") || allowed("challenge.create_personal");
+  const canCreate = allowed("challenge.create_official");
   return [
     { label: "Main", items: [
       { href: "/enterprise", label: "Enterprise Studio", icon: Home },
@@ -348,7 +348,10 @@ function NavigationSections({ sections, activeHref, pathname, mobile = false }: 
 
 function NavigationItem({ item, activeHref, pathname }: { item: NavItem; activeHref: string; pathname: string }) {
   const childRouteActive = Boolean(item.children?.some((child) => pathname === child.href.split("?")[0] || pathname.startsWith(child.href.split("?")[0] + "/")));
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(childRouteActive);
+  useEffect(() => {
+    if (childRouteActive) setOpen(true);
+  }, [childRouteActive]);
   const Icon = item.icon;
   if (item.children?.length) {
     return <div><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className={cn("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", childRouteActive && "bg-white/5 text-white")}><Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span><ChevronDown size={16} className={open ? "rotate-180 transition" : "transition"} /></button>{open ? <div className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-3">{item.children.map((child) => <Link key={child.href} href={child.href} className="flex min-h-10 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">{child.label}</Link>)}</div> : null}</div>;

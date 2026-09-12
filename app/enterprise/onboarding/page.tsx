@@ -35,6 +35,7 @@ export default function EnterpriseOnboardingPage() {
     if (result.ok) router.replace("/enterprise"); else { setError(result.message); setSubmitting(false); }
   }
 
+  if (error && !state) return <AppShell><Card className="mx-auto max-w-3xl p-7"><h1 className="text-2xl font-black text-slate-950">Enterprise onboarding unavailable</h1><p className="mt-3 text-sm text-red-700">{error}</p><div className="mt-6 flex flex-wrap gap-3"><a className="rounded-[8px] bg-[var(--gold)] px-5 py-3 text-sm font-black text-black" href="/dashboard">Personal Workspace</a><a className="rounded-[8px] border border-slate-300 px-5 py-3 text-sm font-black text-slate-950" href="/contact">Contact Support</a></div></Card></AppShell>;
   if (!state) return <AppShell><Card className="mx-auto h-80 max-w-4xl animate-pulse" /></AppShell>;
   return <AppShell><div className="mx-auto max-w-5xl">
     <header className="grid gap-5 rounded-[8px] border border-slate-200 bg-white p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">

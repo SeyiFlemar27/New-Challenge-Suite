@@ -1,5 +1,5 @@
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
-import { enterpriseChallengeInScope } from "@/lib/enterprise-access";
+import { CHALLENGE_SUITE_ENTERPRISE_ID, enterpriseChallengeInScope, isEnterpriseAccessActive, normalizeEnterpriseAccess, type EnterprisePermission } from "@/lib/enterprise-access";
 import { createNotification } from "@/lib/server/notifications";
 import { requireEnterprisePermission } from "@/lib/server/enterprise-access";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -21,7 +21,11 @@ function assignmentFor(challenge: Record<string, unknown>, userId: string) {
 }
 
 export async function GET(request: Request) {
-  const result = await requireEnterprisePermission(request, "challenge.view");
+  const section = new URL(request.url).searchParams.get("section") ?? "studio";
+  const sectionPermission: Record<string, EnterprisePermission> = { studio: "challenge.view", challenges: "challenge.view", assigned: "challenge.view", submissions: "submissions.view", reviews: "reviews.view", analytics: "analytics.view", finance: "finance.view", sponsorships: "sponsors.view", team: "team.view", activity: "activity.view" };
+  const permission = sectionPermission[section];
+  if (!permission) return validationError({ section: "Choose a valid Enterprise workspace section." });
+  const result = await requireEnterprisePermission(request, permission, { allowObligationAccess: section !== "team" && section !== "analytics" && section !== "sponsorships" });
   if (result.response) return result.response;
   const { db, user, access } = result;
   const [challengeSnap, participantSnap, submissionSnap, activitySnap] = await Promise.all([
@@ -32,7 +36,9 @@ export async function GET(request: Request) {
   ]);
   const visible = challengeSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
+    .filter((challenge) => String(challenge.organizationOwnerId ?? CHALLENGE_SUITE_ENTERPRISE_ID) === access.enterpriseId)
     .filter((challenge) => enterpriseChallengeInScope(access, challenge, user.uid))
+    .filter((challenge) => result.accessState !== "obligation_only" || result.obligationChallengeIds.includes(challenge.id))
     .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? "").localeCompare(String(a.updatedAt ?? a.createdAt ?? "")));
   const ids = new Set(visible.map((item) => item.id));
   const participants = participantSnap.docs.filter((doc) => ids.has(String(doc.data().challengeId ?? ""))).length;
@@ -56,8 +62,8 @@ export async function GET(request: Request) {
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
     .filter((item) => ids.has(String(item.challengeId ?? item.targetId ?? "")))
     .slice(0, 8) ?? [];
-  return ok({
-    access,
+  const base = {
+    access, accessState: result.accessState,
     metrics: { activeOfficialChallenges: visible.filter((item) => activeStatuses.has(String(item.status ?? ""))).length, participants, submissions, needsAttention: visible.filter((item) => ["pending_review", "requires_changes", "results_review"].includes(String(item.status ?? ""))).length },
     attention: challenges.filter((item) => item.needsAttention).slice(0, 3),
     assigned: challenges.filter((item) => item.assignment).slice(0, 6),
@@ -65,7 +71,31 @@ export async function GET(request: Request) {
     challenges,
     pagination: { page: 1, pageSize: 36, total: visible.length, totalPages: Math.max(1, Math.ceil(visible.length / 36)) },
     activity,
-  }, "Enterprise Studio loaded.");
+  };
+  if (section === "submissions") {
+    const records = submissionSnap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
+      .filter((item) => ids.has(String(item.challengeId ?? "")))
+      .slice(0, 100);
+    return ok({ ...base, records }, "Enterprise submissions loaded.");
+  }
+  if (section === "team") {
+    const teamSnap = await db.collection("users").where("enterpriseAccessStatus", "==", "approved").limit(200).get();
+    const team = teamSnap.docs.map((doc) => { const data = doc.data(); return { id: doc.id, displayName: String(data.displayName ?? [data.firstName, data.lastName].filter(Boolean).join(" ") ?? "Enterprise staff"), role: String(data.enterpriseRole ?? "operations"), department: String(data.enterpriseDepartment ?? "Operations"), status: String(data.enterpriseStaffStatus ?? "active"), scope: String(data.enterpriseScope ?? "assigned_only") }; });
+    return ok({ ...base, team }, "Enterprise Team loaded.");
+  }
+  if (section === "finance") {
+    const financeSnap = await db.collection("settlementUnresolvedAllocations").where("allocationType", "==", "enterprise_official_organizational_share").limit(200).get();
+    const finance = financeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).filter((item) => ids.has(String(item.challengeId ?? "")));
+    return ok({ ...base, finance }, "Enterprise Finance loaded.");
+  }
+  if (section === "sponsorships") {
+    const sponsorshipSnap = await db.collection("sponsorships").limit(200).get();
+    const sponsorships = sponsorshipSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).filter((item) => ids.has(String(item.challengeId ?? "")));
+    return ok({ ...base, sponsorships }, "Enterprise Sponsorships loaded.");
+  }
+  if (section === "reviews") return ok({ ...base, records: challenges.filter((item) => item.needsAttention) }, "Enterprise reviews loaded.");
+  return ok(base, section === "studio" ? "Enterprise Studio loaded." : `Enterprise ${section} loaded.`);
 }
 
 export async function POST(request: Request) {
@@ -97,7 +127,8 @@ export async function POST(request: Request) {
     const responsibility = String(body.responsibility ?? "operations").slice(0, 80);
     if (!assigneeId) return validationError({ assigneeId: "Staff member is required." });
     const assigneeSnap = await result.db.collection("users").doc(assigneeId).get();
-    if (!assigneeSnap.exists || String(assigneeSnap.data()?.enterpriseStaffStatus ?? "") === "revoked") return fail("Active Enterprise staff member not found.", 404, undefined, "ENTERPRISE_STAFF_NOT_FOUND");
+    const assigneeAccess = assigneeSnap.exists ? normalizeEnterpriseAccess(assigneeSnap.data() ?? {}) : null;
+    if (!assigneeSnap.exists || !isEnterpriseAccessActive(assigneeAccess)) return fail("Active Enterprise staff member not found.", 404, undefined, "ENTERPRISE_STAFF_NOT_FOUND");
     const assignments = Array.isArray(challenge.enterpriseAssignments) ? challenge.enterpriseAssignments as Array<Record<string, unknown>> : [];
     const next = [...assignments.filter((item) => item.userId !== assigneeId), { userId: assigneeId, responsibility, status: "active", assignedBy: result.user.uid, assignedAt: now }];
     await ref.set({ enterpriseAssignments: next, updatedAt: now, version: Number(challenge.version ?? 0) + 1 }, { merge: true });

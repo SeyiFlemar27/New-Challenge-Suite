@@ -45,6 +45,10 @@ function safeId(value: unknown) {
 export async function createNotification(db: Firestore, input: CreateNotificationInput) {
   const idempotencyKey = safeId(input.idempotencyKey);
   const ref = idempotencyKey ? db.collection("notifications").doc(idempotencyKey) : db.collection("notifications").doc();
+  if (idempotencyKey) {
+    const existing = await ref.get();
+    if (existing.exists) return { id: existing.id, ...existing.data() };
+  }
   const createdAt = nowIso();
   const notification = {
     id: ref.id,

@@ -31,7 +31,8 @@ run("studio", () => {
   const page = read("app/enterprise/page.tsx");
   const api = read("app/api/enterprise/workspace/route.ts");
   for (const label of ["Enterprise Studio", "Active Official Challenges", "Participants", "Submissions", "Needs Attention", "My Work", "Official Challenges"]) assert.ok(page.includes(label), `Missing ${label}`);
-  assert.match(api, /requireEnterprisePermission\(request, "challenge\.view"\)/);
+  assert.match(api, /sectionPermission: Record<string, EnterprisePermission>/);
+  assert.match(api, /requireEnterprisePermission\(request, permission/);
   assert.match(api, /enterpriseChallengeInScope/);
   assert.match(api, /limit\(200\)/);
 });
@@ -40,7 +41,7 @@ run("ownership", () => {
   const create = read("app/api/challenges/route.ts");
   const builder = read("components/challenge-builder.tsx");
   assert.match(create, /ENTERPRISE_OFFICIAL_CREATE_DENIED/);
-  assert.match(create, /organizationOwnerId: body\.officialChallenge \? "challenge_suite" : null/);
+  assert.match(create, /organizationOwnerId: body\.officialChallenge \? CHALLENGE_SUITE_ENTERPRISE_ID : null/);
   assert.match(create, /enterpriseChallengeLeadId/);
   assert.match(builder, /enterpriseOwnership === "official"/);
 });

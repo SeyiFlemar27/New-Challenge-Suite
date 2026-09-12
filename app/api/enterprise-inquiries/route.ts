@@ -83,10 +83,10 @@ export async function GET(request: Request) {
   const snapshot = await db.collection(ENTERPRISE_APPLICATION_COLLECTION).where("userId", "==", user.uid).limit(20).get();
   const applications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }));
   const application = latestEnterpriseApplication(applications);
-  if (!application) return ok({ application: null, revisions: [], timeline: [] }, "Enterprise application status loaded.");
+  if (!application) return ok({ application: null, revisions: [], timeline: [], canEdit: false, canResubmit: false }, "Enterprise application status loaded.");
   const revisionSnapshot = await db.collection(ENTERPRISE_APPLICATION_REVISION_COLLECTION).where("applicationId", "==", application.id).limit(50).get();
   const revisions = revisionSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
-  return ok({ application, revisions, timeline: enterpriseApplicationTimeline(application) }, "Enterprise application status loaded.");
+  return ok({ application, revisions, timeline: enterpriseApplicationTimeline(application), canEdit: canEditEnterpriseApplication(application), canResubmit: canResubmitEnterpriseApplication(application) }, "Enterprise application status loaded.");
 }
 
 export async function POST(request: Request) {
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
         const currentSnap = await transaction.get(ref);
         const current = currentSnap.exists ? ({ id: ref.id, ...currentSnap.data() } as Record<string, unknown> & { id: string }) : existing;
         if (current && enterpriseApplicationStatus(current) === "approved") throw new Error("APPLICATION_LOCKED");
+        if (current && ["rejected", "withdrawn", "revoked", "expired"].includes(enterpriseApplicationStatus(current)) && !canResubmitEnterpriseApplication(current)) throw new Error("REAPPLY_NOT_ALLOWED");
         const currentVersion = current ? enterpriseApplicationVersion(current) : 0;
         const expectedVersion = Number(body.expectedVersion ?? currentVersion);
         if (current && (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion)) throw new Error("STALE_VERSION");
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "STALE_VERSION") return fail("This application changed in another session. Refresh before saving again.", 409, undefined, "STALE_APPLICATION_VERSION");
     if (error instanceof Error && error.message === "APPLICATION_LOCKED") return fail("This Enterprise application has already been approved.", 409, undefined, "ENTERPRISE_APPLICATION_LOCKED");
+    if (error instanceof Error && error.message === "REAPPLY_NOT_ALLOWED") return fail("This application is not currently eligible for resubmission. Contact Support if you need assistance.", 403, undefined, "ENTERPRISE_REAPPLY_NOT_ALLOWED");
     return serverError(isApplication ? "Enterprise application could not be submitted." : "Enterprise inquiry could not be saved.", error instanceof Error ? error.message : error);
   }
 }

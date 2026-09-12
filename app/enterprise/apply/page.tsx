@@ -25,14 +25,21 @@ export default function EnterpriseApplyPage() {
   const [editId, setEditId] = useState("");
   const [expectedVersion, setExpectedVersion] = useState(0);
   const [applicationStatus, setApplicationStatus] = useState("");
+  const [editingAllowed, setEditingAllowed] = useState(true);
   useEffect(() => { if (enterpriseApproved) router.replace("/enterprise"); }, [enterpriseApproved, router]);
   useEffect(() => {
     const requestedId = new URLSearchParams(window.location.search).get("application");
     const editingLatest = pathname === "/enterprise/application/edit";
     if (!requestedId && !editingLatest) return;
-    void apiRequest<{ application: Record<string, unknown> | null }>("/api/enterprise-inquiries").then((result) => {
+    void apiRequest<{ application: Record<string, unknown> | null; canEdit?: boolean; canResubmit?: boolean }>("/api/enterprise-inquiries").then((result) => {
       const application = result.data?.application;
       if (!result.ok || !application || (requestedId && String(application.id) !== requestedId) || !["pending", "in_review", "needs_info", "requested_changes", "rejected", "withdrawn"].includes(String(application.status ?? ""))) return;
+      const allowed = Boolean(result.data?.canEdit || result.data?.canResubmit);
+      setEditingAllowed(allowed);
+      if (!allowed) {
+        setMessage("This application cannot be edited or resubmitted right now.");
+        return;
+      }
       setEditId(String(application.id));
       setExpectedVersion(Number(application.version ?? application.currentRevision ?? 1));
       setApplicationStatus(String(application.status ?? "pending"));
@@ -43,6 +50,7 @@ export default function EnterpriseApplyPage() {
   }, [pathname]);
   function update(field: keyof typeof form, value: string) { setForm((current) => ({ ...current, [field]: value })); setMessage(""); setSubmitted(false); }
   async function submit() {
+    if (!editingAllowed) return;
     setSubmitting(true);
     const result = await apiRequest<{ application?: Record<string, unknown> }>("/api/enterprise-inquiries", { method: editId ? "PATCH" : "POST", body: JSON.stringify({ ...form, id: editId || undefined, expectedVersion: expectedVersion || undefined, company: form.organization, useCase: form.reason, applicationType: "enterprise_access_application" }) });
     setSubmitting(false);

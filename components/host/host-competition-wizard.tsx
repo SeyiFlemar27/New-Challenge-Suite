@@ -44,7 +44,7 @@ const initial = {
 };
 type Form = typeof initial;
 
-export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwnership }: { initialCompetitionType?: string; enterpriseOwnership?: "official" | "personal" } = {}) {
+export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwnership }: { initialCompetitionType?: string; enterpriseOwnership?: "official" } = {}) {
   const auth = useAuth();
   const [step, setStep] = useState(0), [unlockedStep, setUnlockedStep] = useState(0), [form, setForm] = useState(() => ({ ...initial, competitionType: initialCompetitionType ?? initial.competitionType, winnerSelection: initialCompetitionType === "Live Event" ? "judge_selection" : initial.winnerSelection })), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [draftId, setDraftId] = useState(""), [submittedId, setSubmittedId] = useState("");
@@ -70,7 +70,7 @@ export function HostCompetitionWizard({ initialCompetitionType, enterpriseOwners
     return {
       title: form.title, description: form.description, category: form.category, subcategory: form.subcategory, type: form.competitionType,
       officialChallenge: enterpriseOwnership === "official",
-      ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : enterpriseOwnership === "personal" ? "enterprise_personal" : "creator_personal",
+      ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : "creator_personal",
       visibility: ["public", "public_preview"].includes(form.visibilityMode) ? "public" : "private",
       acceptedSubmissionTypes: [form.submissionType === "video" ? "video" : "image"], competitionFormat: form.format, bestOf: "1 Rounder",
       startsAt: form.startsAt, endsAt: form.endsAt, submissionDeadline: form.submissionDeadline, votingStartsAt: form.votingStartsAt,
