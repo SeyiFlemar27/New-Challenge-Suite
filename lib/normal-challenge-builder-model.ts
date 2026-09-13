@@ -1,4 +1,5 @@
 import { challengeDateTimeForStorage, challengeDateTimeInputValue, DEFAULT_CHALLENGE_TIME_ZONE, resolveChallengeTimeZone } from "@/lib/challenge-date-time";
+import { normalizeNormalChallengeCapacity } from "@/lib/normal-challenge-capacity";
 import { NORMAL_CHALLENGE_BUILDER_VERSION, NORMAL_PRIZE_SPLITS } from "@/lib/normal-challenge-config";
 import { normalizeSponsorCategories } from "@/lib/forms/canonical-options";
 
@@ -59,7 +60,7 @@ export function normalChallengeFormFromRecord(source: Record<string, unknown>): 
 export function normalChallengePayload(form: NormalChallengeForm, challengeId = "") {
   const iso = (value: string) => challengeDateTimeForStorage(value, form.timeZone);
   const acceptedSubmissionTypes = form.submissionMode === "both" ? ["image", "video"] : [form.submissionMode];
-  const maxParticipants = form.capacityMode === "unlimited" ? null : form.maxParticipants;
+  const maxParticipants = form.capacityMode === "unlimited" ? 0 : normalizeNormalChallengeCapacity(form.maxParticipants);
   const winnerPrizeAmountsCents = form.winnerPrizeAmounts.slice(0, form.numberOfWinners).map((value) => Math.round(Number(value || 0) * 100));
   const prizeValue = winnerPrizeAmountsCents.reduce((sum, value) => sum + value, 0) / 100;
   const primary = form.images[0];

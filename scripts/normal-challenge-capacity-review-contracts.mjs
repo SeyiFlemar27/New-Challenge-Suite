@@ -13,23 +13,20 @@ const capacitySource = read("lib/normal-challenge-capacity.ts");
 const schema = read("lib/server/challenge-validation.ts");
 const publishRoute = read("app/api/challenges/[id]/publish/route.ts");
 
-for (const value of [2, 3, 100, 10000]) {
-  assert.equal(capacity.normalChallengeCapacityError(value, "limited"), null, `${String(value)} should be a valid fixed Normal capacity`);
+for (const value of ["", 0, 2, 50]) {
+  assert.equal(capacity.normalChallengeCapacityError(value), null, `${String(value)} should be a valid Normal capacity`);
 }
-for (const value of [0, 1, -1, 2.5, "not-a-number", null, ""]) {
-  assert.equal(capacity.normalChallengeCapacityError(value, "limited"), capacity.NORMAL_CHALLENGE_CAPACITY_ERROR, `${String(value)} should be rejected as a fixed capacity`);
+for (const value of [1, -1, 3.5, 51, "not-a-number", null]) {
+  assert.equal(capacity.normalChallengeCapacityError(value), capacity.NORMAL_CHALLENGE_CAPACITY_ERROR, `${String(value)} should be rejected`);
 }
-assert.equal(capacity.validateCapacity("unlimited", ""), null, "blank unlimited mode must persist as null");
-assert.equal(capacity.normalizeNormalChallengeCapacity(0), null, "legacy zero capacity must normalize to unlimited");
-assert.equal(capacity.normalChallengeCapacityError(0), null, "legacy zero without a fixed mode must remain readable");
-assert.throws(() => capacity.parseOptionalCapacity(0), /at least 2/);
-assert.throws(() => capacity.parseOptionalCapacity(2.5), /whole number/);
-assert.throws(() => capacity.parseOptionalCapacity("not-a-number"), /valid number/);
+assert.equal(capacity.normalizeNormalChallengeCapacity(""), 0, "blank capacity must normalize to unlimited");
+assert.equal(capacity.normalizeNormalChallengeCapacity(0), 0, "zero capacity must stay unlimited");
 
-assert.match(readiness, /normalChallengeCapacityError\(challenge\.maxParticipants, capacityMode\)/);
-assert.match(schema, /normalChallengeCapacityError\(value\.maxParticipants, capacityMode\)/);
-assert.match(schema, /z\.union\(\[z\.null\(\), z\.coerce\.number\(\)\.int\(\)\.min\(0\)\]\)/);
-assert.doesNotMatch(schema, /maxParticipants[\s\S]{0,180}\.max\(50\)/);
+assert.match(readiness, /normalChallengeCapacityError\(challenge\.maxParticipants\)/);
+assert.match(schema, /normalChallengeCapacityError\(value\.maxParticipants\)/);
+assert.match(schema, /normalChallenge[\s\S]*value\.maxParticipants < 2/);
+assert.match(schema, /z\.coerce\.number\(\)\.int\(\)\.min\(0\)\.max\(50\)/);
+assert.match(schema, /Participant capacity must be at least 2\./);
 assert.ok(publishRoute.includes('const lifecycleStatus = "pending_review"'), "valid Normal submissions must still enter pending_review");
 
 const ready = { ready: true, nextRequiredStep: 0 };
@@ -40,7 +37,7 @@ for (const value of ["Review", Number.NaN, -1, 99, 3.5]) {
   assert.equal(foundation.normalizeNormalChallengeStep(value, incomplete), 3, `incomplete draft ${String(value)} must land on its next required step`);
 }
 
-assert.match(model, /form\.capacityMode === "unlimited" \? null : form\.maxParticipants/);
+assert.match(model, /normalizeNormalChallengeCapacity\(form\.maxParticipants\)/);
 assert.match(builder, /normalizeNormalChallengeStep\(challenge\.builderCurrentStep \?\? challenge\.creationStep \?\? 1, loadedReadiness\)/);
 assert.match(steps, /if \(step === 6\) return <Review/);
 assert.match(builder, /step === NORMAL_CHALLENGE_MAX_STEP[\s\S]*Submit for Review/);
@@ -57,7 +54,7 @@ const reportedState = {
   challengeType: "normal",
   visibility: "public",
   hideParticipantList: true,
-  maxParticipants: capacity.normalizeNormalChallengeCapacity(0),
+  maxParticipants: capacity.normalizeNormalChallengeCapacity(""),
   paidEntryRequested: false,
   eligibleCountry: "",
   minimumAge: 18,
@@ -70,7 +67,7 @@ const reportedState = {
   prizeCurrency: "USD",
   coverImagePath: "challenges/drafts/user/banner/cover.jpg"
 };
-assert.equal(reportedState.maxParticipants, null);
+assert.equal(reportedState.maxParticipants, 0);
 assert.equal(capacity.normalChallengeCapacityError(reportedState.maxParticipants), null);
 
 console.log("PASS normal-challenge-capacity-review-contracts.mjs");

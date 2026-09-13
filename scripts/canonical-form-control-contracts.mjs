@@ -62,8 +62,8 @@ assert.match(capacity, /Capacity must be a valid number/);
 assert.match(capacity, /Capacity must be a whole number/);
 assert.match(capacity, /Capacity must be at least 2/);
 assert.match(capacity, /mode === "unlimited"\) return null/);
-assert.match(capacity, /normalizeNormalChallengeCapacity[\s\S]*validateCapacity/, "Normal Challenge must normalize legacy unlimited capacity through the shared parser");
-assert.doesNotMatch(capacity, /NORMAL_CHALLENGE_MAX_PARTICIPANTS/);
+assert.match(capacity, /normalizeNormalChallengeCapacity[\s\S]*return 0/, "Normal Challenge must retain 0 as unlimited storage compatibility");
+assert.match(capacity, /NORMAL_CHALLENGE_MAX_PARTICIPANTS = 50/);
 
 assert.match(normalSteps, /<SearchSelect label="Category \*"/);
 assert.match(normalSteps, /update\("subcategory", ""\)/, "changing category must clear an incompatible subcategory");
