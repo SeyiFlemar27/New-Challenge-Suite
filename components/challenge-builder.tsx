@@ -20,6 +20,7 @@ import { challengePublishError } from "@/lib/challenge-publish-feedback";
 import { challengeReviewMonetizationLabels, getChallengePublishBlocker } from "@/lib/challenge-publish-readiness";
 import { MultiSelect } from "@/components/canonical-form-controls";
 import { COUNTRY_OPTIONS, SPONSOR_CATEGORY_OPTIONS, normalizeSponsorCategories } from "@/lib/forms/canonical-options";
+import { validateCapacity } from "@/lib/normal-challenge-capacity";
 
 type Mode = "public" | "private";
 const SPONSOR_PLACEMENTS = ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"] as const;
@@ -375,7 +376,7 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
       ageRestrictionMode: privateMode && form.minimumAge ? "minimum_age" : "none",
       minimumAge: privateMode && form.minimumAge ? Math.max(0, Number(form.minimumAge)) : 0,
       capacityMode: privateMode && form.maxParticipants ? "limited" : "unlimited",
-      maxParticipants: privateMode && form.maxParticipants ? Math.max(0, Number(form.maxParticipants)) : 0,
+      maxParticipants: privateMode && form.maxParticipants ? form.maxParticipants : null,
       waitlistEnabled: privateMode && form.waitlistEnabled,
       hideParticipantList: privateMode && form.hideParticipantList,
       privateParticipantQuestions: privateMode ? (form.participantQuestions ?? "").split("\n").map((value) => value.trim()).filter(Boolean) : [],
@@ -434,7 +435,10 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
     if (mode === "private" && step === 1 && (!/^[A-HJ-NP-Z2-9]{5}$/.test(form.accessCode) || !form.access.trim())) return "Generate an access code and add access instructions.";
     if (step === (mode === "private" ? 2 : 1) && (!form.rules.trim() || !form.terms.trim())) return "Rules and eligibility terms are required.";
-    if (mode === "private" && step === 2 && ((form.minimumAge && Number(form.minimumAge) < 13) || (form.maxParticipants && Number(form.maxParticipants) < 2))) return "Set a valid minimum age and participant capacity.";
+    if (mode === "private" && step === 2) {
+      if (form.minimumAge && Number(form.minimumAge) < 13) return "Set a valid minimum age and participant capacity.";
+      try { validateCapacity(form.maxParticipants ? "limited" : "unlimited", form.maxParticipants); } catch { return "Set a valid whole-number participant capacity of at least 2."; }
+    }
     if (mode === "private" && step === 2 && !(form.participantAcknowledgements ?? "I confirm that my submission is original and follows the challenge rules.").trim()) return "Add at least one participant acknowledgment.";
     if (step === (mode === "private" ? 6 : 2) && (!form.submissionTypes.length || !form.submission.trim())) return "Submission type and instructions are required.";
     if (step === (mode === "private" ? 3 : 4) && monetizationProblem) return monetizationProblem;

@@ -40,7 +40,8 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
   const ageMode = text(challenge.ageRestrictionMode) || (number(challenge.minimumAge) > 0 ? "minimum" : "none");
   const minAge = number(challenge.minimumAge);
   if (ageMode === "minimum" && (minAge < 13 || minAge > 120)) issue(issues, "MINIMUM_AGE_INVALID", "minimumAge", 1, "Set a minimum age between 13 and 120.");
-  const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants);
+  const capacityMode = challenge.capacityMode === "limited" ? "limited" : challenge.capacityMode === "unlimited" ? "unlimited" : undefined;
+  const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants, capacityMode);
   if (capacityIssue) issue(issues, "CAPACITY_INVALID", "maxParticipants", 1, capacityIssue);
 
   const paid = bool(monetization.paidEntryRequested) || bool(challenge.paidEntryEnabled);

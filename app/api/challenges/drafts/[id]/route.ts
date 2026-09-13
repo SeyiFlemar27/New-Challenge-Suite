@@ -10,6 +10,7 @@ import { inferLegacyMaxUnlockedStep, normalizeBuilderChallengeType } from "@/lib
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { NORMAL_CHALLENGE_MAX_STEP } from "@/lib/normal-challenge-config";
 import { isCanonicalCountryCode, normalizeCountryCode, normalizeSponsorCategories } from "@/lib/forms/canonical-options";
+import { inferCapacityMode, validateCapacity } from "@/lib/normal-challenge-capacity";
 
 const allowedDraftFields = new Set([
   "title", "shortDescription", "description", "category", "subcategory", "customCategory", "type", "challengeType", "builderVersion", "coverMediaType", "visibility", "premiumOnly",
@@ -45,7 +46,11 @@ function sanitizeDraftPatch(body: Record<string, unknown>) {
     patch.hostOperations = { ...hostOperations, sponsorCategories: normalizeSponsorCategories(hostOperations.sponsorCategories) };
   }
   if (patch.participantApprovalMode && !["automatic", "manual"].includes(String(patch.participantApprovalMode))) delete patch.participantApprovalMode;
-  if (patch.maxParticipants !== undefined) patch.maxParticipants = Math.max(0, Math.trunc(Number(patch.maxParticipants) || 0));
+  if (patch.maxParticipants !== undefined || patch.capacityMode !== undefined) {
+    const capacityMode = patch.capacityMode === "limited" || patch.capacityMode === "unlimited" ? patch.capacityMode : inferCapacityMode(patch.maxParticipants);
+    patch.capacityMode = capacityMode;
+    patch.maxParticipants = validateCapacity(capacityMode, patch.maxParticipants as string | number | null | undefined);
+  }
   if (patch.creationStep !== undefined) patch.creationStep = Math.max(0, Math.trunc(Number(patch.creationStep) || 0));
   if (patch.builderCurrentStep !== undefined) patch.builderCurrentStep = Math.max(0, Math.min(NORMAL_CHALLENGE_MAX_STEP, Math.trunc(Number(patch.builderCurrentStep) || 0)));
   if (patch.maxUnlockedStep !== undefined) patch.maxUnlockedStep = Math.max(0, Math.min(NORMAL_CHALLENGE_MAX_STEP, Math.trunc(Number(patch.maxUnlockedStep) || 0)));
@@ -74,7 +79,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = (parsed.body ?? {}) as Record<string, unknown>;
-  const patch = sanitizeDraftPatch(body);
+  let patch: Record<string, unknown>;
+  try {
+    patch = sanitizeDraftPatch(body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Enter a valid participant capacity.";
+    return fail("Check the participant capacity and try again.", 422, { fieldErrors: { maxParticipants: message } }, "INVALID_PARTICIPANT_CAPACITY");
+  }
   const { id } = await params;
   const ref = db.collection("challenges").doc(id);
   const now = new Date().toISOString();

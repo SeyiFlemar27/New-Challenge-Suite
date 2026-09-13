@@ -1,7 +1,7 @@
 ﻿import { z } from "zod";
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
-import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
+import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isNormalChallengeV2, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
 import { isCanonicalCountryCode, isCanonicalSponsorCategory, isCanonicalTimezone } from "@/lib/forms/canonical-options";
 
@@ -100,7 +100,7 @@ export const serverChallengeCreateSchema = z.object({
   eligibleCountry: z.string().trim().max(100).default(""),
   ageRestrictionMode: z.enum(["none", "minimum", "minimum_age"]).transform((value) => value === "minimum_age" ? "minimum" : value).default("none"),
   minimumAge: z.coerce.number().int().min(0).max(120).default(0),
-  capacityMode: z.enum(["unlimited", "limited"]).default("unlimited"),
+  capacityMode: z.enum(["unlimited", "limited"]).optional(),
   waitlistEnabled: z.coerce.boolean().default(false),
   hideParticipantList: z.coerce.boolean().default(false),
   participantApprovalMode: z.enum(["automatic", "manual"]).default("automatic"),
@@ -167,7 +167,10 @@ export const serverChallengeCreateSchema = z.object({
   eventState: z.string().trim().max(100).default(""),
   eventCountry: z.string().trim().max(100).default(""),
   eventMapUrl: z.string().trim().url("Map link must be valid.").optional().or(z.literal("")),
-  eventCapacity: z.coerce.number().int().min(0).max(50000).default(0),
+  eventCapacity: z.preprocess(
+    (value) => value === "" || value === undefined ? null : value,
+    z.union([z.null(), z.coerce.number().int().min(0)])
+  ).default(null),
   externalLiveUrl: z.string().trim().url("External livestream URL must be valid.").optional().or(z.literal("")),
   externalLiveProvider: z.string().trim().max(80).default(""),
   externalLiveStatus: z.enum(["not_ready", "scheduled", "live", "ended"]).default("not_ready"),
@@ -183,9 +186,9 @@ export const serverChallengeCreateSchema = z.object({
   })).max(20).default([]),
   divisionFormat: z.coerce.number().int().refine((value) => [2, 4, 6].includes(value), "Division format must be 2, 4, or 6.").default(2),
   maxParticipants: z.preprocess(
-    (value) => value === "" ? 0 : value === null ? Number.NaN : value,
-    z.coerce.number().int().min(0).max(50)
-  ).default(50),
+    (value) => value === "" || value === undefined ? null : value,
+    z.union([z.null(), z.coerce.number().int().min(0)])
+  ).default(null),
   joinWindowMode: z.enum(["until_submissions", "custom"]).default("until_submissions"),
   registrationEnabled: z.coerce.boolean().default(true),
   registrationOpensAt: z.string().trim().optional(),
@@ -266,14 +269,14 @@ export const serverChallengeCreateSchema = z.object({
   const normalChallenge = explicitChallengeType
     ? explicitChallengeType === "normal"
     : String(value.type ?? "").toLowerCase() === "public challenge";
+  const tournamentChallenge = explicitChallengeType === "tournament" || value.tournamentType !== "none" || /tournament|bracket|knockout/.test(`${value.type} ${value.competitionFormat}`.toLowerCase());
+  const capacityMode = tournamentChallenge ? "limited" : value.capacityMode ?? inferCapacityMode(value.maxParticipants);
+  const capacityError = normalChallengeCapacityError(value.maxParticipants, capacityMode);
+  if (capacityError) ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: capacityError });
   if (normalChallenge) {
-    const capacityError = normalChallengeCapacityError(value.maxParticipants);
-    if (capacityError) ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: capacityError });
     if (value.builderVersion === "normal_v2" && value.fixAndResubmitEnabled && !NORMAL_RESUBMIT_WINDOWS.includes(value.fixAndResubmitHours as 12 | 24 | 48 | 72)) {
       ctx.addIssue({ code: "custom", path: ["fixAndResubmitHours"], message: "Choose a 12, 24, 48, or 72 hour correction window." });
     }
-  } else if (value.maxParticipants < 2) {
-    ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: "Participant capacity must be at least 2." });
   }
   if (value.publish) {
     if (!isCanonicalChallengeCategory(value.category)) ctx.addIssue({ code: "custom", path: ["category"], message: "Choose a category from the available options." });
@@ -295,6 +298,9 @@ export const serverChallengeCreateSchema = z.object({
       if (value.publish || value[field as keyof typeof value]) ctx.addIssue({ code: "custom", path: [field], message });
     }
   }
+}).transform((value) => {
+  const capacityMode = value.capacityMode ?? inferCapacityMode(value.maxParticipants);
+  return { ...value, capacityMode, maxParticipants: capacityMode === "unlimited" ? null : value.maxParticipants };
 });
 
 export type ServerChallengeCreateInput = z.infer<typeof serverChallengeCreateSchema>;
