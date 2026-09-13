@@ -9,6 +9,7 @@ import { isRetiredHybridCompetition, retiredHybridCompetitionState } from "@/lib
 import { inferLegacyMaxUnlockedStep, normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { NORMAL_CHALLENGE_MAX_STEP } from "@/lib/normal-challenge-config";
+import { isCanonicalCountryCode, normalizeCountryCode, normalizeSponsorCategories } from "@/lib/forms/canonical-options";
 
 const allowedDraftFields = new Set([
   "title", "shortDescription", "description", "category", "subcategory", "customCategory", "type", "challengeType", "builderVersion", "coverMediaType", "visibility", "premiumOnly",
@@ -26,15 +27,22 @@ const allowedDraftFields = new Set([
   "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "joinWindowMode", "submissionRequirements", "submissionRequirementsList", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt", "publishConfirmations"
 ]);
 
-const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
+const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "preferredSponsorCategories", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
 
 function sanitizeDraftPatch(body: Record<string, unknown>) {
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (!allowedDraftFields.has(key)) continue;
     if (key === "monetization" && value && typeof value === "object") {
-      patch[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([field]) => allowedMonetizationFields.has(field)));
+      const monetization = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([field]) => allowedMonetizationFields.has(field)));
+      const categories = normalizeSponsorCategories(monetization.preferredSponsorCategories ?? monetization.preferredSponsorCategory);
+      patch[key] = { ...monetization, preferredSponsorCategories: categories, preferredSponsorCategory: categories[0] ?? "" };
     } else patch[key] = value;
+  }
+  if (Array.isArray(patch.eligibleCountries)) patch.eligibleCountries = Array.from(new Set(patch.eligibleCountries.map(normalizeCountryCode).filter(isCanonicalCountryCode)));
+  if (patch.hostOperations && typeof patch.hostOperations === "object") {
+    const hostOperations = patch.hostOperations as Record<string, unknown>;
+    patch.hostOperations = { ...hostOperations, sponsorCategories: normalizeSponsorCategories(hostOperations.sponsorCategories) };
   }
   if (patch.participantApprovalMode && !["automatic", "manual"].includes(String(patch.participantApprovalMode))) delete patch.participantApprovalMode;
   if (patch.maxParticipants !== undefined) patch.maxParticipants = Math.max(0, Math.trunc(Number(patch.maxParticipants) || 0));

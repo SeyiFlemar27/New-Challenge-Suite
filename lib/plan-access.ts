@@ -101,7 +101,7 @@ export interface PlanExperience {
   privateChallengeLimitLabel: string;
   monthlyChallengeLimit: number | null;
   monthlyPrivateChallengeLimit: number | null;
-  teamMemberLimit: number;
+  teamMemberLimit: number | null;
   monthlyBoostLimit: number;
   voteMultiplierLimit: number;
   features: Record<PlanFeature, boolean>;
@@ -283,7 +283,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     privateChallengeLimitLabel: "Up to 1,000 active private official challenges",
     monthlyChallengeLimit: null,
     monthlyPrivateChallengeLimit: null,
-    teamMemberLimit: 999,
+    teamMemberLimit: null,
     monthlyBoostLimit: 5,
     voteMultiplierLimit: 0,
     features: {
@@ -348,7 +348,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     privateChallengeLimitLabel: "Normal challenge creation unavailable",
     monthlyChallengeLimit: 0,
     monthlyPrivateChallengeLimit: 0,
-    teamMemberLimit: 999,
+    teamMemberLimit: null,
     monthlyBoostLimit: 0,
     voteMultiplierLimit: 0,
     features: {

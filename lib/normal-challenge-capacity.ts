@@ -22,3 +22,19 @@ export function normalChallengeCapacityError(value: unknown) {
   }
   return null;
 }
+
+export function parseOptionalCapacity(value: string | number | null | undefined): number | null {
+  if (value === "" || value === null || value === undefined) return null;
+  const capacity = Number(value);
+  if (!Number.isFinite(capacity)) throw new Error("Capacity must be a valid number.");
+  if (!Number.isInteger(capacity)) throw new Error("Capacity must be a whole number.");
+  if (capacity < 2) throw new Error("Capacity must be at least 2.");
+  return capacity;
+}
+
+export function validateCapacity(mode: "unlimited" | "limited", value: string | number | null | undefined): number | null {
+  if (mode === "unlimited") return null;
+  const capacity = parseOptionalCapacity(value);
+  if (capacity === null) throw new Error("Enter a participant capacity.");
+  return capacity;
+}

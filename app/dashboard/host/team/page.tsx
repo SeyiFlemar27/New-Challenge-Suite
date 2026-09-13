@@ -14,9 +14,9 @@ export default function HostTeamPage() {
   return (
     <PlanFeatureGate feature="team_management" requiredPlan="Host" title="Host team tools require Host plan">
       <AppShell>
-        <PageTitle title="Team Members" subtitle={`Your Host workspace supports up to ${experience.teamMemberLimit} team seats.`} />
+        <PageTitle title="Team Members" subtitle={experience.teamMemberLimit === null ? "Your team capacity is configured by your agreement." : `Your Host workspace supports up to ${experience.teamMemberLimit} team seats.`} />
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <Card className="p-5"><p className="text-sm text-slate-400">Seats used</p><p className="mt-2 text-3xl font-black">1/{experience.teamMemberLimit}</p></Card>
+          <Card className="p-5"><p className="text-sm text-slate-400">Seats used</p><p className="mt-2 text-3xl font-black">{experience.teamMemberLimit === null ? "Configured" : `1/${experience.teamMemberLimit}`}</p></Card>
           <Card className="p-5"><p className="text-sm text-slate-400">Active members</p><p className="mt-2 text-3xl font-black">1</p></Card>
           <Card className="p-5"><p className="text-sm text-slate-400">Pending invitations</p><p className="mt-2 text-3xl font-black">0</p></Card>
         </div>
