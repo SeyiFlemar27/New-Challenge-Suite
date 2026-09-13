@@ -3,7 +3,6 @@ import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isNormalChallengeV2, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
-import { isCanonicalCountryCode, isCanonicalSponsorCategory, isCanonicalTimezone } from "@/lib/forms/canonical-options";
 
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -44,7 +43,7 @@ export const serverChallengeCreateSchema = z.object({
   registrationDeadline: z.string().trim().optional(),
   votingEndsAt: z.string().trim().optional(),
   winnerAnnouncementAt: z.string().trim().optional(),
-  timeZone: z.string().trim().max(80).refine(isCanonicalTimezone, "Choose a supported timezone.").default(DEFAULT_CHALLENGE_TIME_ZONE),
+  timeZone: z.string().trim().max(80).default(DEFAULT_CHALLENGE_TIME_ZONE),
   lateRegistrationEnabled: z.coerce.boolean().default(false),
   standardRules: z.string().trim().max(6000).default(""),
   challengeRules: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
@@ -96,7 +95,7 @@ export const serverChallengeCreateSchema = z.object({
   requiresParticipantApproval: z.coerce.boolean().default(false),
   participationMode: z.enum(["open", "approval"]).default("open"),
   locationEligibility: z.enum(["worldwide", "selected", "selected_countries"]).transform((value) => value === "selected_countries" ? "selected" : value).default("worldwide"),
-  eligibleCountries: z.array(z.string().trim().length(2).refine(isCanonicalCountryCode, "Choose a supported country.")).max(250).default([]),
+  eligibleCountries: z.array(z.string().trim().length(2)).max(250).default([]),
   eligibleCountry: z.string().trim().max(100).default(""),
   ageRestrictionMode: z.enum(["none", "minimum", "minimum_age"]).transform((value) => value === "minimum_age" ? "minimum" : value).default("none"),
   minimumAge: z.coerce.number().int().min(0).max(120).default(0),
@@ -131,7 +130,6 @@ export const serverChallengeCreateSchema = z.object({
     paidVotesRequested: z.coerce.boolean().default(false),
     sponsorshipGoal: z.string().trim().max(240).default(""),
     preferredSponsorCategory: z.string().trim().max(120).default(""),
-    preferredSponsorCategories: z.array(z.string().trim().refine(isCanonicalSponsorCategory, "Choose a supported sponsor category.")).max(3).default([]),
     sponsorNote: z.string().trim().max(1200).default(""),
     placements: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
     status: z.enum(["not_requested", "setup_required", "pending_payment_setup", "active_foundation"]).default("not_requested"),
@@ -150,7 +148,6 @@ export const serverChallengeCreateSchema = z.object({
     paidVotesRequested: false,
     sponsorshipGoal: "",
     preferredSponsorCategory: "",
-    preferredSponsorCategories: [],
     sponsorNote: "",
     placements: [],
     status: "not_requested",
@@ -234,7 +231,7 @@ export const serverChallengeCreateSchema = z.object({
     brandColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Brand color must be a six-digit hex color.").default("#F5B700"),
     allowSponsorInterest: z.coerce.boolean().default(false),
     showSponsorRequestButton: z.coerce.boolean().default(false),
-    sponsorCategories: z.array(z.string().trim().refine(isCanonicalSponsorCategory, "Choose a supported sponsor category.")).max(3).default([]),
+    sponsorCategories: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
     sponsorVisibilityAreas: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
     launchMode: z.enum(["draft", "publish", "schedule"]).default("draft"),
     registrationOpensAt: z.string().trim().max(40).default(""),
@@ -246,7 +243,7 @@ export const serverChallengeCreateSchema = z.object({
     checkInStartAt: z.string().trim().max(40).default(""),
     checkInEndAt: z.string().trim().max(40).default(""),
     checkInRequired: z.coerce.boolean().default(false),
-    timezone: z.string().trim().max(80).refine(isCanonicalTimezone, "Choose a supported timezone.").default("America/New_York"),
+    timezone: z.string().trim().max(80).default("America/New_York"),
     waitlistEnabled: z.coerce.boolean().default(false),
     participantListVisibility: z.enum(["visible", "hidden"]).default("visible"),
     eventFormat: z.enum(["attendance_only", "digital_submission", "physical_competition"]).default("attendance_only"),

@@ -2,7 +2,6 @@ import { fail, ok, readJson, serverError, validationError } from "@/lib/server/r
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 import { cleanMoneyCents, cleanText, isoNow, normalizeProposalDeliverables, normalizeProposalStatus, safeArray } from "@/lib/sponsor-collaboration";
-import { normalizeSponsorCategory } from "@/lib/forms/canonical-options";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +35,7 @@ export function proposalPayload(body: Record<string, unknown>, sponsorId: string
     usageRights: cleanText(body.usageRights ?? existing.usageRights).slice(0, 1200),
     cancellationTerms: cleanText(body.cancellationTerms ?? existing.cancellationTerms).slice(0, 1200),
     sponsorRole: body.sponsorRole === "primary" ? "primary" : existing.sponsorRole === "primary" ? "primary" : "supporting",
-    sponsorCategory: normalizeSponsorCategory(body.sponsorCategory ?? existing.sponsorCategory),
+    sponsorCategory: cleanText(body.sponsorCategory ?? existing.sponsorCategory).slice(0, 120),
     categoryExclusive: body.categoryExclusive === undefined ? existing.categoryExclusive === true : body.categoryExclusive === true,
     requestedPlacements: safeArray(body.requestedPlacements ?? existing.requestedPlacements),
     attachments: safeArray(body.attachments ?? existing.attachments),

@@ -19,7 +19,7 @@ import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time"
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
-import { CHALLENGE_SUITE_ENTERPRISE_ID, ENTERPRISE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export async function GET() {
   const db = getAdminDb();
@@ -74,13 +74,12 @@ export async function POST(request: Request) {
   if (body.officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) {
     return fail("Your Enterprise role cannot create official Challenge Suite challenges.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
   }
-  if (body.ownershipType === "enterprise_personal") {
-    return fail("Switch to Personal Workspace to create a personally owned challenge.", 403, { redirectTo: "/challenges/create" }, "ENTERPRISE_PERSONAL_OWNERSHIP_NOT_ALLOWED");
+  if (body.ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) {
+    return fail("Your Enterprise role cannot create personal challenges.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
   }
-  const entitlementProfile = body.officialChallenge ? { ...planProfile, planId: "enterprise", planStatus: "active" } : planProfile;
-  const planAccess = getUserPlanAccess(entitlementProfile);
-  const planExperience = getPlanExperience(entitlementProfile);
-  const monetizationAccess = getChallengeMonetizationAccess(entitlementProfile);
+  const planAccess = getUserPlanAccess(planProfile);
+  const planExperience = getPlanExperience(planProfile);
+  const monetizationAccess = getChallengeMonetizationAccess(planProfile);
   const monetizationIntent = body.monetization;
   const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
   const requestedMonetization = Boolean(monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested);
@@ -91,14 +90,7 @@ export async function POST(request: Request) {
     return fail("Sponsors manage campaigns from the Brand Command Center. Use /sponsor instead of normal challenge creation.", 403, { redirectTo: "/sponsor/dashboard" }, "USER_ACCOUNT_REQUIRED");
   }
 
-  const enterpriseChallengesSnap = body.officialChallenge
-    ? await db.collection("challenges").where("organizationOwnerId", "==", CHALLENGE_SUITE_ENTERPRISE_ID).limit(ENTERPRISE_LIMITS.activeOfficialChallenges + 1).get()
-    : null;
-  const countedChallenges = enterpriseChallengesSnap?.docs ?? ownedChallengesSnap.docs;
-  const activeChallengeCount = countedChallenges.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status)).length;
-  if (body.officialChallenge && body.publish && activeChallengeCount >= ENTERPRISE_LIMITS.activeOfficialChallenges) {
-    return fail("The Enterprise active official challenge limit has been reached. Contact an Admin before creating more official work.", 409, { limit: ENTERPRISE_LIMITS.activeOfficialChallenges }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
-  }
+  const activeChallengeCount = ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status)).length;
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
@@ -158,7 +150,7 @@ export async function POST(request: Request) {
   if (body.publish) lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const challengeInputForAccess = { ...body, ...moneyLocks, status: lifecycleStatus };
-  const creationAccess = canCreateChallenge(entitlementProfile, { ...challengeInputForAccess, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested } as Record<string, unknown>, activeChallengeCount);
+  const creationAccess = canCreateChallenge(planProfile, { ...challengeInputForAccess, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested } as Record<string, unknown>, activeChallengeCount);
   if (!creationAccess.allowed) {
     return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess, activeChallengeCount }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
   }
@@ -176,8 +168,7 @@ export async function POST(request: Request) {
     paidVotesRequested: Boolean(monetizationIntent.paidVotesRequested && monetizationAccess.canPreparePaidVotes),
     paidVotesCheckoutStatus: monetizationIntent.paidVotesRequested && monetizationAccess.canPreparePaidVotes ? "setup_required" : "not_requested",
     sponsorshipGoal: sponsorEnabled ? monetizationIntent.sponsorshipGoal : "",
-    preferredSponsorCategory: sponsorEnabled ? monetizationIntent.preferredSponsorCategories[0] ?? monetizationIntent.preferredSponsorCategory : "",
-    preferredSponsorCategories: sponsorEnabled ? monetizationIntent.preferredSponsorCategories : [],
+    preferredSponsorCategory: sponsorEnabled ? monetizationIntent.preferredSponsorCategory : "",
     sponsorNote: sponsorEnabled ? monetizationIntent.sponsorNote : "",
     placements: sponsorEnabled ? monetizationIntent.placements : [],
     status: requestedMonetization ? "setup_required" : "not_requested",
@@ -196,7 +187,7 @@ export async function POST(request: Request) {
     createdBy: user.uid,
     officialChallenge: Boolean(body.officialChallenge),
     ownershipType: body.officialChallenge ? "challenge_suite_official" : body.ownershipType,
-    organizationOwnerId: body.officialChallenge ? CHALLENGE_SUITE_ENTERPRISE_ID : null,
+    organizationOwnerId: body.officialChallenge ? "challenge_suite" : null,
     enterpriseChallengeLeadId: body.officialChallenge ? user.uid : null,
     enterpriseAssignments: body.officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
     title: body.title,

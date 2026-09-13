@@ -101,7 +101,7 @@ export interface PlanExperience {
   privateChallengeLimitLabel: string;
   monthlyChallengeLimit: number | null;
   monthlyPrivateChallengeLimit: number | null;
-  teamMemberLimit: number | null;
+  teamMemberLimit: number;
   monthlyBoostLimit: number;
   voteMultiplierLimit: number;
   features: Record<PlanFeature, boolean>;
@@ -279,11 +279,11 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     dashboardName: "Enterprise Command Center",
     dashboardSubtitle: "Coordinate programs, campaigns, branded experiences, large competitions, teams, reports, and integrations.",
     badgeLabel: "Enterprise",
-    challengeLimitLabel: "Up to 1,000 active official challenges",
-    privateChallengeLimitLabel: "Up to 1,000 active private official challenges",
+    challengeLimitLabel: "Unlimited program challenges",
+    privateChallengeLimitLabel: "Unlimited private challenges",
     monthlyChallengeLimit: null,
     monthlyPrivateChallengeLimit: null,
-    teamMemberLimit: null,
+    teamMemberLimit: 999,
     monthlyBoostLimit: 5,
     voteMultiplierLimit: 0,
     features: {
@@ -348,7 +348,7 @@ const planExperiences: Record<BlueprintPlanId, PlanExperience> = {
     privateChallengeLimitLabel: "Normal challenge creation unavailable",
     monthlyChallengeLimit: 0,
     monthlyPrivateChallengeLimit: 0,
-    teamMemberLimit: null,
+    teamMemberLimit: 999,
     monthlyBoostLimit: 0,
     voteMultiplierLimit: 0,
     features: {

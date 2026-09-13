@@ -6,8 +6,6 @@ import { normalizeSponsorReviewStatus } from "@/lib/sponsor-access";
 import { sponsorMediaPath } from "@/lib/media-upload-paths";
 import { ensurePrimarySponsorOrganization, resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 import { z } from "zod";
-import { isCanonicalCountryCode, isCanonicalSponsorCategory, normalizeCountryCode, normalizeSponsorCategories } from "@/lib/forms/canonical-options";
-import { sponsorIndustries } from "@/lib/sponsor-foundation";
 
 export const dynamic = "force-dynamic";
 
@@ -21,19 +19,17 @@ function normalizeUrl(value: unknown) {
 const optionalText = (max = 240) => z.string().trim().max(max).optional().or(z.literal(""));
 const optionalUrl = z.preprocess(normalizeUrl, z.string().trim().url("Enter a valid URL.").optional().or(z.literal("")));
 const safeStringArray = z.array(z.string().trim().min(1).max(120)).max(30).default([]);
-const canonicalCountry = z.preprocess(normalizeCountryCode, z.string().refine(isCanonicalCountryCode, "Choose a supported country."));
-const canonicalSponsorCategories = z.preprocess((value) => normalizeSponsorCategories(value), z.array(z.string().refine(isCanonicalSponsorCategory)).min(1, "Select at least one preferred category.").max(3));
 
 const sponsorProfileSchema = z.object({
   brandName: z.string().trim().min(2, "Brand name is required.").max(120),
   legalBusinessName: optionalText(160),
-  industry: z.enum(sponsorIndustries as [string, ...string[]], { message: "Choose a supported industry." }),
+  industry: z.string().trim().min(2, "Industry/category is required.").max(100),
   companySize: optionalText(80),
   businessType: optionalText(100),
-  businessRegistrationCountry: canonicalCountry.optional(),
+  businessRegistrationCountry: optionalText(120),
   headquartersLocation: optionalText(160),
   website: optionalUrl,
-  countryLocation: canonicalCountry,
+  countryLocation: z.string().trim().min(2, "Country/location is required.").max(120),
   brandDescription: z.string().trim().min(20, "Brand description should be at least 20 characters.").max(1600),
   socialLinks: z.array(z.preprocess(normalizeUrl, z.string().trim().url("Each social link must be a valid URL."))).max(12).default([]),
   contactPerson: optionalText(120),
@@ -57,8 +53,8 @@ const sponsorProfileSchema = z.object({
   ctaButtonText: z.string().trim().min(2, "CTA button text is required.").max(40).transform((value) => value.replace(/[<>]/g, "")),
   ctaDestinationLink: optionalUrl,
   sponsorshipGoals: z.array(z.string().trim().min(1)).min(1, "Select at least one sponsorship goal.").max(12),
-  preferredChallengeCategories: canonicalSponsorCategories,
-  targetCountries: z.array(canonicalCountry).max(30).default([]),
+  preferredChallengeCategories: z.array(z.string().trim().min(1)).min(1, "Select at least one preferred category.").max(16),
+  targetCountries: safeStringArray,
   targetRegions: safeStringArray,
   targetAgeRange: optionalText(80),
   genderPreference: optionalText(80),

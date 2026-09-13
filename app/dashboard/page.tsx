@@ -121,13 +121,13 @@ export default function DashboardPage() {
       : planExperience.planId === "host"
           ? [
               { title: "Competition Operations", body: "Manage participants, submission review, voting controls, tournaments, and live-event setup.", icon: Radio, active: true, href: "/dashboard/host" },
-              { title: "Host Team", body: planExperience.teamMemberLimit === null ? "Team capacity is configured by your agreement. Invitations require setup before sending." : `Team workspace for up to ${planExperience.teamMemberLimit} members. Invitations require setup before sending.`, icon: UsersRound, active: true, href: "/host/team" },
+              { title: "Host Team", body: `Team workspace for up to ${planExperience.teamMemberLimit} members. Invitations require setup before sending.`, icon: UsersRound, active: true, href: "/host/team" },
               { title: "Revenue Overview", body: "Review server-confirmed sponsorship revenue, earnings, and withdrawal status.", icon: ShieldCheck, active: true, href: "/earnings" }
             ]
           : [
               { title: "Programs & Campaigns", body: "Coordinate branded programs, campaigns, and large competition workspaces.", icon: Crown, active: true },
               { title: "Reports & Exports", body: "Enterprise reporting and export readiness for program oversight.", icon: BarChart3, active: true },
-              { title: "Teams & Integrations", body: planExperience.teamMemberLimit === null ? "Multi-admin capacity is configured by your agreement, with integrations shown when configured." : `Multi-admin workspace for up to ${planExperience.teamMemberLimit} members, with integrations shown when configured.`, icon: UsersRound, active: true, href: "/dashboard/host" }
+              { title: "Teams & Integrations", body: `Multi-admin workspace for up to ${planExperience.teamMemberLimit} members, with integrations shown when configured.`, icon: UsersRound, active: true, href: "/dashboard/host" }
             ];
   const quickActions = planExperience.planId === "free"
     ? freeCompetitor ? [
@@ -166,7 +166,7 @@ export default function DashboardPage() {
         ]
       : [
             { icon: <Swords />, title: planExperience.planId === "enterprise" ? "Active Programs" : "Active Competitions", value: dashboard?.stats.activeChallenges ?? 0, label: planExperience.challengeLimitLabel },
-            { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit ?? "Agreement", label: "Team seats" },
+            { icon: <UsersRound />, title: "Team Capacity", value: planExperience.teamMemberLimit, label: "Team seats" },
             { icon: <BarChart3 />, title: "Reports & Exports", value: planExperience.features.data_export ? "Ready" : "Locked", label: "Operational access" }
           ];
 
