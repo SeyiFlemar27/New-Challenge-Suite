@@ -1,2 +1,2 @@
-import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
-export default function Page() { return <HostCompetitionWizard initialCompetitionType="Tournament" enterpriseOwnership="personal" />; }
+import { TournamentBuilder } from "@/components/tournament-builder";
+export default function Page() { return <TournamentBuilder enterpriseOwnership="personal" />; }

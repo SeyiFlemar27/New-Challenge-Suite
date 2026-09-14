@@ -40,6 +40,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
+  if (body.ownershipType !== undefined && body.ownershipType !== tournament.ownershipType) return fail("Tournament ownership cannot be changed after creation.", 409, undefined, "TOURNAMENT_OWNERSHIP_LOCKED");
+  if (body.officialChallenge !== undefined && Boolean(body.officialChallenge) !== Boolean(tournament.officialChallenge)) return fail("Tournament ownership cannot be changed after creation.", 409, undefined, "TOURNAMENT_OWNERSHIP_LOCKED");
   if (body.status && body.status !== tournament.status) {
     const transition = assertTournamentTransition(String(tournament.status ?? "draft") as TournamentStatus, String(body.status) as TournamentStatus);
     if (!transition.valid) return fail(transition.message, 409, transition, transition.code);

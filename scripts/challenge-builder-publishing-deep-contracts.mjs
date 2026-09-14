@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8");
 const builderSource = read("components/normal-challenge-builder.tsx");
 const builder = builderSource + read("components/normal-challenge-builder-steps.tsx");
+const frame = read("components/challenge-builder-frame.tsx");
 const privateBuilder = read("components/challenge-builder.tsx");
 const publishRoute = read("app/api/challenges/[id]/publish/route.ts");
 const createRoute = read("app/api/challenges/route.ts");
@@ -35,7 +36,7 @@ assert(builderSource.indexOf("persist(NORMAL_CHALLENGE_MAX_STEP)") < builderSour
 assert(!draftRoute.includes("createNotification") && !builder.includes("Draft saved."), "autosave must remain silent");
 assert(preview.includes("redirect(`/challenges/create/${draftId}`)") && !preview.includes("ChallengeMediaGallery"), "creation preview must redirect to editing");
 for (const title of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert((builder + read("lib/challenge-builder-foundation.ts")).includes(`"${title}"`), `missing Normal Challenge step ${title}`);
-assert(builder.includes("Submit for Review") && builder.includes("Back") && builder.includes('"Continue"'), "builder must expose only sequential navigation actions");
+assert((builder + frame).includes("Submit for Review") && frame.includes("Back") && frame.includes('"Continue"'), "builder must expose only sequential navigation actions");
 assert(readiness.includes("VOTING_BEFORE_SUBMISSION_CLOSE") && readiness.includes("PRIZE_AMOUNTS_INVALID") && readiness.includes("VIDEO_NOT_CONFIRMED"), "cross-step readiness checks are incomplete");
 assert(!publishRoute.includes("KYC_REQUIRED") && !builder.includes("KYC_REQUIRED"), "KYC must not block challenge review submission");
 

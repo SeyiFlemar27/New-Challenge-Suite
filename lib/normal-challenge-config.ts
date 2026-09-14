@@ -31,7 +31,7 @@ export function isCanonicalChallengeSubcategory(category: string, subcategory: s
 }
 
 export const NORMAL_RESUBMIT_WINDOWS = [12, 24, 48, 72] as const;
-export const NORMAL_PRIZE_SPLITS: Record<number, number[]> = { 1: [100], 2: [70, 30], 3: [50, 30, 20] };
+export const NORMAL_PRIZE_SPLITS: Record<number, number[]> = { 1: [100], 2: [70, 30], 3: [60, 25, 15] };
 
 export const NORMAL_MEDIA_LIMITS = {
   imageCount: 3,

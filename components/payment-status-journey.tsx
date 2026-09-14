@@ -33,6 +33,17 @@ type JourneyCopy = {
   secondaryHref?: string;
 };
 
+const PURPOSE_PROGRESS: Record<PaymentPurpose, readonly [string, string, string]> = {
+  subscription_payment: ["Payment received", "Activating membership", "Membership active"],
+  dorocoin_purchase: ["Payment received", "Adding DoroCoins", "DoroCoins available"],
+  challenge_entry_payment: ["Payment received", "Confirming challenge entry", "Challenge entry confirmed"],
+  prize_pool_funding: ["Payment received", "Confirming prize funding", "Prize funding confirmed"],
+  sponsor_contribution: ["Payment received", "Confirming sponsorship", "Sponsorship confirmed"],
+  vote_purchase: ["Payment received", "Confirming paid votes", "Paid votes available"],
+  challenge_boost_purchase: ["Payment received", "Activating challenge boost", "Challenge boost active"],
+  platform_prize_funding: ["Payment received", "Confirming prize funding", "Prize funding confirmed"]
+};
+
 export function PaymentStatusJourney({
   purpose,
   reference,
@@ -98,6 +109,7 @@ export function PaymentStatusJourney({
 
   const confirmed = status?.state === "confirmed" && status.webhookConfirmed;
   const terminalFailure = status && ["failed", "refunded", "reversed"].includes(status.state);
+  const progressLabels = PURPOSE_PROGRESS[purpose];
   const title = loading ? "Checking payment status" : confirmed ? copy.confirmedTitle : terminalFailure ? "Payment needs attention" : timedOut ? "Activation is still processing" : copy.pendingTitle;
   const body = loading
     ? "Loading the verified provider record."
@@ -106,7 +118,7 @@ export function PaymentStatusJourney({
       : terminalFailure
         ? "The provider record is not active. Review the status below before trying again."
         : timedOut
-          ? "Your access will update automatically after the payment provider confirms the subscription. You can finish later and return from Billing."
+          ? "This payment will update automatically after the provider confirms it. You can leave this page and return to the related item later."
           : copy.pendingBody;
 
   return <AppShell>
@@ -116,8 +128,8 @@ export function PaymentStatusJourney({
       <p className="mt-4 max-w-2xl leading-7 text-slate-300">{body}</p>
 
       <Card className="mt-8 border-yellow-300 bg-white p-5 text-slate-950 shadow-xl sm:p-7" aria-live="polite">
-        <div className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="Membership activation progress">
-          {["Payment received", "Activating Host plan", "Host plan active"].map((label, index) => <div key={label} className={`rounded-[8px] border p-3 text-sm font-black ${confirmed || index === 0 ? "border-emerald-300 bg-emerald-50 text-emerald-800" : index === 1 ? "border-yellow-300 bg-yellow-50 text-yellow-900" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{label}</div>)}
+        <div className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="Payment confirmation progress">
+          {progressLabels.map((label, index) => <div key={label} className={`rounded-[8px] border p-3 text-sm font-black ${confirmed || index === 0 ? "border-emerald-300 bg-emerald-50 text-emerald-800" : index === 1 ? "border-yellow-300 bg-yellow-50 text-yellow-900" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{label}</div>)}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <StatusItem label="Status" value={loading ? "Loading" : labelState(status?.state)} />

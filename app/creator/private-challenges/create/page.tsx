@@ -1,5 +1,5 @@
-import { ChallengeBuilder } from "@/components/challenge-builder";
+import { PrivateChallengeBuilder } from "@/components/challenge-builder";
 
 export default function CreatePrivateChallengePage() {
-  return <ChallengeBuilder mode="private" />;
+  return <PrivateChallengeBuilder />;
 }

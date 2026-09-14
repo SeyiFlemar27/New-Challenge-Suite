@@ -1,5 +1,5 @@
-﻿import { HostCompetitionWizard } from "@/components/host/host-competition-wizard";
+import { NormalChallengeBuilder } from "@/components/normal-challenge-builder";
 
 export default function CreateRoutePage() {
-  return <HostCompetitionWizard initialCompetitionType="Online Challenge" />;
+  return <NormalChallengeBuilder />;
 }

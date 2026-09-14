@@ -6,6 +6,13 @@ const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 const selected = new Set(process.argv.slice(2));
 const run = (name, check) => { if (!selected.size || selected.has(name)) check(); };
+const registrySteps = (type) => {
+  const registry = read("lib/challenge-builder-registry.ts");
+  const start = registry.indexOf(`${type}: [`);
+  const end = registry.indexOf("].map", start);
+  assert(start >= 0 && end > start, `Missing ${type} builder registry.`);
+  return registry.slice(start, end);
+};
 
 run("provisioning", () => {
   const admin = read("app/api/admin/operations/route.ts");
@@ -56,11 +63,11 @@ run("navigation", () => {
 
 run("private_steps", () => {
   const builder = read("components/challenge-builder.tsx");
-  const match = builder.match(/const privateSteps = \[([^\]]+)\]/);
-  assert.ok(match);
-  assert.equal((match[1].match(/"/g) ?? []).length / 2, 9);
-  for (const step of ["Overview", "Access", "Eligibility", "Monetization", "Media", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(match[1].includes(`"${step}"`));
-  assert.ok(!match[1].includes("Participant Requirements"), "Participant requirements belong inside Eligibility, not a separate step.");
+  const steps = registrySteps("private");
+  assert.equal((steps.match(/\["[^"]+", "[^"]+"\]/g) ?? []).length, 9);
+  for (const step of ["Overview", "Access", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(steps.includes(`"${step}"`));
+  assert.ok(!steps.includes("Participant Requirements"), "Participant requirements belong inside Eligibility, not a separate step.");
+  assert.match(builder, /canonicalBuilderSteps\("private"\)/);
   assert.match(builder, /ChallengeBuilderFrame/);
   assert.match(builder, /privateParticipantQuestions/);
   assert.match(builder, /privateParticipantAcknowledgements/);
@@ -85,14 +92,15 @@ run("private_requirements", () => {
 
 run("live_steps", () => {
   const wizard = read("components/host/host-competition-wizard.tsx");
-  const match = wizard.match(/const liveEventSteps = \[([^\]]+)\]/);
-  assert.ok(match);
-  assert.equal((match[1].match(/"/g) ?? []).length / 2, 10);
+  const steps = registrySteps("live_event");
+  assert.equal((steps.match(/\["[^"]+", "[^"]+"\]/g) ?? []).length, 10);
+  assert.match(wizard, /canonicalBuilderSteps\("live_event"\)/);
   assert.match(wizard, /manualCheckInEnabled: true/);
   assert.match(wizard, /qrCheckInRequiresServerToken: true/);
   assert.match(wizard, /judgeAccountIds/);
   assert.match(wizard, /ChallengeBuilderFrame/);
-  assert.match(wizard, /setTimeout\(\(\) =>/);
+  assert.match(wizard, /useChallengeBuilderAutosave/);
+  assert.match(read("lib/hooks/use-challenge-builder-autosave.ts"), /window\.setTimeout/);
 });
 
 console.log(`Normalized Enterprise, Private, and Live Event contracts passed${selected.size ? `: ${[...selected].join(", ")}` : ""}.`);

@@ -30,7 +30,7 @@ function percentTotal(values: unknown) {
 export function validateTournamentFoundation(input: Record<string, unknown>, options: { publish?: boolean } = {}) {
   const errors: TournamentValidationIssue[] = [];
   const format = text(input.format || "single_elimination") as TournamentFormat;
-  const capacity = Math.trunc(Number(input.participantCapacity ?? 0));
+  const capacity = Number(input.participantCapacity ?? 0);
   const participationMode = text(input.participationMode || "individual");
   const registrationOpensAt = dateValue(input.registrationOpensAt);
   const registrationClosesAt = dateValue(input.registrationClosesAt);
@@ -49,7 +49,7 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   if (!Number.isInteger(minimumAge) || minimumAge < 0 || minimumAge > 120) errors.push({ field: "ageRestriction", message: "Minimum age must be a whole number from 0 to 120." });
   if (!TOURNAMENT_FORMATS.includes(format)) errors.push({ field: "format", message: "Tournament format is invalid." });
   if (!["single_elimination", "double_elimination"].includes(format)) errors.push({ field: "format", message: "Choose Single Elimination or Double Elimination." });
-  if (!TOURNAMENT_BRACKET_SIZES.includes(capacity as typeof TOURNAMENT_BRACKET_SIZES[number])) errors.push({ field: "participantCapacity", message: "Choose a bracket size of 4, 8, 16, 32, 64, or 128." });
+  if (!Number.isInteger(capacity) || !TOURNAMENT_BRACKET_SIZES.includes(capacity as typeof TOURNAMENT_BRACKET_SIZES[number])) errors.push({ field: "participantCapacity", message: "Choose a bracket size of 4, 8, 16, 32, 64, or 128." });
   if (!["individual", "team"].includes(participationMode)) errors.push({ field: "participationMode", message: "Choose Individual or Team tournament participation." });
   if (!TOURNAMENT_PRIVACY.includes(text(input.privacy || "public") as TournamentPrivacy)) errors.push({ field: "privacy", message: "Tournament privacy is invalid." });
   if (!TOURNAMENT_REGISTRATION_TYPES.includes(text(input.registrationType || "open") as TournamentRegistrationType)) errors.push({ field: "registrationType", message: "Tournament registration type is invalid." });

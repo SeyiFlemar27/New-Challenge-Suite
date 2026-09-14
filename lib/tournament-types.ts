@@ -49,6 +49,12 @@ export type TournamentMedia = {
 export type TournamentFoundation = {
   id: string;
   hostId: string;
+  createdBy?: string;
+  officialChallenge?: boolean;
+  ownershipType?: "creator_personal" | "enterprise_personal" | "challenge_suite_official";
+  organizationOwnerId?: string | null;
+  enterpriseChallengeLeadId?: string | null;
+  enterpriseAssignments?: Array<Record<string, unknown>>;
   title: string;
   shortDescription: string;
   description: string;

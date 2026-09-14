@@ -14,6 +14,7 @@ const deletionModel = read("lib/server/account-deletion.ts");
 const challengeLifecycle = read("app/api/challenges/[id]/lifecycle/route.ts");
 const challengeDeletion = read("lib/server/challenge-deletion.ts");
 const privateBuilder = read("components/challenge-builder.tsx");
+const builderRegistry = read("lib/challenge-builder-registry.ts");
 const privateAccess = read("lib/private-challenge-access.ts");
 const liveBuilder = read("components/host/host-competition-wizard.tsx");
 const tournamentBuilder = read("components/tournament-builder.tsx");
@@ -51,7 +52,7 @@ has(challengeDeletion, "hardDeleteAllowed", "Challenge deletion is activity-awar
 has(challengeLifecycle, "request_admin_deletion", "Challenges with history can request admin deletion.");
 has(challengeLifecycle, "status: \"cancelled\"", "Active challenges are cancelled rather than erased.");
 
-for (const step of ["Overview", "Access", "Eligibility", "Monetization", "Media", "Schedule", "Entry & Submission", "Review", "Publish"]) has(privateBuilder, `\"${step}\"`, `Private builder includes ${step}.`);
+for (const step of ["Overview", "Access", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) has(builderRegistry, `\"${step}\"`, `Private builder includes ${step}.`);
 has(privateAccess, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "Private codes avoid ambiguous characters.");
 has(privateAccess, "Uint8Array(5)", "Private access code is five characters.");
 has(privateBuilder, "readOnly aria-label=\"Generated private challenge access code\"", "Creator cannot manually type the access code.");
@@ -60,15 +61,15 @@ has(privateBuilder, "publicPreviewEnabled", "Private challenge supports explicit
 has(publicChallenge, "!type.includes(\"private\")", "Private challenges never enter ordinary public Explore.");
 lacks(publicChallenge, "privateAccessCode\"", "Public challenge fields never expose private access codes.");
 
-for (const step of ["Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Format", "Voting & Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) has(liveBuilder, `\"${step}\"`, `Live builder includes ${step}.`);
-has(liveBuilder, "Physical venue name", "Live events are physical-first.");
+for (const step of ["Basics", "Venue & Schedule", "Registration & Tickets", "Participants", "Format", "Voting & Judging", "Prize Setup", "Media & Branding", "Sponsors", "Review & Submit"]) has(builderRegistry, `\"${step}\"`, `Live builder includes ${step}.`);
+has(liveBuilder, "Live Events are physical at launch", "Live events are physical-first.");
 has(liveBuilder, "paid_setup_required", "Paid ticket choice remains setup-only.");
 has(liveBuilder, "ticketCheckoutActive: false", "Live builder never enables fake ticket checkout.");
 
-for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) has(tournamentBuilder, `\"${step}\"`, `Tournament builder includes ${step}.`);
+for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) has(builderRegistry, `\"${step}\"`, `Tournament builder includes ${step}.`);
 has(tournamentValidation, "[\"single_elimination\", \"double_elimination\"]", "Tournament supports the two launch elimination formats.");
 lacks(tournamentValidation, "round_robin", "Round Robin is not a launch format.");
-has(tournamentBuilder, "Performance seeding is platform-managed.", "New brackets use platform-managed performance seeding.");
+has(tournamentBuilder, "Challenge Suite seeds new tournaments by recorded performance", "New brackets use platform-managed performance seeding.");
 
 for (const type of ["standard", "private", "live_event", "tournament"]) has(exploreApi, `\"${type}\"`, `Explore API supports ${type}.`);
 for (const label of ["Standard Challenge", "Private Challenge", "Live Event", "Tournament"]) has(exploreApi, label, `Explore labels ${label}.`);
@@ -89,9 +90,9 @@ has(paymentApi, "verify", "Payment status supports safe server-side provider ver
 has(paymentApi, "persistStripeSubscriptionLifecycle", "Provider verification persists canonical lifecycle state.");
 has(notifications, "bg-white", "Notification panel uses a readable light surface.");
 has(notifications, "/api/notifications/${notification.id}/read", "Individual notifications can be marked read.");
-has(topbar, "canSwitchSponsorRole", "Role switching requires sponsor capability.");
+has(topbar, "hasSponsorAccess", "Role switching requires sponsor capability.");
 lacks(topbar, "Host Control Center</span>", "Role switcher does not present Host as a role.");
-has(host, "Creator Studio", "Host dashboard uses the shared Creator Studio context.");
+has(host, "Host Control Center", "Host dashboard retains its canonical operational context.");
 lacks(host, "Manage boosts", "Host dashboard does not expose a standalone boost destination.");
 has(planAccess, "monthlyBoostLimit: 5", "Host has the locked five-boost monthly allocation.");
 has(planAccess, "monthlyBoostLimit: 2", "Creator has the locked two-boost monthly allocation.");

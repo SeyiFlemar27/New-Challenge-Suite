@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, LockKeyhole, Trophy, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
@@ -12,21 +12,13 @@ import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { tournamentDraftMediaPath } from "@/lib/media-upload-paths";
 import { bracketSizeForParticipants, buildRoundPlan, defaultPrizeDistribution, doubleEliminationMatchCount, singleEliminationMatchCount, singleEliminationStageCount } from "@/lib/server/tournaments";
 import { ChallengeTaxonomyFields } from "@/components/challenge-controlled-fields";
+import { BuilderContent, BuilderFooter, BuilderSurface, ChallengeBuilderFrame } from "@/components/challenge-builder-frame";
+import { CHALLENGE_BUILDER_REGISTRY, canonicalBuilderSteps } from "@/lib/challenge-builder-registry";
+import { TOURNAMENT_BRACKET_SIZES } from "@/lib/server/tournament-validation";
+import { useChallengeBuilderAutosave } from "@/lib/hooks/use-challenge-builder-autosave";
 
-const steps = ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"];
-const stepGuides = [
-  ["Overview", "Set the tournament identity and rules.", ["Use a clear title and category.", "Explain what competitors will create.", "Keep rules specific and enforceable."]],
-  ["Tournament Format", "Choose the bracket entity, elimination model, and size.", ["Individual and Team brackets stay separate.", "Only approved bracket sizes are available.", "Performance seeding is platform-managed."]],
-  ["Eligibility & Participation", "Define who can enter and when registration closes.", ["Eligible entrants are accepted automatically.", "Invite-only remains server-verified.", "Check-in closes before bracket generation."]],
-  ["Monetization & Prize Pool", "Configure confirmed-money rules without mixing sponsor funds.", ["Captain pays once for a paid Team entry.", "Generated revenue keeps the 65/20/15 model.", "Sponsor value remains separately accounted."]],
-  ["Media & Branding", "Upload storage-confirmed tournament media.", ["The first image represents the tournament.", "Uploads must finish before submission.", "No external or placeholder media is accepted."]],
-  ["Competition Method", "Choose how each head-to-head match is decided.", ["Current match result controls advancement.", "Cumulative scores are statistics only.", "Hybrid remains unavailable until normalization exists."]],
-  ["Schedule & Round Timing", "Review generated rounds and their operational order.", ["A new submission is required per round.", "Deadlines are exact and server-authoritative.", "Single Elimination includes a Third-Place Match."]],
-  ["Entry & Round Submissions", "Confirm round-entry ownership and moderation behavior.", ["Team Captains submit for their Team.", "Old round entries are never reused.", "Fix and Resubmit remains moderation-gated."]],
-  ["Review", "Check the complete tournament configuration.", ["Resolve every blocking issue.", "Review bracket size and money rules.", "Admin review is still required."]],
-  ["Publish", "Submit the tournament for admin review.", ["Submission does not make it public.", "Critical state remains server-authoritative.", "Operational management begins after approval."]]
-] as const;
-const capacities = [4, 8, 16, 32, 64, 128];
+const steps = canonicalBuilderSteps("tournament");
+const tournamentRegistry = CHALLENGE_BUILDER_REGISTRY.tournament;
 
 type BuilderForm = {
   title: string; shortDescription: string; description: string; category: string; subcategory: string; tournamentRules: string;
@@ -48,7 +40,7 @@ const initialForm: BuilderForm = {
   entryType: "free", entryFeeAmountMinor: 0, currency: "USD", sponsorReady: false, acceptSponsorshipProposals: false, sponsorshipGoal: 0, sponsorCategories: "", sponsorNote: "", sponsorPlacementPreferences: "", prizeDistribution: defaultPrizeDistribution()
 };
 
-export function TournamentBuilder() {
+export function TournamentBuilder({ enterpriseOwnership }: { enterpriseOwnership?: "personal" | "official" }) {
   const auth = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -62,7 +54,6 @@ export function TournamentBuilder() {
   const [autosaveFailed, setAutosaveFailed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
-  const saveVersion = useRef(0);
   const mediaDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
   const roundPlan = useMemo(() => buildRoundPlan(bracketSizeForParticipants(form.participantCapacity), form.resultMethod, form.thirdPlaceMethod), [form.participantCapacity, form.resultMethod, form.thirdPlaceMethod]);
   const readiness = useMemo(() => {
@@ -92,6 +83,7 @@ export function TournamentBuilder() {
   function draftPayload(status: "draft" | "pending_review" = "draft") {
     return {
       ...form,
+      ...(enterpriseOwnership ? { officialChallenge: enterpriseOwnership === "official", ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : "enterprise_personal" } : {}),
       currency: "USD",
       configVersion: 2,
       status,
@@ -104,13 +96,27 @@ export function TournamentBuilder() {
     };
   }
 
+  const invalidateAutosave = useChallengeBuilderAutosave({
+    enabled: Boolean(createdId) && !submitted && !saving,
+    revision: form,
+    secondaryRevision: step,
+    save: () => apiRequest<{ tournament: { id: string } }>(`/api/tournaments/${createdId}`, { method: "PATCH", body: JSON.stringify(draftPayload("draft")) }),
+    onResult: (result) => {
+      setAutosaveFailed(!result.ok);
+      if (!result.ok) setNotice(result.message || "We couldn't save your changes. Check your connection and try again.");
+    },
+    onError: () => {
+      setAutosaveFailed(true);
+      setNotice("We couldn't save your changes. Check your connection and try again.");
+    }
+  });
+
   async function saveDraft(status: "draft" | "pending_review" = "draft", quiet = false, background = false) {
-    const requestVersion = ++saveVersion.current;
+    invalidateAutosave();
     if (!background) setSaving(true);
     if (!quiet) setNotice("");
     const payload = draftPayload(status);
     const result = await apiRequest<{ tournament: { id: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", body: JSON.stringify(payload) });
-    if (requestVersion !== saveVersion.current) return false;
     if (!background) setSaving(false);
     if (!result.ok || !result.data) {
       setAutosaveFailed(true);
@@ -120,7 +126,7 @@ export function TournamentBuilder() {
     setAutosaveFailed(false);
     setCreatedId(result.data.tournament.id);
     if (status === "pending_review") {
-      saveVersion.current += 1;
+      invalidateAutosave();
       setSubmitted(true);
       setNotice("");
     }
@@ -128,17 +134,25 @@ export function TournamentBuilder() {
     return true;
   }
 
-  useEffect(() => {
-    if (!createdId || submitted || saving) return;
-    const timer = window.setTimeout(() => { void saveDraft("draft", true, true); }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [createdId, form, roundPlan, saving, step, submitted]);
-
   async function next() {
+    const stepError = currentStepError();
+    if (stepError) {
+      setNotice(stepError);
+      return;
+    }
     if (!(await saveDraft("draft", true))) return;
     const nextStep = Math.min(steps.length - 1, step + 1);
     setUnlocked((current) => Math.max(current, nextStep));
     setStep(nextStep);
+  }
+
+  function currentStepError() {
+    if (step === 0 && (!form.title.trim() || !form.category.trim() || !form.subcategory.trim() || form.description.trim().length < 20)) return "Add a title, category, subcategory, and clear full description before continuing.";
+    if (step === 1 && form.participationMode === "team" && (form.minimumTeamSize < 1 || form.minimumTeamSize > form.maximumTeamSize || form.maximumTeamSize > 20)) return "Set valid tournament team sizes before continuing.";
+    if (step === 2 && form.registrationOpensAt && form.registrationClosesAt && new Date(form.registrationOpensAt) >= new Date(form.registrationClosesAt)) return "Registration must close after it opens.";
+    if (step === 3 && form.entryType === "paid_entry_setup_required" && form.entryFeeAmountMinor < 100) return "Set a valid paid entry amount.";
+    if (step === 4 && !mediaDisabled && !form.coverImageUrl) return "Upload the tournament cover before continuing.";
+    return "";
   }
 
   async function finishLater() {
@@ -150,17 +164,14 @@ export function TournamentBuilder() {
   if (submitted && createdId) return <AppShell><main className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Card className="p-6 sm:p-8"><div className="grid size-12 place-items-center rounded-full bg-emerald-100 text-emerald-800"><Check size={24} /></div><h1 className="mt-5 text-2xl font-black">Tournament Submitted</h1><p className="mt-3 text-sm font-bold text-emerald-900">Your tournament has been sent for review.</p><p className="mt-3 text-sm leading-6 text-slate-600">Editing is unavailable while admin review is pending.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href={`/tournaments/${createdId}`}>View Tournament</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/contact" variant="ghost">Contact Support</LinkButton></div></Card></main></AppShell>;
 
   const userId = auth.user.uid;
-  const guide = stepGuides[step] ?? stepGuides[0];
+  const guide = (tournamentRegistry[step] ?? tournamentRegistry[0]).guide;
   return (
     <AppShell>
       <main className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8">
-        <PageTitle title="Create Challenge" subtitle="Configure a first-class Tournament Challenge using the same reviewed publishing workflow." icon={<Trophy />} />
-        <div className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,760px)_280px] 2xl:grid-cols-[290px_minmax(0,840px)_300px]">
-          <nav className="hidden lg:block" aria-label="Tournament builder steps"><ol className="sticky top-24 space-y-1">{steps.map((label, index) => { const locked = index > unlocked; return <li key={label}><button type="button" disabled={locked} aria-current={step === index ? "step" : undefined} onClick={() => !locked && setStep(index)} className={`group flex min-h-12 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold transition ${step === index ? "bg-amber-50 text-slate-950 shadow-sm" : locked ? "cursor-not-allowed text-slate-400" : "text-slate-600 hover:bg-white hover:text-slate-950"}`}><span className={`grid size-7 shrink-0 place-items-center rounded-full border ${step === index ? "border-[var(--gold)] bg-[var(--gold)] text-black" : index < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white"}`}>{locked ? <LockKeyhole size={13} /> : index < step ? <Check size={14} /> : <span className="text-xs">{index + 1}</span>}</span><span className="leading-5">{label}</span></button></li>; })}</ol></nav>
-          <section className="min-w-0">
-            <div className="mb-5 lg:hidden"><label className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500" htmlFor="tournament-mobile-step">Step {step + 1} of {steps.length}</label><select id="tournament-mobile-step" value={step} onChange={(event) => setStep(Number(event.target.value))} className="mt-2 min-h-12 w-full rounded-[8px] border border-black/10 bg-white px-3 font-bold text-slate-950">{steps.map((label, index) => <option key={label} value={index} disabled={index > unlocked}>{index + 1}. {label}</option>)}</select></div>
-            <div className="overflow-hidden rounded-[12px] border border-black/[0.08] bg-white text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-             <div className="p-5 sm:p-8 lg:p-10">
+        <PageTitle title="Create Tournament Challenge" subtitle="Configure a first-class Tournament Challenge using the reviewed publishing workflow." icon={<Trophy />} />
+        <ChallengeBuilderFrame steps={steps} currentStep={step} unlockedStep={unlocked} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={setStep}>
+            <BuilderSurface>
+             <BuilderContent>
              {step === 0 ? <OverviewStep form={form} update={update} /> : null}
              {step === 1 ? <FormatStep form={form} update={update} /> : null}
              {step === 2 ? <RegistrationStep form={form} update={update} /> : null}
@@ -172,21 +183,11 @@ export function TournamentBuilder() {
              {step === 8 || step === 9 ? <ReviewStep form={form} readiness={readiness} roundPlan={roundPlan} /> : null}
              {notice ? <div className="mt-5 rounded-[8px] border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-950">{notice}</div> : null}
             {createdId ? <LinkButton href={`/tournaments/${createdId}`} className="mt-5" variant="secondary">View tournament draft</LinkButton> : null}
-             </div>
-             <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.08] bg-white/95 px-5 py-4 backdrop-blur sm:px-8 lg:px-10">
-               <Button variant="secondary" disabled={step === 0 || saving} onClick={() => setStep((value) => Math.max(0, value - 1))}><ChevronLeft size={16} /> Back</Button>
-               <div className="flex flex-wrap gap-3">
-                 {createdId ? <Button variant="ghost" onClick={() => void finishLater()} disabled={saving}>Finish Later</Button> : null}
-                 {step < steps.length - 1 ? <Button onClick={() => void next()} disabled={saving || autosaveFailed}>{saving ? "Saving..." : "Continue"} <ChevronRight size={16} /></Button> : <Button onClick={() => void saveDraft("pending_review")} disabled={saving || autosaveFailed || !readiness.ready}><CheckCircle2 size={16} /> {saving ? "Submitting..." : "Submit for Review"}</Button>}
-               </div>
-             </div>
-            </div>
-            <button type="button" onClick={() => setMobileGuideOpen(true)} className="mt-4 flex min-h-11 w-full items-center justify-between rounded-[8px] border border-black/10 bg-white px-4 text-sm font-black text-slate-950 xl:hidden">Builder Guide <ChevronDown size={18} /></button>
-          </section>
-          <aside className="hidden xl:block"><div className="sticky top-24 rounded-[12px] border border-black/[0.08] bg-white p-6 shadow-[0_14px_44px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700"><Circle size={8} fill="currentColor" /> Builder Guide</div><h2 className="mt-4 text-lg font-black text-slate-950">{guide[0]}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{guide[1]}</p><ul className="mt-5 space-y-4">{guide[2].map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={16} /><span>{item}</span></li>)}</ul></div></aside>
-        </div>
+             </BuilderContent>
+             <BuilderFooter backDisabled={step === 0} busy={saving} finishLater={createdId ? () => void finishLater() : undefined} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={step < steps.length - 1 ? () => void next() : () => void saveDraft("pending_review")} final={step === steps.length - 1} finalDisabled={autosaveFailed || (step === steps.length - 1 && !readiness.ready)} />
+            </BuilderSurface>
+        </ChallengeBuilderFrame>
       </main>
-      {mobileGuideOpen ? <div className="fixed inset-0 z-[100] bg-black/45 xl:hidden" role="dialog" aria-modal="true" aria-label="Builder Guide" onMouseDown={(event) => { if (event.target === event.currentTarget) setMobileGuideOpen(false); }}><div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-[16px] bg-white p-6 text-slate-950 shadow-2xl"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Builder Guide</p><button type="button" onClick={() => setMobileGuideOpen(false)} className="grid size-10 place-items-center rounded-full bg-slate-100" aria-label="Close Builder Guide"><X size={18} /></button></div><h2 className="mt-4 text-2xl font-black">{guide[0]}</h2><p className="mt-2 leading-7 text-slate-600">{guide[1]}</p><ul className="mt-6 space-y-4">{guide[2].map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={17} /><span>{item}</span></li>)}</ul></div></div> : null}
     </AppShell>
   );
 }
@@ -204,7 +205,7 @@ function MediaStep({ form, update, mediaDisabled, userId, setCoverStatus, setTra
 }
 
 function FormatStep({ form, update }: { form: BuilderForm; update: <K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) => void }) {
-  return <section><StepTitle title="Tournament Format" body="Choose one bracket entity type and one elimination format. Bracket size is the competitive capacity." /><div className="mt-5 grid gap-4 md:grid-cols-2">{(["individual", "team"] as const).map((mode) => <button type="button" key={mode} onClick={() => update("participationMode", mode)} className={`rounded-[8px] border p-4 text-left ${form.participationMode === mode ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10"}`}><p className="font-black">{mode === "individual" ? "Individual" : "Team"}</p><p className="mt-2 text-sm text-slate-400">Every bracket slot represents one {mode === "individual" ? "participant" : "tournament team"}.</p></button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2">{(["single_elimination", "double_elimination"] as const).map((format) => <button type="button" key={format} onClick={() => update("format", format)} className={`rounded-[8px] border p-4 text-left ${form.format === format ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10"}`}><p className="font-black">{format === "single_elimination" ? "Single Elimination" : "Double Elimination"}</p><p className="mt-2 text-sm text-slate-400">{format === "single_elimination" ? "One match loss eliminates a competitor. A Third-Place Match is included." : "The first loss moves a competitor to the Losers Bracket; a second loss eliminates them."}</p></button>)}</div><Field label="Bracket size"><select className={inputClass} value={form.participantCapacity} onChange={(event) => update("participantCapacity", Number(event.target.value))}>{capacities.map((capacity) => <option key={capacity} value={capacity}>{capacity} {form.participationMode === "team" ? "teams" : "participants"}</option>)}</select></Field>{form.participationMode === "team" ? <div className="mt-5 grid gap-5 md:grid-cols-3"><Field label="Minimum team size"><input className={inputClass} type="number" min="1" max="20" value={form.minimumTeamSize} onChange={(event) => update("minimumTeamSize", Number(event.target.value))} /></Field><Field label="Maximum team size"><input className={inputClass} type="number" min="1" max="20" value={form.maximumTeamSize} onChange={(event) => update("maximumTeamSize", Number(event.target.value))} /></Field><Field label="Team joining"><select className={inputClass} value={form.teamJoiningMode} onChange={(event) => update("teamJoiningMode", event.target.value as BuilderForm["teamJoiningMode"])}><option value="invite_only">Invite Only</option><option value="invite_and_requests">Invite + Join Requests</option></select></Field><p className="md:col-span-3 text-sm text-slate-400">Each team has one Captain. The Captain pays one team entry fee and submits the team's round entry. Rosters lock when check-in closes.</p></div> : null}<div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Capacity" value={form.participantCapacity} /><Metric label="Winners rounds" value={singleEliminationStageCount(form.participantCapacity)} /><Metric label="Maximum matches" value={form.format === "double_elimination" ? doubleEliminationMatchCount(form.participantCapacity) : singleEliminationMatchCount(form.participantCapacity)} /></div><Card className="mt-5 p-4 text-sm text-slate-300">Challenge Suite seeds new tournaments by recorded performance. Equivalent unranked competitors are ordered with a reproducible fair tie-break, and higher seeds receive byes.</Card></section>;
+  return <section><StepTitle title="Tournament Format" body="Choose one bracket entity type and one elimination format. Bracket size is the competitive capacity." /><div className="mt-5 grid gap-4 md:grid-cols-2">{(["individual", "team"] as const).map((mode) => <button type="button" key={mode} onClick={() => update("participationMode", mode)} className={`rounded-[8px] border p-4 text-left ${form.participationMode === mode ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-black/10"}`}><p className="font-black">{mode === "individual" ? "Individual" : "Team"}</p><p className="mt-2 text-sm text-slate-600">Every bracket slot represents one {mode === "individual" ? "participant" : "tournament team"}.</p></button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2">{(["single_elimination", "double_elimination"] as const).map((format) => <button type="button" key={format} onClick={() => update("format", format)} className={`rounded-[8px] border p-4 text-left ${form.format === format ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-black/10"}`}><p className="font-black">{format === "single_elimination" ? "Single Elimination" : "Double Elimination"}</p><p className="mt-2 text-sm text-slate-600">{format === "single_elimination" ? "One match loss eliminates a competitor. A Third-Place Match is included." : "The first loss moves a competitor to the Losers Bracket; a second loss eliminates them."}</p></button>)}</div><Field label="Bracket size"><select className={inputClass} value={form.participantCapacity} onChange={(event) => update("participantCapacity", Number(event.target.value))}>{TOURNAMENT_BRACKET_SIZES.map((capacity) => <option key={capacity} value={capacity}>{capacity} {form.participationMode === "team" ? "teams" : "participants"}</option>)}</select></Field>{form.participationMode === "team" ? <div className="mt-5 grid gap-5 md:grid-cols-3"><Field label="Minimum team size"><input className={inputClass} type="number" min="1" max="20" value={form.minimumTeamSize} onChange={(event) => update("minimumTeamSize", Number(event.target.value))} /></Field><Field label="Maximum team size"><input className={inputClass} type="number" min="1" max="20" value={form.maximumTeamSize} onChange={(event) => update("maximumTeamSize", Number(event.target.value))} /></Field><Field label="Team joining"><select className={inputClass} value={form.teamJoiningMode} onChange={(event) => update("teamJoiningMode", event.target.value as BuilderForm["teamJoiningMode"])}><option value="invite_only">Invite Only</option><option value="invite_and_requests">Invite + Join Requests</option></select></Field><p className="md:col-span-3 text-sm text-slate-600">Each team has one Captain. The Captain pays one team entry fee and submits the team's round entry. Rosters lock when check-in closes.</p></div> : null}<div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Capacity" value={form.participantCapacity} /><Metric label="Winners rounds" value={singleEliminationStageCount(form.participantCapacity)} /><Metric label="Maximum matches" value={form.format === "double_elimination" ? doubleEliminationMatchCount(form.participantCapacity) : singleEliminationMatchCount(form.participantCapacity)} /></div><Card className="mt-5 p-4 text-sm text-slate-600">Challenge Suite seeds new tournaments by recorded performance. Equivalent unranked competitors are ordered with a reproducible fair tie-break, and higher seeds receive byes.</Card></section>;
 }
 
 function SeedingStep({ form, update }: { form: BuilderForm; update: <K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) => void }) {

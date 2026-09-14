@@ -8,7 +8,8 @@ const hostPrivateCreate = read("app/host/private/create/page.tsx");
 const tournament = read("components/tournament-builder.tsx");
 
 for (const source of [privateCreate, creatorPrivateCreate, hostPrivateCreate]) {
-  assert(source.includes('ChallengeBuilder mode="private"'), "every Private creation route must use the canonical Private builder");
+  assert(source.includes("PrivateChallengeBuilder"), "every Private creation route must use the canonical Private builder");
+  assert(!source.includes('ChallengeBuilder mode="private"'), "Private routes must not reactivate the deprecated generic builder mode");
   assert(!source.includes("HostCompetitionWizard"), "the generic Host wizard must not remain a Private builder entry point");
 }
 assert(!tournament.includes('<option value="hybrid">'), "Hybrid must not be selectable before normalized scoring exists");

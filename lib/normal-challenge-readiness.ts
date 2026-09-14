@@ -33,14 +33,15 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
   if (!text(challenge.category)) issue(issues, "CATEGORY_REQUIRED", "category", 0, "Choose a category.");
   if (v2 && !text(challenge.subcategory)) issue(issues, "SUBCATEGORY_REQUIRED", "subcategory", 0, "Choose a subcategory.");
 
-  const mode = text(challenge.participationMode) || (bool(challenge.requiresParticipantApproval) ? "approval" : "open");
-  if (!["open", "approval"].includes(mode)) issue(issues, "PARTICIPATION_MODE_REQUIRED", "participationMode", 1, "Choose who can join.");
+  const mode = text(challenge.participationMode) || "open";
+  if (isNormalChallengeV2(challenge) && mode !== "open") issue(issues, "PARTICIPATION_MODE_REQUIRED", "participationMode", 1, "Normal Challenges use automatic eligible joining.");
   const locationMode = text(challenge.locationEligibility) || (text(challenge.eligibleCountry) ? "selected" : "worldwide");
   if (v2 && locationMode === "selected" && !list(challenge.eligibleCountries).length) issue(issues, "COUNTRIES_REQUIRED", "eligibleCountries", 1, "Select at least one eligible country.");
   const ageMode = text(challenge.ageRestrictionMode) || (number(challenge.minimumAge) > 0 ? "minimum" : "none");
   const minAge = number(challenge.minimumAge);
   if (ageMode === "minimum" && (minAge < 13 || minAge > 120)) issue(issues, "MINIMUM_AGE_INVALID", "minimumAge", 1, "Set a minimum age between 13 and 120.");
-  const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants);
+  const capacityMode = challenge.capacityMode === "limited" ? "limited" : challenge.capacityMode === "unlimited" ? "unlimited" : undefined;
+  const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants, capacityMode);
   if (capacityIssue) issue(issues, "CAPACITY_INVALID", "maxParticipants", 1, capacityIssue);
 
   const paid = bool(monetization.paidEntryRequested) || bool(challenge.paidEntryEnabled);

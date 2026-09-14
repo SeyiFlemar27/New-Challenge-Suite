@@ -11,6 +11,7 @@ import { BuilderContent, BuilderFooter, BuilderStepHeading, BuilderSurface, Chal
 import { createChallenge, fetchChallengeDraft, fetchChallengeUsage, publishChallengeDraft, updateChallengeDraft } from "@/lib/api/services";
 import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useChallengeBuilderAutosave } from "@/lib/hooks/use-challenge-builder-autosave";
 import { challengeDraftMediaPath } from "@/lib/media-upload-paths";
 import { getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { validateChallengeForPublish, type ChallengeValidationResult } from "@/lib/server/challenge-validation";
@@ -18,6 +19,8 @@ import { CHALLENGE_TIME_ZONE_OPTIONS, DEFAULT_CHALLENGE_TIME_ZONE, challengeDate
 import { generatePrivateChallengeAccessCode } from "@/lib/private-challenge-access";
 import { challengePublishError } from "@/lib/challenge-publish-feedback";
 import { challengeReviewMonetizationLabels, getChallengePublishBlocker } from "@/lib/challenge-publish-readiness";
+import { CHALLENGE_BUILDER_REGISTRY, canonicalBuilderSteps } from "@/lib/challenge-builder-registry";
+import { validateCapacity } from "@/lib/normal-challenge-capacity";
 
 type Mode = "public" | "private";
 const SPONSOR_PLACEMENTS = ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"] as const;
@@ -43,18 +46,8 @@ type FormState = {
 };
 
 const publicSteps = ["Basics", "Participation", "Entry & Submission", "Competition", "Rewards", "Schedule", "Review"];
-const privateSteps = ["Overview", "Access", "Eligibility", "Monetization", "Media", "Schedule", "Entry & Submission", "Review", "Publish"];
-const privateStepGuides: BuilderGuideContent[] = [
-  { title: "Overview", description: "Set the private challenge identity and brief.", points: ["Use a specific title.", "Explain the outcome clearly.", "Keep rules relevant to the competition."] },
-  { title: "Access", description: "Configure the forwardable link and protected access code together.", points: ["The code is verified by the server.", "The link alone never grants entry.", "Access still respects eligibility and capacity."] },
-  { title: "Eligibility", description: "Define who can participate and what they must confirm.", points: ["Access and eligibility are separate checks.", "Collect only necessary information.", "Use the waitlist only with fixed capacity."] },
-  { title: "Monetization", description: "Configure reviewed money and sponsor requests.", points: ["Provider confirmation remains authoritative.", "Sponsor funding stays separately accounted.", "Submitting does not release money."] },
-  { title: "Media", description: "Upload storage-confirmed challenge media.", points: ["The first image is primary.", "Wait for uploads to complete.", "Use media you can publish."] },
-  { title: "Schedule", description: "Set the Join, Submit, Vote, and Results lifecycle.", points: ["All times use the selected timezone.", "Exact deadlines are closed.", "Results remain admin-gated."] },
-  { title: "Entry & Submission", description: "Describe the accepted entry and submission requirements.", points: ["Choose only supported media types.", "Give precise instructions.", "Fix and Resubmit remains moderation-gated."] },
-  { title: "Review", description: "Review every secured and participant-facing setting.", points: ["Resolve blocking issues.", "Confirm access and money settings.", "Private access does not bypass review."] },
-  { title: "Publish", description: "Submit the private challenge for admin review.", points: ["This does not publish immediately.", "Editing pauses during review.", "The access code remains protected."] }
-];
+const privateSteps = canonicalBuilderSteps("private");
+const privateStepGuides: BuilderGuideContent[] = CHALLENGE_BUILDER_REGISTRY.private.map((step) => step.guide);
 const publicStepSubtitles = [
   "Set the basic details for your challenge.",
   "Tell participants who can join and what to follow.",
@@ -144,7 +137,7 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
   };
 }
 
-export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; draftId?: string; enterpriseOwnership?: "official" | "personal" }) {
+function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; draftId?: string; enterpriseOwnership?: "official" | "personal" }) {
   const router = useRouter();
   const { user, loading } = useCurrentUser();
   const planProfile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType };
@@ -171,7 +164,6 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved" | "failed" | "offline">("idle");
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const hydratedDraftRef = useRef(false);
-  const autosaveVersionRef = useRef(0);
   const activeDraftId = draftId || createdDraftId;
   const recoveryKey = activeDraftId ? `challenge-draft-recovery:${activeDraftId}` : "challenge-draft-recovery:new";
   const mediaUploadDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
@@ -261,21 +253,27 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
     } catch {
       setAutosaveState("offline");
     }
-    const timer = window.setTimeout(() => {
-      const requestVersion = ++autosaveVersionRef.current;
-      setAutosaveState("saving");
-      void updateChallengeDraft(activeDraftId, { ...payload(false), creationStep: step }).then((result) => {
-        if (requestVersion !== autosaveVersionRef.current) return;
-        if (result.ok) {
-          window.localStorage.removeItem(recoveryKey);
-          setAutosaveState("saved");
-          return;
-        }
-        setAutosaveState("failed");
-      }).catch(() => { if (requestVersion === autosaveVersionRef.current) setAutosaveState("offline"); });
-    }, 1400);
-    return () => window.clearTimeout(timer);
   }, [activeDraftId, draftLoaded, form, step, createdId, draftStatus]);
+
+  const invalidateAutosave = useChallengeBuilderAutosave({
+    enabled: Boolean(activeDraftId) && draftLoaded && !createdId && !saving && ["draft", "requires_changes", "changes_requested"].includes(draftStatus),
+    revision: form,
+    secondaryRevision: step,
+    delay: 1400,
+    save: async () => {
+      setAutosaveState("saving");
+      return updateChallengeDraft(activeDraftId, { ...payload(false), creationStep: step });
+    },
+    onResult: (result) => {
+      if (result.ok) {
+        try { window.localStorage.removeItem(recoveryKey); } catch {}
+        setAutosaveState("saved");
+      } else {
+        setAutosaveState("failed");
+      }
+    },
+    onError: () => setAutosaveState("offline")
+  });
 
   function update(field: keyof FormState, value: FormState[keyof FormState]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -363,14 +361,14 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
       privateAccessCodeExpiresAt: privateMode && form.accessCodeExpiresAt ? challengeDateTimeForStorage(form.accessCodeExpiresAt, form.timeZone) : null,
       privateAccessCodeMaxUses: privateMode && form.accessCodeMaxUses ? Math.max(1, Number(form.accessCodeMaxUses)) : null,
       publicPreviewEnabled: false,
-      requiresParticipantApproval: privateMode && form.approvalRequired,
-      participantApprovalMode: privateMode && form.approvalRequired ? "manual" : "automatic",
+      requiresParticipantApproval: false,
+      participantApprovalMode: "automatic",
       locationEligibility: privateMode && form.eligibleCountries.trim() ? "selected_countries" : "worldwide",
       eligibleCountries: privateMode ? form.eligibleCountries.split(",").map((value) => value.trim()).filter(Boolean) : [],
       ageRestrictionMode: privateMode && form.minimumAge ? "minimum_age" : "none",
       minimumAge: privateMode && form.minimumAge ? Math.max(0, Number(form.minimumAge)) : 0,
       capacityMode: privateMode && form.maxParticipants ? "limited" : "unlimited",
-      maxParticipants: privateMode && form.maxParticipants ? Math.max(0, Number(form.maxParticipants)) : 0,
+      maxParticipants: privateMode && form.maxParticipants ? form.maxParticipants : null,
       waitlistEnabled: privateMode && form.waitlistEnabled,
       hideParticipantList: privateMode && form.hideParticipantList,
       privateParticipantQuestions: privateMode ? (form.participantQuestions ?? "").split("\n").map((value) => value.trim()).filter(Boolean) : [],
@@ -428,7 +426,10 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
     if (mode === "private" && step === 1 && (!/^[A-HJ-NP-Z2-9]{5}$/.test(form.accessCode) || !form.access.trim())) return "Generate an access code and add access instructions.";
     if (step === (mode === "private" ? 2 : 1) && (!form.rules.trim() || !form.terms.trim())) return "Rules and eligibility terms are required.";
-    if (mode === "private" && step === 2 && ((form.minimumAge && Number(form.minimumAge) < 13) || (form.maxParticipants && Number(form.maxParticipants) < 2))) return "Set a valid minimum age and participant capacity.";
+    if (mode === "private" && step === 2) {
+      if (form.minimumAge && Number(form.minimumAge) < 13) return "Set a valid minimum age and participant capacity.";
+      try { validateCapacity(form.maxParticipants ? "limited" : "unlimited", form.maxParticipants); } catch { return "Set a valid whole-number participant capacity of at least 2."; }
+    }
     if (mode === "private" && step === 2 && !(form.participantAcknowledgements ?? "I confirm that my submission is original and follows the challenge rules.").trim()) return "Add at least one participant acknowledgment.";
     if (step === (mode === "private" ? 6 : 2) && (!form.submissionTypes.length || !form.submission.trim())) return "Submission type and instructions are required.";
     if (step === (mode === "private" ? 3 : 4) && monetizationProblem) return monetizationProblem;
@@ -452,6 +453,7 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
 
   async function saveDraft() {
     if (privateLocked) return setError("Private challenge drafts require Creator Plan.");
+    invalidateAutosave();
     setSaving(true);
     const response = activeDraftId ? await updateChallengeDraft(activeDraftId, { ...payload(false), creationStep: step }) : await createChallenge(payload(false));
     setSaving(false);
@@ -463,13 +465,12 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
     if (!activeDraftId && savedChallenge?.id) setCreatedDraftId(savedChallenge.id);
     setAutosaveState("saved");
     try { window.localStorage.removeItem(recoveryKey); } catch {}
-    setNotice("Draft saved.");
     return true;
   }
 
   async function publish() {
     if (publishBlocker) return setError(publishBlocker.message);
-    autosaveVersionRef.current += 1;
+    invalidateAutosave();
     setSaving(true);
     if (activeDraftId) {
       const saveResponse = await updateChallengeDraft(activeDraftId, { ...payload(false), creationStep: step });
@@ -496,11 +497,11 @@ export function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode:
   if (loading || !draftLoaded) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Builder" subtitle="Loading builder..." /></Card></AppShell>;
   if (user?.accountType === "sponsor") return <Locked title="Use Brand Command Center" body="Sponsor accounts create and manage campaigns from the dedicated sponsor experience." primaryHref="/sponsor/dashboard" primaryLabel="Open Brand Command Center" />;
   if (privateLocked) return <Locked title="Private challenges are available on Creator Plan" body="Upgrade to create invite-only challenges and manage private competition access." primaryHref="/subscriptions" primaryLabel="View Plans" secondaryHref="/creator/private-challenges" secondaryLabel="Back to Private Challenges" />;
-  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><h1 className="mt-6 text-3xl font-black">Challenge submitted for review.</h1><p className="mt-3 text-slate-300">We'll notify you when it's approved.</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href="/dashboard" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/challenges/create" variant="secondary">Create Another Challenge</LinkButton></div></Card></AppShell>;
+  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><h1 className="mt-6 text-3xl font-black">Challenge submitted for review.</h1><p className="mt-3 text-slate-600">We'll notify you when it's approved.</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href="/dashboard" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/creator/private-challenges/create" variant="secondary">Create Another Private Challenge</LinkButton></div></Card></AppShell>;
 
   if (mode === "private") {
     const guide = privateStepGuides[step] ?? privateStepGuides[0];
-    return <AppShell><main className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8" data-private-builder-canonical-shell><PageTitle title="Create Challenge" subtitle="Build your Private Challenge one step at a time." /><ChallengeBuilderFrame steps={privateSteps} currentStep={step} unlockedStep={unlockedStep} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={setStep}><BuilderSurface><BuilderContent><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} draftId={activeDraftId} />{error ? <div className="mt-7"><ApiErrorPanel title="Check this step" message={error} onRetry={() => setError("")} /></div> : null}</BuilderContent><BuilderFooter backDisabled={step === 0} busy={saving} finishLater={activeDraftId ? () => void saveDraft() : undefined} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={() => step < privateSteps.length - 1 ? void next() : void publish()} final={step === privateSteps.length - 1} finalDisabled={step === privateSteps.length - 1 && publishBlocked} /></BuilderSurface></ChallengeBuilderFrame></main></AppShell>;
+    return <AppShell><main className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8" data-private-builder-canonical-shell><PageTitle title="Create Private Challenge" subtitle="Build your Private Challenge one step at a time." /><ChallengeBuilderFrame steps={privateSteps} currentStep={step} unlockedStep={unlockedStep} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={setStep}><BuilderSurface><BuilderContent><StepContent mode={mode} step={step} form={form} update={update} toggleType={toggleType} togglePlacement={togglePlacement} updateMedia={updateMedia} track={track} userId={user?.uid ?? "anonymous"} planAccess={planAccess} planName={planExperience.badgeLabel} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} draftId={activeDraftId} />{error ? <div className="mt-7"><ApiErrorPanel title="Check this step" message={error} onRetry={() => setError("")} /></div> : null}</BuilderContent><BuilderFooter backDisabled={step === 0} busy={saving} finishLater={activeDraftId ? () => void saveDraft() : undefined} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={() => step < privateSteps.length - 1 ? void next() : void publish()} final={step === privateSteps.length - 1} finalDisabled={step === privateSteps.length - 1 && publishBlocked} /></BuilderSurface></ChallengeBuilderFrame></main></AppShell>;
   }
 
   return (
@@ -537,7 +538,6 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
   const contentStep = mode === "private" && step >= 3 ? step + 1 : step;
   if (mode === "private" && step === 2) return <PrivateEligibilityStep form={form} update={update} />;
   if (mode === "private" && step === 1) return <section><StepTitle title="Access" body="Private challenges use a forwardable link plus a server-verified code." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><input className={inputClass} value="Link + Code" disabled /></Field><Field label="Generated access code"><div className="flex flex-col gap-3 sm:flex-row"><input className={inputClass} value={form.accessCode} readOnly aria-label="Generated private challenge access code" /><Button type="button" variant="secondary" onClick={() => update("accessCode", generatePrivateChallengeAccessCode())}><RefreshCw size={16} /> Regenerate</Button></div></Field><Field label="Code expires (optional)"><input className={inputClass} type="datetime-local" value={form.accessCodeExpiresAt} onChange={(event) => update("accessCodeExpiresAt", event.target.value)} /></Field><Field label="Invitation capacity (optional)"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(event) => update("accessCodeMaxUses", event.target.value)} placeholder="No fixed invitation limit" /></Field></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(event) => update("access", event.target.value)} placeholder="Tell invited participants how to use the link and code." /></Field></div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300"><b className="text-white">Share link:</b> {draftId ? `/challenges/${draftId}/access` : "Save the draft to create a shareable access link."}<p className="mt-2 text-slate-400">Links may be forwarded. Every participant must still verify the code and satisfy eligibility rules.</p></Card></section>;
-  if (mode === "private" && step === 2) return <section><StepTitle title="Eligibility" body="Access verification and participant eligibility are enforced separately." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Join mode"><select className={inputClass} value={form.approvalRequired ? "approval" : "automatic"} onChange={(event) => update("approvalRequired", event.target.value === "approval")}><option value="automatic">Anyone eligible can join</option><option value="approval">Approval required</option></select></Field><Field label="Location eligibility"><select className={inputClass} value={form.eligibleCountries ? "selected" : "worldwide"} onChange={(event) => update("eligibleCountries", event.target.value === "selected" ? "US" : "")}><option value="worldwide">Worldwide</option><option value="selected">Selected countries</option></select></Field>{form.eligibleCountries ? <Field label="Eligible country codes"><input className={inputClass} value={form.eligibleCountries} onChange={(event) => update("eligibleCountries", event.target.value.toUpperCase())} placeholder="US, CA, GB" /></Field> : null}<Field label="Minimum age"><input className={inputClass} type="number" min="13" max="120" value={form.minimumAge} onChange={(event) => update("minimumAge", event.target.value)} placeholder="No minimum age" /></Field><Field label="Participant capacity"><input className={inputClass} type="number" min="2" value={form.maxParticipants} onChange={(event) => update("maxParticipants", event.target.value)} placeholder="Unlimited" /></Field><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-white/10 px-4"><input type="checkbox" checked={form.waitlistEnabled} onChange={(event) => update("waitlistEnabled", event.target.checked)} /><span><b>Enable waitlist</b><small className="block text-slate-400">Available when a fixed capacity is reached.</small></span></label><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-white/10 px-4"><input type="checkbox" checked={form.hideParticipantList} onChange={(event) => update("hideParticipantList", event.target.checked)} /><span><b>Hide participant list</b><small className="block text-slate-400">Participant identities remain private from other participants.</small></span></label></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Challenge rules"><textarea className={textareaClass} value={form.rules} onChange={(event) => update("rules", event.target.value)} /></Field><Field label="Eligibility terms"><textarea className={textareaClass} value={form.terms} onChange={(event) => update("terms", event.target.value)} /></Field></div></section>;
   if (mode === "private" && contentStep === 4) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
   if (mode === "private" && contentStep === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   if (mode === "private" && contentStep === 6) return <PrivateScheduleStep form={form} update={update} />;
@@ -582,7 +582,11 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
 }
 
 function PrivateEligibilityStep({ form, update }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void }) {
-  return <section><StepTitle title="Eligibility" body="Access verification and participant eligibility are enforced separately." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Join mode"><select className={inputClass} value={form.approvalRequired ? "approval" : "automatic"} onChange={(event) => update("approvalRequired", event.target.value === "approval")}><option value="automatic">Anyone eligible can join</option><option value="approval">Approval required</option></select></Field><Field label="Location eligibility"><select className={inputClass} value={form.eligibleCountries ? "selected" : "worldwide"} onChange={(event) => update("eligibleCountries", event.target.value === "selected" ? "US" : "")}><option value="worldwide">Worldwide</option><option value="selected">Selected countries</option></select></Field>{form.eligibleCountries ? <Field label="Eligible country codes"><input className={inputClass} value={form.eligibleCountries} onChange={(event) => update("eligibleCountries", event.target.value.toUpperCase())} placeholder="US, CA, GB" /></Field> : null}<Field label="Minimum age"><input className={inputClass} type="number" min="13" max="120" value={form.minimumAge} onChange={(event) => update("minimumAge", event.target.value)} placeholder="No minimum age" /></Field><Field label="Participant capacity"><input className={inputClass} type="number" min="2" value={form.maxParticipants} onChange={(event) => update("maxParticipants", event.target.value)} placeholder="Unlimited" /></Field><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-black/10 px-4"><input type="checkbox" checked={form.waitlistEnabled} onChange={(event) => update("waitlistEnabled", event.target.checked)} /><span><b>Enable waitlist</b><small className="block text-slate-500">Available when a fixed capacity is reached.</small></span></label><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-black/10 px-4"><input type="checkbox" checked={form.hideParticipantList} onChange={(event) => update("hideParticipantList", event.target.checked)} /><span><b>Hide participant list</b><small className="block text-slate-500">Participant identities remain private from other participants.</small></span></label></div><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Challenge rules"><textarea className={textareaClass} value={form.rules} onChange={(event) => update("rules", event.target.value)} /></Field><Field label="Eligibility terms"><textarea className={textareaClass} value={form.terms} onChange={(event) => update("terms", event.target.value)} /></Field><Field label="Application questions (optional, one per line)"><textarea className={textareaClass} value={form.participantQuestions ?? ""} onChange={(event) => update("participantQuestions", event.target.value)} /></Field><Field label="Required acknowledgments (one per line)"><textarea className={textareaClass} value={form.participantAcknowledgements ?? "I confirm that my submission is original and follows the challenge rules."} onChange={(event) => update("participantAcknowledgements", event.target.value)} /></Field></div><div className="mt-5 rounded-[8px] bg-slate-50 p-4 text-sm leading-6 text-slate-600">Responses are available only to authorized challenge managers and reviewers. Do not request unnecessary sensitive information.</div></section>;
+  return <section><StepTitle title="Eligibility" body="Access verification and participant eligibility are enforced separately." /><div className="mt-6 rounded-[8px] border border-black/10 bg-slate-50 p-4"><p className="font-bold text-slate-950">Anyone eligible with verified access can join</p><p className="mt-1 text-sm leading-6 text-slate-600">Capacity, payment, access code, and eligibility are checked automatically.</p></div><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Location eligibility"><select className={inputClass} value={form.eligibleCountries ? "selected" : "worldwide"} onChange={(event) => update("eligibleCountries", event.target.value === "selected" ? "US" : "")}><option value="worldwide">Worldwide</option><option value="selected">Selected countries</option></select></Field>{form.eligibleCountries ? <Field label="Eligible country codes"><input className={inputClass} value={form.eligibleCountries} onChange={(event) => update("eligibleCountries", event.target.value.toUpperCase())} placeholder="US, CA, GB" /></Field> : null}<Field label="Minimum age"><input className={inputClass} type="number" min="13" max="120" step="1" value={form.minimumAge} onChange={(event) => update("minimumAge", event.target.value)} placeholder="No minimum age" /></Field><Field label="Participant capacity"><input className={inputClass} type="number" inputMode="numeric" min="2" step="1" value={form.maxParticipants} onChange={(event) => update("maxParticipants", event.target.value)} placeholder="Unlimited" /></Field><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-black/10 px-4"><input type="checkbox" checked={form.waitlistEnabled} onChange={(event) => update("waitlistEnabled", event.target.checked)} /><span><b>Enable waitlist</b><small className="block text-slate-500">Available when a fixed capacity is reached.</small></span></label><label className="flex min-h-12 items-center gap-3 rounded-[8px] border border-black/10 px-4"><input type="checkbox" checked={form.hideParticipantList} onChange={(event) => update("hideParticipantList", event.target.checked)} /><span><b>Hide participant list</b><small className="block text-slate-500">Participant identities remain private from other participants.</small></span></label></div><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Challenge rules"><textarea className={textareaClass} value={form.rules} onChange={(event) => update("rules", event.target.value)} /></Field><Field label="Eligibility terms"><textarea className={textareaClass} value={form.terms} onChange={(event) => update("terms", event.target.value)} /></Field><Field label="Application questions (optional, one per line)"><textarea className={textareaClass} value={form.participantQuestions ?? ""} onChange={(event) => update("participantQuestions", event.target.value)} /></Field><Field label="Required acknowledgments (one per line)"><textarea className={textareaClass} value={form.participantAcknowledgements ?? "I confirm that my submission is original and follows the challenge rules."} onChange={(event) => update("participantAcknowledgements", event.target.value)} /></Field></div><div className="mt-5 rounded-[8px] bg-slate-50 p-4 text-sm leading-6 text-slate-600">Responses are available only to authorized challenge managers and reviewers. Do not request unnecessary sensitive information.</div></section>;
+}
+
+export function PrivateChallengeBuilder(props: Omit<React.ComponentProps<typeof ChallengeBuilder>, "mode">) {
+  return <ChallengeBuilder {...props} mode="private" />;
 }
 
 function PrivateScheduleStep({ form, update }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void }) {
@@ -598,7 +602,7 @@ function PrivateReview({ form, planName, mediaUploadDisabled, entryFeeCents, mon
   const summary = {
     Overview: `${form.title || "Not set"} · ${form.category || "Category not set"}`,
     Access: `Link + Code · Code configured · ${form.accessCodeMaxUses ? `${form.accessCodeMaxUses} invitation uses` : "No fixed invitation capacity"}`,
-    Eligibility: `${form.approvalRequired ? "Approval required" : "Automatic eligible entry"} · ${form.eligibleCountries || "Worldwide"} · ${form.maxParticipants ? `${form.maxParticipants} participant limit` : "Unlimited participants"}`,
+    Eligibility: `Automatic eligible entry · ${form.eligibleCountries || "Worldwide"} · ${form.maxParticipants ? `${form.maxParticipants} participant limit` : "Unlimited participants"}`,
     Monetization: `${labels.paidEntry} · ${labels.prizePool} · ${labels.sponsorReady}`,
     Media: mediaUploadDisabled ? "Optional while uploads are unavailable" : form.coverImageUrl ? "Primary media ready" : "Primary media required",
     Schedule: `${formatChallengeLocalDateTime(form.startsAt, form.timeZone) ?? "Start not set"} to ${formatChallengeLocalDateTime(form.endsAt, form.timeZone) ?? "results not set"}`,

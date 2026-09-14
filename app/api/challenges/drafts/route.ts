@@ -8,6 +8,7 @@ import { isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-cha
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { canCreateBuilderType, draftLimitForPlan, isUnfinishedChallengeDraft, normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
+import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -42,6 +43,15 @@ export async function POST(request: Request) {
   if (basicsErrors.length) return fail(basicsErrors[0].message, 422, { fieldErrors: Object.fromEntries(basicsErrors.map((issue) => [issue.field, issue.message])) }, "BASICS_INCOMPLETE");
   const [accountSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
   const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
+  const enterpriseAccess = normalizeEnterpriseAccess(profile);
+  const officialChallenge = body.officialChallenge === true;
+  const ownershipType = officialChallenge ? "challenge_suite_official" : body.ownershipType === "enterprise_personal" ? "enterprise_personal" : "creator_personal";
+  if (officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) {
+    return fail("Your Enterprise role cannot create official Challenge Suite challenges.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
+  }
+  if (ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) {
+    return fail("Your Enterprise role cannot create personal challenges.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  }
   const planAccess = getUserPlanAccess(profile);
   if (planAccess.isSponsor) return fail("Sponsor accounts manage campaigns from the sponsor dashboard.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
   if (!canCreateBuilderType(planAccess.normalizedPlanId, challengeType)) return fail("This challenge type isn't included in your plan.", 403, { challengeType }, "CHALLENGE_TYPE_NOT_INCLUDED");
@@ -52,6 +62,12 @@ export async function POST(request: Request) {
     id: ref.id,
     creatorId: user.uid,
     ownerId: user.uid,
+    createdBy: user.uid,
+    officialChallenge,
+    ownershipType,
+    organizationOwnerId: officialChallenge ? "challenge_suite" : null,
+    enterpriseChallengeLeadId: officialChallenge ? user.uid : null,
+    enterpriseAssignments: officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
     status: "draft",
     lifecycleStatus: "draft",
     visibility: "public",

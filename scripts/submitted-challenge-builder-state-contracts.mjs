@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const builder = readFileSync("components/normal-challenge-builder.tsx", "utf8");
+const autosave = readFileSync("lib/hooks/use-challenge-builder-autosave.ts", "utf8");
 const submittedStateStart = builder.indexOf("function SubmittedChallengeState");
 const submittedState = builder.slice(submittedStateStart);
 
 assert.ok(submittedStateStart > 0, "pending-review challenges need a dedicated submitted state");
 assert.match(builder, /editable = status === "draft" \|\| status === "requires_changes"/);
-assert.match(builder, /if \(!id \|\| loadingDraft \|\| saving \|\| !editable\) return/);
-assert.match(builder, /\[editable, id, loadingDraft, payload, saving, step\]/);
+assert.match(builder, /enabled: Boolean\(id\) && !loadingDraft && !saving && editable/);
 assert.match(builder, /async function persist\(next = step\)[\s\S]*if \(!id \|\| !editable\) return false/);
-assert.match(builder, /version\.current \+= 1;\s*setError\(""\);\s*setSaving\(true\)/);
-assert.match(builder, /version\.current \+= 1;\s*setAutosaveFailed\(false\);\s*setError\(""\);\s*setStatus/);
-assert.match(builder, /currentVersion !== version\.current/);
+assert.match(builder, /invalidateAutosave\(\);\s*setError\(""\);\s*setSaving\(true\)/);
+assert.match(builder, /invalidateAutosave\(\);\s*setAutosaveFailed\(false\);\s*setError\(""\);\s*setStatus/);
+assert.match(autosave, /version === requestVersion\.current/);
 assert.match(builder, /result\.code === "CHALLENGE_NOT_EDITABLE"[\s\S]*fetchChallengeDraft\(id\)[\s\S]*setStatus\("pending_review"\)[\s\S]*setError\(""\)/);
 assert.match(builder, /status === "pending_review" && id/);
 

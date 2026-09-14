@@ -5,6 +5,7 @@ import { canCreateTournament } from "@/lib/server/tournament-permissions";
 import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
+import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +43,13 @@ export async function POST(request: Request) {
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   const requestedStatus = body.status === "pending_review" ? "pending_review" : "draft";
   if (body.status && body.status !== "draft" && body.status !== "pending_review") return fail("Tournament status is not valid for this action.", 422, undefined, "TOURNAMENT_STATUS_INVALID");
-  const profileSnap = await db.collection("users").doc(user.uid).get();
-  const permission = canCreateTournament({ ...(profileSnap.data() ?? {}), uid: user.uid, role: user.role, isAdmin: user.isAdmin });
+  const [userSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
+  const profile = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}), uid: user.uid, role: user.role, isAdmin: user.isAdmin };
+  const enterpriseAccess = normalizeEnterpriseAccess(profile);
+  const officialChallenge = body.officialChallenge === true;
+  if (officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) return fail("Your Enterprise role cannot create official tournaments.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
+  if (body.ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) return fail("Your Enterprise role cannot create personal tournaments.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  const permission = canCreateTournament(profile);
   if (!permission.allowed) return fail("Tournament hosting requires Host, approved Enterprise, or allowed premium Creator access.", 403, permission, "TOURNAMENT_HOSTING_LOCKED");
   const validation = validateTournamentFoundation(body, { publish: requestedStatus === "pending_review" });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));

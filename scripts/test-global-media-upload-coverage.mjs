@@ -72,7 +72,7 @@ assert(settingsPage.includes("profileMediaPath(userId, \"banner\")"), "profile b
 assert(settingsRoute.includes("invalidProfileMediaPath"), "settings API must validate profile media owner paths.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"logo\")"), "sponsor logo upload should use shared sponsor path.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"banner\")"), "sponsor banner upload should use shared sponsor path.");
-assert(sponsorOnboarding.includes("Submitting sends the profile for review. It does not approve the brand"), "sponsor branding must stay pending-review safe.");
+assert(sponsorOnboarding.includes("Submitting sends the organization profile for review. It does not alter your Personal account, activate funding, or approve the brand."), "sponsor branding must stay pending-review safe.");
 assert(sponsorProfileRoute.includes("invalidSponsorMediaPath"), "sponsor API must validate sponsor media owner paths.");
 assert(!sponsorCampaignBuilder.includes("MediaUploadField"), "sponsor campaign asset upload UI is not implemented and remains deferred.");
 

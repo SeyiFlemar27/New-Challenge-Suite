@@ -17,6 +17,8 @@ export function ChallengeBuilderFrame({
   guideOpen,
   setGuideOpen,
   onStepChange,
+  completedSteps,
+  guideStatus,
   children
 }: {
   steps: readonly string[];
@@ -26,11 +28,13 @@ export function ChallengeBuilderFrame({
   guideOpen: boolean;
   setGuideOpen: (open: boolean) => void;
   onStepChange: (step: number) => void;
+  completedSteps?: readonly boolean[];
+  guideStatus?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return <>
     <div className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,760px)_280px] 2xl:grid-cols-[290px_minmax(0,840px)_300px]">
-      <BuilderRail steps={steps} currentStep={currentStep} unlockedStep={unlockedStep} onStepChange={onStepChange} />
+      <BuilderRail steps={steps} currentStep={currentStep} unlockedStep={unlockedStep} completedSteps={completedSteps} onStepChange={onStepChange} />
       <section className="min-w-0">
         <div className="mb-5 lg:hidden">
           <label className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500" htmlFor="advanced-builder-mobile-step">Step {currentStep + 1} of {steps.length}</label>
@@ -43,7 +47,7 @@ export function ChallengeBuilderFrame({
           Builder Guide <ChevronDown size={18} />
         </button>
       </section>
-      <BuilderGuide guide={guide} />
+      <BuilderGuide guide={guide} status={guideStatus} />
     </div>
     {guideOpen ? <BuilderGuideSheet guide={guide} close={() => setGuideOpen(false)} /> : null}
   </>;
@@ -89,16 +93,16 @@ export function BuilderStepHeading({ title, body, eyebrow }: { title: string; bo
   return <div>{eyebrow ? <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{eyebrow}</p> : null}<h2 className={`${eyebrow ? "mt-2" : ""} text-2xl font-black text-slate-950`}>{title}</h2>{body ? <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{body}</p> : null}</div>;
 }
 
-function BuilderRail({ steps, currentStep, unlockedStep, onStepChange }: { steps: readonly string[]; currentStep: number; unlockedStep: number; onStepChange: (step: number) => void }) {
+function BuilderRail({ steps, currentStep, unlockedStep, completedSteps, onStepChange }: { steps: readonly string[]; currentStep: number; unlockedStep: number; completedSteps?: readonly boolean[]; onStepChange: (step: number) => void }) {
   return <nav className="hidden lg:block" aria-label="Challenge builder steps"><ol className="sticky top-24 space-y-1">{steps.map((label, index) => {
     const locked = index > unlockedStep;
-    const complete = index < currentStep;
+    const complete = completedSteps?.[index] ?? index < currentStep;
     return <li key={label}><button type="button" disabled={locked} aria-current={currentStep === index ? "step" : undefined} onClick={() => !locked && onStepChange(index)} className={`group flex min-h-12 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold transition ${currentStep === index ? "bg-amber-50 text-slate-950 shadow-sm" : locked ? "cursor-not-allowed text-slate-400" : "text-slate-600 hover:bg-white hover:text-slate-950"}`}><span className={`grid size-7 shrink-0 place-items-center rounded-full border ${currentStep === index ? "border-[var(--gold)] bg-[var(--gold)] text-black" : complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white"}`}>{locked ? <LockKeyhole size={13} /> : complete ? <Check size={14} /> : <span className="text-xs">{index + 1}</span>}</span><span className="leading-5">{label}</span></button></li>;
   })}</ol></nav>;
 }
 
-function BuilderGuide({ guide }: { guide: BuilderGuideContent }) {
-  return <aside className="hidden xl:block"><div className="sticky top-24 rounded-[12px] border border-black/[0.08] bg-white p-6 shadow-[0_14px_44px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700"><Circle size={8} fill="currentColor" /> Builder Guide</div><h2 className="mt-4 text-lg font-black text-slate-950">{guide.title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{guide.description}</p><ul className="mt-5 space-y-4">{guide.points.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={16} /><span>{item}</span></li>)}</ul></div></aside>;
+function BuilderGuide({ guide, status }: { guide: BuilderGuideContent; status?: React.ReactNode }) {
+  return <aside className="hidden xl:block"><div className="sticky top-24 rounded-[12px] border border-black/[0.08] bg-white p-6 shadow-[0_14px_44px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700"><Circle size={8} fill="currentColor" /> Builder Guide</div><h2 className="mt-4 text-lg font-black text-slate-950">{guide.title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{guide.description}</p><ul className="mt-5 space-y-4">{guide.points.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={16} /><span>{item}</span></li>)}</ul>{status}</div></aside>;
 }
 
 function BuilderGuideSheet({ guide, close }: { guide: BuilderGuideContent; close: () => void }) {

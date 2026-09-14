@@ -88,8 +88,15 @@ export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
 }
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
+  const officialChallenge = input.officialChallenge === true;
   return {
     hostId,
+    createdBy: hostId,
+    officialChallenge,
+    ownershipType: officialChallenge ? "challenge_suite_official" : input.ownershipType === "enterprise_personal" ? "enterprise_personal" : "creator_personal",
+    organizationOwnerId: officialChallenge ? "challenge_suite" : null,
+    enterpriseChallengeLeadId: officialChallenge ? hostId : null,
+    enterpriseAssignments: officialChallenge ? [{ userId: hostId, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: hostId }] : [],
     title: text(input.title),
     shortDescription: text(input.shortDescription),
     description: text(input.description),
