@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { classifySponsorAnalyticsEvent, sponsorAnalyticsEventId } from "@/lib/server/sponsor-analytics";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +28,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ spon
   const requestedPlacements = Array.isArray(visibility.requestedPlacements) ? visibility.requestedPlacements.map(String) : [];
   if (requestedPlacements.length && !requestedPlacements.includes(placementId)) return new Response("Sponsor destination is unavailable.", { status: 404 });
   const userAgent = request.headers.get("user-agent") ?? "";
-  const visitor = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "anonymous";
-  const sessionHash = createHash("sha256").update(`${visitor}|${userAgent}`).digest("hex");
+  const existingCookie = request.headers.get("cookie")?.match(/(?:^|;\s*)cs_sponsor_session=([^;]+)/)?.[1];
+  const sessionId = existingCookie && /^[a-f0-9-]{16,64}$/i.test(existingCookie) ? existingCookie : randomUUID();
+  const rateLimit = consumeRateLimit(`sponsor-click:${sponsorshipId}:${sessionId}`, { limit: 30, windowMs: 60_000 });
+  if (!rateLimit.allowed) return new Response("Too many sponsor redirects. Please try again shortly.", { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
+  const sessionHash = createHash("sha256").update(`${sessionId}|${userAgent}`).digest("hex");
   const now = new Date().toISOString();
   const quality = classifySponsorAnalyticsEvent({ sessionId: sessionHash, userAgent });
   const id = sponsorAnalyticsEventId({ sponsorshipId, placementId, eventType: "cta_click", sessionHash, occurredAt: now });
   await db.collection("sponsorAnalyticsEvents").doc(id).set({ id, sponsorId: sponsorship.sponsorId, sponsorOrganizationId: sponsorship.sponsorOrganizationId ?? sponsorship.sponsorId, sponsorshipId, challengeId, placementId, eventType: "cta_click", sessionHash, valid: quality.valid, classification: quality.classification, invalidReasons: quality.invalidReasons, provisional: true, finalized: false, occurredAt: now, createdAt: now, source: "tracked_sponsor_redirect" }, { merge: true });
   await db.collection("sponsorAnalyticsAggregationQueue").doc(deterministicId(sponsorshipId, now.slice(0, 13))).set({ sponsorshipId, sponsorId: sponsorship.sponsorId, status: "pending", updatedAt: now }, { merge: true });
-  return Response.redirect(destination, 302);
+  const redirect = Response.redirect(destination, 302);
+  if (!existingCookie) redirect.headers.append("Set-Cookie", `cs_sponsor_session=${sessionId}; Path=/; Max-Age=2592000; SameSite=Lax; Secure; HttpOnly`);
+  return redirect;
 }

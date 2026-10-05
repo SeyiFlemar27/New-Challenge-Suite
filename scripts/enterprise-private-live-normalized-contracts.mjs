@@ -81,14 +81,15 @@ run("private_aliases", () => {
   assert.match(schema, /"link_and_code"/);
   assert.match(schema, /selected_countries/);
   assert.match(schema, /minimum_age/);
-  assert.match(route, /privateAccessMethod: body\.visibility === "private" \? "link_and_code"/);
+  assert.match(route, /privateAccessMethod: body\.visibility === "private"/);
+  for (const method of ["invite_link", "invitation_code", "direct_invitations"]) assert.ok(route.includes(method) || schema.includes(method));
 });
 
 run("private_requirements", () => {
   const builder = read("components/challenge-builder.tsx");
   const route = read("app/api/challenges/route.ts");
   const draft = read("app/api/challenges/drafts/[id]/route.ts");
-  for (const field of ["privateParticipantQuestions", "privateParticipantAcknowledgements"]) { assert.ok(builder.includes(field)); assert.ok(route.includes(field)); assert.ok(draft.includes(field)); }
+  for (const field of ["privateParticipantQuestions", "privateParticipantAcknowledgements", "privateParticipantRequirements"]) { assert.ok(builder.includes(field)); assert.ok(route.includes(field)); assert.ok(draft.includes(field)); }
   assert.match(builder, /Do not request unnecessary sensitive information/);
 });
 

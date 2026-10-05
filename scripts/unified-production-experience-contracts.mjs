@@ -16,9 +16,10 @@ const sidebar = read("components/sidebar.tsx");
 const creatorStart = sidebar.indexOf("function personalSections");
 const sponsorStart = sidebar.indexOf("const sponsorSections");
 const creatorNavigation = sidebar.slice(creatorStart, sponsorStart);
-for (const required of ["Creator Studio", "Explore", "Saved", "My Challenges", "My Entries", "Submissions", "Analytics", "Leaderboards", "Winners", "Earnings", "DoroCoins", "Rewards", "Profile", "Settings"]) {
+for (const required of ["Creator Studio", "Explore", "Saved", "My Challenges", "My Entries", "Submissions", "Analytics", "Earnings", "DoroCoins", "Rewards", "Profile", "Settings"]) {
   assert(creatorNavigation.includes(required), `Creator/Host navigation is missing ${required}`);
 }
+for (const contextual of ["Leaderboards", "Winners"]) assert(!creatorNavigation.includes(contextual), `${contextual} must remain contextual rather than a permanent primary destination`);
 for (const retired of ["Monthly Boosts", "Sponsor-Ready", "Creator Pro", "Vote multiplier"]) {
   assert(!creatorNavigation.includes(retired), `Creator/Host navigation must not permanently include ${retired}`);
 }

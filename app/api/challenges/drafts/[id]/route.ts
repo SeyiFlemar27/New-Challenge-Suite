@@ -4,6 +4,7 @@ import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { calculateChallengeDraftProgress, editableDraftStatus, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { isRetiredHybridCompetition, retiredHybridCompetitionState } from "@/lib/server/retired-competitions";
 import { inferLegacyMaxUnlockedStep, normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
@@ -19,7 +20,7 @@ const allowedDraftFields = new Set([
   "standardRules", "challengeRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
   "documentPaths", "challengeImages", "challengeVideo", "mediaUploadStatus", "mediaStatus", "usesPlaceholderMedia", "mediaFallbackType", "prizeType",
-  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode", "privateAccessMethod", "privateAccessCode", "privateAccessCodeExpiresAt", "privateAccessCodeMaxUses", "privateAccessInstructions", "privateParticipantQuestions", "privateParticipantAcknowledgements",
+  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode", "privateAccessMethod", "privateAccessCode", "privateAccessCodeExpiresAt", "privateAccessCodeMaxUses", "privateAccessInstructions", "privateParticipantQuestions", "privateParticipantAcknowledgements", "privateParticipantRequirements", "privateDirectInvitees",
   "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "participationMode", "locationEligibility", "eligibleCountries", "ageRestrictionMode", "capacityMode", "maxParticipants", "hideParticipantList", "waitlistEnabled", "eligibleCountry", "minimumAge", "maximumAge", "teamParticipationEnabled",
   "sponsorEnabled", "sponsorSlots", "minimumSponsorshipAmount", "sponsorPlacementOptions", "sponsorPackages",
   "monetization", "isLiveEvent", "venueName", "eventAddress", "eventCity", "eventState", "eventCountry",
@@ -60,24 +61,19 @@ function sanitizeDraftPatch(body: Record<string, unknown>) {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Challenge draft");
   const { id } = await params;
-  const snap = await db.collection("challenges").doc(id).get();
-  if (!snap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
-  const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-  if (!userOwnsChallenge(challenge, user.uid)) return fail("You can only edit your own challenge drafts.", 403, undefined, "PERMISSION_DENIED");
+  const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (access.response || !access.challenge) return access.response;
+  const challenge = access.challenge;
   const progress = calculateChallengeDraftProgress(challenge);
   return ok({ challenge: { ...challenge, ...(retiredHybridCompetitionState(challenge) ?? {}), managementState: resolveChallengeManagementState(challenge), completionPercentage: Number(challenge.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: challenge.nextIncompleteSection ?? progress.nextIncompleteSection } }, "Challenge draft loaded.");
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Challenge draft autosave");
+  const { id } = await params;
+  const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (access.response || !access.user || !access.db || !access.challenge) return access.response;
+  const { user, db } = access;
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = (parsed.body ?? {}) as Record<string, unknown>;
@@ -88,7 +84,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const message = error instanceof Error ? error.message : "Enter a valid participant capacity.";
     return fail("Check the participant capacity and try again.", 422, { fieldErrors: { maxParticipants: message } }, "INVALID_PARTICIPANT_CAPACITY");
   }
-  const { id } = await params;
   const ref = db.collection("challenges").doc(id);
   const now = new Date().toISOString();
   let updated: Record<string, unknown>;
@@ -97,7 +92,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const current = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-    if (!userOwnsChallenge(current, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!userOwnsChallenge(current, user.uid) && !access.enterpriseAccess && !user.isAdmin) throw new Error("PERMISSION_DENIED");
     const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
     const usesNormalBuilderFoundation = lockedType === "normal" && (
       ["normal_v1", "normal_v2"].includes(String(current.builderVersion ?? "")) || String(current.challengeType ?? "") === "normal"
@@ -155,18 +150,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Challenge draft deletion");
   const { id } = await params;
+  const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (access.response || !access.user || !access.db) return access.response;
+  const { user, db } = access;
   const ref = db.collection("challenges").doc(id);
   const now = new Date().toISOString();
   await db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-    if (!userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!userOwnsChallenge(challenge, user.uid) && !access.enterpriseAccess && !user.isAdmin) throw new Error("PERMISSION_DENIED");
     if (!editableDraftStatus(challenge)) throw new Error("CHALLENGE_NOT_EDITABLE");
     const hasActivity = [challenge.participantCount, challenge.submissionCount, challenge.confirmedPaymentCount, challenge.paymentCount].some((value) => Number(value ?? 0) > 0);
     transaction.set(ref, hasActivity

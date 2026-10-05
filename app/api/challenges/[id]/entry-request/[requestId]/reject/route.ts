@@ -4,6 +4,7 @@ import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; requestId: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -14,6 +15,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (parsed.response) return parsed.response;
   const note = typeof parsed.body?.reason === "string" ? parsed.body.reason.trim().slice(0, 1000) : typeof parsed.body?.note === "string" ? parsed.body.note.trim().slice(0, 1000) : "";
   const { id, requestId } = await params;
+  const managementAccess = await requireChallengeManagementAccess(request, id, "participants.manage");
+  if (managementAccess.response) return managementAccess.response;
   const now = new Date().toISOString();
   const result = await db.runTransaction(async (transaction) => {
     const challengeRef = db.collection("challenges").doc(id);
@@ -24,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const entryRequest = { id: requestSnap.id, ...requestSnap.data() } as Record<string, unknown>;
-    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid) && !managementAccess.enterpriseAccess) throw new Error("PERMISSION_DENIED");
     if (String(entryRequest.challengeId) !== id) throw new Error("ENTRY_REQUEST_MISMATCH");
     const update = { status: "rejected", rejectedAt: now, rejectedBy: user.uid, rejectionReason: note || null, updatedAt: now };
     transaction.set(requestRef, update, { merge: true });

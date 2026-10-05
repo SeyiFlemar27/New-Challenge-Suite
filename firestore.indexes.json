@@ -117,6 +117,14 @@
       ]
     },
     {
+      "collectionGroup": "sponsorAnalyticsEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sponsorId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "sponsorProposalRevisions",
       "queryScope": "COLLECTION",
       "fields": [

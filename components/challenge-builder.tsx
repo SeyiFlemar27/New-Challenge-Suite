@@ -34,7 +34,7 @@ const sponsorPlacementLabels: Record<string, string> = {
 
 type FormState = {
   title: string; category: string; description: string; shortDescription: string;
-  rules: string; terms: string; submission: string; access: string; accessCode: string; accessCodeExpiresAt: string; accessCodeMaxUses: string; publicPreviewEnabled: boolean;
+  rules: string; terms: string; submission: string; access: string; accessMethod: "invite_link" | "invitation_code" | "direct_invitations"; accessCode: string; accessCodeExpiresAt: string; accessCodeMaxUses: string; directInvitees: string; participantRequirements: string; publicPreviewEnabled: boolean;
   participantQuestions?: string; participantAcknowledgements?: string;
   approvalRequired: boolean; eligibleCountries: string; minimumAge: string; maxParticipants: string; waitlistEnabled: boolean; hideParticipantList: boolean;
   submissionTypes: string[]; startsAt: string; registrationDeadline: string; submissionDeadline: string; votingDeadline: string; endsAt: string;
@@ -73,7 +73,7 @@ function dateInput(days: number) {
 }
 
 function initialForm(): FormState {
-  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", accessCode: generatePrivateChallengeAccessCode(), accessCodeExpiresAt: "", accessCodeMaxUses: "", publicPreviewEnabled: false, approvalRequired: false, eligibleCountries: "", minimumAge: "", maxParticipants: "", waitlistEnabled: false, hideParticipantList: false, submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, creatorPrizeFundingRequiredCents: 0, confirmedCreatorPrizeFundingCents: 0, creatorPrizeFundingStatus: "not_requested", sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
+  return { title: "", category: "", description: "", shortDescription: "", rules: "", terms: "", submission: "", access: "", accessMethod: "invitation_code", accessCode: generatePrivateChallengeAccessCode(), accessCodeExpiresAt: "", accessCodeMaxUses: "", directInvitees: "", participantRequirements: "", publicPreviewEnabled: false, approvalRequired: false, eligibleCountries: "", minimumAge: "", maxParticipants: "", waitlistEnabled: false, hideParticipantList: false, submissionTypes: ["image"], startsAt: dateInput(8), registrationDeadline: dateInput(4), submissionDeadline: dateInput(9), votingDeadline: dateInput(10), endsAt: dateInput(11), timeZone: DEFAULT_CHALLENGE_TIME_ZONE, coverImageUrl: "", coverImagePath: "", promoImageUrl: "", promoImagePath: "", galleryImageUrl: "", galleryImagePath: "", trailerVideoUrl: "", trailerVideoPath: "", documentOneUrl: "", documentOnePath: "", documentTwoUrl: "", documentTwoPath: "", paidEntryEnabled: false, entryFeeAmount: "", entryCurrency: "USD", sponsorReady: false, prizePoolEnabled: false, paidVotesEnabled: false, creatorPrizeFundingRequiredCents: 0, confirmedCreatorPrizeFundingCents: 0, creatorPrizeFundingStatus: "not_requested", sponsorshipGoal: "", preferredSponsorCategory: "", sponsorNote: "", sponsorPlacementPreferences: ["challenge_detail", "voting_page"] };
 }
 
 function formFromChallenge(challenge: Record<string, unknown>): FormState {
@@ -92,9 +92,12 @@ function formFromChallenge(challenge: Record<string, unknown>): FormState {
     terms: String(challenge.policyTerms ?? ""),
     submission: String(challenge.challengeGuidelines ?? ""),
     access: String(challenge.privateAccessInstructions ?? ""),
+    accessMethod: ["invite_link", "invitation_code", "direct_invitations"].includes(String(challenge.privateAccessMethod)) ? String(challenge.privateAccessMethod) as FormState["accessMethod"] : "invitation_code",
     accessCode: String(challenge.privateAccessCode ?? generatePrivateChallengeAccessCode()),
     accessCodeExpiresAt: challengeDateTimeInputValue(challenge.privateAccessCodeExpiresAt ?? "", timeZone),
     accessCodeMaxUses: String(challenge.privateAccessCodeMaxUses ?? ""),
+    directInvitees: Array.isArray(challenge.privateDirectInvitees) ? challenge.privateDirectInvitees.map(String).join(", ") : "",
+    participantRequirements: Array.isArray(challenge.privateParticipantRequirements) ? challenge.privateParticipantRequirements.map(String).join("\n") : "",
     publicPreviewEnabled: Boolean(challenge.publicPreviewEnabled),
     participantQuestions: Array.isArray(challenge.privateParticipantQuestions) ? challenge.privateParticipantQuestions.map(String).join("\n") : "",
     participantAcknowledgements: Array.isArray(challenge.privateParticipantAcknowledgements) ? challenge.privateParticipantAcknowledgements.map(String).join("\n") : "I confirm that my submission is original and follows the challenge rules.",
@@ -356,8 +359,8 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
       policyTerms: form.terms,
       challengeGuidelines: form.submission,
       privateAccessInstructions: privateMode ? form.access : "",
-      privateAccessMethod: privateMode ? "link_and_code" : "",
-      privateAccessCode: privateMode ? form.accessCode : "",
+      privateAccessMethod: privateMode ? form.accessMethod : "",
+      privateAccessCode: privateMode && form.accessMethod === "invitation_code" ? form.accessCode : "",
       privateAccessCodeExpiresAt: privateMode && form.accessCodeExpiresAt ? challengeDateTimeForStorage(form.accessCodeExpiresAt, form.timeZone) : null,
       privateAccessCodeMaxUses: privateMode && form.accessCodeMaxUses ? Math.max(1, Number(form.accessCodeMaxUses)) : null,
       publicPreviewEnabled: false,
@@ -373,6 +376,8 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
       hideParticipantList: privateMode && form.hideParticipantList,
       privateParticipantQuestions: privateMode ? (form.participantQuestions ?? "").split("\n").map((value) => value.trim()).filter(Boolean) : [],
       privateParticipantAcknowledgements: privateMode ? (form.participantAcknowledgements ?? "I confirm that my submission is original and follows the challenge rules.").split("\n").map((value) => value.trim()).filter(Boolean) : [],
+      privateParticipantRequirements: privateMode ? form.participantRequirements.split("\n").map((value) => value.trim()).filter(Boolean) : [],
+      privateDirectInvitees: privateMode && form.accessMethod === "direct_invitations" ? form.directInvitees.split(/[\n,]/).map((value) => value.trim().toLowerCase()).filter(Boolean) : [],
       requiresSubmissionApproval: privateMode,
       sponsorEnabled: safeSponsorReady,
       sponsorSlots: safeSponsorReady ? 4 : 0,
@@ -424,7 +429,7 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
 
   function validateStep() {
     if (step === 0 && (!form.title.trim() || !form.category || form.description.trim().length < 20)) return "Add title, category, and a clear description.";
-    if (mode === "private" && step === 1 && (!/^[A-HJ-NP-Z2-9]{5}$/.test(form.accessCode) || !form.access.trim())) return "Generate an access code and add access instructions.";
+    if (mode === "private" && step === 1 && (!form.access.trim() || (form.accessMethod === "invitation_code" && !/^[A-HJ-NP-Z2-9]{5}$/.test(form.accessCode)) || (form.accessMethod === "direct_invitations" && !form.directInvitees.trim()))) return "Configure exactly one access method and add access instructions.";
     if (step === (mode === "private" ? 2 : 1) && (!form.rules.trim() || !form.terms.trim())) return "Rules and eligibility terms are required.";
     if (mode === "private" && step === 2) {
       if (form.minimumAge && Number(form.minimumAge) < 13) return "Set a valid minimum age and participant capacity.";
@@ -537,7 +542,7 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
   const privateOffset = mode === "private" ? 1 : 0;
   const contentStep = mode === "private" && step >= 3 ? step + 1 : step;
   if (mode === "private" && step === 2) return <PrivateEligibilityStep form={form} update={update} />;
-  if (mode === "private" && step === 1) return <section><StepTitle title="Access" body="Private challenges use a forwardable link plus a server-verified code." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><input className={inputClass} value="Link + Code" disabled /></Field><Field label="Generated access code"><div className="flex flex-col gap-3 sm:flex-row"><input className={inputClass} value={form.accessCode} readOnly aria-label="Generated private challenge access code" /><Button type="button" variant="secondary" onClick={() => update("accessCode", generatePrivateChallengeAccessCode())}><RefreshCw size={16} /> Regenerate</Button></div></Field><Field label="Code expires (optional)"><input className={inputClass} type="datetime-local" value={form.accessCodeExpiresAt} onChange={(event) => update("accessCodeExpiresAt", event.target.value)} /></Field><Field label="Invitation capacity (optional)"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(event) => update("accessCodeMaxUses", event.target.value)} placeholder="No fixed invitation limit" /></Field></div><div className="mt-5"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(event) => update("access", event.target.value)} placeholder="Tell invited participants how to use the link and code." /></Field></div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300"><b className="text-white">Share link:</b> {draftId ? `/challenges/${draftId}/access` : "Save the draft to create a shareable access link."}<p className="mt-2 text-slate-400">Links may be forwarded. Every participant must still verify the code and satisfy eligibility rules.</p></Card></section>;
+  if (mode === "private" && step === 1) return <section><StepTitle title="Access" body="Choose one protected access method. Eligibility and participant requirements still apply." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><select className={inputClass} value={form.accessMethod} onChange={(event) => update("accessMethod", event.target.value as FormState["accessMethod"])}><option value="invite_link">Invite Link</option><option value="invitation_code">Invitation Code</option><option value="direct_invitations">Direct Invitations</option></select></Field>{form.accessMethod === "invitation_code" ? <Field label="Generated invitation code"><div className="flex flex-col gap-3 sm:flex-row"><input className={inputClass} value={form.accessCode} readOnly aria-label="Generated private challenge access code" /><Button type="button" variant="secondary" onClick={() => update("accessCode", generatePrivateChallengeAccessCode())}><RefreshCw size={16} /> Regenerate</Button></div></Field> : form.accessMethod === "direct_invitations" ? <Field label="Invitees"><textarea className={textareaClass} value={form.directInvitees} onChange={(event) => update("directInvitees", event.target.value)} placeholder="Email addresses, separated by commas or lines" /></Field> : <Field label="Share link"><input className={inputClass} readOnly value={draftId ? `/challenges/${draftId}/access` : "Save the draft to create a protected invite link."} /></Field>}<Field label="Invitation capacity (optional)"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(event) => update("accessCodeMaxUses", event.target.value)} placeholder="No fixed invitation limit" /></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(event) => update("access", event.target.value)} /></Field><Field label="Participant requirements"><textarea className={textareaClass} value={form.participantRequirements} onChange={(event) => update("participantRequirements", event.target.value)} placeholder="One requirement per line" /></Field></div></section>;
   if (mode === "private" && contentStep === 4) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
   if (mode === "private" && contentStep === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   if (mode === "private" && contentStep === 6) return <PrivateScheduleStep form={form} update={update} />;

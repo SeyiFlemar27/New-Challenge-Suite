@@ -93,7 +93,7 @@ export async function GET(request: Request) {
   if (!stripe || !db) return serverUnavailable("Checkout verification");
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["line_items"] });
     const metadata = session.metadata ?? {};
     if (metadata.userId !== user.uid) return fail("This checkout is not available for the current account.", 404, undefined, "CHECKOUT_NOT_FOUND");
     const purpose = paymentPurpose(metadata);
@@ -102,7 +102,8 @@ export async function GET(request: Request) {
     if (requestedPurpose && requestedPurpose !== purpose) return validationError({ purpose: "Checkout purpose does not match the return request." });
     const record = await checkoutRecord(db, purpose, metadata, user.uid, session.id);
     const providerStatus = session.status === "expired" ? "expired" : session.payment_status === "paid" ? "pending" : session.status ?? "pending";
-    return ok(verifiedSummary(purpose, record, providerStatus), record ? "Verified checkout status loaded." : "Payment confirmation is still processing.");
+    const lineItems = session.line_items?.data.map((item) => ({ description: item.description ?? null, quantity: item.quantity ?? 0, amountCents: item.amount_total ?? 0, currency: item.currency?.toUpperCase() ?? null })) ?? [];
+    return ok({ ...verifiedSummary(purpose, record, providerStatus), lineItems }, record ? "Verified checkout status loaded." : "Payment confirmation is still processing.");
   } catch (error) {
     console.error("[verify-checkout] verification failed", { sessionId, errorType: error instanceof Error ? error.name : "CheckoutVerificationError" });
     return fail("Checkout verification is temporarily unavailable. Please try again shortly.", 502, undefined, "CHECKOUT_VERIFICATION_UNAVAILABLE");

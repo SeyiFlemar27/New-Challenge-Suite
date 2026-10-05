@@ -19,7 +19,7 @@ import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time"
 import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
-import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { ENTERPRISE_WORKSPACE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export async function GET() {
   const db = getAdminDb();
@@ -79,6 +79,16 @@ export async function POST(request: Request) {
   }
   if (body.officialChallenge && !enterpriseAccess?.organizationId) {
     return fail("Your Enterprise organization context is still being provisioned. Try again shortly or contact support.", 409, undefined, "ENTERPRISE_ORGANIZATION_REQUIRED");
+  }
+  if (body.officialChallenge) {
+    const officialChallenges = await db.collection("challenges").where("organizationOwnerId", "==", enterpriseAccess!.organizationId).limit(50).get();
+    const activeOfficialChallenges = officialChallenges.docs.filter((document) => shouldCountAgainstActiveChallengeLimit(document.data().status)).length;
+    if (activeOfficialChallenges >= ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit) {
+      return fail("This Enterprise organization has reached its limit of 10 active challenges.", 409, { activeChallengeCount: activeOfficialChallenges, activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
+    }
+    if (Math.round(Number(body.prizeValue ?? 0) * 100) > ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents) {
+      return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
+    }
   }
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
@@ -202,13 +212,15 @@ export async function POST(request: Request) {
     type: body.type ?? (body.visibility === "private" ? "Private / Exclusive" : "Public Challenge"),
     visibility: body.visibility,
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
-    privateAccessMethod: body.visibility === "private" ? "link_and_code" : "",
-    privateAccessCode: body.visibility === "private" ? body.privateAccessCode : "",
+    privateAccessMethod: body.visibility === "private" ? (body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod) : "",
+    privateAccessCode: body.visibility === "private" && body.privateAccessMethod !== "invite_link" && body.privateAccessMethod !== "direct_invitations" ? body.privateAccessCode : "",
     privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
     privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,
     privateAccessInstructions: body.visibility === "private" ? body.privateAccessInstructions : "",
     privateParticipantQuestions: body.visibility === "private" ? body.privateParticipantQuestions : [],
     privateParticipantAcknowledgements: body.visibility === "private" ? body.privateParticipantAcknowledgements : [],
+    privateParticipantRequirements: body.visibility === "private" ? body.privateParticipantRequirements : [],
+    privateDirectInvitees: body.visibility === "private" && body.privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [],
     premiumOnly: Boolean(body.premiumOnly),
     planRequired: body.premiumOnly ? "pro" : null,
     status: lifecycleStatus,
@@ -307,12 +319,12 @@ export async function POST(request: Request) {
     eventCountry: body.eventCountry || null,
     eventMapUrl: body.eventMapUrl || null,
     eventCapacity: body.eventCapacity,
-    eventMode: body.isLiveEvent ? "physical_first_external_livestream" : "online",
-    externalLiveUrl: body.externalLiveUrl || null,
-    externalLiveProvider: body.externalLiveProvider || null,
-    externalLiveStatus: body.externalLiveStatus,
-    externalLiveOpensAt: body.externalLiveOpensAt || null,
-    externalLiveCtaLabel: body.externalLiveCtaLabel || "Watch live on partner site",
+    eventMode: body.isLiveEvent ? "physical" : "online",
+    externalLiveUrl: null,
+    externalLiveProvider: null,
+    externalLiveStatus: "not_supported",
+    externalLiveOpensAt: null,
+    externalLiveCtaLabel: null,
     nativeLiveStreamingEnabled: false,
     eventSyncStatus: body.isLiveEvent ? "pending_review" : "not_applicable",
     eventVisibility: body.isLiveEvent ? "hidden_until_approved" : "not_applicable",
@@ -357,7 +369,7 @@ export async function POST(request: Request) {
     publishedAt: body.publish && lifecycleStatus !== "pending_review" ? now : null
   };
   const privateInvitePromise = challenge.visibility === "private" || challenge.visibility === "exclusive"
-    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: body.privateAccessCode || undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100 })
+    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: body.privateAccessMethod === "invitation_code" || body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? body.privateAccessCode || undefined : undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100, method: body.privateAccessMethod === "direct_invitations" ? "direct_invitations" : body.privateAccessMethod === "invite_link" ? "invite_link" : "invitation_code", allowedEmails: body.privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [] })
     : Promise.resolve(null);
 
   await Promise.all([

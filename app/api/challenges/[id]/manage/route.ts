@@ -1,5 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
-import { requireRequestUser } from "@/lib/server/auth";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -13,25 +12,13 @@ const collections = {
   report: "challengeReports"
 } as const;
 
-function ownsChallenge(challenge: Record<string, unknown>, userId: string) {
-  return [challenge.creatorId, challenge.ownerId, challenge.hostId, challenge.userId].some((value) => String(value ?? "") === userId);
-}
-
 async function rows(db: FirebaseFirestore.Firestore, collection: string, challengeId: string, limit = 200): Promise<Record<string, unknown>[]> {
   const snap = await db.collection(collection).where("challengeId", "==", challengeId).limit(limit).get().catch(() => null);
   return snap?.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)) ?? [];
 }
 
 async function context(request: Request, challengeId: string) {
-  const auth = await requireRequestUser(request);
-  if (auth.response || !auth.user) return { response: auth.response, user: null, db: null, challenge: null };
-  const db = getAdminDb();
-  if (!db) return { response: serverUnavailable("Challenge management"), user: null, db: null, challenge: null };
-  const snap = await db.collection("challenges").doc(challengeId).get();
-  if (!snap.exists) return { response: fail("Challenge not found.", 404, undefined, "NOT_FOUND"), user: null, db: null, challenge: null };
-  const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-  if (!auth.user.isAdmin && !ownsChallenge(challenge, auth.user.uid)) return { response: fail("Challenge management access is restricted to the owner or an admin.", 403, undefined, "FORBIDDEN"), user: null, db: null, challenge: null };
-  return { response: null, user: auth.user, db, challenge };
+  return requireChallengeManagementAccess(request, challengeId, "challenge.edit");
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

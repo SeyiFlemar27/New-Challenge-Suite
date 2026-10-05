@@ -11,7 +11,7 @@ import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
 import { calculateChallengeDraftProgress, resolveChallengeManagementState } from "@/lib/server/challenge-drafts";
-import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { normalizeChallengeTimelineForStorage } from "@/lib/challenge-date-time";
 import { imageLessChallengePublishingAllowed } from "@/lib/server/provider-readiness";
@@ -24,6 +24,7 @@ import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payload";
 import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
+import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -47,7 +48,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const current = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
-  if (!userOwnsChallenge(current, user.uid)) return fail("You can only submit your own challenge for review.", 403, undefined, "PERMISSION_DENIED");
+  const managementAccess = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (managementAccess.response) return managementAccess.response;
   const currentStatus = String(current.status ?? current.lifecycleStatus ?? "draft").toLowerCase();
   if (currentStatus === "pending_review") return ok({ challenge: current, idempotent: true }, "Challenge is already submitted for review.");
   const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
@@ -142,7 +144,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     && (!monetizationIntent.paidVotesRequested || monetizationAccess.canPreparePaidVotes);
   const sharedBlocker = getChallengePublishBlocker({
     authenticated: true,
-    ownsChallenge: userOwnsChallenge(current, user.uid),
+    ownsChallenge: true,
     status: resolveChallengeManagementState(current),
     planAllowsChallenge: planAllowsRequestedFeatures,
     validation: publishValidation,
@@ -159,6 +161,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
+  if (current.officialChallenge === true && typeof current.organizationOwnerId === "string" && current.organizationOwnerId) {
+    const organizationChallenges = await db.collection("challenges").where("organizationOwnerId", "==", current.organizationOwnerId).limit(50).get();
+    const activeOfficialChallenges = organizationChallenges.docs.filter((document) => document.id !== id && shouldCountAgainstActiveChallengeLimit(document.data().status)).length;
+    if (activeOfficialChallenges >= ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit) return rejectPublish("This Enterprise organization has reached its limit of 10 active challenges.", 409, { activeChallengeCount: activeOfficialChallenges, activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
+  }
   const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
 

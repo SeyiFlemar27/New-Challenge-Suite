@@ -11,9 +11,13 @@ export async function GET(request: Request) {
   const permission = requireSponsorPermission(context, "analytics.view");
   if (permission) return permission;
   try {
+    const url = new URL(request.url);
+    const end = url.searchParams.get("end") ? new Date(String(url.searchParams.get("end"))) : new Date();
+    const start = url.searchParams.get("start") ? new Date(String(url.searchParams.get("start"))) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end || end.getTime() - start.getTime() > 92 * 24 * 60 * 60 * 1000) return serverError("Choose a valid analytics date range of up to 92 days.");
     const [snapshotsSnap, eventsSnap, sponsorshipsSnap] = await Promise.all([
       context.db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", context.sponsorId).limit(100).get(),
-      context.db.collection("sponsorAnalyticsEvents").where("sponsorId", "==", context.sponsorId).limit(5000).get(),
+      context.db.collection("sponsorAnalyticsEvents").where("sponsorId", "==", context.sponsorId).where("occurredAt", ">=", start.toISOString()).where("occurredAt", "<", end.toISOString()).orderBy("occurredAt", "asc").limit(1000).get(),
       context.db.collection("sponsorships").where("sponsorId", "==", context.sponsorId).limit(100).get()
     ]);
     const events = eventsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -34,7 +38,7 @@ export async function GET(request: Request) {
         }
       },
       dataSourceLabels: ["live_provisional", "finalized_reconciled", "not_recorded"]
-    }, "Sponsor analytics loaded.");
+    , range: { start: start.toISOString(), end: end.toISOString() } }, "Sponsor analytics loaded.");
   } catch (error) {
     console.error("[sponsor-analytics:get]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Sponsor analytics could not be loaded.");

@@ -84,7 +84,9 @@ export const serverChallengeCreateSchema = z.object({
   privateAccessInstructions: z.string().trim().max(1200).default(""),
   privateParticipantQuestions: z.array(z.string().trim().min(1).max(300)).max(12).default([]),
   privateParticipantAcknowledgements: z.array(z.string().trim().min(1).max(300)).max(12).default([]),
-  privateAccessMethod: z.enum(["", "access_code", "link_and_code"]).default(""),
+  privateParticipantRequirements: z.array(z.string().trim().min(1).max(300)).max(12).default([]),
+  privateDirectInvitees: z.array(z.string().trim().email()).max(500).default([]),
+  privateAccessMethod: z.enum(["", "invite_link", "invitation_code", "direct_invitations", "access_code", "link_and_code"]).default(""),
   publicPreviewEnabled: z.coerce.boolean().default(false),
   votingSettings: z.object({
     allowFreeVotes: z.coerce.boolean().default(true),
@@ -375,7 +377,7 @@ function challengeKind(challenge: ChallengeLike) {
     isPrivate: [text(challenge.visibility), type, typeof challenge.hostOperations === "object" && challenge.hostOperations ? text((challenge.hostOperations as Record<string, unknown>).visibilityMode) : ""].some((value) => /private|exclusive|invite|access_code|approved_list/.test(value.toLowerCase())),
     isLive: bool(challenge.isLiveEvent) || /live event|physical/.test(type),
     isTournament: tournamentType !== "" && tournamentType !== "none" || /tournament|bracket|knockout/.test(`${type} ${format} ${hostFormat}`),
-    livestreamEnabled: Boolean(text(challenge.externalLiveUrl) || text(challenge.externalLiveProvider) || text(challenge.externalLiveOpensAt) || text(challenge.externalLiveStatus) === "scheduled")
+    livestreamEnabled: false
   };
 }
 
@@ -513,7 +515,6 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const votingStartsAt = dateValue(challenge.votingStartsAt ?? (normalV2 ? undefined : challenge.submissionDeadline));
   const votingDeadline = dateValue(challenge.votingDeadline);
   const registrationDeadline = dateValue(challenge.registrationDeadline);
-  const externalLiveOpensAt = dateValue(challenge.externalLiveOpensAt);
 
   if (startsAt && startsAt <= now && !context.isAdmin) makeIssue(errors, "START_DATE_IN_PAST", "startsAt", "Schedule", "Newly published challenges must start in the future.");
   if (startsAt && endsAt && startsAt >= endsAt) makeIssue(errors, "START_AFTER_END", "startsAt", "Schedule", "Challenge start date must be before the end date.");
@@ -523,7 +524,6 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   if (votingStartsAt && votingDeadline && votingStartsAt >= votingDeadline) makeIssue(errors, "VOTING_START_AFTER_CLOSE", "votingStartsAt", "Schedule", "Voting must open before voting closes.");
   if (votingDeadline && endsAt && (normalV2 ? votingDeadline > endsAt : votingDeadline >= endsAt)) makeIssue(errors, "VOTING_AFTER_END", "votingDeadline", "Schedule", normalV2 ? "Results cannot be announced before voting closes." : "Winner announcement must be after voting/review closes.");
   if (registrationDeadline && submissionStartAt && registrationDeadline > submissionStartAt) makeIssue(errors, "REGISTRATION_AFTER_START", "registrationDeadline", "Schedule", "Registration or invite close must be before or at the challenge/submission start time.");
-  if (kind.livestreamEnabled && externalLiveOpensAt && startsAt && externalLiveOpensAt > startsAt) makeIssue(errors, "LIVESTREAM_AFTER_START", "externalLiveOpensAt", "Schedule", "Livestream access should open before the live challenge begins.");
 
   const ownerId = text(challenge.creatorId) || context.userId || "";
   const challengeId = text(challenge.id);
@@ -558,9 +558,11 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
 
   requireText(errors, challenge, "visibility", "Access", "Select challenge visibility.");
   if (kind.isPrivate) {
-    const accessCode = text(hostOps?.accessCode ?? challenge.inviteCode ?? challenge.accessCode);
-    const hasInviteFoundation = Boolean(accessCode || text(challenge.inviteCode) || text(challenge.accessCode) || bool(hostOps?.approvalRequired));
-    if (!hasInviteFoundation) makeIssue(errors, "PRIVATE_INVITE_REQUIRED", "visibility", "Access", "Add invitation settings for private challenges.");
+    const accessMethod = text(challenge.privateAccessMethod);
+    const normalizedMethod = accessMethod === "link_and_code" || accessMethod === "access_code" ? "invitation_code" : accessMethod;
+    if (!["invite_link", "invitation_code", "direct_invitations"].includes(normalizedMethod)) makeIssue(errors, "PRIVATE_ACCESS_METHOD_REQUIRED", "privateAccessMethod", "Access", "Choose Invite Link, Invitation Code, or Direct Invitations.");
+    if (normalizedMethod === "invitation_code" && !text(challenge.privateAccessCode)) makeIssue(errors, "PRIVATE_CODE_REQUIRED", "privateAccessCode", "Access", "Generate an invitation code.");
+    if (normalizedMethod === "direct_invitations" && !list(challenge.privateDirectInvitees).length) makeIssue(errors, "PRIVATE_DIRECT_INVITE_REQUIRED", "privateDirectInvitees", "Access", "Add at least one direct invitee.");
   }
 
   const prizeType = text(challenge.prizeType) || "bragging_rights";
@@ -582,7 +584,6 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
     if (!text(challenge.eventCity)) makeIssue(errors, "LIVE_CITY_REQUIRED", "eventCity", "Live Event", "Add the physical event city.");
     if (!text(challenge.eventCountry)) makeIssue(errors, "LIVE_COUNTRY_REQUIRED", "eventCountry", "Live Event", "Add the physical event country.");
   }
-  if (kind.livestreamEnabled && !text(challenge.externalLiveUrl)) makeIssue(errors, "LIVESTREAM_URL_REQUIRED", "externalLiveUrl", "Live Event", "Configure livestream details or disable livestreaming.");
 
   if (kind.isTournament) {
     if (text(challenge.tournamentType) === "none") makeIssue(errors, "TOURNAMENT_TYPE_REQUIRED", "tournamentType", "Tournament", "Select a tournament type.");

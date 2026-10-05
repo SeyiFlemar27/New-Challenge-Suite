@@ -3,6 +3,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
+import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
 import { editableDraftStatus } from "@/lib/server/challenge-drafts";
 import { getChallengeMonetizationAccess } from "@/lib/server/payout-structure";
 import { attachCreatorPrizeCheckoutSession, createPendingCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE } from "@/lib/server/prize-funding";
@@ -20,6 +22,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = schema.safeParse(parsed.body ?? {});
   if (!body.success) return validationError({ amount: body.error.issues[0]?.message ?? "Enter a valid prize amount." });
   const { id: challengeId } = await params;
+  const managementAccess = await requireChallengeManagementAccess(request, challengeId, "finance.prepare");
+  if (managementAccess.response) return managementAccess.response;
   const [challengeSnap, userSnap, profileSnap] = await Promise.all([
     db.collection("challenges").doc(challengeId).get(),
     db.collection("users").doc(user.uid).get(),
@@ -27,7 +31,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
-  if (!userOwnsChallenge(challenge, user.uid)) return fail("Only the challenge owner can fund its prize pool.", 403, undefined, "PERMISSION_DENIED");
   if (!editableDraftStatus(challenge)) return fail("Creator prize funding must be completed before the challenge is published.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
   const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(userSnap.exists ? userSnap.data() ?? {} : {}) };
   const access = getChallengeMonetizationAccess(profile);
@@ -36,6 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (confirmedCents > 0) return fail("This challenge already has confirmed creator prize funding. Contact support before changing a funded guarantee.", 409, { confirmedCents }, "PRIZE_FUNDING_ALREADY_CONFIRMED");
 
   const amountCents = body.data.amountCents;
+  if (challenge.officialChallenge === true && confirmedCents + amountCents > ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents) return fail("Enterprise challenge prize funding cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
   const payment = await createPendingCreatorPrizeFunding(db, { challengeId, creatorId: user.uid, amountCents, currency: "USD" });
   const currentMonetization = typeof challenge.monetization === "object" && challenge.monetization ? challenge.monetization as Record<string, unknown> : {};
   await db.collection("challenges").doc(challengeId).set({

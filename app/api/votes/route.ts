@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         await db.collection("adminActionTasks").doc(`reward_free_vote_${String(result.vote?.id ?? "unknown")}`).set({ type: "reward_delivery_failure", rewardEventType: "valid_free_vote", userId: user.uid, sourceId: String(result.vote?.id ?? ""), status: "open", createdAt: new Date().toISOString() }, { merge: true });
       });
     }
-    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, creditCost: result.creditCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "credits" ? `${result.quantity} additional vote${result.quantity === 1 ? "" : "s"} counted using Challenge Credits.` : "Free vote counted.");
+    return ok({ vote: result.vote, votes: result.votes, quantity: result.quantity, doroCoinCost: result.creditCost, walletTransactionId: result.walletTransactionId, voteDate: result.voteDate, timeZone: result.timeZone, freeVoteResetAt: result.freeVoteResetAt }, body.voteMode === "dorocoin" ? `${result.quantity} additional vote${result.quantity === 1 ? "" : "s"} counted using DoroCoins.` : "Free vote counted.");
   } catch (error) {
     const err = error as Error & { code?: string };
     const status = err.code === "NOT_FOUND"

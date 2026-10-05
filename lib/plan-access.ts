@@ -528,7 +528,7 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
     isEnterprisePartner: false,
     isCreatorPro: true,
     isVerifiedHost: true,
-    activeChallengeLimit: 1000,
+    activeChallengeLimit: 10,
     privateChallengeLimit: 1000,
     dailyFreeVoteLimit: 1,
     monthlyBoostLimit: 5,

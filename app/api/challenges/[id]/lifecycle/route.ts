@@ -4,22 +4,18 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
 import { challengeIntegritySources, challengeLifecycleActions } from "@/lib/server/challenge-deletion";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
 const schema = z.object({ action: z.enum(["delete", "cancel", "archive", "request_admin_deletion"]), confirmed: z.boolean().optional(), reason: z.string().trim().max(1000).optional() });
 
 async function load(request: Request, id: string) {
-  const auth = await requireRequestUser(request);
-  if (auth.response || !auth.user) return { response: auth.response, user: null, db: null, challenge: null, activityFlags: [] as string[] };
-  const db = getAdminDb();
-  if (!db) return { response: serverUnavailable("Challenge lifecycle"), user: null, db: null, challenge: null, activityFlags: [] as string[] };
-  const challengeSnap = await db.collection("challenges").doc(id).get();
-  if (!challengeSnap.exists) return { response: fail("Challenge not found.", 404), user: null, db: null, challenge: null, activityFlags: [] as string[] };
-  const challenge = { id, ...challengeSnap.data() } as Record<string, unknown>;
-  if (!auth.user.isAdmin && !userOwnsChallenge(challenge, auth.user.uid)) return { response: fail("Only the challenge owner can manage this lifecycle.", 403), user: null, db: null, challenge: null, activityFlags: [] as string[] };
+  const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (access.response || !access.user || !access.db || !access.challenge) return { response: access.response, user: null, db: null, challenge: null, activityFlags: [] as string[] };
+  const { user, db, challenge } = access;
   const snapshots = await Promise.all(challengeIntegritySources.map(([collection, field]) => db.collection(collection).where(field, "==", id).limit(1).get().catch(() => null)));
   const activityFlags = [...new Set(snapshots.flatMap((snapshot, index) => snapshot && !snapshot.empty ? [challengeIntegritySources[index][2]] : []))];
-  return { response: null, user: auth.user, db, challenge, activityFlags };
+  return { response: null, user, db, challenge, activityFlags };
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

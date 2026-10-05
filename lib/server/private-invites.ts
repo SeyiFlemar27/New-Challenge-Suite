@@ -16,7 +16,7 @@ export function hashPrivateInviteCode(code: string) {
   return createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
 }
 
-export async function createPrivateChallengeInvite(db: Firestore, input: { challengeId: string; creatorId: string; now: string; code?: string; expiresAt?: string | null; maxUses?: number | null }) {
+export async function createPrivateChallengeInvite(db: Firestore, input: { challengeId: string; creatorId: string; now: string; code?: string; expiresAt?: string | null; maxUses?: number | null; method?: "invite_link" | "invitation_code" | "direct_invitations"; allowedEmails?: string[] }) {
   let code = input.code && /^[A-HJ-NP-Z2-9]{5}$/.test(input.code) ? input.code : generateInviteCode(5);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const [hashed, legacy] = await Promise.all([
@@ -38,8 +38,9 @@ export async function createPrivateChallengeInvite(db: Firestore, input: { chall
     maxUses: input.maxUses ?? 100,
     currentUses: 0,
     expiresAt: input.expiresAt ?? null,
+    accessMethod: input.method ?? "invitation_code",
     joinApprovalRequired: false,
-    allowedEmails: [],
+    allowedEmails: input.method === "direct_invitations" ? [...new Set((input.allowedEmails ?? []).map((email) => email.trim().toLowerCase()).filter(Boolean))] : [],
     allowedUserIds: [],
     createdAt: input.now,
     updatedAt: input.now,

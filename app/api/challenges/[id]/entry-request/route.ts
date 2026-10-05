@@ -4,20 +4,16 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { evaluateChallengeEligibility } from "@/lib/server/challenge-viewer-state";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
-  const db = getAdminDb();
-  if (!db) return serverUnavailable("Entry requests");
   const { id } = await params;
-  const challengeSnap = await db.collection("challenges").doc(id).get();
-  if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
-  const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
-  if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) return fail("Only the challenge owner or an admin can review entry requests.", 403, undefined, "PERMISSION_DENIED");
+  const managementAccess = await requireChallengeManagementAccess(request, id, "participants.manage");
+  if (managementAccess.response || !managementAccess.db || !managementAccess.challenge) return managementAccess.response;
+  const { db, challenge } = managementAccess;
   const requestSnap = await db.collection("challengeEntryRequests").where("challengeId", "==", id).limit(100).get();
   const profileSnaps = requestSnap.docs.length ? await db.getAll(...requestSnap.docs.map((doc) => db.collection("profiles").doc(String(doc.data().userId ?? "")))) : [];
   const profiles = new Map(profileSnaps.map((snap) => [snap.id, snap.exists ? snap.data() ?? {} : {}]));

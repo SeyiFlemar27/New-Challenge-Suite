@@ -4,6 +4,7 @@ import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses
 import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { resolveParticipantStatus } from "@/lib/server/submission-lifecycle";
 
@@ -13,6 +14,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const db = getAdminDb();
   if (!db) return serverUnavailable("Entry request approval");
   const { id, requestId } = await params;
+  const managementAccess = await requireChallengeManagementAccess(request, id, "participants.manage");
+  if (managementAccess.response) return managementAccess.response;
   const now = new Date().toISOString();
   try {
   const result = await db.runTransaction(async (transaction) => {
@@ -24,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!requestSnap.exists) throw new Error("ENTRY_REQUEST_NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const entryRequest = { id: requestSnap.id, ...requestSnap.data() } as Record<string, unknown>;
-    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid)) throw new Error("PERMISSION_DENIED");
+    if (!user.isAdmin && !userOwnsChallenge(challenge, user.uid) && !managementAccess.enterpriseAccess) throw new Error("PERMISSION_DENIED");
     if (String(entryRequest.challengeId) !== id) throw new Error("ENTRY_REQUEST_MISMATCH");
     if (String(entryRequest.status) === "approved") return { entryRequest, duplicate: true };
     const participantId = `${id}_${entryRequest.userId}`;

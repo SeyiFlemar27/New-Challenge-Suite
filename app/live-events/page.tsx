@@ -27,10 +27,6 @@ interface LiveEventRecord {
   challengeId?: string | null;
   venueName?: string;
   venueAddress?: string;
-  externalLiveUrl?: string | null;
-  externalLiveStatus?: string;
-  externalLiveProvider?: string | null;
-  externalLiveCtaLabel?: string;
   nativeLiveStreamingEnabled?: boolean;
 }
 
@@ -92,10 +88,6 @@ function LiveEventsContent() {
         ,
         venueName: String((record as any).venueName ?? ""),
         venueAddress: String((record as any).venueAddress ?? ""),
-        externalLiveUrl: (record as any).externalLiveUrl ? String((record as any).externalLiveUrl) : null,
-        externalLiveStatus: String((record as any).externalLiveStatus ?? "not_ready"),
-        externalLiveProvider: (record as any).externalLiveProvider ? String((record as any).externalLiveProvider) : null,
-        externalLiveCtaLabel: String((record as any).externalLiveCtaLabel ?? "Watch live on partner site"),
         nativeLiveStreamingEnabled: false
       };
     }).filter((event) => event.id));
@@ -141,8 +133,7 @@ function LiveEventsContent() {
                 <p className="mt-5 text-slate-200">{event.attending} attending</p>
                 <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300">
                   <p className="font-black text-white">External livestream</p>
-                  <p className="mt-1 capitalize">Status: {event.externalLiveStatus?.replaceAll("_", " ") || "not ready"}</p>
-                  {event.externalLiveUrl && event.externalLiveStatus === "live" ? <a className="mt-3 inline-flex font-black text-[var(--gold)]" href={event.externalLiveUrl} target="_blank" rel="noreferrer">{event.externalLiveCtaLabel || "Watch live on partner site"}</a> : <p className="mt-2">External livestream not ready yet. Challenge Suite does not host native livestream video.</p>}
+                  <p className="mt-1">This is a physical event. Check-in and event participation are managed at the venue.</p>
                 </div>
                 {hostMode ? <p className="mt-2 text-sm text-slate-400">{event.checkInCount ?? 0} checked in · Status: <span className="capitalize">{event.status?.replaceAll("_", " ")}</span></p> : null}
                 <div className="mt-7">
