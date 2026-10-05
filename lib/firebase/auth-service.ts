@@ -2,11 +2,16 @@
 
 import {
   createUserWithEmailAndPassword,
+  browserLocalPersistence,
+  browserSessionPersistence,
   deleteUser as deleteFirebaseUser,
+  GoogleAuthProvider,
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
+  setPersistence,
   type User
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "./client";
@@ -50,14 +55,15 @@ interface BootstrapResponse {
 
 export const demoAuthEnabled = false;
 
-export async function syncServerSession(user: User) {
+export async function syncServerSession(user: User, rememberMe = false) {
   const response = await fetch("/api/auth/session", {
     method: "POST",
     credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${await user.getIdToken()}`
-    }
+    },
+    body: JSON.stringify({ rememberMe })
   });
   const result = await parseApiResponse<unknown>(response);
   if (!result.ok) throw new Error(result.message || "Your session could not be restored.");
@@ -122,9 +128,20 @@ export async function signUpWithProfile(input: SignupInput) {
   return { mode: "firebase" as const, user: credential.user };
 }
 
-export async function loginWithEmail(email: string, password: string) {
+async function ensureGoogleProfile(user: User) {
+  const existing = await callProfileBootstrap(user, { method: "GET" });
+  if (existing.profileExists) return existing.user;
+  const names = String(user.displayName ?? "").trim().split(/\s+/).filter(Boolean);
+  const firstName = names[0] ?? "Challenge";
+  const lastName = names.slice(1).join(" ") || "Suite";
+  const created = await callProfileBootstrap(user, { method: "POST", body: JSON.stringify({ firstName, lastName, role: "user" }) });
+  return created.user;
+}
+
+export async function loginWithEmail(email: string, password: string, rememberMe = false) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
+  await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
   let credential;
   try {
     credential = await signInWithEmailAndPassword(auth, email, password);
@@ -134,7 +151,7 @@ export async function loginWithEmail(email: string, password: string) {
     throw safeAuthError(error);
   }
   const [, profile] = await Promise.all([
-    syncServerSession(credential.user),
+    syncServerSession(credential.user, rememberMe),
     getCurrentProfile(credential.user.uid).catch(() => null)
   ]);
   return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile?.verified || profile?.emailVerified || credential.user.emailVerified) };
@@ -155,6 +172,23 @@ export async function logout() {
   } finally {
     await signOut(auth);
   }
+}
+
+export async function loginWithGoogle(rememberMe = false) {
+  if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
+  if (!auth) throw new Error("Authentication is not configured yet.");
+  await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+  let credential;
+  try {
+    credential = await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (error) {
+    throw safeAuthError(error);
+  }
+  const [, profile] = await Promise.all([
+    syncServerSession(credential.user, rememberMe),
+    ensureGoogleProfile(credential.user)
+  ]);
+  return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile.verified || profile.emailVerified || credential.user.emailVerified) };
 }
 
 export async function getCurrentProfile(uid: string) {

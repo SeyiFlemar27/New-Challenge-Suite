@@ -47,7 +47,9 @@ run("ownership", () => {
   const create = read("app/api/challenges/route.ts");
   const builder = read("components/challenge-builder.tsx");
   assert.match(create, /ENTERPRISE_OFFICIAL_CREATE_DENIED/);
-  assert.match(create, /organizationOwnerId: body\.officialChallenge \? "challenge_suite" : null/);
+  assert.match(create, /organizationOwnerId: body\.officialChallenge \? enterpriseAccess!\.organizationId : null/);
+  assert.match(create, /enterpriseFinanceContextId: body\.officialChallenge \? enterpriseAccess!\.organizationId : null/);
+  assert.match(create, /ENTERPRISE_PERSONAL_OWNERSHIP_RETIRED/);
   assert.match(create, /enterpriseChallengeLeadId/);
   assert.match(builder, /enterpriseOwnership === "official"/);
 });

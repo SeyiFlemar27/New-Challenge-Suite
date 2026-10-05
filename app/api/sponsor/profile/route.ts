@@ -32,8 +32,13 @@ const sponsorProfileSchema = z.object({
   countryLocation: z.string().trim().min(2, "Country/location is required.").max(120),
   brandDescription: z.string().trim().min(20, "Brand description should be at least 20 characters.").max(1600),
   socialLinks: z.array(z.preprocess(normalizeUrl, z.string().trim().url("Each social link must be a valid URL."))).max(12).default([]),
-  contactPerson: optionalText(120),
+  contactPerson: z.string().trim().min(2, "Contact person is required.").max(120),
+  contactPersonRole: z.string().trim().min(2, "Contact person role is required.").max(120),
   businessEmail: z.string().trim().email("Enter a valid business email."),
+  billingAddress: z.object({ street: z.string().trim().min(2).max(180), city: z.string().trim().min(2).max(100), state: z.string().trim().min(2).max(100), zip: z.string().trim().min(2).max(30), country: z.string().trim().min(2).max(120) }),
+  primaryCampaignKpis: z.array(z.enum(["website_traffic", "app_downloads", "product_discovery"])).min(1).max(3),
+  targetBudgetRange: z.string().trim().min(2).max(100),
+  targetAudienceDemographics: z.string().trim().min(2).max(500),
   phoneNumber: optionalText(40),
   logoUrl: optionalUrl,
   logoPath: optionalText(500),
@@ -123,7 +128,12 @@ function defaultSponsorProfile(userId: string, email?: string) {
     brandDescription: "",
     socialLinks: [],
     contactPerson: "",
+    contactPersonRole: "",
     businessEmail: email ?? "",
+    billingAddress: { street: "", city: "", state: "", zip: "", country: "" },
+    primaryCampaignKpis: [],
+    targetBudgetRange: "",
+    targetAudienceDemographics: "",
     phoneNumber: "",
     logoUrl: null,
     logoPath: "",
@@ -255,6 +265,7 @@ async function persistSponsorProfile(request: Request) {
     if (sponsorError) return sponsorError;
 
     const input: SponsorProfileInput = parsed.data;
+    if (!input.logoPath || !input.logoUrl) return validationError({ logoPath: "Upload a Sponsor logo before saving this profile." });
     if (invalidSponsorMediaPath(user.uid, input.logoPath ?? "", "logo")) return validationError({ logoPath: "Sponsor logo must be uploaded to your authenticated sponsor media path." });
     if (invalidSponsorMediaPath(user.uid, input.bannerPath ?? "", "banner")) return validationError({ bannerPath: "Sponsor banner must be uploaded to your authenticated sponsor media path." });
     if (invalidSponsorMediaPath(user.uid, input.coverImagePath ?? "", "banner")) return validationError({ coverImagePath: "Sponsor cover image must be uploaded to your authenticated sponsor banner path." });
@@ -295,7 +306,12 @@ async function persistSponsorProfile(request: Request) {
       brandDescription: input.brandDescription,
       socialLinks: cleanList(input.socialLinks),
       contactPerson: input.contactPerson ?? "",
+      contactPersonRole: input.contactPersonRole,
       businessEmail: input.businessEmail,
+      billingAddress: input.billingAddress,
+      primaryCampaignKpis: input.primaryCampaignKpis,
+      targetBudgetRange: input.targetBudgetRange,
+      targetAudienceDemographics: input.targetAudienceDemographics,
       phoneNumber: input.phoneNumber ?? "",
       logoUrl: cleanOptionalUrl(input.logoUrl),
       logoPath: input.logoPath ?? "",

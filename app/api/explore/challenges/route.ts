@@ -50,7 +50,7 @@ function typeLabel(type: string) {
 function completedWithinExploreWindow(challenge: Record<string, unknown>, phase: PhaseSummary) {
   if (!["completed", "winners_announced", "voting_closed"].includes(phase.phase) || !hasResults(challenge)) return false;
   const confirmedAt = Date.parse(String(challenge.resultsPublishedAt ?? challenge.winnersAnnouncedAt ?? challenge.completedAt ?? challenge.winnerAnnouncementAt ?? ""));
-  return Number.isFinite(confirmedAt) && Date.now() - confirmedAt >= 0 && Date.now() - confirmedAt <= 24 * 60 * 60 * 1000;
+  return Number.isFinite(confirmedAt) && Date.now() - confirmedAt >= 0 && Date.now() - confirmedAt <= 5 * 60 * 1000;
 }
 
 function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseSummary) {

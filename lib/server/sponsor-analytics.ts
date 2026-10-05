@@ -33,6 +33,16 @@ export function reconcileSponsorAnalytics(events: SponsorAnalyticsEvent[]) {
   };
 }
 
+export function reconcileSponsorAnalyticsByDay(events: SponsorAnalyticsEvent[]) {
+  const days = new Map<string, SponsorAnalyticsEvent[]>();
+  for (const event of events) {
+    const day = text(event.occurredAt ?? event.createdAt).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    days.set(day, [...(days.get(day) ?? []), event]);
+  }
+  return [...days.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([date, dayEvents]) => ({ date, ...reconcileSponsorAnalytics(dayEvents) }));
+}
+
 export async function reconcileSponsorAnalyticsForSponsorship(db: Firestore, input: { sponsorshipId: string; finalized: boolean; actorId: string }) {
   const sponsorshipRef = db.collection("sponsorships").doc(input.sponsorshipId);
   const sponsorshipSnap = await sponsorshipRef.get();

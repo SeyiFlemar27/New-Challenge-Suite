@@ -40,9 +40,27 @@ export type EnterpriseAccessRecord = {
   regionScope: string[];
   onboardingComplete: boolean;
   expiresAt: string | null;
+  /**
+   * Organizational context is intentionally distinct from the staff member's
+   * personal account. Legacy approved applications derive a deterministic
+   * value from their canonical application id until they are next provisioned.
+   */
+  organizationId: string | null;
 };
 
 export type WorkspaceContext = "personal" | "sponsor" | "enterprise";
+
+/**
+ * Enterprise access is an administrator-approved workspace entitlement, not a
+ * consumer subscription. Keep its finite operational limits alongside the
+ * access model so callers do not infer them from personal plans.
+ */
+export const ENTERPRISE_WORKSPACE_LIMITS = {
+  activeChallengeLimit: 10,
+  monthlyBoostLimit: 5,
+  boostDurationHours: 72,
+  maximumPrizeAmountCents: 1_000_000,
+} as const;
 
 export function isEnterpriseRole(value: unknown): value is EnterpriseRole { return ENTERPRISE_ROLES.includes(value as EnterpriseRole); }
 export function isEnterpriseScope(value: unknown): value is EnterpriseScope { return ENTERPRISE_SCOPES.includes(value as EnterpriseScope); }
@@ -64,6 +82,13 @@ export function normalizeEnterpriseAccess(source: Record<string, unknown>): Ente
   const statusValue = String(nested.status ?? source.enterpriseStaffStatus ?? "active").toLowerCase();
   const status = (["active", "suspended", "revoked", "pending_onboarding"].includes(statusValue) ? statusValue : "active") as EnterpriseAccessRecord["status"];
   const explicit = Array.isArray(nested.permissions) ? nested.permissions : Array.isArray(source.enterprisePermissions) ? source.enterprisePermissions : [];
+  const directOrganizationId = nested.organizationId ?? nested.enterpriseOrganizationId ?? source.enterpriseOrganizationId ?? source.organizationId;
+  const applicationId = source.enterpriseApplicationId;
+  const organizationId = typeof directOrganizationId === "string" && directOrganizationId.trim()
+    ? directOrganizationId.trim()
+    : typeof applicationId === "string" && applicationId.trim()
+      ? `enterprise_org_${applicationId.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+      : null;
   return {
     status,
     role: roleValue,
@@ -74,6 +99,7 @@ export function normalizeEnterpriseAccess(source: Record<string, unknown>): Ente
     regionScope: (Array.isArray(nested.regionScope) ? nested.regionScope : Array.isArray(source.enterpriseRegionScope) ? source.enterpriseRegionScope : []).filter((value): value is string => typeof value === "string"),
     onboardingComplete: Boolean(nested.onboardingComplete ?? source.enterpriseOnboardingComplete),
     expiresAt: typeof (nested.expiresAt ?? source.enterpriseAccessExpiresAt) === "string" ? String(nested.expiresAt ?? source.enterpriseAccessExpiresAt) : null,
+    organizationId,
   };
 }
 
@@ -89,9 +115,12 @@ export function isEnterpriseAccessActive(access: EnterpriseAccessRecord | null, 
   return Number.isFinite(expiresAt) && expiresAt > now;
 }
 
-export function resolveActiveWorkspace(source: Record<string, unknown>, access: EnterpriseAccessRecord | null, sponsorAvailable = false): WorkspaceContext {
+export function enterpriseWorkspaceLimits(access: EnterpriseAccessRecord | null) {
+  return isEnterpriseAccessActive(access) ? ENTERPRISE_WORKSPACE_LIMITS : null;
+}
+
+export function resolveActiveWorkspace(source: Record<string, unknown>, access: EnterpriseAccessRecord | null, _sponsorAvailable = false): WorkspaceContext {
   if (source.activeWorkspace === "enterprise" && isEnterpriseAccessActive(access)) return "enterprise";
-  if (source.activeWorkspace === "sponsor" && sponsorAvailable) return "sponsor";
   return "personal";
 }
 
@@ -103,6 +132,12 @@ export function enterpriseChallengeInScope(access: EnterpriseAccessRecord, chall
   if (access.regionScope.length && !access.regionScope.includes(region)) return false;
   const assignments = Array.isArray(challenge.enterpriseAssignments) ? challenge.enterpriseAssignments as Array<Record<string, unknown>> : [];
   const assigned = assignments.some((item) => item.userId === userId && item.status !== "removed");
+  const organizationOwnerId = typeof challenge.organizationOwnerId === "string" ? challenge.organizationOwnerId : "";
+  // Old official records used a global placeholder. They stay visible only to
+  // their recorded lead/assignee; they never become visible to every staffer.
+  const legacyRecordAssignedToUser = organizationOwnerId === "challenge_suite"
+    && (assigned || challenge.createdBy === userId || challenge.creatorId === userId);
+  if (!access.organizationId || (organizationOwnerId !== access.organizationId && !legacyRecordAssignedToUser)) return false;
   if (access.scope === "assigned_only") return assigned;
   if (access.scope === "read_all_edit_assigned") return write ? assigned : true;
   return true;

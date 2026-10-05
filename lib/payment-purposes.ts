@@ -1,9 +1,11 @@
 export const PAYMENT_PURPOSES = {
   subscription: "subscription_payment",
   dorocoin: "dorocoin_purchase",
+  challengeCredits: "challenge_credit_purchase",
   challengeEntry: "challenge_entry_payment",
   prizePool: "prize_pool_funding",
   sponsor: "sponsor_contribution",
+  sponsorWallet: "sponsor_wallet_funding",
   votes: "vote_purchase",
   boost: "challenge_boost_purchase",
   platformPrize: "platform_prize_funding"

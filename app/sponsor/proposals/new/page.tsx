@@ -1,3 +1,9 @@
+import { redirect } from "next/navigation";
+
+export default function SponsorProposalCreationRetiredPage() { redirect("/sponsor/campaigns/create"); }
+
+/* Historical proposal builder retained only in source history; it is intentionally disabled.
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
@@ -138,3 +144,4 @@ function DeliverablesEditor({ deliverables, setDeliverables, updateDeliverable }
   return <div><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-black text-slate-950">Deliverables</h3><p className="mt-1 text-sm text-slate-600">Add clear, reviewable deliverables one at a time.</p></div><Button type="button" variant="secondary" onClick={() => setDeliverables((current) => [...current, emptyDeliverable(current.length)])}><Plus size={16} /> Add Deliverable</Button></div><div className="mt-4 grid gap-4">{deliverables.map((item, index) => <Card key={item.id} className="border-slate-200 bg-slate-50 p-4 shadow-none"><div className="flex items-center justify-between gap-3"><p className="font-black text-slate-950">Deliverable {index + 1}</p>{deliverables.length > 1 ? <button type="button" onClick={() => setDeliverables((current) => current.filter((entry) => entry.id !== item.id))} className="flex h-10 w-10 items-center justify-center rounded-[8px] text-red-700 hover:bg-red-50" aria-label={`Remove deliverable ${index + 1}`}><Trash2 size={16} /></button> : null}</div><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Title"><input className={inputClass} value={item.title} onChange={(event) => updateDeliverable(item.id, "title", event.target.value)} /></Field><Field label="Due date (optional)"><input className={inputClass} type="date" value={item.dueDate} onChange={(event) => updateDeliverable(item.id, "dueDate", event.target.value)} /></Field><div className="md:col-span-2"><Field label="Description"><textarea className={textareaClass} value={item.description} onChange={(event) => updateDeliverable(item.id, "description", event.target.value)} /></Field></div><label className="flex min-h-11 items-center gap-3 text-sm font-bold text-slate-800"><input type="checkbox" checked={item.required} onChange={(event) => updateDeliverable(item.id, "required", event.target.checked)} /> Required deliverable</label></div></Card>)}</div></div>;
 }
 function friendly(value: unknown) { return String(value || "Available").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) }
+*/

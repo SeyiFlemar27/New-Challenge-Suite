@@ -33,6 +33,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  return fail("Historical sponsor proposals are read-only. Start a new campaign brief for new sponsorship work.", 410, undefined, "SPONSOR_PROPOSAL_READ_ONLY");
+  /* Historical implementation retained below for read compatibility.
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
@@ -110,4 +112,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
     console.error("[sponsor-proposal:patch]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Proposal could not be updated.");
   }
+  */
 }

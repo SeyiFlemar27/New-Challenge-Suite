@@ -3,6 +3,7 @@ import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isNormalChallengeV2, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS } from "@/lib/normal-challenge-config";
+import { isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -408,7 +409,7 @@ function requireDate(errors: ChallengeValidationIssue[], challenge: ChallengeLik
 }
 
 function validStoragePath(path: string, prefixes: string[]) {
-  return Boolean(path && prefixes.some((prefix) => path.startsWith(prefix)) && !path.includes("..") && !/^https?:/i.test(path));
+  return isInternalStoragePath(path, prefixes);
 }
 
 function storageDisabledEnvFlag() {
@@ -440,6 +441,38 @@ export function validateChallengeForDraft(challenge: ChallengeLike): ChallengeVa
   for (const field of mediaPathFields) {
     const value = field.startsWith("documentPaths.") ? text(list(challenge.documentPaths)[Number(field.split(".")[1])]) : text(challenge[field]);
     if (value && (/^https?:/i.test(value) || value.includes(".."))) makeIssue(errors, "INVALID_MEDIA_PATH", field, "Media", "Media storage paths must be internal Firebase Storage paths.");
+  }
+  const ownerId = text(challenge.creatorId);
+  const challengeId = text(challenge.id);
+  const prefixes = [
+    ...(ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`] : []),
+    ...(challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/gallery/`, `challenges/${challengeId}/video/`, `challenges/${challengeId}/documents/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [])
+  ];
+  const pairs = [
+    ["coverImageUrl", text(challenge.coverImageUrl), text(challenge.coverImagePath)],
+    ["promoImageUrl", text(challenge.promoImageUrl), text(challenge.promoImagePath)],
+    ["trailerVideoUrl", text(challenge.trailerVideoUrl), text(challenge.trailerVideoPath)],
+    ["promoVideoUrl", text(challenge.promoVideoUrl), text(challenge.promoVideoPath)]
+  ] as const;
+  for (const [field, url, path] of pairs) {
+    const result = validateOwnedStorageMedia({ url, path, prefixes });
+    if (!result.valid) makeIssue(errors, result.code, field, "Media", result.message);
+  }
+  const documentUrls = list(challenge.documentUrls).map(text);
+  const documentPaths = list(challenge.documentPaths).map(text);
+  for (let index = 0; index < Math.max(documentUrls.length, documentPaths.length); index += 1) {
+    const result = validateOwnedStorageMedia({ url: documentUrls[index] ?? "", path: documentPaths[index] ?? "", prefixes });
+    if (!result.valid) makeIssue(errors, result.code, `documentUrls.${index}`, "Media", result.message);
+  }
+  for (const [index, item] of list(challenge.challengeImages).entries()) {
+    const media = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const result = validateOwnedStorageMedia({ url: text(media.url), path: text(media.path), prefixes });
+    if (!result.valid) makeIssue(errors, result.code, `challengeImages.${index}`, "Media & Branding", result.message);
+  }
+  if (challenge.challengeVideo && typeof challenge.challengeVideo === "object") {
+    const media = challenge.challengeVideo as Record<string, unknown>;
+    const result = validateOwnedStorageMedia({ url: text(media.url), path: text(media.path), prefixes });
+    if (!result.valid) makeIssue(errors, result.code, "challengeVideo", "Media & Branding", result.message);
   }
   return validationResult(errors);
 }

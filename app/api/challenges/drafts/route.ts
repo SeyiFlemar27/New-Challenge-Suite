@@ -49,8 +49,11 @@ export async function POST(request: Request) {
   if (officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) {
     return fail("Your Enterprise role cannot create official Challenge Suite challenges.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
   }
-  if (ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) {
-    return fail("Your Enterprise role cannot create personal challenges.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  if (ownershipType === "enterprise_personal") {
+    return fail("Enterprise challenges must use the organization-owned challenge flow.", 409, undefined, "ENTERPRISE_PERSONAL_OWNERSHIP_RETIRED");
+  }
+  if (officialChallenge && !enterpriseAccess?.organizationId) {
+    return fail("Your Enterprise organization context is still being provisioned. Try again shortly or contact support.", 409, undefined, "ENTERPRISE_ORGANIZATION_REQUIRED");
   }
   const planAccess = getUserPlanAccess(profile);
   if (planAccess.isSponsor) return fail("Sponsor accounts manage campaigns from the sponsor dashboard.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
@@ -65,7 +68,9 @@ export async function POST(request: Request) {
     createdBy: user.uid,
     officialChallenge,
     ownershipType,
-    organizationOwnerId: officialChallenge ? "challenge_suite" : null,
+    organizationOwnerId: officialChallenge ? enterpriseAccess!.organizationId : null,
+    enterpriseOrganizationId: officialChallenge ? enterpriseAccess!.organizationId : null,
+    enterpriseFinanceContextId: officialChallenge ? enterpriseAccess!.organizationId : null,
     enterpriseChallengeLeadId: officialChallenge ? user.uid : null,
     enterpriseAssignments: officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
     status: "draft",

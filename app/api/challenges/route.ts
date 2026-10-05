@@ -74,8 +74,11 @@ export async function POST(request: Request) {
   if (body.officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) {
     return fail("Your Enterprise role cannot create official Challenge Suite challenges.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
   }
-  if (body.ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) {
-    return fail("Your Enterprise role cannot create personal challenges.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  if (body.ownershipType === "enterprise_personal") {
+    return fail("Enterprise challenges must use the organization-owned challenge flow.", 409, undefined, "ENTERPRISE_PERSONAL_OWNERSHIP_RETIRED");
+  }
+  if (body.officialChallenge && !enterpriseAccess?.organizationId) {
+    return fail("Your Enterprise organization context is still being provisioned. Try again shortly or contact support.", 409, undefined, "ENTERPRISE_ORGANIZATION_REQUIRED");
   }
   const planAccess = getUserPlanAccess(planProfile);
   const planExperience = getPlanExperience(planProfile);
@@ -187,7 +190,9 @@ export async function POST(request: Request) {
     createdBy: user.uid,
     officialChallenge: Boolean(body.officialChallenge),
     ownershipType: body.officialChallenge ? "challenge_suite_official" : body.ownershipType,
-    organizationOwnerId: body.officialChallenge ? "challenge_suite" : null,
+    organizationOwnerId: body.officialChallenge ? enterpriseAccess!.organizationId : null,
+    enterpriseOrganizationId: body.officialChallenge ? enterpriseAccess!.organizationId : null,
+    enterpriseFinanceContextId: body.officialChallenge ? enterpriseAccess!.organizationId : null,
     enterpriseChallengeLeadId: body.officialChallenge ? user.uid : null,
     enterpriseAssignments: body.officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
     title: body.title,

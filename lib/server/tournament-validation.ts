@@ -1,5 +1,6 @@
 import { TOURNAMENT_STATUSES, type TournamentFormat, type TournamentPrivacy, type TournamentRegistrationType, type TournamentThirdPlaceMethod, type TournamentTieBreaker } from "@/lib/tournament-types";
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory } from "@/lib/normal-challenge-config";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 
 export const TOURNAMENT_CAPACITY_MIN = 4;
 export const TOURNAMENT_CAPACITY_MAX = 128;
@@ -27,7 +28,7 @@ function percentTotal(values: unknown) {
   return values.reduce((sum, item) => sum + Number((item as Record<string, unknown>)?.percent ?? 0), 0);
 }
 
-export function validateTournamentFoundation(input: Record<string, unknown>, options: { publish?: boolean } = {}) {
+export function validateTournamentFoundation(input: Record<string, unknown>, options: { publish?: boolean; ownerId?: string; validateMedia?: boolean } = {}) {
   const errors: TournamentValidationIssue[] = [];
   const format = text(input.format || "single_elimination") as TournamentFormat;
   const capacity = Number(input.participantCapacity ?? 0);
@@ -71,6 +72,16 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   if (hybridScoreTotal !== null && hybridScoreTotal !== 100) errors.push({ field: "hybridScoring", message: "Hybrid scoring total must equal 100." });
   if (text(input.resultMethod) === "hybrid" && Number(input.configVersion ?? 2) >= 2) errors.push({ field: "resultMethod", message: "Hybrid is unavailable until normalized scoring is configured." });
   const roundPlan = Array.isArray(input.roundPlan) ? input.roundPlan : [];
+  if (options.validateMedia !== false) {
+    const mediaPrefixes = options.ownerId ? [`tournaments/drafts/${options.ownerId}/`] : [];
+    for (const [field, url, path] of [
+      ["coverImageUrl", text(input.coverImageUrl), text(input.coverImagePath)],
+      ["trailerUrl", text(input.trailerUrl), text(input.trailerPath)]
+    ] as const) {
+      const media = validateOwnedStorageMedia({ url, path, prefixes: mediaPrefixes });
+      if (!media.valid) errors.push({ field, message: media.message });
+    }
+  }
   roundPlan.forEach((round, index) => {
     const record = round as Record<string, unknown>;
     const submissionDeadlineAt = dateValue(record.submissionDeadlineAt);

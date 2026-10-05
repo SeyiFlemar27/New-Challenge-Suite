@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit:entitlements": "node --experimental-strip-types scripts/audit-entitlements.ts",
     "seed:firestore": "node --experimental-strip-types scripts/seed-firestore.ts"
@@ -30,6 +30,7 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-hook-form": "^7.68.0",
+    "recharts": "^3.10.1",
     "stripe": "^20.0.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.2.0",
@@ -41,6 +42,8 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.0.10",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"
   }

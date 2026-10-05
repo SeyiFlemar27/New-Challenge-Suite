@@ -8,7 +8,7 @@ export default function PaidVoteSuccessPage() { return <Suspense><Content /></Su
 function Content() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
-  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.votes} reference={params.get("votePurchaseId")} resourceId={id} copy={{
+  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.votes} reference={params.get("session_id") ?? params.get("votePurchaseId")} resourceId={id} copy={{
     eyebrow: "Additional vote purchase",
     pendingTitle: "Confirming vote credits",
     confirmedTitle: "Vote credits confirmed",

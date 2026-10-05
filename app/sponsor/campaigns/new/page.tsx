@@ -1,3 +1,3 @@
 import { redirect } from "next/navigation";
 
-export default function Page() { redirect("/sponsor/proposals"); }
+export default function SponsorCampaignNewPage() { redirect("/sponsor/campaigns/create"); }

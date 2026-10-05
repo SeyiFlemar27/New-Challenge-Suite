@@ -45,9 +45,9 @@ export function runSponsorPanelContract(name) {
     all(sponsorServer, ["allowHistorical", "includeHistorical: options.allowHistorical === true"], name);
     all(studio, ["Historical records only", "new proposals and funding actions are disabled"], name);
   } else if (name === "retired-v1-surfaces") {
-    assert(read("app/sponsor/campaigns/page.tsx").includes('redirect("/sponsor/proposals")'), "Campaign Brief route must redirect");
+    assert(read("app/sponsor/campaigns/page.tsx").includes("Campaign briefs") && read("app/sponsor/campaigns/page.tsx").includes("/api/sponsor/campaigns"), "Campaign Brief route must render the canonical campaign list");
     assert(read("app/sponsor/team/page.tsx").includes('redirect("/sponsor/settings")'), "Team route must redirect");
-    assert(!proposalBuilder.includes("Campaign brief (optional)") && !proposalBuilder.includes("/api/sponsor/campaigns"), "Proposal creation must not depend on Campaign Brief");
+    assert(proposalBuilder.includes('redirect("/sponsor/campaigns/create")'), "Retired proposal creation must redirect to the campaign brief flow");
     assert(!proposalDetail.includes("Internal Sponsor notes") && !proposalDetail.includes("/api/sponsor/internal-notes"), "Internal Sponsor notes must not be active in v1");
   } else if (name === "manual-channels") {
     all(onboarding, ["Connected channels", "OAuth connections are not available yet", "socialLink1", "socialLink2", "socialLink3", "socialLinks:"], name);
@@ -56,7 +56,7 @@ export function runSponsorPanelContract(name) {
     all(analyticsEvent, ["sponsorAnalyticsEventId", "sessionHash", "classification", "invalidReasons", "deduplicated"], name);
     all(analyticsApi, ["live_provisional", "finalized_available", "trusted_sponsor_placement_events"], name);
   } else if (name === "public-placement") {
-    all(placement, ["placement_impression", "cta_click", "/api/sponsor/analytics/events", "Primary Sponsor", "Supporting Sponsor", 'rel="noopener noreferrer sponsored"'], name);
+    all(placement, ["placement_impression", "cta_click", "/api/sponsor/analytics/events", "/sponsor/click/", "Primary Sponsor", "Supporting Sponsor", 'rel="noopener sponsored"'], name);
     const challengeApi = read("app/api/challenges/[id]/route.ts");
     all(challengeApi, ["linkedChallengeId", "sponsorProfiles", "placementId", "ctaDestinationLink"], name);
   } else if (name === "completion") {

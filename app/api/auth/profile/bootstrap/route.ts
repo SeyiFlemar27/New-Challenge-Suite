@@ -10,11 +10,11 @@ import { deterministicId } from "@/lib/server/idempotency";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
 import { FINAL_ACCOUNT_DELETION_STATUSES, PENDING_ACCOUNT_DELETION_STATUSES, normalizedEmailHash, normalizeAccountDeletionStatus } from "@/lib/server/account-deletion";
 import { isEnterpriseAccessActive, normalizeEnterpriseAccess, resolveActiveWorkspace } from "@/lib/enterprise-access";
-import { resolveSponsorOrganizationAccess, type SponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
+import { isSponsorWorkspaceAvailable, resolveSponsorOrganizationAccess, type SponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 
 export const dynamic = "force-dynamic";
 
-const roleSchema = z.enum(["user", "creator", "host", "sponsor"]);
+const roleSchema = z.enum(["user", "creator", "sponsor"]);
 
 const bootstrapSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(60, "First name must be 60 characters or fewer."),
@@ -24,7 +24,7 @@ const bootstrapSchema = z.object({
 });
 
 const accountTypeSelectionSchema = z.object({
-  accountType: z.enum(["user", "creator", "host", "sponsor"])
+  accountType: z.enum(["creator", "sponsor"])
 });
 
 function initialsFromName(name: string) {
@@ -57,8 +57,8 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     : Boolean(merged.account_type || merged.accountType || merged.role);
   const enterpriseAccess = normalizeEnterpriseAccess(merged);
   const enterpriseAvailable = isEnterpriseAccessActive(enterpriseAccess);
-  const sponsorAvailable = Boolean(sponsorAccess);
-  const availableWorkspaces = ["personal", ...(enterpriseAvailable ? ["enterprise"] : [])];
+  const sponsorAvailable = isSponsorWorkspaceAvailable(sponsorAccess);
+  const availableWorkspaces = ["personal", ...(sponsorAvailable ? ["sponsor"] : []), ...(enterpriseAvailable ? ["enterprise"] : [])];
 
   return {
     uid: user.uid,
@@ -104,7 +104,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
     enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
     enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
-    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, false),
+    activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, sponsorAvailable),
     availableWorkspaces,
     accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
@@ -205,14 +205,14 @@ export async function POST(request: Request) {
         displayName,
         role: sponsorIntent ? "user" : parsed.data.role,
         roleIntent: parsed.data.role,
-        role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : parsed.data.role === "host" ? "host" : "compete",
+        role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : "compete",
         ...planFields,
         accountType,
         account_type: null,
         dashboardType,
         dashboard_type: dashboardType,
         accountTypeSelectionComplete: false,
-        walkthroughCompleted: false,
+        walkthroughCompleted: true,
         ...sponsorFields,
         isAdmin,
         emailVerified: Boolean(user.emailVerified),
@@ -229,14 +229,14 @@ export async function POST(request: Request) {
         email,
         role: sponsorIntent ? "user" : parsed.data.role,
         roleIntent: parsed.data.role,
-        role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : parsed.data.role === "host" ? "host" : "compete",
+        role_intent: parsed.data.role === "sponsor" ? "sponsor" : parsed.data.role === "creator" ? "create" : "compete",
         ...planFields,
         accountType,
         account_type: null,
         dashboardType,
         dashboard_type: dashboardType,
         accountTypeSelectionComplete: false,
-        walkthroughCompleted: false,
+        walkthroughCompleted: true,
         ...sponsorFields,
         premium: planFields.isPremium,
         verified: Boolean(user.emailVerified),
@@ -305,9 +305,9 @@ export async function PATCH(request: Request) {
 
     const selected = parsed.data.accountType;
     const compatibilityAccountType = "user";
-    const role = selected === "user" || selected === "sponsor" ? "user" : selected;
-    const roleIntent = selected === "user" ? "compete" : selected === "creator" ? "create" : selected;
-    const dashboardType = selected === "creator" ? "creator_studio" : selected === "host" ? "host_control_center" : "user_dashboard";
+    const role = selected === "sponsor" ? "user" : selected;
+    const roleIntent = selected === "creator" ? "create" : "sponsor";
+    const dashboardType = selected === "creator" ? "creator_studio" : "user_dashboard";
     const now = new Date().toISOString();
     const sponsorFields = selected === "sponsor" ? {
       sponsorOnboardingStatus: "not_started",

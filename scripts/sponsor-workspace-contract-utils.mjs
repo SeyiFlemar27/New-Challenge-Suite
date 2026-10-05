@@ -72,7 +72,7 @@ export function runSponsorWorkspaceContract(name) {
       hasAll(source.profileApi, ["invalidSponsorMediaPath", "authenticated sponsor media path"], "Sponsor upload server validation incomplete");
       break;
     case "campaign-brief-five-step-flow":
-      assert(read("app/sponsor/campaigns/page.tsx").includes('redirect("/sponsor/proposals")'), "Legacy Campaign Brief UI must redirect to Proposals while historical data is preserved.");
+      hasAll(source.campaigns, ["Sponsor Campaign Brief", "/api/sponsor/campaigns", "/sponsor/campaigns"], "Campaign brief flow missing");
       break;
     case "discover-creators-challenges-saved":
       hasAll(source.discover, ["Creators", "Challenges", "Saved", "/sponsor/discover/creators", "/sponsor/discover/challenges", "/sponsor/saved"], "Discover hub incomplete");

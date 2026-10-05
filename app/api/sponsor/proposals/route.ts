@@ -72,6 +72,8 @@ export async function POST(request: Request) {
   const { context, response } = await requireSponsorContext(request);
   if (response) return response;
   if (!context) return serverError("Sponsor access could not be verified.");
+  return fail("New sponsor proposals are retired. Create a campaign brief and connect through a discovered opportunity instead.", 410, undefined, "SPONSOR_PROPOSAL_CREATION_RETIRED");
+  /* Historical implementation retained below temporarily for schema reference.
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
@@ -100,4 +102,5 @@ export async function POST(request: Request) {
     console.error("[sponsor-proposals:post]", { userId: context.user.uid, message: error instanceof Error ? error.message : String(error) });
     return serverError("Proposal could not be saved.");
   }
+  */
 }

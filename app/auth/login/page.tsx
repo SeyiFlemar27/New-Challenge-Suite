@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Chrome, Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import { getDefaultRouteForAccount } from "@/lib/account-routing";
-import { loginWithEmail, logout } from "@/lib/firebase/auth-service";
+import { loginWithEmail, loginWithGoogle, logout } from "@/lib/firebase/auth-service";
 import { useLanguage } from "@/lib/i18n/use-language";
 import { useAuth } from "@/components/auth-provider";
 
@@ -26,7 +26,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const authState = useAuth();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "", rememberMe: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await loginWithEmail(form.email, form.password);
+      const result = await loginWithEmail(form.email, form.password, form.rememberMe);
       const destination = getNextPath();
       if (result.mode === "firebase" && !result.emailVerified) {
         localStorage.setItem("challenge_suite_signup_email", form.email);
@@ -68,6 +68,22 @@ export default function LoginPage() {
       await routeAfterLogin();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not sign in.");
+      setLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await loginWithGoogle(form.rememberMe);
+      if (!result.emailVerified) {
+        router.push("/auth/verify-email");
+        return;
+      }
+      await routeAfterLogin();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not sign in with Google.");
       setLoading(false);
     }
   }
@@ -106,9 +122,12 @@ export default function LoginPage() {
               </button>
             </div>
           </Field>
+          <label className="flex min-h-11 items-center gap-3 text-sm font-bold text-slate-300"><input type="checkbox" checked={form.rememberMe} onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))} className="h-4 w-4 accent-[var(--gold)]" /> Remember me on this device</label>
           {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
           <Button className="w-full" disabled={loading}>{t(loading ? "Signing in..." : "Sign In")}</Button>
         </form>
+        <div className="my-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500"><span className="h-px flex-1 bg-white/10" />or<span className="h-px flex-1 bg-white/10" /></div>
+        <Button className="w-full" variant="secondary" type="button" disabled={loading} onClick={() => void signInWithGoogle()}><Chrome size={18} /> Continue with Google</Button>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center text-sm sm:flex-row sm:justify-between">
           <Link href="/auth/forgot-password" className="text-[var(--gold)]">{t("Forgot password?")}</Link>
           <Link href="/auth/register" className="font-bold text-[var(--gold)]">{t("Create account")}</Link>

@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Gamepad2, Megaphone, Trophy } from "lucide-react";
+import { Building2, Megaphone } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { Button, Card } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 const options = [
-  { id: "user", title: "Competitor", icon: Trophy, copy: "Join challenges, vote, compete, and build your challenge profile." },
   { id: "creator", title: "Creator", icon: Megaphone, copy: "Create challenges, grow an audience, and unlock sponsorship opportunities." },
-  { id: "host", title: "Host", icon: Gamepad2, copy: "Run competitions, live events, tournaments, and sponsor-ready challenges." },
-  { id: "sponsor", title: "Brand / Sponsor", icon: Building2, copy: "Sponsor challenges, create campaigns, fund prize foundations, and track brand performance." }
+  { id: "sponsor", title: "Sponsor", icon: Building2, copy: "Discover sponsorship opportunities, fund approved campaigns, and track brand performance." }
 ] as const;
 
 export default function AccountTypeOnboardingPage() {
@@ -54,7 +52,7 @@ export default function AccountTypeOnboardingPage() {
         </div>
         {error ? <Card className="mt-6 border-red-500/20 bg-red-950/30 p-4 text-red-200">{error}</Card> : null}
         <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-2xl text-sm leading-6 text-slate-400">Brand accounts use a separate Brand Command Center. Full sponsor tools require brand approval and an active sponsor subscription.</p>
+          <p className="max-w-2xl text-sm leading-6 text-slate-400">Sponsor accounts complete their business profile before the Sponsor workspace becomes available.</p>
           <Button className="w-full sm:w-auto" disabled={!selected || saving} onClick={() => void continueOnboarding()}>{saving ? "Preparing workspace..." : "Continue"}</Button>
         </div>
       </div>

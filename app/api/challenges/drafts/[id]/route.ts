@@ -10,6 +10,7 @@ import { inferLegacyMaxUnlockedStep, normalizeBuilderChallengeType } from "@/lib
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { NORMAL_CHALLENGE_MAX_STEP } from "@/lib/normal-challenge-config";
 import { inferCapacityMode, validateCapacity } from "@/lib/normal-challenge-capacity";
+import { validateChallengeForDraft } from "@/lib/server/challenge-validation";
 
 const allowedDraftFields = new Set([
   "title", "shortDescription", "description", "category", "subcategory", "customCategory", "type", "challengeType", "builderVersion", "coverMediaType", "visibility", "premiumOnly",
@@ -28,6 +29,7 @@ const allowedDraftFields = new Set([
 ]);
 
 const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
+const mediaDraftFields = new Set(["coverImageUrl", "coverImagePath", "promoImageUrl", "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls", "documentPaths", "challengeImages", "challengeVideo"]);
 
 function sanitizeDraftPatch(body: Record<string, unknown>) {
   const patch: Record<string, unknown> = {};
@@ -114,6 +116,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       normalizedPatch.monetization = { ...currentMonetization, ...normalizedPatch.monetization as Record<string, unknown> };
     }
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
+    if (Object.keys(normalizedPatch).some((field) => mediaDraftFields.has(field))) {
+      const mediaErrors = validateChallengeForDraft(merged).errors.filter((issue) => issue.step === "Media" || issue.step === "Media & Branding");
+      if (mediaErrors.length) throw new Error("INVALID_MEDIA_UPLOAD");
+    }
     const currentUnlocked = inferLegacyMaxUnlockedStep(current);
     const requestedStep = Number(normalizedPatch.builderCurrentStep ?? normalizedPatch.creationStep ?? current.builderCurrentStep ?? current.creationStep ?? 1);
     const requestedUnlocked = Number(normalizedPatch.maxUnlockedStep ?? currentUnlocked);
@@ -138,6 +144,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (code === "CHALLENGE_OWNERSHIP_LOCKED") return fail("Challenge ownership can't be changed after the draft is created.", 409, undefined, code);
     if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
     if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
+    if (code === "INVALID_MEDIA_UPLOAD") return fail("Uploaded media must come from your confirmed Challenge Suite storage path.", 422, undefined, code);
     throw error;
   }
   if ("retiredCompetition" in updated && updated.retiredCompetition === true) {

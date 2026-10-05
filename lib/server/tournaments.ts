@@ -89,20 +89,23 @@ export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
   const officialChallenge = input.officialChallenge === true;
+  const storageDisabled = (input.coverMedia as Record<string, unknown> | undefined)?.status === "storage_disabled" || input.mediaUploadStatus === "storage_disabled";
   return {
     hostId,
     createdBy: hostId,
     officialChallenge,
     ownershipType: officialChallenge ? "challenge_suite_official" : input.ownershipType === "enterprise_personal" ? "enterprise_personal" : "creator_personal",
-    organizationOwnerId: officialChallenge ? "challenge_suite" : null,
+    organizationOwnerId: officialChallenge ? text(input.enterpriseOrganizationId) || null : null,
+    enterpriseOrganizationId: officialChallenge ? text(input.enterpriseOrganizationId) || null : null,
+    enterpriseFinanceContextId: officialChallenge ? text(input.enterpriseOrganizationId) || null : null,
     enterpriseChallengeLeadId: officialChallenge ? hostId : null,
     enterpriseAssignments: officialChallenge ? [{ userId: hostId, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: hostId }] : [],
     title: text(input.title),
     shortDescription: text(input.shortDescription),
     description: text(input.description),
     category: text(input.category),
-    coverMedia: { url: text(input.coverImageUrl) || null, path: text(input.coverImagePath) || null, status: text(input.coverImageUrl) ? "uploaded" : "missing" },
-    trailerMedia: { url: text(input.trailerUrl) || null, path: text(input.trailerPath) || null, status: text(input.trailerUrl) ? "uploaded" : "missing" },
+    coverMedia: { url: text(input.coverImageUrl) || null, path: text(input.coverImagePath) || null, status: text(input.coverImageUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
+    trailerMedia: { url: text(input.trailerUrl) || null, path: text(input.trailerPath) || null, status: text(input.trailerUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
     status: "draft",
     configVersion: 2,
     format: text(input.format, "single_elimination") as TournamentFoundation["format"],

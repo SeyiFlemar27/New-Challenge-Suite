@@ -76,12 +76,18 @@ export async function GET(request: Request) {
     record = transaction.exists && transaction.data()?.userId === user.uid
       ? { id: transaction.id, status: "confirmed", webhookConfirmed: true, providerSessionId: reference, confirmedAt: transaction.data()?.createdAt, ...transaction.data() }
       : null;
+  } else if (purpose === PAYMENT_PURPOSES.challengeCredits && reference) {
+    const id = deterministicId("challenge_credit_purchase", reference);
+    const purchase = await db.collection("challengeCreditPurchases").doc(id).get();
+    record = purchase.exists && purchase.data()?.userId === user.uid ? { id: purchase.id, ...purchase.data(), webhookConfirmed: purchase.data()?.balanceCredited === true } : null;
   } else if (purpose === PAYMENT_PURPOSES.challengeEntry && reference) {
     record = await getPaymentStatus(db, "challengeEntryPayments", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.votes && reference) {
     record = await getPaymentStatus(db, "paidVotePurchases", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.sponsor && reference) {
     record = await getPaymentStatus(db, "sponsorContributions", reference, "sponsorId", user.uid);
+  } else if (purpose === PAYMENT_PURPOSES.sponsorWallet && reference) {
+    record = await getPaymentStatus(db, "sponsorWalletFunding", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.prizePool && reference) {
     record = await getPaymentStatus(db, "creatorPrizeFundingPayments", reference, "userId", user.uid);
   } else {

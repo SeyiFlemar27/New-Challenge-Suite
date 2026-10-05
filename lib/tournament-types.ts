@@ -53,6 +53,8 @@ export type TournamentFoundation = {
   officialChallenge?: boolean;
   ownershipType?: "creator_personal" | "enterprise_personal" | "challenge_suite_official";
   organizationOwnerId?: string | null;
+  enterpriseOrganizationId?: string | null;
+  enterpriseFinanceContextId?: string | null;
   enterpriseChallengeLeadId?: string | null;
   enterpriseAssignments?: Array<Record<string, unknown>>;
   title: string;

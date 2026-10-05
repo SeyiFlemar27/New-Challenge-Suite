@@ -1,6 +1,6 @@
 import { ok, serverError } from "@/lib/server/responses";
 import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sponsor";
-import { reconcileSponsorAnalytics } from "@/lib/server/sponsor-analytics";
+import { reconcileSponsorAnalytics, reconcileSponsorAnalyticsByDay } from "@/lib/server/sponsor-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +18,13 @@ export async function GET(request: Request) {
     ]);
     const events = eventsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const liveMetrics = reconcileSponsorAnalytics(events);
+    const daily = reconcileSponsorAnalyticsByDay(events);
     const snapshots = snapshotsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string })).sort((left, right) => String(right.reconciledAt ?? right.updatedAt ?? "").localeCompare(String(left.reconciledAt ?? left.updatedAt ?? "")));
     const finalized = snapshots.filter((item) => item.finalized === true);
     return ok({
       analytics: {
         state: finalized.length ? "finalized_available" : events.length ? "live_provisional" : "not_recorded",
-        live: { metrics: liveMetrics, provisional: true, source: "trusted_sponsor_placement_events" },
+        live: { metrics: liveMetrics, daily, provisional: true, source: "trusted_sponsor_placement_events" },
         finalized,
         sponsorshipCount: sponsorshipsSnap.size,
         definitions: {

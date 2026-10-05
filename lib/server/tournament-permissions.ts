@@ -1,11 +1,11 @@
 import { getPersonalCapabilities, getUserPlanAccess } from "@/lib/plan-access";
+import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export type TournamentPermissionProfile = Record<string, unknown> & { uid?: string; id?: string; role?: string; accountType?: string };
 export type TournamentManagementRole = "host" | "manager" | "participant_manager" | "submission_reviewer" | "moderator" | "judge_coordinator" | "finance_viewer";
 
 function isApprovedEnterprise(profile: TournamentPermissionProfile) {
-  const access = getUserPlanAccess(profile);
-  return access.isEnterprise && String(profile.enterpriseAccessStatus ?? profile.enterpriseApprovalStatus ?? "").toLowerCase() === "approved";
+  return hasEnterprisePermission(normalizeEnterpriseAccess(profile), "challenge.create_official");
 }
 
 export function canCreateTournament(profile: TournamentPermissionProfile) {

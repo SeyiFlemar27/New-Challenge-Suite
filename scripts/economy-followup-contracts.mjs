@@ -15,7 +15,7 @@ export function runEconomyFollowupContract(metaUrl) {
   const authQa = read("scripts/qa/economy-authenticated-provider-flow-qa.mjs");
   const visual = read("scripts/qa/economy-visual-chromium-qa.mjs");
   const growth = read("lib/server/growth-wallet-expiry.ts") + read("lib/server/creator-growth-wallet.ts") + read("app/api/admin/economy/growth-wallet-expiry/route.ts") + read("app/api/economy/summary/route.ts") + read("app/creator/growth-wallet/page.tsx");
-  const doro = read("lib/server/economy-dorocoin.ts") + read("app/api/challenges/[id]/engagement/route.ts") + read("app/api/challenges/[id]/comments/route.ts") + read("app/api/challenges/[id]/publish/route.ts") + read("app/api/challenges/[id]/join/route.ts") + read("app/api/auth/profile/bootstrap/route.ts") + read("app/api/auth/email-otp/verify/route.ts") + read("app/api/kyc/sumsub/webhook/route.ts") + read("app/api/admin/challenges/[id]/winner-proposals/[proposalId]/approve/route.ts") + read("app/api/dorocoin/sponsored-ad/route.ts") + read("app/api/admin/economy/dorocoin-reversals/route.ts");
+  const doro = read("lib/server/economy-dorocoin.ts") + read("lib/server/rewarded-ads.ts") + read("app/api/challenges/[id]/engagement/route.ts") + read("app/api/challenges/[id]/comments/route.ts") + read("app/api/challenges/[id]/publish/route.ts") + read("app/api/challenges/[id]/join/route.ts") + read("app/api/auth/profile/bootstrap/route.ts") + read("app/api/auth/email-otp/verify/route.ts") + read("app/api/kyc/sumsub/webhook/route.ts") + read("app/api/admin/challenges/[id]/winner-proposals/[proposalId]/approve/route.ts") + read("app/api/dorocoin/sponsored-ad/route.ts") + read("app/api/admin/economy/dorocoin-reversals/route.ts");
 
   if (name.includes("provider-readiness-check")) has(provider, ["stripeWebhookEvents", "pending_payment", "success-pages-do-not-credit", "providerSuccessSimulated: false"]);
   else if (name.includes("authenticated-provider-qa-env-validation")) {
@@ -51,7 +51,7 @@ export function runEconomyFollowupContract(metaUrl) {
   else if (name.includes("win-free-challenge")) has(doro, ["win_free_challenge", "isPaidEntryChallenge(challenge)"]);
   else if (name.includes("top-10")) has(doro, ["top_10_finish", "candidates.slice(0, 10)"]);
   else if (name.includes("profile-verification")) has(doro, ["profile_verification", "normalized.status === \"verified\"", "providerVerified: true"]);
-  else if (name.includes("sponsored-ad")) has(doro, ["sponsored_ad_watch", "rewardedAdProviderEvents", "providerVerified !== true", "Math.min(10, Math.max(5"]);
+  else if (name.includes("sponsored-ad")) has(doro, ["sponsored_ad_watch", "rewardedAdProviderEvents", "providerVerified !== true", "REWARDED_AD_DOROCOINS = 3", "REWARDED_AD_CYCLE_LIMIT = 10", "REWARDED_AD_COOLDOWN_MS", "rewardedAdRewardCycles"]);
   else if (name.includes("no-self-farming")) has(doro, ["Self-farming activity is not eligible", "challengeOwnerId === input.userId"]);
   else if (name.includes("idempotency")) has(doro, ["deterministicId(\"doro_reward\"", "oncePerActionSources", "idempotencyKey"]);
   else if (name.includes("daily-caps")) has(doro, ["doroCoinRewardDailyGuards", "videoPerDay", "likesPerDay", "commentsPerDay", "sharesPerDay"]);

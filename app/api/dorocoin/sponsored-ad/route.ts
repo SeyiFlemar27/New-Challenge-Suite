@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!event.exists || data.userId !== user.uid || data.providerVerified !== true || data.completionStatus !== "completed") {
     return fail("Sponsored advertisement reward is awaiting provider confirmation.", 409, undefined, "PROVIDER_VERIFICATION_REQUIRED");
   }
-  const reward = await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "sponsored_ad_watch", actionId: providerEventId, providerVerified: true, rewardAmount: Number(data.rewardAmount ?? 5), suspiciousSignals: Array.isArray(data.suspiciousSignals) ? data.suspiciousSignals.map(String) : [] });
+  const reward = await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "sponsored_ad_watch", actionId: providerEventId, providerVerified: true, suspiciousSignals: Array.isArray(data.suspiciousSignals) ? data.suspiciousSignals.map(String) : [] });
   await eventRef.set({ rewardTransactionId: reward.id, rewardStatus: "credited", rewardedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
   return ok({ reward }, "Provider-confirmed sponsored advertisement reward credited.");
 }

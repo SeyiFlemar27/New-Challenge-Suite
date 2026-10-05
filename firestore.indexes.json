@@ -58,6 +58,87 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "emailVerificationOtps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "email", "order": "ASCENDING" },
+        { "fieldPath": "usedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "privateChallengeInvites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "codeHash", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "privateChallengeInvites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "code", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "paidVotePurchases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "challengeId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "paidVoteCredits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "challengeId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "conversationId", "order": "ASCENDING" },
+        { "fieldPath": "sponsorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorCampaignAnalytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sponsorId", "order": "ASCENDING" },
+        { "fieldPath": "relatedCampaignId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorProposalRevisions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "proposalId", "order": "ASCENDING" },
+        { "fieldPath": "sponsorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorProposalActivity",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "proposalId", "order": "ASCENDING" },
+        { "fieldPath": "sponsorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorInternalNotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "relatedEntityId", "order": "ASCENDING" },
+        { "fieldPath": "sponsorId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

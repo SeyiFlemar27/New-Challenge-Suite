@@ -129,7 +129,7 @@ export interface EffectiveTier {
   dashboardSubtitle: string;
 }
 
-const userPlanOrder: UserProductPlanId[] = ["free", "creator", "pro", "host", "enterprise"];
+const userPlanOrder: UserProductPlanId[] = ["free", "creator", "pro", "host"];
 const sponsorPlanOrder: SponsorProductPlanId[] = ["sponsor_starter", "brand_partner", "enterprise_partner"];
 
 const legacyPlanAliases: Record<string, BlueprintPlanId> = {
@@ -664,6 +664,10 @@ const accessByPlan: Record<BlueprintPlanId, Omit<PlanAccess, "planStatus">> = {
 
 export function normalizePlanId(planId: unknown): BlueprintPlanId {
   if (typeof planId !== "string") return "free";
+  // Enterprise was historically sold as a personal plan. Preserve the paid
+  // personal Host-level capability for those records, but never use it to
+  // authorize the Enterprise workspace.
+  if (planId === "enterprise" || planId === "chief_producer") return "host";
   if (planId in accessByPlan) return planId as BlueprintPlanId;
   return legacyPlanAliases[planId] ?? "free";
 }
@@ -712,9 +716,9 @@ export function getPersonalCapabilities(profile: Record<string, unknown> = {}): 
   const active = hasActivePersonalPlan(status);
   const visiblePlan = requestedPlan === "pro" ? "creator" : requestedPlan;
   const creator = active && visiblePlan === "creator";
-  const host = active && (visiblePlan === "host" || visiblePlan === "enterprise");
+  const host = active && visiblePlan === "host";
   const personal = accountType !== "sponsor";
-  const hadPremiumPersonalPlan = personal && [requestedPlan, historicalPlan].some((plan) => ["creator", "pro", "host", "enterprise"].includes(plan));
+  const hadPremiumPersonalPlan = personal && [requestedPlan, historicalPlan].some((plan) => ["creator", "pro", "host"].includes(plan));
 
   return {
     canCreateNormalChallenge: personal,

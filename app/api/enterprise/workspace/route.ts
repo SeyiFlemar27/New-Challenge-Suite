@@ -24,13 +24,16 @@ export async function GET(request: Request) {
   const result = await requireEnterprisePermission(request, "challenge.view");
   if (result.response) return result.response;
   const { db, user, access } = result;
-  const [challengeSnap, participantSnap, submissionSnap, activitySnap] = await Promise.all([
-    db.collection("challenges").where("officialChallenge", "==", true).limit(200).get(),
+  const [organizationChallenges, legacyChallenges, participantSnap, submissionSnap, activitySnap] = await Promise.all([
+    db.collection("challenges").where("organizationOwnerId", "==", access.organizationId).limit(200).get(),
+    // Narrow compatibility read for records written before organization ids were provisioned.
+    db.collection("challenges").where("organizationOwnerId", "==", "challenge_suite").limit(200).get(),
     db.collection("participants").limit(500).get(),
     db.collection("submissions").limit(500).get(),
     db.collection("auditLogs").orderBy("createdAt", "desc").limit(30).get().catch(() => null),
   ]);
-  const visible = challengeSnap.docs
+  const challengeDocs = [...organizationChallenges.docs, ...legacyChallenges.docs.filter((doc) => !organizationChallenges.docs.some((item) => item.id === doc.id))];
+  const visible = challengeDocs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
     .filter((challenge) => enterpriseChallengeInScope(access, challenge, user.uid))
     .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? "").localeCompare(String(a.updatedAt ?? a.createdAt ?? "")));

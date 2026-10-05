@@ -170,7 +170,7 @@ export function useCurrentUser() {
           enterprisePermissions: Array.isArray(profileRecord.enterprisePermissions) ? profileRecord.enterprisePermissions.filter((value): value is string => typeof value === "string") : [],
           enterpriseStaffStatus: typeof profileRecord.enterpriseStaffStatus === "string" ? profileRecord.enterpriseStaffStatus : null,
           enterpriseOnboardingComplete: Boolean(profileRecord.enterpriseOnboardingComplete),
-          activeWorkspace: profileRecord.activeWorkspace === "enterprise" ? "enterprise" : profileRecord.activeWorkspace === "sponsor" ? "sponsor" : "personal",
+          activeWorkspace: profileRecord.activeWorkspace === "enterprise" ? "enterprise" : "personal",
           availableWorkspaces: Array.isArray(profileRecord.availableWorkspaces) ? profileRecord.availableWorkspaces.filter((value): value is "personal" | "sponsor" | "enterprise" => value === "personal" || value === "sponsor" || value === "enterprise") : ["personal"],
           sponsorOrganizationId: typeof profileRecord.sponsorOrganizationId === "string" ? profileRecord.sponsorOrganizationId : null,
           sponsorOrganizationName: typeof profileRecord.sponsorOrganizationName === "string" ? profileRecord.sponsorOrganizationName : null,

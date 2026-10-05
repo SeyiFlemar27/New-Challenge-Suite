@@ -55,8 +55,20 @@ function operatorRecipientId(challenge: Record<string, unknown>) {
 }
 
 function creatorRecipientId(challenge: Record<string, unknown>) {
-  if (challenge.officialChallenge === true || text(challenge.ownershipType) === "challenge_suite_official") return "";
+  if (isEnterpriseOwnedChallenge(challenge)) return "";
   return text(challenge.creatorId) || text(challenge.ownerId) || text(challenge.userId);
+}
+
+function isEnterpriseOwnedChallenge(challenge: Record<string, unknown>) {
+  return challenge.officialChallenge === true
+    || ["challenge_suite_official", "enterprise_personal"].includes(text(challenge.ownershipType));
+}
+
+function enterpriseFinanceContextId(challenge: Record<string, unknown>) {
+  if (!isEnterpriseOwnedChallenge(challenge)) return "";
+  return text(challenge.enterpriseFinanceContextId)
+    || text(challenge.enterpriseOrganizationId)
+    || (text(challenge.organizationOwnerId) !== "challenge_suite" ? text(challenge.organizationOwnerId) : "");
 }
 
 function hostSponsorRecipientId(challenge: Record<string, unknown>) {
@@ -420,8 +432,10 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
   const now = input.approvedAt ?? new Date().toISOString();
   const holdUntil = holdUntilFromApproval(now, CASH_EARNING_HOLD_HOURS);
   const economyV1ForSettlement = breakdown.economyRuleVersion === ECONOMY_V1_RULE_VERSION;
-  const creatorIdForSettlement = economyV1ForSettlement ? creatorRecipientId(input.challenge) : operatorRecipientId(input.challenge);
-  const growthWalletRef = db.collection("creatorGrowthWallets").doc(creatorIdForSettlement || "unassigned_creator");
+  const enterpriseOwned = isEnterpriseOwnedChallenge(input.challenge);
+  const enterpriseFinanceId = enterpriseFinanceContextId(input.challenge);
+  const creatorIdForSettlement = enterpriseOwned ? "" : economyV1ForSettlement ? creatorRecipientId(input.challenge) : operatorRecipientId(input.challenge);
+  const growthWalletRef = db.collection("creatorGrowthWallets").doc(creatorIdForSettlement || "not_applicable");
 
   const result = await db.runTransaction(async (transaction) => {
     const [settlementSnap, proposalSnap, challengeSnap, growthWalletSnap] = await Promise.all([
@@ -505,12 +519,39 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     const economyV1 = economyV1ForSettlement;
     const operatorId = creatorIdForSettlement;
     const configuredAllocation = Number(growthWalletSnap.data()?.allocationPercent);
-    const allocationPercent = economyV1
+    const allocationPercent = economyV1 && !enterpriseOwned
       ? Number.isFinite(configuredAllocation) ? configuredAllocation : ECONOMY_V1_RULES.growthWallet.defaultAllocationPercent
       : 0;
     const growthAllocation = calculateGrowthWalletAllocation(breakdown.creatorHostAmount, allocationPercent);
     const creatorCashAmount = Math.max(0, breakdown.creatorHostAmount - growthAllocation.amountCents);
-    if (operatorId && breakdown.creatorHostAmount > 0) {
+    if (enterpriseFinanceId && breakdown.creatorHostAmount > 0) {
+      const id = safeId(`${settlementId}_enterprise_${enterpriseFinanceId}`);
+      transaction.create(db.collection("enterpriseFinanceLedger").doc(id), {
+        id,
+        organizationId: enterpriseFinanceId,
+        challengeId: input.challengeId,
+        proposalId: input.proposalId,
+        settlementId,
+        sourceType: "enterprise_challenge_revenue_share",
+        amountCents: breakdown.creatorHostAmount,
+        currency: DEFAULT_CASH_CURRENCY,
+        status: "pending_finance_review",
+        direction: "credit",
+        confirmedPaymentSourcesOnly: true,
+        externalPayoutExecuted: false,
+        createdAt: now,
+        updatedAt: now
+      });
+      transaction.set(db.collection("enterpriseFinanceWallets").doc(enterpriseFinanceId), {
+        organizationId: enterpriseFinanceId,
+        currency: DEFAULT_CASH_CURRENCY,
+        pendingBalanceCents: FieldValue.increment(breakdown.creatorHostAmount),
+        lifetimeChallengeRevenueCents: FieldValue.increment(breakdown.creatorHostAmount),
+        withdrawalsEnabled: false,
+        personalWalletFallback: false,
+        updatedAt: now
+      }, { merge: true });
+    } else if (operatorId && breakdown.creatorHostAmount > 0) {
       const id = safeId(`${settlementId}_creator_${operatorId}`);
       if (creatorCashAmount > 0) walletCredits.push(cashLedgerEntry({ id, userId: operatorId, challengeId: input.challengeId, proposalId: input.proposalId, settlementId, sourceType: "creator_challenge_earning", grossAmountCents: creatorCashAmount, feeRate: 0, feeAmountCents: 0, netAmountCents: creatorCashAmount, holdUntil, adminId: input.adminId, now }));
       if (economyV1 && growthAllocation.amountCents > 0) {
@@ -521,7 +562,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         transaction.create(db.collection("creatorGrowthWalletAllocations").doc(growthId), { id: growthId, userId: operatorId, sourceTransactionId: growthId, challengeId: input.challengeId, settlementId, sourceType: "creator_earning_allocation", originalAmountCents: growthAllocation.amountCents, remainingAmountCents: growthAllocation.amountCents, expiresAt: expiresAtDate.toISOString(), status: "active", ruleVersion: ECONOMY_V1_RULE_VERSION, createdAt: now, updatedAt: now });
         transaction.set(growthWalletRef, { userId: operatorId, balanceCents: FieldValue.increment(growthAllocation.amountCents), allocationPercent: growthAllocation.allocationPercent, allocationOptIn: growthAllocation.allocationPercent > 0, withdrawable: false, restrictedUseOnly: true, ruleVersion: ECONOMY_V1_RULE_VERSION, updatedAt: now }, { merge: true });
       }
-    } else if (breakdown.creatorHostAmount > 0 && (input.challenge.officialChallenge === true || text(input.challenge.ownershipType) === "challenge_suite_official")) {
+    } else if (breakdown.creatorHostAmount > 0 && enterpriseOwned) {
       const unresolvedId = safeId(`${settlementId}_enterprise_official_creator_share`);
       transaction.create(db.collection("settlementUnresolvedAllocations").doc(unresolvedId), {
         id: unresolvedId,
@@ -638,6 +679,8 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       walletCreditIds: walletCredits.map((credit) => credit.id),
       creatorGrowthAllocationAmountCents: growthAllocation.amountCents,
       creatorGrowthAllocationPercent: growthAllocation.allocationPercent,
+      enterpriseOrganizationId: enterpriseFinanceId || null,
+      enterpriseFinanceIsolated: enterpriseOwned,
       platformLedgerIds: platformEntries.map((entry) => String(entry.id)),
       payoutProviderCalled: false,
       externalPayoutExecuted: false,
@@ -715,7 +758,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         actionUrl: "/wallet",
         idempotencyKey: `${settlementId}_winner_notification_${userId}`
       })),
-      operatorRecipientId(input.challenge) && breakdown.creatorHostAmount > 0 ? createNotification(db, {
+      !enterpriseOwned && operatorRecipientId(input.challenge) && breakdown.creatorHostAmount > 0 ? createNotification(db, {
         userId: operatorRecipientId(input.challenge),
         type: "creator_challenge_earning_created",
         title: "Challenge earning prepared",

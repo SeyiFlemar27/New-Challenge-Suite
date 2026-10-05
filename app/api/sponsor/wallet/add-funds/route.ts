@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [checkoutLineItem({ amountCents: result.data.amountCents, currency: "USD", name: "Challenge Suite sponsor wallet funding" })],
-      success_url: `${origin}/sponsor/wallet?funding=processing`,
+      success_url: `${origin}/sponsor/wallet/return?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/sponsor/wallet?funding=cancelled`,
       metadata: checkoutMetadataForPurpose("sponsor_wallet_funding", funding)
     }, { idempotencyKey: `sponsor_wallet_${idempotencyKey}` });

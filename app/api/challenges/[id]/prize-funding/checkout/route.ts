@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [{ price_data: { currency: "usd", unit_amount: amountCents, product_data: { name: `Guaranteed prize funding - ${String(challenge.title ?? "Challenge").slice(0, 80)}` } }, quantity: 1 }],
-    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/prize-funding/success?prizeFundingId=${encodeURIComponent(String(payment.id))}`,
+    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/prize-funding/success?prizeFundingId=${encodeURIComponent(String(payment.id))}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel?paymentPurpose=${CREATOR_PRIZE_PAYMENT_PURPOSE}&challengeId=${encodeURIComponent(challengeId)}`,
     metadata: {
       paymentPurpose: CREATOR_PRIZE_PAYMENT_PURPOSE,

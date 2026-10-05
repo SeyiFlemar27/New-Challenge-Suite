@@ -36,9 +36,11 @@ type JourneyCopy = {
 const PURPOSE_PROGRESS: Record<PaymentPurpose, readonly [string, string, string]> = {
   subscription_payment: ["Payment received", "Activating membership", "Membership active"],
   dorocoin_purchase: ["Payment received", "Adding DoroCoins", "DoroCoins available"],
+  challenge_credit_purchase: ["Payment received", "Adding Challenge Credits", "Challenge Credits available"],
   challenge_entry_payment: ["Payment received", "Confirming challenge entry", "Challenge entry confirmed"],
   prize_pool_funding: ["Payment received", "Confirming prize funding", "Prize funding confirmed"],
   sponsor_contribution: ["Payment received", "Confirming sponsorship", "Sponsorship confirmed"],
+  sponsor_wallet_funding: ["Payment received", "Confirming sponsor funds", "Sponsor funds available"],
   vote_purchase: ["Payment received", "Confirming paid votes", "Paid votes available"],
   challenge_boost_purchase: ["Payment received", "Activating challenge boost", "Challenge boost active"],
   platform_prize_funding: ["Payment received", "Confirming prize funding", "Prize funding confirmed"]
@@ -65,6 +67,10 @@ export function PaymentStatusJourney({
     const params = new URLSearchParams({ purpose });
     if (reference) params.set("reference", reference);
     if (resourceId) params.set("resourceId", resourceId);
+    if (reference?.startsWith("cs_")) {
+      params.set("session_id", reference);
+      return `/api/verify-checkout?${params.toString()}`;
+    }
     return `/api/payments/status?${params.toString()}`;
   }, [purpose, reference, resourceId]);
 

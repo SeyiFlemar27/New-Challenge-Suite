@@ -6,14 +6,16 @@ const root = process.cwd();
 const read = (file) => readFileSync(join(root, file), "utf8");
 const success = read("app/checkout/success/page.tsx");
 const entryCheckout = read("app/api/challenges/[id]/entry-checkout/route.ts");
+const registrationSuccess = read("app/challenges/[id]/registration-success/page.tsx");
 const joinPage = read("app/challenges/[id]/join/page.tsx");
 const detailPage = read("app/challenges/[id]/page.tsx");
 
-assert(entryCheckout.includes("?payment=processing") && !entryCheckout.includes("/join?payment=processing") && entryCheckout.includes("checkoutSuccessActivatesEntry: false"), "paid-entry checkout must return to challenge detail without activating entry.");
-assert(detailPage.includes("paymentReturnState") && detailPage.includes("Confirming Payment"), "detail page must show contextual payment processing feedback.");
-assert(success.includes("paidVoteReturn") && success.includes("sponsorFundingReturn"), "generic success page must distinguish payment contexts.");
-assert(success.includes("This page never activates") && success.includes("does not grant votes") && success.includes("does not fund a challenge"), "success page must state webhook-only activation for each payment context.");
-assert(!success.includes("Your plan is active"), "checkout success page must not use generic active-plan copy for every checkout.");
+assert(entryCheckout.includes("/registration-success?entryPaymentId=") && entryCheckout.includes("session_id={CHECKOUT_SESSION_ID}") && entryCheckout.includes("checkoutSuccessActivatesEntry: false"), "paid-entry checkout must return to its verified registration state without activating entry.");
+assert(registrationSuccess.includes("PaymentStatusJourney") && registrationSuccess.includes("Confirming your entry payment"), "registration return must show contextual verified payment feedback.");
+assert(detailPage.includes("paymentReturnState"), "detail page must retain contextual payment feedback for direct cancellation or legacy returns.");
+assert(success.includes("CheckoutReturnDispatcher") && success.includes("paid_vote") && success.includes("sponsor_funding"), "legacy checkout return must distinguish payment contexts before routing to their verified status pages.");
+assert(success.includes("registration-success") && success.includes("paid-votes/success") && success.includes("/sponsor/funding/"), "legacy checkout return must preserve each payment context without activating it.");
+assert(!success.includes("Your plan is active"), "checkout return must not use generic active-plan copy for every checkout.");
 
 console.log("Contextual checkout feedback checks passed.");
 

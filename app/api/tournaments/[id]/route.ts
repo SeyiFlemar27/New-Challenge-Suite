@@ -46,7 +46,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const transition = assertTournamentTransition(String(tournament.status ?? "draft") as TournamentStatus, String(body.status) as TournamentStatus);
     if (!transition.valid) return fail(transition.message, 409, transition, transition.code);
   }
-  const validation = validateTournamentFoundation({ ...tournament, ...body }, { publish: body.status === "scheduled" || body.status === "pending_review" });
+  const mediaFields = ["coverImageUrl", "coverImagePath", "trailerUrl", "trailerPath"];
+  const validation = validateTournamentFoundation({ ...tournament, ...body }, { publish: body.status === "scheduled" || body.status === "pending_review", ownerId: String(tournament.hostId ?? user.uid), validateMedia: body.status === "pending_review" || mediaFields.some((field) => field in body) });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
   const merged = { ...tournament, ...body };
   const readiness = evaluateTournamentReadiness(merged);

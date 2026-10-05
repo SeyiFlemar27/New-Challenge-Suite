@@ -492,22 +492,27 @@ export async function PATCH(request: Request) {
           "personal"
         ]);
         if (action === "approve") existingWorkspaces.add("enterprise");
+        const requestedOrganizationId = typeof parsed.body?.enterpriseOrganizationId === "string" ? parsed.body.enterpriseOrganizationId.trim().replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120) : "";
+        const applicationOrganizationId = typeof application.enterpriseOrganizationId === "string" ? application.enterpriseOrganizationId.trim() : "";
+        const enterpriseOrganizationId = requestedOrganizationId || applicationOrganizationId || `enterprise_org_${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+        const organizationRef = db.collection("enterpriseOrganizations").doc(enterpriseOrganizationId);
         const staffAccess = action === "approve" ? {
           status: "active", role: enterpriseRole, scope: enterpriseScope,
           department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
           permissions: enterprisePermissions,
           categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
           regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
-          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid
+          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid, organizationId: enterpriseOrganizationId
         } : null;
         const event = { type: `admin_${action}`, status, at: now, message: action === "approve" ? "Enterprise access approved." : action === "request_info" ? "More information requested." : "Application not approved." };
         const accessUpdate = {
           enterpriseAccessStatus: status, enterpriseApprovalStatus: status, enterpriseApplicationId: id,
           enterpriseApprovedAt: action === "approve" ? now : null, enterpriseApprovedBy: action === "approve" ? user.uid : null,
-          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, staffAccess } : {}),
+          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseOrganizationId, enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, staffAccess } : {}),
           updatedAt: now
         };
-        transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
+        transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseOrganizationId: action === "approve" ? enterpriseOrganizationId : application.enterpriseOrganizationId ?? null, enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
+        if (action === "approve") transaction.set(organizationRef, { id: enterpriseOrganizationId, name: String(application.companyName ?? application.company ?? "Enterprise organization").trim().slice(0, 180), applicationId: id, status: "active", createdAt: now, createdBy: user.uid, updatedAt: now }, { merge: true });
         transaction.set(userRef, accessUpdate, { merge: true });
         transaction.set(profileRef, accessUpdate, { merge: true });
         transaction.set(db.collection(ENTERPRISE_APPLICATION_REVISION_COLLECTION).doc(enterpriseApplicationRevisionId(id, currentVersion)), { decisionStatus: status, decidedAt: now, decidedBy: user.uid, decisionReason: reason || null }, { merge: true });

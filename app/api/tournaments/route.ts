@@ -48,14 +48,15 @@ export async function POST(request: Request) {
   const enterpriseAccess = normalizeEnterpriseAccess(profile);
   const officialChallenge = body.officialChallenge === true;
   if (officialChallenge && (!hasEnterprisePermission(enterpriseAccess, "challenge.create_official") || body.ownershipType !== "challenge_suite_official")) return fail("Your Enterprise role cannot create official tournaments.", 403, undefined, "ENTERPRISE_OFFICIAL_CREATE_DENIED");
-  if (body.ownershipType === "enterprise_personal" && !hasEnterprisePermission(enterpriseAccess, "challenge.create_personal")) return fail("Your Enterprise role cannot create personal tournaments.", 403, undefined, "ENTERPRISE_PERSONAL_CREATE_DENIED");
+  if (body.ownershipType === "enterprise_personal") return fail("Enterprise tournaments must use the organization-owned challenge flow.", 409, undefined, "ENTERPRISE_PERSONAL_OWNERSHIP_RETIRED");
+  if (officialChallenge && !enterpriseAccess?.organizationId) return fail("Your Enterprise organization context is still being provisioned. Try again shortly or contact support.", 409, undefined, "ENTERPRISE_ORGANIZATION_REQUIRED");
   const permission = canCreateTournament(profile);
   if (!permission.allowed) return fail("Tournament hosting requires Host, approved Enterprise, or allowed premium Creator access.", 403, permission, "TOURNAMENT_HOSTING_LOCKED");
-  const validation = validateTournamentFoundation(body, { publish: requestedStatus === "pending_review" });
+  const validation = validateTournamentFoundation(body, { publish: requestedStatus === "pending_review", ownerId: user.uid });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
   const ref = db.collection("tournaments").doc();
   const now = new Date().toISOString();
-  const draft = tournamentDraftFromInput(body, user.uid, now);
+  const draft = tournamentDraftFromInput({ ...body, enterpriseOrganizationId: officialChallenge ? enterpriseAccess!.organizationId : null }, user.uid, now);
   const readiness = evaluateTournamentReadiness({ id: ref.id, ...draft });
   if (requestedStatus === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const tournament = { id: ref.id, ...draft, status: requestedStatus, submittedAt: requestedStatus === "pending_review" ? now : null, readiness, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false, fakeParticipantsAllowed: false, fakeBracketAllowed: false, fakeWinnersAllowed: false };

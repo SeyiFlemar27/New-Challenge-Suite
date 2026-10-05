@@ -19,7 +19,7 @@ export const ECONOMY_V1_RULES = {
       win_free_challenge: 150,
       top_10_finish: 75,
       profile_verification: 100,
-      sponsored_ad_watch: 5
+      sponsored_ad_watch: 3
     },
     caps: { videoPerDay: 20, likesPerDay: 50, commentsPerDay: 20, sharesPerDay: 10, sponsoredAdMax: 10 },
     transfer: { minimum: 10, maximum: 10_000, dailyMaximum: 25_000 },

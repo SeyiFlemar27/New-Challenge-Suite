@@ -12,7 +12,6 @@ type SwitcherUser = Pick<CurrentUserProfile, "activeWorkspace" | "availableWorks
 
 const workspaceLabels: Record<Workspace, { label: string; subtitle: string; icon: typeof UserRound }> = {
   personal: { label: "Personal Workspace", subtitle: "Personal account", icon: UserRound },
-
   enterprise: { label: "Challenge Suite Enterprise", subtitle: "Staff Workspace", icon: BriefcaseBusiness },
 };
 
@@ -22,7 +21,7 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const available = (user?.availableWorkspaces ?? ["personal"]).filter((workspace): workspace is Workspace => workspace === "personal" || workspace === "enterprise");
-  const requested = user?.activeWorkspace === "enterprise" ? "enterprise" : "personal";
+  const requested = user?.activeWorkspace === "enterprise" ? user.activeWorkspace : "personal";
   const current: Workspace = available.includes(requested) ? requested : "personal";
   const currentLabel = workspaceLabels[current];
 

@@ -2,7 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { isEnterpriseAccessActive, normalizeEnterpriseAccess, resolveActiveWorkspace } from "@/lib/enterprise-access";
 import { requireAuthenticatedUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
-import { resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
+import { isSponsorWorkspaceAvailable, resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +16,11 @@ async function workspaceState(db: FirebaseFirestore.Firestore, userId: string) {
   const merged = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) };
   const access = normalizeEnterpriseAccess(merged);
   const enterpriseAvailable = isEnterpriseAccessActive(access);
-  const sponsorAvailable = Boolean(sponsorAccess);
+  const sponsorAvailable = isSponsorWorkspaceAvailable(sponsorAccess);
+  // Sponsor is a separately authorized product panel, never a peer workspace.
   const availableWorkspaces = ["personal", ...(enterpriseAvailable ? ["enterprise"] as const : [])] as const;
   return {
-    activeWorkspace: resolveActiveWorkspace(merged, access, false),
+    activeWorkspace: resolveActiveWorkspace(merged, access, sponsorAvailable),
     availableWorkspaces,
     enterpriseAvailable,
     sponsorAvailable
@@ -42,7 +43,7 @@ export async function PATCH(request: Request) {
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const workspace = parsed.body?.workspace;
-  if (workspace !== "personal" && workspace !== "enterprise") return validationError({ workspace: "Choose Personal or Enterprise workspace." });
+  if (workspace !== "personal" && workspace !== "enterprise") return validationError({ workspace: "Choose an available workspace." });
   const current = await workspaceState(db, auth.user.uid);
   if (workspace === "enterprise" && !current.enterpriseAvailable) return fail("Enterprise workspace access is not available for this account.", 403, undefined, "ENTERPRISE_ACCESS_REQUIRED");
 

@@ -1,2 +1,2 @@
 import { TournamentBuilder } from "@/components/tournament-builder";
-export default function Page() { return <TournamentBuilder enterpriseOwnership="personal" />; }
+export default function Page() { return <TournamentBuilder enterpriseOwnership="official" />; }

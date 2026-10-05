@@ -33,6 +33,14 @@ export type SponsorOrganizationAccess = {
   legacyCompatible: boolean;
 };
 
+/** Sponsor access becomes a selectable workspace only after onboarding is complete. */
+export function isSponsorWorkspaceAvailable(access: SponsorOrganizationAccess | null) {
+  if (!access || access.status !== "active") return false;
+  const onboardingComplete = access.organization.sponsorOnboardingComplete;
+  const organizationStatus = String(access.organization.status ?? "active").toLowerCase();
+  return onboardingComplete !== false && organizationStatus !== "pending_onboarding";
+}
+
 const rolePermissions: Record<SponsorMembershipRole, SponsorPermission[]> = {
   owner: [...SPONSOR_PERMISSIONS],
   admin: SPONSOR_PERMISSIONS.filter((permission) => permission !== "wallet.fund"),

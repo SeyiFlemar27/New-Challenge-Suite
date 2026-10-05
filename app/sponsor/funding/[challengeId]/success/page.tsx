@@ -8,7 +8,7 @@ export default function SponsorFundingSuccessPage() { return <Suspense><Content 
 function Content() {
   const { challengeId } = useParams<{ challengeId: string }>();
   const params = useSearchParams();
-  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.sponsor} reference={params.get("sponsorContributionId")} resourceId={challengeId} copy={{
+  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.sponsor} reference={params.get("session_id") ?? params.get("sponsorContributionId")} resourceId={challengeId} copy={{
     eyebrow: "Sponsor contribution",
     pendingTitle: "Confirming sponsor funding",
     confirmedTitle: "Sponsor contribution confirmed",

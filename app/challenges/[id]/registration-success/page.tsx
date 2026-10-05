@@ -8,7 +8,7 @@ export default function RegistrationSuccessPage() { return <Suspense><Content />
 function Content() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
-  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.challengeEntry} reference={params.get("entryPaymentId")} resourceId={id} copy={{
+  return <PaymentStatusJourney purpose={PAYMENT_PURPOSES.challengeEntry} reference={params.get("session_id") ?? params.get("entryPaymentId")} resourceId={id} copy={{
     eyebrow: "Challenge registration",
     pendingTitle: "Confirming your entry payment",
     confirmedTitle: "Registered - Submission Required",
