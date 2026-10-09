@@ -24,13 +24,10 @@ export async function GET(request: Request) {
   const result = await requireEnterprisePermission(request, "challenge.view");
   if (result.response) return result.response;
   const { db, user, access } = result;
-  const [organizationChallenges, legacyChallenges, participantSnap, submissionSnap, activitySnap] = await Promise.all([
+  const [organizationChallenges, legacyChallenges] = await Promise.all([
     db.collection("challenges").where("organizationOwnerId", "==", access.organizationId).limit(200).get(),
     // Narrow compatibility read for records written before organization ids were provisioned.
-    db.collection("challenges").where("organizationOwnerId", "==", "challenge_suite").limit(200).get(),
-    db.collection("participants").limit(500).get(),
-    db.collection("submissions").limit(500).get(),
-    db.collection("auditLogs").orderBy("createdAt", "desc").limit(30).get().catch(() => null),
+    db.collection("challenges").where("organizationOwnerId", "==", "challenge_suite").limit(200).get()
   ]);
   const challengeDocs = [...organizationChallenges.docs, ...legacyChallenges.docs.filter((doc) => !organizationChallenges.docs.some((item) => item.id === doc.id))];
   const visible = challengeDocs
@@ -38,8 +35,18 @@ export async function GET(request: Request) {
     .filter((challenge) => enterpriseChallengeInScope(access, challenge, user.uid))
     .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? "").localeCompare(String(a.updatedAt ?? a.createdAt ?? "")));
   const ids = new Set(visible.map((item) => item.id));
-  const participants = participantSnap.docs.filter((doc) => ids.has(String(doc.data().challengeId ?? ""))).length;
-  const submissions = submissionSnap.docs.filter((doc) => ids.has(String(doc.data().challengeId ?? ""))).length;
+  const idGroups = Array.from(ids).reduce<string[][]>((groups, id, index) => {
+    if (index % 30 === 0) groups.push([]);
+    groups[groups.length - 1].push(id);
+    return groups;
+  }, []);
+  const [participantGroups, submissionGroups, activityGroups] = await Promise.all([
+    Promise.all(idGroups.map((group) => db.collection("participants").where("challengeId", "in", group).count().get())),
+    Promise.all(idGroups.map((group) => db.collection("submissions").where("challengeId", "in", group).count().get())),
+    Promise.all(idGroups.map((group) => db.collection("auditLogs").where("targetId", "in", group).orderBy("createdAt", "desc").limit(100).get().catch(() => null)))
+  ]);
+  const participants = participantGroups.reduce((sum, group) => sum + group.data().count, 0);
+  const submissions = submissionGroups.reduce((sum, group) => sum + group.data().count, 0);
   const challenges = visible.slice(0, 36).map((challenge) => {
     const assignment = assignmentFor(challenge, user.uid);
     return {
@@ -55,9 +62,10 @@ export async function GET(request: Request) {
       needsAttention: ["pending_review", "requires_changes", "results_review"].includes(String(challenge.status ?? "")),
     };
   });
-  const activity = activitySnap?.docs
+  const activity = activityGroups.flatMap((snapshot) => snapshot?.docs ?? [])
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
-    .filter((item) => ids.has(String(item.challengeId ?? item.targetId ?? "")))
+    .filter((item) => ids.has(String(item.targetId ?? item.challengeId ?? "")))
+    .sort((left, right) => String(right.createdAt ?? "").localeCompare(String(left.createdAt ?? "")))
     .slice(0, 8) ?? [];
   return ok({
     access,
@@ -103,7 +111,8 @@ export async function POST(request: Request) {
     if (!assigneeSnap.exists || String(assigneeSnap.data()?.enterpriseStaffStatus ?? "") === "revoked") return fail("Active Enterprise staff member not found.", 404, undefined, "ENTERPRISE_STAFF_NOT_FOUND");
     const assignments = Array.isArray(challenge.enterpriseAssignments) ? challenge.enterpriseAssignments as Array<Record<string, unknown>> : [];
     const next = [...assignments.filter((item) => item.userId !== assigneeId), { userId: assigneeId, responsibility, status: "active", assignedBy: result.user.uid, assignedAt: now }];
-    await ref.set({ enterpriseAssignments: next, updatedAt: now, version: Number(challenge.version ?? 0) + 1 }, { merge: true });
+    const enterpriseAssignedUserIds = [...new Set(next.filter((item) => item.status !== "removed").map((item) => String(item.userId ?? "")).filter(Boolean))];
+    await ref.set({ enterpriseAssignments: next, enterpriseAssignedUserIds, updatedAt: now, version: Number(challenge.version ?? 0) + 1 }, { merge: true });
     await Promise.all([
       writeAuditLog({ actorId: result.user.uid, actorType: "creator", action: "enterprise_staff_assigned", targetType: "challenge", targetId: challengeId, after: { assigneeId, responsibility }, metadata: { enterpriseStaff: true } }, result.db),
       createNotification(result.db, { userId: assigneeId, type: "enterprise_assignment", title: "Assigned to official challenge", body: `You were assigned to ${String(challenge.title ?? "an official challenge")}.`, entityType: "challenge", entityId: challengeId, actionUrl: `/challenges/${challengeId}/manage`, idempotencyKey: `enterprise_assignment_${challengeId}_${assigneeId}_${responsibility}` }),

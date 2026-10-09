@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LockKeyhole, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -161,6 +161,7 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [createdId, setCreatedId] = useState("");
+  const [privateAccess, setPrivateAccess] = useState<Record<string, unknown> | null>(null);
   const [createdDraftId, setCreatedDraftId] = useState("");
   const [draftStatus, setDraftStatus] = useState("draft");
   const [draftLoaded, setDraftLoaded] = useState(!draftId);
@@ -254,9 +255,9 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
     try {
       window.localStorage.setItem(recoveryKey, JSON.stringify({ form, step, savedAt: new Date().toISOString() }));
     } catch {
-      setAutosaveState("offline");
+      // Browser storage may be unavailable; server autosave remains authoritative.
     }
-  }, [activeDraftId, draftLoaded, form, step, createdId, draftStatus]);
+  }, [activeDraftId, draftLoaded, form, step, createdId, draftStatus, recoveryKey]);
 
   const invalidateAutosave = useChallengeBuilderAutosave({
     enabled: Boolean(activeDraftId) && draftLoaded && !createdId && !saving && ["draft", "requires_changes", "changes_requested"].includes(draftStatus),
@@ -410,7 +411,7 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
     };
   }
 
-  const localValidation = useMemo(() => validateChallengeForPublish(payload(true) as Record<string, unknown>, { mode: "publish", userId: user?.uid }), [form, mode, user?.uid]);
+  const localValidation = validateChallengeForPublish(payload(true) as Record<string, unknown>, { mode: "publish", userId: user?.uid });
   const validation = serverValidation ?? localValidation;
   const publishBlocker = getChallengePublishBlocker({
     authenticated: Boolean(user?.uid),
@@ -492,6 +493,7 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
       return setError(challengePublishError(response));
     }
     const challenge = response.data?.challenge as { id?: string } | undefined;
+    setPrivateAccess((response.data?.privateAccess as Record<string, unknown> | null | undefined) ?? null);
     try { window.localStorage.removeItem(recoveryKey); } catch {}
     setCreatedId(challenge?.id ?? activeDraftId ?? "");
     setDraftStatus("pending_review");
@@ -502,7 +504,11 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
   if (loading || !draftLoaded) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Builder" subtitle="Loading builder..." /></Card></AppShell>;
   if (user?.accountType === "sponsor") return <Locked title="Use Brand Command Center" body="Sponsor accounts create and manage campaigns from the dedicated sponsor experience." primaryHref="/sponsor/dashboard" primaryLabel="Open Brand Command Center" />;
   if (privateLocked) return <Locked title="Private challenges are available on Creator Plan" body="Upgrade to create invite-only challenges and manage private competition access." primaryHref="/subscriptions" primaryLabel="View Plans" secondaryHref="/creator/private-challenges" secondaryLabel="Back to Private Challenges" />;
-  if (createdId) return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><h1 className="mt-6 text-3xl font-black">Challenge submitted for review.</h1><p className="mt-3 text-slate-600">We'll notify you when it's approved.</p><div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton><LinkButton href="/dashboard" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/creator/private-challenges/create" variant="secondary">Create Another Private Challenge</LinkButton></div></Card></AppShell>;
+  if (createdId) {
+    const invitations = Array.isArray(privateAccess?.invitations) ? privateAccess.invitations as Array<{ email: string; token: string }> : [];
+    const inviteHref = typeof privateAccess?.token === "string" ? `/private/invite/${privateAccess.token}` : typeof privateAccess?.code === "string" ? `/private/${privateAccess.code}` : "";
+    return <AppShell><Card className="mx-auto max-w-2xl p-8 text-center"><h1 className="mt-6 text-3xl font-black">Challenge submitted for review.</h1><p className="mt-3 text-slate-600">We&apos;ll notify you when it&apos;s approved.</p>{inviteHref ? <div className="mt-6 rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/5 p-4 text-left"><p className="font-bold">Share this one-time access credential</p><a className="mt-2 block break-all text-[var(--gold)] underline" href={inviteHref}>{typeof privateAccess?.code === "string" ? privateAccess.code : inviteHref}</a><p className="mt-2 text-xs text-slate-400">The secret is shown only now. Store or share it securely.</p></div> : null}{invitations.length ? <div className="mt-6 space-y-3 text-left"><p className="font-bold">Direct invitation links</p>{invitations.map((invitation) => <div key={invitation.email} className="rounded-[8px] border border-white/10 p-3"><p className="text-sm">{invitation.email}</p><a className="mt-1 block break-all text-sm text-[var(--gold)] underline" href={`/private/invite/${invitation.token}`}>{`/private/invite/${invitation.token}`}</a></div>)}</div> : null}<div className="mt-8 grid gap-3 sm:flex sm:justify-center"><LinkButton href={"/challenges/" + createdId}>View Challenge</LinkButton>{mode === "private" ? <LinkButton href={`/challenges/${createdId}/access`} variant="secondary">Manage access</LinkButton> : null}<LinkButton href="/dashboard" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/creator/private-challenges/create" variant="secondary">Create Another Private Challenge</LinkButton></div></Card></AppShell>;
+  }
 
   if (mode === "private") {
     const guide = privateStepGuides[step] ?? privateStepGuides[0];
@@ -542,7 +548,7 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
   const privateOffset = mode === "private" ? 1 : 0;
   const contentStep = mode === "private" && step >= 3 ? step + 1 : step;
   if (mode === "private" && step === 2) return <PrivateEligibilityStep form={form} update={update} />;
-  if (mode === "private" && step === 1) return <section><StepTitle title="Access" body="Choose one protected access method. Eligibility and participant requirements still apply." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><select className={inputClass} value={form.accessMethod} onChange={(event) => update("accessMethod", event.target.value as FormState["accessMethod"])}><option value="invite_link">Invite Link</option><option value="invitation_code">Invitation Code</option><option value="direct_invitations">Direct Invitations</option></select></Field>{form.accessMethod === "invitation_code" ? <Field label="Generated invitation code"><div className="flex flex-col gap-3 sm:flex-row"><input className={inputClass} value={form.accessCode} readOnly aria-label="Generated private challenge access code" /><Button type="button" variant="secondary" onClick={() => update("accessCode", generatePrivateChallengeAccessCode())}><RefreshCw size={16} /> Regenerate</Button></div></Field> : form.accessMethod === "direct_invitations" ? <Field label="Invitees"><textarea className={textareaClass} value={form.directInvitees} onChange={(event) => update("directInvitees", event.target.value)} placeholder="Email addresses, separated by commas or lines" /></Field> : <Field label="Share link"><input className={inputClass} readOnly value={draftId ? `/challenges/${draftId}/access` : "Save the draft to create a protected invite link."} /></Field>}<Field label="Invitation capacity (optional)"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(event) => update("accessCodeMaxUses", event.target.value)} placeholder="No fixed invitation limit" /></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(event) => update("access", event.target.value)} /></Field><Field label="Participant requirements"><textarea className={textareaClass} value={form.participantRequirements} onChange={(event) => update("participantRequirements", event.target.value)} placeholder="One requirement per line" /></Field></div></section>;
+  if (mode === "private" && step === 1) return <section><StepTitle title="Access" body="Choose one protected access method. Eligibility and participant requirements still apply." /><div className="mt-6 grid gap-5 md:grid-cols-2"><Field label="Access method"><select className={inputClass} value={form.accessMethod} onChange={(event) => update("accessMethod", event.target.value as FormState["accessMethod"])}><option value="invite_link">Invite Link</option><option value="invitation_code">Invitation Code</option><option value="direct_invitations">Direct Invitations</option></select></Field>{form.accessMethod === "invitation_code" ? <Field label="Invitation code"><input className={inputClass} value={form.accessCode} onChange={(event) => update("accessCode", event.target.value.toUpperCase())} maxLength={5} aria-label="Private challenge access code" /></Field> : form.accessMethod === "direct_invitations" ? <Field label="Invitees"><textarea className={textareaClass} value={form.directInvitees} onChange={(event) => update("directInvitees", event.target.value)} placeholder="Verified account email addresses, separated by commas or lines" /></Field> : <div className="rounded-[8px] border border-black/10 bg-slate-50 p-4 text-sm leading-6 text-slate-600">A random challenge-scoped invitation link is created when you submit. The link is shown once and can be revoked from access management.</div>}{form.accessMethod !== "direct_invitations" ? <Field label="Maximum invitation uses"><input className={inputClass} type="number" min="1" value={form.accessCodeMaxUses} onChange={(event) => update("accessCodeMaxUses", event.target.value)} placeholder="100" /></Field> : null}<Field label="Invitation expires (optional)"><input className={inputClass} type="datetime-local" value={form.accessCodeExpiresAt} onChange={(event) => update("accessCodeExpiresAt", event.target.value)} /></Field></div><div className="mt-5 grid gap-5 md:grid-cols-2"><Field label="Access instructions"><textarea className={textareaClass} value={form.access} onChange={(event) => update("access", event.target.value)} /></Field><Field label="Participant requirements"><textarea className={textareaClass} value={form.participantRequirements} onChange={(event) => update("participantRequirements", event.target.value)} placeholder="One requirement per line" /></Field></div></section>;
   if (mode === "private" && contentStep === 4) return <MonetizationStep form={form} update={update} togglePlacement={togglePlacement} planAccess={planAccess} planName={planName} monetizationEligible={monetizationEligible} entryFeeCents={entryFeeCents} draftId={draftId} />;
   if (mode === "private" && contentStep === 5) return <MediaBrandingStep form={form} userId={userId} updateMedia={updateMedia} track={track} mediaUploadDisabled={mediaUploadDisabled} mediaUploadDisabledReason={mediaUploadDisabledReason} />;
   if (mode === "private" && contentStep === 6) return <PrivateScheduleStep form={form} update={update} />;
@@ -583,7 +589,7 @@ function StepContent({ mode, step, form, update, toggleType, togglePlacement, up
     "Winner Announcement": formatChallengeLocalDateTime(form.endsAt, form.timeZone) ?? "Not set"
   };
   const reviewLabels = challengeReviewMonetizationLabels({ monetizationAllowed: monetizationEligible, paidEntryRequested: form.paidEntryEnabled, entryFeeValid: !form.paidEntryEnabled || entryFeeCents >= 500, sponsorReady: form.sponsorReady, prizePoolRequested: form.prizePoolEnabled, confirmedPrizeFundingCents: form.confirmedCreatorPrizeFundingCents });
-  return <section><StepTitle title={mode === "private" ? "Review & Submit" : "Review & Publish"} body="Check the challenge before submitting it for review." /><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? form.publicPreviewEnabled ? "Private with public preview" : "Private / hidden" : "Public", ...(mode === "private" ? { Access: "Link + Code configured" } : {}), "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Optional while uploads are unavailable" : form.coverImageUrl ? "Ready" : "Required", "Paid Entry": reviewLabels.paidEntry, "Sponsor Ready": reviewLabels.sponsorReady, "Prize Pool": reviewLabels.prizePool }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Review checklist:</b> Check the details below, then submit your challenge for review.</Card></section>;
+  return <section><StepTitle title={mode === "private" ? "Review & Submit" : "Review & Publish"} body="Check the challenge before submitting it for review." /><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries({ Title: form.title || "Not set", Category: form.category || "Not set", Visibility: mode === "private" ? form.publicPreviewEnabled ? "Private with public preview" : "Private / hidden" : "Public", ...(mode === "private" ? { Access: form.accessMethod === "invite_link" ? "Invite Link" : form.accessMethod === "direct_invitations" ? "Direct Invitations" : "Invitation Code" } : {}), "Submission Types": form.submissionTypes.join(", "), ...timelineSummary, Plan: mode === "private" ? "Creator Plan" : planName, Media: mediaUploadDisabled ? "Optional while uploads are unavailable" : form.coverImageUrl ? "Ready" : "Required", "Paid Entry": reviewLabels.paidEntry, "Sponsor Ready": reviewLabels.sponsorReady, "Prize Pool": reviewLabels.prizePool }).map(([label, value]) => <Card key={label} className="p-4"><div className="text-sm font-bold text-slate-400">{label}</div><div className="mt-1 break-words text-base font-black text-white">{String(value)}</div></Card>)}</div><Card className="mt-5 p-4 text-sm leading-6 text-slate-300"><b className="text-white">Review checklist:</b> Check the details below, then submit your challenge for review.</Card></section>;
 }
 
 function PrivateEligibilityStep({ form, update }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void }) {
@@ -606,7 +612,7 @@ function PrivateReview({ form, planName, mediaUploadDisabled, entryFeeCents, mon
   const labels = challengeReviewMonetizationLabels({ monetizationAllowed: monetizationEligible, paidEntryRequested: form.paidEntryEnabled, entryFeeValid: !form.paidEntryEnabled || entryFeeCents >= 500, sponsorReady: form.sponsorReady, prizePoolRequested: form.prizePoolEnabled, confirmedPrizeFundingCents: form.confirmedCreatorPrizeFundingCents });
   const summary = {
     Overview: `${form.title || "Not set"} · ${form.category || "Category not set"}`,
-    Access: `Link + Code · Code configured · ${form.accessCodeMaxUses ? `${form.accessCodeMaxUses} invitation uses` : "No fixed invitation capacity"}`,
+    Access: `${form.accessMethod === "invite_link" ? "Invite Link" : form.accessMethod === "direct_invitations" ? "Direct Invitations" : "Invitation Code"} · ${form.accessMethod === "direct_invitations" ? `${form.directInvitees.split(/[\n,]/).filter((email) => email.trim()).length} recipients` : form.accessCodeMaxUses ? `${form.accessCodeMaxUses} uses` : "No fixed invitation limit"}`,
     Eligibility: `Automatic eligible entry · ${form.eligibleCountries || "Worldwide"} · ${form.maxParticipants ? `${form.maxParticipants} participant limit` : "Unlimited participants"}`,
     Monetization: `${labels.paidEntry} · ${labels.prizePool} · ${labels.sponsorReady}`,
     Media: mediaUploadDisabled ? "Optional while uploads are unavailable" : form.coverImageUrl ? "Primary media ready" : "Primary media required",
@@ -614,7 +620,7 @@ function PrivateReview({ form, planName, mediaUploadDisabled, entryFeeCents, mon
     Submission: `${form.submissionTypes.join(" or ") || "Type not set"} · ${form.submission ? "Instructions ready" : "Instructions missing"}`,
     Plan: planName
   };
-  return <section><StepTitle title="Review" body="Review every private challenge section before moving to final submission." /><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries(summary).map(([label, value]) => <Card key={label} className="p-4"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 break-words font-black text-white">{value}</p></Card>)}</div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">The access code is intentionally masked in Review. Return to Access to view or regenerate it.</Card></section>;
+  return <section><StepTitle title="Review" body="Review every private challenge section before moving to final submission." /><div className="mt-6 grid gap-4 md:grid-cols-2">{Object.entries(summary).map(([label, value]) => <Card key={label} className="p-4"><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 break-words font-black text-white">{value}</p></Card>)}</div><Card className="mt-5 border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">The selected access credential is created on submission and shown once. Rotate it from challenge access management if you lose it.</Card></section>;
 }
 
 function MonetizationStep({ form, update, togglePlacement, planAccess, planName, monetizationEligible, entryFeeCents, draftId }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void; togglePlacement: (surface: string) => void; planAccess: ReturnType<typeof getUserPlanAccess>; planName: string; monetizationEligible: boolean; entryFeeCents: number; draftId?: string }) {

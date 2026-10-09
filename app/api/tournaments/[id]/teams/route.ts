@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { FieldPath } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { conflict, fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -7,6 +8,12 @@ import type { TournamentFoundation, TournamentTeamFoundation } from "@/lib/tourn
 export const dynamic = "force-dynamic";
 const normalizedName = (value: unknown) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 const teamId = (tournamentId: string, name: string) => `${tournamentId}_${createHash("sha256").update(name).digest("hex").slice(0, 20)}`;
+function decodeMemberCursor(value: string) {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { usernameNormalized?: unknown; id?: unknown };
+    return typeof parsed.usernameNormalized === "string" && typeof parsed.id === "string" ? parsed : null;
+  } catch { return null; }
+}
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -22,12 +29,53 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const searchTeam = await db.collection("tournamentTeams").doc(searchTeamId).get();
     if (!searchTeam.exists || searchTeam.data()?.tournamentId !== id || searchTeam.data()?.captainUserId !== user.uid) return fail("Only the Team Captain can search for members.", 403, undefined, "TEAM_CAPTAIN_REQUIRED");
     if (searchTeam.data()?.rosterLockedAt) return conflict("This Team roster is locked.");
-    const profiles = await db.collection("users").limit(250).get();
-    const members = profiles.docs.map((profile) => {
-      const data = profile.data();
-      return { id: profile.id, displayName: String(data.displayName ?? data.name ?? data.username ?? "Account"), username: String(data.username ?? "") };
-    }).filter((profile) => profile.id !== user.uid && `${profile.displayName} ${profile.username}`.toLowerCase().includes(search)).slice(0, 12);
-    return ok({ members }, "Eligible account results loaded.");
+    const requestedLimit = Math.max(1, Math.min(20, Number(url.searchParams.get("limit") ?? 12) || 12));
+    const cursorValue = String(url.searchParams.get("cursor") ?? "");
+    const cursor = cursorValue ? decodeMemberCursor(cursorValue) : null;
+    if (cursorValue && !cursor) return validationError({ cursor: "Search cursor is invalid." });
+    const profilesQuery = db.collection("profiles")
+      .where("usernameNormalized", ">=", search)
+      .where("usernameNormalized", "<=", `${search}\uf8ff`)
+      .orderBy("usernameNormalized", "asc")
+      .orderBy(FieldPath.documentId(), "asc");
+    const pageQuery = cursor ? profilesQuery.startAfter(cursor.usernameNormalized, cursor.id) : profilesQuery;
+    const profilePage = await pageQuery.limit(51).get();
+    const candidates = profilePage.docs;
+    const candidateIds = candidates.map((profile) => profile.id);
+    const [accounts, memberships] = await Promise.all([
+      candidateIds.length ? db.getAll(...candidateIds.map((candidateId) => db.collection("users").doc(candidateId))) : Promise.resolve([]),
+      candidateIds.length ? db.getAll(...candidateIds.map((candidateId) => db.collection("tournamentTeamMemberships").doc(`${id}_${candidateId}`))) : Promise.resolve([])
+    ]);
+    const accountById = new Map(accounts.map((snap) => [snap.id, snap.data() ?? {}]));
+    const membershipById = new Map(memberships.map((snap) => [snap.id.slice(`${id}_`.length), snap.exists]));
+    const members: Array<{ id: string; displayName: string; username: string }> = [];
+    let lastScanned = cursor;
+    for (const profile of candidates) {
+      const profileData = profile.data();
+      lastScanned = { usernameNormalized: String(profileData.usernameNormalized ?? ""), id: profile.id };
+      if (profile.id === user.uid) continue;
+      const account = accountById.get(profile.id) ?? {};
+      const accountStatus = String(account.accountStatus ?? (account.suspended ? "suspended" : "active")).toLowerCase();
+      const profileVisibility = String(profileData.profileVisibility ?? "public").toLowerCase();
+      const accountType = String(account.accountType ?? account.role ?? "user").toLowerCase();
+      const eligible = profileVisibility === "public"
+        && !profileData.publicProfileHidden
+        && !account.disabled && !account.suspended
+        && !["disabled", "suspended", "deactivated", "blocked", "deleted", "deletion_requested", "anonymized"].includes(accountStatus)
+        && !["sponsor", "enterprise"].includes(accountType)
+        && membershipById.get(profile.id) !== true;
+      if (!eligible) continue;
+      const username = String(profileData.username ?? "");
+      if (!username.toLowerCase().startsWith(search)) continue;
+      members.push({ id: profile.id, displayName: String(profileData.displayName ?? profileData.name ?? username ?? "Tournament member"), username });
+      if (members.length >= requestedLimit) break;
+    }
+    const lastScannedIndex = lastScanned ? profilePage.docs.findIndex((profile) => profile.id === lastScanned?.id) : -1;
+    const hasMoreProfiles = profilePage.docs.length === 51 || lastScannedIndex >= 0 && lastScannedIndex < profilePage.docs.length - 1;
+    const nextCursor = hasMoreProfiles && lastScanned
+      ? Buffer.from(JSON.stringify(lastScanned)).toString("base64url")
+      : null;
+    return ok({ members, nextCursor }, "Discoverable eligible team-member results loaded.");
   }
   const [snap, membershipSnap, invitationsSnap, requestsSnap, transfersSnap] = await Promise.all([
     db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get(),
@@ -67,10 +115,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     identityIds.add(String(transfer.fromUserId ?? ""));
     identityIds.add(String(transfer.toUserId ?? ""));
   });
-  const profileSnaps = await Promise.all([...identityIds].filter(Boolean).slice(0, 100).map((profileId) => db.collection("users").doc(profileId).get()));
-  const identities = Object.fromEntries(profileSnaps.map((profile) => {
-    const data = profile.data() ?? {};
-    return [profile.id, { id: profile.id, displayName: String(data.displayName ?? data.name ?? data.username ?? "Tournament member"), username: String(data.username ?? "") }];
+  const visibleIdentityIds = [...identityIds].filter(Boolean).slice(0, 100);
+  const identitySnaps = visibleIdentityIds.length ? await db.getAll(
+    ...visibleIdentityIds.flatMap((profileId) => [db.collection("users").doc(profileId), db.collection("profiles").doc(profileId)])
+  ) : [];
+  const identities = Object.fromEntries(visibleIdentityIds.map((profileId, index) => {
+    const account = identitySnaps[index * 2]?.data() ?? {};
+    const profile = identitySnaps[index * 2 + 1]?.data() ?? {};
+    const hidden = String(profile.profileVisibility ?? "public").toLowerCase() !== "public" || profile.publicProfileHidden === true;
+    const username = hidden ? "" : String(profile.username ?? account.username ?? "");
+    const displayName = hidden ? "Private profile" : String(profile.displayName ?? account.displayName ?? account.name ?? username ?? "Tournament member");
+    return [profileId, { id: profileId, displayName, username }];
   }));
   const teams = records.map((team) => ({ id: team.id, tournamentId: team.tournamentId, name: team.name, status: team.status, paymentStatus: team.paymentStatus, seed: team.seed, rankingScore: team.rankingScore, rosterLockedAt: team.rosterLockedAt, memberCount: team.memberUserIds.length, canManage: team.captainUserId === user.uid, isViewerTeam: team.id === viewerTeamId }));
   return ok({ teams, viewerTeam, viewerCanManage: viewerTeam?.captainUserId === user.uid, invitations: visibleInvitations, requests: visibleRequests, captainTransfers: visibleTransfers, identities }, "Tournament teams loaded.");
@@ -220,6 +275,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (action === "invite") {
     const invitedUserId = String(body.userId ?? "");
     if (!invitedUserId || invitedUserId === user.uid) return validationError({ userId: "Choose another user to invite." });
+    const [invitedProfileSnap, invitedAccountSnap] = await Promise.all([
+      db.collection("profiles").doc(invitedUserId).get(),
+      db.collection("users").doc(invitedUserId).get()
+    ]);
+    const invitedProfile = invitedProfileSnap.data() ?? {};
+    const invitedAccount = invitedAccountSnap.data() ?? {};
+    const invitedStatus = String(invitedAccount.accountStatus ?? (invitedAccount.suspended ? "suspended" : "active")).toLowerCase();
+    const invitedType = String(invitedAccount.accountType ?? invitedAccount.role ?? "user").toLowerCase();
+    if (!invitedProfileSnap.exists || String(invitedProfile.profileVisibility ?? "public").toLowerCase() !== "public" || invitedProfile.publicProfileHidden === true
+      || !invitedAccountSnap.exists || invitedAccount.disabled === true || invitedAccount.suspended === true
+      || ["disabled", "suspended", "deactivated", "blocked", "deleted", "deletion_requested", "anonymized"].includes(invitedStatus)
+      || ["sponsor", "enterprise"].includes(invitedType)) return fail("This account is not eligible for Tournament team discovery or invitation.", 404, undefined, "TEAM_MEMBER_UNAVAILABLE");
     const invitedMembershipRef = db.collection("tournamentTeamMemberships").doc(`${id}_${invitedUserId}`);
     if ((await invitedMembershipRef.get()).exists) return conflict("This user already belongs to a team in the tournament.");
     if (team.memberUserIds.length >= Number(tournament.teamConfig?.maximumSize ?? 20)) return conflict("This team is full.");

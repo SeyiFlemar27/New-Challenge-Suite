@@ -35,7 +35,7 @@ export function runEconomyContract(metaUrl) {
   lacks(files.wallet + files.credits + files.doro, ["Math.random()"]);
 
   if (name.includes("rules-versioning")) has(files.rules + files.create + files.admin, ["economyRuleVersions", "economyRuleVersion", "affectsFutureTransactionsOnly"]);
-  else if (name.includes("super-admin")) has(files.admin, ["requireRecentAdminAuthentication", "super_admin", "platform_owner", "writeAuditLog"]);
+  else if (name.includes("super-admin")) has(files.admin, ["requireRecentAdminAuthentication", "settings.editFinancial", "submittedBy === user.uid", "writeAuditLog"]);
   else if (name.includes("name-maintained")) has(read("app/dorocoins/page.tsx"), ["DoroCoins"]);
   else if (name.includes("not-renamed")) lacks(read("app/dorocoins/page.tsx") + read("components/sidebar.tsx"), ["Challenge Coins"]);
   else if (name.includes("earning-values")) has(files.rules, ["daily_login: 10", "watch_challenge_video: 2", "like_challenge: 1", "comment_challenge: 3", "share_challenge: 5", "referral_signup: 50", "create_free_challenge: 25", "join_free_challenge: 20", "win_free_challenge: 150", "top_10_finish: 75", "profile_verification: 100", "sponsored_ad_watch: 5"]);

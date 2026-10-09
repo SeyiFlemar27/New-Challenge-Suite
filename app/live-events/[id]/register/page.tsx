@@ -1,6 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { CheckCircle2, LockKeyhole } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -32,59 +34,25 @@ function formatDate(value: string) {
 
 export default function EventRegistrationPage() {
   const params = useParams<{ id: string }>();
+  const eventQuery = useQuery({ queryKey: ["live-event-registration", params.id], queryFn: () => fetchLiveEventDetails(params.id) });
+  const eventResult = eventQuery.data;
+  const record = eventResult?.data?.event as Partial<EventDetails> | undefined;
+  const event = useMemo(() => record ? {
+    id: String(record.id ?? ""), title: String(record.title ?? ""), image: String(record.image ?? ""), description: String(record.description ?? ""),
+    date: String(record.date ?? ""), time: String(record.time ?? ""), location: String(record.location ?? ""), ticketType: String(record.ticketType ?? "General attendee access"),
+    alreadyRegistered: Boolean(record.alreadyRegistered), fullCapacity: Boolean(record.fullCapacity), planRequired: Boolean(record.planRequired), registrationOpen: Boolean(record.registrationOpen), canRegister: Boolean(record.canRegister)
+  } satisfies EventDetails : null, [record]);
+  const [formOverrides, setFormOverrides] = useState<{ fullName: string | null; email: string | null; phone: string; notes: string }>({ fullName: null, email: null, phone: "", notes: "" });
+  const form = { fullName: formOverrides.fullName ?? eventResult?.data?.user.displayName ?? "", email: formOverrides.email ?? eventResult?.data?.user.email ?? "", phone: formOverrides.phone, notes: formOverrides.notes };
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const [event, setEvent] = useState<EventDetails | null>(null);
-  const [form, setForm] = useState({ fullName: "", email: "", phone: "", notes: "" });
-  const [loading, setLoading] = useState(true);
+  const loading = eventQuery.isLoading;
   const [submitting, setSubmitting] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-  const [unauthenticated, setUnauthenticated] = useState(false);
+  const code = (eventResult as any)?.code;
+  const notFound = code === "NOT_FOUND";
+  const unauthenticated = code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED";
   const [emailWarning, setEmailWarning] = useState("");
-
-  async function loadEvent() {
-    setLoading(true);
-    setError("");
-    setNotFound(false);
-    setUnauthenticated(false);
-    const result = await fetchLiveEventDetails(params.id);
-    if (!result.ok || !result.data) {
-      const code = (result as any).code;
-      setUnauthenticated(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED");
-      setNotFound(code === "NOT_FOUND");
-      setError(result.message || "Live event could not be loaded.");
-      setLoading(false);
-      return;
-    }
-    const data = result.data;
-    const record = data.event as Partial<EventDetails>;
-    setEvent({
-      id: String(record.id ?? ""),
-      title: String(record.title ?? ""),
-      image: String(record.image ?? ""),
-      description: String(record.description ?? ""),
-      date: String(record.date ?? ""),
-      time: String(record.time ?? ""),
-      location: String(record.location ?? ""),
-      ticketType: String(record.ticketType ?? "General attendee access"),
-      alreadyRegistered: Boolean(record.alreadyRegistered),
-      fullCapacity: Boolean(record.fullCapacity),
-      planRequired: Boolean(record.planRequired),
-      registrationOpen: Boolean(record.registrationOpen),
-      canRegister: Boolean(record.canRegister)
-    });
-    setForm((value) => ({
-      ...value,
-      fullName: data.user.displayName ?? "",
-      email: data.user.email ?? ""
-    }));
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    loadEvent();
-  }, [params.id]);
 
   async function submit(formEvent: React.FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();
@@ -109,7 +77,7 @@ export default function EventRegistrationPage() {
     setSubmitting(false);
     if (!result.ok) {
       setError(result.message || "Registration could not be completed.");
-      await loadEvent();
+      await eventQuery.refetch();
       return;
     }
     setEmailWarning(String((result.data as any)?.emailWarning ?? ""));
@@ -185,7 +153,7 @@ export default function EventRegistrationPage() {
     <AppShell>
       <div className="grid max-w-6xl gap-8 xl:grid-cols-[.9fr_1.1fr]">
         <Card className="overflow-hidden">
-          {event.image ? <img src={event.image} alt={event.title} className="h-72 w-full object-cover" /> : <div className="flex h-72 w-full items-center justify-center bg-black/40 text-sm font-bold text-slate-400">Event media unavailable</div>}
+          {event.image ? <ContentImage src={event.image} alt={event.title} className="h-72 w-full object-cover" /> : <div className="flex h-72 w-full items-center justify-center bg-black/40 text-sm font-bold text-slate-400">Event media unavailable</div>}
           <div className="p-7">
             <PageTitle title={event.title} subtitle={event.description} />
             <div className="mt-6 space-y-3 text-slate-200">
@@ -200,10 +168,10 @@ export default function EventRegistrationPage() {
         <Card className="p-8">
           <h2 className="text-2xl font-black">Event Registration</h2>
           <form className="mt-6 space-y-5" onSubmit={submit}>
-            <Field label="Full Name"><input className={inputClass} value={form.fullName} onChange={(inputEvent) => setForm((value) => ({ ...value, fullName: inputEvent.target.value }))} required /></Field>
-            <Field label="Email"><input className={inputClass} type="email" value={form.email} onChange={(inputEvent) => setForm((value) => ({ ...value, email: inputEvent.target.value }))} required /></Field>
-            <Field label="Phone Number"><input className={inputClass} type="tel" value={form.phone} onChange={(inputEvent) => setForm((value) => ({ ...value, phone: inputEvent.target.value }))} placeholder="+1 555 0100" required /></Field>
-            <Field label="Optional Notes"><textarea className={textareaClass} value={form.notes} onChange={(inputEvent) => setForm((value) => ({ ...value, notes: inputEvent.target.value }))} placeholder="Accessibility needs, team name, or guest notes" /></Field>
+            <Field label="Full Name"><input className={inputClass} value={form.fullName} onChange={(inputEvent) => setFormOverrides((value) => ({ ...value, fullName: inputEvent.target.value }))} required /></Field>
+            <Field label="Email"><input className={inputClass} type="email" value={form.email} onChange={(inputEvent) => setFormOverrides((value) => ({ ...value, email: inputEvent.target.value }))} required /></Field>
+            <Field label="Phone Number"><input className={inputClass} type="tel" value={form.phone} onChange={(inputEvent) => setFormOverrides((value) => ({ ...value, phone: inputEvent.target.value }))} placeholder="+1 555 0100" required /></Field>
+            <Field label="Optional Notes"><textarea className={textareaClass} value={form.notes} onChange={(inputEvent) => setFormOverrides((value) => ({ ...value, notes: inputEvent.target.value }))} placeholder="Accessibility needs, team name, or guest notes" /></Field>
             <label className="flex items-start gap-3 font-bold"><input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> I accept the live event rules, risk notice, and recording consent.</label>
             {blockedMessage ? <p className="rounded-[8px] bg-yellow-950/40 p-3 text-yellow-100">{blockedMessage}</p> : null}
             {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}

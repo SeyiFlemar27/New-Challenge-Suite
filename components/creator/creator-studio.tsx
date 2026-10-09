@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertCircle, ArrowRight, BarChart3, CalendarClock, ClipboardCheck, DollarSign, Sparkles, UsersRound } from "lucide-react";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { useClockTimestamp } from "@/lib/hooks/use-clock-timestamp";
 
 export type CreatorStudioChallenge = Record<string, unknown> & { id: string };
 
@@ -38,6 +39,7 @@ function nextTime(challenge: CreatorStudioChallenge) {
 }
 
 export function CreatorStudio({ displayName, challenges, availableEarningsCents, pendingEarningsCents = 0 }: { displayName: string; challenges: CreatorStudioChallenge[]; availableEarningsCents: number; pendingEarningsCents?: number }) {
+  const now = useClockTimestamp();
   const active = challenges.filter((challenge) => ACTIVE_KPI_STATUSES.has(statusOf(challenge)));
   const participants = active.reduce((sum, challenge) => sum + count(challenge, ["participantCount", "participants"]), 0);
   const submissions = active.reduce((sum, challenge) => sum + count(challenge, ["submissionCount", "submissions"]), 0);
@@ -49,7 +51,7 @@ export function CreatorStudio({ displayName, challenges, availableEarningsCents,
     if (pending > 0) return [{ priority: 2, title: `${pending} item${pending === 1 ? "" : "s"} need review`, body: title, href: `/challenges/${challenge.id}/manage` }];
     const deadline = nextTime(challenge);
     const time = Date.parse(String(deadline ?? ""));
-    if (Number.isFinite(time) && time - Date.now() <= 24 * 60 * 60 * 1000) return [{ priority: 3, title: `${title} has a deadline soon`, body: formatChallengeDateTime(deadline, challenge) ?? "Review the schedule.", href: `/challenges/${challenge.id}/manage?tab=schedule` }];
+    if (now && Number.isFinite(time) && time - now <= 24 * 60 * 60 * 1000) return [{ priority: 3, title: `${title} has a deadline soon`, body: formatChallengeDateTime(deadline, challenge) ?? "Review the schedule.", href: `/challenges/${challenge.id}/manage?tab=schedule` }];
     return [];
   }).sort((a, b) => a.priority - b.priority).slice(0, 3);
   const preview = [...challenges].sort((a, b) => Number(b.recommendationScore ?? 0) - Number(a.recommendationScore ?? 0) || Date.parse(String(b.updatedAt ?? b.createdAt ?? "")) - Date.parse(String(a.updatedAt ?? a.createdAt ?? ""))).slice(0, 6);

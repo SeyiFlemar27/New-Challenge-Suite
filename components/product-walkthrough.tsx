@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Compass, LayoutDashboard, Trophy, UserRound, WalletCards, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
@@ -45,7 +45,9 @@ const sponsorSteps: TourStep[] = [
 export function ProductWalkthrough() {
   const { user, loading } = useCurrentUser();
   const [step, setStep] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [dismissedUserId, setDismissedUserId] = useState<string | null>(null);
+  const eligible = !loading && Boolean(user?.verified && user.walkthroughCompleted === false && user.selectedAccountType);
+  const open = eligible && dismissedUserId !== user?.uid;
   const [saving, setSaving] = useState(false);
   const capabilities = getPersonalCapabilities({ planId: user?.planId, planStatus: user?.planStatus, legacyPlanId: user?.legacyPlanId, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
   const steps = useMemo(
@@ -62,15 +64,11 @@ export function ProductWalkthrough() {
     [capabilities.canManageHostOperations, capabilities.canUseCreatorAnalytics, user?.accountType, user?.selectedAccountType]
   );
 
-  useEffect(() => {
-    setOpen(!loading && Boolean(user?.verified && user.walkthroughCompleted === false && user.selectedAccountType));
-  }, [loading, user?.selectedAccountType, user?.verified, user?.walkthroughCompleted]);
-
   async function finish() {
     setSaving(true);
     const result = await apiRequest<{ completed: boolean }>("/api/onboarding/walkthrough", { method: "PATCH", body: JSON.stringify({}) });
     setSaving(false);
-    if (result.ok) setOpen(false);
+    if (result.ok) setDismissedUserId(user?.uid ?? null);
   }
 
   if (!open) return null;

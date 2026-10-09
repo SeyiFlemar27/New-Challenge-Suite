@@ -4,5 +4,5 @@ const route = read("app/api/dorocoin/packages/route.ts");
 const page = read("app/dorocoins/page.tsx");
 assert(route.includes('db.collection("doroCoinPackages")') && route.includes('where("status", "==", "active")'));
 for (const field of ["baseCoins", "bonusCoins", "mostPopular"]) assert(route.includes(field) && page.includes(field));
-assert(page.includes("Most Popular"));
+assert(page.includes("Best value"));
 console.log("configurable DoroCoin package checks passed");

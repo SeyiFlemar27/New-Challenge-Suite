@@ -36,7 +36,7 @@ export async function validateNormalChallengeVideo(file: File): Promise<UploadFi
   if (!(["mp4", "avi"].includes(extension || ""))) return { ok: false, code: "invalid_video_type", message: "Video must be an MP4 or AVI file." };
   try {
     const metadata = await loadVideo(file);
-    if (metadata.width < NORMAL_MEDIA_LIMITS.videoMinWidth || metadata.height < NORMAL_MEDIA_LIMITS.videoMinHeight) return { ok: false, code: "video_too_small", message: "Video must be at least 1280 x 720 pixels." };
+    if (metadata.width < NORMAL_MEDIA_LIMITS.videoMinWidth || metadata.height < NORMAL_MEDIA_LIMITS.videoMinHeight || metadata.width <= metadata.height) return { ok: false, code: "video_too_small", message: "Video must be landscape and at least 1280 x 720 pixels." };
     if (!Number.isFinite(metadata.durationSeconds) || metadata.durationSeconds > NORMAL_MEDIA_LIMITS.videoMaxDurationSeconds) return { ok: false, code: "video_too_long", message: "Video must be 75 seconds or shorter." };
     return { ok: true, metadata };
   } catch { return { ok: false, code: "video_metadata_failed", message: "We couldn't read this video. Choose another MP4 or AVI file." }; }

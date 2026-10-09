@@ -228,7 +228,8 @@ function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerPath, setDrawerPath] = useState<string | null>(null);
+  const drawerOpen = drawerPath === pathname;
   const { user, loading, signedOut } = useCurrentUser();
   const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
   const effectiveTier = getEffectiveTier({
@@ -255,7 +256,6 @@ export function Sidebar() {
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
   const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;
   const personalEconomyContext = workspaceContext === "user" || workspaceContext === "creator" || workspaceContext === "host";
-  useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
     if (!drawerOpen) return;
     document.body.style.overflow = "hidden";
@@ -268,7 +268,7 @@ export function Sidebar() {
     <>
       <header data-mobile-header className="sticky top-0 z-30 border-b border-yellow-500/20 bg-[var(--panel)] px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_56px] items-center gap-2">
-          <button type="button" onClick={() => setDrawerOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={21} /></button>
+          <button type="button" onClick={() => setDrawerPath(pathname)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" aria-label="Open navigation menu"><Menu size={21} /></button>
           <Link href={signedOut ? "/explore" : workspace.homeHref} className="flex min-w-0 items-center justify-center gap-2 text-center">
             <BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" />
             <span className="truncate text-sm font-black uppercase tracking-[0.12em] text-white">Challenge Suite</span>
@@ -282,9 +282,9 @@ export function Sidebar() {
       </header>
 
       {drawerOpen ? <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
-        <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerOpen(false)} aria-label="Close navigation menu" />
+        <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerPath(null)} aria-label="Close navigation menu" />
         <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5">
-          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
+          <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerPath(null)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} pathname={pathname} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
             {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
@@ -335,15 +335,12 @@ function WorkspaceNavigationLoading() {
 }
 
 function NavigationSections({ sections, activeHref, pathname, mobile = false }: { sections: NavSection[]; activeHref: string; pathname: string; mobile?: boolean }) {
-  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => <NavigationItem key={item.href ?? item.label} item={item} activeHref={activeHref} pathname={pathname} />)}</div></section>)}</div>;
+  return <div className={mobile ? "mt-7 space-y-7" : "space-y-6"}>{sections.map((section) => <section key={section.label}><p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">{section.label}</p><div className="space-y-1">{section.items.map((item) => <NavigationItem key={`${item.href ?? item.label}:${pathname}`} item={item} activeHref={activeHref} pathname={pathname} />)}</div></section>)}</div>;
 }
 
 function NavigationItem({ item, activeHref, pathname }: { item: NavItem; activeHref: string; pathname: string }) {
   const childRouteActive = Boolean(item.children?.some((child) => pathname === child.href.split("?")[0] || pathname.startsWith(child.href.split("?")[0] + "/")));
   const [open, setOpen] = useState(childRouteActive);
-  useEffect(() => {
-    if (childRouteActive) setOpen(true);
-  }, [childRouteActive]);
   const Icon = item.icon;
   if (item.children?.length) {
     return <div><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className={cn("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", childRouteActive && "bg-white/5 text-white")}><Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span><ChevronDown size={16} className={open ? "rotate-180 transition" : "transition"} /></button>{open ? <div className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-3">{item.children.map((child) => <Link key={child.href} href={child.href} className="flex min-h-10 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">{child.label}</Link>)}</div> : null}</div>;

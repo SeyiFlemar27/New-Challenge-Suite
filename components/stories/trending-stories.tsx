@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, Users, Vote, X } from "lucide-react";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
@@ -29,26 +30,26 @@ export function TrendingStories({ challenges, source = "explore", isLoading = fa
   const activeLifecycle = active ? getChallengeLifecycleState(active) : null;
   const dashboardMode = source === "dashboard";
 
-  function track(challengeId: string, action: string) {
+  const track = useCallback((challengeId: string, action: string) => {
     void apiRequest("/api/stories/track", { method: "POST", body: JSON.stringify({ challengeId, action, source }) });
-  }
+  }, [source]);
 
-  function open(index: number) {
+  const open = useCallback((index: number) => {
     setActiveIndex(index);
     track(String(stories[index].id), "view");
-  }
+  }, [stories, track]);
 
-  function move(direction: -1 | 1) {
+  const move = useCallback((direction: -1 | 1) => {
     if (activeIndex === null) return;
     const next = (activeIndex + direction + stories.length) % stories.length;
     track(String(stories[activeIndex].id), direction === 1 ? "next" : "previous");
     open(next);
-  }
+  }, [activeIndex, open, stories, track]);
 
-  function close() {
+  const close = useCallback(() => {
     if (active) track(String(active.id), "close");
     setActiveIndex(null);
-  }
+  }, [active, track]);
 
   useEffect(() => {
     if (activeIndex === null) return;
@@ -63,7 +64,7 @@ export function TrendingStories({ challenges, source = "explore", isLoading = fa
       document.body.style.overflow = "";
       window.removeEventListener("keydown", keydown);
     };
-  }, [activeIndex, dashboardMode, stories.length]);
+  }, [activeIndex, close, dashboardMode, move, stories.length]);
 
   if (isLoading) {
     return <StoryShell><Card className="mt-4 border-white/10 bg-white/[0.03] p-5 text-sm font-bold text-slate-300">Loading trending challenges...</Card></StoryShell>;
@@ -83,8 +84,8 @@ export function TrendingStories({ challenges, source = "explore", isLoading = fa
         {stories.map((story, index) => (
           <button key={story.id} type="button" onClick={() => open(index)} className="w-24 shrink-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
             <div className="rounded-full border-[3px] border-[var(--gold)] p-[3px] shadow-[0_0_22px_rgba(246,198,75,.12)]">
-              <div className="h-[88px] overflow-hidden rounded-full border-4 border-black bg-[#181818]">
-                <img src={story.coverImageUrl || story.imageUrl || story.promoImageUrl || logoUrl} alt={story.title || "Trending challenge"} className="h-full w-full object-cover" />
+              <div className="relative h-[88px] overflow-hidden rounded-full border-4 border-black bg-[#181818]">
+                <Image src={story.coverImageUrl || story.imageUrl || story.promoImageUrl || logoUrl} alt={story.title || "Trending challenge"} fill unoptimized className="object-cover" />
               </div>
             </div>
             <p className="mt-2 line-clamp-2 text-center text-xs font-black">{story.title || "Challenge"}</p>
@@ -123,7 +124,7 @@ function DashboardStoryPreview({ active, lifecycle, onClose }: { active: StoryCh
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/85 p-4" role="dialog" aria-modal="true" aria-label={`${active.title ?? "Challenge"} preview`}>
       <Card className="w-full max-w-2xl overflow-hidden border-[var(--gold)]/30 bg-[#101010]">
         <div className="relative aspect-[16/9] bg-black">
-          <img src={image} alt={active.title ?? "Trending challenge"} className="h-full w-full object-cover" />
+          <Image src={image} alt={active.title ?? "Trending challenge"} fill unoptimized className="object-cover" />
           <button onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/75 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label="Close preview"><X size={18} /></button>
           <div className="absolute bottom-4 left-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.12em]"><span className="rounded-full bg-[var(--gold)] px-3 py-1 text-black">{active.category ?? "Challenge"}</span><span className="rounded-full bg-black/75 px-3 py-1 text-white">{status}</span></div>
         </div>
@@ -152,7 +153,7 @@ function ExploreStoryPreview({ active, stories, activeIndex, lifecycle, onClose,
         <div className="absolute left-3 right-3 top-3 z-20 flex gap-1">{stories.map((story, index) => <div key={story.id} className={`h-1 flex-1 rounded-full ${index <= (activeIndex ?? 0) ? "bg-[var(--gold)]" : "bg-white/20"}`} />)}</div>
         <button onClick={onClose} className="absolute right-4 top-7 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/70" aria-label="Close story"><X /></button>
         <div className="relative min-h-[34dvh] flex-1 bg-black sm:min-h-0">
-          {String(active.trailerVideoUrl || active.promoVideoUrl || "").startsWith("http") ? <video src={active.trailerVideoUrl || active.promoVideoUrl} controls autoPlay muted className="h-full w-full object-contain" /> : <img src={active.coverImageUrl || active.imageUrl || active.promoImageUrl || logoUrl} alt={active.title} className="h-full w-full object-contain" />}
+          {String(active.trailerVideoUrl || active.promoVideoUrl || "").startsWith("http") ? <video src={active.trailerVideoUrl || active.promoVideoUrl} controls autoPlay muted className="h-full w-full object-contain" /> : <Image src={active.coverImageUrl || active.imageUrl || active.promoImageUrl || logoUrl} alt={active.title} fill unoptimized className="object-contain" />}
           <button onClick={() => onMove(-1)} className="absolute left-2 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/60" aria-label="Previous story"><ChevronLeft /></button>
           <button onClick={() => onMove(1)} className="absolute right-2 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/60" aria-label="Next story"><ChevronRight /></button>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -16,6 +16,7 @@ import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-u
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { apiRequest } from "@/lib/api/client";
+import { useDeadlineReached } from "@/lib/hooks/use-deadline-reached";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
@@ -74,6 +75,7 @@ function SubmissionUploadField({ challengeId, userId, acceptedSubmissionTypes, v
 
 export default function JoinChallengePage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const challengeId = params.id;
   const auth = useAuth();
   const [agreed, setAgreed] = useState(false);
@@ -85,11 +87,9 @@ export default function JoinChallengePage() {
   const [uploadStatus, setUploadStatus] = useState<MediaUploadStage>("idle");
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
-  const [paymentReturnProcessing, setPaymentReturnProcessing] = useState(false);
   const [checkingSubmissionAccess, setCheckingSubmissionAccess] = useState(false);
-  const [submissionWindowExpired, setSubmissionWindowExpired] = useState(false);
-  const [entryRewards, setEntryRewards] = useState<EntryReward[]>([]);
-  const [selectedRewardId, setSelectedRewardId] = useState("");
+  const [entryRewardState, setEntryRewardState] = useState<{ userId: string | null; rewards: EntryReward[] }>({ userId: null, rewards: [] });
+  const [selectedRewardState, setSelectedRewardState] = useState<{ userId: string | null; rewardId: string }>({ userId: null, rewardId: "" });
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -97,17 +97,19 @@ export default function JoinChallengePage() {
     staleTime: 30_000
   });
 
-  useEffect(() => {
-    setPaymentReturnProcessing(new URLSearchParams(window.location.search).get("payment") === "processing");
-  }, []);
+  const paymentReturnProcessing = searchParams.get("payment") === "processing";
+
+  const currentUserId = auth.user?.uid ?? null;
+  const entryRewards = entryRewardState.userId === currentUserId ? entryRewardState.rewards : [];
+  const selectedRewardId = selectedRewardState.userId === currentUserId ? selectedRewardState.rewardId : "";
 
   useEffect(() => {
-    if (!auth.user) { setEntryRewards([]); setSelectedRewardId(""); return; }
+    if (!currentUserId) return;
     apiRequest<{ entitlements?: EntryReward[] }>("/api/rewards/summary").then((result) => {
       if (!result.ok) return;
-      setEntryRewards((result.data?.entitlements ?? []).filter((item) => ["free_entry", "fixed_entry_discount", "percentage_entry_discount"].includes(item.type)));
+      setEntryRewardState({ userId: currentUserId, rewards: (result.data?.entitlements ?? []).filter((item) => ["free_entry", "fixed_entry_discount", "percentage_entry_discount"].includes(item.type)) });
     });
-  }, [auth.user]);
+  }, [currentUserId]);
 
   const details = data?.ok ? data.data : null;
   const rawChallenge = details?.challenge as (ChallengeApiRecord & Record<string, unknown>) | undefined;
@@ -121,6 +123,8 @@ export default function JoinChallengePage() {
   const phaseSummary = (details as any)?.phaseSummary as Record<string, unknown> | undefined;
   const joinOpen = Boolean(phaseSummary?.canJoin);
   const challengeTimeZone = String(phaseSummary?.timeZone ?? rawChallenge?.timezone ?? rawChallenge?.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE);
+  const submissionDeadline = typeof phaseSummary?.submissionDeadline === "string" ? Date.parse(phaseSummary.submissionDeadline) : Number.NaN;
+  const submissionWindowExpired = useDeadlineReached(submissionDeadline);
   const submissionAccess = (userState?.submissionAccess && typeof userState.submissionAccess === "object" ? userState.submissionAccess : null) as SubmissionAccess | null;
   const participantJourney = (userState?.participantJourney && typeof userState.participantJourney === "object" ? userState.participantJourney : null) as any;
   const challengePaidEntry = rawChallenge?.paidEntry && typeof rawChallenge.paidEntry === "object" ? rawChallenge.paidEntry as Record<string, unknown> : {};
@@ -159,10 +163,7 @@ export default function JoinChallengePage() {
 
   useEffect(() => {
     const opensAt = typeof phaseSummary?.submissionStartAt === "string" ? Date.parse(phaseSummary.submissionStartAt) : Number.NaN;
-    const closesAt = typeof phaseSummary?.submissionDeadline === "string" ? Date.parse(phaseSummary.submissionDeadline) : Number.NaN;
     const timers: number[] = [];
-
-    setSubmissionWindowExpired(Number.isFinite(closesAt) && Date.now() >= closesAt);
 
     if (Number.isFinite(opensAt) && Date.now() < opensAt) {
       timers.push(window.setTimeout(() => {
@@ -171,15 +172,14 @@ export default function JoinChallengePage() {
       }, Math.max(0, opensAt - Date.now()) + 50));
     }
 
-    if (Number.isFinite(closesAt) && Date.now() < closesAt) {
+    if (Number.isFinite(submissionDeadline) && Date.now() < submissionDeadline) {
       timers.push(window.setTimeout(() => {
-        setSubmissionWindowExpired(true);
         void refetch();
-      }, Math.max(0, closesAt - Date.now()) + 50));
+      }, Math.max(0, submissionDeadline - Date.now()) + 50));
     }
 
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [phaseSummary?.submissionDeadline, phaseSummary?.submissionStartAt, refetch]);
+  }, [phaseSummary?.submissionStartAt, refetch, submissionDeadline]);
 
 
   async function startPaidEntryCheckout() {
@@ -204,7 +204,7 @@ export default function JoinChallengePage() {
       return;
     }
     if (result.data?.status === "confirmed") {
-      setSelectedRewardId("");
+      setSelectedRewardState({ userId: currentUserId, rewardId: "" });
       await refetch();
       return;
     }
@@ -410,7 +410,7 @@ export default function JoinChallengePage() {
               agreed={agreed}
               entryRewards={entryRewards}
               selectedRewardId={selectedRewardId}
-              onRewardChange={setSelectedRewardId}
+              onRewardChange={(rewardId) => setSelectedRewardState({ userId: currentUserId, rewardId })}
               onAgreementChange={setAgreed}
               onPay={() => void startPaidEntryCheckout()}
               onJoin={(action) => void startFreeJoin(action)}

@@ -4,6 +4,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable, validationError } from "@/lib/server/responses";
 import { PAYMENT_PURPOSES, normalizeVerifiedPaymentState, type PaymentPurpose } from "@/lib/payment-purposes";
 import { getStripe } from "@/lib/stripe";
+import { resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 
 type CheckoutRecord = Record<string, unknown> & { id: string };
 
@@ -74,7 +75,7 @@ async function checkoutRecord(
     case PAYMENT_PURPOSES.prizePool:
       return metadata.creatorPrizeFundingId ? ownedRecord(db, "creatorPrizeFundingPayments", metadata.creatorPrizeFundingId, userId) : null;
     case PAYMENT_PURPOSES.sponsor:
-      return metadata.sponsorContributionId ? ownedRecord(db, "sponsorContributions", metadata.sponsorContributionId, userId, "sponsorId") : null;
+      return metadata.sponsorContributionId ? ownedRecord(db, "sponsorContributions", metadata.sponsorContributionId, metadata.sponsorId ?? userId, "sponsorId") : null;
     case PAYMENT_PURPOSES.sponsorWallet:
       return metadata.sponsorWalletFundingId ? ownedRecord(db, "sponsorWalletFunding", metadata.sponsorWalletFundingId, userId) : null;
   }
@@ -95,9 +96,14 @@ export async function GET(request: Request) {
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["line_items"] });
     const metadata = session.metadata ?? {};
-    if (metadata.userId !== user.uid) return fail("This checkout is not available for the current account.", 404, undefined, "CHECKOUT_NOT_FOUND");
     const purpose = paymentPurpose(metadata);
     if (!purpose) return fail("This checkout type is not supported.", 422, undefined, "CHECKOUT_PURPOSE_UNSUPPORTED");
+    let checkoutOwnedByRequester = metadata.userId === user.uid;
+    if (purpose === PAYMENT_PURPOSES.sponsor) {
+      const sponsorAccess = await resolveSponsorOrganizationAccess(db, user.uid);
+      checkoutOwnedByRequester = Boolean(sponsorAccess && sponsorAccess.organizationId === (metadata.sponsorId ?? metadata.userId));
+    }
+    if (!checkoutOwnedByRequester) return fail("This checkout is not available for the current account.", 404, undefined, "CHECKOUT_NOT_FOUND");
     const requestedPurpose = url.searchParams.get("purpose");
     if (requestedPurpose && requestedPurpose !== purpose) return validationError({ purpose: "Checkout purpose does not match the return request." });
     const record = await checkoutRecord(db, purpose, metadata, user.uid, session.id);

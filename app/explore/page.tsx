@@ -1,18 +1,18 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, inputClass, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { ChallengeMediaFrame } from "@/components/media-display";
 import { ExploreCardMedia } from "@/components/challenge-media-carousel";
 import { Bookmark, CalendarDays, Filter, Play, Search, SlidersHorizontal, Trophy, Users } from "lucide-react";
-import { ChallengePagination } from "@/components/challenge-pagination";
-import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 
 type ExploreChallenge = Record<string, any>;
-type ExploreResponse = { challenges: ExploreChallenge[]; featured?: ExploreChallenge[]; trending?: ExploreChallenge[]; categories: string[]; total: number; page: number; limit: number; hasMore: boolean; filters: Record<string, string> };
+type ExploreResponse = { challenges: ExploreChallenge[]; featured?: ExploreChallenge[]; trending?: ExploreChallenge[]; categories: string[]; total: number | null; page: number; limit: number; hasMore: boolean; nextCursor: string | null; filters: Record<string, string> };
 
 const phaseOptions = [
   ["", "Active stages"],
@@ -27,29 +27,26 @@ const typeOptions = [["", "All types"], ["standard", "Standard"], ["private", "P
 const sortOptions = [["recent", "Newest"], ["participants", "Most joined"], ["ending_soon", "Ending soon"]];
 
 export default function ExplorePage() {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [phase, setPhase] = useState("");
-  const [entry, setEntry] = useState("");
-  const [type, setType] = useState("");
-  const [sort, setSort] = useState("recent");
-  const [page, setPage] = useState(1);
+  return <Suspense fallback={<AppShell><div className="min-h-screen bg-[#080808] p-8 text-center font-bold text-white">Loading challenges…</div></AppShell>}><ExplorePageContent /></Suspense>;
+}
+
+function ExplorePageContent() {
+  const searchParams = useSearchParams();
+  const initialCursor = searchParams.get("cursor") ?? "";
+  const initialPage = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const [category, setCategory] = useState(searchParams.get("category") ?? "");
+  const [phase, setPhase] = useState(searchParams.get("phase") ?? "");
+  const [entry, setEntry] = useState(searchParams.get("entry") ?? "");
+  const [type, setType] = useState(searchParams.get("type") ?? "");
+  const [sort, setSort] = useState(searchParams.get("sort") ?? "recent");
+  const [page, setPage] = useState(initialCursor ? initialPage : 1);
+  const [cursorsByPage, setCursorsByPage] = useState<Record<number, string>>(initialCursor ? { 1: "", [initialPage]: initialCursor } : { 1: "" });
   const [data, setData] = useState<ExploreResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadedRequestPath, setLoadedRequestPath] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setQuery(params.get("q") ?? "");
-    setCategory(params.get("category") ?? "");
-    setPhase(params.get("phase") ?? "");
-    setEntry(params.get("entry") ?? "");
-    setType(params.get("type") ?? "");
-    setSort(params.get("sort") ?? "recent");
-    setPage(Math.max(1, Number(params.get("page") ?? 1) || 1));
-  }, []);
 
   const requestPath = useMemo(() => {
     const params = new URLSearchParams();
@@ -60,30 +57,39 @@ export default function ExplorePage() {
     if (type) params.set("type", type);
     if (sort !== "recent") params.set("sort", sort);
     params.set("page", String(page));
-    params.set("limit", String(CHALLENGE_PAGE_SIZE));
+    const cursor = cursorsByPage[page];
+    if (cursor) params.set("cursor", cursor);
     return `/api/explore/challenges?${params.toString()}`;
-  }, [category, entry, page, phase, query, sort, type]);
+  }, [category, cursorsByPage, entry, page, phase, query, sort, type]);
+  const loading = loadedRequestPath !== requestPath;
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
     void apiRequest<ExploreResponse>(requestPath).then((result) => {
       if (!active) return;
-      setLoading(false);
+      setLoadedRequestPath(requestPath);
       if (!result.ok || !result.data) {
         setError(result.message || "Explore could not load.");
         return;
       }
+      setError("");
       setData(result.data);
+      if (result.data.hasMore && result.data.nextCursor) {
+        setCursorsByPage((current) => ({ ...current, [page + 1]: result.data!.nextCursor! }));
+      }
       const browserUrl = requestPath.replace("/api/explore/challenges", "/explore");
       window.history.replaceState(null, "", browserUrl);
+    }).catch(() => {
+      if (!active) return;
+      setError("Explore could not load. Check your connection and try again.");
+      setLoadedRequestPath(requestPath);
     });
     return () => { active = false; };
-  }, [requestPath, reloadKey]);
+  }, [page, requestPath, reloadKey]);
 
   function applySearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCursorsByPage({ 1: "" });
     setPage(1);
     setReloadKey((value) => value + 1);
   }
@@ -102,7 +108,7 @@ export default function ExplorePage() {
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
                 <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Explore Challenges</h1>
               </div>
-              <p className="text-sm font-bold text-slate-400">{loading ? "Loading challenges" : `${Number(data?.total ?? 0).toLocaleString()} active challenge${Number(data?.total ?? 0) === 1 ? "" : "s"}`}</p>
+              <p className="text-sm font-bold text-slate-400">{loading ? "Loading challenges" : `${challenges.length.toLocaleString()} challenges on this page`}</p>
             </div>
             <form className="mt-5 flex flex-col gap-3 sm:flex-row" onSubmit={applySearch}>
               <div className="relative flex-1"><Search className="pointer-events-none absolute left-4 top-4 text-slate-500" size={18} /><input className={`${inputClass} border-white/10 bg-black/40 pl-11 text-white placeholder:text-slate-500`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search challenges, creators, categories" /></div>
@@ -113,11 +119,11 @@ export default function ExplorePage() {
               <Button type="button" variant="secondary" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17} /> Sort</Button>
             </div>
             <div className={`${filtersOpen ? "grid" : "hidden"} mt-4 gap-3 md:grid md:grid-cols-5`}>
-              <Select label="Type" value={type} onChange={(value) => { setType(value); setPage(1); }} options={typeOptions as [string, string][]} />
-              <Select label="Category" value={category} onChange={(value) => { setCategory(value); setPage(1); }} options={[["", "All categories"], ...categories.map((item) => [item, item] as [string, string])]} />
-              <Select label="Stage" value={phase} onChange={(value) => { setPhase(value); setPage(1); }} options={phaseOptions as [string, string][]} />
-              <Select label="Entry" value={entry} onChange={(value) => { setEntry(value); setPage(1); }} options={entryOptions as [string, string][]} />
-              <Select label="Sort" value={sort} onChange={(value) => { setSort(value); setPage(1); }} options={sortOptions as [string, string][]} />
+              <Select label="Type" value={type} onChange={(value) => { setType(value); setCursorsByPage({ 1: "" }); setPage(1); }} options={typeOptions as [string, string][]} />
+              <Select label="Category" value={category} onChange={(value) => { setCategory(value); setCursorsByPage({ 1: "" }); setPage(1); }} options={[["", "All categories"], ...categories.map((item) => [item, item] as [string, string])]} />
+              <Select label="Stage" value={phase} onChange={(value) => { setPhase(value); setCursorsByPage({ 1: "" }); setPage(1); }} options={phaseOptions as [string, string][]} />
+              <Select label="Entry" value={entry} onChange={(value) => { setEntry(value); setCursorsByPage({ 1: "" }); setPage(1); }} options={entryOptions as [string, string][]} />
+              <Select label="Sort" value={sort} onChange={(value) => { setSort(value); setCursorsByPage({ 1: "" }); setPage(1); }} options={sortOptions as [string, string][]} />
             </div>
           </header>
 
@@ -126,7 +132,7 @@ export default function ExplorePage() {
           <section className="mt-8 scroll-mt-24" id="challenge-results">
             <div className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500"><SlidersHorizontal size={16} /> Browse</div>
             {loading ? <div className="mobile-card-list grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-[420px] animate-pulse rounded-[8px] bg-[#151515]" />)}</div> : error ? <Card className="border-red-500/20 bg-red-950/20 p-6 text-red-100"><p className="font-black">Explore could not load</p><p className="mt-2 text-sm text-red-100/70">{error}</p><Button className="mt-4" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button></Card> : challenges.length ? <div className="mobile-card-list grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{challenges.map((challenge) => <ExploreChallengeCard key={String(challenge.id)} challenge={challenge} />)}</div> : <div className="rounded-[8px] border border-white/10 bg-[#111111] p-10 text-center"><Filter className="mx-auto text-slate-600" size={36} /><h2 className="mt-4 text-2xl font-black text-white">No challenges found</h2><p className="mt-2 text-sm text-slate-400">Adjust your search or filters.</p></div>}
-            {data ? <ChallengePagination page={page} total={data.total} pageSize={data.limit || CHALLENGE_PAGE_SIZE} disabled={loading} anchorId="challenge-results" onPageChange={setPage} /> : null}
+            {data ? <nav className="mt-8 flex items-center justify-center gap-4" aria-label="Explore result pages"><Button variant="secondary" disabled={loading || page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</Button><span className="text-sm font-bold text-slate-400">Page {page}</span><Button variant="secondary" disabled={loading || !data.hasMore || !data.nextCursor} onClick={() => setPage((value) => value + 1)}>Next</Button></nav> : null}
           </section>
         </div>
       </div>
@@ -144,7 +150,7 @@ function TrendingCard({ challenge }: { challenge: ExploreChallenge }) {
     <div className="relative mx-auto h-24 w-24 rounded-full bg-[var(--gold)] p-[3px] transition group-hover:scale-[1.02] sm:h-28 sm:w-28">
       <ChallengeMediaFrame src={String(challenge.coverImageUrl ?? "")} alt={String(challenge.title ?? "Challenge")} className="h-full w-full rounded-full border-4 border-[#080808]" placeholder="CS" />
       {challenge.isOwnedByViewer ? <span className="absolute -right-1 top-1 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase text-black">Yours</span> : null}
-      <span className="absolute -bottom-1 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-2 border-[#080808] bg-[var(--gold)] text-[10px] font-black text-black">{creator.avatarUrl ? <img src={String(creator.avatarUrl)} alt="" className="h-full w-full object-cover" /> : String(creator.displayName ?? "CS").slice(0, 2).toUpperCase()}</span>
+      <span className="absolute -bottom-1 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-2 border-[#080808] bg-[var(--gold)] text-[10px] font-black text-black">{creator.avatarUrl ? <ContentImage src={String(creator.avatarUrl)} alt="" className="h-full w-full object-cover" /> : String(creator.displayName ?? "CS").slice(0, 2).toUpperCase()}</span>
     </div>
     <h3 className="mt-4 line-clamp-2 text-sm font-black leading-5 text-white">{challenge.title}</h3>
     <p className="mt-1 truncate text-[11px] font-bold uppercase text-[var(--gold)]">{publicPhaseLabel(challenge.phaseSummary?.label)}</p>

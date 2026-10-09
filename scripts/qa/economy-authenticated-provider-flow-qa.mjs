@@ -5,8 +5,7 @@ const accountVariables = {
   normal_user: ["ECONOMY_QA_USER_EMAIL", "ECONOMY_QA_USER_PASSWORD"],
   creator: ["ECONOMY_QA_CREATOR_EMAIL", "ECONOMY_QA_CREATOR_PASSWORD"],
   sponsor: ["ECONOMY_QA_SPONSOR_EMAIL", "ECONOMY_QA_SPONSOR_PASSWORD"],
-  admin: ["ECONOMY_QA_ADMIN_EMAIL", "ECONOMY_QA_ADMIN_PASSWORD"],
-  super_admin: ["ECONOMY_QA_SUPER_ADMIN_EMAIL", "ECONOMY_QA_SUPER_ADMIN_PASSWORD"]
+  admin: ["ECONOMY_QA_ADMIN_EMAIL", "ECONOMY_QA_ADMIN_PASSWORD"]
 };
 const missing = ["ECONOMY_QA_BASE_URL", ...Object.values(accountVariables).flat()].filter((name) => !process.env[name]);
 if (missing.length) {
@@ -19,8 +18,7 @@ const roleRoutes = {
   normal_user: ["/wallet", "/dorocoins", "/challenge-credits"],
   creator: ["/dashboard/host", "/creator/growth-wallet", "/profile"],
   sponsor: ["/sponsor/dashboard", "/sponsor/campaigns"],
-  admin: ["/admin/developer-tools/economy-rules"],
-  super_admin: ["/admin/developer-tools/economy-rules"]
+  admin: ["/admin/developer-tools/economy-rules"]
 };
 const results = [];
 const systemChromiumCandidates = [process.env.ECONOMY_QA_CHROMIUM_EXECUTABLE, "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", "/usr/bin/chromium", "/usr/bin/google-chrome"].filter(Boolean);

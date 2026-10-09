@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ spon
   if (!snap.exists || !destination || !challengeId || !["approved", "active", "live", "completion_review"].includes(status)) return new Response("Sponsor destination is unavailable.", { status: 404 });
   const placementId = new URL(request.url).searchParams.get("placementId")?.slice(0, 120) || "sponsor_cta";
   const requestedPlacements = Array.isArray(visibility.requestedPlacements) ? visibility.requestedPlacements.map(String) : [];
-  if (requestedPlacements.length && !requestedPlacements.includes(placementId)) return new Response("Sponsor destination is unavailable.", { status: 404 });
+  if (!requestedPlacements.includes(placementId)) return new Response("Sponsor destination is unavailable.", { status: 404 });
   const userAgent = request.headers.get("user-agent") ?? "";
   const existingCookie = request.headers.get("cookie")?.match(/(?:^|;\s*)cs_sponsor_session=([^;]+)/)?.[1];
   const sessionId = existingCookie && /^[a-f0-9-]{16,64}$/i.test(existingCookie) ? existingCookie : randomUUID();

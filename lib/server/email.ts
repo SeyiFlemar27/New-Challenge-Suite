@@ -5,6 +5,8 @@ export interface EmailMessage {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
+  idempotencyKey?: string;
 }
 
 export type EmailProvider = "resend";
@@ -150,11 +152,13 @@ export async function sendEmail(message: EmailMessage) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...(message.idempotencyKey ? { "Idempotency-Key": message.idempotencyKey } : {})
       },
       body: JSON.stringify({
         from: process.env.EMAIL_FROM,
         to: message.to,
+        ...(message.replyTo ? { reply_to: message.replyTo } : {}),
         subject: message.subject,
         html: withChallengeSuiteEmailBranding(message.html),
         text: message.text

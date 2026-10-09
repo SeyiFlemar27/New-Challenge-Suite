@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, Play, X } from "lucide-react";
@@ -36,14 +37,11 @@ export function ChallengeMediaGallery({
     () => orderedMedia(String(videoUrl ?? ""), images.map((value) => String(value ?? "")), title),
     [images, title, videoUrl]
   );
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [requestedIndex, setActiveIndex] = useState(0);
+  const activeIndex = Math.min(requestedIndex, Math.max(media.length - 1, 0));
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const active = media[activeIndex];
-
-  useEffect(() => {
-    setActiveIndex((current) => Math.min(current, Math.max(media.length - 1, 0)));
-  }, [media.length]);
 
   useEffect(() => {
     pause(videoRef.current);
@@ -84,7 +82,7 @@ export function ChallengeMediaGallery({
           <video ref={videoRef} src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="h-full w-full object-contain" aria-label={active.alt} />
         ) : (
           <button type="button" className="h-full w-full cursor-zoom-in" onClick={() => setLightboxOpen(true)} aria-label={`Enlarge ${active.alt}`}>
-            <img src={active.url} alt={active.alt} className="h-full w-full object-contain" loading="eager" />
+            <ContentImage src={active.url} alt={active.alt} className="h-full w-full object-contain" loading="eager" />
           </button>
         )}
         {activeIndex > 0 ? <GalleryArrow direction="previous" onClick={previous} /> : null}
@@ -97,7 +95,7 @@ export function ChallengeMediaGallery({
         <div className="mt-3 flex gap-3 overflow-x-auto pb-1" aria-label="Challenge media thumbnails">
           {media.map((item, index) => (
             <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Show ${item.alt}`} aria-current={index === activeIndex ? "true" : undefined} className={cn("relative aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-[6px] border-2 bg-black transition sm:w-28", index === activeIndex ? "border-[var(--gold)]" : "border-transparent opacity-70 hover:opacity-100")}>
-              {item.type === "video" ? <><video src={item.url} poster={item.posterUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" /><span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play size={17} fill="currentColor" /></span></> : <img src={item.url} alt="" className="h-full w-full object-cover" loading="lazy" />}
+              {item.type === "video" ? <><video src={item.url} poster={item.posterUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" /><span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play size={17} fill="currentColor" /></span></> : <ContentImage src={item.url} alt="" className="h-full w-full object-cover" loading="lazy" />}
             </button>
           ))}
         </div>
@@ -105,7 +103,7 @@ export function ChallengeMediaGallery({
       {lightboxOpen ? (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-black/90 p-4" role="dialog" aria-modal="true" aria-label={`${title} media viewer`} onMouseDown={(event) => { if (event.target === event.currentTarget) setLightboxOpen(false); }}>
           <button type="button" onClick={() => setLightboxOpen(false)} className="absolute right-4 top-4 grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close media viewer"><X /></button>
-          {active.type === "video" ? <video src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="max-h-[88vh] max-w-[92vw] object-contain" /> : <img src={active.url} alt={active.alt} className="max-h-[88vh] max-w-[92vw] object-contain" />}
+          {active.type === "video" ? <video src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="max-h-[88vh] max-w-[92vw] object-contain" /> : <ContentImage src={active.url} alt={active.alt} className="max-h-[88vh] max-w-[92vw] object-contain" />}
           {activeIndex > 0 ? <GalleryArrow direction="previous" onClick={previous} fixed /> : null}
           {activeIndex < media.length - 1 ? <GalleryArrow direction="next" onClick={next} fixed /> : null}
         </div>
@@ -127,7 +125,8 @@ export function ExploreCardMedia({
     () => orderedMedia(String(videoUrl ?? ""), images.map((value) => String(value ?? "")), title),
     [images, title, videoUrl]
   );
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [requestedIndex, setActiveIndex] = useState(0);
+  const activeIndex = Math.min(requestedIndex, Math.max(media.length - 1, 0));
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const active = media[activeIndex];
 
@@ -156,7 +155,7 @@ export function ExploreCardMedia({
       {active.type === "video" ? (
         <><video ref={videoRef} src={active.url} poster={active.posterUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" aria-label={active.alt} /><span className="pointer-events-none absolute bottom-3 left-3 grid size-8 place-items-center rounded-full bg-black/70 text-white"><Play size={14} fill="currentColor" /></span></>
       ) : (
-        <img src={active.url} alt={active.alt} className="h-full w-full object-cover" loading={activeIndex === 0 ? "eager" : "lazy"} />
+        <ContentImage src={active.url} alt={active.alt} className="h-full w-full object-cover" loading={activeIndex === 0 ? "eager" : "lazy"} />
       )}
       {activeIndex > 0 ? <CardArrow direction="previous" onClick={(event) => move(-1, event)} /> : null}
       {activeIndex < media.length - 1 ? <CardArrow direction="next" onClick={(event) => move(1, event)} /> : null}

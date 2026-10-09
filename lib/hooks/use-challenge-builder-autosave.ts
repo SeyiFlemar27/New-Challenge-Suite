@@ -25,9 +25,11 @@ export function useChallengeBuilderAutosave<Result>({
   const saveRef = useRef(save);
   const resultRef = useRef(onResult);
   const errorRef = useRef(onError);
-  saveRef.current = save;
-  resultRef.current = onResult;
-  errorRef.current = onError;
+  useEffect(() => {
+    saveRef.current = save;
+    resultRef.current = onResult;
+    errorRef.current = onError;
+  }, [save, onResult, onError]);
 
   const invalidate = useCallback(() => {
     requestVersion.current += 1;

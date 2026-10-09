@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -9,6 +10,7 @@ import { Card, EmptyState } from "@/components/ui";
 
 type Participant = { id: string; displayName: string; avatarUrl?: string | null; accountType?: string; role?: string | null };
 type Conversation = { id: string; lastMessagePreview?: string; lastMessageAt?: string; updatedAt?: string; unread?: boolean; relatedChallengeId?: string | null; relatedProposalId?: string | null; otherParticipant?: Participant | null };
+const EMPTY_CONVERSATIONS: Conversation[] = [];
 
 async function loadConversations() {
   const response = await fetch("/api/messages", { cache: "no-store" });
@@ -18,7 +20,7 @@ async function loadConversations() {
 export default function MessagesPage() {
   const [query, setQuery] = useState("");
   const result = useQuery({ queryKey: ["messages", "conversations"], queryFn: loadConversations, refetchInterval: 15_000, staleTime: 5_000 });
-  const conversations = result.data?.ok ? result.data.data?.conversations ?? [] : [];
+  const conversations = result.data?.ok ? result.data.data?.conversations ?? EMPTY_CONVERSATIONS : EMPTY_CONVERSATIONS;
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return normalized ? conversations.filter((item) => `${item.otherParticipant?.displayName ?? ""} ${item.lastMessagePreview ?? ""}`.toLowerCase().includes(normalized)) : conversations;
@@ -43,7 +45,7 @@ export default function MessagesPage() {
 function ConversationLink({ conversation }: { conversation: Conversation }) {
   const participant = conversation.otherParticipant;
   return <Link href={`/messages/${conversation.id}`} className="flex min-h-24 items-center gap-3 rounded-[8px] border border-transparent p-3 transition hover:border-amber-200 hover:bg-amber-50/60">
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-sm font-black text-black">{participant?.avatarUrl ? <img src={participant.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials(participant?.displayName)}</span>
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-sm font-black text-black">{participant?.avatarUrl ? <ContentImage src={participant.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials(participant?.displayName)}</span>
     <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate font-black text-slate-950">{participant?.displayName ?? "Challenge Suite member"}</span>{conversation.unread ? <span className="h-2 w-2 rounded-full bg-[var(--gold)]" aria-label="Unread conversation" /> : null}</span><span className="mt-1 block truncate text-sm text-slate-600">{conversation.lastMessagePreview ?? "Open conversation"}</span><span className="mt-2 block text-[11px] text-slate-500">{formatTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></span>
   </Link>;
 }

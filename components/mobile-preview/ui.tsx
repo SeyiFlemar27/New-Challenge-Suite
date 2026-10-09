@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Bell, ChevronRight, Home, Compass, PlusCircle, Wallet, User, Menu, X } from "lucide-react";
@@ -34,7 +35,7 @@ export function MobileTopBar({ screen, tab, onBack, onSettings }: { screen: Mobi
         {root ? <Menu size={19} /> : <ArrowLeft size={19} />}
       </button>
       <div className="flex items-center gap-2">
-        <img src={logoUrl} alt="Challenge Suite" className="h-9 w-9 rounded-full border border-yellow-400/50 object-cover" />
+        <ContentImage src={logoUrl} alt="Challenge Suite" className="h-9 w-9 rounded-full border border-yellow-400/50 object-cover" />
         <span className="text-sm font-black text-[var(--gold)]">Challenge Suite</span>
       </div>
       <button onClick={onSettings} className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#141414]">

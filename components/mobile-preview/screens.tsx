@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { Award, Camera, CheckCircle2, Coins, Eye, LockKeyhole, Mail, Radio, Search, ShieldCheck, Trophy, UploadCloud, Vote } from "lucide-react";
 import { useState } from "react";
@@ -49,7 +50,7 @@ function SplashScreen({ onGo }: Pick<ScreenProps, "onGo">) {
       <div className="flex flex-col items-center">
         <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-yellow-400/35 bg-yellow-500/10 shadow-[0_0_54px_rgba(245,217,10,.22)]">
           <div className="absolute inset-3 rounded-full border border-yellow-400/10" />
-          <img src={logoUrl} alt="Challenge Suite" className="h-24 w-24 rounded-full object-cover" />
+          <ContentImage src={logoUrl} alt="Challenge Suite" className="h-24 w-24 rounded-full object-cover" />
         </div>
         <p className="mt-8 text-xs font-black uppercase tracking-[0.3em] text-[var(--gold)]">Challenge Suite</p>
         <h1 className="mt-4 text-4xl font-black leading-tight">Compete. Vote. Win.</h1>
@@ -70,7 +71,7 @@ function WelcomeScreen({ onGo }: Pick<ScreenProps, "onGo">) {
     <div className="flex min-h-[760px] flex-col justify-between py-3 text-center">
       <div className="space-y-5">
         <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-yellow-500/35 bg-yellow-500/10 shadow-[0_0_30px_rgba(245,217,10,.16)]">
-          <img src={logoUrl} alt="Challenge Suite" className="h-16 w-16 rounded-full object-cover" />
+          <ContentImage src={logoUrl} alt="Challenge Suite" className="h-16 w-16 rounded-full object-cover" />
         </div>
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--gold)]">Premium Competition Platform</p>
@@ -79,7 +80,7 @@ function WelcomeScreen({ onGo }: Pick<ScreenProps, "onGo">) {
         </div>
         <div className="grid gap-3 text-left">
           <MobileCard className="p-4"><div className="flex items-center gap-3"><Trophy className="text-[var(--gold)]" size={20} /><div><h3 className="font-black">Compete with purpose</h3><p className="text-xs text-slate-400">Image and video challenges built for serious creators.</p></div></div></MobileCard>
-          <MobileCard className="p-4"><div className="flex items-center gap-3"><Vote className="text-[var(--gold)]" size={20} /><div><h3 className="font-black">Vote your way</h3><p className="text-xs text-slate-400">Cast a daily free vote or use Challenge Credits for eligible additional votes.</p></div></div></MobileCard>
+          <MobileCard className="p-4"><div className="flex items-center gap-3"><Vote className="text-[var(--gold)]" size={20} /><div><h3 className="font-black">Vote your way</h3><p className="text-xs text-slate-400">Cast a daily free vote or use DoroCoins for eligible additional votes.</p></div></div></MobileCard>
         </div>
       </div>
       <div className="space-y-3 pb-2">
@@ -105,7 +106,7 @@ function AuthPanel({ mode, title, subtitle, primary, footer, onPrimary, onFooter
       <div className="space-y-6">
         <div className="text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-yellow-500/35 bg-yellow-500/10 shadow-[0_0_26px_rgba(245,217,10,.16)]">
-            <img src={logoUrl} alt="Challenge Suite" className="h-14 w-14 rounded-full object-cover" />
+            <ContentImage src={logoUrl} alt="Challenge Suite" className="h-14 w-14 rounded-full object-cover" />
           </div>
           <p className="mt-6 text-xs font-black uppercase tracking-[0.22em] text-[var(--gold)]">Secure preview access</p>
           <h1 className="mt-3 text-4xl font-black leading-tight">{title}</h1>
@@ -194,7 +195,7 @@ function ChallengeListingScreen({ onChallenge }: ScreenProps) {
 
 function ChallengeDetailScreen({ selectedChallenge, onGo, onSheet }: ScreenProps) {
   const challenge = selectedChallenge;
-  return <div className="-mx-4 -mt-3 pb-20"><div className="relative h-72 overflow-hidden"><img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" /><div className="absolute bottom-5 left-4 right-4"><MobileBadge>{challenge.status}</MobileBadge><h1 className="mt-3 text-3xl font-black leading-tight">{challenge.title}</h1><p className="mt-2 text-sm text-slate-200">{challenge.description}</p></div></div><div className="space-y-5 px-4 pt-5"><StatusMetrics challenge={challenge} /><MobileCard className="p-4"><h3 className="font-black text-[var(--gold)]">Challenge Guide</h3><p className="mt-2 text-sm leading-6 text-slate-300">{challenge.acceptedMedia}. Entry fee: {challenge.entryFee}. Registration closes in {challenge.deadline}.</p></MobileCard><MobileCard className="p-4"><h3 className="font-black">Rules</h3><div className="mt-3 space-y-2">{challenge.rules.map((rule) => <p key={rule} className="text-sm text-slate-300">- {rule}</p>)}</div></MobileCard><section><SectionHeader title="Top submissions" action="Vote" onClick={() => onGo("vote")} /><div className="space-y-3">{submissions.slice(0, 2).map((submission) => <SubmissionRow key={submission.id} submission={submission} onClick={() => onGo("submission")} />)}</div></section></div><StickyActions><MobileButton onClick={() => onGo("join")}>Join Challenge</MobileButton><MobileButton variant="secondary" onClick={() => onGo("vote")}>Vote</MobileButton><button onClick={() => onSheet({ title: "Sponsorship", body: "Sponsor proposals are submitted for review before public display.", action: "Sponsorship interest saved" })} className="text-xs font-black text-slate-400">Sponsor this challenge</button></StickyActions></div>;
+  return <div className="-mx-4 -mt-3 pb-20"><div className="relative h-72 overflow-hidden"><ContentImage src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" /><div className="absolute bottom-5 left-4 right-4"><MobileBadge>{challenge.status}</MobileBadge><h1 className="mt-3 text-3xl font-black leading-tight">{challenge.title}</h1><p className="mt-2 text-sm text-slate-200">{challenge.description}</p></div></div><div className="space-y-5 px-4 pt-5"><StatusMetrics challenge={challenge} /><MobileCard className="p-4"><h3 className="font-black text-[var(--gold)]">Challenge Guide</h3><p className="mt-2 text-sm leading-6 text-slate-300">{challenge.acceptedMedia}. Entry fee: {challenge.entryFee}. Registration closes in {challenge.deadline}.</p></MobileCard><MobileCard className="p-4"><h3 className="font-black">Rules</h3><div className="mt-3 space-y-2">{challenge.rules.map((rule) => <p key={rule} className="text-sm text-slate-300">- {rule}</p>)}</div></MobileCard><section><SectionHeader title="Top submissions" action="Vote" onClick={() => onGo("vote")} /><div className="space-y-3">{submissions.slice(0, 2).map((submission) => <SubmissionRow key={submission.id} submission={submission} onClick={() => onGo("submission")} />)}</div></section></div><StickyActions><MobileButton onClick={() => onGo("join")}>Join Challenge</MobileButton><MobileButton variant="secondary" onClick={() => onGo("vote")}>Vote</MobileButton><button onClick={() => onSheet({ title: "Sponsorship", body: "Sponsor proposals are submitted for review before public display.", action: "Sponsorship interest saved" })} className="text-xs font-black text-slate-400">Sponsor this challenge</button></StickyActions></div>;
 }
 
 function JoinScreen({ selectedChallenge, onGo, onSheet }: ScreenProps) {
@@ -203,7 +204,7 @@ function JoinScreen({ selectedChallenge, onGo, onSheet }: ScreenProps) {
 
 function SubmissionScreen({ selectedSubmission, onGo }: ScreenProps) {
   const submission = selectedSubmission;
-  return <div className="-mx-4 -mt-3 pb-20"><img src={submission.mediaUrl} alt={submission.title} className="h-[430px] w-full object-cover" /><div className="space-y-5 px-4 pt-5"><div><MobileBadge>Rank #{submission.rank}</MobileBadge><h1 className="mt-3 text-3xl font-black">{submission.title}</h1><p className="mt-2 text-sm text-slate-300">by {submission.creator} - {submission.challengeTitle}</p></div><div className="grid grid-cols-3 gap-3"><MiniMetric label="Votes" value={submission.votes.toLocaleString()} /><MiniMetric label="Rank" value={`#${submission.rank}`} /><MiniMetric label="Status" value="Live" /></div><MobileCard className="p-4"><h3 className="font-black text-[var(--gold)]">Submission Preview</h3><p className="mt-2 text-sm leading-6 text-slate-300">Verified voting is active. Users get one free vote per challenge/day. Additional votes use Challenge Credits.</p></MobileCard></div><StickyActions><MobileButton onClick={() => onGo("vote")}>Vote for Entry</MobileButton><MobileButton variant="secondary" onClick={() => onGo("challenge-detail")}>Challenge</MobileButton></StickyActions></div>;
+  return <div className="-mx-4 -mt-3 pb-20"><ContentImage src={submission.mediaUrl} alt={submission.title} className="h-[430px] w-full object-cover" /><div className="space-y-5 px-4 pt-5"><div><MobileBadge>Rank #{submission.rank}</MobileBadge><h1 className="mt-3 text-3xl font-black">{submission.title}</h1><p className="mt-2 text-sm text-slate-300">by {submission.creator} - {submission.challengeTitle}</p></div><div className="grid grid-cols-3 gap-3"><MiniMetric label="Votes" value={submission.votes.toLocaleString()} /><MiniMetric label="Rank" value={`#${submission.rank}`} /><MiniMetric label="Status" value="Live" /></div><MobileCard className="p-4"><h3 className="font-black text-[var(--gold)]">Submission Preview</h3><p className="mt-2 text-sm leading-6 text-slate-300">Verified voting is active. Users get one free vote per challenge/day. Additional votes use Challenge Credits.</p></MobileCard></div><StickyActions><MobileButton onClick={() => onGo("vote")}>Vote for Entry</MobileButton><MobileButton variant="secondary" onClick={() => onGo("challenge-detail")}>Challenge</MobileButton></StickyActions></div>;
 }
 
 function VoteScreen({ onSheet }: ScreenProps) {
@@ -224,7 +225,7 @@ function WinnersScreen({ onSubmission }: ScreenProps) {
 }
 
 function EventsScreen({ onSheet }: ScreenProps) {
-  return <div className="space-y-4"><ScreenTitle title="Live Events" subtitle="Offline competitions and verified host gatherings." />{liveEvents.map((event) => <MobileCard key={event.id} className="overflow-hidden"><img src={event.imageUrl} alt={event.title} className="h-40 w-full object-cover" /><div className="p-4"><div className="flex items-center justify-between"><MobileBadge>{event.planRequired ? "Premium" : "Open"}</MobileBadge><span className="text-xs text-slate-400">{event.attending} attending</span></div><h3 className="mt-3 text-xl font-black">{event.title}</h3><p className="mt-2 text-sm text-slate-300">{event.location} - {event.date}</p><MobileButton className="mt-4" variant={event.planRequired ? "secondary" : "primary"} onClick={() => onSheet({ title: event.title, body: event.planRequired ? "Upgrade required to register for this event." : "Your event registration is reserved in preview mode.", action: "Event action saved" })}>{event.planRequired ? "Upgrade Required" : "Register"}</MobileButton></div></MobileCard>)}</div>;
+  return <div className="space-y-4"><ScreenTitle title="Live Events" subtitle="Offline competitions and verified host gatherings." />{liveEvents.map((event) => <MobileCard key={event.id} className="overflow-hidden"><ContentImage src={event.imageUrl} alt={event.title} className="h-40 w-full object-cover" /><div className="p-4"><div className="flex items-center justify-between"><MobileBadge>{event.planRequired ? "Premium" : "Open"}</MobileBadge><span className="text-xs text-slate-400">{event.attending} attending</span></div><h3 className="mt-3 text-xl font-black">{event.title}</h3><p className="mt-2 text-sm text-slate-300">{event.location} - {event.date}</p><MobileButton className="mt-4" variant={event.planRequired ? "secondary" : "primary"} onClick={() => onSheet({ title: event.title, body: event.planRequired ? "Upgrade required to register for this event." : "Your event registration is reserved in preview mode.", action: "Event action saved" })}>{event.planRequired ? "Upgrade Required" : "Register"}</MobileButton></div></MobileCard>)}</div>;
 }
 
 function ProfileScreen({ onGo }: ScreenProps) {

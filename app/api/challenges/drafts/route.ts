@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     enterpriseFinanceContextId: officialChallenge ? enterpriseAccess!.organizationId : null,
     enterpriseChallengeLeadId: officialChallenge ? user.uid : null,
     enterpriseAssignments: officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
+    enterpriseAssignedUserIds: officialChallenge ? [user.uid] : [],
     status: "draft",
     lifecycleStatus: "draft",
     visibility: "public",

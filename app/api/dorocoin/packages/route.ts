@@ -64,7 +64,7 @@ export async function GET() {
       const price = Number(data.price ?? 0);
       const coins = Number(data.coins ?? 0);
       const baseCoins = Number(data.baseCoins ?? data.coins ?? 0);
-      const minimumBaseCoins = Math.round(price * rules.doroCoin.coinsPerUsd);
+      const expectedBaseCoins = Math.round(price * rules.doroCoin.coinsPerUsd);
       return {
         id: doc.id,
         name: data.name,
@@ -76,7 +76,7 @@ export async function GET() {
         mostPopular: Boolean(data.mostPopular),
         status: data.status,
         sortOrder: Number(data.sortOrder ?? 0),
-        pricingConsistent: price > 0 && baseCoins >= minimumBaseCoins
+        pricingConsistent: price > 0 && baseCoins === expectedBaseCoins
       };
     }).filter((item) => item.pricingConsistent).sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 20);
 

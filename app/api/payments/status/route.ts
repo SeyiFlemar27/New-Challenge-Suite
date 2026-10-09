@@ -6,6 +6,7 @@ import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { PAYMENT_PURPOSES, normalizeVerifiedPaymentState, type PaymentPurpose } from "@/lib/payment-purposes";
 import { getStripe } from "@/lib/stripe";
 import { persistStripeSubscriptionLifecycle, subscriptionMetadataFromCheckout } from "@/lib/server/stripe-subscriptions";
+import { resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 import type Stripe from "stripe";
 
 const allowedPurposes = new Set<PaymentPurpose>(Object.values(PAYMENT_PURPOSES));
@@ -85,7 +86,11 @@ export async function GET(request: Request) {
   } else if (purpose === PAYMENT_PURPOSES.votes && reference) {
     record = await getPaymentStatus(db, "paidVotePurchases", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.sponsor && reference) {
-    record = await getPaymentStatus(db, "sponsorContributions", reference, "sponsorId", user.uid);
+    const sponsorAccess = await resolveSponsorOrganizationAccess(db, user.uid);
+    if (!sponsorAccess || !sponsorAccess.permissions.includes("wallet.view")) {
+      return fail("Sponsor organization payment status is not available to this account.", 403, undefined, "SPONSOR_PERMISSION_REQUIRED");
+    }
+    record = await getPaymentStatus(db, "sponsorContributions", reference, "sponsorId", sponsorAccess.organizationId);
   } else if (purpose === PAYMENT_PURPOSES.sponsorWallet && reference) {
     record = await getPaymentStatus(db, "sponsorWalletFunding", reference, "userId", user.uid);
   } else if (purpose === PAYMENT_PURPOSES.prizePool && reference) {

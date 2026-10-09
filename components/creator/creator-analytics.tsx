@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { useClockTimestamp } from "@/lib/hooks/use-clock-timestamp";
 
 type Item = Record<string, unknown> & { id: string };
 type CreatorData = { challenges: Item[]; participants: Item[]; submissions: Item[]; votes: Item[]; sponsorInterest: Item[] };
@@ -13,12 +14,13 @@ function itemDate(item: Item) {
 }
 
 export function CreatorAnalytics({ data }: { data: CreatorData }) {
+  const now = useClockTimestamp();
   const [range, setRange] = useState("90");
   const [challengeId, setChallengeId] = useState("all");
   const [status, setStatus] = useState("all");
   const challenges = data.challenges.filter((item) => (challengeId === "all" || item.id === challengeId) && (status === "all" || String(item.status ?? item.lifecycleStatus ?? "draft") === status));
   const challengeIds = new Set(challenges.map((item) => item.id));
-  const cutoff = range === "all" ? null : new Date(Date.now() - Number(range) * 86_400_000);
+  const cutoff = range === "all" || !now ? null : new Date(now - Number(range) * 86_400_000);
   const select = (items: Item[]) => items.filter((item) => challengeIds.has(String(item.challengeId)) && (!cutoff || !itemDate(item) || itemDate(item)! >= cutoff));
   const participants = select(data.participants);
   const submissions = select(data.submissions);

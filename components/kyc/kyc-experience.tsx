@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
@@ -110,14 +110,13 @@ export function KycStatusPageContent() {
   const [kyc, setKyc] = useState<Kyc | null>(null);
   const [message, setMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  async function load() {
-    setRefreshing(true);
-    const result = await apiRequest<{ kyc: Kyc }>("/api/kyc/sumsub/status");
+  const load = useCallback(() => apiRequest<{ kyc: Kyc }>("/api/kyc/sumsub/status"), []);
+  const applyResult = useCallback((result: Awaited<ReturnType<typeof load>>) => {
     setRefreshing(false);
     if (result.ok) { setKyc(result.data?.kyc ?? null); setMessage(""); }
     else setMessage(result.message || "Sign in to view verification status.");
-  }
-  useEffect(() => { void load(); }, []);
+  }, []);
+  useEffect(() => { void load().then(applyResult); }, [applyResult, load]);
   const required = kyc?.kycRequired === true;
   const copy = kycStatusCopy(kyc?.kycStatus, required);
   return (
@@ -135,7 +134,7 @@ export function KycStatusPageContent() {
           {kyc?.kycFailureReason ? <p className="mt-5 rounded-[8px] border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">{String(kyc.kycFailureReason)}</p> : null}
           {message ? <p className="mt-5 rounded-[8px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-200">{message}</p> : null}
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            {copy.cta === "Refresh Status" ? <Button onClick={load} disabled={refreshing}><RefreshCcw size={17} /> {refreshing ? "Refreshing..." : "Refresh Status"}</Button> : <LinkButton href={copy.href}>{copy.cta}</LinkButton>}
+            {copy.cta === "Refresh Status" ? <Button onClick={() => { setRefreshing(true); void load().then(applyResult); }} disabled={refreshing}><RefreshCcw size={17} /> {refreshing ? "Refreshing..." : "Refresh Status"}</Button> : <LinkButton href={copy.href}>{copy.cta}</LinkButton>}
             {copy.secondary && copy.secondaryHref ? <LinkButton href={copy.secondaryHref} variant="secondary">{copy.secondary}</LinkButton> : null}
             <LinkButton href="/dashboard" variant="ghost">Dashboard</LinkButton>
           </div>

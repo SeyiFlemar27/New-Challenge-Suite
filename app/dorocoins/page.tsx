@@ -1,6 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowDownLeft, ArrowRightLeft, ArrowUpRight, Check, Coins, History, PlayCircle, Search, ShieldCheck, ShoppingBag, Sparkles, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, Field, PageTitle, inputClass } from "@/components/ui";
@@ -28,7 +30,9 @@ const earningRules = [
 ] as const;
 
 export default function DoroCoinsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") as Tab | null;
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab && tabs.includes(initialTab) ? initialTab : "overview");
   const [balance, setBalance] = useState(0);
   const [packages, setPackages] = useState<DoroPackage[]>([]);
   const [coinsPerUsd, setCoinsPerUsd] = useState(100);
@@ -40,7 +44,7 @@ export default function DoroCoinsPage() {
   const [message, setMessage] = useState("");
   const [economy, setEconomy] = useState<EconomySummary | null>(null);
   const [recipientQuery, setRecipientQuery] = useState("");
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [recipientResults, setRecipientResults] = useState<{ query: string; recipients: Recipient[] }>({ query: "", recipients: [] });
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   const [transferAmount, setTransferAmount] = useState("");
   const [transferNote, setTransferNote] = useState("");
@@ -50,10 +54,8 @@ export default function DoroCoinsPage() {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const quote = useMemo(() => quoteCustomDoroCoinPurchase(Number(customUsd)), [customUsd]);
 
-  useEffect(() => {
-    const value = new URLSearchParams(window.location.search).get("tab") as Tab | null;
-    if (value && tabs.includes(value)) setActiveTab(value);
-  }, []);
+  const recipientSearch = recipientQuery.trim();
+  const recipients = recipientResults.query === recipientSearch && !selectedRecipient ? recipientResults.recipients : [];
 
   function chooseTab(tab: Tab) {
     setActiveTab(tab);
@@ -63,11 +65,13 @@ export default function DoroCoinsPage() {
   }
 
   async function load() {
-    setLoading(true);
-    const [walletResult, packageResult, adResult, economyResult, transferResult] = await Promise.all([
+    return Promise.all([
       fetchWallet(), fetchDoroCoinPackages(), apiRequest<AdAvailability>("/api/ad-votes"),
       apiRequest<EconomySummary>("/api/economy/summary"), apiRequest<TransferLimits>("/api/dorocoin/transfer")
     ]);
+  }
+
+  const applyLoadResults = useCallback(([walletResult, packageResult, adResult, economyResult, transferResult]: Awaited<ReturnType<typeof load>>) => {
     if (walletResult.ok && walletResult.data) {
       setBalance(Number(walletResult.data.wallet?.balance ?? 0));
       setTransactions((walletResult.data.transactions ?? []) as DoroTransaction[]);
@@ -80,28 +84,28 @@ export default function DoroCoinsPage() {
     if (economyResult.ok && economyResult.data) setEconomy(economyResult.data);
     if (transferResult.ok && transferResult.data) setTransferLimits(transferResult.data);
     setLoading(false);
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load().then(applyLoadResults); }, [applyLoadResults]);
   useEffect(() => {
-    if (recipientQuery.trim().length < 2 || selectedRecipient) { setRecipients([]); return; }
+    if (recipientSearch.length < 2 || selectedRecipient) return;
     const timer = window.setTimeout(() => {
-      apiRequest<{ recipients: Recipient[] }>(`/api/dorocoin/recipients?q=${encodeURIComponent(recipientQuery.trim())}`)
-        .then((result) => setRecipients(result.ok ? result.data?.recipients ?? [] : []));
+      apiRequest<{ recipients: Recipient[] }>(`/api/dorocoin/recipients?q=${encodeURIComponent(recipientSearch)}`)
+        .then((result) => setRecipientResults({ query: recipientSearch, recipients: result.ok ? result.data?.recipients ?? [] : [] }));
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [recipientQuery, selectedRecipient]);
+  }, [recipientSearch, selectedRecipient]);
 
   function openCheckout(url?: string | null) { if (url) window.location.assign(url); else setMessage("Secure checkout could not be started."); }
   async function buyCustom() { if (!quote) return; setBusy("custom"); setMessage(""); const result = await purchaseCustomDoroCoinsByUsd(quote.amountUsd); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
   async function buyPackage(packageId: string) { setBusy(packageId); setMessage(""); const result = await purchaseDoroCoins(packageId); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
-  async function dailyLogin() { setBusy("daily"); const result = await apiRequest("/api/dorocoin/daily-login", { method: "POST" }); setBusy(null); setMessage(result.message); if (result.ok) await load(); }
+  async function dailyLogin() { setBusy("daily"); const result = await apiRequest("/api/dorocoin/daily-login", { method: "POST" }); setBusy(null); setMessage(result.message); if (result.ok) { setLoading(true); applyLoadResults(await load()); } }
   async function transfer() {
     if (!selectedRecipient) return;
     setBusy("transfer"); setMessage("");
     const result = await apiRequest("/api/dorocoin/transfer", { method: "POST", headers: { "idempotency-key": crypto.randomUUID() }, body: JSON.stringify({ receiverId: selectedRecipient.id, amount: Number(transferAmount), note: transferNote.trim() || undefined }) });
     setBusy(null); setConfirmTransfer(false); setMessage(result.message);
-    if (result.ok) { setTransferAmount(""); setTransferNote(""); setRecipientQuery(""); setSelectedRecipient(null); await load(); }
+    if (result.ok) { setTransferAmount(""); setTransferNote(""); setRecipientQuery(""); setSelectedRecipient(null); setLoading(true); applyLoadResults(await load()); }
   }
 
   const amount = Number(transferAmount);
@@ -152,7 +156,7 @@ function TransferConfirmation({ recipient, amount, busy, close, confirm }: { rec
 
 function BalanceCard({ label, value, note, dominant = false }: { label: string; value: string; note: string; dominant?: boolean }) { return <Card className={`p-5 ${dominant ? "border-yellow-400 bg-yellow-50 text-slate-950" : ""}`}><p className="text-sm font-bold text-[var(--muted)]">{label}</p><p className="mt-2 text-3xl font-black">{value}</p><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{note}</p></Card>; }
 function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-4"><p className="text-xs font-bold text-[var(--muted)]">{label}</p><p className="mt-1 font-black">{value}</p></div>; }
-function Avatar({ recipient }: { recipient: Recipient }) { return recipient.avatarUrl ? <img src={recipient.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-yellow-200 font-black text-yellow-950">{recipient.displayName.slice(0, 1).toUpperCase()}</span>; }
+function Avatar({ recipient }: { recipient: Recipient }) { return recipient.avatarUrl ? <ContentImage src={recipient.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-yellow-200 font-black text-yellow-950">{recipient.displayName.slice(0, 1).toUpperCase()}</span>; }
 function packageName(name: string, index: number) { const clean = name.trim(); if (clean && !/admin|config/i.test(clean)) return clean; return ["Starter", "Growth", "Creator", "Advanced", "Elite"][index] ?? "DoroCoin Package"; }
 function transactionAmount(item: DoroTransaction) { return Number(item.signedAmount ?? item.amount ?? 0); }
 function historyCategory(item: DoroTransaction): HistoryFilter { const value = `${item.type ?? ""} ${item.sourceType ?? ""} ${item.status ?? ""}`.toLowerCase(); if (/pending|review/.test(value)) return "pending"; if (/reversal|reversed/.test(value)) return "reversed"; if (/expir/.test(value)) return "expired"; if (/purchase/.test(value)) return "purchased"; if (/transfer/.test(value)) return "transferred"; if (transactionAmount(item) < 0 || /spend|boost/.test(value)) return "spent"; return "earned"; }

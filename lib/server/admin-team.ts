@@ -1,16 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
-import { ADMIN_ROLES, canDeactivateAdministrator, canManageAdministrators, isAdminRole, type AdminRole } from "@/lib/server/admin-permissions";
-
-export const SENSITIVE_ADMIN_ROLES: AdminRole[] = ["platform_owner", "super_admin", "finance_admin", "technical_admin"];
+import { ADMIN_ROLES, LEGACY_ADMIN_ROLE_NAMES, canDeactivateAdministrator, canManageAdministrators, isKnownAdminAssignment, normalizeAdminRoleAssignments, type AdminRole } from "@/lib/server/admin-permissions";
 
 export function normalizeAdminRoles(value: unknown) {
   if (!Array.isArray(value)) return [] as AdminRole[];
-  return [...new Set(value.filter(isAdminRole))];
+  return normalizeAdminRoleAssignments(value.filter(isKnownAdminAssignment));
 }
 
 export function assertAdminManager(roles: readonly string[] | undefined) {
-  if (!canManageAdministrators(roles)) throw new Error("Only a Platform Owner or Super Admin may manage administrators.");
+  if (!canManageAdministrators(roles)) throw new Error("Admin access is required to manage administrators.");
 }
 
 export function invitationToken() {
@@ -19,13 +17,15 @@ export function invitationToken() {
 }
 
 export async function adminRemovalGuard(db: Firestore, input: { actorId: string; targetId: string; targetRoles: readonly string[] }) {
-  const active = await db.collection("users").where("adminAccessStatus", "==", "active").get();
-  const activeSuperAdminCount = active.docs.filter((doc) => normalizeAdminRoles(doc.data().adminRoles).includes("super_admin")).length;
-  return canDeactivateAdministrator({ ...input, activeSuperAdminCount });
+  const assignments = ["admin", ...LEGACY_ADMIN_ROLE_NAMES];
+  const snapshots = await Promise.all([...assignments.map((role) => db.collection("users").where("adminRoles", "array-contains", role).get()), db.collection("users").where("adminRole", "==", "admin").get(), db.collection("users").where("isAdmin", "==", true).get()]);
+  const activeIds = new Set(snapshots.flatMap((snapshot) => snapshot.docs.filter((doc) => !["pending_invitation", "pending_security_setup", "suspended", "deactivated", "removed"].includes(String(doc.data().adminAccessStatus ?? "legacy_active"))).map((doc) => doc.id)));
+  const activeAdminCount = activeIds.size;
+  return canDeactivateAdministrator({ actorId: input.actorId, targetId: input.targetId, activeAdminCount });
 }
 
 export function adminTeamPublicRecord(id: string, data: Record<string, unknown>) {
-  const roles = normalizeAdminRoles(data.adminRoles);
+  const roles = normalizeAdminRoles([...(Array.isArray(data.adminRoles) ? data.adminRoles : []), data.adminRole]);
   return {
     id,
     displayName: data.displayName ?? data.name ?? "Administrator",
@@ -36,7 +36,7 @@ export function adminTeamPublicRecord(id: string, data: Record<string, unknown>)
     lastActiveAt: data.lastActivityAt ?? data.updatedAt ?? null,
     createdAt: data.adminAppointedAt ?? data.createdAt ?? null,
     appointedBy: data.adminAppointedBy ?? null,
-    permissionsSummary: roles.join(", "),
+    permissionsSummary: roles.length ? "Admin · permissions enforced per action" : "No active Admin role",
     securityWarnings: data.adminSecuritySetupComplete === true ? [] : ["Security setup required"]
   };
 }

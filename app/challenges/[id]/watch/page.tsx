@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Clock3, PlayCircle, Trophy, Users, Vote } from "lucide-react";
+import { CalendarClock, Clock3, Trophy, Users, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChallengeShare } from "@/components/challenge-share";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/api/client";
 import { fetchChallengeDetails } from "@/lib/api/services";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
 import { getChallengeLifecycleState, getChallengeDisplayStatus } from "@/lib/challenge-status";
+import { useClockTimestamp } from "@/lib/hooks/use-clock-timestamp";
 
 const reminderOptions = [
   { value: 60, label: "1 hour before" },
@@ -22,12 +23,13 @@ const reminderOptions = [
 export default function ChallengeWatchPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
+  const now = useClockTimestamp();
   const queryClient = useQueryClient();
   const [selectedReminders, setSelectedReminders] = useState<number[]>([60, 30, 5, 0]);
   const [notice, setNotice] = useState("");
   const query = useQuery({ queryKey: ["challenge-details", challengeId], queryFn: () => fetchChallengeDetails(challengeId), enabled: Boolean(challengeId), staleTime: 20_000 });
   const details = query.data?.ok ? query.data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
   const submissions = useMemo(() => challenge ? (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id).slice(0, 4) : [], [challenge, details?.submissions]);
   const reminderMutation = useMutation({
     mutationFn: () => apiRequest(`/api/challenges/${challengeId}/engagement`, { method: "POST", body: JSON.stringify({ action: "interested", enabled: true, reminderOffsetsMinutes: selectedReminders }) }),
@@ -41,12 +43,12 @@ export default function ChallengeWatchPage() {
   });
 
   if (query.isLoading) return <AppShell><div className="mx-auto max-w-6xl"><Card className="h-[520px] animate-pulse" /></div></AppShell>;
-  if (!challenge) return <AppShell><Card className="mx-auto max-w-3xl"><EmptyState icon={<PlayCircle />} title="Watch room unavailable" body={query.data?.message ?? "This challenge is not available."} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card></AppShell>;
+  if (!challenge) return <AppShell><Card className="mx-auto max-w-3xl"><EmptyState icon={<Users />} title="Challenge activity unavailable" body={query.data?.message ?? "This challenge is not available."} action={<LinkButton href="/challenges">Explore Challenges</LinkButton>} /></Card></AppShell>;
 
   const lifecycle = getChallengeLifecycleState(challenge);
   const status = getChallengeDisplayStatus(challenge);
   const nextAt = lifecycle.nextMilestoneAt;
-  const timeUntilNext = nextAt ? nextAt.getTime() - Date.now() : 0;
+  const timeUntilNext = nextAt && now ? nextAt.getTime() - now : 0;
   const votingOpen = lifecycle.canVote;
   const countdown = timeUntilNext > 0
     ? `${Math.ceil(timeUntilNext / 86_400_000)} day${Math.ceil(timeUntilNext / 86_400_000) === 1 ? "" : "s"} until ${String(lifecycle.nextMilestone ?? "next milestone").replaceAll("_", " ")}`
@@ -57,13 +59,13 @@ export default function ChallengeWatchPage() {
     <AppShell>
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <PageTitle title={challenge.title} subtitle="Watch submissions, voting, leaderboard movement, and winner announcements from one focused room." icon={<PlayCircle />} />
+          <PageTitle title={challenge.title} subtitle="Follow submissions, voting, leaderboard movement, and winner announcements from one focused activity room." icon={<Users />} />
           <div className="flex flex-col gap-3 sm:flex-row"><ChallengeShare title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}/watch`} /><LinkButton href={`/challenges/${challenge.id}`}>View Full Details</LinkButton></div>
         </div>
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
           <Card className="overflow-hidden">
             <div className="flex min-h-[320px] items-center justify-center bg-[#090909] p-8 text-center sm:min-h-[440px]">
-              <div><PlayCircle className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">{lifecycle.canWatchLive ? "Live stream is active" : lifecycle.livestreamStatus === "livestream_scheduled" ? "Live stream is scheduled" : "Live stream is not available yet"}</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">{lifecycle.canWatchLive ? "The configured live stream is available from this room." : "You can follow submissions, voting, leaderboard updates, and winner announcements here."}</p></div>
+              <div><Users className="mx-auto text-[var(--gold)]" size={58} /><h2 className="mt-6 text-2xl font-black">Challenge activity</h2><p className="mx-auto mt-3 max-w-xl leading-7 text-slate-400">Follow submissions, voting, leaderboard updates, and winner announcements here.</p></div>
             </div>
             <div className="grid gap-px bg-white/10 sm:grid-cols-4">{[[status, "Status"], [countdown, "Timeline"], [String(challenge.participants), "Participants"], [String(interestedCount), "Interested"]].map(([value, label]) => <div key={label} className="bg-[#121212] p-5"><p className="break-words text-lg font-black text-[var(--gold)]">{value}</p><p className="mt-1 text-xs uppercase text-slate-500">{label}</p></div>)}</div>
           </Card>

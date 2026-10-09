@@ -9,6 +9,7 @@ import { CreatorAnalytics } from "@/components/creator/creator-analytics";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 
 type RecordItem = Record<string, unknown> & { id: string };
+const EMPTY_RECORDS: RecordItem[] = [];
 type CreatorData = { challenges: RecordItem[]; completedChallenges: RecordItem[]; participants: RecordItem[]; submissions: RecordItem[]; winners: RecordItem[]; votes: RecordItem[]; sponsorInterest: RecordItem[]; boosts: RecordItem[]; notifications: RecordItem[] };
 
 async function loadCreatorData(): Promise<CreatorData> {
@@ -25,7 +26,7 @@ export function CreatorWorkspace({ mode = "dashboard" }: { mode?: keyof typeof l
   const [search, setSearch] = useState("");
   const [view, setView] = useState("all");
   const data = query.data;
-  const challenges = data?.challenges ?? [];
+  const challenges = data?.challenges ?? EMPTY_RECORDS;
   const filtered = useMemo(() => challenges.filter((item) => String(item.title ?? "").toLowerCase().includes(search.toLowerCase())), [challenges, search]);
   const status = (item: RecordItem) => String(item.status ?? item.lifecycleStatus ?? "draft").toLowerCase();
   const sponsorReadyStatuses = new Set(["published", "scheduled"]);

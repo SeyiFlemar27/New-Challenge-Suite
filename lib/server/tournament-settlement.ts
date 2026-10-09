@@ -25,12 +25,14 @@ export function tournamentPlacementFingerprint(placements: Row[]) {
 }
 
 async function tournamentConfirmedSources(db: Firestore, tournamentId: string) {
-  const [entries, paidVotes, sponsors, creatorPrize] = await Promise.all([
+  const [entries, paidVotes, sponsors, creatorPrize, promotionalPrizeSnap] = await Promise.all([
     confirmedRows(db, "challengeEntryPayments", tournamentId),
     confirmedRows(db, "paidVotePurchases", tournamentId),
     confirmedRows(db, "sponsorContributions", tournamentId),
-    confirmedRows(db, "creatorPrizeFundingPayments", tournamentId)
+    confirmedRows(db, "creatorPrizeFundingPayments", tournamentId),
+    db.collection("enterprisePromotionalPrizeFunding").where("challengeId", "==", tournamentId).get()
   ]);
+  const promotionalPrize = promotionalPrizeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Row)).filter((item) => item.status === "confirmed");
   const prizeSponsors = sponsors.filter((item) => ["prize", "prize_funding", "winner_prize"].includes(String(item.fundingPurpose ?? item.sponsorshipPurpose ?? "prize")));
   const gross = (rows: Row[]) => rows.reduce((sum, item) => sum + amount(item.amountCents ?? item.amount ?? item.grossAmountCents), 0);
   return {
@@ -38,6 +40,7 @@ async function tournamentConfirmedSources(db: Firestore, tournamentId: string) {
     confirmedPaidVoteRevenueCents: gross(paidVotes),
     confirmedSponsorPrizeCents: gross(prizeSponsors),
     confirmedCreatorPrizeCents: gross(creatorPrize),
+    confirmedPromotionalPrizeCents: gross(promotionalPrize),
     entryPaymentCount: entries.length,
     paidVotePaymentCount: paidVotes.length,
     sponsorPaymentCount: prizeSponsors.length,
@@ -47,6 +50,7 @@ async function tournamentConfirmedSources(db: Firestore, tournamentId: string) {
       confirmedPaidVotePaymentIds: paidVotes.map((item) => item.id),
       confirmedSponsorPaymentIds: prizeSponsors.map((item) => item.id),
       confirmedCreatorPrizePaymentIds: creatorPrize.map((item) => item.id),
+      confirmedPromotionalPrizeFundingIds: promotionalPrize.map((item) => item.id),
       excludedNonPrizeSponsorPaymentIds: sponsors.filter((item) => !prizeSponsors.includes(item)).map((item) => item.id)
     },
     confirmedOnly: true as const,

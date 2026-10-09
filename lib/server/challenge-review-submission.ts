@@ -2,6 +2,8 @@ import type { Firestore } from "firebase-admin/firestore";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { assertNoUndefinedFirestoreValues } from "@/lib/server/firestore-payload";
 import { mergeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
+import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
+import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize-exposure";
 
 export class ChallengeReviewTransitionError extends Error {
   constructor(readonly code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED", message: string) {
@@ -52,9 +54,25 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     if (latestStatus === "pending_review") return { idempotent: true, challenge: latestChallenge };
     if (latestStatus !== input.expectedStatus) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This challenge changed while it was being submitted. Please refresh and try again.");
 
+    const enterpriseSlot = await prepareEnterpriseActiveChallengeSlot(
+      db,
+      transaction,
+      latestChallenge.officialChallenge === true || latestChallenge.ownershipType === "challenge_suite_official" || Boolean(latestChallenge.organizationOwnerId)
+        ? String(latestChallenge.organizationOwnerId ?? "") || null
+        : null,
+      input.challengeId,
+    );
+    await prepareEnterprisePrizeValueUpdate(db, transaction, {
+      challengeId: input.challengeId,
+      challenge: latestChallenge,
+      nextPrizeValue: input.update.prizeValue ?? latestChallenge.prizeValue ?? 0,
+      now: String(input.update.updatedAt ?? new Date().toISOString()),
+    });
+
     const prizePool = mergeChallengePrizePoolFoundation(prizePoolSnap.exists ? prizePoolSnap.data() ?? {} : {}, { challengeId: input.challengeId, ...input.prizePool });
     assertNoUndefinedFirestoreValues(prizePool, "prizePool");
     transaction.set(challengeRef, input.update, { merge: true });
+    enterpriseSlot.apply();
     transaction.set(revisionRef, input.revision, { merge: true });
     transaction.set(revenueRef, input.revenue, { merge: true });
     transaction.set(prizePoolRef, prizePool, { merge: true });

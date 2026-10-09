@@ -20,7 +20,7 @@ export default function ChallengeVotingPage() {
   const [message, setMessage] = useState("");
   const detailsQuery = useQuery({ queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"], queryFn: () => fetchChallengeDetails(challengeId), enabled: Boolean(challengeId) && !auth.loading, staleTime: 15_000 });
   const details = detailsQuery.data?.ok ? detailsQuery.data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
   const submissions = useMemo(() => challenge ? (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id) : [], [challenge, details?.submissions]);
   const phaseSummary = (details as any)?.phaseSummary as { votingOpen?: boolean; eligibleSubmissionCount?: number | null } | undefined;
   const votingAccess = (details as any)?.userState?.votingAccess as { authenticated?: boolean; canVote?: boolean; reason?: string | null; loginPath?: string; freeVote?: { available?: boolean; used?: boolean; voteDate?: string; timeZone?: string; resetsAt?: string } } | undefined;
@@ -63,7 +63,7 @@ export default function ChallengeVotingPage() {
                 <select className="sr-only" tabIndex={-1} aria-hidden="true" value={submissionId} onChange={(event) => setSubmissionId(event.target.value)}><option value="">Select a submission</option>{submissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.title}</option>)}</select>
               </Field>
               {voteAction()}
-              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use Challenge Credits for Additional Votes</LinkButton> : null}
+              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use DoroCoins for Additional Votes</LinkButton> : null}
             </div>}
         {message ? <p className="mt-4 rounded-[8px] bg-white/[0.05] p-3 text-sm text-slate-200">{message}</p> : null}
         <LinkButton href={`/challenges/${challengeId}`} className="mt-8" variant="secondary">Return to Challenge</LinkButton>

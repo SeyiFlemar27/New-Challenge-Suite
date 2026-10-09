@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useEffect, useState } from "react";
 import { Award, BadgeCheck, LockKeyhole, Settings, Share2, Trophy, UserRound } from "lucide-react";
@@ -68,11 +69,14 @@ export default function ProfilePage() {
   const [shareMessage, setShareMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "challenges" | "entries" | "wins" | "achievements" | "activity">("overview");
 
-  async function loadProfile() {
-    setLoading(true);
-    setError(null);
-    setUnauthenticated(false);
-    const result = await fetchMyProfile();
+  async function loadProfile() { return fetchMyProfile(); }
+
+  useEffect(() => {
+    let active = true;
+    void loadProfile().then((result) => {
+      if (!active) return;
+      setError(null);
+      setUnauthenticated(false);
     if (!result.ok || !result.data) {
       const code = (result as any).code;
       setUnauthenticated(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED");
@@ -83,10 +87,8 @@ export default function ProfilePage() {
     }
     setProfile(result.data as ProfileState);
     setLoading(false);
-  }
-
-  useEffect(() => {
-    loadProfile();
+    });
+    return () => { active = false; };
   }, []);
 
   async function shareProfile() {
@@ -156,7 +158,7 @@ export default function ProfilePage() {
           <div data-mobile-profile-hero data-profile-social-hero className="-mt-24 flex flex-col items-center gap-6 text-center sm:-mt-28 sm:items-stretch sm:text-left lg:-mt-32 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex min-w-0 flex-col items-center gap-5 sm:flex-row sm:items-end sm:gap-7">
               <div className={cn("flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#101010] bg-[var(--gold)] text-3xl font-black text-black shadow-[0_18px_45px_rgba(0,0,0,.35)] sm:h-36 sm:w-36 sm:text-4xl", findCustomizationOption(profile.user.customization?.avatarRingId, "avatarRing")?.previewClass)}>
-                {profile.user.avatarUrl ? <img src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
+                {profile.user.avatarUrl ? <ContentImage src={profile.user.avatarUrl} alt={profile.user.displayName} className="h-full w-full object-cover" /> : profile.user.initials}
               </div>
               <div className="min-w-0 pb-1">
                 <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">

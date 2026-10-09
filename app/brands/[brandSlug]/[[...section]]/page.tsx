@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -31,7 +32,7 @@ export default function BrandProfilePage() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex items-end gap-4">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[8px] border-4 border-black bg-[var(--gold)] text-black">
-                  {data.brand.logoUrl ? <img src={data.brand.logoUrl} alt={data.brand.brandName} className="h-full w-full object-cover" /> : <Building2 />}
+                  {data.brand.logoUrl ? <ContentImage src={data.brand.logoUrl} alt={data.brand.brandName} className="h-full w-full object-cover" /> : <Building2 />}
                 </div>
                 <div>
                   <h1 className="flex items-center gap-2 text-3xl font-black">{data.brand.brandName}<BadgeCheck className="text-[var(--gold)]" /></h1>

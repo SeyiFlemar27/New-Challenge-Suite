@@ -1,6 +1,6 @@
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { forbidden, serverUnavailable, unauthorized } from "@/lib/server/responses";
-import { hasAdminPermission, isAdminRole, resolveAdminPermissions, type AdminPermission, type AdminRole } from "@/lib/server/admin-permissions";
+import { hasAdminPermission, isKnownAdminAssignment, normalizeAdminRoleAssignments, resolveAdminPermissions, type AdminPermission, type AdminRole } from "@/lib/server/admin-permissions";
 
 export const SESSION_COOKIE_NAME = "challenge_suite_session";
 
@@ -33,7 +33,7 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
   if (adminAuth && (token || sessionCookie)) {
     let decoded = null;
     try {
-      if (token) decoded = await adminAuth.verifyIdToken(token);
+      if (token) decoded = await adminAuth.verifyIdToken(token, true);
     } catch {
       decoded = null;
     }
@@ -57,19 +57,22 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
     const profileRoles = [
       ...(Array.isArray(profile?.adminRoles) ? profile.adminRoles : []),
       ...(typeof profile?.adminRole === "string" ? [profile.adminRole] : [])
-    ].filter(isAdminRole);
+    ].filter(isKnownAdminAssignment);
     const allowlisted = Boolean(email && adminAllowlist.has(email));
     const legacyAdmin = Boolean(decoded.admin === true || profile?.isAdmin || allowlisted);
     const accessStatus = typeof profile?.adminAccessStatus === "string" ? profile.adminAccessStatus : "legacy_active";
-    const securityReady = profile?.adminSecuritySetupComplete !== false && !["pending_invitation", "pending_security_setup", "suspended", "deactivated", "removed"].includes(accessStatus);
+    const expiresAt = profile?.adminAccessExpiresAt;
+    const expiry = typeof expiresAt === "number" ? expiresAt : typeof expiresAt === "string" ? Date.parse(expiresAt) : null;
+    const accessUnexpired = expiresAt == null || (expiry !== null && Number.isFinite(expiry) && expiry > Date.now());
+    const securityReady = profile?.adminSecuritySetupComplete !== false && accessUnexpired && !["pending_invitation", "pending_security_setup", "suspended", "deactivated", "removed", "expired"].includes(accessStatus);
     const candidateRoles: AdminRole[] = profileRoles.length
-      ? [...new Set(profileRoles)]
-      : legacyAdmin ? [allowlisted ? "platform_owner" : "super_admin"] : [];
+      ? normalizeAdminRoleAssignments(profileRoles)
+      : legacyAdmin ? ["admin"] : [];
     const adminRoles = securityReady ? candidateRoles : [];
     const explicitPermissions = Array.isArray(profile?.adminPermissions)
       ? profile.adminPermissions.filter((permission): permission is string => typeof permission === "string")
       : [];
-    const adminPermissions = resolveAdminPermissions(adminRoles, explicitPermissions);
+    const adminPermissions = resolveAdminPermissions(profileRoles.length ? profileRoles : candidateRoles, explicitPermissions);
     return {
       uid: decoded.uid,
       email: decoded.email,

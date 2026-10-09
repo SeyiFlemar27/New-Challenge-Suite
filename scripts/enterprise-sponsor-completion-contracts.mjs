@@ -34,9 +34,9 @@ export function runCompletionContract(name) {
     assert.ok(addFunds.includes("getRequestIdempotencyKey"));
     assert.ok(addFunds.includes('checkoutMetadataForPurpose("sponsor_wallet_funding"'));
     assert.ok(webhook.includes("confirmSponsorWalletFunding"));
-  } else if (name === "sponsor-atomic-full-reservation") {
-    for (const value of ["runTransaction", "proposalFundingEligible", "INSUFFICIENT_FUNDS", "availableBalanceCents - amountCents", "reservedFundsCents", "transaction.create(sponsorshipRef", 'status: "converted_to_sponsorship"', "externalPayoutExecuted: false"]) assert.ok(reservation.includes(value), `missing ${value}`);
-    assert.ok(!reservation.includes("partialAmount"));
+  } else if (name === "sponsor-proposal-funding-retired") {
+    for (const value of ["Funding through historical Sponsor proposals is retired", "410", "SPONSOR_PROPOSAL_FUNDING_RETIRED"]) assert.ok(reservation.includes(value), `missing ${value}`);
+    assert.ok(!reservation.includes("proposalFundingEligible") && !reservation.includes("runTransaction"), "historical proposal funding must not reserve or move money");
   } else if (name === "sponsor-organization-owned-operations") {
     for (const source of [deliverables, reports, analytics]) {
       assert.ok(source.includes("context.sponsorId"));

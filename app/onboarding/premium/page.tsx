@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
@@ -16,13 +16,20 @@ export default function PremiumOnboardingPage() {
   const [data, setData] = useState<Onboarding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  async function load() {
-    setLoading(true);
-    const result = await apiRequest<Onboarding>("/api/onboarding/premium");
+  const request = useCallback(() => apiRequest<Onboarding>("/api/onboarding/premium"), []);
+  const applyResult = useCallback((result: Awaited<ReturnType<typeof request>>) => {
     if (result.ok && result.data) { setData(result.data); setError(""); } else setError(result.message || "Membership status could not be loaded.");
     setLoading(false);
+  }, []);
+  async function load() {
+    setLoading(true);
+    applyResult(await request());
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+    void request().then((result) => { if (active) applyResult(result); });
+    return () => { active = false; };
+  }, [applyResult, request]);
 
   return <AppShell><main className="mx-auto max-w-5xl">
     {loading ? <Card className="h-72 animate-pulse" aria-label="Loading verified membership status" /> : error || !data ? <Card className="p-7"><h1 className="text-3xl font-black">Membership status unavailable</h1><p className="mt-3 text-red-200">{error}</p><Button className="mt-5" onClick={() => void load()}>Retry</Button></Card> : !data.subscription.active || !data.subscription.providerConfirmed ? <Pending data={data} refresh={load} /> : <Activated data={data} />}

@@ -11,14 +11,28 @@ await mkdir(tempDir, { recursive: true });
 const lifecycleSource = readFileSync(join(root, "lib/server/challenge-lifecycle.ts"), "utf8");
 const dateTimeSource = readFileSync(join(root, "lib/challenge-date-time.ts"), "utf8");
 const normalCapacitySource = readFileSync(join(root, "lib/normal-challenge-capacity.ts"), "utf8");
+const builderFoundationSource = readFileSync(join(root, "lib/challenge-builder-foundation.ts"), "utf8");
+const normalMediaPolicySource = readFileSync(join(root, "lib/normal-challenge-media-policy.js"), "utf8");
+const normalConfigSource = readFileSync(join(root, "lib/normal-challenge-config.ts"), "utf8")
+  .replace('from "@/lib/challenge-builder-foundation"', 'from "./challenge-builder-foundation.ts"')
+  .replace('from "@/lib/normal-challenge-media-policy.js"', 'from "./normal-challenge-media-policy.js"');
+const mediaStorageSource = readFileSync(join(root, "lib/server/media-storage-validation.ts"), "utf8");
 const validationSource = readFileSync(join(root, "lib/server/challenge-validation.ts"), "utf8")
   .replace('import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";', 'import { validateChallengeDates } from "./challenge-lifecycle.ts";')
   .replace('import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";', 'import { DEFAULT_CHALLENGE_TIME_ZONE } from "./challenge-date-time.ts";')
   .replace('import { normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";', 'import { normalChallengeCapacityError } from "./normal-challenge-capacity.ts";');
+const resolvedValidationSource = validationSource
+  .replace('from "@/lib/normal-challenge-capacity"', 'from "./normal-challenge-capacity.ts"')
+  .replace('from "@/lib/normal-challenge-config"', 'from "./normal-challenge-config.ts"')
+  .replace('from "@/lib/server/media-storage-validation"', 'from "./media-storage-validation.ts"');
 await writeFile(join(tempDir, "challenge-lifecycle.ts"), lifecycleSource, "utf8");
 await writeFile(join(tempDir, "challenge-date-time.ts"), dateTimeSource, "utf8");
 await writeFile(join(tempDir, "normal-challenge-capacity.ts"), normalCapacitySource, "utf8");
-await writeFile(join(tempDir, "challenge-validation.ts"), validationSource, "utf8");
+await writeFile(join(tempDir, "challenge-builder-foundation.ts"), builderFoundationSource, "utf8");
+await writeFile(join(tempDir, "normal-challenge-media-policy.js"), normalMediaPolicySource, "utf8");
+await writeFile(join(tempDir, "normal-challenge-config.ts"), normalConfigSource, "utf8");
+await writeFile(join(tempDir, "media-storage-validation.ts"), mediaStorageSource, "utf8");
+await writeFile(join(tempDir, "challenge-validation.ts"), resolvedValidationSource, "utf8");
 const { serverChallengeCreateSchema, validateChallengeForDraft, validateChallengeForPublish } = await import(pathToFileURL(join(tempDir, "challenge-validation.ts")).href);
 
 const future = (days) => {
@@ -51,7 +65,7 @@ const baseChallenge = {
   standardRules: "Submit original work. Respect all participants.",
   policyTerms: "Participants must follow platform and community rules.",
   challengeGuidelines: "Upload a relevant image submission that follows the challenge brief.",
-  coverImageUrl: "https://storage.example/challenge/banner.jpg",
+  coverImageUrl: "https://firebasestorage.googleapis.com/v0/b/example.appspot.com/o/challenges%2Fdrafts%2Fhost_1%2Fbanner%2F123-banner.jpg?alt=media",
   coverImagePath: "challenges/drafts/host_1/banner/123-banner.jpg",
   prizeType: "bragging_rights",
   numberOfWinners: 1,
@@ -79,11 +93,11 @@ assert.ok(invalidDates.errors.some((issue) => issue.code === "START_AFTER_END"),
 const liveMissingLocation = validateChallengeForPublish({ ...baseChallenge, type: "Live Event", isLiveEvent: true, venueName: "", eventCity: "", eventCountry: "" }, { userId: "host_1", now: new Date() });
 assert.ok(liveMissingLocation.errors.some((issue) => issue.code === "LIVE_LOCATION_REQUIRED"), "live events should require venue details");
 
-const livestreamMissingUrl = validateChallengeForPublish({ ...baseChallenge, externalLiveStatus: "scheduled", externalLiveUrl: "" }, { userId: "host_1", now: new Date() });
-assert.ok(livestreamMissingUrl.errors.some((issue) => issue.code === "LIVESTREAM_URL_REQUIRED"), "scheduled livestreams should require a URL");
+const retiredLivestreamMetadata = validateChallengeForPublish({ ...baseChallenge, externalLiveStatus: "scheduled", externalLiveUrl: "" }, { userId: "host_1", now: new Date() });
+assert.ok(!retiredLivestreamMetadata.errors.some((issue) => issue.code === "LIVESTREAM_URL_REQUIRED"), "legacy stream metadata must not activate Live Event publishing requirements");
 
 const privateMissingInvite = validateChallengeForPublish({ ...baseChallenge, visibility: "private", type: "Private Challenge", hostOperations: { visibilityMode: "hidden" } }, { userId: "host_1", now: new Date() });
-assert.ok(privateMissingInvite.errors.some((issue) => issue.code === "PRIVATE_INVITE_REQUIRED"), "private challenges should require invite settings");
+assert.ok(privateMissingInvite.errors.some((issue) => issue.code === "PRIVATE_ACCESS_METHOD_REQUIRED"), "private challenges should require one canonical access method");
 
 const tournamentMissingStages = validateChallengeForPublish({ ...baseChallenge, type: "Tournament", competitionFormat: "knockout", tournamentType: "knockout", tournamentStages: [] }, { userId: "host_1", now: new Date() });
 assert.ok(tournamentMissingStages.errors.some((issue) => issue.code === "TOURNAMENT_STAGES_REQUIRED"), "tournaments should require stage configuration");
@@ -92,7 +106,7 @@ const wrongOwnerPath = validateChallengeForPublish({ ...baseChallenge, coverImag
 assert.ok(wrongOwnerPath.errors.some((issue) => issue.code === "INVALID_BANNER_STORAGE_PATH"), "banner path must belong to the challenge owner or challenge path");
 
 const complete = validateChallengeForPublish(baseChallenge, { userId: "host_1", now: new Date() });
-assert.equal(complete.valid, true, "complete challenge should pass publish validation");
+assert.equal(complete.valid, true, `complete challenge should pass publish validation: ${JSON.stringify(complete.errors)}`);
 
 await rm(tempDir, { recursive: true, force: true });
 console.log("challenge publish validation tests passed");

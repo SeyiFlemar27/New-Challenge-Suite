@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { CheckCircle2, ChevronRight, Search, UploadCloud } from "lucide-react";
 import { useState } from "react";
@@ -16,11 +17,11 @@ export function SegmentedTabs({ items }: { items: string[] }) {
 }
 
 export function MobileChallengeCard({ challenge, onClick, compact = false }: { challenge: PreviewChallenge; onClick: () => void; compact?: boolean }) {
-  return <button onClick={onClick} className="w-full overflow-hidden rounded-[18px] border border-white/10 bg-[#121212] text-left"><div className={cn("relative", compact ? "h-36" : "h-44")}><img src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />{challenge.boosted ? <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-3 py-1 text-xs font-black">Boosted</span> : null}<span className="absolute right-3 top-3 rounded-full bg-black/80 px-3 py-1 text-xs font-black">{challenge.category}</span></div><div className="p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black leading-tight">{challenge.title}</h3><MobileBadge>{challenge.status}</MobileBadge></div><p className="mt-2 line-clamp-2 text-sm text-slate-300">{challenge.description}</p><div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-400"><span>{challenge.participants} players</span><span className="text-[var(--gold)]">{challenge.prize}</span><span>{challenge.deadline}</span></div></div></button>;
+  return <button onClick={onClick} className="w-full overflow-hidden rounded-[18px] border border-white/10 bg-[#121212] text-left"><div className={cn("relative", compact ? "h-36" : "h-44")}><ContentImage src={challenge.imageUrl} alt={challenge.title} className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />{challenge.boosted ? <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-3 py-1 text-xs font-black">Boosted</span> : null}<span className="absolute right-3 top-3 rounded-full bg-black/80 px-3 py-1 text-xs font-black">{challenge.category}</span></div><div className="p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black leading-tight">{challenge.title}</h3><MobileBadge>{challenge.status}</MobileBadge></div><p className="mt-2 line-clamp-2 text-sm text-slate-300">{challenge.description}</p><div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-400"><span>{challenge.participants} players</span><span className="text-[var(--gold)]">{challenge.prize}</span><span>{challenge.deadline}</span></div></div></button>;
 }
 
 export function SubmissionRow({ submission, onClick }: { submission: PreviewSubmission; onClick?: () => void }) {
-  return <button onClick={onClick} className="flex w-full items-center gap-3 rounded-[16px] border border-white/10 bg-[#121212] p-3 text-left"><img src={submission.mediaUrl} alt={submission.title} className="h-16 w-16 rounded-[12px] object-cover" /><div className="min-w-0 flex-1"><div className="truncate font-black">{submission.title}</div><div className="text-xs text-slate-400">#{submission.rank} • {submission.votes.toLocaleString()} votes</div></div><ChevronRight size={18} className="text-slate-500" /></button>;
+  return <button onClick={onClick} className="flex w-full items-center gap-3 rounded-[16px] border border-white/10 bg-[#121212] p-3 text-left"><ContentImage src={submission.mediaUrl} alt={submission.title} className="h-16 w-16 rounded-[12px] object-cover" /><div className="min-w-0 flex-1"><div className="truncate font-black">{submission.title}</div><div className="text-xs text-slate-400">#{submission.rank} • {submission.votes.toLocaleString()} votes</div></div><ChevronRight size={18} className="text-slate-500" /></button>;
 }
 
 export function LeaderboardRow({ row, compact = false }: { row: { rank: number; name: string; badge: string; points: string }; compact?: boolean }) {
@@ -32,7 +33,7 @@ export function WalletPackage({ pack, onClick }: { pack: { coins: number; price:
 }
 
 export function WinnerCard({ submission, onClick }: { submission: PreviewSubmission; onClick: () => void }) {
-  return <button onClick={onClick} className="w-full overflow-hidden rounded-[18px] border border-yellow-400/20 bg-[#11151d] text-left"><div className="relative h-44"><img src={submission.mediaUrl} alt={submission.title} className="h-full w-full object-cover" /><span className="absolute right-3 top-3 rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">Winner</span></div><div className="p-4"><h3 className="text-lg font-black">{submission.title}</h3><p className="mt-1 text-sm text-slate-300">{submission.creator} • {submission.votes.toLocaleString()} votes</p></div></button>;
+  return <button onClick={onClick} className="w-full overflow-hidden rounded-[18px] border border-yellow-400/20 bg-[#11151d] text-left"><div className="relative h-44"><ContentImage src={submission.mediaUrl} alt={submission.title} className="h-full w-full object-cover" /><span className="absolute right-3 top-3 rounded-full bg-[var(--gold)] px-3 py-1 text-xs font-black text-black">Winner</span></div><div className="p-4"><h3 className="text-lg font-black">{submission.title}</h3><p className="mt-1 text-sm text-slate-300">{submission.creator} • {submission.votes.toLocaleString()} votes</p></div></button>;
 }
 
 export function StepPill({ step, title, done }: { step: string; title: string; done?: boolean }) {

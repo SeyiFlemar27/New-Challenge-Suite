@@ -41,9 +41,7 @@ export default function FeedPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    loadFeed();
-  }, []);
+  useEffect(() => { void Promise.resolve().then(loadFeed); }, []);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -54,7 +52,7 @@ export default function FeedPage() {
       const matchesTab = tab === "Active" ? ["Active", "Closing Soon", "Voting Open"].includes(status) : tab === "Open" ? status === "Open" : tab === "Premium" ? Boolean((challenge as any).premiumOnly || (challenge as any).planRequired) : true;
       return matchesCategory && matchesQuery && matchesTab;
     });
-  }, [category, query, tab]);
+  }, [category, query, tab, challenges]);
 
   function runSearch(value: string) {
     setQuery(value);

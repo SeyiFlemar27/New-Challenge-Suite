@@ -13,13 +13,13 @@ const files = {
   support: read("app/api/support/tickets/route.ts") + read("app/api/admin/cases/route.ts") + read("components/support-ticket-form.tsx"),
   status: read("app/api/admin/system-status/route.ts") + read("app/api/admin/background-jobs/route.ts") + read("components/admin/admin-phase2-workspace.tsx"),
   content: read("app/api/admin/public-content/route.ts") + read("components/admin/public-content-editor.tsx"),
-  earnings: read("app/earnings/page.tsx"), metadata: read("app/layout.tsx") + read("public/site.webmanifest")
+  earnings: read("app/earnings/page.tsx"), metadata: read("app/layout.tsx")
 };
 const has = (source, values) => values.forEach((value) => assert.ok(source.includes(value), `Missing contract: ${value}`));
 
 export function runContract(name) {
   if (name.includes("theme")) has(files.theme, ["light", "dark", "system", "localStorage", "userPreferences", "data-app-theme"]);
-  else if (name.includes("favicon") || name.includes("metadata")) { has(files.metadata, ["favicon.ico", "apple-touch-icon.png", "site.webmanifest"]); ["favicon.ico", "favicon-16x16.png", "favicon-32x32.png", "apple-touch-icon.png", "android-chrome-192x192.png", "android-chrome-512x512.png"].forEach((file) => assert.ok(fs.existsSync(`public/${file}`), `Missing ${file}`)); }
+  else if (name.includes("favicon") || name.includes("metadata")) { const manifest = read("public/site.webmanifest"); has(files.metadata + manifest, ["favicon.ico", "apple-touch-icon.png", "site.webmanifest"]); ["favicon.ico", "favicon-16x16.png", "favicon-32x32.png", "apple-touch-icon.png", "android-chrome-192x192.png", "android-chrome-512x512.png"].forEach((file) => assert.ok(fs.existsSync(`public/${file}`), `Missing ${file}`)); }
   else if (name.includes("admin-team") || name.includes("admin-invite") || name.includes("admin-appoint") || name.includes("admin-removal") || name.includes("admin-final") || name.includes("admin-self") || name.includes("admin-role") || name.includes("admin-2fa") || name.includes("admin-no-duplicate")) { has(files.team + files.auth, ["pending_security_setup", "adminSecuritySetupComplete", "requireRecentAdminAuthentication", "assertAdminManager", "canDeactivateAdministrator", "revokeRefreshTokens", "You cannot appoint or elevate your own"]); }
   else if (name.includes("action-centre")) { has(files.tasks, ["adminActionTasks", "operationalTaskId", "assignedTo", "staffNotes", "slaDueAt", "overdue", "escalated", "Escalation"]); assert.ok(!files.tasks.includes("Math.random")); }
   else if (name.includes("people") || name.includes("user-")) { has(files.people, ["users.view", "users.restrict", "payoutDetailsMasked", "users.viewPayoutDetails", "x-admin-access-reason", "readonlyPreview", "impersonationEnabled: false", "writeAuditLog"]); }

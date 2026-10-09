@@ -1,6 +1,8 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Award, BadgeCheck, MapPin, MessageSquare, Settings, Share2, Trophy, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
@@ -29,30 +31,17 @@ function valueOf(stats: Record<string, number | null>, ...keys: string[]) {
 
 export function PublicProfileView({ username, initialSection = "created" }: { username: string; initialSection?: string }) {
   const section = [...tabs, "followers", "following"].includes(initialSection) ? initialSection : "created";
-  const [data, setData] = useState<SocialProfileData | null>(null);
-  const [connections, setConnections] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  const query = useQuery({ queryKey: ["public-profile", username], queryFn: () => apiRequest<SocialProfileData>(`/api/public/profiles/${encodeURIComponent(username)}`) });
+  const connectionsQuery = useQuery({ queryKey: ["public-profile-connections", username, section], queryFn: () => apiRequest<{ profiles: Item[] }>(`/api/public/profiles/${encodeURIComponent(username)}/connections?mode=${section}`), enabled: ["followers", "following"].includes(section) });
+  const data = query.data?.data ?? null;
+  const connections = connectionsQuery.data?.data?.profiles ?? [];
+  const loading = query.isLoading;
   const [notice, setNotice] = useState("");
-
-  async function load() {
-    setLoading(true);
-    const result = await apiRequest<SocialProfileData>(`/api/public/profiles/${encodeURIComponent(username)}`);
-    if (result.ok && result.data) setData(result.data);
-    else setNotice(result.message);
-    setLoading(false);
-  }
-
-  useEffect(() => { void load(); }, [username]);
-  useEffect(() => {
-    if (!["followers", "following"].includes(section)) return;
-    void apiRequest<{ profiles: Item[] }>(`/api/public/profiles/${encodeURIComponent(username)}/connections?mode=${section}`)
-      .then((result) => setConnections(result.ok ? result.data?.profiles ?? [] : []));
-  }, [section, username]);
 
   async function follow() {
     const result = await apiRequest<{ following: boolean }>(`/api/public/profiles/${encodeURIComponent(username)}/follow`, { method: "POST" });
     setNotice(result.message || (result.ok ? "Profile follow status updated." : "Follow will be available soon."));
-    if (result.ok) await load();
+    if (result.ok) await query.refetch();
   }
 
   async function shareProfile(displayName: string) {
@@ -77,7 +66,7 @@ export function PublicProfileView({ username, initialSection = "created" }: { us
             <div data-mobile-profile-hero className="-mt-20 flex flex-col items-center gap-5 text-center sm:-mt-24 sm:items-stretch sm:text-left lg:flex-row lg:items-end lg:justify-between">
               <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row sm:items-end">
                 <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#101010] bg-[var(--gold)] text-2xl font-black text-black shadow-[0_18px_45px_rgba(0,0,0,.35)] sm:h-36 sm:w-36">
-                  {profile.avatarUrl ? <img src={profile.avatarUrl} alt={displayName} className="h-full w-full object-cover" /> : profile.initials}
+                  {profile.avatarUrl ? <ContentImage src={profile.avatarUrl} alt={displayName} className="h-full w-full object-cover" /> : profile.initials}
                 </div>
                 <div className="min-w-0 pb-1">
                   <h1 className="flex flex-wrap items-center justify-center gap-2 break-words text-3xl font-black sm:justify-start sm:text-4xl">{displayName}{profile.verified ? <BadgeCheck className="text-[var(--gold)]" aria-label="Verified profile" /> : null}</h1>
@@ -121,7 +110,7 @@ function ContentGrid({ section, username, items, badges }: { section: string; us
   const title = section === "entries" ? "Submissions" : section;
   const emptyTitle = section === "entries" ? "No submissions yet" : `No public ${title} yet`;
   const emptyBody = section === "entries" ? "Entries submitted to challenges will appear here." : "Public competition activity will appear here when available.";
-  return <section className="mt-8"><h2 className="text-2xl font-black capitalize">{title}</h2>{items.length ? <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card key={item.id} className="overflow-hidden">{item.mediaUrl || item.coverImageUrl ? <img src={item.mediaUrl || item.coverImageUrl} alt={item.title || "Profile item"} className="h-48 w-full object-cover" /> : <div className="flex h-48 items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.16),transparent_45%),#111] px-4 text-center text-sm font-black text-[var(--gold)]">Challenge Suite Entry</div>}<div className="p-5"><h3 className="break-words text-lg font-black">{item.title || item.challengeTitle || item.type?.replaceAll("_", " ") || "Challenge activity"}</h3><p className="mt-2 text-sm capitalize text-slate-400">Status: {String(item.status || (item.position ? `Placement ${item.position}` : "recorded")).replaceAll("_", " ")}</p>{item.voteCount !== undefined ? <p className="mt-2 text-sm text-slate-300">{item.voteCount} votes · {item.viewCount ?? 0} views</p> : null}{item.challengeId || item.id ? <LinkButton href={`/challenges/${item.challengeId || item.id}`} variant="ghost" className="mt-4 w-full">Open</LinkButton> : null}</div></Card>)}</div> : <Card className="mt-5 border-dashed p-8 text-center text-slate-400"><h3 className="text-2xl font-black text-white">{emptyTitle}</h3><p className="mt-3">{emptyBody}</p>{section === "entries" ? <LinkButton href="/challenges" className="mt-5">Explore Challenges</LinkButton> : null}</Card>}{section === "wins" && badges.length ? <div className="mt-8 flex flex-wrap gap-2">{badges.map((badge) => <span key={badge.id} className="rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 py-2 text-xs font-black text-[var(--gold)]">{badge.title || badge.name}</span>)}</div> : null}</section>;
+  return <section className="mt-8"><h2 className="text-2xl font-black capitalize">{title}</h2>{items.length ? <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card key={item.id} className="overflow-hidden">{item.mediaUrl || item.coverImageUrl ? <ContentImage src={item.mediaUrl || item.coverImageUrl} alt={item.title || "Profile item"} className="h-48 w-full object-cover" /> : <div className="flex h-48 items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.16),transparent_45%),#111] px-4 text-center text-sm font-black text-[var(--gold)]">Challenge Suite Entry</div>}<div className="p-5"><h3 className="break-words text-lg font-black">{item.title || item.challengeTitle || item.type?.replaceAll("_", " ") || "Challenge activity"}</h3><p className="mt-2 text-sm capitalize text-slate-400">Status: {String(item.status || (item.position ? `Placement ${item.position}` : "recorded")).replaceAll("_", " ")}</p>{item.voteCount !== undefined ? <p className="mt-2 text-sm text-slate-300">{item.voteCount} votes · {item.viewCount ?? 0} views</p> : null}{item.challengeId || item.id ? <LinkButton href={`/challenges/${item.challengeId || item.id}`} variant="ghost" className="mt-4 w-full">Open</LinkButton> : null}</div></Card>)}</div> : <Card className="mt-5 border-dashed p-8 text-center text-slate-400"><h3 className="text-2xl font-black text-white">{emptyTitle}</h3><p className="mt-3">{emptyBody}</p>{section === "entries" ? <LinkButton href="/challenges" className="mt-5">Explore Challenges</LinkButton> : null}</Card>}{section === "wins" && badges.length ? <div className="mt-8 flex flex-wrap gap-2">{badges.map((badge) => <span key={badge.id} className="rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 py-2 text-xs font-black text-[var(--gold)]">{badge.title || badge.name}</span>)}</div> : null}</section>;
 }
 
 function About({ profile, badges }: { profile: Item; badges: Item[] }) {
@@ -129,5 +118,5 @@ function About({ profile, badges }: { profile: Item; badges: Item[] }) {
 }
 
 function ConnectionList({ title, profiles }: { title: string; profiles: Item[] }) {
-  return <section className="mt-8"><h2 className="text-2xl font-black capitalize">{title}</h2><div className="mt-5 grid gap-3 sm:grid-cols-2">{profiles.length ? profiles.map((profile) => <Card key={profile.id} className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] font-black text-black">{profile.avatarUrl ? <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-cover" /> : String(profile.displayName).slice(0, 2).toUpperCase()}</div><div className="min-w-0"><a href={`/profile/${profile.username}`} className="font-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{profile.displayName}</a><p className="truncate text-sm text-slate-400">@{profile.username}</p></div></Card>) : <Card className="p-8 text-slate-400">No {title} yet.</Card>}</div></section>;
+  return <section className="mt-8"><h2 className="text-2xl font-black capitalize">{title}</h2><div className="mt-5 grid gap-3 sm:grid-cols-2">{profiles.length ? profiles.map((profile) => <Card key={profile.id} className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] font-black text-black">{profile.avatarUrl ? <ContentImage src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-cover" /> : String(profile.displayName).slice(0, 2).toUpperCase()}</div><div className="min-w-0"><a href={`/profile/${profile.username}`} className="font-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{profile.displayName}</a><p className="truncate text-sm text-slate-400">@{profile.username}</p></div></Card>) : <Card className="p-8 text-slate-400">No {title} yet.</Card>}</div></section>;
 }

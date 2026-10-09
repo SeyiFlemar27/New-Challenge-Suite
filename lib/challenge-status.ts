@@ -534,7 +534,7 @@ export function getChallengeLifecycleState(challenge: Challenge | Record<string,
 
   const submissionStatus = resolveSubmissionStatus(record, timeline, now);
   const votingStatus = resolveVotingStatus(record, timeline, now, persisted);
-  const livestreamStatus = resolveLivestreamStatus(record, timeline, now);
+  const livestreamStatus = resolveLivestreamStatus();
   const primaryStatus = resolvePrimaryStatus(persisted, timeline, now, submissionStatus, votingStatus);
   const next = getNextMilestone(record, now);
   const nextMilestone = next[0];
@@ -790,20 +790,9 @@ function resolveVotingStatus(record: Record<string, unknown>, timeline: Normaliz
   return "voting_not_open";
 }
 
-function resolveLivestreamStatus(record: Record<string, unknown>, timeline: NormalizedTimeline, now: Date): LivestreamWindowStatus {
-  const streamStatus = String(record.streamStatus ?? record.externalLiveStatus ?? "").toLowerCase();
-  const hasStreamUrl = Boolean(record.livestreamUrl || record.livestreamEmbedUrl || record.externalLiveUrl);
-  const replayEnabled = record.replayEnabled === true;
-  const hasReplay = Boolean(record.replayUrl || record.recordingUrl);
-  const livestreamEnabled = record.livestreamEnabled === true || record.externalLiveEnabled === true || hasStreamUrl || Boolean(timeline.livestreamStartsAt || timeline.livestreamEndsAt);
-  if (!livestreamEnabled) return "livestream_not_scheduled";
-  if (streamStatus === "paused") return "livestream_paused";
-  if (streamStatus === "live" && hasStreamUrl) return "livestream_live";
-  if (streamStatus === "ended") return replayEnabled && hasReplay ? "replay_available" : "replay_unavailable";
-  if (timeline.livestreamStartsAt && now < timeline.livestreamStartsAt) return "livestream_scheduled";
-  if (timeline.livestreamEndsAt && now > timeline.livestreamEndsAt) return replayEnabled && hasReplay ? "replay_available" : "livestream_ended";
-  if (timeline.livestreamStartsAt && now >= timeline.livestreamStartsAt && (!timeline.livestreamEndsAt || now <= timeline.livestreamEndsAt) && hasStreamUrl) return "livestream_live";
-  return "livestream_scheduled";
+function resolveLivestreamStatus(): LivestreamWindowStatus {
+  // Historical stream metadata is retained for compatibility but never activates a stream.
+  return "livestream_not_scheduled";
 }
 
 function timelineWarnings(timeline: NormalizedTimeline): ChallengeTimelineWarning[] {

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 const builder = fs.readFileSync("components/tournament-builder.tsx", "utf8");
+const registry = fs.readFileSync("lib/challenge-builder-registry.ts", "utf8");
 const validation = fs.readFileSync("lib/server/tournament-validation.ts", "utf8");
 const operations = fs.readFileSync("lib/server/tournament-operations.ts", "utf8");
 const results = fs.readFileSync("app/api/tournaments/[id]/results/route.ts", "utf8");
 const createRoute = fs.readFileSync("app/api/tournaments/route.ts", "utf8");
 const updateRoute = fs.readFileSync("app/api/tournaments/[id]/route.ts", "utf8");
-for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) assert(builder.includes(step));
+for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) assert(registry.includes(step));
+assert.match(builder, /canonicalBuilderSteps\("tournament"\)/);
 assert.match(validation, /single_elimination.*double_elimination/);
 assert.doesNotMatch(validation, /round_robin.*Advanced formats/);
 assert.match(operations, /generateDoubleEliminationBracket/);

@@ -8,7 +8,11 @@ const root = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:\/)/
 const tempDir = join(root, ".tmp-challenge-lifecycle");
 await rm(tempDir, { recursive: true, force: true });
 await mkdir(tempDir, { recursive: true });
-const source = readFileSync(join(root, "lib/challenge-status.ts"), "utf8").replace('import type { Challenge } from "./types";', 'type Challenge = Record<string, unknown>;');
+const dateTimeSource = readFileSync(join(root, "lib/challenge-date-time.ts"), "utf8");
+const source = readFileSync(join(root, "lib/challenge-status.ts"), "utf8")
+  .replace('import type { Challenge } from "./types";', 'type Challenge = Record<string, unknown>;')
+  .replace('import { resolveChallengeTimeZone } from "./challenge-date-time";', 'import { resolveChallengeTimeZone } from "./challenge-date-time.ts";');
+await writeFile(join(tempDir, "challenge-date-time.ts"), dateTimeSource, "utf8");
 await writeFile(join(tempDir, "challenge-status.ts"), source, "utf8");
 const {
   getChallengeLifecycleState,
@@ -23,6 +27,7 @@ const {
 const d = (iso) => new Date(iso);
 const base = {
   id: "challenge_lifecycle_test",
+  builderVersion: "normal_v2",
   title: "Lifecycle Test",
   status: "scheduled",
   acceptedSubmissionTypes: ["image"],
@@ -83,13 +88,13 @@ assert.equal(state.votingStatus, "voting_closed");
 assert.equal(state.canVote, false);
 
 state = getChallengeLifecycleState(base, d("2026-08-06T11:59:59.000Z"));
-assert.equal(state.livestreamStatus, "livestream_scheduled");
+assert.equal(state.livestreamStatus, "livestream_not_scheduled");
 assert.equal(state.canWatchLive, false);
 state = getChallengeLifecycleState(base, d("2026-08-06T12:00:00.000Z"));
-assert.equal(state.livestreamStatus, "livestream_live");
-assert.equal(state.canWatchLive, true);
+assert.equal(state.livestreamStatus, "livestream_not_scheduled");
+assert.equal(state.canWatchLive, false);
 state = getChallengeLifecycleState(base, d("2026-08-06T14:00:00.001Z"));
-assert.equal(state.livestreamStatus, "replay_available");
+assert.equal(state.livestreamStatus, "livestream_not_scheduled");
 
 state = getChallengeLifecycleState(base, d("2026-08-21T10:00:00.000Z"));
 assert.equal(state.primaryStatus, "winners_announced");

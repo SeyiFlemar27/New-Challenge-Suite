@@ -4,6 +4,7 @@ import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
 import { calculatePaidRevenueSplit, calculateSponsorContributionSplit, MINIMUM_ENTRY_FEE_CENTS, validateEntryFee, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { calculateEntryEntitlement, consumeEntryEntitlement, type RewardEntitlementType } from "@/lib/server/reward-economy";
+import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
 
 export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding", "sponsor_wallet_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
@@ -123,6 +124,7 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     id,
     userId: input.userId,
     challengeId: input.challengeId,
+    organizationOwnerId: null as string | null,
     participantId: null,
     reservedParticipantId: participantId,
     paymentPurpose: "challenge_entry_fee",
@@ -182,9 +184,9 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     const existingReservation = paymentSnap.exists ? paymentSnap.data() ?? {} : null;
     const existingIsReserved = existingReservation?.reservationStatus === "reserved" && existingReservation?.status === "pending" && (parseTime(existingReservation?.reservationExpiresAt) ?? 0) > nowMs;
     if (capacity !== null && occupied >= capacity && !existingIsReserved) throw new Error("This challenge is full. Paid-entry checkout is not available.");
-    if (paymentSnap.exists && !existingIsReserved && paymentSnap.data()?.status === "pending") {
-      transaction.set(paymentRef, { status: "canceled", reservationStatus: "released", releasedAt: now, updatedAt: now }, { merge: true });
-    }
+    const expiredPendingContributionCents = paymentSnap.exists && !existingIsReserved && paymentSnap.data()?.status === "pending"
+      ? cents(paymentSnap.data()?.winnerShareCents)
+      : 0;
     if (entitlementRef && entitlementSnap) {
       if (!entitlementSnap.exists) throw new Error("The selected reward is no longer available.");
       const entitlement = entitlementSnap.data() ?? {};
@@ -197,8 +199,21 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
       if (!calculation.eligible) throw new Error("The selected reward cannot be used for this entry fee.");
       const discountedRevenue = calculateEntryRevenueFoundation(calculation.payableCents);
       record = { ...record, amountCents: calculation.payableCents, amount: calculation.payableCents, amountGrossCents: discountedRevenue.amountGrossCents, platformFeeCents: discountedRevenue.platformFeeCents, amountNetCents: discountedRevenue.amountNetCents, winnerShareCents: discountedRevenue.winnerShareCents, creatorHostOperatorShareCents: discountedRevenue.creatorHostOperatorShareCents, rewardEntitlementId: entitlementRef.id, rewardEntitlementType: String(entitlement.type), rewardDiscountCents: calculation.discountCents };
-      transaction.set(entitlementRef, { status: "reserved", reservationId: id, reservedUntil: reservationExpiresAt, updatedAt: now }, { merge: true });
     }
+    const financialOwnership = resolveEnterpriseFinancialOwnership(freshChallenge);
+    if (financialOwnership.workspaceType === "enterprise") {
+      record = { ...record, organizationOwnerId: financialOwnership.organizationOwnerId };
+      await reserveEnterprisePrizeExposureInTransaction(db, transaction, {
+        challengeId: input.challengeId,
+        challenge: freshChallenge,
+        organizationOwnerId: financialOwnership.organizationOwnerId,
+        amountCents: cents(record.winnerShareCents),
+        sourceType: "entry",
+        releaseAmountCents: expiredPendingContributionCents,
+        now,
+      });
+    }
+    if (entitlementRef && entitlementSnap) transaction.set(entitlementRef, { status: "reserved", reservationId: id, reservedUntil: reservationExpiresAt, updatedAt: now }, { merge: true });
     transaction.set(paymentRef, { ...record, ...(paymentSnap.exists ? { createdAt: paymentSnap.data()?.createdAt ?? now } : {}) }, { merge: true });
   });
   return record;
@@ -286,6 +301,10 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
     const reservationValid = payment.reservationStatus === "reserved" && reservationExpiresAtMs > nowMs;
     const participantAlreadyActive = participantSnap.exists && isActiveParticipantStatus(participantSnap.data()?.status) && ["paid", "confirmed"].includes(String(participantSnap.data()?.entryPaymentStatus ?? ""));
     const capacityAvailable = capacity === null || occupied < capacity || participantAlreadyActive;
+    const financialOwnership = resolveEnterpriseFinancialOwnership(challenge);
+    if (financialOwnership.workspaceType === "enterprise" && String(payment.organizationOwnerId ?? "") !== financialOwnership.organizationOwnerId) {
+      throw new Error("Enterprise entry funding owner no longer matches the challenge.");
+    }
     const basePaymentUpdate = {
       stripeCheckoutSessionId: session.id,
       providerSessionId: session.id,
@@ -308,6 +327,16 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
         refundExecutionEnabled: false
       }, { merge: true });
       return { handled: true, kind: "challenge_entry_fee", id, duplicate: false, enrollmentActivated: false, reviewRequired: true, payoutProviderCalled: false, prizeReleased: false };
+    }
+    if (financialOwnership.workspaceType === "enterprise" && revenue.winnerShareCents > 0) {
+      await confirmEnterprisePrizeExposureInTransaction(db, transaction, {
+        challengeId,
+        challenge,
+        organizationOwnerId: financialOwnership.organizationOwnerId,
+        amountCents: revenue.winnerShareCents,
+        sourceType: "entry",
+        now,
+      });
     }
     if (payment.rewardEntitlementId) {
       await consumeEntryEntitlement(transaction, db, { entitlementId: String(payment.rewardEntitlementId), checkoutId: id, paymentId: id, now });
@@ -347,6 +376,7 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       pendingEntryFeeRevenueGrossCents: FieldValue.increment(amountCents),
       pendingEntryFeePlatformFeeCents: FieldValue.increment(revenue.platformFeeCents),
       pendingEntryFeeWinnerShareCents: FieldValue.increment(revenue.winnerShareCents),
+      confirmedEntryFeeAllocationCents: financialOwnership.workspaceType === "enterprise" ? FieldValue.increment(revenue.winnerShareCents) : FieldValue.increment(0),
       pendingEntryFeeCreatorShareCents: FieldValue.increment(revenue.creatorHostOperatorShareCents),
       pendingEntryFeeNetCents: FieldValue.increment(revenue.amountNetCents),
       paidEntryConfirmedCount: FieldValue.increment(1),
@@ -356,11 +386,23 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       payoutExecutionEnabled: false,
       updatedAt: now
     }, { merge: true });
+    if (financialOwnership.workspaceType === "enterprise" && revenue.winnerShareCents > 0) transaction.set(db.collection("prizePools").doc(challengeId), {
+      challengeId,
+      confirmedEntryFeeAllocationCents: FieldValue.increment(revenue.winnerShareCents),
+      totalConfirmedCents: FieldValue.increment(revenue.winnerShareCents),
+      totalCommittedCents: FieldValue.increment(revenue.winnerShareCents),
+      visibleJackpotCents: FieldValue.increment(revenue.winnerShareCents),
+      fundingStatus: "growing_pool",
+      status: "growing_pool",
+      updatedAt: now,
+    }, { merge: true });
     for (const [shareType, amount] of [["winner_share", revenue.winnerShareCents], ["creator_host_share", revenue.creatorHostOperatorShareCents], ["platform_share", revenue.platformFeeCents]] as const) {
       transaction.set(db.collection("challengeFinancialLedger").doc(deterministicId("entry_fee", id, shareType)), {
         id: deterministicId("entry_fee", id, shareType),
         challengeId,
         userId,
+        organizationOwnerId: financialOwnership.workspaceType === "enterprise" ? financialOwnership.organizationOwnerId : null,
+        financialOwnerType: financialOwnership.workspaceType === "enterprise" ? "organization" : "user",
         entryPaymentId: id,
         revenueType: "entry_fee",
         shareType,
@@ -389,22 +431,49 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
   });
 }
 
-export async function expireChallengeEntryPayment(db: Firestore, session: Stripe.Checkout.Session) {
-  const id = metadata(session).entryPaymentId;
+export async function releasePendingEntryPayment(db: Firestore, id: string, reason: "expired" | "checkout_creation_failed" = "expired", providerSessionId?: string) {
   if (!id) return { handled: false, reason: "entry_payment_id_missing" };
   const now = new Date().toISOString();
   const paymentRef = db.collection("challengeEntryPayments").doc(id);
-  const paymentSnap = await paymentRef.get();
-  const rewardEntitlementId = paymentSnap.data()?.rewardEntitlementId;
-  await paymentRef.set({ status: "canceled", reservationStatus: "expired", expiredAt: now, updatedAt: now, stripeCheckoutSessionId: session.id, providerSessionId: session.id, webhookConfirmed: false }, { merge: true });
+  let rewardEntitlementId = "";
+  await db.runTransaction(async (transaction) => {
+    const paymentSnap = await transaction.get(paymentRef);
+    if (!paymentSnap.exists || paymentSnap.data()?.status !== "pending") return;
+    const payment = paymentSnap.data() ?? {};
+    rewardEntitlementId = String(payment.rewardEntitlementId ?? "");
+    const challengeRef = db.collection("challenges").doc(String(payment.challengeId ?? ""));
+    const challengeSnap = await transaction.get(challengeRef);
+    if (!challengeSnap.exists) throw new Error("Entry payment challenge was not found during reservation release.");
+    const challenge = challengeSnap.data() ?? {};
+    const ownership = resolveEnterpriseFinancialOwnership(challenge);
+    const limitRef = db.collection("enterprisePrizeFundingLimits").doc(String(payment.challengeId));
+    const limitSnap = ownership.workspaceType === "enterprise" ? await transaction.get(limitRef) : null;
+    transaction.set(paymentRef, { status: reason === "expired" ? "canceled" : "failed", reservationStatus: "released", expiredAt: reason === "expired" ? now : null, releasedAt: now, updatedAt: now, stripeCheckoutSessionId: providerSessionId ?? null, providerSessionId: providerSessionId ?? null, webhookConfirmed: false }, { merge: true });
+    if (ownership.workspaceType === "enterprise" && limitSnap?.exists && cents(payment.winnerShareCents) > 0) {
+      const limit = limitSnap?.data() ?? {};
+      const confirmedCents = cents(limit.confirmedCents);
+      const reservedCents = Math.max(0, cents(limit.reservedCents) - cents(payment.winnerShareCents));
+      const configuredPrizeCents = cents(limit.configuredPrizeCents);
+      const additionalReservedCents = Math.max(0, cents(limit.additionalReservedCents) - cents(payment.winnerShareCents));
+      const exposureCents = Math.max(configuredPrizeCents, cents(limit.creatorConfirmedCents) + cents(limit.creatorReservedCents))
+        + cents(limit.sponsorConfirmedCents) + cents(limit.entryConfirmedCents) + cents(limit.promotionalConfirmedCents) + additionalReservedCents;
+      transaction.set(limitRef, { organizationOwnerId: ownership.organizationOwnerId, confirmedCents, reservedCents, additionalReservedCents, exposureCents, updatedAt: now }, { merge: true });
+    }
+  });
   if (rewardEntitlementId) {
-    const entitlementRef = db.collection("rewardEntitlements").doc(String(rewardEntitlementId));
+    const entitlementRef = db.collection("rewardEntitlements").doc(rewardEntitlementId);
     await db.runTransaction(async (transaction) => {
       const snap = await transaction.get(entitlementRef);
       if (snap.exists && snap.data()?.status === "reserved" && snap.data()?.reservationId === id) transaction.set(entitlementRef, { status: "available", reservationId: null, reservedUntil: null, updatedAt: now }, { merge: true });
     });
   }
-  return { handled: true, kind: "challenge_entry_fee", id, status: "canceled", reservationStatus: "expired" };
+  return { handled: true, kind: "challenge_entry_fee", id, status: reason === "expired" ? "canceled" : "failed", reservationStatus: "released" };
+}
+
+export async function expireChallengeEntryPayment(db: Firestore, session: Stripe.Checkout.Session) {
+  const id = metadata(session).entryPaymentId;
+  if (!id) return { handled: false, reason: "entry_payment_id_missing" };
+  return releasePendingEntryPayment(db, id, "expired", session.id);
 }
 
 export async function createPendingPaidVotePurchase(db: Firestore, input: { userId: string; challengeId: string; challenge: Record<string, unknown>; voteQuantity: number; amountCents: number; submissionId?: string; now?: string }) {
@@ -414,6 +483,7 @@ export async function createPendingPaidVotePurchase(db: Firestore, input: { user
   const voteQuantity = Math.max(0, Math.trunc(Number(input.voteQuantity) || 0));
   if (voteQuantity < 1 || voteQuantity > 1000) throw new Error("Select a valid paid vote quantity.");
   const amountCents = cents(input.amountCents);
+  const financialOwnership = resolveEnterpriseFinancialOwnership(input.challenge);
   if (amountCents < 100) throw new Error("Paid vote checkout amount is invalid.");
   const id = deterministicId("paid_vote", input.challengeId, input.userId, input.submissionId ?? "challenge", Date.now());
   const now = input.now ?? new Date().toISOString();
@@ -421,6 +491,8 @@ export async function createPendingPaidVotePurchase(db: Firestore, input: { user
     id,
     userId: input.userId,
     challengeId: input.challengeId,
+    organizationOwnerId: financialOwnership.workspaceType === "enterprise" ? financialOwnership.organizationOwnerId : null,
+    financialOwnerType: financialOwnership.workspaceType === "enterprise" ? "organization" : "user",
     submissionId: text(input.submissionId, 160) || null,
     paymentPurpose: "paid_vote",
     voteQuantity,
@@ -459,6 +531,12 @@ export async function confirmPaidVotePurchase(db: Firestore, event: Stripe.Event
     const amountCents = cents(purchase.amountCents);
     const voteQuantity = Math.max(0, Math.trunc(Number(purchase.voteQuantity) || 0));
     const split = calculatePaidRevenueSplit(amountCents, "paid_vote");
+    const challengeSnap = await transaction.get(db.collection("challenges").doc(challengeId));
+    if (!challengeSnap.exists) throw new Error("Challenge for paid vote was not found.");
+    const financialOwnership = resolveEnterpriseFinancialOwnership(challengeSnap.data() ?? {});
+    if ((financialOwnership.workspaceType === "enterprise" ? financialOwnership.organizationOwnerId : null) !== (purchase.organizationOwnerId ?? null)) {
+      throw new Error("Paid vote financial owner no longer matches the challenge.");
+    }
     const creditId = deterministicId("paid_vote_credit", id);
     transaction.set(purchaseRef, {
       status: "confirmed",
@@ -468,6 +546,9 @@ export async function confirmPaidVotePurchase(db: Firestore, event: Stripe.Event
       votesUsed: 0,
       stripeCheckoutSessionId: session.id,
       stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
+      winnerShareCents: split.winnerShareCents,
+      creatorHostOperatorShareCents: split.creatorHostOperatorShareCents,
+      platformFeeCents: split.platformAdminShareCents,
       stripeEventId: event.id,
       webhookConfirmed: true,
       idempotencyKey: deterministicId("stripe", event.id, id)
@@ -477,6 +558,7 @@ export async function confirmPaidVotePurchase(db: Firestore, event: Stripe.Event
       purchaseId: id,
       userId,
       challengeId,
+      organizationOwnerId: financialOwnership.workspaceType === "enterprise" ? financialOwnership.organizationOwnerId : null,
       submissionId: purchase.submissionId ?? null,
       voteQuantity,
       votesRemaining: voteQuantity,
@@ -498,6 +580,35 @@ export async function confirmPaidVotePurchase(db: Firestore, event: Stripe.Event
       confirmedPaidVotePurchaseCount: FieldValue.increment(1),
       updatedAt: now
     }, { merge: true });
+    if (financialOwnership.workspaceType === "enterprise") {
+      const ledgerShares = [
+        ["winner_share", split.winnerShareCents],
+        ["creator_host_share", split.creatorHostOperatorShareCents],
+        ["platform_share", split.platformAdminShareCents],
+      ] as const;
+      for (const [shareType, shareAmountCents] of ledgerShares) {
+        const ledgerId = deterministicId("paid_vote", id, shareType);
+        transaction.set(db.collection("challengeFinancialLedger").doc(ledgerId), {
+          id: ledgerId,
+          challengeId,
+          organizationOwnerId: financialOwnership.organizationOwnerId,
+          financialOwnerType: "organization",
+          actorUserId: userId,
+          paidVotePurchaseId: id,
+          transactionId: id,
+          sourceType: "paid_vote_revenue",
+          shareType,
+          amountCents: shareAmountCents,
+          currency: purchase.currency ?? "USD",
+          direction: "credit",
+          status: "confirmed",
+          providerEventId: event.id,
+          idempotencyKey: deterministicId("stripe_paid_vote_revenue", id, shareType),
+          createdAt: now,
+          updatedAt: now,
+        }, { merge: true });
+      }
+    }
     return { handled: true, kind: "paid_vote", id, duplicate: false, creditsGranted: voteQuantity, creditConsumptionActive: false, payoutProviderCalled: false, prizeReleased: false };
   });
 }
@@ -510,26 +621,32 @@ export async function expirePaidVotePurchase(db: Firestore, session: Stripe.Chec
   return { handled: true, kind: "paid_vote", id, status: "expired" };
 }
 
-export async function createPendingSponsorContribution(db: Firestore, input: { sponsorId: string; challengeId: string; challenge: Record<string, unknown>; sponsorProfile: Record<string, unknown>; amountCents: number; logoUrl?: string; bannerUrl?: string; ctaText?: string; ctaUrl?: string; placementNotes?: string; placements?: string[]; now?: string }) {
+export async function createPendingSponsorContribution(db: Firestore, input: { sponsorId: string; challengeId: string; challenge: Record<string, unknown>; sponsorProfile: Record<string, unknown>; amountCents: number; idempotencyKey: string; ctaText?: string; ctaUrl?: string; placementNotes?: string; placements?: string[]; agreementId?: string; now?: string }) {
   const fundingWindow = validateSponsorFundingWindow(input.challenge);
   if (!fundingWindow.allowed) throw new Error("This challenge is not eligible for sponsor funding right now.");
   const amountCents = cents(input.amountCents);
   if (amountCents < 500) throw new Error("Sponsor funding amount must be at least $5.");
-  const id = deterministicId("sponsor_funding", input.challengeId, input.sponsorId, Date.now());
+  const requestKey = safeIdPart(input.idempotencyKey, "");
+  if (!requestKey) throw new Error("A sponsor funding idempotency key is required.");
+  const id = deterministicId("sponsor_funding", input.challengeId, input.sponsorId, requestKey);
   const now = input.now ?? new Date().toISOString();
   const split = calculateSponsorContributionSplit(amountCents);
-  const record = {
+  const record: Record<string, unknown> = {
     id,
     sponsorId: input.sponsorId,
     challengeId: input.challengeId,
+    agreementId: input.agreementId ?? null,
+    organizationOwnerId: text(input.challenge.organizationOwnerId, 160) || null,
     paymentPurpose: "sponsor_funding",
     amountCents,
     amount: amountCents,
     currency: "USD",
     status: "pending",
     brandingStatus: "pending_review",
-    logoUrl: safeUrl(input.logoUrl),
-    bannerUrl: safeUrl(input.bannerUrl),
+    logoUrl: text(input.sponsorProfile.logoPath, 500).startsWith("sponsors/") ? safeUrl(input.sponsorProfile.logoUrl) : null,
+    bannerUrl: text(input.sponsorProfile.bannerPath, 500).startsWith("sponsors/") ? safeUrl(input.sponsorProfile.bannerUrl) : null,
+    logoPath: text(input.sponsorProfile.logoPath, 500).startsWith("sponsors/") ? text(input.sponsorProfile.logoPath, 500) : null,
+    bannerPath: text(input.sponsorProfile.bannerPath, 500).startsWith("sponsors/") ? text(input.sponsorProfile.bannerPath, 500) : null,
     ctaText: text(input.ctaText, 80),
     ctaUrl: safeUrl(input.ctaUrl),
     placementNotes: text(input.placementNotes, 1200),
@@ -539,13 +656,75 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
     stripeCheckoutSessionId: null,
     stripePaymentIntentId: null,
     confirmedAt: null,
-    idempotencyKey: id,
+    idempotencyKey: requestKey,
     metadata: { checkoutSuccessConfirmsContribution: false, webhookConfirmationRequired: true, sponsorContributionGoesFullyToWinners: true, sponsorBrandingAutoApproved: false, prizeReleaseCreated: false, payoutExecutionCreated: false },
     createdAt: now,
     updatedAt: now
   };
-  await db.collection("sponsorContributions").doc(id).set(record, { merge: true });
-  return record;
+  const contributionRef = db.collection("sponsorContributions").doc(id);
+    const official = resolveEnterpriseFinancialOwnership(input.challenge).workspaceType === "enterprise";
+  const challengeRef = db.collection("challenges").doc(input.challengeId);
+  const prior = await db.runTransaction(async (transaction) => {
+    const existingSnap = await transaction.get(contributionRef);
+    if (existingSnap.exists) {
+      const existing = existingSnap.data() ?? {};
+      if (existing.sponsorId !== input.sponsorId || existing.challengeId !== input.challengeId || cents(existing.amountCents) !== amountCents || existing.idempotencyKey !== requestKey) {
+        throw new Error("Sponsor funding idempotency key was already used for a different request.");
+      }
+      if (["failed", "expired", "refunded", "partially_refunded"].includes(String(existing.status))) {
+        throw new Error("SPONSOR_FUNDING_ATTEMPT_CLOSED");
+      }
+      return existing;
+    }
+    const agreementRef = input.agreementId ? db.collection("sponsorChallengeAgreements").doc(input.agreementId) : null;
+    const agreementSnap = agreementRef ? await transaction.get(agreementRef) : null;
+    const latestChallenge = await transaction.get(challengeRef);
+    if (!latestChallenge.exists) throw new Error("Challenge opportunity was not found.");
+    const challenge = latestChallenge.data() ?? {};
+    if (agreementRef) {
+      if (!agreementSnap?.exists) throw new Error("SPONSOR_AGREEMENT_NOT_FOUND");
+      const agreement = agreementSnap.data() ?? {};
+      const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
+      if (agreement.challengeId !== input.challengeId || agreement.sponsorOrganizationId !== input.sponsorId || agreement.status !== "accepted"
+        || agreement.sponsorAcceptedVersion !== agreement.termsVersion || agreement.creatorAcceptedVersion !== agreement.termsVersion) throw new Error("SPONSOR_AGREEMENT_NOT_ACCEPTED");
+      const expectedCreatorId = text(challenge.creatorId ?? challenge.hostId, 160);
+      if (!expectedCreatorId || text(agreement.creatorId, 160) !== expectedCreatorId) throw new Error("SPONSOR_AGREEMENT_OWNER_MISMATCH");
+      if (!validateSponsorFundingWindow(challenge).allowed) throw new Error("SPONSOR_FUNDING_WINDOW_CLOSED");
+      if (cents(terms.amountCents) !== amountCents || text(terms.currency, 8).toUpperCase() !== "USD") throw new Error("SPONSOR_AGREEMENT_AMOUNT_MISMATCH");
+      if (!["not_started", "failed", "expired"].includes(String(agreement.fundingStatus ?? "not_started"))) throw new Error("SPONSOR_AGREEMENT_ALREADY_FUNDED_OR_PENDING");
+      record.agreementId = agreementRef.id;
+      record.agreementVersion = agreement.termsVersion;
+      record.preferredPlacements = Array.isArray(terms.placements) ? terms.placements : [];
+      record.ctaText = text(terms.ctaText, 80);
+      record.ctaUrl = safeUrl(terms.ctaUrl);
+      record.agreedDeliverables = Array.isArray(terms.deliverables) ? terms.deliverables : [];
+      record.agreedDuration = { start: terms.durationStart ?? null, end: terms.durationEnd ?? null };
+      record.logoPath = typeof terms.brandAssetPath === "string" && terms.brandAssetPath.startsWith(`sponsors/${input.sponsorId}/`) ? terms.brandAssetPath : null;
+      record.logoUrl = record.logoPath ? safeUrl(input.sponsorProfile.logoUrl) : null;
+    }
+      const ownership = resolveEnterpriseFinancialOwnership(challenge);
+      const enterprise = ownership.workspaceType === "enterprise";
+    if (enterprise) {
+        const organizationOwnerId = ownership.organizationOwnerId;
+        await reserveEnterprisePrizeExposureInTransaction(db, transaction, {
+          challengeId: input.challengeId,
+          challenge,
+          organizationOwnerId,
+          amountCents,
+          sourceType: "sponsor",
+          now,
+      });
+        const inputOwner = resolveEnterpriseFinancialOwnership(input.challenge).organizationOwnerId;
+        if (organizationOwnerId !== inputOwner) throw new Error("Enterprise organization ownership changed. Retry funding checkout.");
+        record.organizationOwnerId = organizationOwnerId;
+    } else if (official) {
+      throw new Error("Enterprise organization ownership is missing.");
+    }
+    if (agreementRef) transaction.set(agreementRef, { status: "funding_pending", fundingStatus: "pending", fundingContributionId: id, fundingStartedAt: now, updatedAt: now }, { merge: true });
+    transaction.create(contributionRef, record);
+    return null;
+  });
+  return (prior ?? record) as typeof record;
 }
 
 export async function confirmSponsorContribution(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session) {
@@ -561,6 +740,35 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
     if (contribution.status === "confirmed") return { handled: true, kind: "sponsor_funding", id, duplicate: true };
     const challengeId = text(contribution.challengeId, 160);
     const amountCents = cents(contribution.amountCents);
+    const challengeRef = db.collection("challenges").doc(challengeId);
+    const challengeSnap = await transaction.get(challengeRef);
+    if (!challengeSnap.exists) throw new Error("Challenge for sponsor funding was not found.");
+    const challenge = challengeSnap.data() ?? {};
+    const agreementRef = text(contribution.agreementId, 160) ? db.collection("sponsorChallengeAgreements").doc(text(contribution.agreementId, 160)) : null;
+    const agreementSnap = agreementRef ? await transaction.get(agreementRef) : null;
+    if (agreementRef) {
+      if (!agreementSnap?.exists) throw new Error("Sponsor agreement for funding was not found.");
+      const agreement = agreementSnap.data() ?? {};
+      const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
+      if (agreement.challengeId !== challengeId || agreement.sponsorOrganizationId !== contribution.sponsorId
+        || agreement.termsVersion !== contribution.agreementVersion || cents(terms.amountCents) !== amountCents
+        || !["funding_pending", "funded_pending_review", "active"].includes(String(agreement.status))) throw new Error("Sponsor agreement no longer matches the funded contribution.");
+      if (text(agreement.creatorId, 160) !== text(challenge.creatorId ?? challenge.hostId, 160)) throw new Error("Sponsor agreement creator ownership no longer matches the challenge.");
+    }
+      const ownership = resolveEnterpriseFinancialOwnership(challenge);
+      const enterprise = ownership.workspaceType === "enterprise";
+    if (enterprise) {
+      const organizationOwnerId = ownership.organizationOwnerId;
+      if (!organizationOwnerId || text(contribution.organizationOwnerId, 160) !== organizationOwnerId) throw new Error("Enterprise sponsor funding ownership no longer matches the challenge.");
+      await confirmEnterprisePrizeExposureInTransaction(db, transaction, {
+        challengeId,
+        challenge,
+        organizationOwnerId,
+        amountCents,
+        sourceType: "sponsor",
+        now,
+      });
+    }
     transaction.set(contributionRef, {
       status: "confirmed",
       confirmedAt: now,
@@ -572,7 +780,39 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
       brandingStatus: contribution.brandingStatus ?? "pending_review",
       idempotencyKey: deterministicId("stripe", event.id, id)
     }, { merge: true });
-    transaction.set(db.collection("challenges").doc(challengeId), {
+    if (agreementRef) {
+      transaction.set(agreementRef, { status: "funded_pending_review", fundingStatus: "confirmed", fundedAt: now, updatedAt: now }, { merge: true });
+      const sponsorshipId = `sponsorship_agreement_${agreementRef.id}`;
+      transaction.set(db.collection("sponsorships").doc(sponsorshipId), {
+        id: sponsorshipId,
+        agreementId: agreementRef.id,
+        agreementVersion: contribution.agreementVersion,
+        sponsorId: contribution.sponsorId,
+        sponsorOrganizationId: contribution.sponsorId,
+        challengeId,
+        linkedChallengeId: challengeId,
+        challengeTitle: text(challenge.title, 180) || "Challenge sponsorship",
+        creatorId: challenge.creatorId ?? challenge.hostId ?? null,
+        amountCents,
+        currency: "USD",
+        status: "pending_admin_review",
+        fundingStatus: "confirmed",
+        placementStatus: "pending_review",
+        placements: contribution.preferredPlacements ?? [],
+        ctaText: contribution.ctaText ?? "",
+        ctaUrl: contribution.ctaUrl ?? null,
+        logoPath: contribution.logoPath ?? null,
+        logoUrl: contribution.logoUrl ?? null,
+        sponsorContributionId: id,
+        sponsorApprovedAt: agreementSnap?.data()?.sponsorAcceptedAt ?? null,
+        creatorApprovedAt: agreementSnap?.data()?.creatorAcceptedAt ?? null,
+        termsVersion: contribution.agreementVersion,
+        createdAt: agreementSnap?.data()?.createdAt ?? now,
+        fundedAt: now,
+        updatedAt: now
+      }, { merge: true });
+    }
+    transaction.set(challengeRef, {
       confirmedSponsorContributionCents: FieldValue.increment(amountCents),
       confirmedSponsorContributionWinnerShareCents: FieldValue.increment(amountCents),
       sponsorContributionConfirmedCount: FieldValue.increment(1),
@@ -588,16 +828,89 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
       transferEnabled: false,
       updatedAt: now
     }, { merge: true });
+    transaction.set(db.collection("challengeFinancialLedger").doc(deterministicId("sponsor_prize_contribution", id)), {
+      id: deterministicId("sponsor_prize_contribution", id),
+      challengeId,
+      sponsorContributionId: id,
+      sponsorId: contribution.sponsorId,
+      organizationOwnerId: enterprise ? ownership.organizationOwnerId : null,
+      financialOwnerType: enterprise ? "organization" : "challenge_owner",
+      sourceType: "sponsor_prize_contribution",
+      amountCents,
+      currency: "usd",
+      direction: "credit",
+      shareType: "winner_share",
+      status: "confirmed",
+      provider: "stripe",
+      providerReference: session.id,
+      providerEventId: event.id,
+      idempotencyKey: deterministicId("sponsor_prize_contribution", id),
+      payoutExecutionEnabled: false,
+      refundExecutionEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
     return { handled: true, kind: "sponsor_funding", id, duplicate: false, sponsorContributionGoesFullyToWinners: true, brandingStatus: "pending_review", payoutProviderCalled: false, prizeReleased: false };
   });
+}
+
+export async function applySponsorAgreementRefundState(db: Firestore, input: { contributionId: string; refundCaseId: string; amountCents?: number; now?: string }) {
+  const now = input.now ?? new Date().toISOString();
+  const contributionRef = db.collection("sponsorContributions").doc(input.contributionId);
+  return db.runTransaction(async (transaction) => {
+    const contributionSnap = await transaction.get(contributionRef);
+    if (!contributionSnap.exists) throw new Error("Sponsor contribution for refund was not found.");
+    const contribution = contributionSnap.data() ?? {};
+    const agreementId = text(contribution.agreementId, 180);
+    const agreementRef = agreementId ? db.collection("sponsorChallengeAgreements").doc(agreementId) : null;
+    const sponsorshipRef = agreementId ? db.collection("sponsorships").doc(`sponsorship_agreement_${agreementId}`) : null;
+    const [agreementSnap, sponsorshipSnap] = agreementRef && sponsorshipRef
+      ? await Promise.all([transaction.get(agreementRef), transaction.get(sponsorshipRef)])
+      : [null, null];
+    const originalAmount = cents(contribution.amountCents);
+    const refundAmount = cents(input.amountCents ?? originalAmount);
+    const fullRefund = refundAmount >= originalAmount;
+    const nextStatus = fullRefund ? "refunded" : "partially_refunded";
+    transaction.set(contributionRef, { status: nextStatus, refundCaseId: input.refundCaseId, refundedAt: now, refundedAmountCents: refundAmount, updatedAt: now }, { merge: true });
+    if (agreementRef && agreementSnap?.exists) transaction.set(agreementRef, { status: fullRefund ? "refunded" : "refund_review", fundingStatus: nextStatus, refundCaseId: input.refundCaseId, refundedAt: now, updatedAt: now }, { merge: true });
+    if (sponsorshipRef && sponsorshipSnap?.exists) transaction.set(sponsorshipRef, { status: fullRefund ? "refunded" : "refund_review", fundingStatus: nextStatus, placementStatus: "paused_refund_review", refundCaseId: input.refundCaseId, updatedAt: now }, { merge: true });
+    return { updated: true, contributionId: input.contributionId, agreementId: agreementId || null, status: nextStatus, refundAmountCents: refundAmount };
+  });
+}
+
+export async function releasePendingSponsorContribution(db: Firestore, id: string, sessionId?: string) {
+  if (!id) return { handled: false, reason: "sponsor_contribution_id_missing" };
+  const now = new Date().toISOString();
+  const contributionRef = db.collection("sponsorContributions").doc(id);
+  await db.runTransaction(async (transaction) => {
+    const contributionSnap = await transaction.get(contributionRef);
+    if (!contributionSnap.exists || contributionSnap.data()?.status !== "pending") return;
+    const contribution = contributionSnap.data() ?? {};
+    const agreementRef = text(contribution.agreementId, 160) ? db.collection("sponsorChallengeAgreements").doc(text(contribution.agreementId, 160)) : null;
+    const agreementSnap = agreementRef ? await transaction.get(agreementRef) : null;
+    const organizationOwnerId = text(contribution.organizationOwnerId, 160);
+    const limitRef = db.collection("enterprisePrizeFundingLimits").doc(text(contribution.challengeId, 160));
+    const limitSnap = organizationOwnerId ? await transaction.get(limitRef) : null;
+    transaction.set(contributionRef, { status: sessionId ? "expired" : "failed", expiredAt: sessionId ? now : null, updatedAt: now, stripeCheckoutSessionId: sessionId ?? null }, { merge: true });
+    if (agreementRef && agreementSnap?.exists && agreementSnap.data()?.fundingContributionId === id && agreementSnap.data()?.fundingStatus === "pending") {
+      transaction.set(agreementRef, { status: "accepted", fundingStatus: sessionId ? "expired" : "failed", fundingContributionId: null, updatedAt: now }, { merge: true });
+    }
+    if (organizationOwnerId) {
+      const limit = limitSnap?.data() ?? {};
+      const reservedCents = Math.max(0, cents(limit.reservedCents) - cents(contribution.amountCents));
+      const additionalReservedCents = Math.max(0, cents(limit.additionalReservedCents) - cents(contribution.amountCents));
+      const exposureCents = Math.max(cents(limit.configuredPrizeCents), cents(limit.creatorConfirmedCents) + cents(limit.creatorReservedCents))
+        + cents(limit.sponsorConfirmedCents) + cents(limit.entryConfirmedCents) + cents(limit.promotionalConfirmedCents) + additionalReservedCents;
+      transaction.set(limitRef, { reservedCents, additionalReservedCents, exposureCents, updatedAt: now }, { merge: true });
+    }
+  });
+  return { handled: true, kind: "sponsor_funding", id, status: sessionId ? "expired" : "failed" };
 }
 
 export async function expireSponsorContribution(db: Firestore, session: Stripe.Checkout.Session) {
   const id = metadata(session).sponsorContributionId;
   if (!id) return { handled: false, reason: "sponsor_contribution_id_missing" };
-  const now = new Date().toISOString();
-  await db.collection("sponsorContributions").doc(id).set({ status: "expired", expiredAt: now, updatedAt: now, stripeCheckoutSessionId: session.id }, { merge: true });
-  return { handled: true, kind: "sponsor_funding", id, status: "expired" };
+  return releasePendingSponsorContribution(db, id, session.id);
 }
 
 export async function createPendingSponsorWalletFunding(db: Firestore, input: { sponsorId: string; organizationId: string; userId: string; amountCents: number; idempotencyKey: string; now?: string }) {
@@ -653,10 +966,10 @@ export function checkoutMetadataForPurpose(purpose: MonetizationPaymentPurpose, 
     amount: String(cents(record.amountCents ?? record.amount)),
     currency: text(record.currency, 8) || "USD"
   };
-  if (purpose === "challenge_entry_fee" || purpose === "challenge_entry") return { ...base, entryPaymentId: text(record.id, 160) };
-  if (purpose === "paid_vote") return { ...base, votePurchaseId: text(record.id, 160), voteQuantity: String(cents(record.voteQuantity)) };
-  if (purpose === "sponsor_wallet_funding") return { ...base, sponsorId: text(record.sponsorId, 160), sponsorWalletFundingId: text(record.id, 160) };
-  return { ...base, sponsorId: text(record.sponsorId, 160), sponsorContributionId: text(record.id, 160) };
+  if (purpose === "challenge_entry_fee" || purpose === "challenge_entry") return { ...base, entryPaymentId: text(record.id, 500) };
+  if (purpose === "paid_vote") return { ...base, votePurchaseId: text(record.id, 500), voteQuantity: String(cents(record.voteQuantity)) };
+  if (purpose === "sponsor_wallet_funding") return { ...base, sponsorId: text(record.sponsorId, 160), sponsorWalletFundingId: text(record.id, 500) };
+  return { ...base, sponsorId: text(record.sponsorId, 160), sponsorContributionId: text(record.id, 500) };
 }
 
 export function checkoutLineItem(input: { amountCents: number; currency?: string; name: string }) {
@@ -671,7 +984,9 @@ export function checkoutLineItem(input: { amountCents: number; currency?: string
 }
 
 export async function getPaymentStatus(db: Firestore, collection: string, id: string, ownerField: "userId" | "sponsorId", ownerId: string) {
-  const snap = await db.collection(collection).doc(safeIdPart(id)).get();
+  const recordId = String(id ?? "").trim().replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 500);
+  if (!recordId) return null;
+  const snap = await db.collection(collection).doc(recordId).get();
   if (!snap.exists) return null;
   const data = snap.data() ?? {};
   if (data[ownerField] !== ownerId) return null;

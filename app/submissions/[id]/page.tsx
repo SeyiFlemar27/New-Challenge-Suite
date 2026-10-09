@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -35,11 +36,11 @@ export default function SubmissionPage() {
   });
 
   const details = data?.ok ? data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
   const submission = useMemo(() => {
     if (!details?.submission) return null;
     return normalizeSubmission(details.submission as SubmissionApiRecord, challenge ?? undefined);
-  }, [challenge, details?.submission]);
+  }, [challenge, details]);
   const creator = (details?.creator ?? {}) as CreatorRecord;
   const votingOpen = challenge ? canVoteOnChallenge(challenge) : false;
   const rank = details?.rank ?? null;
@@ -104,7 +105,7 @@ export default function SubmissionPage() {
     <AppShell>
       <div className="grid max-w-[1320px] gap-12 xl:grid-cols-[1.4fr_1fr]">
         <div className="relative">
-          {submission.mediaType === "video" ? <video src={submission.mediaUrl} className="max-h-[620px] w-full rounded-[12px] object-cover" controls /> : <img src={submission.mediaUrl} alt={submission.title} className="max-h-[620px] w-full rounded-[12px] object-cover" />}
+          {submission.mediaType === "video" ? <video src={submission.mediaUrl} className="max-h-[620px] w-full rounded-[12px] object-cover" controls /> : <ContentImage src={submission.mediaUrl} alt={submission.title} className="max-h-[620px] w-full rounded-[12px] object-cover" />}
           {submission.isWinner ? <div className="absolute left-5 top-5 flex items-center gap-2 rounded-[8px] bg-[var(--gold)] px-5 py-3 font-black text-black"><Trophy size={18} /> WINNER</div> : null}
         </div>
         <aside>

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { classifySponsorAnalyticsEvent, sponsorAnalyticsEventId } from "@/lib/server/sponsor-analytics";
@@ -29,16 +30,19 @@ export async function POST(request: Request) {
   if (!sponsorshipSnap.exists || challengeId !== input.data.challengeId || !["approved", "active", "live", "completion_review"].includes(lifecycle)) return fail("Sponsor placement is not available.", 404, undefined, "SPONSOR_PLACEMENT_NOT_AVAILABLE");
   const visibility = sponsorship.visibility && typeof sponsorship.visibility === "object" ? sponsorship.visibility as Record<string, unknown> : {};
   const placements = Array.isArray(visibility.requestedPlacements) ? visibility.requestedPlacements.map(String) : [];
-  if (placements.length && !placements.includes(input.data.placementId)) return fail("Sponsor placement is not available.", 404, undefined, "SPONSOR_PLACEMENT_NOT_AVAILABLE");
+  if (!placements.includes(input.data.placementId)) return fail("Sponsor placement is not available.", 404, undefined, "SPONSOR_PLACEMENT_NOT_AVAILABLE");
   const userAgent = request.headers.get("user-agent") ?? "";
   const sessionHash = createHash("sha256").update(input.data.sessionId + "|" + userAgent).digest("hex");
   const quality = classifySponsorAnalyticsEvent({ sessionId: input.data.sessionId, userAgent });
   const now = new Date().toISOString();
   const id = sponsorAnalyticsEventId({ sponsorshipId: input.data.sponsorshipId, placementId: input.data.placementId, eventType: input.data.eventType, sessionHash, occurredAt: now });
   const ref = db.collection("sponsorAnalyticsEvents").doc(id);
-  const existing = await ref.get();
-  if (existing.exists) return ok({ accepted: true, deduplicated: true }, "Sponsor placement event recorded.");
-  await ref.create({
+  const dailyRef = db.collection("sponsorAnalyticsDaily").doc(deterministicId(sponsorship.sponsorId, now.slice(0, 10)));
+  const sessionRef = db.collection("sponsorAnalyticsDailySessions").doc(deterministicId(sponsorship.sponsorId, now.slice(0, 10), sessionHash));
+  const result = await db.runTransaction(async (transaction) => {
+    const [existing, session] = await Promise.all([transaction.get(ref), transaction.get(sessionRef)]);
+    if (existing.exists) return { deduplicated: true };
+    transaction.create(ref, {
     id,
     sponsorId: sponsorship.sponsorId,
     sponsorOrganizationId: sponsorship.sponsorOrganizationId ?? sponsorship.sponsorId,
@@ -55,7 +59,21 @@ export async function POST(request: Request) {
     occurredAt: now,
     createdAt: now,
     source: "public_sponsor_placement"
+    });
+    transaction.set(dailyRef, {
+      sponsorId: sponsorship.sponsorId,
+      sponsorOrganizationId: sponsorship.sponsorOrganizationId ?? sponsorship.sponsorId,
+      date: now.slice(0, 10),
+      validImpressions: FieldValue.increment(quality.valid && input.data.eventType === "placement_impression" ? 1 : 0),
+      uniqueCtaClicks: FieldValue.increment(quality.valid && input.data.eventType === "cta_click" ? 1 : 0),
+      invalidEventsExcluded: FieldValue.increment(quality.valid ? 0 : 1),
+      uniqueSessions: FieldValue.increment(session.exists ? 0 : quality.valid ? 1 : 0),
+      updatedAt: now
+    }, { merge: true });
+    if (!session.exists && quality.valid) transaction.create(sessionRef, { sponsorId: sponsorship.sponsorId, date: now.slice(0, 10), sessionHash, createdAt: now });
+    return { deduplicated: false };
   });
+  if (result.deduplicated) return ok({ accepted: true, deduplicated: true }, "Sponsor placement event recorded.");
   await db.collection("sponsorAnalyticsAggregationQueue").doc(deterministicId(input.data.sponsorshipId, now.slice(0, 13))).set({ sponsorshipId: input.data.sponsorshipId, sponsorId: sponsorship.sponsorId, status: "pending", updatedAt: now }, { merge: true });
   return ok({ accepted: true, deduplicated: false }, "Sponsor placement event recorded.");
 }

@@ -50,6 +50,14 @@ export async function POST(request: Request) {
   if (!Number.isFinite(coins) || coins <= 0) return validationError({ packageId: "DoroCoin package is missing a valid coin amount." });
   const economyRules = await getActiveEconomyRules(db);
   const amountUsd = customQuote?.amountUsd ?? (customCoins ? Number((coins / economyRules.doroCoin.coinsPerUsd).toFixed(2)) : Number(pack.price ?? 0));
+  if (packageId) {
+    const priceCents = Math.round(amountUsd * 100);
+    const baseCoins = Number(pack.baseCoins ?? pack.coins ?? 0);
+    const expectedBaseCoins = Math.round(priceCents * economyRules.doroCoin.coinsPerUsd / 100);
+    if (!Number.isSafeInteger(baseCoins) || baseCoins !== expectedBaseCoins) {
+      return validationError({ packageId: "This DoroCoin package does not match the canonical $1 = 100 DC conversion." });
+    }
+  }
   const stripe = getStripe();
   const priceConfig = !customCoins ? resolveDoroCoinStripePriceId(pack, packageId, coins) : { priceId: null, configuredEnv: null, envCandidates: [] as string[] };
   const missing = !stripe ? "STRIPE_SECRET_KEY" : "DOROCOIN_STRIPE_PRICE_ID";

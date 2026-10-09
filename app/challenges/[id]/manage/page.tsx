@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, CheckCircle2, ClipboardCheck, DollarSign, ExternalLink, Trophy, UserRound, Users, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -20,6 +20,7 @@ type Payload = {
   winnerProposals: RecordRow[];
   settlements: RecordRow[];
   sponsorships: RecordRow[];
+  sponsorshipInterests: RecordRow[];
   financialLedger: RecordRow[];
   prizePool: RecordRow | null;
   audits: RecordRow[];
@@ -54,12 +55,11 @@ function nextDeadline(challenge: Record<string, unknown>) {
 
 export default function ChallengeManagePage() {
   const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<TabId>("overview");
+  const searchParams = useSearchParams();
+  const [selectedTab, setSelectedTab] = useState<TabId>("overview");
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["challenge-manage", id], queryFn: () => apiRequest<Payload>(`/api/challenges/${id}/manage`), enabled: Boolean(id), staleTime: 15_000 });
   const data = query.data?.ok ? query.data.data : null;
-  const requestQuery = useQuery({ queryKey: ["entry-requests", id], queryFn: () => apiRequest<RequestPayload>(`/api/challenges/${id}/entry-request`), enabled: Boolean(id && tab === "participant-requests"), staleTime: 10_000 });
-  const requestPayload = requestQuery.data?.ok ? requestQuery.data.data : null;
   const focus = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("focus") ?? "";
 
   const tabs = useMemo<Tab[]>(() => {
@@ -68,7 +68,7 @@ export default function ChallengeManagePage() {
     const kind = challengeKind(challenge);
     const approval = challenge.requiresParticipantApproval === true || challenge.participantApprovalMode === "manual" || data.entryRequests.length > 0;
     const noDigitalSubmission = kind === "live" && ["attendance_only", "competition_without_submission"].includes(text(challenge.eventFormat ?? challenge.challengeFormat).toLowerCase());
-    const sponsorRelevant = challenge.sponsorEnabled === true || challenge.sponsorReady === true || data.sponsorships.length > 0;
+    const sponsorRelevant = challenge.sponsorEnabled === true || challenge.sponsorReady === true || data.sponsorships.length > 0 || data.sponsorshipInterests.length > 0;
     const votingRelevant = challenge.votingEnabled !== false && (challenge.votingSettings != null || challenge.votingDeadline != null || challenge.votingEndsAt != null);
     const result: Tab[] = [{ id: "overview", label: "Overview" }];
     if (approval) result.push({ id: "participant-requests", label: "Participant Requests", count: data.entryRequests.filter((item) => item.status === "pending").length });
@@ -78,19 +78,16 @@ export default function ChallengeManagePage() {
     if (kind === "live" && (challenge.judgingEnabled === true || challenge.winnerSelection === "judge_selection")) result.push({ id: "judges", label: "Judges" });
     if (kind === "tournament") result.push({ id: "bracket", label: "Bracket" }, { id: "rounds", label: "Rounds" });
     result.push({ id: "winners", label: "Winners", count: data.winnerProposals.length }, { id: "prize-revenue", label: "Prize & Revenue" });
-    if (sponsorRelevant) result.push({ id: "sponsors", label: "Sponsors", count: data.sponsorships.length });
+    if (sponsorRelevant) result.push({ id: "sponsors", label: "Sponsors", count: data.sponsorships.length + data.sponsorshipInterests.filter((item) => ["interest_submitted", "awaiting_sponsor_acceptance", "accepted", "funding_pending"].includes(String(item.status))).length });
     result.push({ id: "schedule", label: "Schedule" });
     if (votingRelevant) result.push({ id: "voting", label: "Voting" });
     if (challenge.analyticsEnabled === true || challenge.creatorAnalyticsEnabled === true) result.push({ id: "analytics", label: "Analytics" });
     return result;
   }, [data]);
-
-  useEffect(() => {
-    if (!data) return;
-    const requested = new URLSearchParams(window.location.search).get("tab") as TabId | null;
-    if (requested && tabs.some((item) => item.id === requested)) setTab(requested);
-    else if (!tabs.some((item) => item.id === tab)) setTab("overview");
-  }, [data, tab, tabs]);
+  const requestedTab = searchParams.get("tab") as TabId | null;
+  const tab = requestedTab && tabs.some((item) => item.id === requestedTab) ? requestedTab : tabs.some((item) => item.id === selectedTab) ? selectedTab : "overview";
+  const requestQuery = useQuery({ queryKey: ["entry-requests", id], queryFn: () => apiRequest<RequestPayload>(`/api/challenges/${id}/entry-request`), enabled: Boolean(id && tab === "participant-requests"), staleTime: 10_000 });
+  const requestPayload = requestQuery.data?.ok ? requestQuery.data.data : null;
 
   const requestMutation = useMutation({
     mutationFn: async ({ requestId, action, reason }: { requestId: string; action: "approve" | "reject"; reason?: string }) => apiRequest(`/api/challenges/${id}/entry-request/${requestId}/${action}`, { method: "POST", body: JSON.stringify({ reason }) }),
@@ -112,7 +109,7 @@ export default function ChallengeManagePage() {
 
   return <AppShell><div className="mx-auto max-w-7xl">
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><PageTitle title={text(data?.challenge.title, "Challenge Management")} subtitle="Operate this challenge without changing its public participant experience." icon={<ClipboardCheck />} /><div className="flex flex-col gap-2 sm:flex-row"><LinkButton href={`/challenges/${id}`} variant="secondary"><ExternalLink size={16} /> View Public Page</LinkButton>{data?.challenge.status === "draft" || data?.challenge.status === "changes_requested" ? <LinkButton href={`/challenges/create/${id}`} variant="secondary">Edit Challenge</LinkButton> : null}</div></div>
-    <div className="mt-6 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Challenge management sections">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`min-h-11 shrink-0 rounded-[8px] border px-4 text-sm font-black ${tab === item.id ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/[0.03] text-slate-300"}`}>{item.label}{item.count !== undefined ? ` · ${item.count}` : ""}</button>)}</div>
+    <div className="mt-6 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Challenge management sections">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setSelectedTab(item.id)} className={`min-h-11 shrink-0 rounded-[8px] border px-4 text-sm font-black ${tab === item.id ? "border-[var(--gold)] bg-[var(--gold)] text-black" : "border-white/10 bg-white/[0.03] text-slate-300"}`}>{item.label}{item.count !== undefined ? ` · ${item.count}` : ""}</button>)}</div>
     {query.isLoading ? <Card className="mt-6 h-72 animate-pulse" /> : !data ? <Card className="mt-6 border-red-500/30 p-5 text-red-200">{query.data?.message ?? "Challenge management could not load."}</Card> : <ManagementContent tab={tab} data={data} requestPayload={requestPayload} requestLoading={requestQuery.isLoading} requestMessage={requestMutation.data?.message ?? ""} requestBusy={requestMutation.isPending} operationMessage={operationMutation.data?.message ?? ""} operationBusy={operationMutation.isPending} focus={focus} id={id} decide={decide} checkIn={(targetId) => { if (window.confirm("Check in this participant?")) operationMutation.mutate({ targetId, action: "check_in" }); }} />}
   </div></AppShell>;
 }
@@ -125,7 +122,7 @@ function ManagementContent(props: { tab: TabId; data: Payload; requestPayload: R
   if (tab === "submissions") return <RecordList title="Submissions" rows={data.submissions} empty="No submissions yet." primary="title" secondary="status" link={(row) => `/submissions/${row.id}`} />;
   if (tab === "winners") return <Winners data={data} id={id} />;
   if (tab === "prize-revenue") return <PrizeRevenue data={data} />;
-  if (tab === "sponsors") return <RecordList title="Sponsors" rows={data.sponsorships} empty="No sponsor activity yet." primary="brandName" secondary="status" />;
+  if (tab === "sponsors") return <SponsorInterests id={id} interests={data.sponsorshipInterests} sponsorships={data.sponsorships} />;
   if (tab === "schedule") return <Schedule challenge={data.challenge} />;
   if (tab === "voting") return <OperationalLink title="Voting" body="Voting windows and visibility remain governed by the canonical challenge lifecycle." href={`/challenges/${id}/votes`} label="View Voting" />;
   if (tab === "analytics") return <OperationalLink title="Analytics" body="Open creator analytics for recorded challenge activity." href="/creator/analytics" label="Open Analytics" />;
@@ -133,6 +130,27 @@ function ManagementContent(props: { tab: TabId; data: Payload; requestPayload: R
   if (tab === "judges") return <OperationalLink title="Judges" body="Assigned judges use server-authorized judging controls. Ordinary participants cannot access judge actions." href={`/host/participants?challengeId=${encodeURIComponent(id)}`} label="Manage Judges" />;
   if (tab === "bracket" || tab === "rounds") return <OperationalLink title={tab === "bracket" ? "Bracket" : "Rounds"} body="Tournament progression uses confirmed participants and server-authoritative match results." href={`/tournaments/${id}/manage`} label="Open Tournament Operations" />;
   return null;
+}
+
+function SponsorInterests({ id, interests, sponsorships }: { id: string; interests: RecordRow[]; sponsorships: RecordRow[] }) {
+  const [message, setMessage] = useState("");
+  const [busyId, setBusyId] = useState("");
+  async function decide(agreementId: string, action: "accept" | "reject") {
+    setBusyId(agreementId);
+    const result = await apiRequest(`/api/challenges/${id}/sponsorship-interests`, { method: "PATCH", body: JSON.stringify({ agreementId, action }) });
+    setMessage(result.message);
+    setBusyId("");
+    if (result.ok) window.location.reload();
+  }
+  return <div className="mt-6 space-y-5"><div><h2 className="text-2xl font-black">Sponsor interest and agreements</h2><p className="mt-2 text-sm text-slate-400">Review proposed terms. Accepting records your approval; the Sponsor must then accept the same terms before funding is available.</p></div>
+    {message ? <Card className="p-4 text-sm">{message}</Card> : null}
+    {!interests.length ? <Card><EmptyState icon={<Users />} title="No sponsorship interest yet" body="Interest from verified Sponsor organizations will appear here." /></Card> : interests.map((interest) => {
+      const terms = interest.terms && typeof interest.terms === "object" ? interest.terms as Record<string, unknown> : {};
+      const pending = interest.status === "interest_submitted";
+      return <Card key={interest.id} className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="font-black">Sponsor organization {text(interest.sponsorOrganizationId, "Unavailable")}</p><p className="mt-1 text-sm capitalize text-slate-400">{statusLabel(interest.status)}</p><p className="mt-3 text-sm text-slate-300">Proposed amount: {money(terms.amountCents, terms.currency)} · Version {String(interest.termsVersion ?? 1)}</p><p className="mt-2 text-sm text-slate-400">Placements: {Array.isArray(terms.placements) ? terms.placements.map(String).join(", ") : "None listed"}</p><p className="mt-2 text-sm text-slate-400">CTA: {text(terms.ctaText, "Not proposed")} · {text(terms.ctaUrl, "No destination")}</p><p className="mt-2 text-sm text-slate-400">Deliverables: {Array.isArray(terms.deliverables) && terms.deliverables.length ? terms.deliverables.map(String).join("; ") : "None proposed"}</p>{interest.fundingStatus === "pending" ? <p className="mt-3 text-sm font-bold text-amber-300">Payment pending. No active sponsorship until provider confirmation.</p> : null}{interest.fundingStatus === "confirmed" ? <p className="mt-3 text-sm font-bold text-emerald-300">Funding confirmed; placement remains subject to review.</p> : null}</div>{pending ? <div className="flex shrink-0 gap-2"><Button disabled={Boolean(busyId)} onClick={() => void decide(interest.id, "accept")}>{busyId === interest.id ? "Saving..." : "Accept Terms"}</Button><Button disabled={Boolean(busyId)} variant="secondary" onClick={() => void decide(interest.id, "reject")}>Reject</Button></div> : null}</div></Card>;
+    })}
+    {sponsorships.length ? <div><h3 className="mb-3 text-xl font-black">Funded sponsorship records</h3><RecordList title="" rows={sponsorships} empty="No funded sponsorships yet." primary="sponsorOrganizationId" secondary="status" /></div> : null}
+  </div>;
 }
 
 function CheckIn({ participants, busy, message, checkIn }: { participants: RecordRow[]; busy: boolean; message: string; checkIn: (id: string) => void }) {

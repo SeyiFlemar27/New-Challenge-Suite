@@ -4,7 +4,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
-import { createPendingEntryPayment, attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, confirmRewardEntitledEntry, isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { createPendingEntryPayment, attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, confirmRewardEntitledEntry, isPaidEntryChallenge, releasePendingEntryPayment } from "@/lib/server/monetization-payments";
 import { releaseEntryEntitlementReservation } from "@/lib/server/reward-economy";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 
@@ -54,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const stripe = getStripe();
   if (!stripe) {
+    await releasePendingEntryPayment(db, record.id, "checkout_creation_failed").catch(() => undefined);
     if (record.rewardEntitlementId) await releaseEntryEntitlementReservation(db, { entitlementId: record.rewardEntitlementId, checkoutId: record.id });
     return fail("Stripe paid entry checkout is not configured.", 503, { payment: record, webhookConfirmationRequired: true }, "PAYMENT_CONFIGURATION_ERROR");
   }
@@ -66,8 +67,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/registration-success?entryPaymentId=${encodeURIComponent(record.id)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=canceled`,
       metadata: checkoutMetadataForPurpose("challenge_entry_fee", record)
-    });
+    }, { idempotencyKey: `challenge_entry_${record.id}` });
   } catch (error) {
+    await releasePendingEntryPayment(db, record.id, "checkout_creation_failed").catch(() => undefined);
     if (record.rewardEntitlementId) await releaseEntryEntitlementReservation(db, { entitlementId: record.rewardEntitlementId, checkoutId: record.id });
     return fail("Paid entry checkout could not be started. Please try again.", 503, undefined, "PAYMENT_PROVIDER_UNAVAILABLE");
   }

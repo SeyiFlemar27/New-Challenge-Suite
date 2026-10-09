@@ -5,7 +5,7 @@ import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { adminRemovalGuard, assertAdminManager, normalizeAdminRoles } from "@/lib/server/admin-team";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
-const updateSchema = z.object({ action: z.enum(["change_roles", "suspend", "deactivate", "remove", "revoke_sessions"]), roles: z.array(z.string()).optional(), reason: z.string().trim().min(8).max(500) });
+const updateSchema = z.object({ action: z.enum(["change_roles", "suspend", "deactivate", "remove", "revoke_sessions"]), roles: z.array(z.literal("admin")).length(1).optional(), reason: z.string().trim().min(8).max(500) });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ adminId: string }> }) {
   const { adminId } = await params; const { user, response } = await requireRecentAdminAuthentication(request, "roles.manage"); if (response) return response;
@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ad
     const before = snap.data() ?? {}; const targetRoles = normalizeAdminRoles(before.adminRoles); const guard = await adminRemovalGuard(db, { actorId: user!.uid, targetId: adminId, targetRoles });
     if (["suspend", "deactivate", "remove"].includes(parsed.data.action) && !guard.allowed) return fail(guard.reason ?? "Administrator access cannot be removed.", 409);
     const now = new Date().toISOString(); const update: Record<string, unknown> = { updatedAt: now };
-    if (parsed.data.action === "change_roles") { const roles = normalizeAdminRoles(parsed.data.roles); if (!roles.length) return validationError({ roles: "Select at least one valid role." }); if (roles.includes("platform_owner") && !user?.adminRoles?.includes("platform_owner")) return fail("Only the Platform Owner may assign Platform Owner access.", 403); update.adminRoles = roles; }
+    if (parsed.data.action === "change_roles") { const roles = normalizeAdminRoles(parsed.data.roles); if (roles.length !== 1) return validationError({ roles: "Assign the single canonical Admin role." }); update.adminRoles = roles; update.adminRole = "admin"; update.isAdmin = true; }
     else if (parsed.data.action === "revoke_sessions") await auth.revokeRefreshTokens(adminId);
     else update.adminAccessStatus = parsed.data.action;
     await ref.set(update, { merge: true }); await writeAuditLog({ actorId: user!.uid, actorType: "admin", action: `admin.${parsed.data.action}`, targetType: "account", targetId: adminId, reason: parsed.data.reason, before, after: update }, db);

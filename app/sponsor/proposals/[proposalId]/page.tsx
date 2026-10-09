@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { Clock3, ShieldCheck } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
-import { Button, Card, Field, LinkButton, textareaClass } from "@/components/ui";
+import { Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { label } from "@/lib/sponsor-collaboration";
 
@@ -13,39 +13,15 @@ type ProposalResponse = { proposal: Item; revisions: Item[]; activity: Item[] };
 
 export default function SponsorProposalDetailPage() {
   const params = useParams<{ proposalId: string }>();
-  const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
-  const [proposal, setProposal] = useState<Item | null>(null);
-  const [revisions, setRevisions] = useState<Item[]>([]);
-  const [activity, setActivity] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState("");
-  const [revisionMessage, setRevisionMessage] = useState("");
+  const query = useQuery({ queryKey: ["sponsor-proposal-history", params.proposalId], queryFn: async () => Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<ProposalResponse>(`/api/sponsor/proposals/${params.proposalId}`)]) });
+  const profile = query.data?.[0].data?.sponsorProfile ?? null;
+  const proposal = query.data?.[1].data?.proposal ?? null;
+  const revisions = query.data?.[1].data?.revisions ?? [];
+  const activity = query.data?.[1].data?.activity ?? [];
+  const notice = query.data?.[1].ok ? "" : query.data?.[1].message || query.error?.message || "Proposal could not be loaded.";
 
-  async function load() {
-    setLoading(true);
-    const [profileResult, proposalResult] = await Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<ProposalResponse>(`/api/sponsor/proposals/${params.proposalId}`)]);
-    if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
-    if (proposalResult.ok && proposalResult.data) { setProposal(proposalResult.data.proposal); setRevisions(proposalResult.data.revisions); setActivity(proposalResult.data.activity); }
-    else setNotice(proposalResult.message || "Proposal could not be loaded.");
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, [params.proposalId]);
-
-  async function takeAction(action: string) {
-    const result = await apiRequest(`/api/sponsor/proposals/${params.proposalId}`, { method: "PATCH", body: JSON.stringify({ action, expectedVersion: proposal?.version }) });
-    setNotice(result.message); if (result.ok) void load();
-  }
-  async function addRevision() {
-    const result = await apiRequest(`/api/sponsor/proposals/${params.proposalId}/revisions`, { method: "POST", body: JSON.stringify({ status: "countered", expectedVersion: proposal?.version, sponsorMessage: revisionMessage, deliverables: proposal?.deliverables ?? [], budget: Number(proposal?.proposedBudgetCents ?? 0) / 100, startDate: proposal?.startDate, endDate: proposal?.endDate, paymentPreference: proposal?.paymentPreference }) });
-    setNotice(result.message); setRevisionMessage(""); if (result.ok) void load();
-  }
-
-  if (loading) return <SponsorShell profile={profile}><Card className="h-96 animate-pulse bg-slate-100" /></SponsorShell>;
+  if (query.isLoading) return <SponsorShell profile={profile}><Card className="h-96 animate-pulse bg-slate-100" /></SponsorShell>;
   if (!proposal) return <SponsorShell profile={profile}><Card className="p-6 text-red-800">{notice}</Card></SponsorShell>;
-  const status = String(proposal.status ?? "");
-  const canNegotiate = false;
-  const canArchive = false;
-
   return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl">
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><p className="text-sm font-black uppercase tracking-[0.2em] text-amber-700">Historical proposal</p><h1 className="mt-3 break-words text-4xl font-black text-slate-950">{String(proposal.title ?? "Untitled proposal")}</h1><p className="mt-3 max-w-3xl break-words leading-7 text-slate-600">{String(proposal.objective ?? "Proposal objective pending.")}</p></div><div className="flex flex-wrap gap-3"><LinkButton href="/sponsor/campaigns/create" variant="secondary">Create Campaign Brief</LinkButton><LinkButton href="/sponsor/proposals" variant="secondary">All Historical Proposals</LinkButton></div></div>
     {notice ? <Card className="mt-6 p-4 text-sm text-slate-600">{notice}</Card> : null}

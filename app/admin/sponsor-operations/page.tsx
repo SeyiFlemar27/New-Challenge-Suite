@@ -15,7 +15,7 @@ export default function AdminSponsorOperationsPage() {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   async function load() { setLoading(true); const result = await apiRequest<{ cases: Case[] }>("/api/admin/sponsor-operations"); if (result.ok) setCases(result.data?.cases ?? []); else setMessage(result.message); setLoading(false); }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, []);
   const visible = useMemo(() => filter === "all" ? cases : cases.filter((item) => item.caseType === filter), [cases, filter]);
   function openDecision(item: Case, action: Decision["action"]) { setDecision({ item, action }); setReason(""); setMessage(""); }
   async function submitDecision() {

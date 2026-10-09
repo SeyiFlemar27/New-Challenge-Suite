@@ -20,7 +20,7 @@ export default function KycStartPage() {
         <section className="rounded-[8px] border border-[var(--gold)]/20 bg-[#101010] p-6 sm:p-8 lg:p-10">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Secure verification</p>
           <h1 className="mt-3 text-4xl font-black leading-tight sm:text-5xl">Start identity verification</h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">You'll complete this process securely through our verification provider. Challenge Suite stores only verification status and provider metadata.</p>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">You&apos;ll complete this process securely through our verification provider. Challenge Suite stores only verification status and provider metadata.</p>
         </section>
         <div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]">
           <Card className="p-6 sm:p-8">

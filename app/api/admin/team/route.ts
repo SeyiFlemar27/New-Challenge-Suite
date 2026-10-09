@@ -6,7 +6,7 @@ import { adminTeamPublicRecord, assertAdminManager, invitationToken, normalizeAd
 import { conflict, fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
-const createSchema = z.object({ method: z.enum(["email", "uid", "existing_user"]), email: z.string().trim().email().optional(), uid: z.string().trim().min(8).max(128).optional(), roles: z.array(z.string()).min(1).max(4), reason: z.string().trim().min(8).max(500) });
+const createSchema = z.object({ method: z.enum(["email", "uid", "existing_user"]), email: z.string().trim().email().optional(), uid: z.string().trim().min(8).max(128).optional(), roles: z.array(z.literal("admin")).length(1), reason: z.string().trim().min(8).max(500) });
 
 export async function GET(request: Request) {
   const { response } = await requireAdminPermission(request, "roles.manage");
@@ -22,8 +22,7 @@ export async function POST(request: Request) {
   const db = getAdminDb(); const auth = getAdminAuth(); if (!db || !auth) return serverUnavailable("Admin team");
   const body = await readJson(request); if (body.response) return body.response;
   const parsed = createSchema.safeParse(body.body); if (!parsed.success) return validationError({ request: parsed.error.issues[0]?.message ?? "Invalid request." });
-  const roles = normalizeAdminRoles(parsed.data.roles); if (!roles.length) return validationError({ roles: "Select at least one valid administrator role." });
-  if (roles.includes("platform_owner") && !user?.adminRoles?.includes("platform_owner")) return fail("Only the Platform Owner may appoint another Platform Owner.", 403);
+  const roles = normalizeAdminRoles(parsed.data.roles); if (roles.length !== 1) return validationError({ roles: "Assign the single canonical Admin role." });
   try {
     let uid = parsed.data.uid ?? ""; let email = parsed.data.email?.toLowerCase() ?? "";
     if (parsed.data.method === "email") { if (!email) return validationError({ email: "Email is required." }); try { uid = (await auth.getUserByEmail(email)).uid; } catch { /* Keep invitation email-linked. */ } }
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
     if (uid) {
       const ref = db.collection("users").doc(uid); const existing = await ref.get();
       if (existing.data()?.adminAccessStatus === "active") return conflict("This Firebase identity already has active administrator access.");
-      await ref.set({ adminRoles: roles, adminAccessStatus: "active", adminSecuritySetupComplete: true, adminAppointedAt: now, adminAppointedBy: user!.uid, adminAppointmentReason: parsed.data.reason, updatedAt: now }, { merge: true });
+      await ref.set({ adminRoles: roles, adminRole: "admin", isAdmin: true, adminAccessStatus: "active", adminSecuritySetupComplete: true, adminAppointedAt: now, adminAppointedBy: user!.uid, adminAppointmentReason: parsed.data.reason, updatedAt: now }, { merge: true });
       await writeAuditLog({ actorId: user!.uid, actorType: "admin", action: "admin.appointed", targetType: "account", targetId: uid, reason: parsed.data.reason, after: { roles, status: "active", delivery: "not_applicable" } }, db);
       return ok({ uid, status: "active", delivery: "not_applicable" }, "Administrator access assigned directly. No invitation email was sent.");
     }

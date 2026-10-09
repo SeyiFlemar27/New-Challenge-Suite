@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { cashLedgerEntry } from "../lib/server/challenge-settlement.ts";
 
 const root = process.cwd();
 const read = (file) => readFileSync(join(root, file), "utf8");
@@ -21,8 +22,14 @@ assert(settlement.includes("getConfirmedSponsorContributionForChallenge"), "fina
 assert(settlement.includes("pendingFailedCancelledExcluded: true"), "unconfirmed sponsor contributions must be ignored.");
 assert(settlement.includes("creatorHostAmount"), "creator/host share must be calculated.");
 assert(settlement.includes("platformChallengeFeeAmount"), "platform share must be calculated.");
-assert(settlement.includes("balanceBucket: \"pending\""), "ledger entries must enter pending bucket.");
-assert(settlement.includes("status: \"pending_review\""), "ledger entries must remain pending review.");
+const pendingLedger = cashLedgerEntry({ id: "ledger-contract", userId: "winner-1", challengeId: "challenge-1", proposalId: "proposal-1", settlementId: "settlement-1", sourceType: "challenge_winner_prize", grossAmountCents: 5000, feeRate: 0, feeAmountCents: 0, netAmountCents: 5000, holdUntil: null, adminId: "admin-1", now: new Date(0).toISOString() });
+assert.equal(pendingLedger.status, "pending_review", "new internal ledger credits must remain review-gated");
+assert.equal(pendingLedger.balanceBucket, "pending", "pending review credits must enter the pending balance bucket");
+assert.equal(pendingLedger.paid, false, "ledger credits must not be marked paid before external payout exists");
+assert.equal(pendingLedger.withdrawn, false, "ledger credits must not be marked withdrawn before an authorized withdrawal");
+// The previous source assertion required a literal status field, even though the
+// settlement helper derives it from the pending-review payout state. The runtime
+// assertion above now verifies the persisted ledger shape returned by that helper.
 assert(settlement.includes("holdUntil"), "ledger entries must include holdUntil.");
 assert(settlement.includes("CASH_EARNING_HOLD_HOURS"), "24-hour hold configuration must be reused.");
 assert(settlement.includes("kycRequiredBeforeWithdrawal: false"), "internal credits must follow the KYC-free launch policy.");

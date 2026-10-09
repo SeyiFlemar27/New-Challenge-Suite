@@ -3,8 +3,9 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { fail, forbidden, ok, serverError, serverUnavailable, readJson } from "@/lib/server/responses";
-import { extendedMonthlyBoostEnd, monthlyBoostEntitlement, monthlyBoostEntitlementKey, monthlyBoostMonthKey } from "@/lib/monthly-boost";
-import { getChallengeBoostAccess, loadMonthlyBoostState } from "@/lib/server/boosts";
+import { extendedMonthlyBoostEnd, monthlyBoostEntitlement, monthlyBoostEntitlementKey, monthlyBoostMonthKey, monthlyBoostResetAt } from "@/lib/monthly-boost";
+import { getChallengeBoostAccess, loadEnterpriseBoostAccess, loadMonthlyBoostState } from "@/lib/server/boosts";
+import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const [challengeSnap, profile] = await Promise.all([db.collection("challenges").doc(id).get(), accountProfile(db, user.uid)]);
     if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
     const challenge = { id, ...challengeSnap.data() } as Record<string, unknown>;
-    const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile });
+    const enterpriseAccess = await loadEnterpriseBoostAccess(db, user.uid, challenge);
+    const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile, enterpriseAccess });
     if (!access.owner) return forbidden("Only the challenge owner can manage Monthly Boost.");
-    return ok({ state: await loadMonthlyBoostState(db, challenge, user.uid, profile) }, "Monthly Boost state loaded.");
+    return ok({ state: await loadMonthlyBoostState(db, challenge, user.uid, profile, new Date(), enterpriseAccess) }, "Monthly Boost state loaded.");
   } catch (error) {
     return serverError("Monthly Boost state could not be loaded.", error instanceof Error ? error.message : error);
   }
@@ -52,18 +54,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!challengeSnap.exists) throw new BoostError("NOT_FOUND", "Challenge not found.", 404);
       const challenge = { id, ...challengeSnap.data() } as Record<string, unknown>;
       const profile = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) } as Record<string, unknown>;
-      const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile });
+      const enterpriseAccess = await loadEnterpriseBoostAccess(db, user.uid, challenge, profile);
+      const access = getChallengeBoostAccess({ challenge, userId: user.uid, profile, enterpriseAccess });
       if (access.reason === "owner_required") throw new BoostError("FORBIDDEN", "Only the challenge owner can use Monthly Boost.", 403);
       if (access.reason === "plan_required") throw new BoostError("PLAN_REQUIRED", "Monthly Boosts are available with eligible premium plans.", 403);
       if (access.reason === "public_challenge_required") throw new BoostError("CHALLENGE_NOT_DISCOVERABLE", "This challenge must be approved and publicly discoverable before it can be boosted.", 409);
       if (access.reason === "status_not_eligible") throw new BoostError("BOOST_STATUS_INELIGIBLE", "Monthly Boost is available only while a challenge is Scheduled or Active.", 409);
       if (!access.allowed) throw new BoostError("BOOST_FORBIDDEN", "Monthly Boost is not available for this challenge.", 403);
 
-      const entitlementKey = monthlyBoostEntitlementKey(profile, now);
-      const entitlementRef = db.collection("monthlyBoostEntitlements").doc(deterministicId("monthly_boost_entitlement", user.uid, entitlementKey));
+      const enterpriseBoost = Boolean(enterpriseAccess && challenge.organizationOwnerId && enterpriseAccess.organizationId === challenge.organizationOwnerId && enterpriseAccess.permissions.includes("boost.redeem"));
+      const entitlementKey = enterpriseBoost ? `enterprise:${enterpriseAccess!.organizationId}:${monthlyBoostMonthKey(now)}` : monthlyBoostEntitlementKey(profile, now);
+      const entitlementId = enterpriseBoost
+        ? deterministicId("monthly_boost_entitlement", "enterprise", enterpriseAccess!.organizationId, monthlyBoostMonthKey(now))
+        : deterministicId("monthly_boost_entitlement", user.uid, entitlementKey);
+      const entitlementRef = db.collection("monthlyBoostEntitlements").doc(entitlementId);
       const redemptionRef = db.collection("monthlyBoostRedemptions").doc(deterministicId("monthly_boost", user.uid, id, idempotencyKey));
       const [entitlementSnap, redemptionSnap] = await Promise.all([transaction.get(entitlementRef), transaction.get(redemptionRef)]);
-      const entitlement = monthlyBoostEntitlement(profile, Number(entitlementSnap.data()?.used ?? 0), now);
+      const used = Number(entitlementSnap.data()?.used ?? 0);
+      const entitlement = enterpriseBoost
+        ? { planId: "enterprise", allowance: ENTERPRISE_WORKSPACE_LIMITS.monthlyBoostLimit, used, remaining: Math.max(0, ENTERPRISE_WORKSPACE_LIMITS.monthlyBoostLimit - used), resetAt: monthlyBoostResetAt(now), entitlementKey, activeSubscription: true }
+        : monthlyBoostEntitlement(profile, used, now);
       if (redemptionSnap.exists) return { replay: true, endsAt: redemptionSnap.data()?.endsAt, entitlement };
       if (entitlement.allowance <= 0) throw new BoostError("PLAN_REQUIRED", "Monthly Boosts are available with eligible premium plans.", 403);
       if (entitlement.remaining <= 0) throw new BoostError("MONTHLY_BOOST_EXHAUSTED", "You have used all Monthly Boosts available for this month.", 409);
@@ -71,8 +81,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const startsAt = now.toISOString();
       const endsAt = extendedMonthlyBoostEnd(challenge.monthlyBoostEndsAt ?? challenge.boostEndsAt ?? challenge.boostedUntil, now);
       const nextUsed = entitlement.used + 1;
-      const redemption = { id: redemptionRef.id, userId: user.uid, challengeId: id, entitlementKey, entitlementMonth: monthlyBoostMonthKey(now), planId: entitlement.planId, durationHours: 72, startsAt, endsAt, status: "active", createdAt: startsAt };
-      transaction.set(entitlementRef, { userId: user.uid, entitlementKey, month: monthlyBoostMonthKey(now), planId: entitlement.planId, allowance: entitlement.allowance, used: nextUsed, updatedAt: startsAt }, { merge: true });
+      const redemption = { id: redemptionRef.id, userId: user.uid, organizationId: enterpriseBoost ? enterpriseAccess!.organizationId : null, challengeId: id, entitlementKey, entitlementMonth: monthlyBoostMonthKey(now), planId: entitlement.planId, durationHours: 72, startsAt, endsAt, status: "active", createdAt: startsAt };
+      transaction.set(entitlementRef, { userId: enterpriseBoost ? null : user.uid, organizationId: enterpriseBoost ? enterpriseAccess!.organizationId : null, entitlementKey, month: monthlyBoostMonthKey(now), planId: entitlement.planId, allowance: entitlement.allowance, used: nextUsed, updatedAt: startsAt }, { merge: true });
       transaction.set(redemptionRef, redemption);
       transaction.set(challengeRef, { monthlyBoostEndsAt: endsAt, monthlyBoostStatus: "active", monthlyBoostUpdatedAt: startsAt, updatedAt: startsAt }, { merge: true });
       transaction.set(db.collection("auditLogs").doc(`${redemptionRef.id}_redeemed`), { id: `${redemptionRef.id}_redeemed`, actorId: user.uid, challengeId: id, action: "monthly_boost.redeemed", entityType: "challenge", entityId: id, createdAt: startsAt, metadata: { entitlementKey, durationHours: 72 } });

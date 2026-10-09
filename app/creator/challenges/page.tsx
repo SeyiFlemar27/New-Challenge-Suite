@@ -1,6 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ClipboardList, Medal, Swords, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -31,12 +33,13 @@ function nextDeadline(challenge: CreatorChallenge) {
 }
 
 export default function CreatorChallengesPage() {
-  const [activeTab, setActiveTab] = useState<CreatorChallengeTab>("active");
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [type, setType] = useState("");
-  const [sort, setSort] = useState("updated");
-  useEffect(() => { const params = new URLSearchParams(window.location.search); const tab = params.get("status") as CreatorChallengeTab | null; if (tab && CREATOR_CHALLENGE_TABS.includes(tab)) setActiveTab(tab); setPage(Math.max(1, Number(params.get("page") ?? 1) || 1)); setSearch(params.get("q") ?? ""); setType(params.get("type") ?? ""); setSort(params.get("sort") ?? "updated"); }, []);
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("status") as CreatorChallengeTab | null;
+  const [activeTab, setActiveTab] = useState<CreatorChallengeTab>(initialTab && CREATOR_CHALLENGE_TABS.includes(initialTab) ? initialTab : "active");
+  const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page") ?? 1) || 1));
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [type, setType] = useState(searchParams.get("type") ?? "");
+  const [sort, setSort] = useState(searchParams.get("sort") ?? "updated");
   const params = new URLSearchParams({ tab: activeTab, page: String(page), q: search, type, sort });
   const query = useQuery({ queryKey: ["creator-challenges", { activeTab, page, search, type, sort }], queryFn: () => apiRequest<Payload>(`/api/creator/challenges?${params}`), staleTime: 20_000 });
   const payload = query.data?.ok ? query.data.data : null;
@@ -63,7 +66,7 @@ function CreatorChallengeCard({ challenge }: { challenge: CreatorChallenge }) {
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "draft").replaceAll("_", " ");
   const pending = Number(challenge.pendingRequestCount ?? challenge.pendingEntryRequestCount ?? 0);
   return <Card className="flex h-full flex-col overflow-hidden bg-[#171717]">
-    <div className="relative aspect-[16/9] bg-[#101010]">{image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Challenge Suite</div>}<span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-[11px] font-black text-white">{challengeTypeLabel(challenge)}</span></div>
+    <div className="relative aspect-[16/9] bg-[#101010]">{image ? <ContentImage src={image} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Challenge Suite</div>}<span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-[11px] font-black text-white">{challengeTypeLabel(challenge)}</span></div>
     <div className="flex flex-1 flex-col p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">{status}</p><h2 className="mt-2 line-clamp-2 text-xl font-black">{title}</h2>
       <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-slate-300"><span className="flex items-center gap-2"><Users size={15} /> {Number(challenge.participantCount ?? 0)} participants</span><span className="flex items-center gap-2"><ClipboardList size={15} /> {Number(challenge.submissionCount ?? 0)} submissions</span>{pending > 0 ? <span className="col-span-2 font-black text-amber-300">{pending} participant requests need review</span> : null}<span className="col-span-2 flex items-center gap-2"><CalendarClock size={15} /> {nextDeadline(challenge) ?? "No upcoming deadline"}</span></div>
       <div className="mt-auto grid gap-2 pt-6"><LinkButton href={`/challenges/${challenge.id}/manage`} className="w-full">Manage Challenge</LinkButton><LinkButton href={`/challenges/${challenge.id}`} variant="secondary" className="w-full">View Public Page</LinkButton></div>

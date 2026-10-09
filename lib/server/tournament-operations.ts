@@ -227,11 +227,36 @@ export function validateTournamentSubmission(params: { tournament: TournamentFou
   return { valid: true, code: "SUBMISSION_VALID", message: "Submission can be recorded." };
 }
 
-export function validateTournamentVote(params: { tournament: TournamentFoundation; match: TournamentMatchFoundation; existingVote?: boolean; strictOneVote?: boolean; votingOpen?: boolean }) {
-  if (!params.votingOpen || params.match.status !== "active") return { valid: false, code: "VOTING_NOT_OPEN", message: "Voting is not open for this match." };
-  if (params.existingVote) return { valid: false, code: "DUPLICATE_VOTE_BLOCKED", message: "Duplicate tournament vote rejected." };
-  if (params.strictOneVote && (params.tournament.voting as Record<string, unknown>)?.bonusVotesAllowed) return { valid: false, code: "STRICT_VOTING_BLOCKS_BONUS", message: "Strict voting disables bonus, ad, and purchased votes." };
-  return { valid: true, code: "VOTE_ALLOWED", message: "Vote can be recorded." };
+export function validateTournamentVote(params: {
+  tournament: TournamentFoundation;
+  match: TournamentMatchFoundation;
+  round: TournamentRoundFoundation;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const voting = (params.tournament.voting ?? {}) as Record<string, unknown>;
+  if (params.tournament.status !== "active" && params.tournament.status !== "round_active") return { valid: false, code: "TOURNAMENT_NOT_VOTING", message: "This tournament is not accepting votes." };
+  if (params.tournament.resultMethod !== "votes" || params.match.resultMethod !== "votes") return { valid: false, code: "PUBLIC_VOTING_DISABLED", message: "Public voting is not the configured decision method for this match." };
+  if (params.match.status !== "active" || params.match.resultStatus === "confirmed" || params.round.status !== "active") return { valid: false, code: "MATCH_NOT_VOTING", message: "This match is not accepting votes." };
+  if (!params.match.participantAId || !params.match.participantBId || params.match.participantAId === params.match.participantBId) return { valid: false, code: "MATCH_COMPETITORS_INVALID", message: "Both eligible competitors must be assigned before voting opens." };
+  if (params.round.tournamentId !== params.tournament.id || params.match.tournamentId !== params.tournament.id || params.match.roundId !== params.round.id || params.round.roundNumber !== params.match.roundNumber) return { valid: false, code: "MATCH_ROUND_MISMATCH", message: "The match and round do not belong to this tournament round." };
+  const opensAt = Date.parse(String(params.round.votingOpensAt ?? ""));
+  const closesAt = Date.parse(String(params.round.votingClosesAt ?? ""));
+  if (!Number.isFinite(opensAt) || !Number.isFinite(closesAt) || now.getTime() < opensAt || now.getTime() >= closesAt) return { valid: false, code: "VOTING_WINDOW_CLOSED", message: "Voting is not open for this match." };
+  if (voting.paidVotesActive === true) return { valid: false, code: "PAID_TOURNAMENT_VOTING_UNSUPPORTED", message: "Paid Tournament voting is not supported." };
+  return { valid: true, code: "VOTE_ALLOWED", message: "One free vote can be recorded for this match." };
+}
+
+export function tournamentMatchVoteOutcome(match: TournamentMatchFoundation) {
+  const votesA = Number.isSafeInteger(match.voteCountA) && Number(match.voteCountA) >= 0 ? Number(match.voteCountA) : 0;
+  const votesB = Number.isSafeInteger(match.voteCountB) && Number(match.voteCountB) >= 0 ? Number(match.voteCountB) : 0;
+  return {
+    votesA,
+    votesB,
+    winnerParticipantId: votesA === votesB ? null : votesA > votesB ? match.participantAId : match.participantBId,
+    tied: votesA === votesB,
+    totalVotes: votesA + votesB
+  };
 }
 
 export function validateJudgeRubric(criteria: Array<{ name: string; weight: number }>) {

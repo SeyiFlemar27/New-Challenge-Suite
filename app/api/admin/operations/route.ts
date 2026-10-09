@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
+import { prepareEnterpriseActiveChallengeRelease } from "@/lib/server/enterprise-active-challenge-limit";
 import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -318,7 +319,7 @@ export async function GET(request: Request) {
       riskSafety,
       auditLogs: hasAdminPermission(user.adminPermissions, "auditLogs.viewRaw") ? auditLogs : [],
       settings: {
-        adminRoles: "Server-verified granular administrator roles and permissions",
+        adminRoles: "Single canonical Admin identity; action access is server-verified by permission",
         reviewRulesConfigured: true,
         payoutProvider: "manual_review",
         automaticMoneyMovement: false,
@@ -347,7 +348,7 @@ export async function GET(request: Request) {
           predictionArena: "compliance_review_required",
           voterRewardsWheel: "server_selected"
         },
-        roles: ["Platform Owner", "Super Admin", "Operations Admin", "Finance Admin", "Moderation Admin", "Safety Admin", "Support Admin", "Sponsor Manager", "Event and Tournament Admin", "Content Admin", "Marketing and Communications Admin", "Analyst", "Read-only Auditor", "Technical Admin", "Developer Support"]
+        roles: ["Admin"]
       }
     }, "Admin operations data loaded.");
   } catch (error) {
@@ -496,19 +497,23 @@ export async function PATCH(request: Request) {
         const applicationOrganizationId = typeof application.enterpriseOrganizationId === "string" ? application.enterpriseOrganizationId.trim() : "";
         const enterpriseOrganizationId = requestedOrganizationId || applicationOrganizationId || `enterprise_org_${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
         const organizationRef = db.collection("enterpriseOrganizations").doc(enterpriseOrganizationId);
+        const expiryText = String(parsed.body?.enterpriseAccessExpiresAt ?? "").trim();
+        const expiryMillis = expiryText ? Date.parse(expiryText) : Number.NaN;
+        const expiryDate = Number.isFinite(expiryMillis) ? new Date(expiryMillis) : null;
         const staffAccess = action === "approve" ? {
           status: "active", role: enterpriseRole, scope: enterpriseScope,
           department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
           permissions: enterprisePermissions,
           categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
           regionScope: Array.isArray(parsed.body?.enterpriseRegionScope) ? parsed.body.enterpriseRegionScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],
-          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid, organizationId: enterpriseOrganizationId
+          onboardingComplete: false, provisionedAt: now, provisionedBy: user.uid, organizationId: enterpriseOrganizationId,
+          expiresAt: expiryDate?.toISOString() ?? null, expiresAtTimestamp: expiryDate
         } : null;
         const event = { type: `admin_${action}`, status, at: now, message: action === "approve" ? "Enterprise access approved." : action === "request_info" ? "More information requested." : "Application not approved." };
         const accessUpdate = {
           enterpriseAccessStatus: status, enterpriseApprovalStatus: status, enterpriseApplicationId: id,
           enterpriseApprovedAt: action === "approve" ? now : null, enterpriseApprovedBy: action === "approve" ? user.uid : null,
-          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseOrganizationId, enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, staffAccess } : {}),
+          ...(action === "approve" ? { workspaceTypes: [...existingWorkspaces], enterpriseOrganizationId, enterpriseRole, enterpriseScope, enterpriseDepartment: staffAccess!.department, enterprisePermissions, enterpriseCategoryScope: staffAccess!.categoryScope, enterpriseRegionScope: staffAccess!.regionScope, enterpriseStaffStatus: "active", enterpriseOnboardingComplete: false, enterpriseAccessExpiresAt: expiryDate?.toISOString() ?? null, staffAccess } : {}),
           updatedAt: now
         };
         transaction.set(ref, { status, approvalStatus: status, enterpriseAccessGranted: action === "approve", enterpriseOrganizationId: action === "approve" ? enterpriseOrganizationId : application.enterpriseOrganizationId ?? null, enterpriseRole: action === "approve" ? enterpriseRole : null, enterpriseScope: action === "approve" ? enterpriseScope : null, reviewedRevision: currentVersion, reviewedAt: now, reviewedBy: user.uid, decisionReason: reason || null, requestedInfoMessage: action === "request_info" ? reason : null, timeline: [...(Array.isArray(application.timeline) ? application.timeline : []), event], updatedAt: now }, { merge: true });
@@ -538,6 +543,9 @@ export async function PATCH(request: Request) {
         if (!validTransition) throw new Error("INVALID_STATE");
         if (["approve", "second_approve"].includes(action) && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
         if (action === "second_approve" && record.firstApprovedBy === user.uid) throw new Error("SECOND_APPROVER_REQUIRED");
+        const walletRef = action === "reject" || action === "mark_paid" ? db.collection("cashWallets").doc(String(record.userId)) : null;
+        const walletSnap = walletRef ? await transaction.get(walletRef) : null;
+        const wallet = walletSnap?.data() ?? {};
         transaction.set(ref, {
           status,
           adminReviewStatus: status,
@@ -553,13 +561,10 @@ export async function PATCH(request: Request) {
           updatedAt: now
         }, { merge: true });
         if (action === "reject" || action === "mark_paid") {
-          const walletRef = db.collection("cashWallets").doc(String(record.userId));
-          const walletSnap = await transaction.get(walletRef);
-          const wallet = walletSnap.data() ?? {};
           const amount = Number(record.amountCents ?? 0);
           const available = Number(wallet.availableBalanceCents ?? 0);
           const underReview = Math.max(0, Number(wallet.underReviewBalanceCents ?? wallet.lockedBalanceCents ?? 0) - amount);
-          transaction.set(walletRef, action === "reject"
+          transaction.set(walletRef!, action === "reject"
             ? { availableBalanceCents: available + amount, underReviewBalanceCents: underReview, lockedBalanceCents: underReview, updatedAt: now }
             : { underReviewBalanceCents: underReview, lockedBalanceCents: underReview, withdrawnBalanceCents: Number(wallet.withdrawnBalanceCents ?? 0) + amount, updatedAt: now }, { merge: true });
           const ledgerSuffix = action === "reject" ? "rejected" : "paid_manual";
@@ -606,11 +611,17 @@ export async function PATCH(request: Request) {
         updatedAt: now
       };
       status = String(update.status ?? status);
-      await ref.set({
-        ...update,
-        moneyMovementEnabled: false,
-        transferEnabled: false
-      }, { merge: true });
+      await db.runTransaction(async (transaction) => {
+        const latest = await transaction.get(ref);
+        if (!latest.exists) throw new Error("Challenge record not found.");
+        const latestChallenge = latest.data() ?? {};
+        const leavesActiveSet = !["pending_review", "scheduled", "active", "submission_open", "voting_open", "voting_closed", "under_review"].includes(String(update.status ?? ""));
+        const release = leavesActiveSet
+          ? await prepareEnterpriseActiveChallengeRelease(db, transaction, String(latestChallenge.organizationOwnerId ?? "") || null, id)
+          : { apply: () => undefined };
+        transaction.set(ref, { ...update, moneyMovementEnabled: false, transferEnabled: false }, { merge: true });
+        release.apply();
+      });
       const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? "");
       if (creatorId && ["approve", "reject", "request_changes"].includes(action)) {
         const notificationCopy = action === "approve" ? { type: "challenge_approved", title: "Challenge approved", body: "Your challenge is now available." } : action === "request_changes" ? { type: "challenge_changes_requested", title: "Challenge changes requested", body: "Review the requested changes and resubmit your challenge." } : { type: "challenge_rejected", title: "Challenge not approved", body: "Review the decision before editing your challenge." };
