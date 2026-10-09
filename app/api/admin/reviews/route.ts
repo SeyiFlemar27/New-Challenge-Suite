@@ -4,6 +4,7 @@ import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-per
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
+import { prepareEnterpriseActiveChallengeRelease } from "@/lib/server/enterprise-active-challenge-limit";
 
 const reviewTypes = new Set(["sponsor", "challenge", "sponsorship"]);
 const reviewActions = new Set(["approve", "reject"]);
@@ -74,13 +75,22 @@ export async function PATCH(request: Request) {
     const challenge = snap.data() ?? {};
     const approved = action === "approve";
     const reviewUpdate = approved ? buildChallengeApprovalUpdate(challenge, user.uid, now) : buildChallengeRejectionUpdate(user.uid, now);
-    await ref.set({
-      ...reviewUpdate,
-      prizeApprovalStatus: approved ? "approved" : "rejected",
-      eventApprovalStatus: challenge.isLiveEvent ? approved ? "approved" : "rejected" : challenge.eventApprovalStatus ?? "not_required",
-      eventSyncStatus: challenge.isLiveEvent ? approved ? "synced" : "rejected" : challenge.eventSyncStatus ?? "not_applicable",
-      eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable"
-    }, { merge: true });
+    await db.runTransaction(async (transaction) => {
+      const latest = await transaction.get(ref);
+      if (!latest.exists) throw new Error("Challenge not found.");
+      const latestChallenge = latest.data() ?? {};
+      const release = !approved
+        ? await prepareEnterpriseActiveChallengeRelease(db, transaction, String(latestChallenge.organizationOwnerId ?? "") || null, id)
+        : { apply: () => undefined };
+      transaction.set(ref, {
+        ...reviewUpdate,
+        prizeApprovalStatus: approved ? "approved" : "rejected",
+        eventApprovalStatus: challenge.isLiveEvent ? approved ? "approved" : "rejected" : challenge.eventApprovalStatus ?? "not_required",
+        eventSyncStatus: challenge.isLiveEvent ? approved ? "synced" : "rejected" : challenge.eventSyncStatus ?? "not_applicable",
+        eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable"
+      }, { merge: true });
+      release.apply();
+    });
     if (approved && challenge.isLiveEvent) {
       await db.collection("liveEvents").doc(id).set({
         id,

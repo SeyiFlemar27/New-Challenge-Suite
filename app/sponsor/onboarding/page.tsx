@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Save, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { MediaUploadField } from "@/components/media-upload-field";
@@ -16,10 +16,23 @@ const sponsorTypes = ["Sponsor a challenge", "Sponsor creators", "Sponsor live e
 const sponsorGoals = ["Brand awareness", "Product launch", "Creator collaboration", "Community growth", "Live event activation", "Tournament partnership", "Lead generation"];
 const DRAFT_KEY = "challenge-suite-sponsor-onboarding-draft";
 
+function subscribeDraft(onChange: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === DRAFT_KEY) onChange(); };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("sponsor-onboarding-draft-change", onChange);
+  return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("sponsor-onboarding-draft-change", onChange); };
+}
+
+function readDraft() { return window.localStorage.getItem(DRAFT_KEY) ?? "{}"; }
+
 export default function SponsorOnboardingPage() {
   const auth = useAuth();
   const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
-  const [form, setForm] = useState(initial);
+  const storedDraft = useSyncExternalStore(subscribeDraft, readDraft, () => "{}");
+  const localDraft = useMemo(() => { try { const value: unknown = JSON.parse(storedDraft); return value && typeof value === "object" ? value as Partial<typeof initial> : {}; } catch { return {}; } }, [storedDraft]);
+  const [profileValues, setProfileValues] = useState<Partial<typeof initial>>({});
+  const [formEdits, setFormEdits] = useState<Partial<typeof initial>>({});
+  const form = useMemo(() => ({ ...initial, ...localDraft, ...profileValues, ...formEdits }), [formEdits, localDraft, profileValues]);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -27,19 +40,22 @@ export default function SponsorOnboardingPage() {
   const workspace = resolveSponsorWorkspaceState(profile ?? form);
 
   useEffect(() => {
-    const local = localStorage.getItem(DRAFT_KEY);
-    if (local) { try { setForm((current) => ({ ...current, ...JSON.parse(local) })); } catch {} }
     void apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile").then((result) => {
       if (!result.ok || !result.data) return;
       const saved = result.data.sponsorProfile;
       setProfile(saved);
       const billingAddress = saved.billingAddress && typeof saved.billingAddress === "object" ? saved.billingAddress as Record<string, unknown> : {};
-      setForm((current) => ({ ...current, brandName: String(saved.brandName || current.brandName), workEmail: String(saved.businessEmail || current.workEmail), website: String(saved.website || current.website), industry: String(saved.industry || current.industry), countryRegion: String(saved.countryLocation || saved.headquartersLocation || billingAddress.country || current.countryRegion), contactPerson: String(saved.contactPerson || current.contactPerson), contactPersonRole: String(saved.contactPersonRole || current.contactPersonRole), billingStreet: String(billingAddress.street || current.billingStreet), billingCity: String(billingAddress.city || current.billingCity), billingState: String(billingAddress.state || current.billingState), billingZip: String(billingAddress.zip || current.billingZip), sponsorGoal: Array.isArray(saved.sponsorshipGoals) ? String(saved.sponsorshipGoals[0] || current.sponsorGoal) : current.sponsorGoal, brandDescription: String(saved.brandDescription || current.brandDescription), sponsorshipType: String(saved.preferredSponsorshipStructure || current.sponsorshipType), primaryCampaignKpi: Array.isArray(saved.primaryCampaignKpis) ? String(saved.primaryCampaignKpis[0] || current.primaryCampaignKpi) : current.primaryCampaignKpi, targetAudience: String(saved.preferredAudienceSize || current.targetAudience), targetAudienceDemographics: String(saved.targetAudienceDemographics || current.targetAudienceDemographics), typicalBudget: String(saved.targetBudgetRange || saved.typicalCampaignBudget || current.typicalBudget), campaignDuration: String(saved.preferredCampaignDuration || current.campaignDuration), preferredCurrency: String(saved.preferredPaymentCurrency || current.preferredCurrency), legalApproval: saved.legalApprovalRequired ? "yes" : "no", logoUrl: String(saved.logoUrl || current.logoUrl), logoPath: String(saved.logoPath || current.logoPath), bannerUrl: String(saved.bannerUrl || current.bannerUrl), bannerPath: String(saved.bannerPath || current.bannerPath), socialLink1: Array.isArray(saved.socialLinks) ? String(saved.socialLinks[0] || current.socialLink1) : current.socialLink1, socialLink2: Array.isArray(saved.socialLinks) ? String(saved.socialLinks[1] || current.socialLink2) : current.socialLink2, socialLink3: Array.isArray(saved.socialLinks) ? String(saved.socialLinks[2] || current.socialLink3) : current.socialLink3 }));
+      const socialLinks: unknown[] = Array.isArray(saved.socialLinks) ? saved.socialLinks : [];
+      const goals: unknown[] = Array.isArray(saved.sponsorshipGoals) ? saved.sponsorshipGoals : [];
+      const kpis: unknown[] = Array.isArray(saved.primaryCampaignKpis) ? saved.primaryCampaignKpis : [];
+      const values: Partial<typeof initial> = { brandName: String(saved.brandName || ""), workEmail: String(saved.businessEmail || ""), website: String(saved.website || ""), industry: String(saved.industry || ""), countryRegion: String(saved.countryLocation || saved.headquartersLocation || billingAddress.country || ""), contactPerson: String(saved.contactPerson || ""), contactPersonRole: String(saved.contactPersonRole || ""), billingStreet: String(billingAddress.street || ""), billingCity: String(billingAddress.city || ""), billingState: String(billingAddress.state || ""), billingZip: String(billingAddress.zip || ""), sponsorGoal: String(goals[0] || ""), brandDescription: String(saved.brandDescription || ""), sponsorshipType: String(saved.preferredSponsorshipStructure || ""), primaryCampaignKpi: String(kpis[0] || ""), targetAudience: String(saved.preferredAudienceSize || ""), targetAudienceDemographics: String(saved.targetAudienceDemographics || ""), typicalBudget: String(saved.targetBudgetRange || saved.typicalCampaignBudget || ""), campaignDuration: String(saved.preferredCampaignDuration || ""), preferredCurrency: String(saved.preferredPaymentCurrency || ""), legalApproval: saved.legalApprovalRequired ? "yes" : "no", logoUrl: String(saved.logoUrl || ""), logoPath: String(saved.logoPath || ""), bannerUrl: String(saved.bannerUrl || ""), bannerPath: String(saved.bannerPath || ""), socialLink1: String(socialLinks[0] || ""), socialLink2: String(socialLinks[1] || ""), socialLink3: String(socialLinks[2] || "") };
+      for (const [key, value] of Object.entries(values)) if (value === "") delete values[key as keyof typeof initial];
+      setProfileValues(values);
     });
   }, []);
-  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); }, [form]);
+  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); window.dispatchEvent(new Event("sponsor-onboarding-draft-change")); }, [form]);
 
-  function update(field: keyof typeof form, value: string) { setForm((current) => ({ ...current, [field]: value })); setMessage(""); setError(""); }
+  function update(field: keyof typeof form, value: string) { setFormEdits((current) => ({ ...current, [field]: value })); setMessage(""); setError(""); }
   const requiredReady = form.brandName.trim().length >= 2 && form.workEmail.includes("@") && form.industry.trim().length >= 2 && form.countryRegion.trim().length >= 2 && form.brandDescription.trim().length >= 20 && Boolean(form.contactPerson.trim()) && Boolean(form.contactPersonRole.trim()) && Boolean(form.billingStreet.trim()) && Boolean(form.billingCity.trim()) && Boolean(form.billingState.trim()) && Boolean(form.billingZip.trim()) && Boolean(form.logoPath) && Boolean(form.sponsorGoal) && Boolean(form.sponsorshipType) && Boolean(form.typicalBudget.trim()) && Boolean(form.targetAudienceDemographics.trim());
   const progress = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
 

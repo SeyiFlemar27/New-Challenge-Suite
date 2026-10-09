@@ -82,8 +82,6 @@ export function LiveEventBuilder({ enterpriseOwnership }: { enterpriseOwnership?
       minimumSponsorshipAmount: 0, sponsorPlacementOptions: lines(form.sponsorVisibilityAreas), sponsorPackages: [],
       isLiveEvent: live, venueName: live ? form.venueName || "Venue pending" : "", eventAddress: live ? form.eventAddress : "", eventCity: live ? form.eventCity || form.locationRestriction || "Location pending" : "",
       eventState: live ? form.eventState : "", eventCountry: live ? form.eventCountry || "Location pending" : "", eventMapUrl: "", eventCapacity: participantCapacity,
-      externalLiveUrl: "", externalLiveProvider: "", externalLiveStatus: "not_supported",
-      externalLiveOpensAt: "", externalLiveCtaLabel: "",
       tournamentType: form.competitionType === "Tournament" ? form.tournamentType : "none", tournamentStages: form.competitionType === "Tournament" ? [
         { id: "registration", name: "Registration", order: 1, status: "draft", advancementRule: "Approve participants before round one." },
         { id: "round_1", name: "Round 1", order: 2, status: "draft", advancementRule: "Collect submissions and votes or judge scores." },

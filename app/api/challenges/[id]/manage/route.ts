@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const access = await context(request, id);
   if (access.response || !access.db || !access.challenge || !access.user) return access.response;
-  const [participants, entryRequests, submissions, reports, winnerProposals, settlements, sponsorships, financialLedger, prizePoolSnap, directAudits, relatedAudits] = await Promise.all([
+  const [participants, entryRequests, submissions, reports, winnerProposals, settlements, sponsorships, sponsorshipInterests, financialLedger, prizePoolSnap, directAudits, relatedAudits] = await Promise.all([
     rows(access.db, "challengeParticipants", id),
     rows(access.db, "challengeEntryRequests", id),
     rows(access.db, "submissions", id),
@@ -33,6 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     rows(access.db, "winnerProposals", id, 50),
     rows(access.db, "challengeSettlements", id, 25),
     rows(access.db, "sponsorships", id, 100),
+    rows(access.db, "sponsorChallengeAgreements", id, 100),
     rows(access.db, "challengeFinancialLedger", id, 200),
     access.db.collection("prizePools").doc(id).get(),
     access.db.collection("auditLogs").where("targetId", "==", id).limit(100).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))).catch(() => []),
@@ -49,6 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     winnerProposals,
     settlements,
     sponsorships,
+    sponsorshipInterests,
     financialLedger: financialLedger.map((item) => ({ id: item.id, revenueType: item.revenueType ?? null, shareType: item.shareType ?? item.sourceType ?? null, amountCents: Number(item.amountCents ?? item.netAmountCents ?? 0), currency: item.currency ?? "usd", status: item.status ?? null, createdAt: item.createdAt ?? null })),
     prizePool: prizePoolSnap.exists ? { id: prizePoolSnap.id, ...prizePoolSnap.data() } : null,
     audits,

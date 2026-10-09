@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Chrome, Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
@@ -22,19 +22,16 @@ function getNextPath() {
   return safeInternalPath(new URLSearchParams(window.location.search).get("next"));
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const authState = useAuth();
   const [form, setForm] = useState({ email: "", password: "", rememberMe: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [nextPath, setNextPath] = useState("");
-
-  useEffect(() => {
-    setNextPath(getNextPath());
-  }, []);
+  const nextPath = safeInternalPath(searchParams.get("next"));
 
   async function routeAfterLogin() {
     const profile = await fetchBootstrapProfile();
@@ -135,4 +132,8 @@ export default function LoginPage() {
       </Card>
     </main>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense fallback={<main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 text-sm text-slate-300">Loading sign-in…</main>}><LoginForm /></Suspense>;
 }

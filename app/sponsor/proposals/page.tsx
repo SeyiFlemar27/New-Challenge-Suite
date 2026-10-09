@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileText, Search } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
 import { Card, EmptyState, LinkButton, inputClass } from "@/components/ui";
@@ -10,20 +11,13 @@ import { label, proposalStatuses } from "@/lib/sponsor-collaboration";
 type Proposal = Record<string, any> & { id: string };
 
 export default function SponsorProposalsPage() {
-  const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const queryResult = useQuery({ queryKey: ["sponsor-historical-proposals"], queryFn: async () => Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<{ proposals: Proposal[] }>("/api/sponsor/proposals")]) });
+  const profile = queryResult.data?.[0].data?.sponsorProfile ?? null;
+  const proposals = useMemo(() => queryResult.data?.[1].data?.proposals ?? [], [queryResult.data]);
   const [status, setStatus] = useState("all");
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  async function load() {
-    setLoading(true); setError("");
-    const [profileResult, proposalResult] = await Promise.all([apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"), apiRequest<{ proposals: Proposal[] }>("/api/sponsor/proposals")]);
-    if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
-    if (proposalResult.ok && proposalResult.data) setProposals(proposalResult.data.proposals); else setError(proposalResult.message || "Proposals could not be loaded.");
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, []);
+  const loading = queryResult.isLoading;
+  const error = queryResult.data?.[1].ok ? "" : queryResult.data?.[1].message || queryResult.error?.message || "";
   const filtered = useMemo(() => proposals.filter((item) => (status === "all" || item.status === status) && (!query || [item.title, item.objective].some((value) => String(value ?? "").toLowerCase().includes(query.toLowerCase())))), [proposals, query, status]);
 
   return <SponsorShell profile={profile}><div className="mx-auto max-w-7xl"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">Historical Proposals</p><h1 className="mt-2 break-words text-3xl font-black text-slate-950 sm:text-4xl">Previous sponsor proposals</h1><p className="mt-3 max-w-3xl break-words leading-7 text-slate-600">These records remain available for audit and reference. New sponsorship work starts with a campaign brief and a discovered opportunity.</p><LinkButton href="/sponsor/campaigns/create" variant="secondary" className="mt-5">Create Campaign Brief</LinkButton></div>

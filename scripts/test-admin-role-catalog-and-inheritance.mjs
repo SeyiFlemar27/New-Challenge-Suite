@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { read } from "./production-flow-test-utils.mjs";
-const source = read("lib/server/admin-permissions.ts");
-for (const role of ["platform_owner", "super_admin", "operations_admin", "finance_admin", "moderation_admin", "safety_admin", "support_admin", "sponsor_manager", "event_tournament_admin", "content_admin", "marketing_communications_admin", "analyst", "read_only_auditor", "technical_admin", "developer_support"]) assert(source.includes(`"${role}"`), `${role} missing`);
-assert(source.includes("platform_owner: [...ADMIN_PERMISSIONS]") && source.includes("super_admin: [...ADMIN_PERMISSIONS]"));
-assert(source.includes("resolveAdminPermissions"));
-console.log("admin role catalog and inheritance: ok");
+import { ADMIN_ROLES, resolveAdminPermissions, normalizeAdminRoleAssignments } from "../lib/server/admin-permissions.ts";
+assert.deepEqual(ADMIN_ROLES, ["admin"], "only the canonical Admin role is assignable");
+assert.deepEqual(normalizeAdminRoleAssignments(["support_admin", "finance_admin"]), ["admin"], "legacy assigned roles normalize to one Admin identity");
+const support = resolveAdminPermissions(["support_admin"]);
+assert.ok(support.includes("tickets.resolve"), "legacy support access is retained as a permission");
+assert.ok(!support.includes("refunds.execute"), "legacy support access does not gain financial permissions");
+assert.ok(resolveAdminPermissions(["finance_admin"]).includes("refunds.execute"), "legacy finance permission is retained during migration");
+console.log("PASS single Admin role and legacy permission compatibility");

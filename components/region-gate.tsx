@@ -1,36 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button, Card } from "./ui";
 import { allowedRegions } from "@/lib/legal";
 import type { RegionCode } from "@/lib/types";
 
+function getStoredRegion() {
+  const cookieRegion = document.cookie.split("; ").find((row) => row.startsWith("challenge-suite-region="))?.split("=")[1];
+  return cookieRegion || localStorage.getItem("challenge-suite-region");
+}
+
+function subscribeRegion(onChange: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === "challenge-suite-region") onChange(); };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("challenge-suite-region-change", onChange);
+  return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("challenge-suite-region-change", onChange); };
+}
+
 export function RegionGate({ children }: { children: React.ReactNode }) {
-  const [region, setRegion] = useState<string | null>(null);
-  const [ipRegion, setIpRegion] = useState<string>("Unknown");
+  const storedRegion = useSyncExternalStore(subscribeRegion, getStoredRegion, () => null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const region = searchParams.get("region") || storedRegion;
+  const [ipRegion, setIpRegion] = useState<string>("Unknown");
 
   useEffect(() => {
-    const cookieRegion = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("challenge-suite-region="))
-      ?.split("=")[1];
-    const queryRegion = searchParams.get("region");
-    const stored = queryRegion || cookieRegion || localStorage.getItem("challenge-suite-region");
-    if (stored) setRegion(stored);
     fetch("/api/compliance/region")
       .then((response) => response.json())
       .then((data) => setIpRegion(data.country ?? "Unknown"))
       .catch(() => setIpRegion("Unknown"));
-  }, [searchParams]);
+  }, []);
 
   function chooseRegion(nextRegion: RegionCode) {
     localStorage.setItem("challenge-suite-region", nextRegion);
     document.cookie = `challenge-suite-region=${nextRegion}; path=/; max-age=31536000; samesite=lax`;
-    setRegion(nextRegion);
+    window.dispatchEvent(new Event("challenge-suite-region-change"));
     const params = new URLSearchParams(searchParams.toString());
     params.set("region", nextRegion);
     router.replace(`${pathname}?${params.toString()}`);

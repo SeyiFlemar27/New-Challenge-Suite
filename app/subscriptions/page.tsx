@@ -37,7 +37,7 @@ export default function SubscriptionsPage() {
     setLoading(false);
   }
 
-  useEffect(() => { void loadPlans(); }, []);
+  useEffect(() => { void Promise.resolve().then(loadPlans); }, []);
 
   async function checkout(planId: string) {
     setLoadingPlan(planId);
@@ -50,7 +50,7 @@ export default function SubscriptionsPage() {
       return;
     }
     setCheckoutMessage((result.data as any).mode === "mock" || (result.data as any).developmentOnly ? result.message || "Development checkout started. No payment will be processed and no subscription will be activated." : "Checkout started. Your plan updates after Stripe webhook confirmation.");
-    window.location.href = result.data.url;
+    window.location.assign(result.data.url);
   }
 
   return (

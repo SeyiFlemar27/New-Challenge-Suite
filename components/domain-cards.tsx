@@ -1,3 +1,4 @@
+import { ContentImage } from "@/components/content-image";
 ﻿import Link from "next/link";
 import { CalendarDays, Heart, Star, Trophy, Users, Crown, LockKeyhole } from "lucide-react";
 import type { Challenge, Submission, UserPlanId } from "@/lib/types";
@@ -20,7 +21,7 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
     <Card className="group flex h-full flex-col overflow-hidden bg-[#171717] transition hover:border-[var(--gold)]/35">
       <Link href={`/challenges/${challenge.id}`} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View details for ${challenge.title}`}>
         <div className="relative aspect-[16/10] overflow-hidden">
-          {imageUrl ? <img src={imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827] px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite</div>}
+          {imageUrl ? <ContentImage src={imageUrl} alt={challenge.title} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827] px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite</div>}
           <span className="absolute right-4 top-4 max-w-[calc(100%-2rem)] rounded-full bg-black/80 px-3 py-2 text-[11px] font-black uppercase tracking-[.12em] text-white backdrop-blur">{challenge.category}</span>
           <span className={`absolute bottom-4 right-4 max-w-[calc(100%-2rem)] rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] ${statusClassName(displayStatus)}`}>{displayStatus}</span>
           {challenge.type === "Private / Exclusive" ? <span className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-yellow-500 px-3 py-2 text-xs font-black text-black"><LockKeyhole size={13} /> Invite-only</span> : null}
@@ -57,7 +58,7 @@ export function SubmissionCard({ submission }: { submission: SubmissionWithProfi
         <span className="rounded-[8px] border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-xs font-black uppercase text-[var(--gold)]">{submission.challengeTitle}</span>
       </div>
       <Link href={`/submissions/${submission.id}`}>
-        <img src={submission.mediaUrl} alt={submission.title} className="h-[420px] w-full object-cover" />
+        <ContentImage src={submission.mediaUrl} alt={submission.title} className="h-[420px] w-full object-cover" />
       </Link>
       <div className="flex items-center justify-between p-6">
         <div className="flex gap-4">
@@ -78,7 +79,7 @@ export function WinnerCard({ submission }: { submission: SubmissionWithProfile }
     <Card className="group flex h-full flex-col overflow-hidden bg-[#0f141d] transition hover:border-[var(--gold)]/35">
       <Link href={`/winners/${submission.id}`} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View winner ${submission.userName}`}>
         <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(246,198,75,.18),transparent_45%),#111827]">
-          {visualUrl ? <img src={visualUrl} alt={submission.title || submission.challengeTitle || "Winning submission"} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" /> : <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite Winner</div>}
+          {visualUrl ? <ContentImage src={visualUrl} alt={submission.title || submission.challengeTitle || "Winning submission"} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" /> : <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-black uppercase tracking-[0.16em] text-[var(--gold)]">Challenge Suite Winner</div>}
           <span className="absolute left-3 top-3 flex items-center gap-2 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black uppercase tracking-[.1em] text-black"><Trophy size={14} /> Winner</span>
           {rank ? <span className="absolute bottom-3 right-3 rounded-full bg-black/80 px-3 py-2 text-[11px] font-black uppercase tracking-[.12em] text-white">Rank #{rank}</span> : null}
         </div>

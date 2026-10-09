@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
-const proposals=read("app/api/sponsor/proposals/route.ts"), dashboard=read("app/api/sponsor/dashboard/route.ts"), reporting=read("lib/server/sponsor-reporting.ts");
-assert(proposals.includes('requireSponsorContext') && proposals.includes('sponsorProposals'));
-assert(dashboard.includes('sponsorProposals') && reporting.includes('proposalsAwaitingReview'));
-assert(proposals.includes('paymentReleaseStatus: "not_active"'));
-console.log("Phase 7 sponsor proposal checks passed.");
+const proposals = read("app/api/sponsor/proposals/route.ts");
+const dashboard = read("app/api/sponsor/dashboard/route.ts");
+const reporting = read("lib/server/sponsor-reporting.ts");
+assert.match(proposals, /requireSponsorContext[\s\S]*?collection\("sponsorProposals"\)/);
+assert.match(proposals, /export async function POST[\s\S]*?410[\s\S]*?SPONSOR_PROPOSAL_CREATION_RETIRED/);
+assert.doesNotMatch(proposals, /batch\.create|runTransaction|\.add\(|\.set\(/);
+assert(dashboard.includes("sponsorProposals") && reporting.includes("proposalsAwaitingReview"), "historical proposal records remain available to authorized Sponsor reporting");
+console.log("Historical Sponsor proposal compatibility checks passed.");

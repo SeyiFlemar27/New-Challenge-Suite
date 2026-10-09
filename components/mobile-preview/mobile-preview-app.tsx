@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
@@ -63,7 +64,7 @@ export function MobilePreviewApp() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 xl:flex-row xl:items-start xl:justify-center">
         <aside className="max-w-md pt-4 text-center xl:sticky xl:top-10 xl:text-left">
           <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-yellow-500/40 bg-yellow-500/10 xl:mx-0">
-            <img src={logoUrl} alt="Challenge Suite" className="h-16 w-16 rounded-full object-cover" />
+            <ContentImage src={logoUrl} alt="Challenge Suite" className="h-16 w-16 rounded-full object-cover" />
           </div>
           <p className="text-sm font-black uppercase tracking-[0.24em] text-[var(--gold)]">Mobile Preview</p>
           <h1 className="mt-4 text-4xl font-black leading-tight md:text-5xl">Challenge Suite in your pocket.</h1>

@@ -1,7 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Bookmark, ChevronDown, Coins, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -27,9 +28,10 @@ type ChallengeGuideSection = "overview" | "rules" | "submission" | "voting" | "p
 
 export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const challengeId = params.id;
   const { user } = useCurrentUser();
-  const [saved, setSaved] = useState(false);
+  const [savedOverride, setSavedOverride] = useState<boolean | null>(null);
   const [engagementMessage, setEngagementMessage] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
   const [commentBody, setCommentBody] = useState("");
@@ -38,7 +40,6 @@ export default function ChallengeDetailPage() {
   const [guideSection, setGuideSection] = useState<ChallengeGuideSection>("overview");
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
-  const [paymentReturnState, setPaymentReturnState] = useState<"" | "processing" | "canceled">("");
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["challenge-details", challengeId],
     queryFn: () => fetchChallengeDetails(challengeId),
@@ -47,21 +48,18 @@ export default function ChallengeDetailPage() {
   });
 
   const details = data?.ok ? data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
   const challengeTranslations = ((details?.challenge as Record<string, unknown> | undefined)?.translations ?? {}) as { title?: DynamicTranslations; description?: DynamicTranslations };
   const challengeSubmissions = useMemo(() => {
     if (!challenge) return [];
     return (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id);
   }, [challenge, details?.submissions]);
 
-  useEffect(() => {
-    setSaved(Boolean(details?.userState?.saved));
-  }, [details?.userState]);
-
-  useEffect(() => {
-    const payment = new URLSearchParams(window.location.search).get("payment");
-    if (payment === "processing" || payment === "canceled") setPaymentReturnState(payment);
-  }, []);
+  const saved = savedOverride ?? Boolean(details?.userState?.saved);
+  const paymentValue = searchParams.get("payment");
+  const paymentReturnState = paymentValue === "processing" || paymentValue === "canceled" ? paymentValue : "";
+  const waitingSubmissionStart = (details as any)?.phaseSummary?.submissionStartAt;
+  const participantJourneyStep = (details as any)?.userState?.participantJourney?.step;
 
   useEffect(() => {
     if (paymentReturnState !== "processing") return;
@@ -75,11 +73,8 @@ export default function ChallengeDetailPage() {
   }, [paymentReturnState, refetch]);
 
   useEffect(() => {
-    const runtimeDetails = details as any;
-    const journey = runtimeDetails?.userState?.participantJourney;
-    const start = runtimeDetails?.phaseSummary?.submissionStartAt;
-    if (journey?.step !== "entered_waiting_submission" || !start) return;
-    const openAt = new Date(String(start)).getTime();
+    if (participantJourneyStep !== "entered_waiting_submission" || !waitingSubmissionStart) return;
+    const openAt = new Date(String(waitingSubmissionStart)).getTime();
     if (!Number.isFinite(openAt)) return;
     const delay = openAt - Date.now();
     if (delay <= 0) {
@@ -88,7 +83,7 @@ export default function ChallengeDetailPage() {
     }
     const timer = window.setTimeout(() => void refetch(), Math.min(delay + 500, 2_147_483_647));
     return () => window.clearTimeout(timer);
-  }, [(details as any)?.phaseSummary?.submissionStartAt, (details as any)?.userState?.participantJourney, refetch]);
+  }, [participantJourneyStep, refetch, waitingSubmissionStart]);
   useEffect(() => {
     if (!challengeId) return;
     void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
@@ -105,7 +100,7 @@ export default function ChallengeDetailPage() {
       setEngagementMessage(result.message);
       return;
     }
-    if (action === "save_challenge") setSaved(enabled);
+    if (action === "save_challenge") setSavedOverride(enabled);
     setEngagementMessage(result.message);
   }
 
@@ -194,7 +189,6 @@ export default function ChallengeDetailPage() {
   const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
   const isLiveEvent = challengeKind.includes("live_event") || challengeKind.includes("live event");
-  const creatorSuiteUrl = String((challenge as any).creatorSuiteUrl ?? (challenge as any).livestreamUrl ?? (challenge as any).livestreamEmbedUrl ?? "");
   const topParticipants = ((details as { topParticipants?: PublicChallengeParticipant[] } | null)?.topParticipants ?? []).slice(0, 5);
   const rawChallenge = details?.challenge as Record<string, any> | undefined;
   const monetization = rawChallenge?.monetization && typeof rawChallenge.monetization === "object" ? rawChallenge.monetization as Record<string, any> : {};
@@ -227,7 +221,7 @@ export default function ChallengeDetailPage() {
     { id: "overview", label: "Overview", body: challenge.description },
     { id: "rules", label: "Rules & Eligibility", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join(" ") : challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}.` : "Open to eligible platform users in supported regions." },
     { id: "submission", label: "Submission", body: `Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow the published challenge rules and be submitted before the deadline.` },
-    { id: "voting", label: "Voting & Judging", body: votingOpen ? "Voting is open for eligible submissions. One daily free vote and Challenge Credit additional votes remain separate actions." : phase === "voting_pending" ? "Voting becomes available when eligible submissions are approved." : "Voting follows the published challenge schedule and eligibility rules." },
+    { id: "voting", label: "Voting & Judging", body: votingOpen ? "Voting is open for eligible submissions. One daily free vote and DoroCoin additional votes remain separate actions." : phase === "voting_pending" ? "Voting becomes available when eligible submissions are approved." : "Voting follows the published challenge schedule and eligibility rules." },
     { id: "prizes", label: "Prizes", body: `${prizeStatusLabel}. ${Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `Published prize pool: ${prizeValue}.` : "No public prize amount is available."}` },
     { id: "leaderboard", label: "Leaderboard", body: leaderboardRelevant ? "The leaderboard is available below and contains eligible entries only." : "Leaderboard becomes available when voting opens." }
   ];
@@ -327,7 +321,7 @@ export default function ChallengeDetailPage() {
               </div>
               {commentMessage ? <p className="mt-3 text-sm text-slate-300">{commentMessage}</p> : null}</>}
               <div className="mt-6 space-y-3">
-                {comments.length ? comments.map((comment) => { const profileHref = comment.username ? `/profile/${comment.username}` : "/profile"; const name = comment.displayName || "Challenge Suite member"; return <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-3"><a href={profileHref} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-xs font-black text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View ${name} profile`}>{comment.avatarUrl ? <img src={comment.avatarUrl} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</a><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]"><a href={profileHref} className="break-words hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{name}</a><PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div>{comment.username ? <p className="text-xs text-slate-500">@{comment.username}</p> : null}</div></div><p className="mt-3 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>; }) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
+                {comments.length ? comments.map((comment) => { const profileHref = comment.username ? `/profile/${comment.username}` : "/profile"; const name = comment.displayName || "Challenge Suite member"; return <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-3"><a href={profileHref} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-xs font-black text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View ${name} profile`}>{comment.avatarUrl ? <ContentImage src={comment.avatarUrl} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</a><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]"><a href={profileHref} className="break-words hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{name}</a><PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div>{comment.username ? <p className="text-xs text-slate-500">@{comment.username}</p> : null}</div></div><p className="mt-3 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>; }) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
               </div>
             </Card> : null}
           </section>
@@ -351,18 +345,13 @@ export default function ChallengeDetailPage() {
             {predictionAccess.windowOpen ? <LinkButton href={`/challenges/${challenge.id}/prediction`} className="mt-5 w-full">Enter Prediction Arena</LinkButton> : <Button className="mt-5 w-full" disabled>Locked</Button>}<p className="mt-3 text-xs leading-5 text-slate-500">{predictionAccess.windowOpen ? "Predictions close when voting opens." : "New stakes and participant changes are closed. Awaiting official results."}</p>
           </Card> : null}
 
-          {isLiveEvent ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7">
-            <h3 className="text-xl font-black">Live Event Stream</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-300">This event will stream through Creator Suite.</p>
-            {creatorSuiteUrl ? <a href={creatorSuiteUrl} className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-[8px] bg-[var(--gold)] px-5 py-3 text-sm font-black text-black" target="_blank" rel="noreferrer">Open Creator Suite</a> : <Button className="mt-5 w-full" disabled>Creator Suite link not available yet</Button>}
-          </Card> : null}
           <Card id="vote" className="p-5 sm:p-8">
             <h3 className="text-xl font-black">Information & Rules</h3>
             {challenge.rules.length ? challenge.rules.map((rule) => <p key={rule.id} className="mt-3 text-slate-300">- {rule.editableText}</p>) : <p className="mt-3 text-slate-300">Rules have not been published for this challenge yet.</p>}
             <div className="mt-5">
               {votingOpen && eligibleSubmissionCount > 0 ? <LinkButton href={`/challenges/${challenge.id}/votes`} className="w-full"><Vote size={17} /> View Voting</LinkButton> : <Button className="w-full" disabled><Vote size={17} /> {eligibleSubmissionCount <= 0 ? "Voting Unavailable" : lifecycle.votingStatus === "voting_not_open" ? "Voting Not Open" : lifecycle.votingStatus === "voting_not_enabled" ? "Voting Unavailable" : "Voting Closed"}</Button>}
             </div>
-            {votingOpen && eligibleSubmissionCount > 0 ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Additional Votes</p><p className="mt-2 text-xs leading-5 text-slate-400">Additional votes cost 10 Challenge Credits each and count only under this challenge&apos;s voting rules.</p><LinkButton href={`/challenges/${challenge.id}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use Challenge Credits</LinkButton></div> : <p className="mt-4 text-sm text-slate-400">{eligibleSubmissionCount <= 0 ? "No eligible submissions are available for voting yet." : "Additional votes become available when voting opens."}</p>}
+            {votingOpen && eligibleSubmissionCount > 0 ? <div className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.03] p-4"><p className="text-sm font-black text-[var(--gold)]">Additional Votes</p><p className="mt-2 text-xs leading-5 text-slate-400">Additional votes cost 5 DoroCoins each and count only under this challenge&apos;s voting rules.</p><LinkButton href={`/challenges/${challenge.id}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use DoroCoins</LinkButton></div> : <p className="mt-4 text-sm text-slate-400">{eligibleSubmissionCount <= 0 ? "No eligible submissions are available for voting yet." : "Additional votes become available when voting opens."}</p>}
           </Card>
         </aside>
       </div>

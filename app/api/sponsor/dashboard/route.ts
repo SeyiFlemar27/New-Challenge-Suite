@@ -33,8 +33,8 @@ export async function GET(request: Request) {
       db.collection("sponsorDeliverables").where("sponsorId", "==", sponsorId).limit(100).get(),
       db.collection("sponsorWallets").doc(sponsorId).get(),
       db.collection("sponsorAnalyticsSnapshots").where("sponsorId", "==", sponsorId).limit(50).get(),
-      db.collection("challenges").limit(150).get(),
-      db.collection("profiles").limit(150).get()
+      db.collection("challenges").where("visibility", "==", "public").where("sponsorEnabled", "==", true).where("status", "in", ["approved", "published", "scheduled", "registration_open", "active", "submission_open", "voting_open"]).orderBy("createdAt", "desc").limit(150).get(),
+      db.collection("profiles").where("sponsorReadyEnabled", "==", true).limit(150).get()
     ]);
     const widgetErrors: Record<string, string> = {};
     const docs = (index: number) => {

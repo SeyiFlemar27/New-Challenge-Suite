@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ArrowRight, CircleAlert, Handshake, LineChart, RefreshCw, WalletCards } from "lucide-react";
 import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
@@ -22,23 +24,14 @@ type DashboardResponse = {
 };
 
 export default function SponsorDashboardPage() {
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">("challenges");
-
-  async function load() {
-    setLoading(true); setError("");
-    const result = await apiRequest<DashboardResponse>("/api/sponsor/dashboard");
-    if (result.ok && result.data) setDashboard(result.data);
-    else setError(result.message || "Sponsor Studio could not be loaded.");
-    setLoading(false);
-  }
-  useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get("opportunities");
-    if (tab === "creators") setOpportunityTab("creators");
-    void load();
-  }, []);
+  const searchParams = useSearchParams();
+  const initialOpportunityTab = searchParams.get("opportunities");
+  const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">(initialOpportunityTab === "creators" ? "creators" : "challenges");
+  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard"], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false });
+  const reloadDashboard = async () => { await dashboardQuery.refetch(); };
+  const dashboard = dashboardQuery.data?.ok ? dashboardQuery.data.data ?? null : null;
+  const loading = dashboardQuery.isLoading;
+  const error = dashboardQuery.data && !dashboardQuery.data.ok ? dashboardQuery.data.message || "Sponsor Studio could not be loaded." : "";
 
   function selectTab(tab: "challenges" | "creators") {
     setOpportunityTab(tab);
@@ -58,7 +51,7 @@ export default function SponsorDashboardPage() {
 
     {historicalOnly ? <div className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50 px-5 py-4"><p className="font-black text-amber-950">Historical records only</p><p className="mt-1 text-sm leading-6 text-amber-900">This Sponsor Organization is restricted. Existing sponsorships, reports, analytics and wallet history remain available, but new proposals and funding actions are disabled.</p></div> : null}
 
-    {error ? <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-red-200 bg-red-50 px-5 py-4"><p className="text-sm font-bold text-red-800">{error}</p><Button variant="secondary" onClick={() => void load()}><RefreshCw size={16} /> Try Again</Button></div> : null}
+    {error ? <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-red-200 bg-red-50 px-5 py-4"><p className="text-sm font-bold text-red-800">{error}</p><Button variant="secondary" onClick={() => void dashboardQuery.refetch()}><RefreshCw size={16} /> Try Again</Button></div> : null}
 
     <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sponsor Studio metrics">
       <Metric title="Active Sponsorships" value={String(metrics.activeSponsorships)} detail="Active and scheduled partnerships" />
@@ -69,18 +62,18 @@ export default function SponsorDashboardPage() {
 
     <div className="mt-9 grid gap-9 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)]">
       <section><SectionTitle title="Needs Attention" href={dashboard?.attention.length === 5 ? "/sponsor/dashboard?view=attention" : undefined} />
-        {dashboard?.widgetErrors?.proposals || dashboard?.widgetErrors?.deliverables ? <WidgetError message="Some attention items could not be loaded." retry={load} /> : null}
-        {!historicalOnly && dashboard?.attention.length ? <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{dashboard.attention.map((item) => <div key={item.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-black text-slate-950">{item.title}</p><p className="mt-1 text-sm font-bold text-amber-800">{item.context}</p><p className="mt-1 text-sm leading-6 text-slate-600">{item.reason}</p>{item.deadline ? <p className="mt-1 text-xs text-slate-500">Due {date(item.deadline)}</p> : null}</div><LinkButton href={item.href} variant="ghost">{item.actionLabel} <ArrowRight size={15} /></LinkButton></div>)}</div> : <EmptyState icon={<CircleAlert />} title="Nothing needs your attention" body="New proposal responses, funding actions and deliverable reviews will appear here." />}
+        {dashboard?.widgetErrors?.proposals || dashboard?.widgetErrors?.deliverables ? <WidgetError message="Some attention items could not be loaded." retry={reloadDashboard} /> : null}
+        {!historicalOnly && dashboard?.attention.length ? <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{dashboard.attention.map((item) => <div key={item.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-black text-slate-950">{item.title}</p><p className="mt-1 text-sm font-bold text-amber-800">{item.context}</p><p className="mt-1 text-sm leading-6 text-slate-600">{item.reason}</p>{item.deadline ? <p className="mt-1 text-xs text-slate-500">Due {date(item.deadline)}</p> : null}</div><LinkButton href={item.href} variant="ghost">{item.actionLabel} <ArrowRight size={15} /></LinkButton></div>)}</div> : <EmptyState icon={<CircleAlert />} title="Nothing needs your attention" body="Funding actions and deliverable reviews will appear here." />}
       </section>
 
       <section><SectionTitle title="Active Sponsorships" href="/sponsor/sponsorships" />
-        {dashboard?.widgetErrors?.sponsorships ? <WidgetError message="Sponsorships could not be loaded." retry={load} /> : dashboard?.sponsorships.length ? <div className="mt-3 space-y-3">{dashboard.sponsorships.map((item) => <Card key={item.id} className="p-4 shadow-none"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-black text-slate-950">{String(item.challengeTitle ?? item.title ?? "Sponsorship")}</p><p className="mt-1 text-xs font-bold uppercase text-amber-800">{label(item.status)}</p><p className="mt-2 text-sm text-slate-600">{label(item.sponsorRole ?? "supporting")} Sponsor</p></div><Handshake className="shrink-0 text-amber-700" size={19} /></div><Link href={"/sponsor/sponsorships/" + item.id} className="mt-4 inline-flex min-h-10 items-center text-sm font-black text-slate-950">View Sponsorship <ArrowRight className="ml-1" size={15} /></Link></Card>)}</div> : <div className="mt-3 rounded-[8px] bg-[#DCD9D2]/60 p-5"><p className="font-black text-slate-950">No active sponsorships yet.</p><p className="mt-2 text-sm leading-6 text-slate-600">Discover sponsorship-ready Challenges and Creators to start your first partnership.</p>{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges" className="mt-4">Discover Opportunities</LinkButton>}</div>}
+        {dashboard?.widgetErrors?.sponsorships ? <WidgetError message="Sponsorships could not be loaded." retry={reloadDashboard} /> : dashboard?.sponsorships.length ? <div className="mt-3 space-y-3">{dashboard.sponsorships.map((item) => <Card key={item.id} className="p-4 shadow-none"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-black text-slate-950">{String(item.challengeTitle ?? item.title ?? "Sponsorship")}</p><p className="mt-1 text-xs font-bold uppercase text-amber-800">{label(item.status)}</p><p className="mt-2 text-sm text-slate-600">{label(item.sponsorRole ?? "supporting")} Sponsor</p></div><Handshake className="shrink-0 text-amber-700" size={19} /></div><Link href={"/sponsor/sponsorships/" + item.id} className="mt-4 inline-flex min-h-10 items-center text-sm font-black text-slate-950">View Sponsorship <ArrowRight className="ml-1" size={15} /></Link></Card>)}</div> : <div className="mt-3 rounded-[8px] bg-[#DCD9D2]/60 p-5"><p className="font-black text-slate-950">No active sponsorships yet.</p><p className="mt-2 text-sm leading-6 text-slate-600">Discover sponsorship-ready Challenges and Creators to start your first partnership.</p>{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges" className="mt-4">Discover Opportunities</LinkButton>}</div>}
       </section>
     </div>
 
     {historicalOnly ? null : <section className="mt-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-2xl font-black text-slate-950">Recommended Opportunities</h2><p className="mt-1 text-sm text-slate-600">Real sponsorship-ready records from Discover.</p></div><Link href={"/sponsor/discover?tab=" + opportunityTab} className="text-sm font-black text-amber-800">Discover all</Link></div>
       <div className="mt-4 inline-flex rounded-[8px] bg-slate-100 p-1" role="tablist" aria-label="Opportunity type">{(["challenges","creators"] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={opportunityTab === tab} onClick={() => selectTab(tab)} className={"min-h-10 rounded-[6px] px-5 text-sm font-black capitalize " + (opportunityTab === tab ? "bg-white text-slate-950 shadow-sm" : "text-slate-600")}>{tab}</button>)}</div>
-      {dashboard?.widgetErrors?.[opportunityTab] ? <WidgetError message={opportunityTab + " could not be loaded."} retry={load} /> : opportunities.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{opportunities.map((item) => <Link key={item.id} href={item.href} className="min-w-0 rounded-[8px] border border-slate-200 bg-white p-5 transition hover:border-amber-400"><p className="text-xs font-black uppercase text-amber-800">{item.category || (opportunityTab === "challenges" ? "Challenge" : "Creator")}</p><h3 className="mt-2 line-clamp-2 font-black text-slate-950">{item.title || item.displayName}</h3>{item.creatorName ? <p className="mt-2 truncate text-sm text-slate-600">{item.creatorName}</p> : null}<span className="mt-5 inline-flex items-center text-sm font-black">View {opportunityTab === "challenges" ? "Opportunity" : "Creator"} <ArrowRight className="ml-1" size={15} /></span></Link>)}</div> : <div className="mt-4 rounded-[8px] border border-slate-200 bg-white p-6 text-sm text-slate-600">No matching {opportunityTab} are available right now.</div>}
+      {dashboard?.widgetErrors?.[opportunityTab] ? <WidgetError message={opportunityTab + " could not be loaded."} retry={reloadDashboard} /> : opportunities.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{opportunities.map((item) => <Link key={item.id} href={item.href} className="min-w-0 rounded-[8px] border border-slate-200 bg-white p-5 transition hover:border-amber-400"><p className="text-xs font-black uppercase text-amber-800">{item.category || (opportunityTab === "challenges" ? "Challenge" : "Creator")}</p><h3 className="mt-2 line-clamp-2 font-black text-slate-950">{item.title || item.displayName}</h3>{item.creatorName ? <p className="mt-2 truncate text-sm text-slate-600">{item.creatorName}</p> : null}<span className="mt-5 inline-flex items-center text-sm font-black">View {opportunityTab === "challenges" ? "Opportunity" : "Creator"} <ArrowRight className="ml-1" size={15} /></span></Link>)}</div> : <div className="mt-4 rounded-[8px] border border-slate-200 bg-white p-6 text-sm text-slate-600">No matching {opportunityTab} are available right now.</div>}
     </section>}
 
     <section className="mt-10 border-t border-slate-200 pt-8"><SectionTitle title="Performance Snapshot" href="/sponsor/analytics" />

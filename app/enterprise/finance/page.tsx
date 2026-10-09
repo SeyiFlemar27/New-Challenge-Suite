@@ -1,1 +1,5 @@
-import { EnterpriseSectionPage } from "@/components/enterprise/enterprise-section-page"; export default function Page() { return <EnterpriseSectionPage kind="finance" />; }
+import { EnterpriseFinancePage } from "@/components/enterprise/enterprise-finance-page";
+
+export default function Page() {
+  return <EnterpriseFinancePage />;
+}

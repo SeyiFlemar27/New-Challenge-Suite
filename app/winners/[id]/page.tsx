@@ -1,4 +1,5 @@
 ﻿"use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -66,7 +67,7 @@ export default function WinnerDetailPage() {
         <div className="grid gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
           <div className="space-y-6">
             <Card className="overflow-hidden">
-              {winnerMediaUrl ? <img src={winnerMediaUrl} alt={winner.title || challenge?.title || "Winning submission"} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" /> : <div className="flex h-[280px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] px-6 text-center text-xl font-black text-[var(--gold)] sm:h-[360px] sm:text-2xl lg:h-[420px]">Challenge Suite Winner</div>}
+              {winnerMediaUrl ? <ContentImage src={winnerMediaUrl} alt={winner.title || challenge?.title || "Winning submission"} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" /> : <div className="flex h-[280px] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,217,10,.18),transparent_45%),#111] px-6 text-center text-xl font-black text-[var(--gold)] sm:h-[360px] sm:text-2xl lg:h-[420px]">Challenge Suite Winner</div>}
               <div className="p-5 sm:p-7">
                 <PageTitle title={winner.title} subtitle={String(winnerMeta?.caption ?? winner.description ?? "Winning submission")} icon={<Trophy className="text-[var(--gold)]" />} />
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -97,7 +98,7 @@ export default function WinnerDetailPage() {
           <div className="space-y-6">
             <Card className="p-5 sm:p-6">
               <a href={profileHref} className="flex min-w-0 items-center gap-4 rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View ${winnerName} profile`}>
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-base font-black text-black sm:h-16 sm:w-16 sm:text-lg">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : profile?.initials ?? winner.userInitials}</div>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-base font-black text-black sm:h-16 sm:w-16 sm:text-lg">{profile?.avatarUrl ? <ContentImage src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : profile?.initials ?? winner.userInitials}</div>
                 <div className="min-w-0">
                   <h2 className="break-words text-xl font-black sm:text-2xl">{winnerName}</h2>
                   {profile?.username ? <p className="text-sm text-slate-400">@{profile.username}</p> : null}

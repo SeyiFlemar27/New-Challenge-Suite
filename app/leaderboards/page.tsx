@@ -1,6 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Crown, Medal, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -24,12 +26,14 @@ function stateLabel(payload: Payload | null) {
   return "Live Standings";
 }
 
-export default function LeaderboardsPage() {
-  const [board, setBoard] = useState<Board>("global");
-  const [period, setPeriod] = useState<Period>("all");
-  const [challengeId, setChallengeId] = useState("");
-  const [page, setPage] = useState(1);
-  useEffect(() => { const params = new URLSearchParams(window.location.search); const nextBoard = params.get("board"); if (nextBoard === "challenge" || nextBoard === "tournament") setBoard(nextBoard); const nextPeriod = params.get("period"); if (nextPeriod === "week" || nextPeriod === "month") setPeriod(nextPeriod); setChallengeId(params.get("challengeId") ?? ""); setPage(Math.max(1, Number(params.get("page") ?? 1) || 1)); }, []);
+function LeaderboardsContent() {
+  const searchParams = useSearchParams();
+  const boardParam = searchParams.get("board");
+  const periodParam = searchParams.get("period");
+  const [board, setBoard] = useState<Board>(boardParam === "challenge" || boardParam === "tournament" ? boardParam : "global");
+  const [period, setPeriod] = useState<Period>(periodParam === "week" || periodParam === "month" ? periodParam : "all");
+  const [challengeId, setChallengeId] = useState(searchParams.get("challengeId") ?? "");
+  const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page") ?? 1) || 1));
   const canLoad = board === "global" || challengeId.trim().length > 0;
   const query = useQuery({ queryKey: ["leaderboards", { board, period, challengeId, page }], queryFn: () => fetchLeaderboards(board, { type: board, challengeId: challengeId.trim() || undefined, period, page }), enabled: canLoad, staleTime: 15_000, refetchInterval: 30_000 });
   const payload = query.data?.ok ? query.data.data as Payload : null;
@@ -58,4 +62,8 @@ export default function LeaderboardsPage() {
 }
 
 function Podium({ row }: { row: Row }) { const first = row.rank === 1; return <Card className={`p-5 text-center ${first ? "sm:order-none sm:min-h-[310px] border-[var(--gold)]/50" : "sm:min-h-[270px]"}`}><div className={`mx-auto ${first ? "h-20 w-20" : "h-16 w-16"}`}><Avatar row={row} large /></div><p className={`mt-4 font-black ${row.rank === 1 ? "text-[var(--gold)]" : row.rank === 2 ? "text-slate-300" : "text-amber-700"}`}>{first ? <Crown className="mx-auto mb-1" size={20} /> : <Medal className="mx-auto mb-1" size={18} />}{ordinal(row.rank)}</p><h2 className="mt-2 break-words text-xl font-black">{row.displayName}</h2><p className="mt-3 text-3xl font-black">{Number(row.points ?? 0).toLocaleString()}</p><p className="text-xs text-slate-400">points</p></Card>; }
-function Avatar({ row, large = false }: { row: Row; large?: boolean }) { return <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] font-black text-black ${large ? "h-full w-full text-lg" : "h-11 w-11 text-xs"}`}>{row.avatarUrl ? <img src={row.avatarUrl} alt="" className="h-full w-full object-cover" /> : row.initials ?? row.displayName.slice(0, 2).toUpperCase()}</span>; }
+function Avatar({ row, large = false }: { row: Row; large?: boolean }) { return <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] font-black text-black ${large ? "h-full w-full text-lg" : "h-11 w-11 text-xs"}`}>{row.avatarUrl ? <ContentImage src={row.avatarUrl} alt="" className="h-full w-full object-cover" /> : row.initials ?? row.displayName.slice(0, 2).toUpperCase()}</span>; }
+
+export default function LeaderboardsPage() {
+  return <Suspense fallback={<AppShell><div className="mx-auto max-w-[1400px] py-12 text-center text-slate-400">Loading standings…</div></AppShell>}><LeaderboardsContent /></Suspense>;
+}

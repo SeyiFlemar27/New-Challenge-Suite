@@ -207,9 +207,9 @@ const submissions: SeedDoc[] = [
 ];
 
 const doroPackages: SeedDoc[] = [
-  { id: "doro_50", name: "Starter", coins: 50, price: 1.99, bestFor: "Quick votes", description: "A small pack for trying DoroCoin voting.", status: "active", sortOrder: 1, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_50 ?? null, createdAt: iso(-1), updatedAt: iso(-1) },
-  { id: "doro_100", name: "Popular", coins: 100, price: 7.99, bestFor: "Vote packs", description: "A balanced pack for challenge voters.", status: "active", sortOrder: 2, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_100 ?? null, createdAt: iso(-1), updatedAt: iso(-1) },
-  { id: "doro_500", name: "Power", coins: 500, price: 19.99, bestFor: "Boosts and voting", description: "Best for boosts, vote runs, and premium entries.", status: "active", sortOrder: 3, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_500 ?? null, createdAt: iso(-1), updatedAt: iso(-1) }
+  { id: "doro_50", name: "Starter", coins: 199, baseCoins: 199, bonusCoins: 0, price: 1.99, bestFor: "Quick votes", description: "A small pack for trying DoroCoin voting.", status: "active", sortOrder: 1, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_50 ?? null, createdAt: iso(-1), updatedAt: iso(-1) },
+  { id: "doro_100", name: "Popular", coins: 799, baseCoins: 799, bonusCoins: 0, price: 7.99, bestFor: "Vote packs", description: "A balanced pack for challenge voters.", status: "active", sortOrder: 2, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_100 ?? null, createdAt: iso(-1), updatedAt: iso(-1) },
+  { id: "doro_500", name: "Power", coins: 1999, baseCoins: 1999, bonusCoins: 0, price: 19.99, bestFor: "Boosts and voting", description: "Best for boosts, vote runs, and premium entries.", status: "active", sortOrder: 3, stripePriceId: process.env.STRIPE_PRICE_DOROCOIN_500 ?? null, createdAt: iso(-1), updatedAt: iso(-1) }
 ];
 
 const categories: SeedDoc[] = ["Photography", "Dance", "Business", "Music", "Fitness", "Gaming"].map((name, index) => ({ id: `demo-${name.toLowerCase()}`, name, status: "active", sortOrder: index + 1, createdAt: iso(-1), updatedAt: iso(-1) }));

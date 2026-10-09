@@ -58,19 +58,22 @@ export async function POST(request: Request) {
   if (!snap.exists) return fail("Economy rule version not found.", 404, undefined, "NOT_FOUND");
   if (action === "submit") {
     if (snap.data()?.status !== "draft") return fail("Only draft economy rules can be submitted.", 409);
-    await ref.set({ status: "pending_super_admin_approval", submittedBy: user.uid, submittedAt: now, reason, updatedAt: now }, { merge: true });
+    await ref.set({ status: "pending_admin_approval", submittedBy: user.uid, submittedAt: now, reason, updatedAt: now }, { merge: true });
     await db.collection("adminActionTasks").doc(deterministicId("economy_approval", versionId)).set({ type: "economy_rule_approval_pending", versionId, status: "open", createdAt: now }, { merge: true });
-    return ok({ versionId, status: "pending_super_admin_approval" }, "Economy rules submitted for Super Admin approval.");
+    await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "economy.rules_submitted", targetType: "system", targetId: versionId, reason, after: { status: "pending_admin_approval" } }, db);
+    return ok({ versionId, status: "pending_admin_approval" }, "Economy rules submitted for separate Admin approval.");
   }
   if (action === "approve") {
-    if (!user.adminRoles?.some((role) => role === "platform_owner" || role === "super_admin")) return fail("Super Admin or Platform Owner approval is required.", 403, undefined, "SUPER_ADMIN_APPROVAL_REQUIRED");
-    if (snap.data()?.status !== "pending_super_admin_approval") return fail("Only submitted economy rules can be approved.", 409);
+    if (!user.adminPermissions?.includes("settings.editFinancial")) return fail("Admin financial settings permission is required.", 403, undefined, "ADMIN_PERMISSION_REQUIRED");
+    if (!["pending_admin_approval", "pending_super_admin_approval"].includes(String(snap.data()?.status ?? ""))) return fail("Only submitted economy rules can be approved.", 409);
+    if (snap.data()?.submittedBy === user.uid) return fail("A different Admin must approve submitted economy rules.", 409, undefined, "SEPARATION_OF_DUTIES_REQUIRED");
     const effectiveAt = String(parsed.body?.effectiveAt ?? now);
     await db.runTransaction(async (transaction) => {
       const active = await db.collection("economyRuleVersions").where("status", "==", "active").get();
       for (const doc of active.docs) transaction.set(doc.ref, { status: "retired", retiredAt: now, updatedAt: now }, { merge: true });
       transaction.set(ref, { status: "active", approvedBy: user.uid, approvedAt: now, effectiveAt, reason, updatedAt: now, immutableAfterUse: true }, { merge: true });
     });
+    await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "economy.rules_approved", targetType: "system", targetId: versionId, reason, before: { status: "pending_admin_approval" }, after: { status: "active", effectiveAt } }, db);
     await writeAuditLog({ actorId: user.uid, actorType: "admin", action: "economy.rules_approved", targetType: "economyRuleVersion", targetId: versionId, reason, after: { status: "active", effectiveAt } }, db);
     return ok({ versionId, status: "active", effectiveAt }, "Economy rule version approved for future transactions.");
   }

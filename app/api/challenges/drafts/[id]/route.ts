@@ -12,6 +12,8 @@ import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { NORMAL_CHALLENGE_MAX_STEP } from "@/lib/normal-challenge-config";
 import { inferCapacityMode, validateCapacity } from "@/lib/normal-challenge-capacity";
 import { validateChallengeForDraft } from "@/lib/server/challenge-validation";
+import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize-exposure";
+import { deleteUnpublishedChallengeMedia } from "@/lib/server/media-verification";
 
 const allowedDraftFields = new Set([
   "title", "shortDescription", "description", "category", "subcategory", "customCategory", "type", "challengeType", "builderVersion", "coverMediaType", "visibility", "premiumOnly",
@@ -24,8 +26,7 @@ const allowedDraftFields = new Set([
   "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "participationMode", "locationEligibility", "eligibleCountries", "ageRestrictionMode", "capacityMode", "maxParticipants", "hideParticipantList", "waitlistEnabled", "eligibleCountry", "minimumAge", "maximumAge", "teamParticipationEnabled",
   "sponsorEnabled", "sponsorSlots", "minimumSponsorshipAmount", "sponsorPlacementOptions", "sponsorPackages",
   "monetization", "isLiveEvent", "venueName", "eventAddress", "eventCity", "eventState", "eventCountry",
-  "eventMapUrl", "eventCapacity", "externalLiveUrl", "externalLiveProvider", "externalLiveStatus", "externalLiveOpensAt",
-  "externalLiveCtaLabel", "tournamentType", "tournamentStages", "divisionFormat", "scoringMode", "bestOfRounds",
+  "eventMapUrl", "eventCapacity", "tournamentType", "tournamentStages", "divisionFormat", "scoringMode", "bestOfRounds",
   "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "joinWindowMode", "submissionRequirements", "submissionRequirementsList", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt", "publishConfirmations"
 ]);
 
@@ -110,6 +111,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
       normalizedPatch.monetization = { ...currentMonetization, ...normalizedPatch.monetization as Record<string, unknown> };
     }
+    if (normalizedPatch.prizeValue !== undefined) {
+      await prepareEnterprisePrizeValueUpdate(db, transaction, {
+        challengeId: id,
+        challenge: current,
+        nextPrizeValue: normalizedPatch.prizeValue,
+        now,
+      });
+    }
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
     if (Object.keys(normalizedPatch).some((field) => mediaDraftFields.has(field))) {
       const mediaErrors = validateChallengeForDraft(merged).errors.filter((issue) => issue.step === "Media" || issue.step === "Media & Branding");
@@ -127,8 +136,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const firstInvalidStep = normalReadiness ? normalReadiness.steps.findIndex((item) => !item.complete) : -1;
     const requestedBoundary = Math.max(currentUnlocked, Math.min(currentUnlocked + 1, requestedUnlocked, requestedStep));
     const safeUnlockedStep = firstInvalidStep >= 0 ? Math.min(requestedBoundary, firstInvalidStep) : requestedBoundary;
-    const finalPatch = { ...normalizedPatch, challengeType: lockedType, challengeTypeLocked: true, maxUnlockedStep: safeUnlockedStep, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
+    const mediaChanged = Object.keys(normalizedPatch).some((field) => mediaDraftFields.has(field));
+    const staleMediaVerification = mediaChanged ? { version: 1, status: "stale", reason: "media_replaced", invalidatedAt: now } : undefined;
+    const finalPatch = { ...normalizedPatch, ...(staleMediaVerification ? { mediaVerification: staleMediaVerification } : {}), challengeType: lockedType, challengeTypeLocked: true, maxUnlockedStep: safeUnlockedStep, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
     transaction.set(ref, finalPatch, { merge: true });
+    if (staleMediaVerification) transaction.set(db.collection("challengeMediaVerifications").doc(id), staleMediaVerification, { merge: true });
     return { ...merged, ...progress, retiredCompetition: false, archived: false };
     });
   } catch (error) {
@@ -140,6 +152,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
     if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
     if (code === "INVALID_MEDIA_UPLOAD") return fail("Uploaded media must come from your confirmed Challenge Suite storage path.", 422, undefined, code);
+    if (code === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, undefined, code);
+    if (code === "ENTERPRISE_ORGANIZATION_REQUIRED" || code === "ENTERPRISE_FINANCE_OWNER_MISMATCH") return fail("Enterprise financial ownership could not be verified.", 409, undefined, code);
     throw error;
   }
   if ("retiredCompetition" in updated && updated.retiredCompetition === true) {
@@ -156,7 +170,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { user, db } = access;
   const ref = db.collection("challenges").doc(id);
   const now = new Date().toISOString();
-  await db.runTransaction(async (transaction) => {
+  const deletion = await db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const challenge = { id: snap.id, ...snap.data() } as Record<string, unknown>;
@@ -166,7 +180,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     transaction.set(ref, hasActivity
       ? { status: "cancelled", lifecycleStatus: "cancelled", cancellationReason: "Creator cancelled a draft with recorded activity.", cancelledAt: now, cancelledBy: user.uid, draftDeleted: false, updatedAt: now }
       : { status: "cancelled", lifecycleStatus: "cancelled", deletedAt: now, deletedBy: user.uid, draftDeleted: true, updatedAt: now }, { merge: true });
+    return { hasActivity, challenge };
   });
+  const mediaForCleanup = deletion.hasActivity ? null : deletion.challenge;
+  let mediaCleanup: { deletedAssetCount: number; status: "complete" | "pending" } = { deletedAssetCount: 0, status: "complete" };
+  if (mediaForCleanup) {
+    try {
+      mediaCleanup.deletedAssetCount = (await deleteUnpublishedChallengeMedia(db, id, mediaForCleanup, user.uid)).deletedAssetCount;
+    } catch (error) {
+      mediaCleanup.status = "pending";
+      await db.collection("challengeMediaCleanupTasks").doc(id).set({ challengeId: id, creatorId: user.uid, paths: [mediaForCleanup.coverImagePath, mediaForCleanup.promoImagePath, mediaForCleanup.trailerVideoPath, mediaForCleanup.promoVideoPath].filter((value): value is string => typeof value === "string"), status: "pending", reason: error instanceof Error ? error.message.slice(0, 160) : "cleanup_failed", createdAt: now, updatedAt: now }, { merge: true }).catch(() => undefined);
+    }
+  }
   await writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge.draft_deleted", targetType: "challenge", targetId: id, metadata: { softDelete: true } }, db).catch(() => undefined);
-  return ok({ id, status: "cancelled" }, "Draft deleted.");
+  return ok({ id, status: "cancelled", mediaCleanup }, mediaCleanup.status === "complete" ? "Draft deleted." : "Draft deleted. Media cleanup is queued for retry.");
 }

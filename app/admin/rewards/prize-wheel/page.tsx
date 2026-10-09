@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Equal, Eye, Gift, GitCompare, History, Plus, Search, Send, Trash2, X } from "lucide-react";
 import { RewardWheelVisual } from "@/components/rewards/reward-wheel-visual";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
@@ -15,6 +15,7 @@ type Version = AdminWheelDraft;
 type WheelData = { prizes: Prize[]; versions: Version[]; activeVersionIds: Record<Tier, string | null> };
 type DraftResponse = { version: Version };
 type EditableEntry = { prizeId: string; probabilityUnits: number };
+type TierDraftState = { id?: string | null; revision?: number; entries?: EditableEntry[] };
 
 const tierLabels: Record<Tier, string> = { basic: "Basic", standard: "Standard", premium: "Premium" };
 const supportedRewardTypes = new Set(["reward_points", "dorocoin", "cash", "free_entry", "fixed_entry_discount", "percentage_entry_discount", "creator_boost", "bonus_spin"]);
@@ -55,10 +56,8 @@ function handleDialogKeys(event: ReactKeyboardEvent<HTMLDivElement>, close: () =
 export default function AdminPrizeWheelPage() {
   const [data, setData] = useState<WheelData | null>(null);
   const [selectedTier, setSelectedTier] = useState<Tier>("basic");
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
+  const [tierDrafts, setTierDrafts] = useState<Partial<Record<Tier, TierDraftState>>>({});
   const pointCost = REWARD_WHEEL_POINT_COSTS[selectedTier];
-  const [entries, setEntries] = useState<EditableEntry[]>([]);
   const [message, setMessage] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [busy, setBusy] = useState(false);
@@ -86,14 +85,27 @@ export default function AdminPrizeWheelPage() {
   const activeId = data?.activeVersionIds?.[selectedTier] ?? null;
   const activeVersion = tierVersions.find((version) => version.id === activeId) ?? null;
   const draftVersion = tierVersions.find((version) => version.status === "draft") ?? null;
+  const sourceVersion = draftVersion ?? activeVersion;
+  const initialEntries = useMemo(() => editableEntries(sourceVersion?.entries ?? []), [sourceVersion]);
+  const tierDraft = tierDrafts[selectedTier];
+  const entries = tierDraft?.entries ?? initialEntries;
+  const draftId = tierDraft?.id ?? draftVersion?.id ?? null;
+  const revision = tierDraft?.revision ?? draftVersion?.revision ?? 0;
+  const setEntries = useCallback((update: EditableEntry[] | ((current: EditableEntry[]) => EditableEntry[])) => {
+    setTierDrafts((current) => {
+      const existing = current[selectedTier];
+      const currentEntries = existing?.entries ?? initialEntries;
+      return { ...current, [selectedTier]: { ...existing, entries: typeof update === "function" ? update(currentEntries) : update } };
+    });
+  }, [initialEntries, selectedTier]);
+  const setDraftId = useCallback((id: string | null) => { setTierDrafts((current) => ({ ...current, [selectedTier]: { ...current[selectedTier], id } })); }, [selectedTier]);
+  const setRevision = useCallback((nextRevision: number) => { setTierDrafts((current) => ({ ...current, [selectedTier]: { ...current[selectedTier], revision: nextRevision } })); }, [selectedTier]);
 
   useEffect(() => {
     if (!data) return;
-    const source = draftVersion ?? activeVersion;
-    const nextEntries = editableEntries(source?.entries ?? []);
-    setDraftId(draftVersion?.id ?? null); setRevision(draftVersion?.revision ?? 0); setEntries(nextEntries); setMessage(""); setSaveState("idle");
-    lastSavedRef.current = JSON.stringify({ pointCost, entries: nextEntries }); initializedRef.current = true;
-  }, [activeVersion, data, draftVersion, pointCost, selectedTier]);
+    lastSavedRef.current = JSON.stringify({ pointCost, entries: initialEntries });
+    initializedRef.current = true;
+  }, [data, initialEntries, pointCost, selectedTier]);
 
   const includedPrizes = entries.map((entry) => ({ entry, prize: tierPrizes.find((prize) => prize.id === entry.prizeId) })).filter((row): row is { entry: EditableEntry; prize: Prize } => Boolean(row.prize));
   const totalUnits = entries.reduce((sum, entry) => sum + entry.probabilityUnits, 0);
@@ -115,7 +127,7 @@ export default function AdminPrizeWheelPage() {
       setDraftId(response.data.version.id); setRevision(response.data.version.revision); lastSavedRef.current = signature; setSaveState("saved");
     }, 850);
     return () => window.clearTimeout(timer);
-  }, [draftId, entries, pointCost, retryToken, revision, selectedTier, signature]);
+  }, [draftId, entries, pointCost, retryToken, revision, selectedTier, setDraftId, setRevision, signature]);
 
   const pickerPrizes = tierPrizes.filter((prize) => prizeAvailability(prize).available && !entries.some((entry) => entry.prizeId === prize.id) && pickerCategoryMatches(prize.prizeType, pickerCategory) && `${prize.prizeName} ${prize.prizeType}`.toLowerCase().includes(pickerQuery.trim().toLowerCase()));
   function addPrize(prizeId: string) { setEntries((current) => distributeProbabilityUnits([...current.map((entry) => entry.prizeId), prizeId])); setPickerOpen(false); }
@@ -133,11 +145,12 @@ export default function AdminPrizeWheelPage() {
       return;
     }
     setPublishState("success"); setPublishOpen(false); setReason(""); setConfirmation(""); setPublishMessage(""); initializedRef.current = false;
+    setTierDrafts((current) => ({ ...current, [selectedTier]: {} }));
     setMessage(`${tierLabels[selectedTier]} Wheel published successfully. Active reference ${response.data.activeVersionId.slice(0, 12)}. ${response.data.version.entries.length} rewards, 100% total probability, ${pointCost.toLocaleString()} Reward Points.`);
     load();
   }
 
-  async function cloneVersion(versionId: string) { setBusy(true); const response = await apiRequest("/api/admin/rewards/wheels", { method: "POST", body: JSON.stringify({ action: "clone_version", versionId }) }); setBusy(false); setMessage(response.message); if (response.ok) { initializedRef.current = false; load(); } }
+  async function cloneVersion(versionId: string) { setBusy(true); const response = await apiRequest("/api/admin/rewards/wheels", { method: "POST", body: JSON.stringify({ action: "clone_version", versionId }) }); setBusy(false); setMessage(response.message); if (response.ok) { initializedRef.current = false; setTierDrafts((current) => ({ ...current, [selectedTier]: {} })); load(); } }
 
   const activeEntryMap = useMemo(() => new Map(editableEntries(activeVersion?.entries ?? []).map((entry) => [entry.prizeId, entry.probabilityUnits])), [activeVersion]);
   const draftEntryMap = useMemo(() => new Map(entries.map((entry) => [entry.prizeId, entry.probabilityUnits])), [entries]);
@@ -151,7 +164,7 @@ export default function AdminPrizeWheelPage() {
   return <>
     <PageTitle title="Spin Wheel Configuration" subtitle="Configure the rewards and winning chances for each Spin tier." icon={<Gift />} />
     {message ? <Card className="mt-5 p-4 text-sm font-bold" role="status">{message}</Card> : null}
-    <div className="mt-6 grid gap-3 md:grid-cols-3" role="tablist" aria-label="Wheel tiers">{tiers.map((item) => { const itemActive = data?.activeVersionIds?.[item]; const itemDraft = data?.versions.some((version) => version.tier === item && version.status === "draft"); const itemCost = REWARD_WHEEL_POINT_COSTS[item]; return <button key={item} type="button" role="tab" aria-selected={selectedTier === item} onClick={() => { initializedRef.current = false; setSelectedTier(item); }} className={`min-h-24 rounded-[8px] border p-4 text-left ${selectedTier === item ? "border-[var(--gold)] bg-amber-50" : "border-[var(--line)] bg-[var(--panel)]"}`}><strong className="block text-lg">{tierLabels[item]}</strong><span className="mt-1 block text-sm">{itemCost ? `${itemCost.toLocaleString()} points` : "No active cost"}</span><span className="mt-2 block text-xs font-bold text-[var(--muted)]">{itemDraft ? "Draft" : itemActive ? "Published" : "Not configured"}</span></button>; })}</div>
+    <div className="mt-6 grid gap-3 md:grid-cols-3" role="tablist" aria-label="Wheel tiers">{tiers.map((item) => { const itemActive = data?.activeVersionIds?.[item]; const itemDraft = data?.versions.some((version) => version.tier === item && version.status === "draft"); const itemCost = REWARD_WHEEL_POINT_COSTS[item]; return <button key={item} type="button" role="tab" aria-selected={selectedTier === item} onClick={() => { initializedRef.current = false; setSelectedTier(item); setMessage(""); setSaveState("idle"); }} className={`min-h-24 rounded-[8px] border p-4 text-left ${selectedTier === item ? "border-[var(--gold)] bg-amber-50" : "border-[var(--line)] bg-[var(--panel)]"}`}><strong className="block text-lg">{tierLabels[item]}</strong><span className="mt-1 block text-sm">{itemCost ? `${itemCost.toLocaleString()} points` : "No active cost"}</span><span className="mt-2 block text-xs font-bold text-[var(--muted)]">{itemDraft ? "Draft" : itemActive ? "Published" : "Not configured"}</span></button>; })}</div>
 
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)]">
       <div className="space-y-6">

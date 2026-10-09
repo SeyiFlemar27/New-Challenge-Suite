@@ -63,11 +63,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
   const stepDefinition = NORMAL_CHALLENGE_STEP_DEFINITIONS[step] ?? NORMAL_CHALLENGE_STEP_DEFINITIONS[0];
   const uploadBusy = Object.values(media).some((value) => ["preparing", "uploading", "processing"].includes(value)) || (step === 6 && readiness.issues.some((item) => item.step < 6));
   const editable = status === "draft" || status === "requires_changes";
-
-  useEffect(() => {
-    const firstInvalid = readiness.steps.findIndex((item) => !item.complete);
-    if (firstInvalid >= 0) setUnlocked((current) => Math.min(current, firstInvalid));
-  }, [readiness]);
+  const firstInvalidStep = readiness.steps.findIndex((item) => !item.complete);
+  const accessibleStep = firstInvalidStep >= 0 ? Math.min(unlocked, firstInvalidStep) : unlocked;
 
   useEffect(() => {
     if (!draftId || hydrated.current) return;
@@ -248,7 +245,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
           <ChallengeBuilderFrame
             steps={NORMAL_CHALLENGE_STEPS}
             currentStep={step}
-            unlockedStep={unlocked}
+            unlockedStep={accessibleStep}
             completedSteps={readiness.steps.map((item) => item.complete)}
             guide={{ title: stepDefinition.title, description: stepDefinition.description, points: stepDefinition.guide }}
             guideOpen={mobileGuideOpen}
@@ -285,7 +282,7 @@ function SubmittedChallengeState({ challengeId }: { challengeId: string }) {
 }
 
 function DraftLimit({ onBack }: { onBack: () => void }) {
-  return <AppShell><main className="mx-auto max-w-xl px-4 py-10"><Card className="p-6 sm:p-8"><h1 className="text-2xl font-black">You've reached your draft limit.</h1><p className="mt-3 text-sm leading-6 text-slate-600">Continue an existing draft, delete one you no longer need, or upgrade your plan.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/my-challenges">View Drafts</LinkButton><LinkButton href="/subscriptions" variant="secondary">Upgrade Plan</LinkButton><Button variant="ghost" onClick={onBack}>Back</Button></div></Card></main></AppShell>;
+  return <AppShell><main className="mx-auto max-w-xl px-4 py-10"><Card className="p-6 sm:p-8"><h1 className="text-2xl font-black">You&apos;ve reached your draft limit.</h1><p className="mt-3 text-sm leading-6 text-slate-600">Continue an existing draft, delete one you no longer need, or upgrade your plan.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href="/my-challenges">View Drafts</LinkButton><LinkButton href="/subscriptions" variant="secondary">Upgrade Plan</LinkButton><Button variant="ghost" onClick={onBack}>Back</Button></div></Card></main></AppShell>;
 }
 
 function TypeCards({ plan, choose }: { plan: string; choose: () => void }) {

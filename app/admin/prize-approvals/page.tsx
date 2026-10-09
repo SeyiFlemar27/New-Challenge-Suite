@@ -45,7 +45,7 @@ export default function AdminPrizeApprovalsPage() {
   }
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(load);
   }, []);
 
   return (

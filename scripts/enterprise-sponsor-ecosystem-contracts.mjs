@@ -34,8 +34,8 @@ export function runEnterpriseSponsorEcosystemContract(name) {
     includesAll(sponsorOrganizations, ["sponsorOrganizations", "sponsorMemberships", "SPONSOR_MEMBERSHIP_ROLES", "SPONSOR_PERMISSIONS"], name);
     includesAll(sponsorServer, ["resolveSponsorOrganizationAccess", "sponsorId:", "requireSponsorPermission"], name);
   } else if (name === "sponsor-navigation") {
-    includesAll(sponsorShell, ['label: "Sponsor Studio"', 'label: "Discover"', 'label: "Saved"', 'label: "Sponsorships"', 'label: "Proposals"', 'label: "Deliverables"', 'label: "Analytics"', 'label: "Reports"', 'label: "Wallet"', 'label: "Settings"', 'label: "Support"', "Return to Challenge Suite"], name);
-    assert.ok(!sponsorShell.includes('label: "Campaigns"') && !sponsorShell.includes("WorkspaceSwitcher"), `${name}: Campaigns and the workspace switcher must not appear in Sponsor Panel`);
+    includesAll(sponsorShell, ['Sponsor Panel', 'label: "Dashboard"', 'label: "Discover Opportunities"', 'label: "My Campaigns"', 'label: "Analytics"', 'label: "Wallet"', "Return to Challenge Suite"], name);
+    assert.ok(!sponsorShell.includes('href: "/sponsor/proposals/new"') && !sponsorShell.includes('label: "Proposals"') && !sponsorShell.includes("WorkspaceSwitcher"), `${name}: retired proposal creation and the workspace switcher must not appear in Sponsor Panel`);
   } else if (name === "enterprise-shell-isolation") {
     includesAll(sidebar, ["personalEconomyContext", 'routedWorkspace === "enterprise"', "workspaceForRoute"], name);
     assert.ok(!sidebar.includes("Enterprise Access"), `${name}: legacy Enterprise access badge must not replace workspace identity`);
@@ -48,22 +48,23 @@ export function runEnterpriseSponsorEcosystemContract(name) {
     const steps = sponsorOnboarding.match(/const steps = \[(.*?)\] as const;/s)?.[1] ?? "";
     assert.equal((steps.match(/"/g) ?? []).length / 2, 7, `${name}: expected exactly seven steps`);
   } else if (name === "proposal-nine-step-builder") {
-    includesAll(proposalBuilder, ["Sponsorship Goal", "Offer & Funding", "Brand Visibility", "Campaign Creative", "Timeline & Expiry", '"Message"', '"Review"', "Prize Contribution is 100% winner-directed"], name);
-    const steps = proposalBuilder.match(/const steps = \[(.*?)\] as const;/s)?.[1] ?? "";
-    assert.equal((steps.match(/"/g) ?? []).length / 2, 9, `${name}: expected exactly nine steps`);
+    includesAll(proposalBuilder, ['redirect("/sponsor/campaigns/create")'], name);
+    assert.ok(!proposalBuilder.includes("Proposal Builder"), `${name}: retired builder must not remain active`);
   } else if (name === "proposal-immutable-revisions") {
-    includesAll(proposalCreate, ["batch.create(revisionRef", "immutable: true", "activeRevisionId", "revisionNumber: 1"], name);
-    includesAll(revisionRoute, ["runTransaction", "expectedVersion", "PROPOSAL_VERSION_CONFLICT", "sponsorAcceptedRevisionId: null", "creatorAcceptedRevisionId: null", "immutable: true"], name);
+    includesAll(proposalCreate, ["Historical Sponsor proposal records remain readable", "SPONSOR_PROPOSAL_CREATION_RETIRED", "410"], name);
+    includesAll(revisionRoute, ["SPONSOR_PROPOSAL_REVISION_RETIRED", "410"], name);
   } else if (name === "proposal-double-acceptance") {
-    includesAll(proposalRoute, ["sponsorAcceptedRevisionId", "creatorAcceptedRevisionId", 'next.status = bothAccepted ? "accepted" : "negotiating"', 'next.fundingStatus = bothAccepted ? "eligibility_review_required" : "not_active"'], name);
-    includesAll(creatorCounterpart, ["creatorAcceptedRevisionId", "sponsorAcceptedRevisionId", "PROPOSAL_VERSION_CONFLICT"], name);
+    includesAll(proposalRoute, ["SPONSOR_PROPOSAL_READ_ONLY", "410"], name);
+    includesAll(creatorCounterpart, ["SPONSOR_PROPOSAL_READ_ONLY", "410"], name);
   } else if (name === "creator-counterpart-authorization") {
-    includesAll(creatorCounterpart, ["requireRequestUser", "creatorCanAccess", "PERMISSION_DENIED", "request_changes", "counter", "accept", "decline"], name);
+    includesAll(creatorCounterpart, ["requireRequestUser", "creatorCanAccess", "SPONSOR_PROPOSAL_READ_ONLY", "410"], name);
+    assert.ok(!creatorCounterpart.includes("runTransaction") && !creatorCounterpart.includes("transaction.update") && !creatorCounterpart.includes("transaction.create"), `${name}: historical proposal compatibility must not write`);
   } else if (name === "funding-gated-no-movement") {
-    includesAll(funding, ["proposalFundingEligible", "PROPOSAL_NOT_FUNDING_ELIGIBLE", "INSUFFICIENT_SPONSOR_FUNDS", "partialFundingAllowed: false", 'collection("sponsorships")', 'status: "converted_to_sponsorship"', "externalPayoutExecuted: false"], name);
+    includesAll(funding, ["SPONSOR_PROPOSAL_FUNDING_RETIRED", "410"], name);
+    assert.ok(!funding.includes("runTransaction") && !funding.includes('collection("sponsorProposals")'), `${name}: historical proposal funding must not mutate financial or proposal records`);
   } else if (name === "prize-contribution-isolated") {
-    includesAll(proposalBuilder, ["prizeContribution", "creatorSponsorship", "platformFee", "100% winner-directed"], name);
-    includesAll(proposalCreate, ["prizeContributionCents", "creatorSponsorshipCents", "platformFeeCents"], name);
+    includesAll(proposalBuilder, ['redirect("/sponsor/campaigns/create")'], name);
+    includesAll(proposalCreate, ["SPONSOR_PROPOSAL_CREATION_RETIRED", "410"], name);
   } else if (name === "directories-36-per-page") {
     [creatorDirectory, challengeDirectory].forEach((source) => includesAll(source, ["const pageSize = 36", '.get("page")', "totalPages", ".slice((page - 1) * pageSize, page * pageSize)"], name));
   } else {

@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -61,7 +62,7 @@ export default function ChallengePredictionPage() {
   const challengeId = params.id;
   const requestedSubmissionId = searchParams.get("submissionId") ?? "";
   const paymentReturn = searchParams.get("payment");
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState(requestedSubmissionId);
+  const [selectedSubmissionOverride, setSelectedSubmissionOverride] = useState<string | null>(null);
   const [stake, setStake] = useState("10");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [message, setMessage] = useState("");
@@ -89,6 +90,7 @@ export default function ChallengePredictionPage() {
   const participantPayload = participantsQuery.data?.ok ? participantsQuery.data.data : null;
   const access = statusPayload?.access ?? participantPayload?.predictionAccess;
   const prediction = statusPayload?.prediction;
+  const selectedSubmissionId = selectedSubmissionOverride ?? prediction?.predictedSubmissionId ?? requestedSubmissionId;
   const participants = useMemo(() => participantPayload?.participants ?? [], [participantPayload?.participants]);
   const selected = participants.find((item) => item.submissionId === selectedSubmissionId);
   const amountCents = Math.round((Number(stake) || 0) * 100);
@@ -101,13 +103,6 @@ export default function ChallengePredictionPage() {
   const estimatedMultiplier = amountCents > 0 ? estimatedReturnCents / amountCents : 0;
   const currentPoolShare = estimatedTotalPoolCents > 0 ? estimatedSelectedPoolCents / estimatedTotalPoolCents : 0;
   const timeZone = participantPayload?.challenge.timezone ?? participantPayload?.challenge.timeZone ?? DEFAULT_CHALLENGE_TIME_ZONE;
-
-  useEffect(() => {
-    if (requestedSubmissionId) setSelectedSubmissionId(requestedSubmissionId);
-  }, [requestedSubmissionId]);
-  useEffect(() => {
-    if (prediction?.predictedSubmissionId) setSelectedSubmissionId(prediction.predictedSubmissionId);
-  }, [prediction?.predictedSubmissionId]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -201,7 +196,7 @@ export default function ChallengePredictionPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black/40">
-                            {participant.avatarUrl ? <img src={participant.avatarUrl} alt={participant.displayName} className="h-full w-full object-cover" /> : <UserRound size={18} className="text-[var(--gold)]" />}
+                            {participant.avatarUrl ? <ContentImage src={participant.avatarUrl} alt={participant.displayName} className="h-full w-full object-cover" /> : <UserRound size={18} className="text-[var(--gold)]" />}
                           </div>
                           <div className="min-w-0">
                             {participant.profilePath ? <Link href={participant.profilePath} className="block truncate font-black hover:text-[var(--gold)]">{participant.displayName}</Link> : <p className="truncate font-black">{participant.displayName}</p>}
@@ -212,7 +207,7 @@ export default function ChallengePredictionPage() {
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <LinkButton href={participant.submissionPath} variant="ghost" className="w-full"><ExternalLink size={15} /> Entry</LinkButton>
-                        <Button type="button" variant={selectedSubmissionId === participant.submissionId ? "primary" : "secondary"} className="w-full" onClick={() => setSelectedSubmissionId(participant.submissionId)} disabled={!access?.windowOpen || Boolean(prediction?.status === "active" && prediction.predictedSubmissionId !== participant.submissionId)}>
+                        <Button type="button" variant={selectedSubmissionId === participant.submissionId ? "primary" : "secondary"} className="w-full" onClick={() => setSelectedSubmissionOverride(participant.submissionId)} disabled={!access?.windowOpen || Boolean(prediction?.status === "active" && prediction.predictedSubmissionId !== participant.submissionId)}>
                           Select
                         </Button>
                       </div>

@@ -15,6 +15,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (request.method === "POST") return fail("Paid vote checkout has been retired. Use DoroCoin voting at 5 DC per extra vote.", 410, undefined, "PAID_VOTE_CHECKOUT_RETIRED");
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();

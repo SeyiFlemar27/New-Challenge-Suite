@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
-import { advanceWinner, cumulativeTournamentScore, finalPlacements, resolveMatchResult } from "@/lib/server/tournament-operations";
+import { advanceWinner, cumulativeTournamentScore, finalPlacements, resolveMatchResult, tournamentMatchVoteOutcome } from "@/lib/server/tournament-operations";
 import { canPerformTournamentRole } from "@/lib/server/tournament-permissions";
 import type { TournamentFoundation, TournamentMatchFoundation } from "@/lib/tournament-types";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const permission = canPerformTournamentRole({ uid: user.uid, role: user.role, isAdmin: user.isAdmin }, tournament, ["host", "manager", "moderator"]);
   if (!permission.allowed) return fail("Tournament result permission is required.", 403, permission, "TOURNAMENT_RESULT_PERMISSION_REQUIRED");
   const match = { id: matchSnap.id, ...matchSnap.data() } as TournamentMatchFoundation;
-  if (match.resultMethod !== "creator_decision" && !user.isAdmin) return fail("This match result must be confirmed through its configured competition method.", 403, undefined, "TOURNAMENT_RESULT_METHOD_REQUIRED");
+  if (match.resultMethod !== "creator_decision" && match.resultMethod !== "votes" && !user.isAdmin) return fail("This match result must be confirmed through its configured competition method.", 403, undefined, "TOURNAMENT_RESULT_METHOD_REQUIRED");
   const winnerParticipantId = String(body.winnerParticipantId ?? "");
   const loserParticipantId = String(body.loserParticipantId ?? "");
   const competitors = new Set([match.participantAId, match.participantBId].filter(Boolean));
@@ -45,12 +45,42 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!winnerParticipantSnap.exists || !loserParticipantSnap.exists) return fail("Tournament competitor records need attention before confirming this result.", 409, undefined, "TOURNAMENT_COMPETITOR_RECORD_MISSING");
   const previousLosses = Number(loserParticipantSnap.data()?.lossCount ?? 0);
   const nextLosses = previousLosses + 1;
-  const winnerScore = cumulativeTournamentScore(Number(winnerParticipantSnap.data()?.cumulativeScore ?? 0), Number(body.winnerScore ?? 0));
-  const loserScore = cumulativeTournamentScore(Number(loserParticipantSnap.data()?.cumulativeScore ?? 0), Number(body.loserScore ?? 0));
+  const publicVotingMatch = match.resultMethod === "votes";
+  const winnerScore = cumulativeTournamentScore(Number(winnerParticipantSnap.data()?.cumulativeScore ?? 0), publicVotingMatch ? 0 : Number(body.winnerScore ?? 0));
+  const loserScore = cumulativeTournamentScore(Number(loserParticipantSnap.data()?.cumulativeScore ?? 0), publicVotingMatch ? 0 : Number(body.loserScore ?? 0));
   if (!winnerScore.valid || !loserScore.valid) return fail("Match scores must be valid non-negative numbers.", 422, undefined, "TOURNAMENT_MATCH_SCORE_INVALID");
   const requiresGrandFinalReset = tournament.format === "double_elimination" && match.bracket === "grand_final" && Boolean(match.resetMatchId) && previousLosses === 0;
   const loserContinues = Boolean(loserNextMatch) && (tournament.format === "single_elimination" || nextLosses < 2);
-  await db.runTransaction(async (transaction) => {
+  let voteOutcome: ReturnType<typeof tournamentMatchVoteOutcome> | null = null;
+  try {
+    await db.runTransaction(async (transaction) => {
+    const [currentTournamentSnap, currentMatchSnap] = await Promise.all([
+      transaction.get(db.collection("tournaments").doc(id)),
+      transaction.get(db.collection("tournamentMatches").doc(match.id))
+    ]);
+    if (!currentTournamentSnap.exists) throw Object.assign(new Error("Tournament not found."), { code: "TOURNAMENT_NOT_FOUND" });
+    if (!currentMatchSnap.exists) throw Object.assign(new Error("Tournament match is required."), { code: "TOURNAMENT_MATCH_NOT_FOUND" });
+    const currentTournament = { id: currentTournamentSnap.id, ...currentTournamentSnap.data() } as TournamentFoundation;
+    const currentMatch = { id: currentMatchSnap.id, ...currentMatchSnap.data() } as TournamentMatchFoundation;
+    if (currentMatch.tournamentId !== id) throw Object.assign(new Error("The match does not belong to this Tournament."), { code: "TOURNAMENT_MATCH_MISMATCH" });
+    if (["confirmed", "forfeit", "bye"].includes(currentMatch.status)) throw Object.assign(new Error("This match result has already been recorded."), { code: "MATCH_RESULT_ALREADY_RECORDED" });
+    if (currentMatch.resultMethod !== match.resultMethod) throw Object.assign(new Error("The configured match decision method changed. Refresh and try again."), { code: "TOURNAMENT_RESULT_METHOD_CHANGED" });
+    const currentCompetitors = new Set([currentMatch.participantAId, currentMatch.participantBId].filter(Boolean));
+    if (!currentCompetitors.has(winnerParticipantId) || !currentCompetitors.has(loserParticipantId)) throw Object.assign(new Error("The match competitors changed. Refresh before confirming the result."), { code: "MATCH_PARTICIPANTS_CHANGED" });
+    if (currentMatch.resultMethod === "votes") {
+      if (currentTournament.resultMethod !== "votes" || !["active", "round_active"].includes(currentTournament.status) || currentMatch.status !== "active") throw Object.assign(new Error("Public voting is not active for this Tournament match."), { code: "TOURNAMENT_VOTING_NOT_CONFIGURED" });
+      const currentRoundSnap = await transaction.get(db.collection("tournamentRounds").doc(currentMatch.roundId));
+      const closesAt = Date.parse(String(currentRoundSnap.data()?.votingClosesAt ?? ""));
+      if (!currentRoundSnap.exists || currentRoundSnap.data()?.tournamentId !== id || currentRoundSnap.id !== currentMatch.roundId) throw Object.assign(new Error("Tournament round is invalid."), { code: "TOURNAMENT_ROUND_MISMATCH" });
+      if (!Number.isFinite(closesAt) || Date.now() < closesAt) throw Object.assign(new Error("Voting must close before the result is confirmed."), { code: "TOURNAMENT_VOTING_STILL_OPEN" });
+      voteOutcome = tournamentMatchVoteOutcome(currentMatch);
+      if (voteOutcome.totalVotes === 0) throw Object.assign(new Error("At least one valid public vote is required before confirming this match result."), { code: "TOURNAMENT_VOTES_REQUIRED" });
+      if (voteOutcome.tied) {
+        if (currentTournament.tieBreaker !== "host_review") throw Object.assign(new Error("The configured Tournament tie-breaker must resolve this tied vote before advancement."), { code: "TOURNAMENT_VOTE_TIE_REQUIRES_REVIEW" });
+      } else if (voteOutcome.winnerParticipantId !== winnerParticipantId) {
+        throw Object.assign(new Error("The selected winner does not match the verified public vote result."), { code: "TOURNAMENT_VOTE_RESULT_MISMATCH" });
+      }
+    }
     transaction.set(db.collection("tournamentMatches").doc(match.id), { winnerParticipantId, loserParticipantId, resultStatus: result.status, status: "confirmed", confirmedAt: new Date().toISOString(), confirmedBy: user.uid }, { merge: true });
     if (advancement.nextMatch) transaction.set(db.collection("tournamentMatches").doc(advancement.nextMatch.id), advancement.nextMatch, { merge: true });
     transaction.set(db.collection(competitorCollection).doc(winnerParticipantId), { cumulativeScore: winnerScore.score, status: "active", updatedAt: new Date().toISOString() }, { merge: true });
@@ -75,6 +105,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       placementRows.forEach((placement) => transaction.set(db.collection("tournamentPlacements").doc(`${id}_${placement.placement}`), { ...placement, id: `${id}_${placement.placement}`, tournamentId: id, userId: tournament.participationMode === "team" ? null : placement.participantId, teamId: tournament.participationMode === "team" ? placement.participantId : null, lockedAt: new Date().toISOString(), payoutStatus: "pending_admin_review" }, { merge: true }));
       transaction.set(db.collection("tournaments").doc(id), { status: "under_review", resultsUnderReviewAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
     }
-  });
-  return ok({ result, advancement, grandFinalResetRequired: requiresGrandFinalReset }, requiresGrandFinalReset ? "A Grand Final reset is required because both finalists now have one loss." : "Tournament result confirmed server-side. Payout remains admin and ledger-gated.");
+    });
+  } catch (error) {
+    const failure = error as Error & { code?: string };
+    if (failure.code) return fail(failure.message, 409, undefined, failure.code);
+    throw error;
+  }
+  return ok({ result, advancement, voteOutcome, grandFinalResetRequired: requiresGrandFinalReset }, requiresGrandFinalReset ? "A Grand Final reset is required because both finalists now have one loss." : "Tournament result confirmed server-side. Payout remains admin and ledger-gated.");
 }

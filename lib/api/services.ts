@@ -124,10 +124,18 @@ export function fetchPrivateExclusiveChallenges(limit = 30) {
 }
 
 export function checkPrivateInviteCode(inviteCode: string, challengeId?: string) {
-  return apiRequest<{ challengeId: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "check_code", inviteCode, challengeId }) });
+  return apiRequest<{ challengeId: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "preview_invite", credential: inviteCode, challengeId }) });
 }
 
-export function requestPrivateAccess(payload: { challengeId?: string; reason: string; note?: string }) {
+export function previewPrivateInvite(credential: string) {
+  return apiRequest<{ challengeId: string; accessMethod: string; alreadyAdmitted: boolean; challenge: { id: string; title: string }; requirements: { requirements: string[]; acknowledgements: string[]; questions: string[] } }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "preview_invite", credential }) });
+}
+
+export function admitPrivateInvite(credential: string, requirementAcknowledgements: string[], participantAnswers: Record<string, string>) {
+  return apiRequest<{ challengeId: string; alreadyAdmitted: boolean }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "admit_invite", credential, requirementAcknowledgements, participantAnswers }) });
+}
+
+export function requestPrivateAccess(payload: { challengeId?: string; reason: string; note?: string; requirementAcknowledgements?: string[]; participantAnswers?: Record<string, string> }) {
   return apiRequest<{ requestId: string; status: string }>("/api/private-exclusive", { method: "POST", body: JSON.stringify({ action: "request_access", ...payload }) });
 }
 
@@ -317,7 +325,7 @@ export function fetchDoroCoinPackages() {
 }
 
 export function createChallenge(payload: unknown) {
-  return apiRequest<{ challenge: unknown }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
+  return apiRequest<{ challenge: unknown; privateAccess?: Record<string, unknown> | null }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function createChallengeDraft(payload: unknown) {
@@ -333,7 +341,7 @@ export function updateChallengeDraft(draftId: string, payload: unknown) {
 }
 
 export function publishChallengeDraft(draftId: string, payload: unknown) {
-  return apiRequest<{ challenge: Record<string, unknown> }>(`/api/challenges/${draftId}/publish`, { method: "POST", body: JSON.stringify(payload) });
+  return apiRequest<{ challenge: Record<string, unknown>; privateAccess?: Record<string, unknown> | null }>(`/api/challenges/${draftId}/publish`, { method: "POST", body: JSON.stringify(payload) });
 }
 export function joinChallenge(challengeId: string, payload: { entryAgreementAccepted?: boolean; action?: "register" | "enter_challenge" } = {}) {
   return apiRequest(`/api/challenges/${challengeId}/join`, { method: "POST", body: JSON.stringify(payload) });
@@ -371,7 +379,7 @@ export function fetchLeaderboards(board = "global", options: { type?: "global" |
   return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; competitionMode?: string; visibilityMode?: string; visible?: boolean; message?: string | null; pagination?: { page: number; pageSize: number; total: number; totalPages: number }; currentUserPosition?: unknown | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
-export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "credits"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {
+export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {
   return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; creditCost?: number; walletTransactionId?: string | null; voteDate?: string; timeZone?: string; freeVoteResetAt?: string }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 

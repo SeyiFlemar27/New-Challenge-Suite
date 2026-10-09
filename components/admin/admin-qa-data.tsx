@@ -21,7 +21,6 @@ export function AdminQaData() {
   const [confirmation, setConfirmation] = useState<{ mode: "create" | "delete"; batch?: QaBatch } | null>(null);
 
   async function load() {
-    setLoading(true);
     const result = await apiRequest<{ batches: QaBatch[] }>("/api/admin/qa-data");
     setLoading(false);
     if (!result.ok || !result.data) return setNotice(result.message);
@@ -30,7 +29,12 @@ export function AdminQaData() {
   }
 
   useEffect(() => {
-    void load();
+    void apiRequest<{ batches: QaBatch[] }>("/api/admin/qa-data").then((result) => {
+      setLoading(false);
+      if (!result.ok || !result.data) return setNotice(result.message);
+      setBatches(result.data.batches);
+      setNotice("");
+    });
   }, []);
 
   async function confirm() {
@@ -46,6 +50,7 @@ export function AdminQaData() {
     setNotice(result.message);
     if (result.ok) {
       setConfirmation(null);
+      setLoading(true);
       await load();
       window.dispatchEvent(new Event("admin:refresh"));
     }

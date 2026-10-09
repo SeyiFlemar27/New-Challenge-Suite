@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { CheckCircle2, ClipboardCheck, ExternalLink, ShieldCheck } from "lucide-react";
 import { Card, LinkButton, PageTitle } from "@/components/ui";
 
@@ -20,21 +20,30 @@ const checks = [
 ];
 const storageKey = "challenge-suite-admin-qa-checklist-v1";
 
-export function AdminQaChecklist() {
-  const [completed, setCompleted] = useState<string[]>([]);
+function subscribeChecklist(onChange: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === storageKey) onChange(); };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("admin-qa-checklist-change", onChange);
+  return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("admin-qa-checklist-change", onChange); };
+}
 
-  useEffect(() => {
+function readChecklist() { return window.localStorage.getItem(storageKey) ?? "[]"; }
+
+export function AdminQaChecklist() {
+  const storedChecklist = useSyncExternalStore(subscribeChecklist, readChecklist, () => "[]");
+  const completed = useMemo(() => {
     try {
-      setCompleted(JSON.parse(window.localStorage.getItem(storageKey) ?? "[]"));
+      const parsed: unknown = JSON.parse(storedChecklist);
+      return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : [];
     } catch {
-      setCompleted([]);
+      return [];
     }
-  }, []);
+  }, [storedChecklist]);
 
   function toggle(label: string) {
     const next = completed.includes(label) ? completed.filter((item) => item !== label) : [...completed, label];
-    setCompleted(next);
     window.localStorage.setItem(storageKey, JSON.stringify(next));
+    window.dispatchEvent(new Event("admin-qa-checklist-change"));
   }
 
   return (

@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -57,7 +58,7 @@ export default function EntryRequestsPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-4">
             <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-[var(--gold)]/15 text-lg font-black text-[var(--gold)]">
-              {request.participantProfile?.avatarUrl ? <img src={request.participantProfile.avatarUrl} alt="" className="h-full w-full object-cover" /> : (request.participantProfile?.displayName ?? "P").slice(0, 2).toUpperCase()}
+              {request.participantProfile?.avatarUrl ? <ContentImage src={request.participantProfile.avatarUrl} alt="" className="h-full w-full object-cover" /> : (request.participantProfile?.displayName ?? "P").slice(0, 2).toUpperCase()}
             </div>
             <div>
               <h2 className="text-xl font-black">{request.participantProfile?.displayName ?? "Participant"}</h2>

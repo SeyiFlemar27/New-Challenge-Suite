@@ -6,6 +6,7 @@ import { challengeIntegritySources, challengeLifecycleActions } from "@/lib/serv
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { requireChallengeManagementAccess } from "@/lib/server/challenge-management-access";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { prepareEnterpriseActiveChallengeRelease } from "@/lib/server/enterprise-active-challenge-limit";
 
 const schema = z.object({ action: z.enum(["delete", "cancel", "archive", "request_admin_deletion"]), confirmed: z.boolean().optional(), reason: z.string().trim().max(1000).optional() });
 
@@ -44,7 +45,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } else if (parsed.data.action === "cancel") {
       if (!actions.cancelAllowed) return fail("This challenge can no longer be cancelled.", 409);
       if (!reason) return validationError({ reason: "A cancellation reason is required." });
-      await state.db.collection("challenges").doc(id).set({ status: "cancelled", lifecycleStatus: "cancelled", visibility: "hidden", cancellationReason: reason, cancelledAt: now, cancelledBy: state.user.uid, updatedAt: now }, { merge: true });
+      const challengeRef = state.db.collection("challenges").doc(id);
+      await state.db.runTransaction(async (transaction) => {
+        const latest = await transaction.get(challengeRef);
+        if (!latest.exists) throw new Error("CHALLENGE_NOT_FOUND");
+        const data = latest.data() ?? {};
+        const release = await prepareEnterpriseActiveChallengeRelease(state.db!, transaction, String(data.organizationOwnerId ?? "") || null, id);
+        transaction.set(challengeRef, { status: "cancelled", lifecycleStatus: "cancelled", visibility: "hidden", cancellationReason: reason, cancelledAt: now, cancelledBy: state.user!.uid, updatedAt: now }, { merge: true });
+        release.apply();
+      });
     } else if (parsed.data.action === "archive") {
       if (!actions.archiveAllowed) return fail("Only completed or cancelled challenges can be archived.", 409);
       await state.db.collection("challenges").doc(id).set({ managementState: "archived", archivedAt: now, archivedBy: state.user.uid, updatedAt: now }, { merge: true });

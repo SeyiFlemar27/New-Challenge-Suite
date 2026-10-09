@@ -171,11 +171,6 @@ export const serverChallengeCreateSchema = z.object({
     (value) => value === "" || value === undefined ? null : value,
     z.union([z.null(), z.coerce.number().int().min(0)])
   ).default(null),
-  externalLiveUrl: z.string().trim().url("External livestream URL must be valid.").optional().or(z.literal("")),
-  externalLiveProvider: z.string().trim().max(80).default(""),
-  externalLiveStatus: z.enum(["not_ready", "scheduled", "live", "ended"]).default("not_ready"),
-  externalLiveOpensAt: z.string().trim().optional().or(z.literal("")),
-  externalLiveCtaLabel: z.string().trim().max(80).default("Watch live on partner site"),
   tournamentType: z.enum(["none", "one_vs_one", "group", "knockout", "bracket", "league_table", "audition_to_final", "group_stage_to_final", "custom_rounds"]).default("none"),
   tournamentStages: z.array(z.object({
     id: z.string().trim().min(1).max(80),
@@ -376,8 +371,7 @@ function challengeKind(challenge: ChallengeLike) {
   return {
     isPrivate: [text(challenge.visibility), type, typeof challenge.hostOperations === "object" && challenge.hostOperations ? text((challenge.hostOperations as Record<string, unknown>).visibilityMode) : ""].some((value) => /private|exclusive|invite|access_code|approved_list/.test(value.toLowerCase())),
     isLive: bool(challenge.isLiveEvent) || /live event|physical/.test(type),
-    isTournament: tournamentType !== "" && tournamentType !== "none" || /tournament|bracket|knockout/.test(`${type} ${format} ${hostFormat}`),
-    livestreamEnabled: false
+    isTournament: tournamentType !== "" && tournamentType !== "none" || /tournament|bracket|knockout/.test(`${type} ${format} ${hostFormat}`)
   };
 }
 

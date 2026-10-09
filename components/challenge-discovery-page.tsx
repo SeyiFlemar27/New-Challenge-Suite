@@ -1,7 +1,9 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CalendarClock, LockKeyhole, MapPin, Radio, Trophy, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
@@ -20,8 +22,8 @@ const copy = {
 } as const;
 
 export function ChallengeDiscoveryPage({ kind, createHref }: { kind: Kind; createHref?: string }) {
-  const [page, setPage] = useState(1);
-  useEffect(() => { setPage(Math.max(1, Number(new URLSearchParams(window.location.search).get("page") ?? 1) || 1)); }, []);
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get("page") ?? 1) || 1));
   const query = useQuery({ queryKey: ["challenge-discovery", kind, page], queryFn: () => apiRequest<Payload>(`/api/challenge-discovery?type=${kind}&page=${page}`), staleTime: 30_000 });
   const payload = query.data?.ok ? query.data.data : null;
   const Icon = copy[kind].icon;
@@ -38,5 +40,5 @@ export function ChallengeDiscoveryPage({ kind, createHref }: { kind: Kind; creat
 function DiscoveryCard({ challenge, kind }: { challenge: Challenge; kind: Kind }) {
   const image = String(challenge.coverImageUrl ?? "");
   const destination = kind === "private" ? `/challenges/${challenge.id}/access` : kind === "tournament" ? `/tournaments/${challenge.id}` : challenge.challengeId ? `/challenges/${String(challenge.challengeId)}` : `/host/live-events`;
-  return <Card className="group flex h-full flex-col overflow-hidden bg-[#171717]"><div className="relative aspect-[16/10] bg-[#0f0f0f]">{image ? <img src={image} alt="" className="h-full w-full object-cover transition group-hover:scale-[1.02]" /> : <div className="grid h-full place-items-center text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Challenge Suite</div>}<span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-[11px] font-black text-white">{challenge.typeLabel}</span><span className="absolute bottom-3 right-3 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black capitalize text-black">{String(challenge.status).replaceAll("_", " ")}</span></div><div className="flex flex-1 flex-col p-5"><h2 className="line-clamp-2 text-xl font-black">{challenge.title}</h2><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{String(challenge.description ?? "Challenge details are available on the challenge page.")}</p><p className="mt-4 text-xs font-black text-[var(--gold)]">Created by {String(challenge.creatorDisplayName ?? "Challenge creator")}</p><div className="mt-4 grid gap-2 text-xs text-slate-300"><span className="flex items-center gap-2"><Users size={15} /> {Number(challenge.participantCount ?? 0)} participants</span><span className="flex items-center gap-2"><CalendarClock size={15} /> {formatChallengeDateTime(challenge.startsAt ?? challenge.registrationDeadline, challenge) ?? "Schedule pending"}</span>{kind === "private" ? <span className="flex items-center gap-2"><LockKeyhole size={15} /> Link + Code required</span> : null}{kind === "live" && challenge.venueName ? <span className="flex items-center gap-2"><MapPin size={15} /> {String(challenge.venueName)}</span> : null}</div><LinkButton href={destination} className="mt-auto w-full pt-5">{kind === "private" ? "Enter Access Code" : "View Challenge"}</LinkButton></div></Card>;
+  return <Card className="group flex h-full flex-col overflow-hidden bg-[#171717]"><div className="relative aspect-[16/10] bg-[#0f0f0f]">{image ? <ContentImage src={image} alt="" className="h-full w-full object-cover transition group-hover:scale-[1.02]" /> : <div className="grid h-full place-items-center text-sm font-black uppercase tracking-[0.14em] text-[var(--gold)]">Challenge Suite</div>}<span className="absolute left-3 top-3 rounded-[6px] bg-black/80 px-3 py-2 text-[11px] font-black text-white">{challenge.typeLabel}</span><span className="absolute bottom-3 right-3 rounded-[6px] bg-[var(--gold)] px-3 py-2 text-[11px] font-black capitalize text-black">{String(challenge.status).replaceAll("_", " ")}</span></div><div className="flex flex-1 flex-col p-5"><h2 className="line-clamp-2 text-xl font-black">{challenge.title}</h2><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{String(challenge.description ?? "Challenge details are available on the challenge page.")}</p><p className="mt-4 text-xs font-black text-[var(--gold)]">Created by {String(challenge.creatorDisplayName ?? "Challenge creator")}</p><div className="mt-4 grid gap-2 text-xs text-slate-300"><span className="flex items-center gap-2"><Users size={15} /> {Number(challenge.participantCount ?? 0)} participants</span><span className="flex items-center gap-2"><CalendarClock size={15} /> {formatChallengeDateTime(challenge.startsAt ?? challenge.registrationDeadline, challenge) ?? "Schedule pending"}</span>{kind === "private" ? <span className="flex items-center gap-2"><LockKeyhole size={15} /> Link + Code required</span> : null}{kind === "live" && challenge.venueName ? <span className="flex items-center gap-2"><MapPin size={15} /> {String(challenge.venueName)}</span> : null}</div><LinkButton href={destination} className="mt-auto w-full pt-5">{kind === "private" ? "Enter Access Code" : "View Challenge"}</LinkButton></div></Card>;
 }

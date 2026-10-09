@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDownloadURL, ref, uploadBytesResumable, type UploadTask } from "firebase/storage";
@@ -54,6 +55,7 @@ export function MediaUploadField({
   const lastProgressAtRef = useRef(0);
   const lastBytesTransferredRef = useRef(0);
   const [status, setStatusState] = useState<MediaUploadStage>("idle");
+  const [retryAvailable, setRetryAvailable] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -130,6 +132,7 @@ export function MediaUploadField({
       return;
     }
     retryFileRef.current = file;
+    setRetryAvailable(true);
     setPreview(file);
     setSelectedFile({ name: file.name, size: file.size, type: file.type || "unknown" });
     setStatus("preparing");
@@ -228,6 +231,7 @@ export function MediaUploadField({
       setLocalPreview("");
       setSelectedFile(null);
       retryFileRef.current = null;
+      setRetryAvailable(false);
       uploadTaskRef.current = null;
       setStatus("complete");
       logUploadDebug("complete", { uploadPath: path, contentType: file.type, size: file.size });
@@ -261,6 +265,7 @@ export function MediaUploadField({
     const shouldRemove = !hasUploadedValue || window.confirm("Are you sure you want to remove this media?");
     if (!shouldRemove) return;
     retryFileRef.current = null;
+    setRetryAvailable(false);
     uploadTaskRef.current?.cancel();
     uploadTaskRef.current = null;
     setPreview(null);
@@ -294,7 +299,7 @@ export function MediaUploadField({
       <Card className={builderAppearance ? "border-slate-200 bg-white p-3 shadow-none" : "border-white/10 bg-black/30 p-4"}>
         {displayUrl ? (
           <div className={`overflow-hidden rounded-[8px] border ${builderAppearance ? "border-slate-200 bg-slate-100" : "border-white/10 bg-[#111]"}`}>
-            {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded.</div> : isVideo ? <video src={displayUrl} controls playsInline className="max-h-72 w-full object-cover" /> : !previewFailed ? <img src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable.</div>}
+            {isDocument ? <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center text-sm font-bold text-slate-300"><FileText className="text-[var(--gold)]" /> Document uploaded.</div> : isVideo ? <video src={displayUrl} controls playsInline className="max-h-72 w-full object-cover" /> : !previewFailed ? <ContentImage src={displayUrl} alt={label} onError={() => setPreviewFailed(true)} className="max-h-72 w-full object-cover" /> : <div className="flex h-40 items-center justify-center text-sm font-bold text-slate-400">Preview unavailable.</div>}
           </div>
         ) : (
           <button type="button" onClick={chooseAnotherFile} disabled={disabled} className={`flex min-h-44 w-full flex-col items-center justify-center rounded-[8px] border border-dashed px-4 py-8 text-center ${builderAppearance ? disabled ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : "border-slate-300 bg-slate-50 text-slate-700 hover:border-amber-500 hover:bg-amber-50" : disabled ? "cursor-not-allowed border-white/15 bg-[#101010] text-slate-500" : "border-white/15 bg-[#151515] text-slate-300 hover:border-[var(--gold)]/50 hover:text-[var(--gold)]"}`}>
@@ -320,7 +325,7 @@ export function MediaUploadField({
         {status === "complete" || value ? <p className={`mt-3 flex items-center gap-2 rounded-[8px] bg-emerald-500/10 p-3 text-sm font-bold ${builderAppearance ? "text-emerald-800" : "text-emerald-200"}`}><CheckCircle2 size={16} /> Upload complete.</p> : null}
         {disabled ? <p className="mt-3 rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-sm font-bold text-yellow-100">Publishing without media. No upload request will be attempted.</p> : null}
         {value || localPreview ? <div className="mt-4 flex flex-wrap gap-3">{!disabled ? <Button type="button" variant="secondary" onClick={chooseAnotherFile}><UploadCloud size={16} /> {value ? "Replace" : "Choose Another File"}</Button> : null}<Button type="button" variant="ghost" onClick={remove}><Trash2 size={16} /> Remove</Button></div> : null}
-        {status === "failed" && !disabled ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryFileRef.current}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}
+        {status === "failed" && !disabled ? <div className="mt-3 flex flex-wrap gap-3"><Button type="button" variant="secondary" onClick={retry} disabled={!retryAvailable}><RotateCcw size={16} /> Retry Upload</Button><Button type="button" variant="ghost" onClick={chooseAnotherFile}><UploadCloud size={16} /> Choose Another File</Button></div> : null}
         {helperText ? <p className="mt-3 text-xs leading-5 text-slate-500">{helperText}</p> : null}
         {removedNotice ? <p className="mt-3 rounded-[8px] bg-slate-900 p-3 text-sm font-bold text-slate-200">{removedNotice}</p> : null}
         {error ? <div className="mt-3 rounded-[8px] bg-red-950/50 p-3 text-sm font-bold text-red-200" role="alert"><p className="flex items-center gap-2"><XCircle size={16} /> {error}</p>{errorCode ? <p className="mt-2 text-xs font-semibold text-red-200/70">Error code: {errorCode}</p> : null}</div> : null}

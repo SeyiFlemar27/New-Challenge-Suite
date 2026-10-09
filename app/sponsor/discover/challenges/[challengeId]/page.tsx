@@ -23,6 +23,7 @@ export default function ChallengeOpportunityPage() {
   const [placementNotes, setPlacementNotes] = useState("");
   const [fundingMessage, setFundingMessage] = useState("");
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [agreement, setAgreement] = useState<Opportunity | null>(null);
   const [discussionLoading, setDiscussionLoading] = useState(false);
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function ChallengeOpportunityPage() {
       apiRequest<{ opportunity: Opportunity }>(`/api/sponsor/discover/challenges/${params.challengeId}`)
     ]).then(([profileResult, opportunityResult]) => {
       if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
-      if (opportunityResult.ok && opportunityResult.data) setOpportunity(opportunityResult.data.opportunity);
+      if (opportunityResult.ok && opportunityResult.data) { setOpportunity(opportunityResult.data.opportunity); setAgreement(opportunityResult.data.opportunity.agreement ?? null); }
       else setError(opportunityResult.message || "Opportunity could not be loaded.");
       setLoading(false);
     });
@@ -41,29 +42,51 @@ export default function ChallengeOpportunityPage() {
     await apiRequest("/api/sponsor/saved/challenges", { method: "POST", body: JSON.stringify({ challengeId: params.challengeId }) });
   }
 
-  async function startFundingCheckout() {
+  async function expressInterest() {
     setFundingMessage("");
     const dollars = Number(fundingAmount);
     if (!Number.isFinite(dollars) || dollars < 5) {
-      setFundingMessage("Sponsor funding amount must be at least $5.");
+      setFundingMessage("Proposed sponsorship amount must be at least $5.");
       return;
     }
     setFundingLoading(true);
-    const result = await apiRequest<{ url?: string; sponsorContributionId?: string }>(`/api/sponsor/challenges/${params.challengeId}/funding-checkout`, {
+    const result = await apiRequest<{ agreement: Opportunity }>(`/api/sponsor/challenges/${params.challengeId}/interest`, {
       method: "POST",
       body: JSON.stringify({
         amountCents: Math.round(dollars * 100),
         ctaText,
         ctaUrl,
-        placementNotes,
-        placements: ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"]
+        placements: ["challenge_detail", "voting_page", "leaderboard", "winner_announcement", "share_card"],
+        deliverables: placementNotes.trim() ? [placementNotes.trim()] : []
       })
     });
     setFundingLoading(false);
-    if (!result.ok || !result.data?.url) {
+    if (!result.ok || !result.data?.agreement) {
       setFundingMessage(result.message);
       return;
     }
+    setAgreement(result.data.agreement);
+    setFundingMessage(result.message);
+  }
+
+  async function acceptTerms() {
+    if (!agreement?.id) return;
+    setFundingLoading(true);
+    const result = await apiRequest<{ agreement: Opportunity }>(`/api/sponsor/agreements/${agreement.id}/accept`, { method: "POST", body: JSON.stringify({}) });
+    setFundingLoading(false);
+    if (result.ok && result.data?.agreement) setAgreement(result.data.agreement);
+    setFundingMessage(result.message);
+  }
+
+  async function startFundingCheckout() {
+    if (!agreement?.id || agreement.status !== "accepted") return setFundingMessage("Both parties must accept the current agreement before funding.");
+    setFundingLoading(true);
+    const result = await apiRequest<{ url?: string }>(`/api/sponsor/challenges/${params.challengeId}/funding-checkout`, {
+      method: "POST",
+      body: JSON.stringify({ agreementId: agreement.id, idempotencyKey: crypto.randomUUID() })
+    });
+    setFundingLoading(false);
+    if (!result.ok || !result.data?.url) return setFundingMessage(result.message || "Sponsor funding checkout could not start.");
     window.location.href = result.data.url;
   }
 
@@ -101,15 +124,14 @@ export default function ChallengeOpportunityPage() {
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button>
           <Button variant="secondary" onClick={() => void discussSponsorship()} disabled={discussionLoading || !opportunity.creatorId}><MessageSquare size={16} /> {discussionLoading ? "Opening..." : "Discuss Sponsorship"}</Button>
-          <LinkButton href={`/sponsor/funding/${opportunity.id}/checkout`}><WalletCards size={16} /> Fund Challenge</LinkButton>
+          <LinkButton href="#funding-checkout"><WalletCards size={16} /> Sponsorship terms</LinkButton>
         </div>
       </div>
 
       <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-5">
         <ShieldAlert className="text-[var(--gold)]" />
-        <h2 className="mt-3 text-xl font-black">Funding setup required</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Sponsor funding checkout can create a pending Stripe session when provider configuration and sponsor gates are satisfied. Contributions count toward the prize pool only after Stripe webhook confirmation.</p>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Starting a sponsorship discussion does not confirm payment, approve placement, release a payout, or award a prize.</p>
+        <h2 className="mt-3 text-xl font-black">Agree terms before funding</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Send proposed commercial terms to the challenge owner. Funding opens only after both parties accept the same version. Confirmed contributions remain prize-directed; placements still require review.</p>
       </Card>
 
       <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -131,9 +153,10 @@ export default function ChallengeOpportunityPage() {
 
       <Card id="funding-checkout" className="mt-8 p-6">
         <WalletCards className="text-[var(--gold)]" />
-        <h2 className="mt-3 text-2xl font-black">Sponsor funding checkout</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Confirmed sponsor contributions go 100% to winners. Branding remains pending review, and checkout success does not confirm funding.</p>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <h2 className="mt-3 text-2xl font-black">Sponsorship interest and terms</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">The proposed amount is not charged until you and the Creator/Host accept the same agreement terms.</p>
+        {agreement ? <div className="mt-4 rounded-[8px] border border-slate-200 bg-slate-50 p-4 text-sm"><p className="font-black capitalize">Agreement: {String(agreement.status).replaceAll("_", " ")}</p><p className="mt-2">Funding: {String(agreement.fundingStatus ?? "not_started").replaceAll("_", " ")}</p><p className="mt-2">Agreed amount: {formatCents(agreement.terms?.amountCents)}</p><p className="mt-2">Placements: {(agreement.terms?.placements ?? []).map((item: string) => placementLabel(item)).join(", ")}</p></div> : null}
+        {!agreement ? <div className="mt-5 grid gap-4 md:grid-cols-2">
           <Field label="Funding amount (USD)">
             <input className={inputClass} type="number" min="5" step="1" value={fundingAmount} onChange={(event) => setFundingAmount(event.target.value)} placeholder="500" />
           </Field>
@@ -146,8 +169,12 @@ export default function ChallengeOpportunityPage() {
           <Field label="Placement notes">
             <textarea className={textareaClass} value={placementNotes} onChange={(event) => setPlacementNotes(event.target.value)} placeholder="Preferred placement context. No public placement appears until payment and approval are confirmed." />
           </Field>
-        </div>
-        <Button className="mt-5 w-full sm:w-auto" onClick={() => void startFundingCheckout()} disabled={fundingLoading || !opportunity.fundingWindow?.allowed}>{fundingLoading ? "Starting Checkout..." : "Start Sponsor Funding Checkout"}</Button>
+        </div> : null}
+        {!agreement ? <Button className="mt-5 w-full sm:w-auto" onClick={() => void expressInterest()} disabled={fundingLoading || !opportunity.fundingWindow?.allowed}>{fundingLoading ? "Sending..." : "Send Interest and Proposed Terms"}</Button> : null}
+        {agreement?.status === "awaiting_sponsor_acceptance" ? <Button className="mt-5 w-full sm:w-auto" onClick={() => void acceptTerms()} disabled={fundingLoading}>{fundingLoading ? "Accepting..." : "Accept Creator’s Terms"}</Button> : null}
+        {agreement?.status === "accepted" && agreement.fundingStatus !== "confirmed" ? <Button className="mt-5 w-full sm:w-auto" onClick={() => void startFundingCheckout()} disabled={fundingLoading || !opportunity.fundingWindow?.allowed}>{fundingLoading ? "Starting Checkout..." : "Fund Accepted Sponsorship"}</Button> : null}
+        {agreement?.fundingStatus === "pending" ? <p className="mt-5 text-sm font-bold text-amber-900">Payment pending provider confirmation. This is not an active or funded sponsorship yet.</p> : null}
+        {agreement?.fundingStatus === "confirmed" ? <p className="mt-5 text-sm font-bold text-emerald-800">Funding confirmed. Placement remains pending review.</p> : null}
         {fundingMessage ? <p className="mt-4 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-800">{fundingMessage}</p> : null}
         <p className="mt-4 text-xs leading-5 text-slate-500">Webhook confirmation is required. No sponsor money, prize pool growth, public brand placement, ledger entry, payout, or winner payment is created from this form.</p>
       </Card>

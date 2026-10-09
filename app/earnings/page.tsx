@@ -6,6 +6,7 @@ import { Button, Card, Field, LinkButton, inputClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { fetchWallet } from "@/lib/api/services";
 import { moneyFromCents } from "@/lib/utils";
+import { useClockTimestamp } from "@/lib/hooks/use-clock-timestamp";
 
 type CashWallet = { availableBalanceCents: number; pendingBalanceCents: number; underReviewBalanceCents?: number; lifetimeEarningsCents?: number; currency?: string };
 type Earning = { id: string; challengeId?: string | null; settlementId?: string | null; sourceType: string; grossAmountCents: number; feeAmountCents: number; netAmountCents: number; status: string; createdAt?: string | null };
@@ -16,6 +17,7 @@ type Method = "payoneer" | "bank_transfer" | "paypal";
 type Tab = "overview" | "transactions" | "payouts" | "documents";
 
 export default function EarningsPage() {
+  const now = useClockTimestamp();
   const [tab, setTab] = useState<Tab>("overview");
   const [wallet, setWallet] = useState<CashWallet | null>(null);
   const [earnings, setEarnings] = useState<Earning[]>([]);
@@ -45,12 +47,12 @@ export default function EarningsPage() {
     if (methodResult.ok && methodResult.data) setMethods(methodResult.data.methods ?? []);
     setLoading(false);
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, []);
 
   const filtered = useMemo(() => {
-    const cutoff = dateRange === "30" ? Date.now() - 30 * 86400000 : dateRange === "90" ? Date.now() - 90 * 86400000 : 0;
+    const cutoff = !now ? 0 : dateRange === "30" ? now - 30 * 86400000 : dateRange === "90" ? now - 90 * 86400000 : 0;
     return earnings.filter((item) => (activity === "all" || item.sourceType === activity) && (!cutoff || Date.parse(String(item.createdAt ?? "")) >= cutoff));
-  }, [activity, dateRange, earnings]);
+  }, [activity, dateRange, earnings, now]);
   const expenses = earnings.reduce((sum, item) => sum + Number(item.feeAmountCents ?? 0), 0);
   const available = Number(wallet?.availableBalanceCents ?? 0);
 

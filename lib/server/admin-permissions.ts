@@ -23,11 +23,8 @@ export const ADMIN_PERMISSIONS = [
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
-export const ADMIN_ROLES = [
-  "platform_owner", "super_admin", "operations_admin", "finance_admin", "moderation_admin", "safety_admin",
-  "support_admin", "sponsor_manager", "event_tournament_admin", "content_admin", "marketing_communications_admin",
-  "analyst", "read_only_auditor", "technical_admin", "developer_support"
-] as const;
+/** Challenge Suite has one administrator identity. Legacy values below are read only for migration compatibility. */
+export const ADMIN_ROLES = ["admin"] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
@@ -36,7 +33,7 @@ const viewPermissions: AdminPermission[] = [
   "submissions.view", "participants.view", "winners.view", "finance.view", "sponsors.view", "tickets.view", "settings.view", "rewards.view"
 ];
 
-const rolePermissions: Record<AdminRole, AdminPermission[]> = {
+const legacyRolePermissions: Record<string, AdminPermission[]> = {
   platform_owner: [...ADMIN_PERMISSIONS],
   super_admin: [...ADMIN_PERMISSIONS],
   operations_admin: [...viewPermissions, "admin.actionCentre.assign", "admin.actionCentre.manage", "admin.actionCentre.resolve", "admin.actionCentre.escalate", "users.warn", "users.restrict", "users.suspendWorkspace", "users.reinstate", "challenges.review", "challenges.editSafeFields", "challenges.extendDeadlines", "challenges.pause", "challenges.resume", "challenges.cancel", "challenges.archive", "submissions.review", "participants.review", "participants.disqualify", "winners.review", "sponsors.review", "tickets.assign", "tickets.resolve", "disputes.review", "rewards.fulfil"],
@@ -58,11 +55,22 @@ export function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && (ADMIN_ROLES as readonly string[]).includes(value);
 }
 
+export const LEGACY_ADMIN_ROLE_NAMES = Object.keys(legacyRolePermissions);
+const legacyAdminRoleNames = new Set(LEGACY_ADMIN_ROLE_NAMES);
+
+export function isKnownAdminAssignment(value: unknown): value is string {
+  return isAdminRole(value) || (typeof value === "string" && legacyAdminRoleNames.has(value));
+}
+
+export function normalizeAdminRoleAssignments(values: readonly unknown[]): AdminRole[] {
+  return values.some(isKnownAdminAssignment) ? ["admin"] : [];
+}
+
 export function resolveAdminPermissions(roles: readonly string[], explicitPermissions: readonly string[] = []) {
   const permissions = new Set<AdminPermission>();
   for (const role of roles) {
-    if (!isAdminRole(role)) continue;
-    for (const permission of rolePermissions[role]) permissions.add(permission);
+    if (role === "admin") for (const permission of ADMIN_PERMISSIONS) permissions.add(permission);
+    for (const permission of legacyRolePermissions[role] ?? []) permissions.add(permission);
   }
   for (const permission of explicitPermissions) {
     if ((ADMIN_PERMISSIONS as readonly string[]).includes(permission)) permissions.add(permission as AdminPermission);
@@ -74,13 +82,12 @@ export function hasAdminPermission(permissions: readonly string[] | undefined, p
   return Boolean(permissions?.includes(permission));
 }
 
-export function canDeactivateAdministrator(input: { actorId: string; targetId: string; activeSuperAdminCount: number; targetRoles: readonly string[] }) {
+export function canDeactivateAdministrator(input: { actorId: string; targetId: string; activeAdminCount: number }) {
   if (input.actorId === input.targetId) return { allowed: false, reason: "You cannot deactivate your own administrator account." };
-  if (input.targetRoles.some((role) => role === "platform_owner")) return { allowed: false, reason: "Platform ownership must be transferred through the protected ownership process." };
-  if (input.targetRoles.some((role) => role === "super_admin") && input.activeSuperAdminCount <= 1) return { allowed: false, reason: "The final active Super Admin cannot be removed." };
+  if (input.activeAdminCount <= 1) return { allowed: false, reason: "The final active Admin cannot be removed." };
   return { allowed: true, reason: null };
 }
 
 export function canManageAdministrators(roles: readonly string[] | undefined) {
-  return Boolean(roles?.some((role) => role === "platform_owner" || role === "super_admin"));
+  return Boolean(roles?.includes("admin"));
 }

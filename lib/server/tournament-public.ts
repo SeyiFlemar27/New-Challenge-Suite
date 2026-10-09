@@ -60,7 +60,12 @@ export async function getTournamentBundle(id: string): Promise<{ available: bool
         ? rows(teams).map((team) => ({ id: team.id, tournamentId: id, displayName: String(team.name ?? "Tournament Team"), status: team.status, seed: team.seed ?? null }))
         : rows(participants),
       rounds: rows(rounds),
-      matches: rows(matches),
+      matches: rows(matches).map((match) => {
+        const scoresVisible = tournament.scoreVisibility === "live"
+          || (tournament.scoreVisibility === "final_only" && ["confirmed", "forfeit"].includes(String(match.status ?? "")));
+        if (scoresVisible) return match;
+        return Object.fromEntries(Object.entries(match).filter(([key]) => key !== "voteCountA" && key !== "voteCountB")) as TournamentRow;
+      }),
       submissions: rows(submissions),
       announcements: rows(announcements).filter((item) => item.status === "published"),
       sponsors: rows(sponsors).filter((item) => item.publicDisplayApproved === true),

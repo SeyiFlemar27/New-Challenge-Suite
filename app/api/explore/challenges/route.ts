@@ -1,17 +1,20 @@
 import { NextRequest } from "next/server";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { ok, serverError } from "@/lib/server/responses";
-import { getChallengePhaseSummary } from "@/lib/challenge-status";
+import { getChallengePhaseSummary, PUBLIC_CHALLENGE_STATUS_VALUES } from "@/lib/challenge-status";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
-import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
+import { isPublicChallenge, isQaOrDemoRecord, isRetiredHybridCompetition, publicChallengeFields } from "@/lib/server/public-challenge";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { FieldPath, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
+import { NORMAL_CHALLENGE_CATEGORIES } from "@/lib/normal-challenge-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+const EXPLORE_SCAN_PAGE = 180;
 
 type PhaseSummary = ReturnType<typeof getChallengePhaseSummary>;
 
@@ -61,6 +64,34 @@ function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseS
   return true;
 }
 
+function isLockedPublicPreview(id: string, challenge: Record<string, unknown>) {
+  const visibility = text(challenge.visibility).toLowerCase();
+  const type = text(challenge.type ?? challenge.competitionType).toLowerCase();
+  const status = text(challenge.status ?? challenge.lifecycleStatus).toLowerCase();
+  return visibility === "private"
+    && challenge.publicPreviewEnabled === true
+    && challenge.publicVisibility !== false
+    && challenge.eventVisibility !== "hidden_until_approved"
+    && (PUBLIC_CHALLENGE_STATUS_VALUES as readonly string[]).includes(status)
+    && !isQaOrDemoRecord(id, challenge)
+    && !isRetiredHybridCompetition(challenge)
+    && (type.includes("private") || type.includes("exclusive") || type.includes("invite"));
+}
+
+function cursorValue(challenge: Record<string, unknown>, field: string) {
+  const value = challenge[field] as { toMillis?: () => number } | string | number | null | undefined;
+  if (value && typeof value === "object" && typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value === "string") return Date.parse(value) || value;
+  return value ?? 0;
+}
+
+function compareExploreDocs(left: QueryDocumentSnapshot, right: QueryDocumentSnapshot, field: string, direction: "asc" | "desc") {
+  const leftValue = cursorValue(left.data() as Record<string, unknown>, field);
+  const rightValue = cursorValue(right.data() as Record<string, unknown>, field);
+  const comparison = typeof leftValue === "number" && typeof rightValue === "number" ? leftValue - rightValue : String(leftValue).localeCompare(String(rightValue));
+  return (direction === "asc" ? comparison : -comparison) || left.id.localeCompare(right.id) * (direction === "asc" ? 1 : -1);
+}
+
 function trustedRecentActivity(item: Record<string, unknown>) {
   if (item.activityIntegrityStatus === "blocked" || item.suspiciousActivity === true || item.hiddenFromTrending === true) return null;
   const creatorActivity = Number(item.creatorSelfActivity72h ?? 0);
@@ -87,14 +118,6 @@ function trustedRecentActivity(item: Record<string, unknown>) {
       : views > 0 ? `${views.toLocaleString()} recent view${views === 1 ? "" : "s"}`
         : fresh ? "New challenge" : "Active";
   return { score, activityLabel };
-}
-
-function sortChallenges(items: Array<Record<string, unknown>>, sort: string) {
-  const byDate = (key: string, item: Record<string, unknown>) => Date.parse(String(item[key] ?? "")) || 0;
-  const copy = [...items];
-  if (sort === "participants") return copy.sort((a, b) => Number(b.participantCount ?? 0) - Number(a.participantCount ?? 0));
-  if (sort === "ending_soon") return copy.sort((a, b) => byDate("submissionDeadline", a) - byDate("submissionDeadline", b));
-  return copy.sort((a, b) => Number(b.discoveryScore ?? 0) - Number(a.discoveryScore ?? 0) || byDate("publishedAt", b) - byDate("publishedAt", a));
 }
 
 function withoutRankingSignals(item: Record<string, unknown>) {
@@ -146,18 +169,45 @@ export async function GET(request: NextRequest) {
   const sponsorReady = url.searchParams.get("sponsorReady") === "true";
   const sort = text(url.searchParams.get("sort")).slice(0, 40).toLowerCase() || "recent";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+  const cursor = text(url.searchParams.get("cursor")).slice(0, 200);
   const limit = CHALLENGE_PAGE_SIZE;
+  if (page > 1 && !cursor) return serverError("Explore requires a cursor to continue this filtered result set.", "EXPLORE_CURSOR_REQUIRED");
   try {
-    const [snap, participantSnap] = await Promise.all([
-      db.collection("challenges").orderBy("createdAt", "desc").limit(180).get(),
+    const sortField = sort === "participants" ? "participantCount" : sort === "ending_soon" ? "submissionDeadline" : "createdAt";
+    const sortDirection = sort === "ending_soon" ? "asc" as const : "desc" as const;
+    const challengesRef = db.collection("challenges");
+    const orderQuery = (visibility: "public" | "private") => {
+      let query = challengesRef
+        .where("visibility", "==", visibility)
+        .where("status", "in", PUBLIC_CHALLENGE_STATUS_VALUES)
+        .orderBy(sortField, sortDirection)
+        .orderBy(FieldPath.documentId(), sortDirection);
+      if (visibility === "private") query = query.where("publicPreviewEnabled", "==", true);
+      return query;
+    };
+    let publicQuery = orderQuery("public");
+    let lockedQuery = orderQuery("private");
+    if (cursor) {
+      const cursorSnapshot = await challengesRef.doc(cursor).get();
+      if (!cursorSnapshot.exists) return serverError("Explore pagination cursor is no longer available.", "EXPLORE_CURSOR_NOT_FOUND");
+      publicQuery = publicQuery.startAfter(cursorSnapshot);
+      lockedQuery = lockedQuery.startAfter(cursorSnapshot);
+    }
+    const [publicSnap, lockedSnap, participantSnap] = await Promise.all([
+      publicQuery.limit(EXPLORE_SCAN_PAGE + 1).get(),
+      lockedQuery.limit(EXPLORE_SCAN_PAGE + 1).get(),
       user ? db.collection("challengeParticipants").where("userId", "==", user.uid).limit(200).get() : Promise.resolve(null)
     ]);
+    const candidateDocs = [...new Map([...publicSnap.docs, ...lockedSnap.docs].map((doc) => [doc.id, doc])).values()]
+      .sort((left, right) => compareExploreDocs(left, right, sortField, sortDirection))
+      .slice(0, EXPLORE_SCAN_PAGE * 2);
     const participantByChallenge = new Map((participantSnap?.docs ?? []).map((doc) => [String(doc.data().challengeId ?? ""), { id: doc.id, ...doc.data() }]));
-    const all = snap.docs.flatMap((doc) => {
+    const all = candidateDocs.flatMap<Record<string, unknown> & { _sortDocId: string }>((doc) => {
       const raw = { id: doc.id, ...doc.data() } as Record<string, unknown>;
-      if (!isPublicChallenge(doc.id, raw)) return [];
+      const lockedPreview = isLockedPublicPreview(doc.id, raw);
+      if (!lockedPreview && !isPublicChallenge(doc.id, raw)) return [];
       const phase = getChallengePhaseSummary(raw, new Date(), { eligibleSubmissionCount: Number(raw.approvedSubmissionCount ?? raw.eligibleSubmissionCount ?? 0) });
-      if (!phaseFilter && !isDefaultDiscoverable(raw, phase)) return [];
+      if (!isDefaultDiscoverable(raw, phase)) return [];
       if (phaseFilter && phase.phase !== phaseFilter) return [];
       if (category && String(raw.category ?? "").toLowerCase() !== category) return [];
       if (entry === "free" && isPaidEntryChallenge(raw)) return [];
@@ -165,8 +215,33 @@ export async function GET(request: NextRequest) {
       const kind = challengeType(raw);
       if (typeFilter && kind !== typeFilter) return [];
       if (sponsorReady && !Boolean(raw.sponsorReady ?? raw.sponsorEnabled ?? (raw.monetization as Record<string, unknown> | undefined)?.sponsorReady)) return [];
-      const searchable = [raw.title, raw.shortDescription, raw.description, raw.category, raw.creatorName, raw.creatorUsername, ...(Array.isArray(raw.keywords) ? raw.keywords : []), ...(Array.isArray(raw.tags) ? raw.tags : [])].map((value) => String(value ?? "").toLowerCase()).join(" ");
+      const searchable = (lockedPreview
+        ? [raw.title, raw.shortDescription, raw.category, raw.creatorName, raw.creatorUsername]
+        : [raw.title, raw.shortDescription, raw.description, raw.category, raw.creatorName, raw.creatorUsername, ...(Array.isArray(raw.keywords) ? raw.keywords : []), ...(Array.isArray(raw.tags) ? raw.tags : [])])
+        .map((value) => String(value ?? "").toLowerCase()).join(" ");
       if (query && !searchable.includes(query.toLowerCase())) return [];
+      if (lockedPreview) {
+        const item = {
+          id: doc.id,
+          title: text(raw.title) || "Private Challenge",
+          shortDescription: text(raw.shortDescription ?? raw.summary),
+          category: text(raw.category) || "General",
+          type: raw.type ?? "Private / Exclusive",
+          visibility: "private",
+          publicPreviewEnabled: true,
+          challengeType: "private",
+          typeLabel: typeLabel("private"),
+          coverImageUrl: text(raw.coverImageUrl ?? raw.bannerUrl) || null,
+          publishedAt: toIso(raw.publishedAt ?? raw.createdAt),
+          creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
+          phaseSummary: phase,
+          completedRecently: completedWithinExploreWindow(raw, phase),
+          completedInteractionsDisabled: true,
+          detailHref: `/challenges/${doc.id}`,
+          cta: { label: "View Locked Challenge", href: `/challenges/${doc.id}`, action: "locked_preview" }
+        };
+        return [{ ...item, _sortDocId: doc.id }];
+      }
       const publicFields = publicChallengeFields(raw);
       const paid = isPaidEntryChallenge(raw);
       const owned = Boolean(user?.uid && ownedBy(raw, user.uid));
@@ -203,17 +278,25 @@ export async function GET(request: NextRequest) {
         creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
         cta: ctaFor({ challenge: raw, phase, userId: user?.uid ?? null, sponsor, participant: participantByChallenge.get(doc.id) })
       };
-      return [challenge];
+      return [{ ...challenge, _sortDocId: doc.id }];
     });
-    const sorted = sortChallenges(all, sort);
-    const start = (page - 1) * limit;
-    const items = sorted.slice(start, start + limit).map(withoutRankingSignals);
+    const pageItems = all.slice(0, limit);
+    const hasExtraMatch = all.length > limit;
+    const hasMoreCandidates = publicSnap.size > EXPLORE_SCAN_PAGE || lockedSnap.size > EXPLORE_SCAN_PAGE || candidateDocs.length < publicSnap.size + lockedSnap.size;
+    const hasMore = hasExtraMatch || hasMoreCandidates;
+    const nextCursor = hasExtraMatch
+      ? String(pageItems.at(-1)?._sortDocId ?? "")
+      : hasMoreCandidates ? candidateDocs.at(-1)?.id ?? "" : null;
+    const items = pageItems.map((item) => {
+      const { _sortDocId: _cursorId, ...publicItem } = item;
+      return withoutRankingSignals(publicItem);
+    });
     const trending = all.filter((item) => Number(item.trendingScore ?? 0) > 0 && !item.completedInteractionsDisabled)
       .sort((a, b) => Number(b.trendingScore ?? 0) - Number(a.trendingScore ?? 0))
       .slice(0, 12)
-      .map(withoutRankingSignals);
-    const categories = Array.from(new Set(all.map((item) => String(item.category ?? "")).filter(Boolean))).slice(0, 12);
-    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: sorted.length, hasMore: start + limit < sorted.length, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: !phaseFilter }, "Explore challenges loaded.");
+      .map((item) => { const { _sortDocId: _cursorId, ...publicItem } = item; return withoutRankingSignals(publicItem); });
+    const categories = NORMAL_CHALLENGE_CATEGORIES.map((item) => item.label);
+    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: null, hasMore, nextCursor: nextCursor || null, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: true, cursorPagination: true, scannedPageLimit: EXPLORE_SCAN_PAGE * 2, lockedPrivatePreviewsIncluded: true }, "Explore challenges loaded.");
   } catch (error) {
     return serverError("Explore challenges could not be loaded.", error instanceof Error ? error.message : error);
   }

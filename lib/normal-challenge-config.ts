@@ -1,4 +1,5 @@
 export { NORMAL_CHALLENGE_MAX_STEP, NORMAL_CHALLENGE_STEPS } from "@/lib/challenge-builder-foundation";
+export { NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-media-policy.js";
 export const NORMAL_CHALLENGE_BUILDER_VERSION = "normal_v2";
 
 export const NORMAL_CHALLENGE_CATEGORIES = [
@@ -32,20 +33,6 @@ export function isCanonicalChallengeSubcategory(category: string, subcategory: s
 
 export const NORMAL_RESUBMIT_WINDOWS = [12, 24, 48, 72] as const;
 export const NORMAL_PRIZE_SPLITS: Record<number, number[]> = { 1: [100], 2: [70, 30], 3: [60, 25, 15] };
-
-export const NORMAL_MEDIA_LIMITS = {
-  imageCount: 3,
-  imageBytes: 5 * 1024 * 1024,
-  imageMinWidth: 712,
-  imageMinHeight: 430,
-  imageMaxWidth: 4000,
-  imageMaxHeight: 2416,
-  videoCount: 1,
-  videoBytes: 50 * 1024 * 1024,
-  videoMinWidth: 1280,
-  videoMinHeight: 720,
-  videoMaxDurationSeconds: 75
-} as const;
 
 export function isNormalChallengeV2(value: Record<string, unknown>) {
   return String(value.builderVersion ?? "") === NORMAL_CHALLENGE_BUILDER_VERSION;

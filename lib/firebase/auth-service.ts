@@ -18,6 +18,7 @@ import { auth, isFirebaseConfigured } from "./client";
 import { AuthFlowError, safeAuthError, type SignupEmailState } from "./auth-errors";
 import type { AppRole, UserPlanId } from "@/lib/types";
 import { parseApiResponse } from "@/lib/api/client";
+import { getRememberMePreference, setRememberMePreference } from "@/lib/firebase/session-persistence";
 
 export interface SignupInput {
   firstName: string;
@@ -55,21 +56,44 @@ interface BootstrapResponse {
 
 export const demoAuthEnabled = false;
 
-export async function syncServerSession(user: User, rememberMe = false) {
-  const response = await fetch("/api/auth/session", {
+let sessionSyncVersion = 0;
+let activeSessionSync: { controller: AbortController; promise: Promise<void>; uid: string; rememberMe: boolean } | null = null;
+
+export async function syncServerSession(user: User, rememberMe = getRememberMePreference()) {
+  const current = activeSessionSync;
+  if (current && !current.controller.signal.aborted && current.uid === user.uid && current.rememberMe === rememberMe) return current.promise;
+  current?.controller.abort();
+  const version = ++sessionSyncVersion;
+  const controller = new AbortController();
+  const promise = (async () => {
+    const idToken = await user.getIdToken();
+    if (version !== sessionSyncVersion || auth?.currentUser?.uid !== user.uid) return;
+    const response = await fetch("/api/auth/session", {
     method: "POST",
     credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${await user.getIdToken()}`
+      Authorization: `Bearer ${idToken}`
     },
-    body: JSON.stringify({ rememberMe })
+      body: JSON.stringify({ rememberMe }),
+      signal: controller.signal
+    });
+    if (version !== sessionSyncVersion) return;
+    const result = await parseApiResponse<unknown>(response);
+    if (!result.ok) throw new Error(result.message || "Your session could not be restored.");
+  })().finally(() => {
+    if (activeSessionSync?.promise === promise) activeSessionSync = null;
   });
-  const result = await parseApiResponse<unknown>(response);
-  if (!result.ok) throw new Error(result.message || "Your session could not be restored.");
+  activeSessionSync = { controller, promise, uid: user.uid, rememberMe };
+  return promise;
 }
 
 async function clearServerSession() {
+  ++sessionSyncVersion;
+  const current = activeSessionSync;
+  current?.controller.abort();
+  await current?.promise.catch(() => undefined);
+  activeSessionSync = null;
   await fetch("/api/auth/session", {
     method: "DELETE",
     credentials: "same-origin"
@@ -101,6 +125,7 @@ async function callProfileBootstrap(user: User, init: RequestInit = {}) {
 export async function signUpWithProfile(input: SignupInput) {
   if (!isFirebaseConfigured) throw new Error("Account creation is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
+  setRememberMePreference(false);
 
   const availability = await fetch("/api/auth/account-availability", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: input.email }) });
   const availabilityBody = await parseApiResponse<{ state?: SignupEmailState; available?: boolean }>(availability);
@@ -141,6 +166,7 @@ async function ensureGoogleProfile(user: User) {
 export async function loginWithEmail(email: string, password: string, rememberMe = false) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
+  setRememberMePreference(rememberMe);
   await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
   let credential;
   try {
@@ -171,12 +197,14 @@ export async function logout() {
     await clearServerSession();
   } finally {
     await signOut(auth);
+    setRememberMePreference(false);
   }
 }
 
 export async function loginWithGoogle(rememberMe = false) {
   if (!isFirebaseConfigured) throw new Error("Sign in is not configured yet.");
   if (!auth) throw new Error("Authentication is not configured yet.");
+  setRememberMePreference(rememberMe);
   await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
   let credential;
   try {

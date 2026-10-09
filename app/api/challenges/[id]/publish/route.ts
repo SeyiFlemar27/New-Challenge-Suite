@@ -25,6 +25,7 @@ import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payloa
 import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
+import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -99,6 +100,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
   if (!validation.success) return rejectPublish("Some required details are missing.", 400, { fieldErrors: zodFieldErrors(validation.error) }, "VALIDATION_ERROR");
   const body = validation.data;
+  const privateAccessMethod = body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod;
+  let privateAccess: Record<string, unknown> | null = null;
   const judgeAccountIds = body.hostOperations?.judgeAccountIds ?? [];
   if (body.isLiveEvent && body.hostOperations?.winnerSelection === "judge_selection") {
     if (!judgeAccountIds.length) return rejectPublish("Assign at least one registered judge before submitting this event.", 422, { fieldErrors: { judgeAccountIds: "Assign at least one registered judge." } }, "REGISTERED_JUDGE_REQUIRED");
@@ -161,11 +164,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
-  if (current.officialChallenge === true && typeof current.organizationOwnerId === "string" && current.organizationOwnerId) {
-    const organizationChallenges = await db.collection("challenges").where("organizationOwnerId", "==", current.organizationOwnerId).limit(50).get();
-    const activeOfficialChallenges = organizationChallenges.docs.filter((document) => document.id !== id && shouldCountAgainstActiveChallengeLimit(document.data().status)).length;
-    if (activeOfficialChallenges >= ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit) return rejectPublish("This Enterprise organization has reached its limit of 10 active challenges.", 409, { activeChallengeCount: activeOfficialChallenges, activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
-  }
   const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
 
@@ -203,8 +201,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     : 1;
   const revisionSuffix = reviewRevisionNumber === 1 ? "initial" : `revision_${reviewRevisionNumber}`;
   const storedChallengeFields = sanitizeFirestorePayload(body, "challengeUpdate");
-  const update = {
+  const update: Record<string, unknown> = {
     ...storedChallengeFields,
+    officialChallenge: current.officialChallenge === true,
+    ownershipType: current.ownershipType ?? "creator_personal",
+    organizationOwnerId: current.officialChallenge === true ? current.organizationOwnerId ?? null : null,
+    enterpriseOrganizationId: current.officialChallenge === true ? current.enterpriseOrganizationId ?? current.organizationOwnerId ?? null : null,
+    enterpriseFinanceContextId: current.officialChallenge === true ? current.enterpriseFinanceContextId ?? current.organizationOwnerId ?? null : null,
+    enterpriseChallengeLeadId: current.officialChallenge === true ? current.enterpriseChallengeLeadId ?? current.creatorId ?? user.uid : null,
+    enterpriseAssignedUserIds: current.officialChallenge === true ? [...new Set([
+      String(current.enterpriseChallengeLeadId ?? current.creatorId ?? user.uid),
+      ...(Array.isArray(current.enterpriseAssignments) ? current.enterpriseAssignments as Array<Record<string, unknown>> : []).filter((assignment) => assignment.status !== "removed").map((assignment) => String(assignment.userId ?? "")).filter(Boolean),
+    ])] : [],
+    privateAccessMethod,
+    privateAccessCode: "",
+    privateDirectInvitees: [],
     submissionStartAt: body.submissionStartAt || body.startsAt,
     votingStartsAt: simpleVotingStartAt,
     winnerAnnouncementAt: body.winnerAnnouncementAt || body.endsAt,
@@ -247,6 +258,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true }, createdAt: now }, submitAuditRef.id, now);
   const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: reviewRevisionNumber }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
 
+  let mediaVerification: Record<string, unknown>;
+  try {
+    mediaVerification = await verifyChallengeMedia(db, id, { ...current, ...body }, user.uid);
+  } catch (error) {
+    const code = error instanceof Error ? error.message.split(":")[0] : "MEDIA_VERIFICATION_FAILED";
+    await recordChallengeMediaVerificationFailure(db, id, code).catch(() => undefined);
+    return rejectPublish("Challenge media could not be verified from storage. Replace the media and try again.", 422, undefined, code);
+  }
+  update.mediaVerification = mediaVerification;
+  applyVerifiedChallengeMedia(update, mediaVerification);
+  if (body.visibility === "private" || body.visibility === "exclusive") {
+    try {
+      privateAccess = await createPrivateChallengeInvite(db, {
+        challengeId: id,
+        creatorId: user.uid,
+        now,
+        code: privateAccessMethod === "invitation_code" ? body.privateAccessCode : undefined,
+        expiresAt: body.privateAccessCodeExpiresAt ?? null,
+        maxUses: body.privateAccessCodeMaxUses ?? 100,
+        method: privateAccessMethod as "invite_link" | "invitation_code" | "direct_invitations",
+        allowedEmails: privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : []
+      });
+    } catch (error) {
+      return rejectPublish("Private access invitations could not be provisioned. Review the access settings and try again.", 422, undefined, error instanceof Error ? error.message : "PRIVATE_INVITE_PROVISION_FAILED");
+    }
+  }
+
   let transition: { idempotent: boolean; challenge: Record<string, unknown> };
   try {
     transition = await commitChallengeReviewSubmission(db, {
@@ -261,6 +299,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       prizePool: { prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now }
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "EnterpriseActiveChallengeLimitError") {
+      return rejectPublish(error.message, 409, { activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
+    }
+    if (error instanceof Error && error.message === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") {
+      return rejectPublish("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
+    }
+    if (error instanceof Error && ["ENTERPRISE_ORGANIZATION_REQUIRED", "ENTERPRISE_FINANCE_OWNER_MISMATCH"].includes(error.message)) {
+      return rejectPublish("Enterprise financial ownership could not be verified.", 409, undefined, error.message);
+    }
     if (error instanceof InvalidFirestorePayloadError) {
       const payloadName = error.fieldPath.split(/[.[]/, 1)[0] || "submitPayload";
       const supportDiagnostic = { requestId: publishRequestId, stage: "payload_validation", payloadName, safePath: error.fieldPath };
@@ -275,18 +322,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return serverError("Challenge could not be submitted for review.", error instanceof Error ? error.message : error);
   }
   if (transition.idempotent) return ok({ challenge: transition.challenge, idempotent: true }, "Challenge is already submitted for review.");
-
-  if (body.visibility === "private" || body.visibility === "exclusive") {
-    await createPrivateChallengeInvite(db, { challengeId: id, creatorId: user.uid, now, code: typeof body.privateAccessCode === "string" ? body.privateAccessCode : undefined, expiresAt: typeof body.privateAccessCodeExpiresAt === "string" ? body.privateAccessCodeExpiresAt : null, maxUses: typeof body.privateAccessCodeMaxUses === "number" ? body.privateAccessCodeMaxUses : null }).catch(async (error) => {
-      await writeAuditLog({ actorId: user.uid, actorType: "system", action: "challenge.private_invite_failed", targetType: "challenge", targetId: id, reason: "Private invite creation failed after review submission.", metadata: { causeCode: "PRIVATE_INVITE_DELIVERY_FAILED", occurredAt: now }, createdAt: now }, db).catch(() => undefined);
-      console.error("[challenge.publish] private invite creation failed", { challengeId: id, userId: user.uid, code: "PRIVATE_INVITE_DELIVERY_FAILED", message: error instanceof Error ? error.message : "Unknown error" });
-    });
-  }
+  await persistChallengeMediaVerification(db, id, mediaVerification);
   await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: id }).catch(() => undefined);
   if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
     await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {
       await db.collection("adminActionTasks").doc(`doro_create_${id}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "create_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
     });
   }
-  return ok({ challenge: update }, lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.");
+  return ok({ challenge: update, privateAccess }, lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.");
 }

@@ -20,6 +20,8 @@ import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 import { ENTERPRISE_WORKSPACE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
+import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
 
 export async function GET() {
   const db = getAdminDb();
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
   const validation = serverChallengeCreateSchema.safeParse(normalizedInput);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
+  const privateAccessMethod = body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod;
   if (body.publish && body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return fail("Challenge media uploads are not available yet. Add a storage-confirmed challenge image before publishing.", 503, { provider: "firebase_storage", setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   if (isRetiredHybridCompetition(body as unknown as Record<string, unknown>)) {
     return fail("Hybrid Competition has been discontinued. Create a Challenge, Live Event, or Tournament instead.", 410, undefined, "HYBRID_COMPETITION_RETIRED");
@@ -81,11 +84,6 @@ export async function POST(request: Request) {
     return fail("Your Enterprise organization context is still being provisioned. Try again shortly or contact support.", 409, undefined, "ENTERPRISE_ORGANIZATION_REQUIRED");
   }
   if (body.officialChallenge) {
-    const officialChallenges = await db.collection("challenges").where("organizationOwnerId", "==", enterpriseAccess!.organizationId).limit(50).get();
-    const activeOfficialChallenges = officialChallenges.docs.filter((document) => shouldCountAgainstActiveChallengeLimit(document.data().status)).length;
-    if (activeOfficialChallenges >= ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit) {
-      return fail("This Enterprise organization has reached its limit of 10 active challenges.", 409, { activeChallengeCount: activeOfficialChallenges, activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
-    }
     if (Math.round(Number(body.prizeValue ?? 0) * 100) > ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents) {
       return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
     }
@@ -194,7 +192,7 @@ export async function POST(request: Request) {
     kycRequiredBeforeWithdrawal: isKycRequiredForAction("withdrawalRequest"),
     cashHoldHours: 24
   };
-  const challenge = {
+  const challenge: Record<string, unknown> = {
     id: ref.id,
     creatorId: user.uid,
     createdBy: user.uid,
@@ -205,6 +203,7 @@ export async function POST(request: Request) {
     enterpriseFinanceContextId: body.officialChallenge ? enterpriseAccess!.organizationId : null,
     enterpriseChallengeLeadId: body.officialChallenge ? user.uid : null,
     enterpriseAssignments: body.officialChallenge ? [{ userId: user.uid, responsibility: "challenge_lead", status: "active", assignedAt: now, assignedBy: user.uid }] : [],
+    enterpriseAssignedUserIds: body.officialChallenge ? [user.uid] : [],
     title: body.title,
     description: body.description,
     category: body.category === "Other" ? body.customCategory : body.category,
@@ -212,15 +211,15 @@ export async function POST(request: Request) {
     type: body.type ?? (body.visibility === "private" ? "Private / Exclusive" : "Public Challenge"),
     visibility: body.visibility,
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
-    privateAccessMethod: body.visibility === "private" ? (body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod) : "",
-    privateAccessCode: body.visibility === "private" && body.privateAccessMethod !== "invite_link" && body.privateAccessMethod !== "direct_invitations" ? body.privateAccessCode : "",
+    privateAccessMethod: body.visibility === "private" ? privateAccessMethod : "",
+    privateAccessCode: "",
     privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
     privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,
     privateAccessInstructions: body.visibility === "private" ? body.privateAccessInstructions : "",
     privateParticipantQuestions: body.visibility === "private" ? body.privateParticipantQuestions : [],
     privateParticipantAcknowledgements: body.visibility === "private" ? body.privateParticipantAcknowledgements : [],
     privateParticipantRequirements: body.visibility === "private" ? body.privateParticipantRequirements : [],
-    privateDirectInvitees: body.visibility === "private" && body.privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [],
+    privateDirectInvitees: [],
     premiumOnly: Boolean(body.premiumOnly),
     planRequired: body.premiumOnly ? "pro" : null,
     status: lifecycleStatus,
@@ -320,11 +319,6 @@ export async function POST(request: Request) {
     eventMapUrl: body.eventMapUrl || null,
     eventCapacity: body.eventCapacity,
     eventMode: body.isLiveEvent ? "physical" : "online",
-    externalLiveUrl: null,
-    externalLiveProvider: null,
-    externalLiveStatus: "not_supported",
-    externalLiveOpensAt: null,
-    externalLiveCtaLabel: null,
     nativeLiveStreamingEnabled: false,
     eventSyncStatus: body.isLiveEvent ? "pending_review" : "not_applicable",
     eventVisibility: body.isLiveEvent ? "hidden_until_approved" : "not_applicable",
@@ -368,12 +362,41 @@ export async function POST(request: Request) {
     submittedForReviewAt: lifecycleStatus === "pending_review" ? now : null,
     publishedAt: body.publish && lifecycleStatus !== "pending_review" ? now : null
   };
-  const privateInvitePromise = challenge.visibility === "private" || challenge.visibility === "exclusive"
-    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: body.privateAccessMethod === "invitation_code" || body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? body.privateAccessCode || undefined : undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100, method: body.privateAccessMethod === "direct_invitations" ? "direct_invitations" : body.privateAccessMethod === "invite_link" ? "invite_link" : "invitation_code", allowedEmails: body.privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [] })
+  if (body.publish) {
+    try {
+      challenge.mediaVerification = await verifyChallengeMedia(db, ref.id, challenge, user.uid);
+      applyVerifiedChallengeMedia(challenge, challenge.mediaVerification as Record<string, unknown>);
+    } catch (error) {
+      const code = error instanceof Error ? error.message.split(":")[0] : "MEDIA_VERIFICATION_FAILED";
+      await recordChallengeMediaVerificationFailure(db, ref.id, code).catch(() => undefined);
+      return fail("Challenge media could not be verified from storage. Replace the media and try again.", 422, undefined, code);
+    }
+  }
+  const privateInvitePromise = body.publish && (challenge.visibility === "private" || challenge.visibility === "exclusive")
+    ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: privateAccessMethod === "invitation_code" ? body.privateAccessCode || undefined : undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100, method: privateAccessMethod as "invite_link" | "invitation_code" | "direct_invitations", allowedEmails: privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [] })
     : Promise.resolve(null);
 
-  await Promise.all([
-    ref.set(challenge),
+  let challengeWrite: void;
+  try {
+    challengeWrite = await db.runTransaction(async (transaction) => {
+      const slot = await prepareEnterpriseActiveChallengeSlot(
+        db,
+        transaction,
+        body.officialChallenge && shouldCountAgainstActiveChallengeLimit(lifecycleStatus) ? enterpriseAccess!.organizationId : null,
+        ref.id,
+      );
+      slot.apply();
+      transaction.create(ref, challenge);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "EnterpriseActiveChallengeLimitError") {
+      return fail(error.message, 409, { activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
+    }
+    throw error;
+  }
+
+  const [privateAccess] = await Promise.all([
+    Promise.resolve(challengeWrite),
     db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`).set(revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
     privateInvitePromise,
     writeChallengePrizePoolFoundation(db, {
@@ -385,6 +408,7 @@ export async function POST(request: Request) {
       now
     })
   ]);
+  if (body.publish && challenge.mediaVerification && typeof challenge.mediaVerification === "object") await persistChallengeMediaVerification(db, ref.id, challenge.mediaVerification as Record<string, unknown>);
   if (body.publish) await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: ref.id }).catch(() => undefined);
   await writeAuditLog({
     actorId: user.uid,
@@ -398,5 +422,5 @@ export async function POST(request: Request) {
   }, db).catch((error) => console.warn("[audit] challenge create log failed", error instanceof Error ? error.message : String(error)));
 
   const publishMessage = lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.";
-  return ok({ challenge }, body.publish ? publishMessage : "Challenge draft saved.");
+  return ok({ challenge, privateAccess }, body.publish ? publishMessage : "Challenge draft saved.");
 }

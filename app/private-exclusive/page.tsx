@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ChallengeCard } from "@/components/domain-cards";
 import { Button, Card, EmptyState, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
 import { CheckCircle2, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
-import { checkPrivateInviteCode, fetchPrivateExclusiveChallenges, requestPrivateAccess } from "@/lib/api/services";
+import { fetchPrivateExclusiveChallenges, requestPrivateAccess } from "@/lib/api/services";
 import { normalizeChallenge } from "@/lib/api/normalizers";
 import type { Challenge } from "@/lib/types";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getEffectiveTier, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 
 export default function PrivateExclusivePage() {
+  const router = useRouter();
   const { user } = useCurrentUser();
   const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType });
   const experience = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
@@ -23,13 +25,16 @@ export default function PrivateExclusivePage() {
   const privateLocked = !planAccess.canCreatePrivateChallenges;
   const [inviteCode, setInviteCode] = useState("");
   const [status, setStatus] = useState("");
-  const [privateChallenges, setPrivateChallenges] = useState<Challenge[]>([]);
+  const [privateChallenges, setPrivateChallenges] = useState<Array<Challenge & Record<string, any>>>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [requestChallenge, setRequestChallenge] = useState<(Challenge & Record<string, any>) | null>(null);
   const [accessForm, setAccessForm] = useState({ reason: "", note: "" });
+  const [requirementAcknowledgements, setRequirementAcknowledgements] = useState<string[]>([]);
+  const [participantAnswers, setParticipantAnswers] = useState<Record<string, string>>({});
 
   async function loadPrivateChallenges() {
     setLoading(true);
@@ -44,33 +49,59 @@ export default function PrivateExclusivePage() {
       setLoading(false);
       return;
     }
-    setPrivateChallenges(result.data.challenges.map((challenge) => normalizeChallenge(challenge as any)));
+    setPrivateChallenges(result.data.challenges.map((challenge) => ({ ...normalizeChallenge(challenge as any), ...(challenge as Record<string, any>) })));
     setLoading(false);
   }
 
   useEffect(() => {
-    loadPrivateChallenges();
+    let active = true;
+    fetchPrivateExclusiveChallenges(30).then((result) => {
+      if (!active) return;
+      if (!result.ok || !result.data) {
+        const code = (result as any).code;
+        setPrivateChallenges([]);
+        setUnauthorized(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED");
+        setError(result.message || "Private challenges could not be loaded.");
+      } else setPrivateChallenges(result.data.challenges.map((challenge) => ({ ...normalizeChallenge(challenge as any), ...(challenge as Record<string, any>) })));
+      setLoading(false);
+    });
+    return () => { active = false; };
   }, []);
 
   async function checkCode() {
-    setSubmitting(true);
-    const result = await checkPrivateInviteCode(inviteCode);
-    setStatus(result.message || (result.ok ? "Access granted. Private challenge unlocked." : "Invalid invite code. Request access or try again."));
-    setSubmitting(false);
-    if (result.ok) loadPrivateChallenges();
+    if (!inviteCode.trim()) return setStatus("Enter an invitation code to continue.");
+    router.push(`/private/${encodeURIComponent(inviteCode.trim().toUpperCase())}`);
   }
 
   async function requestAccess() {
-    if (!accessForm.reason.trim()) {
+    if (!requestChallenge || !accessForm.reason.trim()) {
       setStatus("Tell us why you want access before sending the request.");
       return;
     }
     setSubmitting(true);
-    const result = await requestPrivateAccess({ reason: accessForm.reason, note: accessForm.note });
+    const result = await requestPrivateAccess({ challengeId: requestChallenge.id, reason: accessForm.reason, note: accessForm.note, requirementAcknowledgements, participantAnswers });
     setStatus(result.message || (result.ok ? "Access request sent." : "Access request could not be sent."));
-    if (result.ok) setRequestOpen(false);
+    if (result.ok) {
+      setRequestOpen(false);
+      setAccessForm({ reason: "", note: "" });
+      await loadPrivateChallenges();
+    }
     setSubmitting(false);
   }
+
+  function openRequest(challenge: Challenge & Record<string, any>) {
+    setRequestChallenge(challenge);
+    setAccessForm({ reason: "", note: "" });
+    setRequirementAcknowledgements([]);
+    setParticipantAnswers({});
+    setRequestOpen(true);
+  }
+
+  const previewChallenges = privateChallenges.filter((challenge) => challenge.privatePreview === true);
+  const accessibleChallenges = privateChallenges.filter((challenge) => challenge.privatePreview !== true);
+  const configuredRequirements = requestChallenge?.privateParticipantRequirements ?? [];
+  const configuredAcknowledgements = requestChallenge?.privateParticipantAcknowledgements ?? [];
+  const configuredQuestions = requestChallenge?.privateParticipantQuestions ?? [];
 
   return (
     <AppShell>
@@ -102,7 +133,6 @@ export default function PrivateExclusivePage() {
             <Field label="Invite Code"><input className={inputClass} value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder="Enter invite code" /></Field>
             <div className="flex gap-3">
               <Button className="flex-1" onClick={checkCode} disabled={submitting}>Check Code</Button>
-              <Button variant="secondary" className="flex-1" onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>
             </div>
             {status ? <p className={`flex items-center gap-2 rounded-[8px] p-3 text-sm font-bold ${status.startsWith("Invalid") ? "bg-red-950/40 text-red-200" : "bg-emerald-950/40 text-emerald-200"}`}><CheckCircle2 size={17} /> {status}</p> : null}
           </div>
@@ -119,23 +149,30 @@ export default function PrivateExclusivePage() {
       ) : error ? (
         <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title="Private challenges unavailable" body={error} action={<Button onClick={loadPrivateChallenges}>Retry</Button>} /></Card>
       ) : privateChallenges.length ? (
-        <div className="mt-6 grid gap-7 md:grid-cols-2 xl:grid-cols-3">
-          {privateChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}
-        </div>
+        <>
+          {previewChallenges.length ? <><h3 className="mt-7 text-lg font-black">Locked opportunities</h3><div className="mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {previewChallenges.map((challenge) => <Card key={challenge.id} className="p-5"><div className="flex items-center justify-between gap-3"><p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--gold)]">{challenge.category || "Private challenge"}</p><LockKeyhole size={16} className="text-slate-400" /></div><h3 className="mt-3 text-xl font-black">{challenge.title}</h3><p className="mt-2 line-clamp-3 text-sm text-slate-300">{challenge.shortDescription || "Details are available after access is approved."}</p>{challenge.accessRequest?.status ? <p className="mt-4 text-sm font-bold text-slate-300">Request: {String(challenge.accessRequest.status).replaceAll("_", " ")}</p> : null}{challenge.accessRequest?.status === "approved" ? <LinkButton href={`/challenges/${challenge.id}/join`} className="mt-4 w-full">Continue to admission</LinkButton> : challenge.accessRequest?.status === "pending_review" ? <Button className="mt-4 w-full" variant="secondary" disabled>Request pending</Button> : challenge.accessRequest?.status === "rejected" ? <Button className="mt-4 w-full" variant="secondary" disabled>Request declined</Button> : <Button className="mt-4 w-full" onClick={() => openRequest(challenge)}>Request Access</Button>}</Card>)}
+          </div></> : null}
+          {accessibleChallenges.length ? <><h3 className="mt-8 text-lg font-black">Challenges you can access</h3><div className="mt-4 grid gap-7 md:grid-cols-2 xl:grid-cols-3">{accessibleChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} />)}</div></> : null}
+        </>
       ) : (
-        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title={hostMode ? "No private competitions yet" : "No private challenges available"} body={hostMode ? "Create a private competition, then manage invite codes, access requests, approved participants, and pending approvals from this workspace." : "Request an invite or check back when exclusive creator challenges open."} action={hostMode ? <LinkButton href="/private/create">Create Private Competition</LinkButton> : <Button onClick={() => setRequestOpen(true)} disabled={submitting}>Request Access</Button>} /></Card>
+        <Card className="mt-6"><EmptyState icon={<LockKeyhole />} title={hostMode ? "No private competitions yet" : "No private challenges available"} body={hostMode ? "Create a private competition, then manage invite codes, access requests, approved participants, and pending approvals from this workspace." : "Check back when a private opportunity opens for public preview."} action={hostMode ? <LinkButton href="/private/create">Create Private Competition</LinkButton> : null} /></Card>
       )}
       {requestOpen ? (
         <div className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur sm:items-center sm:justify-center">
           <Card className="w-full max-w-lg p-6">
             <h2 className="text-2xl font-black">Request Private Access</h2>
-            <p className="mt-2 text-sm text-slate-300">Tell the creator or admin why you should be approved for private and exclusive access.</p>
+            <p className="mt-2 text-sm text-slate-300">Send your request to the challenge owner. Approval grants access only; eligibility, payment, capacity, and admission rules still apply.</p>
+            {requestChallenge ? <p className="mt-2 font-bold">{requestChallenge.title}</p> : null}
             <div className="mt-5 space-y-4">
+              {configuredRequirements.map((text: string, index: number) => { const id = `requirement-${index}`; return <label key={id} className="flex gap-3 rounded-[8px] border border-white/10 p-3 text-sm"><input type="checkbox" checked={requirementAcknowledgements.includes(id)} onChange={(event) => setRequirementAcknowledgements((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} /><span>{text}</span></label>; })}
+              {configuredAcknowledgements.map((text: string, index: number) => { const id = `acknowledgement-${index}`; return <label key={id} className="flex gap-3 rounded-[8px] border border-white/10 p-3 text-sm"><input type="checkbox" checked={requirementAcknowledgements.includes(id)} onChange={(event) => setRequirementAcknowledgements((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} /><span>{text}</span></label>; })}
+              {configuredQuestions.map((question: string, index: number) => <Field key={`question-${index}`} label={question}><textarea className="min-h-20 w-full rounded-[8px] border border-white/10 bg-[#11151d] px-4 py-3 outline-none focus:border-[var(--gold)]" value={participantAnswers[`question-${index}`] ?? ""} onChange={(event) => setParticipantAnswers((current) => ({ ...current, [`question-${index}`]: event.target.value }))} /></Field>)}
               <Field label="Reason for access"><input className={inputClass} value={accessForm.reason} onChange={(event) => setAccessForm((value) => ({ ...value, reason: event.target.value }))} placeholder="I was invited by the host..." /></Field>
               <Field label="Optional note"><textarea className="min-h-28 w-full rounded-[8px] border border-white/10 bg-[#11151d] px-4 py-3 outline-none focus:border-[var(--gold)]" value={accessForm.note} onChange={(event) => setAccessForm((value) => ({ ...value, note: event.target.value }))} /></Field>
             </div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button className="flex-1" onClick={requestAccess} disabled={submitting}>{submitting ? "Sending..." : "Send Request"}</Button>
+              <Button className="flex-1" onClick={requestAccess} disabled={submitting || !requestChallenge}>{submitting ? "Sending..." : "Send Request"}</Button>
               <Button variant="ghost" className="flex-1" onClick={() => setRequestOpen(false)}>Cancel</Button>
             </div>
           </Card>

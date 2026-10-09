@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/submission-lifecycle";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
+import { validatePrivateParticipantEligibility, validatePrivateRequirementEvidence } from "@/lib/server/private-invites";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,13 +43,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const challengeRef = db.collection("challenges").doc(id);
       const participantRef = db.collection("challengeParticipants").doc(`${id}_${user.uid}`);
       const accessRef = db.collection("privateChallengeAccess").doc(`${id}_${user.uid}`);
-      const [challengeSnap, participantSnap, accessSnap] = await Promise.all([
+      const [challengeSnap, participantSnap, accessSnap, currentAccountSnap, currentProfileSnap] = await Promise.all([
         transaction.get(challengeRef),
         transaction.get(participantRef),
-        transaction.get(accessRef)
+        transaction.get(accessRef),
+        transaction.get(db.collection("users").doc(user.uid)),
+        transaction.get(db.collection("profiles").doc(user.uid))
       ]);
       if (!challengeSnap.exists) throw new Error("Challenge not found.");
       const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+      const currentPlanProfile = { ...(currentProfileSnap.exists ? currentProfileSnap.data() ?? {} : {}), ...(currentAccountSnap.exists ? currentAccountSnap.data() ?? {} : {}) };
       const privateOnly = isPrivateChallengeRecord(challenge);
       const isOwner = userOwnsChallenge(challenge, user.uid);
       if (isOwner) throw new Error("SELF_ENTRY_NOT_ALLOWED");
@@ -57,8 +61,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (manualApproval && requestedAction !== "join_waitlist") throw new Error("ENTRY_REQUEST_REQUIRED");
       const hasAccessGrant = accessSnap.exists && accessSnap.data()?.status === "approved";
       if (privateOnly && !hasAccessGrant) throw new Error("PRIVATE_INVITE_REQUIRED");
+      if (privateOnly) {
+        const grant = accessSnap.data() ?? {};
+        if (String(grant.source ?? "") !== String(challenge.privateAccessMethod ?? "") && String(grant.source ?? "") !== "owner_approval") throw new Error("PRIVATE_INVITE_REQUIRED");
+        const eligibilityError = validatePrivateParticipantEligibility(challenge, currentPlanProfile);
+        if (eligibilityError) throw new Error(eligibilityError);
+        const evidence = validatePrivateRequirementEvidence(challenge, { requirementAcknowledgements: grant.requirementAcknowledgements, participantAnswers: grant.participantAnswers });
+        if (typeof evidence === "string") throw new Error(evidence);
+      }
       const accessChallenge = privateOnly && hasAccessGrant ? { ...challenge, visibility: "public" } : challenge;
-      const access = canAccessChallenge(planProfile, accessChallenge);
+      const access = canAccessChallenge(currentPlanProfile, accessChallenge);
       if (!access.allowed) throw new Error(access.code ?? "PREMIUM_REQUIRED");
       const joinable = isChallengeJoinable(challenge);
       if (!joinable.allowed) throw new Error(joinable.reason ?? "Registration is closed for this challenge.");
@@ -123,6 +135,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message === "PREMIUM_REQUIRED") return fail("Premium membership is required to join this challenge.", 403, undefined, "PREMIUM_REQUIRED");
     if (message === "CREATOR_PRO_REQUIRED") return fail("Creator or Host access is required to join this private challenge.", 403, undefined, "CREATOR_PRO_REQUIRED");
     if (message === "PRIVATE_INVITE_REQUIRED") return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
+    if (message === "ACCOUNT_UNAVAILABLE") return fail("This account cannot join challenges.", 403, undefined, message);
+    if (message === "COUNTRY_NOT_ELIGIBLE") return fail("Your verified account location is not eligible for this challenge.", 403, undefined, message);
+    if (message === "COUNTRY_VERIFICATION_REQUIRED") return fail("Verified account location is required for this challenge.", 403, undefined, message);
+    if (message === "AGE_VERIFICATION_REQUIRED") return fail("Verified age information is required for this challenge.", 403, undefined, message);
+    if (message === "AGE_NOT_ELIGIBLE") return fail("Your verified age does not meet this challenge's minimum age.", 403, undefined, message);
+    if (message === "PARTICIPANT_REQUIREMENTS_REQUIRED" || message === "PARTICIPANT_ANSWERS_REQUIRED") return fail("Your private access requirements must be accepted before joining.", 403, undefined, message);
     if (message === "SELF_ENTRY_NOT_ALLOWED") return fail("Creators and hosts cannot compete in their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
     if (message === "ENTRY_REQUEST_REQUIRED") return fail("Request entry before joining this challenge.", 409, { action: "request_entry", requestUrl: `/api/challenges/${id}/entry-request` }, "ENTRY_REQUEST_REQUIRED");
     if (message === "WAITLIST_ACTION_REQUIRED") return fail("This challenge is full. Join the waitlist to continue.", 409, { action: "join_waitlist" }, "WAITLIST_AVAILABLE");

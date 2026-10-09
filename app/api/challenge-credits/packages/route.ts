@@ -1,8 +1,5 @@
-import { getAdminDb } from "@/lib/firebase/admin";
-import { ok } from "@/lib/server/responses";
-import { getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { fail } from "@/lib/server/responses";
 
 export async function GET() {
-  const rules = await getActiveEconomyRules(getAdminDb());
-  return ok({ packages: rules.challengeCredits.packages, creditsPerUsd: rules.challengeCredits.creditsPerUsd, ruleVersion: rules.version, withdrawable: false }, "Challenge Credit packages loaded.");
+  return fail("Challenge Credit packages are retired. Use DoroCoin in supported product flows.", 410, { redirectTo: "/dorocoins" }, "CHALLENGE_CREDITS_RETIRED");
 }

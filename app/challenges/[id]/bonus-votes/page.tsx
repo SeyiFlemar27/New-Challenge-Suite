@@ -20,7 +20,6 @@ export default function BonusVotesPage() {
   const queryClient = useQueryClient();
   const [custom, setCustom] = useState("1");
   const [agreed, setAgreed] = useState(false);
-  const [largeSpendConfirmed, setLargeSpendConfirmed] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
@@ -33,7 +32,7 @@ export default function BonusVotesPage() {
     staleTime: 30_000
   });
   const details = detailsQuery.data?.ok ? detailsQuery.data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details?.challenge]);
+  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
   const submissions = useMemo(() => {
     if (!challenge) return [];
     const voteEligibleStatuses = new Set(["active", "approved", "winner"]);
@@ -43,20 +42,20 @@ export default function BonusVotesPage() {
       .filter((item) => item.id);
   }, [challenge, details?.submissions]);
   const votes = Number(custom || 0);
-  const credits = votes * 10;
+  const doroCoinCost = votes * 5;
   const lifecycle = challenge ? getChallengeLifecycleState(challenge) : null;
   const phaseSummary = (details as any)?.phaseSummary as { votingOpen?: boolean; eligibleSubmissionCount?: number | null } | undefined;
   const votingOpen = Boolean(phaseSummary?.votingOpen);
   const eligibleSubmissionCount = Number(phaseSummary?.eligibleSubmissionCount ?? submissions.length);
   const economyQuery = useQuery({
     queryKey: ["economy-summary", auth.user?.uid ?? "signed-out"],
-    queryFn: () => apiRequest<{ challengeCredits?: { balance?: number } }>("/api/economy/summary"),
+    queryFn: () => apiRequest<{ doroCoins?: { balance?: number } }>("/api/economy/summary"),
     enabled: Boolean(auth.user) && !auth.loading
   });
-  const walletBalance = economyQuery.data?.ok ? Number(economyQuery.data.data?.challengeCredits?.balance ?? 0) : 0;
+  const walletBalance = economyQuery.data?.ok ? Number(economyQuery.data.data?.doroCoins?.balance ?? 0) : 0;
 
   const voteMutation = useMutation({
-    mutationFn: async (mode: "free" | "credits") => {
+    mutationFn: async (mode: "free" | "dorocoin") => {
       if (!submissionId) throw new Error("Select a submission to vote for.");
       const quantity = mode === "free" ? 1 : votes;
       const result = await voteForSubmission({
@@ -65,7 +64,7 @@ export default function BonusVotesPage() {
         voteMode: mode,
         quantity,
         idempotencyKey: crypto.randomUUID(),
-        confirmedLargeSpend: mode !== "credits" || quantity < 8 || largeSpendConfirmed
+        confirmedLargeSpend: true
       });
       if (!result.ok) throw new Error(result.message);
       return { ...result.data, mode };
@@ -75,7 +74,7 @@ export default function BonusVotesPage() {
       const spent = Number(result?.creditCost ?? 0);
       setSuccessMessage(result?.mode === "free"
         ? "Your free daily vote was recorded."
-        : `${recorded} vote${recorded === 1 ? "" : "s"} were recorded. ${spent} Challenge Credits spent.`);
+        : `${recorded} vote${recorded === 1 ? "" : "s"} were recorded. ${spent} DoroCoins spent.`);
       setSuccess(true);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["challenge-details", challengeId] }),
@@ -96,7 +95,7 @@ export default function BonusVotesPage() {
       return;
     }
     if (!agreed) {
-      setError("Accept the Challenge Credit voting acknowledgement to continue.");
+      setError("Accept the DoroCoin voting acknowledgement to continue.");
       return;
     }
     if (!votingOpen) {
@@ -111,15 +110,11 @@ export default function BonusVotesPage() {
       setError("You can cast up to 10 additional votes per challenge each day.");
       return;
     }
-    if (votes >= 8 && !largeSpendConfirmed) {
-      setError("Confirm this Challenge Credit spend to continue.");
+    if (doroCoinCost > walletBalance) {
+      setError("Insufficient DoroCoin balance.");
       return;
     }
-    if (credits > walletBalance) {
-      setError("Insufficient Challenge Credit balance.");
-      return;
-    }
-    voteMutation.mutate("credits");
+    voteMutation.mutate("dorocoin");
   }
 
   if (auth.loading || detailsQuery.isLoading || economyQuery.isLoading) {
@@ -162,7 +157,7 @@ export default function BonusVotesPage() {
         <Card className="mx-auto max-w-4xl p-5 sm:p-8">
           <PageTitle title="Bonus Votes" subtitle={challenge.title} icon={<Vote className="text-[var(--gold)]" />} />
           <h2 className="mt-8 text-xl font-black">Bonus votes are not available yet.</h2>
-          <p className="mt-3 text-slate-300">Voting must open before Challenge Credit votes can be used.</p>
+          <p className="mt-3 text-slate-300">Voting must open before additional DoroCoin votes can be used.</p>
           <LinkButton href={`/challenges/${challenge.id}`} className="mt-8">Return to Challenge</LinkButton>
         </Card>
       </AppShell>
@@ -195,7 +190,7 @@ export default function BonusVotesPage() {
         ) : (
           <>
             {!auth.user ? <p className="mt-6 rounded-[8px] bg-red-950/50 p-3 text-red-200">Sign in before voting.</p> : null}
-            <div className="mt-8"><Field label="Additional vote quantity"><input className={inputClass} type="number" min="1" max="10" value={custom} onChange={(event) => { setCustom(event.target.value); setLargeSpendConfirmed(false); }} /></Field><p className="mt-2 text-sm text-slate-400">10 Challenge Credits per additional vote, with a maximum of 10 per challenge each day.</p></div>
+            <div className="mt-8"><Field label="Additional vote quantity"><input className={inputClass} type="number" min="1" max="10" value={custom} onChange={(event) => setCustom(event.target.value)} /></Field><p className="mt-2 text-sm text-slate-400">5 DoroCoins per additional vote, with a maximum of 10 per challenge each day.</p></div>
             <div className="mt-6">
               <Field label="Vote For Submission">
                 <select className={inputClass} value={submissionId} onChange={(event) => setSubmissionId(event.target.value)}>
@@ -205,20 +200,18 @@ export default function BonusVotesPage() {
               </Field>
             </div>
             <Card className="mt-6 bg-black/30 p-4 sm:p-5">
-              <p><b>Challenge Credit wallet:</b> {walletBalance} Credits</p>
+              <p><b>DoroCoin wallet:</b> {walletBalance} DC</p>
               <p className="mt-2"><b>Selected participant:</b> {submissions.find((submission) => submission.id === submissionId)?.title ?? "None selected"}</p>
-              <p className="mt-2"><b>Total:</b> {votes || 0} votes x 10 Credits = {credits || 0} Challenge Credits</p>
+              <p className="mt-2"><b>Total:</b> {votes || 0} votes x 5 DC = {doroCoinCost || 0} DoroCoins</p>
             </Card>
             <Card className="mt-6 border-yellow-500/20 bg-yellow-500/[0.04] p-4 sm:p-5">
-              <h2 className="text-lg font-black">Paid Vote Checkout</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Card-based paid vote credits are granted only after Stripe webhook confirmation and cannot be granted from the success page.</p>
-              <Button className="mt-4 w-full" variant="secondary" disabled title="Paid vote checkout requires payment setup and challenge-level paid vote activation">Paid votes setup required</Button>
+              <h2 className="text-lg font-black">DoroCoin voting</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">DoroCoins are platform credits and cannot be withdrawn or converted to cash.</p>
             </Card>
-            <label className="mt-6 flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I acknowledge that additional votes are final once recorded and use non-withdrawable Challenge Credits.</span></label>
-            {votes >= 8 ? <label className="mt-4 flex items-start gap-3 rounded-[8px] border border-amber-400/30 bg-amber-400/10 p-4 text-sm font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={largeSpendConfirmed} onChange={(event) => setLargeSpendConfirmed(event.target.checked)} /> <span>Confirm spending {credits} Challenge Credits on this vote request.</span></label> : null}
+            <label className="mt-6 flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I acknowledge that additional votes are final once recorded and use non-withdrawable DoroCoins.</span></label>
             {error ? <p className="mt-4 rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
-            <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm Challenge Credit Votes"}</Button>
-            <LinkButton href={`/challenge-credits?returnTo=${encodeURIComponent(`/challenges/${challengeId}/bonus-votes?submissionId=${submissionId}`)}`} variant="secondary" className="mt-4 w-full">Buy Challenge Credits</LinkButton>
+            <Button className="mt-6 w-full" onClick={purchase} disabled={!auth.user || !votingOpen || !submissions.length || voteMutation.isPending}>{voteMutation.isPending ? "Recording Votes" : "Confirm DoroCoin Votes"}</Button>
+            <LinkButton href={`/dorocoins?returnTo=${encodeURIComponent(`/challenges/${challengeId}/bonus-votes?submissionId=${submissionId}`)}`} variant="secondary" className="mt-4 w-full">Get DoroCoins</LinkButton>
           </>
         )}
       </Card>

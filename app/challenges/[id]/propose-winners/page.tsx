@@ -27,6 +27,7 @@ type CandidatePayload = {
   activeProposal: { id: string; status?: string; winners?: Array<{ placement: number; submissionId?: string | null }>; notes?: string; adminNote?: string | null } | null;
   noEligibleCandidatesMessage: string | null;
 };
+const EMPTY_CANDIDATES: WinnerCandidate[] = [];
 
 const oneWinner = [{ placement: 1, splitPercent: 100 }];
 const twoWinners = [{ placement: 1, splitPercent: 70 }, { placement: 2, splitPercent: 30 }];
@@ -54,7 +55,7 @@ export default function ProposeWinnersPage() {
 
   const payload = data?.ok ? data.data : null;
   const slots = mode === "one" ? oneWinner : mode === "two" ? twoWinners : threeWinners;
-  const candidates = payload?.candidates ?? [];
+  const candidates = payload?.candidates ?? EMPTY_CANDIDATES;
   const candidatesById = useMemo(() => new Map(candidates.map((candidate) => [candidate.submissionId, candidate])), [candidates]);
   const duplicateSelection = new Set(Object.values(selected).filter(Boolean)).size !== Object.values(selected).filter(Boolean).length;
   const allFilled = slots.every((slot) => selected[slot.placement]);

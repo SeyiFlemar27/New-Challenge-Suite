@@ -23,11 +23,14 @@ export default function EditProfilePage() {
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  async function loadProfile() {
-    setLoading(true);
-    setError(null);
-    setUnauthenticated(false);
-    const result = await fetchMyProfile();
+  async function loadProfile() { return fetchMyProfile(); }
+
+  useEffect(() => {
+    let active = true;
+    void loadProfile().then((result) => {
+      if (!active) return;
+      setError(null);
+      setUnauthenticated(false);
     if (!result.ok || !result.data) {
       const code = (result as any).code;
       setUnauthenticated(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED");
@@ -43,10 +46,8 @@ export default function EditProfilePage() {
       selfDeclaredRegion: user.selfDeclaredRegion === "NG" ? "NG" : "US"
     });
     setLoading(false);
-  }
-
-  useEffect(() => {
-    loadProfile();
+    });
+    return () => { active = false; };
   }, []);
 
   async function saveProfile() {

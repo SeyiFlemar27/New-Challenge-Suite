@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Landmark, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
@@ -38,18 +38,22 @@ export default function WithdrawPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    const result = await apiRequest<WithdrawalData>("/api/withdrawals");
+  const request = useCallback(() => apiRequest<WithdrawalData>("/api/withdrawals"), []);
+  const applyResult = useCallback((result: Awaited<ReturnType<typeof request>>) => {
     setLoading(false);
     if (!result.ok || !result.data) return setNotice(result.message);
     const payload = result.data;
     setData(payload);
     setSourceId((current) => current || payload.eligibleSources?.[0]?.id || "");
     setPayoutMethodId((current) => current || payload.payoutMethods?.[0]?.id || "");
-  }
+  }, []);
+  async function load() { setLoading(true); applyResult(await request()); }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+    void request().then((result) => { if (active) applyResult(result); });
+    return () => { active = false; };
+  }, [applyResult, request]);
 
   async function submitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

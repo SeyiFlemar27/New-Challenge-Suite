@@ -2,6 +2,7 @@ import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { requireSponsorContext } from "@/lib/server/sponsor";
 import { fail, ok, serverError } from "@/lib/server/responses";
 import { sponsorPlacementFoundation, sponsorshipDiscussionFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
+import { deterministicId } from "@/lib/server/idempotency";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
     const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
     if (!sponsorReady) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
     const fundingWindow = validateSponsorFundingWindow(data);
+    const agreementId = deterministicId("sponsor_opportunity", snap.id, context.organizationId);
+    const agreementSnap = await context.db.collection("sponsorChallengeAgreements").doc(agreementId).get();
     const placementFoundation = sponsorPlacementFoundation();
     const opportunity = {
       id: snap.id,
@@ -36,6 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
       sponsorReady,
       fundingWindow,
       discussionFoundation: sponsorshipDiscussionFoundation(snap.id, context.user.uid),
+      agreement: agreementSnap.exists ? { id: agreementSnap.id, ...agreementSnap.data() } : null,
       fundingSetupCopy: "Sponsor funding checkout creates a pending Stripe session only. Confirmed sponsor contributions are added 100% to the winner prize pool after webhook confirmation.",
       timeline: { startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, votingDeadline: data.votingDeadline ?? null },
       riskIndicators: { adminReviewRequired: Boolean(data.adminReviewRequired), fundingEnabled: false },

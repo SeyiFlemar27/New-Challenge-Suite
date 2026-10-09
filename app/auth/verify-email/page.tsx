@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
@@ -12,6 +12,16 @@ import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { auth } from "@/lib/firebase/client";
 
 const RESEND_SECONDS = 60;
+const SIGNUP_EMAIL_KEY = "challenge_suite_signup_email";
+
+function subscribeSignupEmail(onChange: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === SIGNUP_EMAIL_KEY) onChange(); };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("challenge-suite-signup-email", onChange);
+  return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("challenge-suite-signup-email", onChange); };
+}
+
+function getSignupEmail() { return localStorage.getItem(SIGNUP_EMAIL_KEY) || auth?.currentUser?.email || ""; }
 
 function getSafeReturnUrl() {
   if (typeof window === "undefined") return null;
@@ -32,27 +42,44 @@ export default function VerifyEmailPage() {
   const router = useRouter();
   const authState = useAuth();
   const requestedInitialCode = useRef(false);
-  const [email, setEmail] = useState("");
+  const storedEmail = useSyncExternalStore(subscribeSignupEmail, getSignupEmail, () => "");
+  const [emailOverride, setEmailOverride] = useState<string | null>(null);
+  const email = emailOverride ?? storedEmail;
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [seconds, setSeconds] = useState(0);
-  const [verified, setVerified] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
+  const [locallyVerified, setLocallyVerified] = useState(false);
+  const [locallyRedirecting, setLocallyRedirecting] = useState(false);
+  const verified = authState.verified || locallyVerified;
+  const redirecting = authState.verified || locallyRedirecting;
   const [requesting, setRequesting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const maskedEmail = useMemo(() => email || "your email", [email]);
 
-  useEffect(() => {
-    const storedEmail = localStorage.getItem("challenge_suite_signup_email") || auth?.currentUser?.email || "";
-    setEmail(storedEmail);
-  }, []);
+  const requestCode = useCallback(async (showSuccess = true) => {
+    if (verified || redirecting) return;
+    setRequesting(true);
+    setError("");
+    setNotice("");
+    const result = await requestEmailVerificationCode();
+    setRequesting(false);
+    if (!result.ok || !result.data) {
+      const retryAfter = (result as any).details?.retryAfterSeconds;
+      if (typeof retryAfter === "number") setSeconds(retryAfter);
+      setError(`${result.message || "We couldn't send a code right now."} Your account was created, but we could not send the verification code. Please resend verification or contact support.`);
+      return;
+    }
+    setEmailOverride(result.data.email);
+    localStorage.setItem(SIGNUP_EMAIL_KEY, result.data.email);
+    window.dispatchEvent(new Event("challenge-suite-signup-email"));
+    setSeconds(result.data.resendCooldownSeconds || RESEND_SECONDS);
+    if (showSuccess) setNotice("We sent a fresh code to your email.");
+  }, [redirecting, verified]);
 
   useEffect(() => {
     if (authState.loading) return;
     if (authState.verified) {
-      setVerified(true);
-      setRedirecting(true);
       const timer = window.setTimeout(() => {
         void getVerifiedDestination().then((destination) => router.replace(destination));
       }, 900);
@@ -61,34 +88,13 @@ export default function VerifyEmailPage() {
     if (!authState.user || requestedInitialCode.current) return;
     requestedInitialCode.current = true;
     void requestCode(false);
-  }, [authState.loading, authState.user, authState.verified, router]);
+  }, [authState.loading, authState.user, authState.verified, requestCode, router]);
 
   useEffect(() => {
     if (verified || seconds <= 0) return;
     const timer = window.setTimeout(() => setSeconds((value) => Math.max(value - 1, 0)), 1000);
     return () => window.clearTimeout(timer);
   }, [seconds, verified]);
-
-  async function requestCode(showSuccess = true) {
-    if (verified || redirecting) return;
-    setRequesting(true);
-    setError("");
-    setNotice("");
-    const result = await requestEmailVerificationCode();
-    setRequesting(false);
-
-    if (!result.ok || !result.data) {
-      const retryAfter = (result as any).details?.retryAfterSeconds;
-      if (typeof retryAfter === "number") setSeconds(retryAfter);
-      setError(`${result.message || "We couldn't send a code right now."} Your account was created, but we could not send the verification code. Please resend verification or contact support.`);
-      return;
-    }
-
-    setEmail(result.data.email);
-    localStorage.setItem("challenge_suite_signup_email", result.data.email);
-    setSeconds(result.data.resendCooldownSeconds || RESEND_SECONDS);
-    if (showSuccess) setNotice("We sent a fresh code to your email.");
-  }
 
   async function verify(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,8 +127,8 @@ export default function VerifyEmailPage() {
     await authState.refreshProfile().catch(() => null);
     const destination = await getVerifiedDestination();
     localStorage.removeItem("challenge_suite_signup_email");
-    setVerified(true);
-    setRedirecting(true);
+    setLocallyVerified(true);
+    setLocallyRedirecting(true);
     setVerifying(false);
     setNotice("Email verified successfully. Redirecting...");
     window.setTimeout(() => router.replace(destination), 900);
@@ -169,7 +175,7 @@ export default function VerifyEmailPage() {
               <Link href="/auth/register" className="inline-flex h-11 items-center justify-center rounded-[8px] border border-white/10 bg-[#1d1d1d] px-5 text-sm font-bold text-white transition hover:bg-[#242424]">Change Email</Link>
             </div>
             <div className="mt-7 flex items-center justify-center gap-2 border-t border-white/10 pt-6 text-xs font-bold text-slate-500">
-              <ShieldCheck size={14} /> Didn't receive it? Check spam, request a new code, or <Link href="/contact" className="text-[var(--gold)] underline">contact support</Link>.
+              <ShieldCheck size={14} /> Didn&apos;t receive it? Check spam, request a new code, or <Link href="/contact" className="text-[var(--gold)] underline">contact support</Link>.
             </div>
           </>
         )}

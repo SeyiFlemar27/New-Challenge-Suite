@@ -14,6 +14,7 @@ import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
 type Attachment = { url: string; path: string; fileName?: string | null; contentType?: string | null; size?: number | null };
 type Participant = { id: string; displayName: string; avatarUrl?: string | null; role?: string | null; accountType?: string | null };
 type Conversation = { id: string; participantIds?: string[]; status?: string; source?: string; relatedChallengeId?: string | null; relatedProposalId?: string | null; relatedCampaignId?: string | null; lastMessagePreview?: string; otherParticipant?: Participant | null; unread?: boolean };
+const EMPTY_CONVERSATIONS: Conversation[] = [];
 type Message = { id: string; senderId?: string; body?: string; createdAt?: string; status?: string; attachments?: Attachment[] };
 
 async function loadConversations() { const response = await fetch("/api/messages", { cache: "no-store" }); return response.json() as Promise<{ ok: boolean; data?: { conversations: Conversation[] } }> }
@@ -30,7 +31,7 @@ export default function MessageThreadPage() {
   const [notice, setNotice] = useState("");
   const conversationsResult = useQuery({ queryKey: ["messages", "conversations"], queryFn: loadConversations, refetchInterval: 15_000 });
   const threadResult = useQuery({ queryKey: ["messages", conversationId], queryFn: () => loadConversation(conversationId), enabled: Boolean(conversationId), refetchInterval: 8_000, staleTime: 3_000 });
-  const conversations = conversationsResult.data?.ok ? conversationsResult.data.data?.conversations ?? [] : [];
+  const conversations = conversationsResult.data?.ok ? conversationsResult.data.data?.conversations ?? EMPTY_CONVERSATIONS : EMPTY_CONVERSATIONS;
   const filtered = useMemo(() => { const value = query.trim().toLowerCase(); return value ? conversations.filter((item) => `${item.otherParticipant?.displayName ?? ""} ${item.lastMessagePreview ?? ""}`.toLowerCase().includes(value)) : conversations; }, [conversations, query]);
   const selected = conversations.find((item) => item.id === conversationId) ?? threadResult.data?.data?.conversation;
   const messages = threadResult.data?.ok ? threadResult.data.data?.messages ?? [] : [];

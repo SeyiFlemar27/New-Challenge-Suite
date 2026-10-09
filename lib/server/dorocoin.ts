@@ -10,7 +10,6 @@ export async function ensureWallet(db: Firestore, userId: string) {
   }
   return walletRef;
 }
-
 export async function applyDoroCoinTransaction(
   db: Firestore,
   input: {
@@ -90,9 +89,3 @@ export async function applyDoroCoinTransaction(
     return record;
   });
 }
-
-export const doroCoinPackages = {
-  doro_50: { coins: 50, price: 1.99, stripePriceEnv: "STRIPE_PRICE_DOROCOIN_50" },
-  doro_100: { coins: 100, price: 7.99, stripePriceEnv: "STRIPE_PRICE_DOROCOIN_100" },
-  doro_500: { coins: 500, price: 19.99, stripePriceEnv: "STRIPE_PRICE_DOROCOIN_500" }
-};

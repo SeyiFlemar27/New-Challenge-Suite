@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
 import Link from "next/link";
 import { BriefcaseBusiness, Check, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
@@ -60,7 +61,7 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
   const personalPlan = String(user.planName ?? user.planId ?? "").replaceAll("_", " ").trim();
   return <div ref={ref} className="relative" data-workspace-switcher>
     <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu" className={"flex min-h-14 w-full items-center gap-3 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-3 text-left text-[var(--foreground)] transition hover:border-[var(--gold)]/50 " + (compact ? "mt-1" : "")}>
-      {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{user.initials || "?"}</span>}
+      {user.avatarUrl ? <ContentImage src={user.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{user.initials || "?"}</span>}
       <span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{user.displayName || "Account"}</span><span className="block truncate text-xs text-[var(--muted)]">{currentLabel.label}</span></span>
       <ChevronDown size={17} className={open ? "rotate-180 transition" : "transition"} />
     </button>

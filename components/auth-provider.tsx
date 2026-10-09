@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { demoAuthEnabled, getCurrentProfile, listenToAuth, syncServerSession, type AuthProfile } from "@/lib/firebase/auth-service";
 
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const authCallbackGeneration = useRef(0);
 
   const refreshProfile = useCallback(async () => {
     const activeUser = user;
@@ -33,17 +34,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = listenToAuth(async (nextUser) => {
+      const generation = ++authCallbackGeneration.current;
       setUser(nextUser);
       if (nextUser) {
         const [, nextProfile] = await Promise.all([
           syncServerSession(nextUser).catch(() => undefined),
           getCurrentProfile(nextUser.uid).catch(() => null)
         ]);
-        setProfile(nextProfile);
+        if (generation === authCallbackGeneration.current) setProfile(nextProfile);
       } else {
         setProfile(null);
       }
-      setLoading(false);
+      if (generation === authCallbackGeneration.current) setLoading(false);
     });
     return unsubscribe;
   }, []);

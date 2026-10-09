@@ -11,8 +11,9 @@ assert(!guard.includes("LoadingGate") && !guard.includes("Restoring your session
 assert(!guard.includes("router.replace("), "the auth guard must not create a redirect loop while Firebase restores.");
 assert(serverAuth.includes("verifySessionCookie") && serverAuth.includes("verifyIdToken"), "server auth must support verified cookie and bearer paths.");
 assert(serverAuth.includes("profile?.role") && serverAuth.includes("profile?.isAdmin"), "session restoration must preserve role checks from server data.");
-assert(sessionRoute.includes("await adminAuth.verifyIdToken(idToken)"), "session cookies must only be minted from verified Firebase tokens.");
-assert(sessionRoute.includes("maxAge: SESSION_DURATION_SECONDS"));
+assert(sessionRoute.includes("await adminAuth.verifyIdToken(idToken, true)"), "session cookies must only be minted from verified, non-revoked Firebase tokens.");
+assert(sessionRoute.includes("STANDARD_SESSION_DURATION_SECONDS = 60 * 60 * 24") && sessionRoute.includes("REMEMBERED_SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30"), "server cookie lifetime must preserve standard and Remember Me policies.");
+assert(sessionRoute.includes("verifyIdToken(idToken, true)"), "revoked Firebase credentials must not mint or extend a server session.");
 assert(sessionRoute.includes("maxAge: 0"), "logout must clear the server session cookie.");
 
 console.log("Auth session-cookie refresh and loop-safety checks passed.");

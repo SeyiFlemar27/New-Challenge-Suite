@@ -1,6 +1,8 @@
 "use client";
+import { ContentImage } from "@/components/content-image";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { fetchLiveEvents } from "@/lib/api/services";
@@ -43,60 +45,27 @@ export default function LiveEventsPage() {
 
 function LiveEventsContent() {
   const { user } = useCurrentUser();
-  const [events, setEvents] = useState<LiveEventRecord[]>([]);
-  const [canHostLiveEvents, setCanHostLiveEvents] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [unauthenticated, setUnauthenticated] = useState(false);
-  const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
-  const hostMode = tier.id === "host";
-
-  async function loadEvents() {
-    setLoading(true);
-    setError("");
-    setUnauthenticated(false);
-    const result = await fetchLiveEvents(30);
-    if (!result.ok || !result.data) {
-      const code = (result as any).code;
-      setUnauthenticated(code === "AUTHENTICATION_REQUIRED" || code === "PERMISSION_DENIED");
-      setError(result.message || "Live events could not be loaded.");
-      setEvents([]);
-      setLoading(false);
-      return;
-    }
-    setCanHostLiveEvents(Boolean(result.data.user.canHostLiveEvents));
-    setEvents(result.data.events.map((event) => {
+  const eventsQuery = useQuery({ queryKey: ["live-events", user?.uid ?? "signed-out"], queryFn: () => fetchLiveEvents(30), staleTime: 30_000, retry: false });
+  const events = useMemo(() => {
+    const rawEvents = eventsQuery.data?.ok ? eventsQuery.data.data?.events ?? [] : [];
+    return rawEvents.map((event) => {
       const record = event as Partial<LiveEventRecord>;
       return {
-        id: String(record.id ?? ""),
-        title: String(record.title ?? ""),
-        host: String(record.host ?? ""),
-        image: String(record.image ?? ""),
-        location: String(record.location ?? ""),
-        date: String(record.date ?? ""),
-        time: String(record.time ?? ""),
-        attending: Number(record.attending ?? 0),
-        registrationStatus: String(record.registrationStatus ?? "available"),
-        planRequired: Boolean(record.planRequired),
-        canRegister: Boolean(record.canRegister)
-        ,
-        checkInCount: Number(record.checkInCount ?? 0),
-        status: String(record.status ?? "scheduled"),
-        isOwned: Boolean(record.isOwned),
-        source: String((record as any).source ?? "liveEvents"),
-        challengeId: (record as any).challengeId ? String((record as any).challengeId) : null
-        ,
-        venueName: String((record as any).venueName ?? ""),
-        venueAddress: String((record as any).venueAddress ?? ""),
-        nativeLiveStreamingEnabled: false
+        id: String(record.id ?? ""), title: String(record.title ?? ""), host: String(record.host ?? ""), image: String(record.image ?? ""),
+        location: String(record.location ?? ""), date: String(record.date ?? ""), time: String(record.time ?? ""), attending: Number(record.attending ?? 0),
+        registrationStatus: String(record.registrationStatus ?? "available"), planRequired: Boolean(record.planRequired), canRegister: Boolean(record.canRegister),
+        checkInCount: Number(record.checkInCount ?? 0), status: String(record.status ?? "scheduled"), isOwned: Boolean(record.isOwned),
+        source: String((record as any).source ?? "liveEvents"), challengeId: (record as any).challengeId ? String((record as any).challengeId) : null,
+        venueName: String((record as any).venueName ?? ""), venueAddress: String((record as any).venueAddress ?? ""), nativeLiveStreamingEnabled: false
       };
-    }).filter((event) => event.id));
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    loadEvents();
-  }, []);
+    }).filter((event) => event.id);
+  }, [eventsQuery.data]);
+  const canHostLiveEvents = Boolean(eventsQuery.data?.ok && eventsQuery.data.data?.user.canHostLiveEvents);
+  const loading = eventsQuery.isLoading;
+  const error = eventsQuery.data && !eventsQuery.data.ok ? eventsQuery.data.message || "Live events could not be loaded." : "";
+  const unauthenticated = eventsQuery.data && !eventsQuery.data.ok && ["AUTHENTICATION_REQUIRED", "PERMISSION_DENIED"].includes(String(eventsQuery.data.code ?? ""));
+  const tier = getEffectiveTier({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role });
+  const hostMode = tier.id === "host";
 
   return (
     <AppShell>
@@ -115,7 +84,7 @@ function LiveEventsContent() {
         </Card>
       ) : error ? (
         <Card className="mt-12 max-w-5xl">
-          <EmptyState icon={<LockKeyhole />} title="Live events unavailable" body={error} action={<Button onClick={loadEvents}>Retry</Button>} />
+          <EmptyState icon={<LockKeyhole />} title="Live events unavailable" body={error} action={<Button onClick={() => void eventsQuery.refetch()}>Retry</Button>} />
         </Card>
       ) : (hostMode ? events.filter((event) => event.isOwned) : events).length ? (
         <div className="mt-12 grid max-w-5xl gap-10 border-t border-white/10 pt-12 md:grid-cols-2">
@@ -123,7 +92,7 @@ function LiveEventsContent() {
           const isRegistered = event.registrationStatus === "registered";
           return (
             <Card key={event.title} className="overflow-hidden">
-              {event.image ? <img src={event.image} alt={event.title} className="h-52 w-full object-cover" /> : <div className="flex h-52 w-full items-center justify-center bg-black/40 text-sm font-bold text-slate-400">Event media unavailable</div>}
+              {event.image ? <ContentImage src={event.image} alt={event.title} className="h-52 w-full object-cover" /> : <div className="flex h-52 w-full items-center justify-center bg-black/40 text-sm font-bold text-slate-400">Event media unavailable</div>}
               <div className="p-7">
                 <div className="font-bold">Hosted by: {event.host} <span className="text-emerald-400">Verified</span></div>
                 <h2 className="mt-5 text-2xl font-black">{event.title}</h2>
@@ -132,14 +101,14 @@ function LiveEventsContent() {
                 <p className="mt-8 text-slate-200">Date: {formatDate(event.date)} at {event.time || "Time unavailable"}</p>
                 <p className="mt-5 text-slate-200">{event.attending} attending</p>
                 <div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4 text-sm text-slate-300">
-                  <p className="font-black text-white">External livestream</p>
-                  <p className="mt-1">This is a physical event. Check-in and event participation are managed at the venue.</p>
+                  <p className="font-black text-white">In-person event</p>
+                  <p className="mt-1">Registration, check-in, and participation are managed at the venue.</p>
                 </div>
                 {hostMode ? <p className="mt-2 text-sm text-slate-400">{event.checkInCount ?? 0} checked in · Status: <span className="capitalize">{event.status?.replaceAll("_", " ")}</span></p> : null}
                 <div className="mt-7">
                   {hostMode ? <LinkButton href="/dashboard/host/events">Manage Event</LinkButton> : null}
                   {!hostMode ? <>
-                  {event.challengeId ? <LinkButton href={`/challenges/${event.challengeId}`} variant="secondary" className="mb-3 mr-3">Watch Challenge</LinkButton> : null}
+                  {event.challengeId ? <LinkButton href={`/challenges/${event.challengeId}`} variant="secondary" className="mb-3 mr-3">View Challenge</LinkButton> : null}
                   {isRegistered ? (
                     <p className="flex items-center gap-2 rounded-[8px] bg-emerald-950/40 p-3 font-bold text-emerald-200"><CheckCircle2 size={18} /> Registered to attend</p>
                   ) : event.planRequired ? (
@@ -158,7 +127,7 @@ function LiveEventsContent() {
         </div>
       ) : (
         <Card className="mt-12 max-w-5xl">
-          <EmptyState icon={<LockKeyhole />} title={hostMode ? "No hosted events yet" : "No live events available"} body={hostMode ? "Create your first live-event challenge to begin the event-management workflow." : "There are no scheduled live events right now."} action={hostMode ? <LinkButton href="/host/live/create">Create Live Event</LinkButton> : <Button onClick={loadEvents}>Retry</Button>} />
+          <EmptyState icon={<LockKeyhole />} title={hostMode ? "No hosted events yet" : "No live events available"} body={hostMode ? "Create your first live-event challenge to begin the event-management workflow." : "There are no scheduled live events right now."} action={hostMode ? <LinkButton href="/host/live/create">Create Live Event</LinkButton> : <Button onClick={() => void eventsQuery.refetch()}>Retry</Button>} />
         </Card>
       )}
     </AppShell>

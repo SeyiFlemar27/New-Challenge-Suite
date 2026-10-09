@@ -1,9 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
-import { applyChallengeCreditTransaction } from "@/lib/server/challenge-credits";
 import { applyGrowthWalletTransaction } from "@/lib/server/creator-growth-wallet";
-import { ECONOMY_V1_RULES } from "@/lib/server/economy-rules";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 
 export async function POST(request: Request) {
@@ -19,13 +17,12 @@ export async function POST(request: Request) {
   const reason = String(body.reason ?? "").trim();
   const idempotencyKey = String(body.idempotencyKey ?? "").trim();
   if (!userId || !Number.isInteger(amount) || amount === 0 || reason.length < 8 || !idempotencyKey) return validationError({ adjustment: "User, non-zero whole amount, idempotency key, and a meaningful reason are required." });
-  if (walletType === "challenge_credits" && action === "refund" && !ECONOMY_V1_RULES.challengeCredits.refundableReasons.includes(body.refundReason)) return validationError({ refundReason: "Refund reason must be duplicate payment, failed delivery, provider error, or admin approved." });
+  if (walletType === "challenge_credits") return fail("Challenge Credit balances are retired and read-only. No new adjustments can be created.", 410, undefined, "CHALLENGE_CREDITS_RETIRED");
+  if (walletType !== "growth_wallet") return validationError({ walletType: "Select a supported wallet." });
   const db = getAdminDb();
   if (!db) return serverUnavailable("Economy adjustment");
   try {
-    const transaction = walletType === "growth_wallet"
-      ? await applyGrowthWalletTransaction(db, { userId, amountCents: amount, sourceType: amount > 0 ? "admin_credit" : "admin_debit", reason, createdBy: user.uid, idempotencyKey })
-      : await applyChallengeCreditTransaction(db, { userId, amount, sourceType: action === "refund" ? "refund" : "admin_adjustment", reason, createdBy: user.uid, idempotencyKey, relatedPaymentId: body.relatedPaymentId ? String(body.relatedPaymentId) : undefined });
+    const transaction = await applyGrowthWalletTransaction(db, { userId, amountCents: amount, sourceType: amount > 0 ? "admin_credit" : "admin_debit", reason, createdBy: user.uid, idempotencyKey });
     await writeAuditLog({ actorId: user.uid, actorType: "admin", action: `economy.${walletType}_${action}`, targetType: "account", targetId: userId, reason, after: { amount, transactionId: transaction.id, refundReason: body.refundReason ?? null, providerRefundExecuted: false } }, db);
     return ok({ transaction, providerRefundExecuted: false }, "Economy ledger adjustment recorded. No external refund or payout was executed.");
   } catch (error) {

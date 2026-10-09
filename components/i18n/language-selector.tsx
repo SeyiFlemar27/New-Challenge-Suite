@@ -1,39 +1,44 @@
 "use client";
 
 import { Languages } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, normalizeLanguage, readBrowserLanguagePreference, SUPPORTED_LANGUAGES, type LanguageCode } from "@/lib/i18n/config";
 
+function subscribeLanguage(onChange: () => void) {
+  const handleStorage = (event: StorageEvent) => { if (event.key === LANGUAGE_STORAGE_KEY) onChange(); };
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener("challenge-suite-language-change", onChange);
+  return () => { window.removeEventListener("storage", handleStorage); window.removeEventListener("challenge-suite-language-change", onChange); };
+}
+
+function getLanguageSnapshot(): LanguageCode { return readBrowserLanguagePreference(); }
+
+function saveLanguage(language: LanguageCode) {
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  document.cookie = `${LANGUAGE_STORAGE_KEY}=${language};path=/;max-age=31536000;samesite=lax`;
+  document.documentElement.lang = language;
+  window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: language }));
+}
+
 export function LanguageSelector({ compact = false, persistAccount = false }: { compact?: boolean; persistAccount?: boolean }) {
-  const [language, setLanguage] = useState<LanguageCode>(DEFAULT_LANGUAGE);
+  const language = useSyncExternalStore(subscribeLanguage, getLanguageSnapshot, () => DEFAULT_LANGUAGE);
   useEffect(() => {
     const saved = readBrowserLanguagePreference();
     if (saved !== DEFAULT_LANGUAGE || !persistAccount) {
       const next = saved;
-      setLanguage(next);
       document.documentElement.lang = next;
-      const frame = window.requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: next }));
-      });
-      return () => window.cancelAnimationFrame(frame);
+      return;
     }
     fetch("/api/profile/language", { cache: "no-store" }).then((response) => response.json()).then((body) => {
       if (!body?.ok || !body?.data?.language) return;
       const next = normalizeLanguage(body.data.language);
-      setLanguage(next);
-      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
-      document.cookie = `${LANGUAGE_STORAGE_KEY}=${next};path=/;max-age=31536000;samesite=lax`;
-      window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: next }));
+      saveLanguage(next);
     }).catch(() => undefined);
   }, [persistAccount]);
 
   async function change(value: string) {
     const next = normalizeLanguage(value);
-    setLanguage(next);
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
-    document.cookie = `${LANGUAGE_STORAGE_KEY}=${next};path=/;max-age=31536000;samesite=lax`;
-    document.documentElement.lang = next;
-    window.dispatchEvent(new CustomEvent("challenge-suite-language-change", { detail: next }));
+    saveLanguage(next);
     if (persistAccount) await fetch("/api/profile/language", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ language: next }) }).catch(() => undefined);
   }
 
