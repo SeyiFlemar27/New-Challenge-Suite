@@ -2,6 +2,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { validateTournamentSubmission } from "@/lib/server/tournament-operations";
+import { tournamentSubmissionMediaPath } from "@/lib/media-upload-paths";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentParticipantFoundation, TournamentRoundFoundation, TournamentSubmissionStatus } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const match = { id: matchSnap.id, ...matchSnap.data() } as TournamentMatchFoundation;
   if (match.tournamentId !== id || match.roundId !== roundSnap.id || ![match.participantAId, match.participantBId].includes(participant.id)) return fail("This competitor is not assigned to the selected tournament match.", 403, undefined, "TOURNAMENT_MATCH_ASSIGNMENT_REQUIRED");
   if (tournament.participationMode === "team" && (!teamSnap?.exists || !["checked_in", "active"].includes(String(teamSnap.data()?.status ?? "")))) return fail("The tournament Team must be checked in before submitting.", 409, undefined, "TOURNAMENT_TEAM_CHECK_IN_REQUIRED");
+  const mediaType = String(body.mediaType ?? "");
+  const mediaFolder = mediaType === "image" ? "images" : mediaType === "video" ? "videos" : null;
+  if (!mediaFolder) return fail("Tournament submissions support image or video media.", 400, undefined, "MEDIA_TYPE_UNSUPPORTED");
+  const mediaPrefix = `${tournamentSubmissionMediaPath(id, roundSnap.id, matchId, participant.id, mediaFolder)}/`;
+  const media = validateOwnedStorageMedia({ url: String(body.mediaUrl ?? ""), path: String(body.mediaPath ?? ""), prefixes: [mediaPrefix] });
+  if (!media.valid) return fail(media.message, 400, undefined, media.code);
   const validation = validateTournamentSubmission({ tournament, round: { id: roundSnap.id, ...roundSnap.data() } as TournamentRoundFoundation, mediaUrl: String(body.mediaUrl ?? ""), mediaPath: String(body.mediaPath ?? ""), mediaType: String(body.mediaType ?? ""), replacementAllowed: Boolean((tournament.voting as Record<string, unknown>)?.submissionReplacementAllowed), existingStatus: existingSnap.exists ? String(existingSnap.data()?.status ?? "") as TournamentSubmissionStatus : null });
   if (!validation.valid) return fail(validation.message, 400, validation, validation.code);
   const now = new Date().toISOString();

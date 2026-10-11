@@ -4,6 +4,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { getEffectiveTier, getUserPlanAccess } from "@/lib/plan-access";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { profileMediaPath } from "@/lib/media-upload-paths";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 
 const settingsSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
@@ -132,6 +133,8 @@ export async function PATCH(request: Request) {
   const input = parsed.data;
   if (invalidProfileMediaPath(user.uid, input.avatarPath, "avatar")) return validationError({ avatarPath: "Profile avatar must be uploaded to your authenticated profile media path." });
   if (invalidProfileMediaPath(user.uid, input.coverImagePath, "banner")) return validationError({ coverImagePath: "Profile banner must be uploaded to your authenticated profile media path." });
+  if (input.avatarPath && !validateOwnedStorageMedia({ url: input.avatarUrl ?? "", path: input.avatarPath, prefixes: [`${profileMediaPath(user.uid, "avatar")}/`] }).valid) return validationError({ avatarUrl: "Profile avatar URL must match its confirmed Storage upload." });
+  if (input.coverImagePath && !validateOwnedStorageMedia({ url: input.coverImageUrl ?? "", path: input.coverImagePath, prefixes: [`${profileMediaPath(user.uid, "banner")}/`] }).valid) return validationError({ coverImageUrl: "Profile cover URL must match its confirmed Storage upload." });
   const usernameNormalized = input.username.toLowerCase();
   const usernameMatch = await db.collection("profiles").where("usernameNormalized", "==", usernameNormalized).limit(1).get();
   if (usernameMatch.docs[0] && usernameMatch.docs[0].id !== user.uid) return fail("Username is already in use.", 409, undefined, "USERNAME_TAKEN");

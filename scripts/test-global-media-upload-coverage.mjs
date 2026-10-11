@@ -32,8 +32,7 @@ assert(pathHelper.includes("submissions: \"challenges/{challengeId}/submissions/
 assert(mediaUpload.includes("application/pdf"), "document uploads must include PDF support.");
 assert(mediaUpload.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "document uploads must include DOCX support.");
 assert(mediaUpload.includes("if (kind === \"document\") return documentTypes.join(\",\");"), "document accept list should be document-only.");
-assert(mediaUpload.includes("kind === \"video\" ? 250 : 15"), "video uploads should default to 250MB.");
-assert(mediaUpload.includes("? 250 : 15"), "image and document uploads should default to 15MB.");
+assert(mediaUpload.includes("kind === \"video\" ? 49 : kind === \"image\" ? 5 : 15"), "shared upload limits should match the 49MB video, 5MB image, and 15MB document rules.");
 assert(mediaUpload.includes("kind === \"document\" ? documentOk"), "valid documents should pass document validation only for document fields.");
 
 assert(uploadField.includes("Replace"), "shared upload field must support replacing existing media.");
@@ -58,8 +57,8 @@ assert(joinPage.includes("SubmissionUploadField"), "participant submission page 
 assert(joinPage.includes("submissionMediaPath(challengeId, userId"), "participant submissions should use shared submission paths.");
 assert(joinPage.includes("Please wait for your media upload to finish."), "participant submissions should block while upload is active.");
 assert(joinPage.includes("Please retry the failed media upload before submitting."), "participant submissions should fail closed after upload errors.");
-assert(joinPage.includes("!submissionMedia?.url || !submissionMedia.path"), "participant submission must require a storage-confirmed URL and path.");
-assert(joinPage.includes("currentChallenge.acceptedSubmissionTypes.includes(submissionMedia.mediaType)"), "unsupported participant media types must fail closed.");
+assert(joinPage.includes("!effectiveSubmissionMedia?.url || !effectiveSubmissionMedia.path"), "participant submission must require a storage-confirmed URL and path, including an existing editable submission.");
+assert(joinPage.includes("currentChallenge.acceptedSubmissionTypes.includes(effectiveSubmissionMedia.mediaType)"), "unsupported participant media types must fail closed.");
 assert(!joinPage.includes("uploadBytesResumable"), "participant join page should not duplicate Firebase upload logic.");
 assert(submissionsRoute.includes("expectedSubmissionPrefix"), "submission API must verify the authenticated owner path.");
 assert(submissionValidation.includes("Participant media must be uploaded before submitting."), "submission API must reject pending media demo submissions.");
@@ -70,10 +69,12 @@ assert(!/fake upload success|mock upload success|storage\.example/.test(joinPage
 assert(settingsPage.includes("profileMediaPath(userId, \"avatar\")"), "profile avatar uploads should use shared profile path.");
 assert(settingsPage.includes("profileMediaPath(userId, \"banner\")"), "profile banner uploads should use shared profile path.");
 assert(settingsRoute.includes("invalidProfileMediaPath"), "settings API must validate profile media owner paths.");
+assert(settingsRoute.includes("validateOwnedStorageMedia"), "settings API must ensure a provided Storage URL matches its owned media path.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"logo\")"), "sponsor logo upload should use shared sponsor path.");
 assert(sponsorOnboarding.includes("sponsorMediaPath(auth.user?.uid ?? \"anonymous\", \"banner\")"), "sponsor banner upload should use shared sponsor path.");
 assert(sponsorOnboarding.includes("Submitting sends the organization profile for review. It does not alter your Personal account, activate funding, or approve the brand."), "sponsor branding must stay pending-review safe.");
 assert(sponsorProfileRoute.includes("invalidSponsorMediaPath"), "sponsor API must validate sponsor media owner paths.");
+assert(sponsorProfileRoute.includes("validateOwnedStorageMedia"), "sponsor API must ensure uploaded media URLs match their owned Storage paths.");
 assert(!sponsorCampaignBuilder.includes("MediaUploadField"), "sponsor campaign asset upload UI is not implemented and remains deferred.");
 
 assert(builder.includes("mediaUploadDisabled") && builder.includes("storage_disabled"), "storage-disabled challenge publishing must remain supported.");

@@ -2,6 +2,7 @@ import { assertSponsorOwnedDoc, requireSponsorContext } from "@/lib/server/spons
 import { ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { cleanText, isoNow } from "@/lib/sponsor-collaboration";
 import { sponsorConversationMediaPath } from "@/lib/media-upload-paths";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { canReplyToConversation } from "@/lib/server/messaging-permissions";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,8 @@ function safeAttachments(value: unknown, conversationId: string, sponsorId: stri
     const path = cleanText(record.path).slice(0, 700);
     const contentType = cleanText(record.contentType).slice(0, 140);
     const kind = contentType.startsWith("image/") ? "image" : contentType === "application/pdf" || contentType.includes("wordprocessingml") || contentType === "application/msword" || contentType === "text/plain" ? "document" : "";
-    if (!url || !path || !kind || !allowedPrefixes.some((prefix) => path.startsWith(prefix))) return [];
+    if (!url || !path || !kind || !allowedPrefixes.some((prefix) => path.startsWith(prefix))
+      || !validateOwnedStorageMedia({ url, path, prefixes: allowedPrefixes }).valid) return [];
     return [{ url, path, contentType, kind, fileName: cleanText(record.fileName).slice(0, 180), size: Number(record.size ?? 0) }];
   });
 }

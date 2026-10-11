@@ -6,5 +6,7 @@ const route = readFileSync(join(root, "app/api/tournaments/[id]/submissions/rout
 assert(existsSync(join(root, "app/tournaments/[id]/matches/[matchId]/page.tsx")), "Match detail route must exist.");
 assert(route.includes("roundId") && route.includes("matchId") && route.includes("participantId"), "Tournament submission must connect tournament/round/match/participant.");
 assert(route.includes("mediaUrl") && route.includes("mediaPath") && !route.includes("externalUrl"), "Submissions must require uploaded media and no external URL field.");
+assert(route.includes("tournamentSubmissionMediaPath") && route.includes("validateOwnedStorageMedia"), "Submission route must verify uploaded media URL and exact participant-owned storage path.");
+assert(route.includes("MEDIA_TYPE_UNSUPPORTED") && route.includes("mediaPrefix"), "Submission route must reject unsupported media types and paths outside the assigned match participant folder.");
 assert(route.includes("SUBMISSION_DEADLINE_CLOSED") || readFileSync(join(root, "lib/server/tournament-operations.ts"), "utf8").includes("SUBMISSION_DEADLINE_CLOSED"), "Deadline enforcement must exist server-side.");
 console.log("Tournament rounds/submissions checks passed.");

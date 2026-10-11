@@ -4,6 +4,7 @@ import { requireAdminUser, requireRequestUser } from "@/lib/server/auth";
 import { forbidden, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { normalizeSponsorReviewStatus } from "@/lib/sponsor-access";
 import { sponsorMediaPath } from "@/lib/media-upload-paths";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { ensurePrimarySponsorOrganization, resolveSponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
 import { z } from "zod";
 
@@ -269,6 +270,9 @@ async function persistSponsorProfile(request: Request) {
     if (invalidSponsorMediaPath(user.uid, input.logoPath ?? "", "logo")) return validationError({ logoPath: "Sponsor logo must be uploaded to your authenticated sponsor media path." });
     if (invalidSponsorMediaPath(user.uid, input.bannerPath ?? "", "banner")) return validationError({ bannerPath: "Sponsor banner must be uploaded to your authenticated sponsor media path." });
     if (invalidSponsorMediaPath(user.uid, input.coverImagePath ?? "", "banner")) return validationError({ coverImagePath: "Sponsor cover image must be uploaded to your authenticated sponsor banner path." });
+    if (input.logoPath && !validateOwnedStorageMedia({ url: input.logoUrl ?? "", path: input.logoPath, prefixes: [`${sponsorMediaPath(user.uid, "logo")}/`] }).valid) return validationError({ logoUrl: "Sponsor logo URL must match its confirmed Storage upload." });
+    if (input.bannerPath && !validateOwnedStorageMedia({ url: input.bannerUrl ?? "", path: input.bannerPath, prefixes: [`${sponsorMediaPath(user.uid, "banner")}/`] }).valid) return validationError({ bannerUrl: "Sponsor banner URL must match its confirmed Storage upload." });
+    if (input.coverImagePath && !validateOwnedStorageMedia({ url: input.coverImageUrl ?? "", path: input.coverImagePath, prefixes: [`${sponsorMediaPath(user.uid, "banner")}/`] }).valid) return validationError({ coverImageUrl: "Sponsor cover URL must match its confirmed Storage upload." });
     const now = new Date().toISOString();
     const brandSlug = slugify(input.brandName);
     const currentVerificationStatus = normalizeSponsorReviewStatus({ ...context.profileData, ...context.userData, ...context.sponsorData }.sponsorVerificationStatus);
