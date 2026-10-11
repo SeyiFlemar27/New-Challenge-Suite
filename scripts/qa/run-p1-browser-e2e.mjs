@@ -341,7 +341,7 @@ async function waitForServer() {
         const contentType = response.headers.get("content-type") ?? "";
         const html = await response.text();
         if (response.status === 200) {
-          const loginMarker = /Sign In|Loading sign-in|Opening your workspace|We couldn't open your workspace/i.test(html);
+          const loginMarker = /Sign In|Loading sign-in|We couldn't open your workspace/i.test(html);
           if (contentType.includes("text/html") && loginMarker) return;
           throw new Error(`Runner-owned Next.js returned HTTP 200 for /auth/login but failed route readiness (contentType=${contentType || "missing"}, loginMarker=${loginMarker}, bodyLength=${html.length}). ${logs.slice(-1800)}`);
         }

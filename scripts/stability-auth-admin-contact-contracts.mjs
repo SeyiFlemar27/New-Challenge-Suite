@@ -23,7 +23,9 @@ const adminUi = read("components/admin/admin-control-center.tsx");
 
 assert.match(publicShell, /user\?<><Link href="\/profile"/);
 assert.doesNotMatch(publicShell, /if\(user\.isAdmin\)return"\/admin"/);
-assert.match(login, /router\.replace\(getAuthenticatedDestination\(profile\.data\.user, nextPath\)\)/);
+assert.match(login, /router\.replace\(getAuthenticatedDestination\(profile, nextPath\)\)/);
+assert.match(login, /routeAfterLogin\(result\.profile\)/);
+assert.doesNotMatch(login, /Opening your workspace|Taking you to the right place for your account/);
 assert.match(login, /Sign out to switch account/);
 assert.doesNotMatch(login, /Already signed in|Continue with Google|signInWithGoogle/);
 assert.match(login, /authState\.user\?\.uid/);

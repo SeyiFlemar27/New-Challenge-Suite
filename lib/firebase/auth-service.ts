@@ -51,6 +51,8 @@ export interface AuthProfile {
   isAdmin: boolean;
   accountStatus?: string;
   deletionStatus?: string;
+  activeWorkspace?: "personal" | "sponsor" | "enterprise";
+  availableWorkspaces?: Array<"personal" | "sponsor" | "enterprise">;
 }
 
 interface BootstrapResponse {
@@ -184,7 +186,7 @@ export async function loginWithEmail(email: string, password: string, rememberMe
     syncServerSession(credential.user, rememberMe),
     getCurrentProfile(credential.user.uid).catch(() => null)
   ]);
-  return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile?.verified || profile?.emailVerified || credential.user.emailVerified) };
+  return { mode: "firebase" as const, user: credential.user, profile, emailVerified: Boolean(profile?.verified || profile?.emailVerified || credential.user.emailVerified) };
 }
 
 export async function sendResetEmail(email: string) {

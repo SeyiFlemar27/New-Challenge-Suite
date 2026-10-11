@@ -3,15 +3,18 @@ import fs from "node:fs";
 
 const read = (file) => fs.readFileSync(file, "utf8");
 const accountRouting = read("lib/account-routing.ts");
+const authDestination = read("lib/auth-destination.ts");
 const selectionRoute = read("app/api/auth/profile/bootstrap/route.ts");
 const introRoute = read("app/api/onboarding/intro/route.ts");
 const welcomePage = read("app/onboarding/welcome/page.tsx");
 const verifyPage = read("app/auth/verify-email/page.tsx");
 const registerPage = read("app/auth/register/page.tsx");
 
-assert.match(accountRouting, /accountTypeSelectionComplete === false\) return "\/onboarding\/account-type"/);
-assert.match(accountRouting, /accountIntroOnboardingStatus === "in_progress"\) return "\/onboarding\/welcome"/);
-assert.match(accountRouting, /setupPending \|\| !requestedPath \? defaultRoute : requestedPath/);
+assert.match(accountRouting, /accountTypeSelectionComplete: profile\.accountTypeSelectionComplete !== false/);
+assert.match(accountRouting, /accountIntroOnboardingInProgress: profile\.accountIntroOnboardingStatus === "in_progress"/);
+assert.match(authDestination, /!state\.accountTypeSelectionComplete\) return "\/onboarding\/account-type"/);
+assert.match(authDestination, /state\.accountIntroOnboardingInProgress\) return "\/onboarding\/welcome"/);
+assert.match(authDestination, /setupPending \|\| !requestedPath \? defaultRoute : requestedPath/);
 assert.match(selectionRoute, /accountType: z\.enum\(\["creator", "sponsor"\]\)/);
 assert.match(selectionRoute, /db\.runTransaction\(async \(transaction\)/);
 assert.match(selectionRoute, /accountIntroOnboardingStatus: "in_progress"/);

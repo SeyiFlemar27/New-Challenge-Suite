@@ -28,19 +28,25 @@ function LoginForm() {
   const [redirectError, setRedirectError] = useState("");
   const [loading, setLoading] = useState(false);
   const routedUserId = useRef("");
+  const interactiveLoginInProgress = useRef(false);
   const nextPath = safeInternalPath(searchParams.get("next"));
 
-  const routeAfterLogin = useCallback(async () => {
-    const profile = await fetchBootstrapProfile();
-    if (!profile.ok || !profile.data?.user) {
-      throw new Error(profile.message || "Profile could not be loaded.");
+  const routeAfterLogin = useCallback(async (resolvedProfile?: object | null) => {
+    let profile = resolvedProfile;
+    if (!profile) {
+      const response = await fetchBootstrapProfile();
+      if (!response.ok || !response.data?.user) {
+        throw new Error(response.message || "Profile could not be loaded.");
+      }
+      profile = response.data.user;
     }
-    router.replace(getAuthenticatedDestination(profile.data.user, nextPath));
+    router.replace(getAuthenticatedDestination(profile, nextPath));
   }, [nextPath, router]);
 
   useEffect(() => {
     const uid = authState.user?.uid;
     if (authState.loading) return;
+    if (interactiveLoginInProgress.current) return;
     if (!uid) {
       routedUserId.current = "";
       return;
@@ -48,13 +54,13 @@ function LoginForm() {
     if (routedUserId.current === uid) return;
     routedUserId.current = uid;
     let active = true;
-    void routeAfterLogin().catch((caught: unknown) => {
+    void routeAfterLogin(authState.profile).catch((caught: unknown) => {
       if (!active) return;
       routedUserId.current = "";
       setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
     });
     return () => { active = false; };
-  }, [authState.loading, authState.user?.uid, routeAfterLogin]);
+  }, [authState.loading, authState.profile, authState.user?.uid, routeAfterLogin]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,6 +74,7 @@ function LoginForm() {
     }
     setError("");
     setLoading(true);
+    interactiveLoginInProgress.current = true;
     try {
       const result = await loginWithEmail(form.email, form.password, form.rememberMe);
       const destination = nextPath;
@@ -76,21 +83,32 @@ function LoginForm() {
         router.push(destination ? `/auth/verify-email?returnUrl=${encodeURIComponent(destination)}` : "/auth/verify-email");
         return;
       }
-      await routeAfterLogin();
+      routedUserId.current = result.user.uid;
+      try {
+        await routeAfterLogin(result.profile);
+      } catch (caught) {
+        interactiveLoginInProgress.current = false;
+        routedUserId.current = "";
+        setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
+        setLoading(false);
+      }
     } catch (error) {
+      interactiveLoginInProgress.current = false;
       setError(error instanceof Error ? error.message : "Could not sign in.");
       setLoading(false);
     }
   }
 
-  if (authState.loading || authState.user) {
+  if ((authState.loading || authState.user) && !redirectError) return null;
+
+  if (authState.user && redirectError) {
     return (
         <main className="auth-shell theme-workspace flex min-h-[100dvh] items-center justify-center bg-[var(--background)] px-5 py-10 text-[var(--foreground)] sm:px-6 sm:py-14 lg:px-8 lg:py-20">
         <Card className="w-full max-w-[480px] rounded-[12px] p-6 text-center sm:p-9">
           <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
-          <h1 className="text-2xl font-black">{redirectError ? "We couldn't open your workspace" : "Opening your workspace…"}</h1>
-          {redirectError ? <p role="alert" className="mt-3 text-sm leading-6 text-red-700">{redirectError}</p> : <p role="status" className="mt-3 text-sm leading-6 text-[var(--muted)]">Taking you to the right place for your account.</p>}
-          {redirectError ? <div className="mt-7 grid gap-3"><Button onClick={() => void routeAfterLogin().catch((caught: unknown) => setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened."))}>Try again</Button><Button variant="secondary" onClick={() => void logout()}>Sign out to switch account</Button></div> : null}
+          <h1 className="text-2xl font-black">We couldn&apos;t open your workspace</h1>
+          <p role="alert" className="mt-3 text-sm leading-6 text-red-700">{redirectError}</p>
+          <div className="mt-7 grid gap-3"><Button onClick={() => { setRedirectError(""); void routeAfterLogin(authState.profile).catch((caught: unknown) => setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.")); }}>Try again</Button><Button variant="secondary" onClick={() => void logout()}>Sign out to switch account</Button></div>
         </Card>
       </main>
     );

@@ -79,12 +79,10 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (authState.loading) return;
     if (authState.verified) {
-      const timer = window.setTimeout(() => {
-        void getVerifiedDestination().then((destination) => router.replace(destination)).catch(() => {
-          setError("We verified your email, but could not confirm your account setup. Please try again.");
-        });
-      }, 900);
-      return () => window.clearTimeout(timer);
+      void getVerifiedDestination().then((destination) => router.replace(destination)).catch(() => {
+        setError("We verified your email, but could not confirm your account setup. Please try again.");
+      });
+      return;
     }
     if (!authState.user || requestedInitialCode.current) return;
     requestedInitialCode.current = true;
@@ -138,8 +136,7 @@ export default function VerifyEmailPage() {
     setLocallyVerified(true);
     setLocallyRedirecting(true);
     setVerifying(false);
-    setNotice("Email verified successfully. Redirecting...");
-    window.setTimeout(() => router.replace(destination), 900);
+    router.replace(destination);
   }
 
   return (
@@ -152,7 +149,7 @@ export default function VerifyEmailPage() {
             <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-400" />
             <p className="mt-7 text-xs font-black uppercase text-[var(--gold)]">Identity confirmed</p>
             <h1 className="mt-3 text-3xl font-black sm:text-4xl">Email verified</h1>
-            <p className="mt-4 text-slate-300">Your Challenge Suite account is ready. We are opening your workspace now.</p>
+            <p className="mt-4 text-slate-300">Your Challenge Suite account is ready.</p>
             {error ? <p role="alert" className="mt-5 rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
             <Button className="mt-8 w-full" onClick={() => void getVerifiedDestination().then((destination) => router.replace(destination)).catch(() => setError("We couldn't confirm your account setup. Please try again."))}>Continue</Button>
           </div>

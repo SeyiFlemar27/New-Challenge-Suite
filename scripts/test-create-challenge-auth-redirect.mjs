@@ -31,9 +31,9 @@ assert(draftApi.includes("if (response) return response"), "Draft API must rejec
 assert(draftApi.indexOf("requireRequestUser(request)") < draftApi.indexOf("const ref = db.collection(\"challenges\").doc()"), "Draft document must be created only after auth succeeds.");
 
 assert(loginPage.includes("function safeInternalPath") && loginPage.includes("value.startsWith(\"//\")") && loginPage.includes("value.includes(\"://\")"), "Login page must reject unsafe external next URLs.");
-assert(loginPage.includes("getNextPath()"), "Login page must centralize next parsing.");
-assert(loginPage.includes("router.replace(destination)"), "Successful login must route to next/default without leaving stale login history.");
-assert(loginPage.includes("getDefaultRouteForAccount(profile.data.user)"), "Login without next must keep the existing default redirect behavior.");
+assert(loginPage.includes('safeInternalPath(searchParams.get("next"))'), "Login page must centralize safe next parsing.");
+assert(loginPage.includes("router.replace(getAuthenticatedDestination(profile, nextPath))"), "Successful login must route to next/default without leaving stale login history.");
+assert(loginPage.includes("routeAfterLogin(result.profile)"), "Login must reuse the verified profile returned by authentication.");
 assert(loginPage.includes("Sign in to continue"), "Login page must show continuation copy when next is present.");
 assert(loginPage.includes("router.push(destination ? `/auth/verify-email?returnUrl=${encodeURIComponent(destination)}` : \"/auth/verify-email\")"), "Unverified login must preserve the safe destination through email verification.");
 assert(loginPage.includes("setError(error instanceof Error ? error.message : \"Could not sign in.\")"), "Failed login must show a clear error and remain on login page.");
