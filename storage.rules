@@ -18,10 +18,48 @@ service firebase.storage {
       return signedIn()
         && (isAdmin()
           || (firestore.exists(challengePath)
-            && firestore.get(challengePath).data.officialChallenge != true
-            && firestore.get(challengePath).data.ownershipType != 'challenge_suite_official'
+            && firestore.get(challengePath).data.get('officialChallenge', false) != true
+            && firestore.get(challengePath).data.get('ownershipType', '') != 'challenge_suite_official'
             && firestore.get(challengePath).data.creatorId == request.auth.uid)
           || isEnterpriseChallengeManager(challengeId));
+    }
+
+    function isPrivateChallenge(challenge) {
+      return challenge.visibility == 'private'
+        || challenge.visibility == 'exclusive'
+        || challenge.type == 'Private / Exclusive'
+        || challenge.type == 'private'
+        || challenge.type == 'exclusive';
+    }
+
+    function hasApprovedPrivateAccess(challengeId) {
+      let accessPath = /databases/(default)/documents/privateChallengeAccess/$(challengeId + '_' + request.auth.uid);
+      return firestore.exists(accessPath) && firestore.get(accessPath).data.status == 'approved';
+    }
+
+    function hasPrivateChallengeParticipation(challengeId) {
+      let participantPath = /databases/(default)/documents/challengeParticipants/$(challengeId + '_' + request.auth.uid);
+      return firestore.exists(participantPath)
+        && firestore.get(participantPath).data.status in ['registered', 'approved', 'active', 'entered', 'enrolled', 'winner'];
+    }
+
+    function isPublicPrivatePreview(challenge) {
+      return challenge.visibility == 'private'
+        && challenge.publicPreviewEnabled == true
+        && challenge.get('publicVisibility', true) != false
+        && challenge.get('eventVisibility', '') != 'hidden_until_approved'
+        && challenge.status in ['published', 'approved', 'scheduled', 'registration_open', 'active'];
+    }
+
+    function canReadChallengeMedia(challengeId, allowPublicPreview) {
+      let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      return isAdmin()
+        || (firestore.exists(challengePath)
+          && (!isPrivateChallenge(firestore.get(challengePath).data)
+            || isChallengeManager(challengeId)
+            || (allowPublicPreview && isPublicPrivatePreview(firestore.get(challengePath).data))
+            || hasApprovedPrivateAccess(challengeId)
+            || hasPrivateChallengeParticipation(challengeId)));
     }
 
     function isEnterpriseChallengeManager(challengeId) {
@@ -83,22 +121,22 @@ service firebase.storage {
     }
 
     match /challenges/{challengeId}/banner/{fileName} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadChallengeMedia(challengeId, true);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/trailers/{fileName} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isVideo()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/promo-flyer/{fileName} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/promo-video/{fileName} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isVideo()) || request.resource == null);
     }
 
