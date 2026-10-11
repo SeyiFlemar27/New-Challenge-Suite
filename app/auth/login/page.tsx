@@ -29,7 +29,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const routedUserId = useRef("");
   const interactiveLoginInProgress = useRef(false);
-  const nextPath = safeInternalPath(searchParams.get("next"));
+  const nextPath = safeInternalPath(searchParams.get("next") ?? searchParams.get("returnTo"));
 
   const routeAfterLogin = useCallback(async (resolvedProfile?: object | null) => {
     let profile = resolvedProfile;

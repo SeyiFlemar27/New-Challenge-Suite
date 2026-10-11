@@ -31,14 +31,14 @@ assert(draftApi.includes("if (response) return response"), "Draft API must rejec
 assert(draftApi.indexOf("requireRequestUser(request)") < draftApi.indexOf("const ref = db.collection(\"challenges\").doc()"), "Draft document must be created only after auth succeeds.");
 
 assert(loginPage.includes("function safeInternalPath") && loginPage.includes("value.startsWith(\"//\")") && loginPage.includes("value.includes(\"://\")"), "Login page must reject unsafe external next URLs.");
-assert(loginPage.includes('safeInternalPath(searchParams.get("next"))'), "Login page must centralize safe next parsing.");
+assert(loginPage.includes('safeInternalPath(searchParams.get("next") ?? searchParams.get("returnTo"))'), "Login page must centralize safe next and returnTo parsing.");
 assert(loginPage.includes("router.replace(getAuthenticatedDestination(profile, nextPath))"), "Successful login must route to next/default without leaving stale login history.");
 assert(loginPage.includes("routeAfterLogin(result.profile)"), "Login must reuse the verified profile returned by authentication.");
 assert(loginPage.includes("Sign in to continue"), "Login page must show continuation copy when next is present.");
 assert(loginPage.includes("router.push(destination ? `/auth/verify-email?returnUrl=${encodeURIComponent(destination)}` : \"/auth/verify-email\")"), "Unverified login must preserve the safe destination through email verification.");
 assert(loginPage.includes("setError(error instanceof Error ? error.message : \"Could not sign in.\")"), "Failed login must show a clear error and remain on login page.");
 
-assert(verifyEmailPage.includes("params.get(\"returnUrl\") || params.get(\"next\")"), "Email verification must preserve returnUrl/next continuation.");
+assert(verifyEmailPage.includes("params.get(\"returnUrl\") || params.get(\"next\") || params.get(\"returnTo\")"), "Email verification must preserve returnUrl/next/returnTo continuation.");
 assert(verifyEmailPage.includes("!value.includes(\"://\")"), "Email verification must reject unsafe external return URLs.");
 assert(verifyEmailPage.includes("router.replace(destination)"), "Email verification must continue to the preserved destination after verification.");
 

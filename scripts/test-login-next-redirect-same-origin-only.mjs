@@ -7,7 +7,7 @@ const guard = readFileSync("components/verification-guard.tsx", "utf8");
 assert(login.includes('value.startsWith("/")'));
 assert(login.includes('value.startsWith("//")'));
 assert(login.includes('value.includes("://")'));
-assert(login.includes('safeInternalPath(searchParams.get("next"))'));
+assert(login.includes('safeInternalPath(searchParams.get("next") ?? searchParams.get("returnTo"))'));
 assert(login.includes("router.replace(getAuthenticatedDestination(profile, nextPath))"));
 assert(login.includes("routeAfterLogin(result.profile)"));
 assert(guard.includes("/auth/login?next="));

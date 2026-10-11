@@ -26,7 +26,7 @@ function getSignupEmail() { return localStorage.getItem(SIGNUP_EMAIL_KEY) || aut
 function getSafeReturnUrl() {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
-  const value = params.get("returnUrl") || params.get("next");
+  const value = params.get("returnUrl") || params.get("next") || params.get("returnTo");
   return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : null;
 }
 
