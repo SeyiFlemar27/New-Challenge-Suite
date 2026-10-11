@@ -13,6 +13,38 @@ service firebase.storage {
       return signedIn() && ('admin' in request.auth.token) && request.auth.token.admin == true;
     }
 
+    function isActiveAdminUser() {
+      return signedIn()
+        && isActiveAdminUserProfile(request.auth.uid, request.auth.token.get('admin', false) == true);
+    }
+
+    function isActiveAdminUserProfile(userId, tokenIsAdmin) {
+      let userPath = /databases/(default)/documents/users/$(userId);
+      return firestore.exists(userPath)
+        ? isActiveAdminProfile(firestore.get(userPath).data)
+        : tokenIsAdmin;
+    }
+
+    function isActiveAdminProfile(profile) {
+      let assignments = profile.get('adminRoles', []);
+      let expiresAt = profile.get('adminAccessExpiresAt', null);
+      return (request.auth.token.get('admin', false) == true
+          || profile.get('isAdmin', false) == true
+          || profile.get('adminRole', '') == 'admin'
+          || (assignments is list && assignments.hasAny([
+            'admin', 'platform_owner', 'super_admin', 'operations_admin',
+            'finance_admin', 'moderation_admin', 'safety_admin', 'support_admin',
+            'sponsor_manager', 'event_tournament_admin', 'content_admin',
+            'marketing_communications_admin', 'analyst', 'read_only_auditor',
+            'technical_admin', 'developer_support'
+          ])))
+        && profile.get('adminAccessStatus', 'legacy_active') in ['active', 'legacy_active']
+        && profile.get('adminSecuritySetupComplete', true) != false
+        && (expiresAt == null
+          || (expiresAt is timestamp && request.time < expiresAt)
+          || (expiresAt is int && request.time.toMillis() < expiresAt));
+    }
+
     function isChallengeManager(challengeId) {
       let challengePath = /databases/(default)/documents/challenges/$(challengeId);
       return signedIn()
@@ -95,6 +127,62 @@ service firebase.storage {
         && request.resource.contentType in ['video/mp4', 'video/avi', 'video/x-msvideo'];
     }
 
+    function isDocument() {
+      return request.resource != null
+        && request.resource.size <= 15 * 1024 * 1024
+        && request.resource.contentType in [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'text/plain'
+        ];
+    }
+
+    function canWriteChallengeDraftMedia(folder) {
+      return (folder in ['banner', 'gallery'] && isImage())
+        || (folder == 'video' && isVideo())
+        || (folder == 'documents' && isDocument());
+    }
+
+    function canWriteTournamentDraftMedia(folder) {
+      return (folder == 'cover' && isImage())
+        || (folder == 'trailer' && isVideo());
+    }
+
+    function canReadSponsorConversation(conversationId) {
+      let conversationPath = /databases/(default)/documents/sponsorConversations/$(conversationId);
+      return isActiveAdminUser()
+        || (signedIn()
+          && firestore.exists(conversationPath)
+          && (firestore.get(conversationPath).data.get('sponsorId', '') == request.auth.uid
+            || firestore.get(conversationPath).data.get('recipientId', '') == request.auth.uid));
+    }
+
+    function canWriteSponsorConversation(conversationId, sponsorId) {
+      let conversationPath = /databases/(default)/documents/sponsorConversations/$(conversationId);
+      return isOwner(sponsorId)
+        && firestore.exists(conversationPath)
+        && firestore.get(conversationPath).data.get('sponsorId', '') == sponsorId;
+    }
+
+    function isTournamentSubmissionOwner(tournamentId, participantId) {
+      let participantPath = /databases/(default)/documents/tournamentParticipants/$(tournamentId + '_' + request.auth.uid);
+      let membershipPath = /databases/(default)/documents/tournamentTeamMemberships/$(tournamentId + '_' + request.auth.uid);
+      return signedIn()
+        && ((participantId == tournamentId + '_' + request.auth.uid
+            && firestore.exists(participantPath)
+            && firestore.get(participantPath).data.get('status', '') in ['registered', 'checked_in', 'active'])
+          || (firestore.exists(membershipPath)
+            && firestore.get(membershipPath).data.get('teamId', '') == participantId
+            && firestore.get(membershipPath).data.get('role', '') == 'captain'
+            && firestore.get(membershipPath).data.get('status', '') == 'active'));
+    }
+
+    function canWriteTournamentSubmissionMedia(folder) {
+      return (folder == 'images' && isImage())
+        || (folder == 'videos' && isVideo());
+    }
+
     function isMedia() {
       return isImage() || isVideo();
     }
@@ -107,17 +195,17 @@ service firebase.storage {
 
     match /challenges/drafts/{userId}/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId) && canWriteChallengeDraftMedia(folder);
     }
 
     match /challenges/host-drafts/{userId}/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId) && canWriteChallengeDraftMedia(folder);
     }
 
     match /challenges/hybrid-drafts/{userId}/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId) && canWriteChallengeDraftMedia(folder);
     }
 
     match /challenges/{challengeId}/banner/{fileName} {
@@ -140,9 +228,23 @@ service firebase.storage {
       allow write: if isChallengeManager(challengeId) && ((resource == null && isVideo()) || request.resource == null);
     }
 
-    match /challenges/{challengeId}/submissions/{userId}/{fileName} {
+    match /challenges/{challengeId}/submissions/{userId}/{folder}/{fileName} {
       allow read: if isOwner(userId) || isChallengeManager(challengeId);
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId)
+        && ((folder == 'images' && isImage())
+          || (folder == 'videos' && isVideo())
+          || (folder == 'documents' && isDocument()));
+    }
+
+    match /tournaments/drafts/{userId}/{folder}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && canWriteTournamentDraftMedia(folder);
+    }
+
+    match /tournaments/{tournamentId}/rounds/{roundId}/matches/{matchId}/participants/{participantId}/{folder}/{fileName} {
+      allow read: if isTournamentSubmissionOwner(tournamentId, participantId);
+      allow write: if isTournamentSubmissionOwner(tournamentId, participantId)
+        && canWriteTournamentSubmissionMedia(folder);
     }
 
     match /live-events/drafts/{userId}/media/{folder}/{fileName} {
@@ -170,9 +272,30 @@ service firebase.storage {
       allow write: if isOwner(userId) && (isSupportAttachment() || request.resource == null);
     }
 
+    match /sponsors/{sponsorId}/{folder}/{fileName} {
+      allow read: if isOwner(sponsorId) || isAdmin();
+      allow write: if isOwner(sponsorId)
+        && folder in ['logo', 'banner']
+        && isImage();
+    }
+
     match /sponsors/{sponsorId}/assets/{folder}/{fileName} {
       allow read: if isOwner(sponsorId) || isAdmin();
       allow write: if isOwner(sponsorId) && isImage();
+    }
+
+    match /sponsor-conversations/{conversationId}/{sponsorId}/{folder}/{fileName} {
+      allow read: if canReadSponsorConversation(conversationId);
+      allow write: if canWriteSponsorConversation(conversationId, sponsorId)
+        && ((folder == 'images' && isImage())
+          || (folder == 'documents' && isDocument()));
+    }
+
+    match /admin/public-content/{assetType}/{fileName} {
+      allow read: if isActiveAdminUser();
+      allow write: if isActiveAdminUser()
+        && ((assetType == 'hero-poster' && isImage())
+          || (assetType == 'hero-video' && isVideo()));
     }
 
     match /rewardPrizeMedia/{prizeId}/{userId}/{fileName} {

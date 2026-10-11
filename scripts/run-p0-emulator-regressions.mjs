@@ -10,6 +10,7 @@ const tests = [
   "scripts/test-enterprise-active-cap-concurrency.mjs",
   "scripts/test-enterprise-refund-settlement-lock.mjs",
   "scripts/test-enterprise-storage-rules.mjs",
+  "scripts/test-media-upload-storage-rules.mjs",
   "scripts/test-enterprise-ownership-migration.mjs",
   "scripts/test-authoritative-media-verification.mjs",
   "scripts/test-private-access-method-enforcement.mjs",
