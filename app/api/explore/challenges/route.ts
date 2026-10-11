@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
           publicPreviewEnabled: true,
           challengeType: "private",
           typeLabel: typeLabel("private"),
-          coverImageUrl: text(raw.coverImageUrl ?? raw.bannerUrl) || null,
+          coverImageUrl: typeof raw.coverImagePath === "string" ? `/api/challenge-media?path=${encodeURIComponent(raw.coverImagePath)}` : null,
           publishedAt: toIso(raw.publishedAt ?? raw.createdAt),
           creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
           phaseSummary: phase,
@@ -244,7 +244,7 @@ export async function GET(request: NextRequest) {
         };
         return [{ ...item, _sortDocId: doc.id }];
       }
-      const publicFields = publicChallengeFields(raw);
+      const publicFields = publicChallengeFields(raw, doc.id);
       const paid = isPaidEntryChallenge(raw);
       const owned = Boolean(user?.uid && ownedBy(raw, user.uid));
       const recentCompletion = completedWithinExploreWindow(raw, phase);
@@ -257,7 +257,7 @@ export async function GET(request: NextRequest) {
         detailHref: `/challenges/${doc.id}`,
         title: text(publicFields.title ?? raw.title) || "Untitled challenge",
         shortDescription: text(raw.shortDescription ?? raw.summary),
-        coverImageUrl: text(raw.coverImageUrl ?? raw.bannerUrl ?? raw.mediaUrl),
+        coverImageUrl: text(publicFields.coverImageUrl ?? raw.bannerUrl ?? raw.mediaUrl),
         category: text(raw.category) || "General",
         publishedAt: toIso(raw.publishedAt ?? raw.createdAt),
         updatedAt: toIso(raw.updatedAt ?? raw.publishedAt ?? raw.createdAt),

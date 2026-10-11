@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { createHash, randomBytes } from "node:crypto";
 import { isPrivateChallengeRecord } from "@/lib/server/challenge-access";
 import { isChallengeJoinable } from "@/lib/server/submission-lifecycle";
@@ -33,6 +33,22 @@ export function inviteExpired(invite: Record<string, unknown>, now = Date.now())
 export async function hasPrivateChallengeAccess(db: Firestore, challengeId: string, userId: string) {
   const accessSnap = await db.collection("privateChallengeAccess").doc(`${challengeId}_${userId}`).get();
   return accessSnap.exists && accessSnap.data()?.status === "approved";
+}
+
+export function setPrivateChallengeMediaAccessInTransaction(
+  db: Firestore,
+  transaction: Transaction,
+  input: { challengeId: string; userId: string; allowed: boolean; now: string }
+) {
+  const id = `${input.challengeId}_${input.userId}`;
+  transaction.set(db.collection("challengeMediaAccess").doc(id), {
+    id,
+    challengeId: input.challengeId,
+    userId: input.userId,
+    privateMediaRead: input.allowed,
+    status: input.allowed ? "active" : "revoked",
+    updatedAt: input.now
+  }, { merge: true });
 }
 
 export function privateRequirements(challenge: Record<string, unknown>) {
@@ -246,6 +262,12 @@ export async function admitPrivateChallenge(db: Firestore, input: {
       }, { merge: true });
     }
     transaction.create(accessRef, { ...receipt, membershipStatus: waitlisted ? "waitlisted" : receipt.membershipStatus });
+    setPrivateChallengeMediaAccessInTransaction(db, transaction, {
+      challengeId,
+      userId: input.userId,
+      allowed: true,
+      now
+    });
     transaction.set(inviteRef, {
       currentUses: currentUses + 1,
       lastUsedAt: now,

@@ -1,4 +1,5 @@
 import { isPublicChallengeStatus } from "@/lib/challenge-status";
+import { challengeMediaDeliveryUrl, isFirebaseStorageDownloadUrl } from "@/lib/server/challenge-media-delivery";
 
 const PUBLIC_SUBMISSION_STATUSES = new Set(["approved", "active", "winner"]);
 
@@ -99,7 +100,21 @@ export function isPublicSubmission(id: string, data: Record<string, unknown>) {
     && data.publicVisibility !== false;
 }
 
-export function publicChallengeFields(data: Record<string, unknown>) {
+function privateRecord(data: Record<string, unknown>) {
+  const visibility = normalized(data.visibility ?? data.type);
+  const type = normalized(data.type);
+  return visibility.includes("private") || visibility.includes("exclusive") || visibility.includes("invite")
+    || type.includes("private") || type.includes("exclusive") || type.includes("invite");
+}
+
+function mediaUrl(data: Record<string, unknown>, pathField: string, urlField: string) {
+  const path = data[pathField];
+  if (typeof path === "string" && path.trim()) return challengeMediaDeliveryUrl(path.trim());
+  const url = data[urlField];
+  return privateRecord(data) || isFirebaseStorageDownloadUrl(url) ? null : url ?? null;
+}
+
+export function publicChallengeFields(data: Record<string, unknown>, challengeId?: string) {
   const result = pick(data, [
     "title", "shortDescription", "description", "category", "subcategory", "type", "visibility", "status", "lifecycleStatus", "builderVersion",
     "computedStatus", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
@@ -117,6 +132,40 @@ export function publicChallengeFields(data: Record<string, unknown>) {
     "confirmedPredictionPoolCents", "confirmedPredictionCount",
     "publishedAt", "createdAt", "updatedAt"
   ]);
+  const id = challengeId ?? (typeof data.id === "string" ? data.id : typeof data.challengeId === "string" ? data.challengeId : "");
+  if (id) {
+    const cover = mediaUrl(data, "coverImagePath", "coverImageUrl");
+    if (cover) result.coverImageUrl = cover;
+    else delete result.coverImageUrl;
+    for (const [pathField, urlField] of [["promoImagePath", "promoImageUrl"], ["trailerVideoPath", "trailerVideoUrl"], ["promoVideoPath", "promoVideoUrl"]]) {
+      const value = mediaUrl(data, pathField, urlField);
+      if (value) result[urlField] = value;
+      else delete result[urlField];
+    }
+    if (Array.isArray(data.challengeImages)) {
+      result.challengeImages = data.challengeImages.flatMap((item) => {
+        if (!item || typeof item !== "object") return privateRecord(data) ? [] : [item];
+        const image = item as Record<string, unknown>;
+        const value = mediaUrl(image, "path", "url");
+        if (!value) return [];
+        const safeImage = Object.fromEntries(["id", "path", "fileName", "contentType", "size", "width", "height", "durationSeconds", "moderationStatus"]
+          .filter((key) => image[key] !== undefined)
+          .map((key) => [key, image[key]]));
+        return [{ ...safeImage, url: value }];
+      });
+    }
+    if (data.challengeVideo && typeof data.challengeVideo === "object") {
+      const video = data.challengeVideo as Record<string, unknown>;
+      const value = mediaUrl(video, "path", "url");
+      const safeVideo = Object.fromEntries(["id", "path", "fileName", "contentType", "size", "width", "height", "durationSeconds", "moderationStatus"]
+        .filter((key) => video[key] !== undefined)
+        .map((key) => [key, video[key]]));
+      result.challengeVideo = value ? { ...safeVideo, url: value } : null;
+    }
+  } else if (privateRecord(data)) {
+    // Never serialize stored download-token URLs when the stable media path is unavailable.
+    for (const key of ["coverImageUrl", "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "challengeImages", "challengeVideo"]) delete result[key];
+  }
   if (data.hideParticipantList === true) delete result.participantCount;
   if (data.hideVoteTotals === true) {
     delete result.voteCount;
@@ -126,9 +175,14 @@ export function publicChallengeFields(data: Record<string, unknown>) {
 }
 
 export function publicSubmissionFields(data: Record<string, unknown>) {
-  return pick(data, [
+  const result = pick(data, [
     "challengeId", "title", "description", "mediaUrl", "mediaType", "thumbnailUrl",
     "status", "submittedAt", "createdAt", "updatedAt", "voteCount", "weightedVoteCount",
     "participantName", "displayName", "username", "avatarUrl", "planBadge"
   ]);
+  const path = typeof data.mediaStoragePath === "string" ? data.mediaStoragePath.trim() : "";
+  if (path) result.mediaUrl = challengeMediaDeliveryUrl(path);
+  else if (isFirebaseStorageDownloadUrl(data.mediaUrl)) delete result.mediaUrl;
+  if (isFirebaseStorageDownloadUrl(data.thumbnailUrl)) delete result.thumbnailUrl;
+  return result;
 }

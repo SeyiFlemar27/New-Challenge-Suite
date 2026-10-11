@@ -501,7 +501,7 @@ export async function PATCH(request: Request) {
         const expiryMillis = expiryText ? Date.parse(expiryText) : Number.NaN;
         const expiryDate = Number.isFinite(expiryMillis) ? new Date(expiryMillis) : null;
         const staffAccess = action === "approve" ? {
-          status: "active", role: enterpriseRole, scope: enterpriseScope,
+          status: "active", organizationStatus: "active", role: enterpriseRole, scope: enterpriseScope,
           department: String(parsed.body?.enterpriseDepartment ?? "Operations").trim().slice(0, 100) || "Operations",
           permissions: enterprisePermissions,
           categoryScope: Array.isArray(parsed.body?.enterpriseCategoryScope) ? parsed.body.enterpriseCategoryScope.filter((value: unknown): value is string => typeof value === "string").slice(0, 30) : [],

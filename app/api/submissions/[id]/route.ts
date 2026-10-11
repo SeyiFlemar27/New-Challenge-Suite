@@ -147,7 +147,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const challenge = challengeSnap?.exists && challengeData
-      ? { id: challengeSnap.id, ...publicChallengeFields(challengeData) }
+      ? { id: challengeSnap.id, ...publicChallengeFields(challengeData, challengeSnap.id) }
       : null;
     const creator = profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null;
     const rank = leaderboard?.entries.find((item) => item.submissionId === id || item.id === id)?.rank ?? null;

@@ -12,7 +12,7 @@ import {
 } from "@/lib/server/submission-lifecycle";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
-import { validatePrivateParticipantEligibility, validatePrivateRequirementEvidence } from "@/lib/server/private-invites";
+import { setPrivateChallengeMediaAccessInTransaction, validatePrivateParticipantEligibility, validatePrivateRequirementEvidence } from "@/lib/server/private-invites";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -127,6 +127,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         updatedAt: now
       };
       transaction.set(participantRef, participant);
+      if (privateOnly) setPrivateChallengeMediaAccessInTransaction(db, transaction, { challengeId: id, userId: user.uid, allowed: true, now });
       transaction.set(challengeRef, { registrationCount: Number(challenge.registrationCount ?? 0) + 1, updatedAt: now }, { merge: true });
       return { alreadyJoined: false, participant, rewardEligible: false, challengeOwnerId: String(challenge.creatorId ?? challenge.ownerId ?? challenge.hostId ?? "") };
     });

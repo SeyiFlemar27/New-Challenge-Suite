@@ -119,7 +119,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     pageSize: 5
   });
 
-  const publicChallenge = publicChallengeFields(challengeData);
+  const publicChallenge = publicChallengeFields(challengeData, id);
   const creatorProfile = { ...(creatorAccountSnap?.exists ? creatorAccountSnap.data() ?? {} : {}), ...(creatorProfileSnap?.exists ? creatorProfileSnap.data() ?? {} : {}) };
   const creatorFullName = [creatorProfile.firstName, creatorProfile.lastName].filter((value) => typeof value === "string" && value.trim()).join(" ");
   const creatorDisplayName = [creatorProfile.displayName, creatorProfile.name, creatorFullName, creatorProfile.username, typeof creatorProfile.email === "string" ? creatorProfile.email.split("@")[0] : "", challengeData.creatorName]

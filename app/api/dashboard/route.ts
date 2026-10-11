@@ -14,7 +14,7 @@ function personalChallengeFields(id: string, data: Record<string, unknown>, rela
   const progress = calculateChallengeDraftProgress(data);
   return {
     id,
-    ...publicChallengeFields(data),
+    ...publicChallengeFields(data, id),
     relationship,
     status: data.status ?? data.lifecycleStatus ?? "draft",
     lifecycleStatus: data.lifecycleStatus ?? data.status ?? "draft",

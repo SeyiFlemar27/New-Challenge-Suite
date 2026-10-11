@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
-import { randomUUID } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdminStorage } from "@/lib/firebase/admin";
+import { challengeMediaDeliveryUrl } from "@/lib/server/challenge-media-delivery";
 import { inspectImageBytes, inspectVideoBytes, normalizeImageBytes, validateInspectedMedia, type InspectedMedia } from "@/lib/server/media-inspection";
 import { isModernNormalChallenge, NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
 
 type MediaCandidate = { path: string; expectedType: "image" | "video"; field: string };
 type VerifiedAsset = MediaCandidate & { generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
+type StorageFile = ReturnType<ReturnType<NonNullable<ReturnType<typeof getAdminStorage>>["bucket"]>["file"]>;
 
 function candidates(challenge: Record<string, unknown>): MediaCandidate[] {
   const result: MediaCandidate[] = [];
@@ -26,6 +27,17 @@ function candidates(challenge: Record<string, unknown>): MediaCandidate[] {
     seen.add(candidate.path);
     return true;
   });
+}
+
+async function removeDownloadToken(file: StorageFile, field: string) {
+  let [metadata] = await file.getMetadata();
+  const objectMetadata = { ...(metadata.metadata ?? {}) } as Record<string, string>;
+  if (!objectMetadata.firebaseStorageDownloadTokens) return metadata;
+  delete objectMetadata.firebaseStorageDownloadTokens;
+  await file.setMetadata({ metadata: objectMetadata });
+  [metadata] = await file.getMetadata();
+  if (metadata.metadata?.firebaseStorageDownloadTokens) throw new Error(`MEDIA_DOWNLOAD_TOKEN_COULD_NOT_BE_REMOVED:${field}`);
+  return metadata;
 }
 
 export async function verifyChallengeMedia(db: Firestore, challengeId: string, challenge: Record<string, unknown>, creatorId: string) {
@@ -82,25 +94,17 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
         if (!existingBytes.equals(bytes)) throw new Error(`MEDIA_VERIFIED_OBJECT_COLLISION:${candidate.field}`);
         verifiedBytes = existingBytes;
       } else {
-        const downloadToken = randomUUID();
-        await verifiedFile.save(bytes, { resumable: false, metadata: { contentType, metadata: { firebaseStorageDownloadTokens: downloadToken, normalizedBy: "challenge-media-verification-v1", sourceGeneration: generation || "unknown" } }, preconditionOpts: { ifGenerationMatch: 0 } });
+        await verifiedFile.save(bytes, { resumable: false, metadata: { contentType, metadata: { normalizedBy: "challenge-media-verification-v1", sourceGeneration: generation || "unknown" } }, preconditionOpts: { ifGenerationMatch: 0 } });
       }
-      const [verifiedMetadata] = await verifiedFile.getMetadata();
+      const verifiedMetadata = await removeDownloadToken(verifiedFile, candidate.field);
       verifiedGeneration = String(verifiedMetadata.generation ?? "") || null;
     }
-    const sourceUrl = candidate.field.startsWith("challengeImages.")
-      ? (challenge.challengeImages as Array<Record<string, unknown>> | undefined)?.[Number(candidate.field.split(".")[1])]?.url
-      : candidate.field === "challengeVideo.path"
-        ? (challenge.challengeVideo as Record<string, unknown> | null)?.url
-        : (challenge as Record<string, unknown>)[candidate.field.replace(/Path$/, "Url")];
-    let verifiedUrl = typeof sourceUrl === "string" ? sourceUrl : "";
-    if (ownerDraftPath) {
-      const token = String((await bucket.file(verifiedPath).getMetadata())[0].metadata?.firebaseStorageDownloadTokens ?? "").split(",")[0];
-      if (!token) throw new Error(`MEDIA_DOWNLOAD_TOKEN_MISSING:${candidate.field}`);
-      const encodedPath = encodeURIComponent(verifiedPath);
-      const bucketName = bucket.name;
-      verifiedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
-    }
+    // Upload SDKs may have attached a bearer download token to the source file.
+    // Revoke that capability after verification; readers use the server route.
+    await removeDownloadToken(file, candidate.field);
+    // Persist only an application URL. Firebase download-token URLs are bearer
+    // capabilities and bypass Storage Rules after they have been shared.
+    const verifiedUrl = challengeMediaDeliveryUrl(verifiedPath);
     assets.push({ ...candidate, path: verifiedPath, generation: verifiedGeneration, size: verifiedBytes.length, sha256: createHash("sha256").update(verifiedBytes).digest("hex"), inspected, url: verifiedUrl });
   }
   const verification = { version: 1, status: "verified", verifiedAt: new Date().toISOString(), assets };
@@ -146,5 +150,21 @@ export function applyVerifiedChallengeMedia(challenge: Record<string, unknown>, 
     const asset = byField.get("challengeVideo.path");
     if (asset) challenge.challengeVideo = { ...(challenge.challengeVideo as Record<string, unknown>), path: asset.path, url: asset.url };
   }
+  // Storage Rules cannot inspect an array of objects to authorize one exact
+  // gallery path. Persist a server-derived list of the verified public image
+  // paths so rules can allow only referenced media while staying within the
+  // cross-service document-access limit. Visibility/status checks still gate
+  // every read, and private previews expose only their cover.
+  const publicPaths = new Set<string>();
+  if (typeof challenge.coverImagePath === "string" && challenge.coverImagePath.trim()) {
+    publicPaths.add(challenge.coverImagePath.trim());
+  }
+  if (Array.isArray(challenge.challengeImages)) {
+    for (const image of challenge.challengeImages) {
+      const path = image && typeof image === "object" ? (image as Record<string, unknown>).path : null;
+      if (typeof path === "string" && path.trim()) publicPaths.add(path.trim());
+    }
+  }
+  challenge.publicMediaPaths = [...publicPaths];
   return challenge;
 }

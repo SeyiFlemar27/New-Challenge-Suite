@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   const challenges = await Promise.all(approvedSponsorships.map(async (doc) => {
     const challengeId = String(doc.data().challengeId ?? "");
     const challenge = await db.collection("challenges").doc(challengeId).get();
-    return challenge.exists ? { id: challenge.id, ...publicChallengeFields(challenge.data() ?? {}) } : null;
+    return challenge.exists ? { id: challenge.id, ...publicChallengeFields(challenge.data() ?? {}, challenge.id) } : null;
   }));
   const prizePools = await Promise.all(approvedSponsorships.map(async (doc) => {
     const challengeId = String(doc.data().challengeId ?? "");

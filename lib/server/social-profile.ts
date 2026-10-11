@@ -50,13 +50,13 @@ export async function buildSocialProfile(db: Firestore, username: string, viewer
   const privacy = profilePrivacySettings(merged);
   const connectionsVisible = canViewProfileConnections(merged, viewerId === userId);
   const profile = toPublicProfile(userId, merged);
-  const created = challengesSnap.docs.filter((doc) => isPublicChallenge(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data()) } as Record<string, unknown>));
+  const created = challengesSnap.docs.filter((doc) => isPublicChallenge(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicChallengeFields(doc.data(), doc.id) } as Record<string, unknown>));
   const participantRecords = participantsSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const winnerRecords = winnersSnap.docs.filter((doc) => !isQaOrDemoRecord(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const submissionRecords = submissionsSnap.docs.filter((doc) => isPublicSubmission(doc.id, doc.data())).map((doc) => ({ id: doc.id, ...publicSubmissionFields(doc.data()) } as Record<string, unknown>));
   const relatedChallengeIds = [...new Set([...participantRecords, ...winnerRecords, ...submissionRecords].map((item) => String(item.challengeId ?? "")).filter(Boolean))];
   const relatedChallengeSnaps = relatedChallengeIds.length ? await db.getAll(...relatedChallengeIds.map((id) => db.collection("challenges").doc(id))) : [];
-  const publicRelatedChallenges = new Map(relatedChallengeSnaps.filter((snap) => snap.exists && isPublicChallenge(snap.id, snap.data() ?? {})).map((snap) => [snap.id, publicChallengeFields(snap.data() ?? {})]));
+  const publicRelatedChallenges = new Map(relatedChallengeSnaps.filter((snap) => snap.exists && isPublicChallenge(snap.id, snap.data() ?? {})).map((snap) => [snap.id, publicChallengeFields(snap.data() ?? {}, snap.id)]));
   const participating = privacy.showParticipatedChallenges === false ? [] : participantRecords.flatMap((item) => {
     const challengeId = String(item.challengeId ?? "");
     const challenge = publicRelatedChallenges.get(challengeId);

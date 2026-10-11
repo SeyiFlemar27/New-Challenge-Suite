@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       if (!snap.exists) return [];
       const data = snap.data() ?? {};
       if (!isPublicChallenge(snap.id, data)) return [];
-      return [[snap.id, { id: snap.id, ...publicChallengeFields(data) }]];
+      return [[snap.id, { id: snap.id, ...publicChallengeFields(data, snap.id) }]];
     }));
     const items = engagements
       .map((engagement) => {

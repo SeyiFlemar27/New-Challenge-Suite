@@ -83,6 +83,7 @@ try {
   const grant = await accessRef.get();
   if (storedRequest.status === "approved") {
     equal(grant.data()?.source, "owner_approval", "approval creates durable owner-review grant");
+    equal((await db.collection("challengeMediaAccess").doc(`${challengeId}_${requester.uid}`).get()).data()?.privateMediaRead, true, "approval writes the bounded Storage Rules private-media access projection");
     equal((await db.collection("challengeParticipants").doc(`${challengeId}_${requester.uid}`).get()).exists, false, "approval does not register the user as a participant");
     const retry = await post(owner, { action: "decide_access_request", challengeId, requestId: firstData.requestId, decision: "approve" });
     equal(retry.status, 200, "same decision retry is idempotent");
@@ -119,6 +120,7 @@ try {
     const admitted = await post(inviteUser, { action: "admit_invite", credential, requirementAcknowledgements: [], participantAnswers: {} });
     equal(admitted.status, 200, `${method} remains a functional admission method`);
     equal((await db.collection("privateChallengeAccess").doc(`${inviteChallengeId}_${inviteUser.uid}`).get()).data()?.source, method, `${method} grant retains the selected method`);
+    equal((await db.collection("challengeMediaAccess").doc(`${inviteChallengeId}_${inviteUser.uid}`).get()).data()?.privateMediaRead, true, `${method} admission writes the bounded private-media access projection`);
   }
 
   console.log(`PASS actual Private access request, owner decision, access grant, join, and invitation handlers against Firebase Auth/Firestore Emulator: ${assertions} assertions.`);

@@ -9,6 +9,7 @@ import {
   inviteExpired,
   privateRequirements,
   revokePrivateChallengeInvite,
+  setPrivateChallengeMediaAccessInTransaction,
   validatePrivateParticipantEligibility,
   validatePrivateRequirementEvidence
 } from "@/lib/server/private-invites";
@@ -336,6 +337,7 @@ export async function POST(request: Request) {
             participantAnswers: evidence.answers, requirementsAcceptedAt: requestData.requirementsAcceptedAt ?? now,
             createdAt: now, updatedAt: now
           }, { merge: true });
+          setPrivateChallengeMediaAccessInTransaction(db, transaction, { challengeId, userId, allowed: true, now });
         }
         transaction.set(requestRef, { status: decision, decidedBy: user.uid, decidedAt: now, updatedAt: now }, { merge: true });
         return { requestId, status: decision, duplicate: false };

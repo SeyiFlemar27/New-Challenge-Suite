@@ -442,6 +442,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Storage Rules read this server-maintained projection to authorize private
+    // media within Firebase's two-document cross-service access limit.
+    match /challengeMediaAccess/{document=**} {
+      allow read, write: if false;
+    }
+
     match /privateInviteAuditEvents/{document=**} {
       allow read, write: if false;
     }

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     .map((doc) => {
       const data = doc.data();
       const progress = calculateChallengeDraftProgress(data);
-      return { id: doc.id, ...publicChallengeFields(data), status: data.status ?? "draft", managementState: resolveChallengeManagementState(data), completionPercentage: Number(data.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: data.nextIncompleteSection ?? progress.nextIncompleteSection, lastAutosavedAt: data.lastAutosavedAt ?? data.updatedAt ?? null };
+      return { id: doc.id, ...publicChallengeFields(data, doc.id), status: data.status ?? "draft", managementState: resolveChallengeManagementState(data), completionPercentage: Number(data.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: data.nextIncompleteSection ?? progress.nextIncompleteSection, lastAutosavedAt: data.lastAutosavedAt ?? data.updatedAt ?? null };
     });
   return ok({ challenges }, "Challenge drafts loaded.");
 }

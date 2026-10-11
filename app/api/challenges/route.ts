@@ -30,7 +30,7 @@ export async function GET() {
   const challenges = snap.docs.flatMap((doc) => {
     const data = doc.data();
     if (!isPublicChallenge(doc.id, data)) return [];
-    return [{ ...publicChallengeFields(data), id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) }];
+    return [{ ...publicChallengeFields(data, doc.id), id: doc.id, computedStatus: getChallengeDisplayStatus(data as any) }];
   });
   return ok({ challenges }, "Challenges loaded.");
 }

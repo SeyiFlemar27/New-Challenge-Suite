@@ -11,8 +11,12 @@ export async function requireEnterprisePermission(request: Request, permission: 
   if (!db) return { user: null, db: null, access: null, response: serverUnavailable("Enterprise workspace") };
   const [userSnap, profileSnap] = await Promise.all([db.collection("users").doc(auth.user!.uid).get(), db.collection("profiles").doc(auth.user!.uid).get()]);
   const access = normalizeEnterpriseAccess({ ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}) });
-  if (!hasEnterprisePermission(access, permission)) return { user: null, db: null, access: null, response: forbidden("Your Enterprise role does not include this action.") };
-  return { user: auth.user!, db, access: access!, response: null };
+  if (!hasEnterprisePermission(access, permission) || !access?.organizationId) return { user: null, db: null, access: null, response: forbidden("Your Enterprise role does not include this action.") };
+  const organizationSnap = await db.collection("enterpriseOrganizations").doc(access.organizationId).get();
+  if (!organizationSnap.exists || String(organizationSnap.data()?.status ?? "").toLowerCase() !== "active") {
+    return { user: null, db: null, access: null, response: forbidden("This Enterprise organization is not active.") };
+  }
+  return { user: auth.user!, db, access: { ...access, organizationStatus: "active" }, response: null };
 }
 
 export async function requireEnterpriseChallengeAccess(request: Request, challengeId: string, permission: EnterprisePermission, write = false) {

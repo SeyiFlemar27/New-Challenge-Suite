@@ -20,8 +20,10 @@ service firebase.storage {
 
     function isActiveAdminUserProfile(userId, tokenIsAdmin) {
       let userPath = /databases/(default)/documents/users/$(userId);
-      return firestore.exists(userPath)
-        ? isActiveAdminProfile(firestore.get(userPath).data)
+      let userExists = firestore.exists(userPath);
+      let profile = userExists ? firestore.get(userPath).data : {};
+      return userExists
+        ? isActiveAdminProfile(profile)
         : tokenIsAdmin;
     }
 
@@ -47,72 +49,135 @@ service firebase.storage {
 
     function isChallengeManager(challengeId) {
       let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      let challengeExists = firestore.exists(challengePath);
+      let challenge = challengeExists ? firestore.get(challengePath).data : {};
       return signedIn()
         && (isAdmin()
-          || (firestore.exists(challengePath)
-            && firestore.get(challengePath).data.get('officialChallenge', false) != true
-            && firestore.get(challengePath).data.get('ownershipType', '') != 'challenge_suite_official'
-            && firestore.get(challengePath).data.creatorId == request.auth.uid)
-          || isEnterpriseChallengeManager(challengeId));
+          || (challengeExists
+            && challenge.get('officialChallenge', false) != true
+            && challenge.get('ownershipType', '') != 'challenge_suite_official'
+            && isChallengeOwner(challenge))
+          || (challengeExists && isEnterpriseChallengeManager(challenge)));
+    }
+
+    function hasPrivateChallengeMarker(value) {
+      return value is string && value.lower().matches('.*(private|exclusive|invite).*');
     }
 
     function isPrivateChallenge(challenge) {
-      return challenge.visibility == 'private'
-        || challenge.visibility == 'exclusive'
-        || challenge.type == 'Private / Exclusive'
-        || challenge.type == 'private'
-        || challenge.type == 'exclusive';
+      return hasPrivateChallengeMarker(challenge.get('visibility', ''))
+        || hasPrivateChallengeMarker(challenge.get('type', ''));
     }
 
-    function hasApprovedPrivateAccess(challengeId) {
-      let accessPath = /databases/(default)/documents/privateChallengeAccess/$(challengeId + '_' + request.auth.uid);
-      return firestore.exists(accessPath) && firestore.get(accessPath).data.status == 'approved';
+    function hasPrivateChallengeMediaAccess(challengeId) {
+      let accessPath = /databases/(default)/documents/challengeMediaAccess/$(challengeId + '_' + request.auth.uid);
+      let accessExists = firestore.exists(accessPath);
+      let access = accessExists ? firestore.get(accessPath).data : {};
+      return signedIn() && accessExists
+        && access.get('privateMediaRead', false) == true
+        && access.get('status', '') == 'active';
     }
 
-    function hasPrivateChallengeParticipation(challengeId) {
-      let participantPath = /databases/(default)/documents/challengeParticipants/$(challengeId + '_' + request.auth.uid);
-      return firestore.exists(participantPath)
-        && firestore.get(participantPath).data.status in ['registered', 'approved', 'active', 'entered', 'enrolled', 'winner'];
+    function isChallengeOwner(challenge) {
+      return signedIn()
+        && (challenge.get('creatorId', '') == request.auth.uid
+          || challenge.get('hostId', '') == request.auth.uid
+          || challenge.get('ownerId', '') == request.auth.uid);
     }
 
     function isPublicPrivatePreview(challenge) {
-      return challenge.visibility == 'private'
-        && challenge.publicPreviewEnabled == true
+      return challenge.get('visibility', '') == 'private'
+        && challenge.get('publicPreviewEnabled', false) == true
         && challenge.get('publicVisibility', true) != false
         && challenge.get('eventVisibility', '') != 'hidden_until_approved'
-        && challenge.status in ['published', 'approved', 'scheduled', 'registration_open', 'active'];
+        && challenge.get('status', challenge.get('lifecycleStatus', '')) in ['published', 'approved', 'scheduled', 'registration_open', 'active'];
     }
 
-    function canReadChallengeMedia(challengeId, allowPublicPreview) {
+    function canReadChallengeMedia(challengeId) {
       let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      let challengeExists = firestore.exists(challengePath);
+      let challenge = challengeExists ? firestore.get(challengePath).data : {};
       return isAdmin()
-        || (firestore.exists(challengePath)
-          && (!isPrivateChallenge(firestore.get(challengePath).data)
-            || isChallengeManager(challengeId)
-            || (allowPublicPreview && isPublicPrivatePreview(firestore.get(challengePath).data))
-            || hasApprovedPrivateAccess(challengeId)
-            || hasPrivateChallengeParticipation(challengeId)));
+        || (challengeExists && (
+          isChallengeOwner(challenge)
+          || (isPrivateChallenge(challenge)
+            ? hasPrivateChallengeMediaAccess(challengeId)
+            : isEnterpriseChallengeManager(challenge))));
     }
 
-    function isEnterpriseChallengeManager(challengeId) {
-      let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+    function isEnterpriseChallengeManager(challenge) {
       let userPath = /databases/(default)/documents/users/$(request.auth.uid);
+      let userExists = firestore.exists(userPath);
+      let user = userExists ? firestore.get(userPath).data : {};
+      let staff = user.get('staffAccess', {});
       return signedIn()
-        && firestore.exists(challengePath)
-        && firestore.exists(userPath)
-        && firestore.get(challengePath).data.officialChallenge == true
-        && firestore.get(challengePath).data.organizationOwnerId is string
-        && firestore.get(userPath).data.staffAccess.status == 'active'
-        && firestore.get(userPath).data.staffAccess.organizationId == firestore.get(challengePath).data.organizationOwnerId
-        && firestore.get(userPath).data.staffAccess.permissions.hasAny(['challenge.edit'])
-        && (firestore.get(userPath).data.staffAccess.expiresAtTimestamp == null
-          || request.time < firestore.get(userPath).data.staffAccess.expiresAtTimestamp)
-        && firestore.exists(/databases/(default)/documents/enterpriseOrganizations/$(firestore.get(challengePath).data.organizationOwnerId))
-        && firestore.get(/databases/(default)/documents/enterpriseOrganizations/$(firestore.get(challengePath).data.organizationOwnerId)).data.status == 'active'
-        && (firestore.get(userPath).data.staffAccess.scope == 'all_official'
-          || (firestore.get(userPath).data.staffAccess.scope in ['assigned_only', 'read_all_edit_assigned']
-            && firestore.get(challengePath).data.enterpriseAssignedUserIds is list
-            && firestore.get(challengePath).data.enterpriseAssignedUserIds.hasAny([request.auth.uid])));
+        && userExists
+        && challenge.get('officialChallenge', false) == true
+        && challenge.get('organizationOwnerId', '') is string
+        && challenge.get('organizationOwnerId', '') != ''
+        && staff.get('status', '') == 'active'
+        && staff.get('organizationStatus', '') == 'active'
+        && staff.get('organizationId', '') == challenge.get('organizationOwnerId', '')
+        && staff.get('permissions', []) is list
+        && staff.get('permissions', []).hasAny(['challenge.edit'])
+        && (staff.get('expiresAtTimestamp', null) == null
+          || (staff.get('expiresAtTimestamp', null) is timestamp && request.time < staff.get('expiresAtTimestamp', null)))
+        && (staff.get('scope', '') == 'all_official'
+          || (staff.get('scope', '') in ['assigned_only', 'read_all_edit_assigned']
+            && challenge.get('enterpriseAssignedUserIds', []) is list
+            && challenge.get('enterpriseAssignedUserIds', []).hasAny([request.auth.uid])));
+    }
+
+    function isStoredImage() {
+      return resource != null
+        && resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    function isPublicChallengeBanner(challengeId, fileName) {
+      let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      let path = 'challenges/' + challengeId + '/banner/' + fileName;
+      let challenge = firestore.exists(challengePath) ? firestore.get(challengePath).data : {};
+      let publicMediaPaths = challenge.get('publicMediaPaths', []);
+      let isReferenced = challenge.get('coverImagePath', '') == path
+        || (publicMediaPaths is list && publicMediaPaths.hasAny([path]));
+      return isReferenced
+        && !isPrivateChallenge(challenge)
+        && challenge.get('visibility', 'public') == 'public'
+        && challenge.get('publicVisibility', true) != false
+        && challenge.get('eventVisibility', '') != 'hidden_until_approved'
+        && challenge.get('status', challenge.get('lifecycleStatus', ''))
+          in ['approved', 'published', 'scheduled', 'registration_open', 'active', 'submission_open', 'submission_closed', 'voting_open', 'voting_closed', 'under_review', 'winners_announced', 'completed'];
+    }
+
+    function isPublicPrivatePreviewBanner(challengeId, fileName) {
+      let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      let path = 'challenges/' + challengeId + '/banner/' + fileName;
+      let challengeExists = firestore.exists(challengePath);
+      let challenge = challengeExists ? firestore.get(challengePath).data : {};
+      return challengeExists
+        && isPrivateChallenge(challenge)
+        && isPublicPrivatePreview(challenge)
+        && challenge.get('coverImagePath', '') == path
+        && isStoredImage();
+    }
+
+    function canReadVerifiedChallengeMedia(challengeId, mediaKind, fileName) {
+      let challengePath = /databases/(default)/documents/challenges/$(challengeId);
+      let path = 'verified-challenge-media/' + challengeId + '/' + mediaKind + '/' + fileName;
+      let challengeExists = firestore.exists(challengePath);
+      let challenge = challengeExists ? firestore.get(challengePath).data : {};
+      let isCover = challenge.get('coverImagePath', '') == path;
+      let publicMediaPaths = challenge.get('publicMediaPaths', []);
+      let isExplicitlyPublic = publicMediaPaths is list && publicMediaPaths.hasAny([path]);
+      let publicRecord = challenge.get('visibility', 'public') == 'public'
+        && challenge.get('publicVisibility', true) != false
+        && challenge.get('eventVisibility', '') != 'hidden_until_approved'
+        && challenge.get('status', challenge.get('lifecycleStatus', ''))
+          in ['approved', 'published', 'scheduled', 'registration_open', 'active', 'submission_open', 'submission_closed', 'voting_open', 'voting_closed', 'under_review', 'winners_announced', 'completed'];
+      return challengeExists && (
+        (publicRecord && !isPrivateChallenge(challenge) && mediaKind == 'images' && isStoredImage() && (isCover || isExplicitlyPublic))
+        || (isPrivateChallenge(challenge) && isPublicPrivatePreview(challenge) && mediaKind == 'images' && isStoredImage() && isCover)
+        || canReadChallengeMedia(challengeId));
     }
 
     function isImage() {
@@ -151,18 +216,22 @@ service firebase.storage {
 
     function canReadSponsorConversation(conversationId) {
       let conversationPath = /databases/(default)/documents/sponsorConversations/$(conversationId);
+      let conversationExists = firestore.exists(conversationPath);
+      let conversation = conversationExists ? firestore.get(conversationPath).data : {};
       return isActiveAdminUser()
         || (signedIn()
-          && firestore.exists(conversationPath)
-          && (firestore.get(conversationPath).data.get('sponsorId', '') == request.auth.uid
-            || firestore.get(conversationPath).data.get('recipientId', '') == request.auth.uid));
+          && conversationExists
+          && (conversation.get('sponsorId', '') == request.auth.uid
+            || conversation.get('recipientId', '') == request.auth.uid));
     }
 
     function canWriteSponsorConversation(conversationId, sponsorId) {
       let conversationPath = /databases/(default)/documents/sponsorConversations/$(conversationId);
+      let conversationExists = firestore.exists(conversationPath);
+      let conversation = conversationExists ? firestore.get(conversationPath).data : {};
       return isOwner(sponsorId)
-        && firestore.exists(conversationPath)
-        && firestore.get(conversationPath).data.get('sponsorId', '') == sponsorId;
+        && conversationExists
+        && conversation.get('sponsorId', '') == sponsorId;
     }
 
     function isTournamentSubmissionOwner(tournamentId, participantId) {
@@ -209,23 +278,33 @@ service firebase.storage {
     }
 
     match /challenges/{challengeId}/banner/{fileName} {
-      allow read: if signedIn() && canReadChallengeMedia(challengeId, true);
+      allow read: if isStoredImage() && isPublicChallengeBanner(challengeId, fileName)
+        || isPublicPrivatePreviewBanner(challengeId, fileName)
+        || (signedIn() && canReadChallengeMedia(challengeId));
       allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/trailers/{fileName} {
-      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
+      allow read: if signedIn() && canReadChallengeMedia(challengeId);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isVideo()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/promo-flyer/{fileName} {
-      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
+      allow read: if signedIn() && canReadChallengeMedia(challengeId);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/promo-video/{fileName} {
-      allow read: if signedIn() && canReadChallengeMedia(challengeId, false);
+      allow read: if signedIn() && canReadChallengeMedia(challengeId);
       allow write: if isChallengeManager(challengeId) && ((resource == null && isVideo()) || request.resource == null);
+    }
+
+    // Verified challenge media is delivered through the authorized application
+    // media endpoint. Direct SDK reads use the same bounded rule checks; writes
+    // remain server-only so Firebase download-token URLs are never required.
+    match /verified-challenge-media/{challengeId}/{mediaKind}/{fileName} {
+      allow read: if canReadVerifiedChallengeMedia(challengeId, mediaKind, fileName);
+      allow write: if false;
     }
 
     match /challenges/{challengeId}/submissions/{userId}/{folder}/{fileName} {

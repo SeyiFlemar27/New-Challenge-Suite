@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         const data = doc.data();
         if (!isPublicChallenge(doc.id, data)) return [];
         return [{
-          ...publicChallengeFields(data),
+          ...publicChallengeFields(data, doc.id),
           id: doc.id,
           createdAt: toIso(data.createdAt),
           updatedAt: toIso(data.updatedAt),

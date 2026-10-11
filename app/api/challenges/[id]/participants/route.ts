@@ -70,7 +70,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
 
   return ok({
-    challenge: { id, ...publicChallengeFields(challenge) },
+    challenge: { id, ...publicChallengeFields(challenge, id) },
     phaseSummary,
     participants: result.entries,
     pagination: result.pagination,
