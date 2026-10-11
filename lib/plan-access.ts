@@ -959,7 +959,7 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   if (paid && !access.canCreatePaidChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to submit paid-entry challenges for review." };
   if (privateChallenge && !capabilities.canCreatePrivateChallenge) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator or Host access is required to publish private challenges." };
   if (premiumOnly && !capabilities.canCreatePrivateChallenge) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator or Host access is required to publish restricted challenges." };
-  if (prize && !access.canCreatePrizeChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish sponsor-funded prize or product-prize challenges." };
+  if (prize && !access.canCreatePrizeChallenges && challengeInput.creatorPrizeFundingConfirmed !== true) return { allowed: false, code: "CREATOR_REQUIRED", message: "A confirmed creator-funded cash prize is required before a Free challenge can be published." };
   if (sponsored && !access.canCreateSponsoredChallenges) return { allowed: false, code: "CREATOR_REQUIRED", message: "Creator plan or higher is required to publish sponsor-ready challenges." };
 
   return { allowed: true, code: null, message: "Challenge can be created." };

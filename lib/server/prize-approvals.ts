@@ -10,6 +10,7 @@ import {
   calculateWinnerPrizePool,
   holdUntilFromApproval
 } from "@/lib/server/payout-structure";
+import { normalWinnerDistribution } from "@/lib/normal-challenge-prize-allocation";
 import {
   buildConfirmedSettlementPreview,
   createInternalChallengeSettlement
@@ -65,16 +66,20 @@ export function defaultWinnerSplit(count: number) {
   return Array.from({ length: count }, (_, index) => ({ position: index + 1, percent: index === count - 1 ? 100 - base * (count - 1) : base }));
 }
 
-export function normalizeWinnerProposalWinners(input: unknown): NormalizedProposalWinner[] {
+export function normalizeWinnerProposalWinners(input: unknown, challenge?: Record<string, unknown> | null): NormalizedProposalWinner[] {
   const raw = Array.isArray(input) ? input as WinnerProposalWinnerInput[] : [];
   const defaults = defaultWinnerSplit(raw.length);
+  const fixedNormalDistribution = challenge?.builderVersion === "normal_v3"
+    ? normalWinnerDistribution(raw.length)
+    : null;
   return raw.slice(0, 20).map((winner, index) => {
     const fallback = defaults[index] ?? { position: index + 1, percent: 0 };
+    const placement = Math.max(1, Math.round(Number(winner.placement ?? fallback.position) || fallback.position));
     return {
       userId: text(winner.userId, 160),
       submissionId: text(winner.submissionId, 160) || null,
-      placement: Math.max(1, Math.round(Number(winner.placement ?? fallback.position) || fallback.position)),
-      splitPercent: Math.max(0, Math.round(Number(winner.splitPercent ?? fallback.percent) || 0)),
+      placement,
+      splitPercent: fixedNormalDistribution?.find((item) => item.position === placement)?.percent ?? Math.max(0, Math.round(Number(winner.splitPercent ?? fallback.percent) || 0)),
       proposedAmountPreviewCents: 0,
       currency: DEFAULT_CASH_CURRENCY,
       notes: text(winner.notes, 500) || null
@@ -82,13 +87,19 @@ export function normalizeWinnerProposalWinners(input: unknown): NormalizedPropos
   });
 }
 
-export function validateWinnerProposalWinners(winners: NormalizedProposalWinner[]) {
+export function validateWinnerProposalWinners(winners: NormalizedProposalWinner[], challenge?: Record<string, unknown> | null) {
   const errors: Record<string, string> = {};
   const totalPercent = winners.reduce((sum, winner) => sum + winner.splitPercent, 0);
   const placements = new Set<number>();
   const userIds = new Set<string>();
 
   if (!winners.length) errors.winners = "At least one proposed winner is required.";
+  if (challenge?.builderVersion === "normal_v3") {
+    const expectedCount = Number(challenge.numberOfWinners);
+    if (![1, 3].includes(expectedCount) || winners.length !== expectedCount) errors.winnerCount = "Winner selection must match this challenge's configured one or three winners.";
+    const expectedPlacements = new Set(Array.from({ length: expectedCount }, (_, index) => index + 1));
+    if (winners.some((winner) => !expectedPlacements.has(winner.placement))) errors.winnerPlacement = "Winner placements must match the configured prize positions.";
+  }
   if (totalPercent !== 100) errors.winnerSplit = "Winner split must equal 100%.";
 
   winners.forEach((winner, index) => {
@@ -211,14 +222,15 @@ export function buildPrizeApprovalPreview(input: {
   approvedAt?: string;
 }) {
   const approvedAt = input.approvedAt ?? new Date().toISOString();
+  const winners = normalizeWinnerProposalWinners(input.winners, input.challenge);
   const sources = getConfirmedPrizeSources(input.challenge);
   const prizePool = calculateWinnerPrizePool(sources);
   const distribution = calculateWinnerDistribution(
     prizePool.winnerPrizePoolCents,
-    input.winners.map((winner) => ({ position: winner.placement, percent: winner.splitPercent }))
+    winners.map((winner) => ({ position: winner.placement, percent: winner.splitPercent }))
   );
   const holdUntil = holdUntilFromApproval(approvedAt, CASH_EARNING_HOLD_HOURS);
-  const winnerAmounts = input.winners.map((winner) => {
+  const winnerAmounts = winners.map((winner) => {
     const match = distribution.distributions.find((item) => item.position === winner.placement);
     return {
       ...winner,
@@ -347,8 +359,8 @@ export async function getAdminPrizeApprovalDetail(db: Firestore, proposalId: str
   if (!proposal) return null;
   const challengeId = text(proposal.challengeId, 160);
   const challenge = challengeId ? await getChallengeOrNull(db, challengeId) : null;
-  const winners = normalizeWinnerProposalWinners(proposal.winners);
-  const validation = validateWinnerProposalWinners(winners);
+  const winners = normalizeWinnerProposalWinners(proposal.winners, challenge);
+  const validation = validateWinnerProposalWinners(winners, challenge);
   const preview = challenge ? await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners }) : null;
   const settlementId = text(proposal.settlementId, 200) || `challenge_settlement_${challengeId}_${proposalId}`;
   const settlementSnap = challengeId ? await db.collection("challengeSettlements").doc(settlementId).get() : null;
@@ -376,8 +388,8 @@ export async function finalizeApprovedWinnerProposalLedger(db: Firestore, input:
   if (!proposal) return { finalized: false, status: "proposal_not_found", message: "Winner proposal not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
   if (!challenge) return { finalized: false, status: "challenge_not_found", message: "Challenge not found.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
   if (proposal.status !== "approved") return { finalized: false, status: "manual_review_required", message: "Admin approval is required before settlement.", ledgerEntriesCreated: 0, payoutProviderCalled: false };
-  const winners = normalizeWinnerProposalWinners(proposal.winners);
-  const validation = validateWinnerProposalWinners(winners);
+  const winners = normalizeWinnerProposalWinners(proposal.winners, challenge);
+  const validation = validateWinnerProposalWinners(winners, challenge);
   if (!validation.valid) return { finalized: false, status: "manual_review_required", message: "Winner split requires manual review.", validation, ledgerEntriesCreated: 0, payoutProviderCalled: false };
   const result = await createInternalChallengeSettlement(db, {
     challengeId: input.challengeId,

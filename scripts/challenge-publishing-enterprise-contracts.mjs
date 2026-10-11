@@ -47,7 +47,7 @@ for (const message of [
 ]) assert.ok(`${sources.feedback}\n${sources.publishReadiness}`.includes(message), `missing publish feedback: ${message}`);
 assert.doesNotMatch(sources.builder, /response\.message \|\| "Challenge could not be published/);
 
-for (const title of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
+for (const title of ["Overview", "Participation", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review Your Challenge", "Ready to Submit?"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
 assert.match(sources.normalBuilder, /NORMAL_CHALLENGE_(?:STEPS\[step\]|STEP_DEFINITIONS\[step\])/);
 assert.match(sources.normalBuilder, /createChallengeDraft\(payload\)/);
 assert.match(sources.normalBuilder, /publishChallengeDraft\(id, payload\)/);

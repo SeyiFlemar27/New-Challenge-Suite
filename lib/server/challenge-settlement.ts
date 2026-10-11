@@ -15,6 +15,7 @@ import { createNotification } from "@/lib/server/notifications";
 import { calculateGrowthWalletAllocation, calculatePaidEntrySplit, ECONOMY_V1_RULES, ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
 import { getConfirmedCreatorPrizeFunding } from "@/lib/server/prize-funding";
 import { getConfirmedEnterprisePromotionalPrizeFunding, isEnterpriseFinanceResource, organizationOwnerForFinance, reserveEnterpriseSettlementLockInTransaction } from "@/lib/server/enterprise-prize-exposure";
+import { normalWinnerDistribution } from "@/lib/normal-challenge-prize-allocation";
 
 export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
@@ -213,11 +214,19 @@ export function buildSettlementBreakdown(input: {
   const sponsorPrizePlatformFeeAmount = Math.floor(grossConfirmedSponsorPrizeAmount * SPONSOR_PRIZE_PLATFORM_FEE_PERCENT / 100);
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
   const placementCount = new Set(input.winners.map((winner) => winner.placement)).size;
-  const generatedPlacementDistribution = distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
-  const creatorPlacementDistribution = distributeByPercent(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, defaultPlacementSplit(placementCount));
+  const fixedNormalPrizeDistribution = input.challenge.builderVersion === "normal_v3"
+    ? normalWinnerDistribution(placementCount)
+    : null;
+  const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : defaultPlacementSplit(placementCount);
+  const generatedPlacementDistribution = fixedNormalPrizeDistribution?.length
+    ? distributeByPercent(generatedSplit.winnerShareCents, prizePlacementDistribution)
+    : distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
+  const creatorPlacementDistribution = distributeByPercent(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, prizePlacementDistribution);
   const challengeDistribution = generatedPlacementDistribution.map((item) => ({ ...item, amountCents: item.amountCents + (creatorPlacementDistribution.find((creator) => creator.position === item.position)?.amountCents ?? 0) }));
   const memberChallengeDistribution = distributePlacementMembers(challengeDistribution, input.winners);
-  const sponsorSplits = customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(placementCount);
+  const sponsorSplits = fixedNormalPrizeDistribution?.length
+    ? prizePlacementDistribution
+    : customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(placementCount);
   const sponsorGrossDistribution = customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount)
     ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
   const sponsorFeeDistribution = distributeByWeights(sponsorPrizePlatformFeeAmount, sponsorGrossDistribution);
@@ -448,16 +457,32 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
   const enterpriseFinanceId = enterpriseFinanceContextId(input.challenge);
   const creatorIdForSettlement = enterpriseOwned ? "" : economyV1ForSettlement ? creatorRecipientId(input.challenge) : operatorRecipientId(input.challenge);
   const growthWalletRef = db.collection("creatorGrowthWallets").doc(creatorIdForSettlement || "not_applicable");
+  const pendingSponsorReservationQuery = db.collection("sponsorContributions")
+    .where("challengeId", "==", input.challengeId)
+    .where("status", "in", ["pending", "payment_review_required"])
+    .limit(1);
+  const disputedSponsorContributionQuery = db.collection("sponsorContributions")
+    .where("challengeId", "==", input.challengeId)
+    .where("stripeDisputeRestricted", "==", true)
+    .limit(1);
 
   const result = await db.runTransaction(async (transaction) => {
-    const [settlementSnap, proposalSnap, challengeSnap, growthWalletSnap] = await Promise.all([
+    const [settlementSnap, proposalSnap, challengeSnap, growthWalletSnap, pendingSponsorReservationSnap, disputedSponsorContributionSnap] = await Promise.all([
       transaction.get(settlementRef),
       transaction.get(proposalRef),
       transaction.get(challengeRef),
-      transaction.get(growthWalletRef)
+      transaction.get(growthWalletRef),
+      transaction.get(pendingSponsorReservationQuery),
+      transaction.get(disputedSponsorContributionQuery)
     ]);
     const confirmedMoneyNow = breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount + breakdown.grossConfirmedCreatorPrizeAmount > 0;
     const existingSettlement = settlementSnap.exists ? settlementSnap.data() ?? {} : null;
+    if (!pendingSponsorReservationSnap.empty) {
+      throw new Error("Settlement is paused while Sponsor funding reservations or payment reviews are unresolved.");
+    }
+    if (!disputedSponsorContributionSnap.empty) {
+      throw new Error("Settlement is paused while a credited Sponsor contribution is disputed and awaiting Admin reconciliation.");
+    }
     if (existingSettlement && (existingSettlement.status !== "awaiting_confirmed_revenue" || !confirmedMoneyNow)) {
       const storedSettlement = {
         id: settlementSnap.id,

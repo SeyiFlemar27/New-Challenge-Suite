@@ -27,9 +27,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
   if (!editableDraftStatus(challenge)) return fail("Creator prize funding must be completed before the challenge is published.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
+  const [profileSnap, accountSnap] = managementAccess.enterpriseAccess ? [null, null] : await Promise.all([
+    db.collection("profiles").doc(user.uid).get(),
+    db.collection("users").doc(user.uid).get()
+  ]);
   const profile = managementAccess.enterpriseAccess
-    ? { planId: "enterprise", planStatus: "active", accountType: "enterprise", enterpriseAccessStatus: "approved" }
-    : {};
+    ? { planId: "enterprise", planStatus: "active", accountType: "user", enterpriseAccessStatus: "approved" }
+    : { ...(profileSnap?.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap?.exists ? accountSnap.data() ?? {} : {}) };
   const access = getChallengeMonetizationAccess(profile);
   if (!access.canPreparePrizePool) return fail("Creator prize funding is available to eligible Creator, Host, and approved Enterprise accounts.", 403, undefined, "PRIZE_POOL_LOCKED");
   const confirmedCents = Math.max(0, Number(challenge.confirmedCreatorPrizeFundingCents ?? 0));
@@ -48,8 +52,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     payment = await createPendingCreatorPrizeFunding(db, { challengeId, creatorId: user.uid, initiatedByUserId: user.uid, organizationOwnerId, amountCents, currency: "USD" });
   } catch (error) {
     if (error instanceof Error && error.message === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
+    if (error instanceof Error && error.message === "CREATOR_PRIZE_FUNDING_AMOUNT_CONFLICT") return fail("A different creator prize-funding amount is already reserved for this challenge. Complete or cancel that checkout first.", 409, undefined, "PRIZE_FUNDING_AMOUNT_CONFLICT");
+    if (error instanceof Error && error.message === "CHALLENGE_NOT_EDITABLE") return fail("Creator prize funding must be completed before the challenge is published.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
     return serverError("Creator prize funding could not be reserved.", error instanceof Error ? error.message : error);
   }
+  if (Number(payment.amountCents) !== amountCents) return fail("A different creator prize-funding amount is already reserved for this challenge. Complete or cancel that checkout first.", 409, undefined, "PRIZE_FUNDING_AMOUNT_CONFLICT");
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   let session;
   try {

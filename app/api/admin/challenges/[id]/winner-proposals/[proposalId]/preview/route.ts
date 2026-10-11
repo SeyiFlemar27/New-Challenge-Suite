@@ -17,8 +17,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!challenge) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   if (!proposal || proposal.challengeId !== challengeId) return fail("Winner proposal not found.", 404, undefined, "WINNER_PROPOSAL_NOT_FOUND");
 
-  const winners = normalizeWinnerProposalWinners(proposal.winners);
-  const validation = validateWinnerProposalWinners(winners);
+  const winners = normalizeWinnerProposalWinners(proposal.winners, challenge);
+  const validation = validateWinnerProposalWinners(winners, challenge);
   if (!validation.valid) return validationError(validation.errors, "Winner proposal split is invalid.");
 
   const preview = await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners });

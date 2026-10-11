@@ -54,9 +54,10 @@ export function validateEntryFee(entryFeeCents: number) {
 export function getChallengeMonetizationAccess(profile: Record<string, unknown> = {}) {
   const access = getUserPlanAccess(profile);
   const enterpriseApproved = access.isEnterprise && String(profile.enterpriseAccessStatus ?? profile.enterpriseApprovalStatus ?? "").toLowerCase() === "approved";
-  const earningAccount = access.isCreator || access.isHost || enterpriseApproved;
+  const ownerAccount = !access.isSponsor && (!access.isEnterprise || enterpriseApproved);
+  const paidCreatorFeatures = ownerAccount && access.canCreatePaidChallenges;
   const lockedReason = access.normalizedPlanId === "free"
-    ? "Free users can create basic non-monetized public challenges only."
+    ? "Free users can fund their own cash prize. Paid entry, sponsorship, and paid-vote settings require an eligible paid Creator or Host plan."
     : access.isEnterprise && !enterpriseApproved
       ? "Enterprise monetization requires admin-approved Enterprise access."
       : "Monetization remains setup-safe until payment, KYC, admin review, and payout foundations are active.";
@@ -64,10 +65,10 @@ export function getChallengeMonetizationAccess(profile: Record<string, unknown> 
     accountType: access.accountType,
     planId: access.normalizedPlanId,
     enterpriseApproved,
-    canPreparePaidEntry: earningAccount,
-    canPrepareSponsorReady: earningAccount,
-    canPreparePrizePool: earningAccount,
-    canPreparePaidVotes: earningAccount,
+    canPreparePaidEntry: paidCreatorFeatures,
+    canPrepareSponsorReady: ownerAccount && access.canCreateSponsoredChallenges,
+    canPreparePrizePool: ownerAccount,
+    canPreparePaidVotes: paidCreatorFeatures,
     paidEntryPaymentActive: false,
     paidVotePaymentActive: false,
     prizePoolReleaseActive: false,
@@ -196,21 +197,21 @@ export function holdUntilFromApproval(approvedAt: string | Date, holdHours = CAS
 export function validateSponsorFundingWindow(challenge: Record<string, unknown>, now = new Date()) {
   const lifecycle = getChallengeLifecycleState(challenge, now);
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
-  const votingClosesAt = normalizeChallengeDate(challenge.votingDeadline ?? challenge.votingEndsAt, "end");
+  const votingStartsAt = normalizeChallengeDate(challenge.votingStartsAt ?? challenge.votingStartAt, "start");
   const published = Boolean(challenge.publishedAt) || ["published", "scheduled", "registration_not_open", "registration_open", "active", "submission_open", "voting_open"].includes(status);
   const terminal = ["cancelled", "paused", "completed", "winners_announced"].includes(status) || Boolean(challenge.winnersApprovedAt || challenge.adminWinnersApprovedAt);
-  const votingClosed = votingClosesAt ? now.getTime() > votingClosesAt.getTime() : lifecycle.votingStatus === "voting_closed";
+  const votingStarted = votingStartsAt ? now.getTime() >= votingStartsAt.getTime() : lifecycle.votingStatus === "voting_open" || lifecycle.votingStatus === "voting_closed";
   const sponsorReady = Boolean(challenge.sponsorEnabled || challenge.sponsorReady);
-  const allowed = sponsorReady && published && !terminal && !votingClosed;
+  const allowed = sponsorReady && published && !terminal && !votingStarted;
   return {
     allowed,
     sponsorReady,
     published,
-    votingClosed,
+    votingStarted,
     terminal,
     lifecycleStatus: lifecycle.primaryStatus,
-    closesAt: votingClosesAt?.toISOString() ?? null,
-    reason: allowed ? "sponsor_funding_open" : !sponsorReady ? "challenge_not_sponsor_ready" : !published ? "challenge_not_published" : terminal ? "challenge_terminal_or_winners_approved" : "voting_closed"
+    closesAt: votingStartsAt?.toISOString() ?? null,
+    reason: allowed ? "sponsor_funding_open" : !sponsorReady ? "challenge_not_sponsor_ready" : !published ? "challenge_not_published" : terminal ? "challenge_terminal_or_winners_approved" : "voting_started"
   };
 }
 

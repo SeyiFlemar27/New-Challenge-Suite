@@ -20,6 +20,11 @@ const challengeId = `${runId}_enterprise_challenge`;
 const organizationId = `${runId}_org`;
 const creatorSessionId = `cs_${runId}_creator_prize`;
 let createdCreatorSession;
+let sponsorChargeCreatedAt;
+let sponsorChargeUnavailable = false;
+let failNextSponsorPaymentIntentRetrieval = false;
+const sponsorSessions = new Map();
+let sponsorCheckoutSequence = 0;
 const sponsorChallengeId = `${runId}_sponsor_challenge`;
 const sponsorOrgId = `${runId}_sponsor_org`;
 const sponsorSessionId = `cs_${runId}_sponsor_funding`;
@@ -49,6 +54,7 @@ const settlementRefundCaseId = `refund_creatorPrizeFundingPayments_${settlementF
 let fundingId;
 let creatorLedgerRefs = [];
 let sponsorContributionId;
+let ambiguousSponsorContributionId;
 let sponsorLedgerRefs = [];
 let entryPaymentId;
 let entryLedgerRefs = [];
@@ -100,7 +106,7 @@ try {
   };
   stripe.checkout.sessions.retrieve = async (requestedId, options) => {
     if (requestedId === creatorSessionId) return { ...createdCreatorSession, line_items: { data: [] } };
-    if (requestedId === sponsorSessionId) return { ...createdSponsorSession, line_items: { data: [] } };
+    if (sponsorSessions.has(requestedId)) return { ...sponsorSessions.get(requestedId), line_items: { data: [] } };
     if (requestedId === participantSessionId) return { ...createdEntrySession, line_items: { data: [] } };
     assert.equal(requestedId, sessionId);
     assert.deepEqual(options, { expand: ["line_items"] });
@@ -108,16 +114,59 @@ try {
   };
   stripe.checkout.sessions.create = async (params) => {
     const isSponsor = params.metadata.paymentPurpose === "sponsor_funding";
+    if (isSponsor) assert.equal(params.payment_intent_data?.capture_method, "automatic", "Sponsor Checkout uses automatic capture rather than authorization-only flow");
     const isEntry = params.metadata.paymentPurpose === "challenge_entry_fee";
+    const sponsorSequence = isSponsor ? sponsorCheckoutSequence++ : 0;
     const session = {
-      id: isSponsor ? sponsorSessionId : isEntry ? participantSessionId : creatorSessionId, mode: "payment", status: "complete", payment_status: "paid",
-      amount_total: params.line_items[0].price_data.unit_amount, currency: "usd",
-      payment_intent: `pi_${runId}_${isSponsor ? "sponsor" : isEntry ? "entry" : "creator_prize"}`, metadata: params.metadata,
+      id: isSponsor ? (sponsorSequence === 0 ? sponsorSessionId : `${sponsorSessionId}_${sponsorSequence + 1}`) : isEntry ? participantSessionId : creatorSessionId, object: "checkout.session", mode: "payment", status: "complete", payment_status: "paid",
+      amount_total: params.line_items[0].price_data.unit_amount, currency: "usd", payment_method_types: params.payment_method_types,
+      payment_intent: `pi_${runId}_${isSponsor ? `sponsor_${sponsorSequence + 1}` : isEntry ? "entry" : "creator_prize"}`, metadata: params.metadata,
     };
-    if (isSponsor) createdSponsorSession = session;
+    if (isSponsor) {
+      createdSponsorSession = session;
+      sponsorSessions.set(session.id, session);
+    }
     else if (isEntry) createdEntrySession = session;
     else createdCreatorSession = session;
     return { ...session, url: "https://checkout.test/session" };
+  };
+  stripe.paymentIntents.retrieve = async (requestedId, options) => {
+    const sponsorSession = [...sponsorSessions.values()].find((session) => session.payment_intent === requestedId);
+    assert.ok(sponsorSession, "Sponsor webhook retrieves the PaymentIntent for the stored Checkout Session");
+    assert.deepEqual(options, { expand: ["latest_charge"] }, "Sponsor webhook requests the provider Charge needed to verify completion timing");
+    if (failNextSponsorPaymentIntentRetrieval) {
+      failNextSponsorPaymentIntentRetrieval = false;
+      throw new Error("Deterministic PaymentIntent retrieval failure");
+    }
+    const sponsorRecord = await db.collection("sponsorContributions").doc(sponsorSession.metadata.sponsorContributionId).get();
+    const reservationCreatedAt = Date.parse(sponsorRecord.data().reservationCreatedAt);
+    return {
+      id: requestedId,
+      object: "payment_intent",
+      status: "succeeded",
+      capture_method: "automatic",
+      amount: Number(sponsorSession.amount_total),
+      amount_received: Number(sponsorSession.amount_total),
+      currency: sponsorSession.currency,
+      latest_charge: sponsorChargeUnavailable ? null : {
+        id: `ch_${runId}_sponsor`,
+        object: "charge",
+        status: "succeeded",
+        paid: true,
+        captured: true,
+        disputed: false,
+        refunded: false,
+        review: null,
+        outcome: { type: "authorized" },
+        fraud_details: {},
+        payment_intent: requestedId,
+        amount: Number(sponsorSession.amount_total),
+        amount_captured: Number(sponsorSession.amount_total),
+        currency: sponsorSession.currency,
+        payment_method_details: { type: "card" },
+        created: sponsorChargeCreatedAt ?? Math.floor(reservationCreatedAt / 1000) + 60,
+      },
+    };
   };
   let providerRefundCalls = 0;
   let failNextProviderRefund = false;
@@ -437,8 +486,31 @@ try {
   assert.equal(pendingSponsorFunding.sponsorId, sponsorOrgId);
   assert.equal(pendingSponsorFunding.organizationOwnerId, organizationId);
   assert.equal(createdSponsorSession.metadata.sponsorContributionId, sponsorContributionId);
-  const sponsorWebhook = await sendWebhook(stripeEvent(`${runId}_sponsor_event`, createdSponsorSession));
-  assert.equal(sponsorWebhook.status, 200, await sponsorWebhook.clone().text());
+  const sponsorReservationExpiresAt = new Date(Math.floor((Date.now() - 5 * 60_000) / 1000) * 1000);
+  const sponsorReservationCreatedAtForLateDelivery = new Date(sponsorReservationExpiresAt.getTime() - 15 * 60_000);
+  const sponsorVotingStartedAt = new Date(sponsorReservationCreatedAtForLateDelivery.getTime() + 60_000);
+  await Promise.all([
+    db.collection("sponsorContributions").doc(sponsorContributionId).set({
+      createdAt: sponsorReservationCreatedAtForLateDelivery.toISOString(),
+      reservationCreatedAt: sponsorReservationCreatedAtForLateDelivery.toISOString(),
+      reservationExpiresAt: sponsorReservationExpiresAt.toISOString(),
+      reservationDurationMs: 900_000,
+    }, { merge: true }),
+    db.collection("challenges").doc(sponsorChallengeId).set({ votingStartsAt: sponsorVotingStartedAt.toISOString() }, { merge: true }),
+  ]);
+  sponsorChargeCreatedAt = Math.floor((sponsorReservationCreatedAtForLateDelivery.getTime() + 60_000) / 1000);
+  const delayedSponsorEvent = stripeEvent(`${runId}_sponsor_event`, createdSponsorSession);
+  delayedSponsorEvent.created = Math.floor((sponsorReservationExpiresAt.getTime() - 60_000) / 1000);
+  failNextSponsorPaymentIntentRetrieval = true;
+  const firstAttemptAfterProviderReadFailure = await sendWebhook(delayedSponsorEvent);
+  assert.equal(firstAttemptAfterProviderReadFailure.status, 500, "provider retrieval failure is not treated as a successful payment confirmation");
+  assert.equal((await db.collection("stripeWebhookEvents").doc(delayedSponsorEvent.id).get()).data()?.status, "failed", "Stripe event is retryable after provider state retrieval fails");
+  const retryEventA = { ...delayedSponsorEvent, id: `${runId}_sponsor_concurrent_a` };
+  const retryEventB = { ...delayedSponsorEvent, id: `${runId}_sponsor_concurrent_b` };
+  const [sponsorWebhook, concurrentSponsorWebhook] = await Promise.all([sendWebhook(retryEventA), sendWebhook(retryEventB)]);
+  const sponsorWebhookFailure = (await db.collection("stripeWebhookEvents").doc(delayedSponsorEvent.id).get()).data()?.error;
+  assert.equal(sponsorWebhook.status, 200, `${await sponsorWebhook.clone().text()} cause=${String(sponsorWebhookFailure ?? "not recorded")}`);
+  assert.equal(concurrentSponsorWebhook.status, 200, "concurrent distinct Stripe event deliveries are handled idempotently");
   const sponsorRetryWebhook = await sendWebhook(stripeEvent(`${runId}_sponsor_retry_event`, createdSponsorSession));
   assert.equal(sponsorRetryWebhook.status, 200, await sponsorRetryWebhook.clone().text());
   const confirmedSponsorFunding = (await db.collection("sponsorContributions").doc(sponsorContributionId).get()).data();
@@ -446,10 +518,15 @@ try {
   const sponsorLedgers = await db.collection("challengeFinancialLedger").where("sponsorContributionId", "==", sponsorContributionId).get();
   sponsorLedgerRefs = sponsorLedgers.docs.map((doc) => doc.ref);
   assert.equal(confirmedSponsorFunding.status, "confirmed");
+  assert.equal(confirmedSponsorFunding.providerCompletionUpperBoundAt, new Date(delayedSponsorEvent.created * 1000).toISOString(), "funding eligibility uses Stripe Event time as a conservative completion upper bound, not Charge.created or webhook receipt time");
+  assert.equal(confirmedSponsorFunding.providerChargeCreatedAt, new Date(sponsorChargeCreatedAt * 1000).toISOString(), "Charge.created remains separately auditable and does not control eligibility");
+  assert.ok(Date.now() > Date.parse(confirmedSponsorFunding.reservationExpiresAt), "webhook is processed after the reservation expires");
+  assert.ok(delayedSponsorEvent.created * 1000 < Date.parse(confirmedSponsorFunding.reservationExpiresAt), "provider completion Event occurred before reservation expiration");
   assert.equal(confirmedSponsorFunding.sponsorId, sponsorOrgId);
   assert.equal(confirmedSponsorFunding.organizationOwnerId, organizationId);
   assert.equal(sponsorExposure.exposureCents, 2500);
   assert.equal(sponsorLedgers.size, 1);
+  assert.equal((await db.collection("refundCases").where("paymentId", "==", sponsorContributionId).get()).size, 0, "on-time successful payment does not create an unnecessary refund or review case");
   assert.equal(sponsorLedgers.docs[0].data().organizationOwnerId, organizationId);
   assert.equal(sponsorLedgers.docs[0].data().financialOwnerType, "organization");
   assert.equal((await db.collection("sponsorChallengeAgreements").doc(sponsorAgreementId).get()).data().fundingStatus, "confirmed");
@@ -458,6 +535,10 @@ try {
   assert.equal(linkedSponsorship.data().status, "pending_admin_review", "confirmed funding enters the existing Admin placement review queue");
   assert.equal(linkedSponsorship.data().placementStatus, "pending_review", "confirmed funding does not bypass placement approval");
   assert.deepEqual((await db.collection("cashWallets").doc(userId).get()).data(), creatorWalletBeforeSponsorFunding);
+  const staleExpiration = { ...stripeEvent(`${runId}_sponsor_expiration_race`, createdSponsorSession), type: "checkout.session.expired" };
+  assert.equal((await sendWebhook(staleExpiration)).status, 200, "an expiration event racing with a provider-paid session is acknowledged safely");
+  assert.equal((await db.collection("sponsorContributions").doc(sponsorContributionId).get()).data().status, "confirmed", "stale Checkout expiration cannot downgrade confirmed funding");
+  assert.equal((await db.collection("challengeFinancialLedger").where("sponsorContributionId", "==", sponsorContributionId).get()).size, 1, "expiration race cannot duplicate or reverse the prize ledger credit");
   const verifiedSponsorCheckout = await verifyCheckout(request(`http://localhost/api/verify-checkout?session_id=${sponsorSessionId}`, sponsorToken));
   assert.equal(verifiedSponsorCheckout.status, 200, await verifiedSponsorCheckout.clone().text());
   const verifiedSponsorBody = await verifiedSponsorCheckout.json();
@@ -474,6 +555,38 @@ try {
   const crossOrganizationStatus = await paymentStatus(request(`http://localhost/api/payments/status?purpose=sponsor_contribution&reference=${foreignSponsorContributionId}`, sponsorToken));
   assert.equal(crossOrganizationStatus.status, 200, await crossOrganizationStatus.clone().text());
   assert.equal((await crossOrganizationStatus.json()).data?.amountCents, null);
+
+  const ambiguousSponsorChallengeId = `${runId}_ambiguous_sponsor_challenge`;
+  const ambiguousAgreementId = `sponsor_opportunity_${ambiguousSponsorChallengeId}_${sponsorOrgId}`;
+  await Promise.all([
+    db.collection("challenges").doc(ambiguousSponsorChallengeId).set({ id: ambiguousSponsorChallengeId, title: "Ambiguous card timestamp review", creatorId: userId, status: "active", visibility: "public", sponsorEnabled: true, category: "art", region: "US", prizeValue: 0 }),
+    db.collection("sponsorChallengeAgreements").doc(ambiguousAgreementId).set({ id: ambiguousAgreementId, challengeId: ambiguousSponsorChallengeId, creatorId: userId, sponsorId: sponsorOrgId, sponsorOrganizationId: sponsorOrgId, status: "accepted", fundingStatus: "not_started", termsVersion: 1, creatorAcceptedVersion: 1, sponsorAcceptedVersion: 1, terms: { amountCents: 2500, currency: "USD", placements: ["challenge_detail"], ctaText: "Visit sponsor", ctaUrl: "https://sponsor.example.test", deliverables: [], durationStart: null, durationEnd: null } }),
+  ]);
+  const ambiguousCheckoutResponse = await createSponsorCheckout(new Request("http://localhost/api/sponsor/challenges/ambiguous/funding-checkout", {
+    method: "POST", headers: { authorization: `Bearer ${sponsorToken}`, "content-type": "application/json", "idempotency-key": `${runId}_ambiguous_sponsor_key` },
+    body: JSON.stringify({ agreementId: ambiguousAgreementId }),
+  }), { params: Promise.resolve({ id: ambiguousSponsorChallengeId }) });
+  assert.equal(ambiguousCheckoutResponse.status, 200, await ambiguousCheckoutResponse.clone().text());
+  const ambiguousCheckoutBody = await ambiguousCheckoutResponse.json();
+  ambiguousSponsorContributionId = ambiguousCheckoutBody.data?.sponsorContributionId ?? ambiguousCheckoutBody.sponsorContributionId;
+  const ambiguousSession = [...sponsorSessions.values()].find((session) => session.metadata.sponsorContributionId === ambiguousSponsorContributionId);
+  sponsorChargeUnavailable = true;
+  const ambiguousEvent = stripeEvent(`${runId}_ambiguous_sponsor_event`, ambiguousSession);
+  const ambiguousWebhook = await sendWebhook(ambiguousEvent);
+  assert.equal(ambiguousWebhook.status, 200, await ambiguousWebhook.clone().text());
+  const ambiguousContribution = (await db.collection("sponsorContributions").doc(ambiguousSponsorContributionId).get()).data();
+  assert.equal(ambiguousContribution.status, "payment_review_required", "a paid session without a verifiable successful Charge timestamp is routed to review");
+  assert.equal(ambiguousContribution.providerCompletionUpperBoundAt, null, "missing capture evidence cannot be converted into a payment-completion bound");
+  assert.ok(ambiguousContribution.providerEventCreatedAt, "the actual provider Event timestamp is retained for manual review");
+  const ambiguousReviewCase = (await db.collection("refundCases").doc(`refund_sponsorContributions_${ambiguousSponsorContributionId}`).get()).data();
+  assert.equal(ambiguousReviewCase.financialCreditStatus, "never_credited");
+  assert.equal(ambiguousReviewCase.reviewReason, "provider_payment_completion_not_verifiable");
+  assert.equal(ambiguousReviewCase.automaticFundingCreditExecuted, false);
+  assert.equal((await db.collection("challengeFinancialLedger").where("sponsorContributionId", "==", ambiguousSponsorContributionId).get()).size, 0, "ambiguous payment creates no funding ledger credit");
+  const ambiguousDuplicateWebhook = await sendWebhook(stripeEvent(`${runId}_ambiguous_sponsor_retry`, ambiguousSession));
+  assert.equal(ambiguousDuplicateWebhook.status, 200);
+  assert.equal((await db.collection("refundCases").where("paymentId", "==", ambiguousSponsorContributionId).get()).size, 1, "duplicate provider event does not create another review/refund case");
+  sponsorChargeUnavailable = false;
 
   await Promise.all([
     db.collection("challenges").doc(settlementChallengeId).set({
@@ -608,6 +721,7 @@ try {
     db.collection("paidVotePurchases").doc(purchaseId).delete(),
     db.collection("challenges").doc(challengeId).delete(),
     db.collection("challenges").doc(sponsorChallengeId).delete(),
+    db.collection("challenges").doc(`${runId}_ambiguous_sponsor_challenge`).delete(),
     db.collection("challenges").doc(participantChallengeId).delete(),
     db.collection("enterprisePrizeFundingLimits").doc(challengeId).delete(),
     db.collection("enterprisePrizeFundingLimits").doc(sponsorChallengeId).delete(),
@@ -618,6 +732,7 @@ try {
     ...(fundingId ? [db.collection("creatorPrizeFundingPayments").doc(fundingId).delete()] : []),
     ...(sponsorContributionId ? [db.collection("sponsorContributions").doc(sponsorContributionId).delete()] : []),
     db.collection("sponsorChallengeAgreements").doc(`sponsor_opportunity_${sponsorChallengeId}_${sponsorOrgId}`).delete(),
+    ...(ambiguousSponsorContributionId ? [db.collection("sponsorChallengeAgreements").doc(`sponsor_opportunity_${runId}_ambiguous_sponsor_challenge_${sponsorOrgId}`).delete(), db.collection("sponsorContributions").doc(ambiguousSponsorContributionId).delete(), db.collection("refundCases").doc(`refund_sponsorContributions_${ambiguousSponsorContributionId}`).delete()] : []),
     db.collection("sponsorships").doc(`sponsorship_agreement_sponsor_opportunity_${sponsorChallengeId}_${sponsorOrgId}`).delete(),
     db.collection("sponsorContributions").doc(foreignSponsorContributionId).delete(),
     ...(entryPaymentId ? [db.collection("challengeEntryPayments").doc(entryPaymentId).delete(), db.collection("challengeParticipants").doc(`${participantChallengeId}_${participantUserId}`).delete()] : []),
@@ -658,6 +773,8 @@ try {
     db.collection("stripeWebhookEvents").doc(`${runId}_creator_retry_event`).delete(),
     db.collection("stripeWebhookEvents").doc(`${runId}_sponsor_event`).delete(),
     db.collection("stripeWebhookEvents").doc(`${runId}_sponsor_retry_event`).delete(),
+    db.collection("stripeWebhookEvents").doc(`${runId}_ambiguous_sponsor_event`).delete(),
+    db.collection("stripeWebhookEvents").doc(`${runId}_ambiguous_sponsor_retry`).delete(),
     db.collection("stripeWebhookEvents").doc(`${runId}_entry_event`).delete(),
     db.collection("stripeWebhookEvents").doc(`${runId}_entry_retry_event`).delete(),
     db.collection("users").doc(userId).delete(), db.collection("users").doc(otherUserId).delete(),

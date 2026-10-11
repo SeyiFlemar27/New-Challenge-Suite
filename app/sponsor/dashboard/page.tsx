@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { ArrowRight, CircleAlert, Handshake, LineChart, RefreshCw, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, CircleAlert, Handshake, LineChart, RefreshCw, WalletCards, ShieldCheck } from "lucide-react";
 import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 
 type RecordItem = Record<string, unknown> & { id: string };
 type Attention = { id: string; title: string; context: string; reason: string; href: string; actionLabel: string; deadline: string | null };
@@ -24,14 +26,27 @@ type DashboardResponse = {
 };
 
 export default function SponsorDashboardPage() {
+  const router = useRouter();
+  const { user, loading: userLoading } = useCurrentUser();
   const searchParams = useSearchParams();
   const initialOpportunityTab = searchParams.get("opportunities");
   const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">(initialOpportunityTab === "creators" ? "creators" : "challenges");
-  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard"], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false });
+  const isSponsorAccount = Boolean(user?.selectedAccountType === "sponsor" || user?.isSponsor || user?.accountType === "sponsor");
+  const pendingProfileSetup = Boolean(isSponsorAccount && !user?.hasSponsorProfile && !user?.sponsorOrganizationId);
+  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard"], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false, enabled: !userLoading && isSponsorAccount && !pendingProfileSetup });
   const reloadDashboard = async () => { await dashboardQuery.refetch(); };
   const dashboard = dashboardQuery.data?.ok ? dashboardQuery.data.data ?? null : null;
-  const loading = dashboardQuery.isLoading;
+  const loading = userLoading || dashboardQuery.isLoading;
   const error = dashboardQuery.data && !dashboardQuery.data.ok ? dashboardQuery.data.message || "Sponsor Studio could not be loaded." : "";
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (!user) router.replace("/auth/login?next=%2Fsponsor%2Fdashboard");
+    else if (!isSponsorAccount) router.replace(getDefaultRouteForAccount({ ...user }));
+  }, [isSponsorAccount, router, user, userLoading]);
+
+  if (!userLoading && !user) return <main className="theme-workspace grid min-h-screen place-items-center bg-[var(--background)] px-5"><Card className="max-w-lg p-7 text-center"><h1 className="text-2xl font-black">Sign in to open Sponsor Studio</h1><LinkButton href="/auth/login?next=%2Fsponsor%2Fdashboard" className="mt-5">Sign in</LinkButton></Card></main>;
+  if (!userLoading && user && !isSponsorAccount) return <main className="theme-workspace grid min-h-screen place-items-center bg-[var(--background)] px-5"><p role="status">Opening your account workspace…</p></main>;
 
   function selectTab(tab: "challenges" | "creators") {
     setOpportunityTab(tab);
@@ -42,6 +57,8 @@ export default function SponsorDashboardPage() {
   }
 
   if (loading) return <SponsorShell><div className="mx-auto max-w-[1320px] space-y-7"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-[8px] bg-white" />)}</div><div className="h-72 animate-pulse rounded-[8px] bg-white" /></div></SponsorShell>;
+
+  if (pendingProfileSetup && user) return <SponsorShell profile={{ brandName: user.displayName || "Sponsor", sponsorOnboardingStatus: "not_started", organizationStatus: "pending_onboarding" }}><div className="mx-auto max-w-4xl"><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Sponsor Studio</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">Welcome to Challenge Suite</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Your Sponsor dashboard is ready. Add your business details when you are ready to review agreements or take protected sponsorship actions.</p><Card className="mt-7 border-amber-200 bg-amber-50 p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-1 shrink-0 text-amber-800" /><div><h2 className="font-black text-amber-950">Business verification stays separate</h2><p className="mt-2 text-sm leading-6 text-amber-900">The three-screen introduction is complete. Sponsor profile review and required verification remain in place before agreements, funding, or other protected actions.</p><LinkButton href="/sponsor/onboarding" className="mt-5">Set up Sponsor profile <ArrowRight size={16} /></LinkButton></div></div></Card></div></SponsorShell>;
 
   const metrics = dashboard?.metrics ?? { activeSponsorships: 0, openProposals: 0, needsAttention: 0, walletBalanceCents: 0 };
   const opportunities = opportunityTab === "challenges" ? dashboard?.recommendations.challenges ?? [] : dashboard?.recommendations.creators ?? [];

@@ -5,6 +5,7 @@ import { deterministicId, safeIdPart } from "@/lib/server/idempotency";
 import { calculatePaidRevenueSplit, calculateSponsorContributionSplit, MINIMUM_ENTRY_FEE_CENTS, validateEntryFee, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { calculateEntryEntitlement, consumeEntryEntitlement, type RewardEntitlementType } from "@/lib/server/reward-economy";
 import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
+import { createSponsorReservationWindow, isSponsorPaymentWithinReservation, SPONSOR_FUNDING_RESERVATION_WINDOW_MS } from "@/lib/server/sponsor-reservation-policy";
 
 export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding", "sponsor_wallet_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
@@ -225,6 +226,8 @@ export async function attachCheckoutSession(db: Firestore, collection: string, i
     stripeCheckoutSessionId: session.id,
     providerSessionId: session.id,
     checkoutUrlCreatedAt: now,
+    ...(Number.isFinite(session.expires_at) ? { providerSessionExpiresAt: new Date(session.expires_at * 1000).toISOString() } : {}),
+    ...(Array.isArray(session.payment_method_types) ? { providerPaymentMethodTypes: session.payment_method_types } : {}),
     updatedAt: now,
     checkoutSuccessActivates: false
   }, { merge: true });
@@ -621,7 +624,7 @@ export async function expirePaidVotePurchase(db: Firestore, session: Stripe.Chec
   return { handled: true, kind: "paid_vote", id, status: "expired" };
 }
 
-export async function createPendingSponsorContribution(db: Firestore, input: { sponsorId: string; challengeId: string; challenge: Record<string, unknown>; sponsorProfile: Record<string, unknown>; amountCents: number; idempotencyKey: string; ctaText?: string; ctaUrl?: string; placementNotes?: string; placements?: string[]; agreementId?: string; now?: string }) {
+export async function createPendingSponsorContribution(db: Firestore, input: { sponsorId: string; sponsorOrganizationId?: string; challengeId: string; challenge: Record<string, unknown>; sponsorProfile: Record<string, unknown>; amountCents: number; idempotencyKey: string; ctaText?: string; ctaUrl?: string; placementNotes?: string; placements?: string[]; agreementId?: string; now?: string }) {
   const fundingWindow = validateSponsorFundingWindow(input.challenge);
   if (!fundingWindow.allowed) throw new Error("This challenge is not eligible for sponsor funding right now.");
   const amountCents = cents(input.amountCents);
@@ -630,12 +633,14 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
   if (!requestKey) throw new Error("A sponsor funding idempotency key is required.");
   const id = deterministicId("sponsor_funding", input.challengeId, input.sponsorId, requestKey);
   const now = input.now ?? new Date().toISOString();
+  const reservationWindow = createSponsorReservationWindow(new Date(now));
   const split = calculateSponsorContributionSplit(amountCents);
   const record: Record<string, unknown> = {
     id,
     sponsorId: input.sponsorId,
     challengeId: input.challengeId,
     agreementId: input.agreementId ?? null,
+    sponsorOrganizationId: input.sponsorOrganizationId ?? input.sponsorId,
     organizationOwnerId: text(input.challenge.organizationOwnerId, 160) || null,
     paymentPurpose: "sponsor_funding",
     amountCents,
@@ -657,6 +662,10 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
     stripePaymentIntentId: null,
     confirmedAt: null,
     idempotencyKey: requestKey,
+    reservationCreatedAt: reservationWindow.createdAt,
+    reservationExpiresAt: reservationWindow.expiresAt,
+    reservationDurationMs: SPONSOR_FUNDING_RESERVATION_WINDOW_MS,
+    reservationStatus: "reserved",
     metadata: { checkoutSuccessConfirmsContribution: false, webhookConfirmationRequired: true, sponsorContributionGoesFullyToWinners: true, sponsorBrandingAutoApproved: false, prizeReleaseCreated: false, payoutExecutionCreated: false },
     createdAt: now,
     updatedAt: now
@@ -674,6 +683,10 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
       if (["failed", "expired", "refunded", "partially_refunded"].includes(String(existing.status))) {
         throw new Error("SPONSOR_FUNDING_ATTEMPT_CLOSED");
       }
+      const existingExpiresAt = Date.parse(String(existing.reservationExpiresAt ?? ""));
+      if (existing.status === "pending" && (!Number.isFinite(existingExpiresAt) || existingExpiresAt <= Date.parse(now))) {
+        throw new Error("SPONSOR_RESERVATION_EXPIRED");
+      }
       return existing;
     }
     const agreementRef = input.agreementId ? db.collection("sponsorChallengeAgreements").doc(input.agreementId) : null;
@@ -685,7 +698,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
       if (!agreementSnap?.exists) throw new Error("SPONSOR_AGREEMENT_NOT_FOUND");
       const agreement = agreementSnap.data() ?? {};
       const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
-      if (agreement.challengeId !== input.challengeId || agreement.sponsorOrganizationId !== input.sponsorId || agreement.status !== "accepted"
+      if (agreement.challengeId !== input.challengeId || agreement.sponsorOrganizationId !== (input.sponsorOrganizationId ?? input.sponsorId) || agreement.status !== "accepted"
         || agreement.sponsorAcceptedVersion !== agreement.termsVersion || agreement.creatorAcceptedVersion !== agreement.termsVersion) throw new Error("SPONSOR_AGREEMENT_NOT_ACCEPTED");
       const expectedCreatorId = text(challenge.creatorId ?? challenge.hostId, 160);
       if (!expectedCreatorId || text(agreement.creatorId, 160) !== expectedCreatorId) throw new Error("SPONSOR_AGREEMENT_OWNER_MISMATCH");
@@ -727,7 +740,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
   return (prior ?? record) as typeof record;
 }
 
-export async function confirmSponsorContribution(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session) {
+export async function confirmSponsorContribution(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session, paymentIntent?: Stripe.PaymentIntent) {
   const id = metadata(session).sponsorContributionId;
   if (!id) throw new Error("Missing sponsor contribution id.");
   const contributionRef = db.collection("sponsorContributions").doc(id);
@@ -736,25 +749,214 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
     const contributionSnap = await transaction.get(contributionRef);
     if (!contributionSnap.exists) throw new Error("Stored sponsor contribution record not found.");
     const contribution = contributionSnap.data() ?? {};
-    assertStripeSessionMatchesRecord(session, contribution, "sponsor_funding");
     if (contribution.status === "confirmed") return { handled: true, kind: "sponsor_funding", id, duplicate: true };
+    if (contribution.status === "payment_review_required") return { handled: true, kind: "sponsor_funding", id, reviewRequired: true, duplicate: true };
+    const expectedAmountCents = cents(contribution.amountCents);
+    const intentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? "";
+    const paymentMethodTypes = Array.isArray(session.payment_method_types) ? session.payment_method_types : [];
+    const reservedPaymentMethodTypes = Array.isArray(contribution.providerPaymentMethodTypes) ? contribution.providerPaymentMethodTypes : [];
+    const latestCharge = paymentIntent?.latest_charge;
+    const charge = latestCharge && typeof latestCharge === "object" ? latestCharge : null;
+    const eventSession = event.data.object as Stripe.Checkout.Session;
+    const eventPaymentIntentId = typeof eventSession.payment_intent === "string"
+      ? eventSession.payment_intent
+      : eventSession.payment_intent?.id ?? "";
+    const eventTimestampIsValid = Number.isSafeInteger(event.created) && event.created > 0;
+    const eventSessionMatches = eventSession.object === "checkout.session"
+      && eventSession.id === session.id
+      && eventSession.mode === "payment"
+      && eventSession.status === "complete"
+      && eventSession.payment_status === "paid"
+      && eventSession.metadata?.sponsorContributionId === id
+      && cents(eventSession.amount_total) === expectedAmountCents
+      && lowerCurrency(eventSession.currency) === lowerCurrency(contribution.currency)
+      && Array.isArray(eventSession.payment_method_types)
+      && eventSession.payment_method_types.length === 1
+      && eventSession.payment_method_types[0] === "card"
+      && eventPaymentIntentId === intentId;
+    // Stripe documents that Event objects are created when the resource state
+    // changes and contain that state snapshot. For card-only Checkout, a paid,
+    // completed snapshot plus a retrieved, automatically captured successful
+    // PaymentIntent/Charge establishes payment completion. Event.created is the
+    // provider event timestamp, not webhook receipt or Charge object creation.
+    // Its one-second precision is treated as an uncertainty interval below.
+    const chargeIsCompletedCardPayment = Boolean(charge
+      && charge.object === "charge"
+      && charge.status === "succeeded"
+      && charge.paid === true
+      && charge.captured === true
+      && charge.disputed === false
+      && charge.refunded === false
+      && charge.review == null
+      && charge.outcome?.type !== "blocked"
+      && charge.fraud_details?.user_report !== "fraudulent"
+      && charge.payment_intent === paymentIntent?.id
+      && cents(charge.amount) === expectedAmountCents
+      && cents(charge.amount_captured) === expectedAmountCents
+      && lowerCurrency(charge.currency) === lowerCurrency(contribution.currency)
+      && charge.payment_method_details?.type === "card"
+      && Number.isSafeInteger(charge.created)
+      && charge.created > 0
+      && paymentIntent?.capture_method === "automatic");
+    const amountMatches = cents(session.amount_total) === expectedAmountCents && cents(paymentIntent?.amount_received) === expectedAmountCents;
+    const currencyMatches = lowerCurrency(session.currency) === lowerCurrency(contribution.currency) && lowerCurrency(paymentIntent?.currency) === lowerCurrency(contribution.currency);
+    const cardOnly = paymentMethodTypes.length === 1 && paymentMethodTypes[0] === "card"
+      && reservedPaymentMethodTypes.length === 1 && reservedPaymentMethodTypes[0] === "card";
+    const sessionMatchesReservation = session.id === contribution.stripeCheckoutSessionId;
+    const providerVerified = sessionMatchesReservation && event.type === "checkout.session.completed"
+      && eventTimestampIsValid && eventSessionMatches
+      && session.mode === "payment" && session.payment_status === "paid" && paymentIntent?.status === "succeeded"
+      && Boolean(intentId) && paymentIntent.id === intentId && amountMatches && currencyMatches;
+    const paymentCompletionVerified = Boolean(providerVerified && cardOnly && chargeIsCompletedCardPayment);
+    const providerEventCreatedAt = eventTimestampIsValid ? new Date(event.created * 1000).toISOString() : null;
+    // This is a conservative upper bound on completion, not a claim that the
+    // payment completed at the exact event-object creation instant.
+    const providerCompletionUpperBoundAt = paymentCompletionVerified ? providerEventCreatedAt : null;
+    const providerChargeRestricted = Boolean(charge && (
+      charge.disputed === true
+      || charge.refunded === true
+      || charge.review != null
+      || charge.outcome?.type === "blocked"
+      || charge.fraud_details?.user_report === "fraudulent"
+    ));
+    const providerChargeCreatedAt = charge && Number.isSafeInteger(charge.created) && charge.created > 0
+      ? new Date(charge.created * 1000).toISOString()
+      : null;
     const challengeId = text(contribution.challengeId, 160);
-    const amountCents = cents(contribution.amountCents);
     const challengeRef = db.collection("challenges").doc(challengeId);
     const challengeSnap = await transaction.get(challengeRef);
     if (!challengeSnap.exists) throw new Error("Challenge for sponsor funding was not found.");
     const challenge = challengeSnap.data() ?? {};
     const agreementRef = text(contribution.agreementId, 160) ? db.collection("sponsorChallengeAgreements").doc(text(contribution.agreementId, 160)) : null;
     const agreementSnap = agreementRef ? await transaction.get(agreementRef) : null;
-    if (agreementRef) {
-      if (!agreementSnap?.exists) throw new Error("Sponsor agreement for funding was not found.");
-      const agreement = agreementSnap.data() ?? {};
-      const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
-      if (agreement.challengeId !== challengeId || agreement.sponsorOrganizationId !== contribution.sponsorId
-        || agreement.termsVersion !== contribution.agreementVersion || cents(terms.amountCents) !== amountCents
-        || !["funding_pending", "funded_pending_review", "active"].includes(String(agreement.status))) throw new Error("Sponsor agreement no longer matches the funded contribution.");
-      if (text(agreement.creatorId, 160) !== text(challenge.creatorId ?? challenge.hostId, 160)) throw new Error("Sponsor agreement creator ownership no longer matches the challenge.");
+    const agreement = agreementSnap?.data() ?? {};
+    const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
+    const agreementMatches = !agreementRef || Boolean(agreementSnap?.exists
+      && agreement.challengeId === challengeId
+      && agreement.sponsorOrganizationId === (contribution.sponsorOrganizationId ?? contribution.sponsorId)
+      && agreement.termsVersion === contribution.agreementVersion
+      && cents(terms.amountCents) === expectedAmountCents
+      && ["funding_pending", "funded_pending_review", "active"].includes(String(agreement.status))
+      && text(agreement.creatorId, 160) === text(challenge.creatorId ?? challenge.hostId, 160));
+    const challengeStatus = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
+    const challengeStillEligible = !["cancelled", "canceled", "paused", "completed", "winners_announced"].includes(challengeStatus)
+      && !challenge.winnersApprovedAt && !challenge.adminWinnersApprovedAt;
+    const reservationStillPending = contribution.status === "pending" && contribution.reservationStatus === "reserved";
+    const originalCreatedAt = Date.parse(String(contribution.createdAt ?? ""));
+    const reservationCreatedAt = Date.parse(String(contribution.reservationCreatedAt ?? ""));
+    const reservationCreationConsistent = Number.isFinite(originalCreatedAt) && originalCreatedAt === reservationCreatedAt;
+    const reservationExpiresAtMs = Date.parse(String(contribution.reservationExpiresAt ?? ""));
+    const providerPaymentTimeMs = providerCompletionUpperBoundAt ? Date.parse(providerCompletionUpperBoundAt) : NaN;
+    const providerTimestampOverlapsExpiry = Number.isFinite(providerPaymentTimeMs) && Number.isFinite(reservationExpiresAtMs)
+      && providerPaymentTimeMs < reservationExpiresAtMs && providerPaymentTimeMs + 1000 >= reservationExpiresAtMs;
+    const providerShowsNoCompletedPayment = session.payment_status !== "paid" && paymentIntent?.status !== "succeeded" && cents(paymentIntent?.amount_received) === 0;
+    if (providerShowsNoCompletedPayment) {
+      return { handled: true, kind: "sponsor_funding", id, status: "pending", credited: false, awaitingProviderPayment: true };
     }
+    const paymentIsEligible = Boolean(providerVerified && cardOnly && chargeIsCompletedCardPayment && providerCompletionUpperBoundAt && agreementMatches && challengeStillEligible && reservationStillPending && reservationCreationConsistent && contribution.stripeDisputeRestricted !== true
+      && isSponsorPaymentWithinReservation({
+        reservationCreatedAt: contribution.reservationCreatedAt,
+        reservationExpiresAt: contribution.reservationExpiresAt,
+        paymentCompletedAt: providerCompletionUpperBoundAt,
+        paymentTimestampPrecisionMs: 1000,
+        votingStartsAt: challenge.votingStartsAt ?? challenge.votingStartAt ?? null
+      }));
+    if (!paymentIsEligible) {
+      const now = new Date().toISOString();
+      const organizationOwnerId = text(contribution.organizationOwnerId, 160);
+      const limitRef = db.collection("enterprisePrizeFundingLimits").doc(challengeId);
+      const reservationNeedsRelease = reservationStillPending;
+      const limitSnap = organizationOwnerId && reservationNeedsRelease ? await transaction.get(limitRef) : null;
+      const refundCaseId = `refund_sponsorContributions_${id}`;
+      const refundRef = db.collection("refundCases").doc(refundCaseId);
+      const refundSnap = await transaction.get(refundRef);
+      if (!refundSnap.exists) transaction.create(refundRef, {
+        id: refundCaseId,
+        paymentCollection: "sponsorContributions",
+        paymentId: id,
+        sponsorId: contribution.sponsorId ?? null,
+        sponsorOrganizationId: contribution.sponsorOrganizationId ?? contribution.sponsorId ?? null,
+        organizationOwnerId: organizationOwnerId || null,
+        financialOwnerType: organizationOwnerId ? "organization" : "challenge_owner",
+        financialCreditStatus: "never_credited",
+        refundSourceState: "successful_provider_payment_not_accepted_as_prize_funding",
+        challengeId,
+        amountCents: cents(session.amount_total),
+        sourceAmountCents: expectedAmountCents,
+        fullRefundAmountCents: cents(session.amount_total),
+        currency: contribution.currency ?? "USD",
+        providerAmountCents: cents(session.amount_total),
+        providerCurrency: lowerCurrency(session.currency),
+        providerAmountReceivedCents: cents(paymentIntent?.amount_received),
+        provider: "stripe",
+        providerPaymentIntentId: intentId || null,
+        providerCheckoutSessionId: session.id,
+        providerCompletionUpperBoundAt,
+        providerEventCreatedAt,
+        providerChargeCreatedAt,
+        providerTimestampPrecisionMs: 1000,
+        providerEventId: event.id,
+        status: "pending_review",
+        reason: "sponsor_funding_reservation_ineligible",
+        reviewReason: contribution.stripeDisputeRestricted === true ? "provider_dispute_open"
+          : providerChargeRestricted ? "provider_charge_restricted"
+          : !cardOnly && session.payment_status === "paid" ? "unsupported_async_payment_method"
+          : !amountMatches || !currencyMatches ? "provider_amount_or_currency_mismatch"
+            : !sessionMatchesReservation ? "checkout_session_does_not_match_reservation"
+              : !paymentCompletionVerified ? "provider_payment_completion_not_verifiable"
+                : !reservationStillPending ? "reservation_not_pending"
+                  : !agreementMatches ? "agreement_no_longer_eligible"
+                    : !challengeStillEligible ? "challenge_no_longer_eligible"
+                      : !reservationCreationConsistent ? "reservation_creation_timestamp_mismatch"
+                        : providerTimestampOverlapsExpiry ? "provider_timestamp_resolution_overlaps_expiration" : "reservation_expired_or_created_after_cutoff",
+        externalRefundExecuted: false,
+        automaticRefundExecuted: false,
+        automaticFundingCreditExecuted: false,
+        createdBy: "stripe_webhook",
+        createdAt: now,
+        updatedAt: now
+      });
+      transaction.set(contributionRef, {
+        status: "payment_review_required",
+        reservationStatus: "ineligible_payment",
+        refundStatus: "pending_review",
+        reviewRequired: true,
+        reviewReason: contribution.stripeDisputeRestricted === true ? "provider_dispute_open"
+          : providerChargeRestricted ? "provider_charge_restricted"
+          : !cardOnly && session.payment_status === "paid" ? "unsupported_async_payment_method"
+          : !amountMatches || !currencyMatches ? "provider_amount_or_currency_mismatch"
+            : !sessionMatchesReservation ? "checkout_session_does_not_match_reservation"
+          : !paymentCompletionVerified ? "provider_payment_completion_not_verifiable"
+                : !reservationStillPending ? "reservation_not_pending"
+                  : !agreementMatches ? "agreement_no_longer_eligible"
+                    : !challengeStillEligible ? "challenge_no_longer_eligible"
+                      : !reservationCreationConsistent ? "reservation_creation_timestamp_mismatch"
+                        : providerTimestampOverlapsExpiry ? "provider_timestamp_resolution_overlaps_expiration" : "reservation_expired_or_created_after_cutoff",
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId: intentId || null,
+        stripeEventId: event.id,
+        providerCompletionUpperBoundAt,
+        providerEventCreatedAt,
+        providerChargeCreatedAt,
+        providerTimestampPrecisionMs: 1000,
+        paymentReviewCaseId: refundCaseId,
+        updatedAt: now
+      }, { merge: true });
+      if (agreementRef && agreementSnap?.exists && agreement.fundingContributionId === id) {
+        transaction.set(agreementRef, { status: "refund_review", fundingStatus: "payment_review_required", refundCaseId, updatedAt: now }, { merge: true });
+      }
+      if (organizationOwnerId && reservationNeedsRelease) {
+        const limit = limitSnap?.data() ?? {};
+        const reservedCents = Math.max(0, cents(limit.reservedCents) - expectedAmountCents);
+        const additionalReservedCents = Math.max(0, cents(limit.additionalReservedCents) - expectedAmountCents);
+        const exposureCents = Math.max(cents(limit.configuredPrizeCents), cents(limit.creatorConfirmedCents) + cents(limit.creatorReservedCents))
+          + cents(limit.sponsorConfirmedCents) + cents(limit.entryConfirmedCents) + cents(limit.promotionalConfirmedCents) + additionalReservedCents;
+        transaction.set(limitRef, { reservedCents, additionalReservedCents, exposureCents, updatedAt: now }, { merge: true });
+      }
+      return { handled: true, kind: "sponsor_funding", id, status: "payment_review_required", credited: false, refundCaseId };
+    }
+    assertStripeSessionMatchesRecord(session, contribution, "sponsor_funding");
+    const amountCents = expectedAmountCents;
       const ownership = resolveEnterpriseFinancialOwnership(challenge);
       const enterprise = ownership.workspaceType === "enterprise";
     if (enterprise) {
@@ -775,7 +977,14 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
       updatedAt: now,
       stripeCheckoutSessionId: session.id,
       stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
+      stripeChargeId: charge?.id ?? null,
       stripeEventId: event.id,
+      providerCompletionUpperBoundAt,
+      providerEventCreatedAt,
+      providerChargeCreatedAt,
+      providerTimestampPrecisionMs: 1000,
+      providerCompletionEvidence: "stripe_checkout_session_completed_event_created_paid_card_snapshot_and_captured_automatic_charge",
+      reservationStatus: "confirmed_within_window",
       webhookConfirmed: true,
       brandingStatus: contribution.brandingStatus ?? "pending_review",
       idempotencyKey: deterministicId("stripe", event.id, id)
@@ -854,7 +1063,7 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
   });
 }
 
-export async function applySponsorAgreementRefundState(db: Firestore, input: { contributionId: string; refundCaseId: string; amountCents?: number; now?: string }) {
+export async function applySponsorAgreementRefundState(db: Firestore, input: { contributionId: string; refundCaseId: string; amountCents?: number; neverCredited?: boolean; now?: string }) {
   const now = input.now ?? new Date().toISOString();
   const contributionRef = db.collection("sponsorContributions").doc(input.contributionId);
   return db.runTransaction(async (transaction) => {
@@ -869,7 +1078,7 @@ export async function applySponsorAgreementRefundState(db: Firestore, input: { c
       : [null, null];
     const originalAmount = cents(contribution.amountCents);
     const refundAmount = cents(input.amountCents ?? originalAmount);
-    const fullRefund = refundAmount >= originalAmount;
+    const fullRefund = input.neverCredited === true || refundAmount >= originalAmount;
     const nextStatus = fullRefund ? "refunded" : "partially_refunded";
     transaction.set(contributionRef, { status: nextStatus, refundCaseId: input.refundCaseId, refundedAt: now, refundedAmountCents: refundAmount, updatedAt: now }, { merge: true });
     if (agreementRef && agreementSnap?.exists) transaction.set(agreementRef, { status: fullRefund ? "refunded" : "refund_review", fundingStatus: nextStatus, refundCaseId: input.refundCaseId, refundedAt: now, updatedAt: now }, { merge: true });
@@ -891,7 +1100,15 @@ export async function releasePendingSponsorContribution(db: Firestore, id: strin
     const organizationOwnerId = text(contribution.organizationOwnerId, 160);
     const limitRef = db.collection("enterprisePrizeFundingLimits").doc(text(contribution.challengeId, 160));
     const limitSnap = organizationOwnerId ? await transaction.get(limitRef) : null;
-    transaction.set(contributionRef, { status: sessionId ? "expired" : "failed", expiredAt: sessionId ? now : null, updatedAt: now, stripeCheckoutSessionId: sessionId ?? null }, { merge: true });
+    transaction.set(contributionRef, {
+      status: sessionId ? "expired" : "failed",
+      reservationStatus: sessionId ? "expired" : "failed",
+      reservationReleasedAt: now,
+      reservationReleaseReason: sessionId ? "stripe_checkout_session_expired" : "checkout_session_creation_failed",
+      expiredAt: sessionId ? now : null,
+      updatedAt: now,
+      stripeCheckoutSessionId: sessionId ?? null
+    }, { merge: true });
     if (agreementRef && agreementSnap?.exists && agreementSnap.data()?.fundingContributionId === id && agreementSnap.data()?.fundingStatus === "pending") {
       transaction.set(agreementRef, { status: "accepted", fundingStatus: sessionId ? "expired" : "failed", fundingContributionId: null, updatedAt: now }, { merge: true });
     }
@@ -993,11 +1210,11 @@ export async function getPaymentStatus(db: Firestore, collection: string, id: st
   return { id: snap.id, ...data };
 }
 
-async function sumConfirmed(db: Firestore, collection: string, challengeId: string, purpose: MonetizationPaymentPurpose) {
+async function sumConfirmed(db: Firestore, collection: string, challengeId: string, purpose: MonetizationPaymentPurpose, includeRecord: (record: Record<string, unknown>) => boolean = () => true) {
   const snap = await db.collection(collection).where("challengeId", "==", challengeId).get();
   const records = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
-    .filter((item) => item.paymentPurpose === purpose && item.webhookConfirmed === true && ["paid", "confirmed"].includes(String(item.status)));
+    .filter((item) => item.paymentPurpose === purpose && item.webhookConfirmed === true && ["paid", "confirmed"].includes(String(item.status)) && includeRecord(item));
   const grossAmountCents = records.reduce((sum, item) => sum + cents(item.amountCents ?? item.amount), 0);
   return {
     challengeId,
@@ -1037,7 +1254,7 @@ export async function getConfirmedPaidVoteRevenueForChallenge(db: Firestore, cha
 }
 
 export async function getConfirmedSponsorContributionForChallenge(db: Firestore, challengeId: string) {
-  const source = await sumConfirmed(db, "sponsorContributions", challengeId, "sponsor_funding");
+  const source = await sumConfirmed(db, "sponsorContributions", challengeId, "sponsor_funding", (record) => record.stripeDisputeRestricted !== true);
   const split = calculateSponsorContributionSplit(source.grossAmountCents);
   return { ...source, ...split, sponsorContributionGoesFullyToWinners: true, brandingAutoApproved: false };
 }

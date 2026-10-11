@@ -140,6 +140,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
   const requiredCreatorFundingCents = Math.max(0, Number(currentMonetization.creatorPrizeFundingRequiredCents ?? 0));
   const confirmedCreatorFundingCents = Math.max(0, Number(current.confirmedCreatorPrizeFundingCents ?? currentMonetization.confirmedCreatorPrizeFundingCents ?? 0));
+  const configuredPrizeCents = Math.max(0, Math.round(Number(body.prizeValue ?? 0) * 100));
+  const creatorPrizeFundingConfirmed = requiredCreatorFundingCents > 0
+    && confirmedCreatorFundingCents >= requiredCreatorFundingCents
+    && confirmedCreatorFundingCents >= configuredPrizeCents;
+  if (freePlan && monetizationIntent.prizePoolRequested && !creatorPrizeFundingConfirmed) {
+    return rejectPublish("Confirm the full creator-funded cash prize before publishing this Free challenge.", 409, {
+      requiredCreatorFundingCents,
+      confirmedCreatorFundingCents,
+      configuredPrizeCents
+    }, "CREATOR_PRIZE_FUNDING_REQUIRED");
+  }
   const planAllowsRequestedFeatures = !planAccess.isSponsor
     && (!monetizationIntent.paidEntryRequested || monetizationAccess.canPreparePaidEntry)
     && (!monetizationIntent.sponsorReady || monetizationAccess.canPrepareSponsorReady)
@@ -164,7 +175,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
-  const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
+  const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, creatorPrizeFundingConfirmed, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
 
   const sponsorEnabled = Boolean((body.sponsorEnabled || monetizationIntent.sponsorReady) && planAccess.canCreateSponsoredChallenges);
@@ -194,7 +205,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   };
   const progress = calculateChallengeDraftProgress(body as unknown as Record<string, unknown>);
   const economyRules = await getActiveEconomyRules(db);
-  const normalV2 = body.builderVersion === "normal_v2";
+  const normalV2 = body.builderVersion === "normal_v2" || body.builderVersion === "normal_v3";
   const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" && !normalV2 ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
   const reviewRevisionNumber = currentStatus === "changes_requested" || currentStatus === "requires_changes"
     ? Math.max(1, Number(current.reviewRevisionNumber ?? 1)) + 1
@@ -214,6 +225,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ...(Array.isArray(current.enterpriseAssignments) ? current.enterpriseAssignments as Array<Record<string, unknown>> : []).filter((assignment) => assignment.status !== "removed").map((assignment) => String(assignment.userId ?? "")).filter(Boolean),
     ])] : [],
     privateAccessMethod,
+    privateJoiningPolicy: body.visibility === "private" ? body.privateJoiningPolicy : "invite_only",
     privateAccessCode: "",
     privateDirectInvitees: [],
     submissionStartAt: body.submissionStartAt || body.startsAt,

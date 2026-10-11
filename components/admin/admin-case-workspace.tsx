@@ -10,9 +10,51 @@ export function AdminCaseWorkspace({ kind }: { kind: "support" | "disputes" | "a
 
 function AdminRecordsWorkspace({ kind }: { kind: "disputes" | "appeals" | "safety" }) {
   const [records, setRecords] = useState<Array<Record<string, unknown> & { id: string }>>([]);
-  useEffect(() => { void apiRequest<{ cases: Array<Record<string, unknown> & { id: string }> }>(`/api/admin/cases?kind=${kind}`).then((result) => result.data && setRecords(result.data.cases)); }, [kind]);
+  const [chargebacks, setChargebacks] = useState<Array<Record<string, unknown> & { id: string }>>([]);
+  const [chargebackNextCursor, setChargebackNextCursor] = useState<string | null>(null);
+  const [chargebacksHaveMore, setChargebacksHaveMore] = useState(false);
+  const [loadingOlderChargebacks, setLoadingOlderChargebacks] = useState(false);
+  const [resolution, setResolution] = useState<{ caseId: string; action: "release_won" | "acknowledge_loss" } | null>(null);
+  const [reason, setReason] = useState(""); const [confirmed, setConfirmed] = useState(false); const [notice, setNotice] = useState(""); const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      apiRequest<{ cases: Array<Record<string, unknown> & { id: string }> }>(`/api/admin/cases?kind=${kind}`),
+      kind === "disputes" ? apiRequest<{ chargebacks: Array<Record<string, unknown> & { id: string }>; hasMore: boolean; nextCursor: string | null }>("/api/admin/chargebacks?limit=50") : Promise.resolve({ data: { chargebacks: [], hasMore: false, nextCursor: null } })
+    ]).then(([casesResult, chargebacksResult]) => {
+      if (!active) return;
+      if (casesResult.data) setRecords(casesResult.data.cases);
+      if (chargebacksResult.data) {
+        setChargebacks(chargebacksResult.data.chargebacks);
+        setChargebacksHaveMore(chargebacksResult.data.hasMore);
+        setChargebackNextCursor(chargebacksResult.data.nextCursor);
+      }
+    });
+    return () => { active = false; };
+  }, [kind]);
+  async function loadOlderChargebacks() {
+    if (!chargebackNextCursor || loadingOlderChargebacks) return;
+    setLoadingOlderChargebacks(true);
+    const result = await apiRequest<{ chargebacks: Array<Record<string, unknown> & { id: string }>; hasMore: boolean; nextCursor: string | null }>(`/api/admin/chargebacks?limit=50&cursor=${encodeURIComponent(chargebackNextCursor)}`);
+    if (result.data) {
+      setChargebacks((current) => {
+        const existingIds = new Set(current.map((item) => item.id));
+        return [...current, ...result.data!.chargebacks.filter((item) => !existingIds.has(item.id))];
+      });
+      setChargebacksHaveMore(result.data.hasMore);
+      setChargebackNextCursor(result.data.nextCursor);
+    } else setNotice(result.message);
+    setLoadingOlderChargebacks(false);
+  }
+  async function reconcile() {
+    if (!resolution || !confirmed || reason.trim().length < 10) return;
+    setBusy(true);
+    const result = await apiRequest("/api/admin/chargebacks", { method: "PATCH", body: JSON.stringify({ caseId: resolution.caseId, action: resolution.action, reason: reason.trim(), confirmed }) });
+    setNotice(result.message); setBusy(false);
+    if (result.ok) { setResolution(null); setReason(""); setConfirmed(false); const fresh = await apiRequest<{ chargebacks: Array<Record<string, unknown> & { id: string }>; hasMore: boolean; nextCursor: string | null }>("/api/admin/chargebacks?limit=50"); if (fresh.data) { setChargebacks(fresh.data.chargebacks); setChargebacksHaveMore(fresh.data.hasMore); setChargebackNextCursor(fresh.data.nextCursor); } }
+  }
   const title = kind === "disputes" ? "Formal Disputes" : kind === "appeals" ? "Appeals" : "Safety Reports";
-  return <><PageTitle title={title} subtitle="A separate permission-controlled workspace backed by real case records." icon={kind === "safety" ? <ShieldAlert className="text-[var(--gold)]" /> : <Flag className="text-[var(--gold)]" />} /><div className="mt-6 grid gap-4 md:grid-cols-2">{records.map((record) => <Card key={record.id} className="p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">{String(record.status ?? "submitted").replaceAll("_", " ")}</p><h2 className="mt-2 text-lg font-black">{String(record.subject ?? record.title ?? record.type ?? record.id)}</h2><p className="mt-3 text-sm text-slate-400">{String(record.reason ?? record.description ?? "Review the linked source record and activity history.")}</p></Card>)}{!records.length ? <Card className="md:col-span-2"><EmptyState icon={<Flag />} title={`No ${title.toLowerCase()}`} body="No synthetic cases or conversations are displayed." /></Card> : null}</div></>;
+  return <><PageTitle title={title} subtitle="A separate permission-controlled workspace backed by real case records." icon={kind === "safety" ? <ShieldAlert className="text-[var(--gold)]" /> : <Flag className="text-[var(--gold)]" />} />{notice ? <p role="status" className="mt-4 text-sm">{notice}</p> : null}{kind === "disputes" && chargebacks.length ? <section className="mt-6"><h2 className="mb-3 text-lg font-black">Stripe funding disputes</h2><div className="grid gap-4 md:grid-cols-2">{chargebacks.map((item) => <Card key={item.id} className="p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">{String(item.providerStatus ?? item.status ?? "received").replaceAll("_", " ")} · {String(item.adminReconciliationStatus ?? "reconciliation required").replaceAll("_", " ")}</p><h3 className="mt-2 font-black">{String(item.challengeId ?? "Unlinked challenge")}</h3><p className="mt-2 text-sm text-slate-400">Disputed {String(item.amountCents ?? 0)} {String(item.currency ?? "").toUpperCase()} · contribution {String(item.contributionId ?? "unlinked")}</p><p className="mt-2 text-xs text-slate-500">{String(item.linkStatus ?? "unverified link")} · Stripe dispute {String(item.stripeDisputeId ?? "unavailable")}</p>{item.linkStatus === "verified" && item.providerOutcome === "won" && item.restrictionActive === true ? <Button className="mt-4" onClick={() => { setResolution({ caseId: item.id, action: "release_won" }); setReason(""); setConfirmed(false); }}>Review and release hold</Button> : null}{item.providerOutcome === "lost" && item.adminReconciliationStatus !== "loss_acknowledged_hold_remains" ? <Button variant="secondary" className="mt-4" onClick={() => { setResolution({ caseId: item.id, action: "acknowledge_loss" }); setReason(""); setConfirmed(false); }}>Acknowledge loss, keep hold</Button> : null}</Card>)}</div>{chargebacksHaveMore ? <Button variant="secondary" className="mt-4" onClick={() => void loadOlderChargebacks()} disabled={loadingOlderChargebacks}>{loadingOlderChargebacks ? "Loading older disputes…" : "Load older disputes"}</Button> : null}</section> : null}<div className="mt-6 grid gap-4 md:grid-cols-2">{records.map((record) => <Card key={record.id} className="p-5"><p className="text-xs font-black uppercase text-[var(--gold)]">{String(record.status ?? "submitted").replaceAll("_", " ")}</p><h2 className="mt-2 text-lg font-black">{String(record.subject ?? record.title ?? record.type ?? record.id)}</h2><p className="mt-3 text-sm text-slate-400">{String(record.reason ?? record.description ?? "Review the linked source record and activity history.")}</p></Card>)}{!records.length ? <Card className="md:col-span-2"><EmptyState icon={<Flag />} title={`No ${title.toLowerCase()}`} body="No synthetic cases or conversations are displayed." /></Card> : null}</div>{resolution ? <div role="dialog" aria-modal="true" aria-labelledby="stripe-dispute-reconciliation" className="fixed inset-0 z-[130] grid place-items-center bg-black/70 p-4"><Card className="w-full max-w-lg p-6"><h2 id="stripe-dispute-reconciliation" className="text-xl font-black">{resolution.action === "release_won" ? "Release a won-dispute hold" : "Record lost-dispute review"}</h2><p className="mt-3 text-sm text-slate-400">{resolution.action === "release_won" ? "The server rechecks Stripe’s current final status and other financial restrictions. Completed payouts remain unchanged." : "This records Admin review only. The financial restriction remains in place; no replacement funding or debit is created."}</p><label className="mt-4 block text-sm font-bold">Required reason<textarea className="mt-2 min-h-24 w-full rounded-[8px] border border-white/10 bg-black/30 p-3" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1200} /></label><label className="mt-4 flex items-start gap-3 text-sm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>I reviewed the provider outcome and confirm this Admin reconciliation.</span></label><div className="mt-5 flex justify-end gap-3"><Button variant="secondary" onClick={() => setResolution(null)} disabled={busy}>Cancel</Button><Button onClick={() => void reconcile()} disabled={busy || !confirmed || reason.trim().length < 10}>Confirm reconciliation</Button></div></Card></div> : null}</>;
 }
 
 function AdminSupportWorkspace() {

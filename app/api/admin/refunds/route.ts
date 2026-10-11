@@ -35,7 +35,8 @@ export async function PATCH(request: Request) {
     const enterpriseFundingCollection = record.paymentCollection === "sponsorContributions" || record.paymentCollection === "creatorPrizeFundingPayments" || record.paymentCollection === "challengeEntryPayments";
     const enterprisePaidVoteCollection = record.paymentCollection === "paidVotePurchases";
     const enterpriseRefundCollection = enterpriseFundingCollection || enterprisePaidVoteCollection;
-    if (enterpriseRefundCollection) {
+    const paymentWasNeverCredited = record.financialCreditStatus === "never_credited";
+    if (enterpriseRefundCollection && !paymentWasNeverCredited) {
       const source = await db.collection(record.paymentCollection).doc(String(record.paymentId)).get();
       const sourceData = source.data() ?? {};
       if (sourceData.organizationOwnerId && sourceData.challengeId) {
@@ -45,7 +46,7 @@ export async function PATCH(request: Request) {
     }
     const stripe = getStripe(); if (!stripe) return fail("Stripe refund provider is not connected.", 503, undefined, "PROVIDER_NOT_CONFIGURED"); const paymentIntent = String(record.providerPaymentIntentId ?? ""); if (!paymentIntent) return conflict("Confirmed provider payment reference is missing.");
     let enterpriseRefundClaim: { challengeId: string; organizationOwnerId: string; idempotent: boolean } | null = null;
-    if (enterpriseRefundCollection) {
+    if (enterpriseRefundCollection && !paymentWasNeverCredited) {
       const source = await db.collection(record.paymentCollection).doc(String(record.paymentId)).get();
       const sourceData = source.data() ?? {};
       if (sourceData.organizationOwnerId && sourceData.challengeId) enterpriseRefundClaim = await claimEnterpriseRefundLock(db, {
@@ -64,7 +65,7 @@ export async function PATCH(request: Request) {
     }
     const status = result.status === "succeeded" ? "succeeded" : ["failed", "canceled"].includes(String(result.status)) ? "failed" : "processing";
     if (status === "failed" && enterpriseRefundClaim) await releaseEnterpriseRefundLock(db, { refundCaseId: ref.id, challengeId: enterpriseRefundClaim.challengeId, refundStatus: "failed", providerStatus: result.status ?? undefined, now });
-    if (status === "succeeded" && enterpriseRefundCollection) {
+    if (status === "succeeded" && enterpriseRefundCollection && !paymentWasNeverCredited) {
       const source = await db.collection(record.paymentCollection).doc(String(record.paymentId)).get();
       if (source.data()?.organizationOwnerId && source.data()?.challengeId) {
         if (enterprisePaidVoteCollection) await finalizeEnterprisePaidVoteRefund(db, { refundCaseId: ref.id, paymentId: String(record.paymentId), providerRefundId: result.id, now });
@@ -72,7 +73,7 @@ export async function PATCH(request: Request) {
       }
     }
     if (status === "succeeded" && record.paymentCollection === "sponsorContributions") {
-      await applySponsorAgreementRefundState(db, { contributionId: String(record.paymentId), refundCaseId: ref.id, amountCents: Number(record.amountCents ?? 0), now });
+      await applySponsorAgreementRefundState(db, { contributionId: String(record.paymentId), refundCaseId: ref.id, amountCents: Number(record.amountCents ?? 0), neverCredited: paymentWasNeverCredited, now });
     }
     await db.runTransaction(async (transaction) => {
       const cashLedgerRef = db.collection("cashLedger").doc(`refund_${ref.id}`);

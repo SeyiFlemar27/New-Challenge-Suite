@@ -14,7 +14,7 @@ const sources: ReadonlyArray<readonly [string, string, readonly string[], AdminP
   ["winner_confirmation", "winners", ["pending_admin_review"], "winners.view"],
   ["withdrawal_review", "withdrawalRequests", ["pending_review", "needs_kyc"], "withdrawals.review"],
   ["refund_review", "refundCases", ["pending_review", "approved"], "refunds.request"],
-  ["chargeback", "chargebackCases", ["submitted", "needs_response"], "chargebacks.review"],
+  ["chargeback", "chargebackCases", ["submitted", "needs_response", "under_review", "provider_submitted", "pending_admin_reconciliation", "won", "lost"], "chargebacks.review"],
   ["dispute", "disputes", ["submitted", "under_review"], "disputes.review"],
   ["appeal", "appeals", ["submitted", "under_review"], "appeals.review"],
   ["critical_safety_report", "safetyReports", ["submitted", "triaged"], "safetyReports.review"],

@@ -10,7 +10,8 @@ const payout = read("lib/server/payout-structure.ts");
 const walletArchitecture = read("lib/server/wallet-architecture.ts");
 const revenueSharing = read("lib/server/revenue-sharing.ts");
 const revenuePage = read("app/revenue-share/page.tsx");
-const sponsorshipRoute = read("app/api/challenges/[id]/sponsorships/route.ts");
+const sponsorshipRoute = read("app/api/sponsor/challenges/[id]/funding-checkout/route.ts");
+const monetizationPayments = read("lib/server/monetization-payments.ts");
 const sponsorDiscovery = read("app/api/sponsor/discover/challenges/route.ts");
 const prizePools = read("lib/server/prize-pools.ts");
 const withdrawalsRoute = read("app/api/withdrawals/route.ts");
@@ -29,11 +30,11 @@ assert(payout.includes("winnerSharePercent: 100"), "sponsor contribution must go
 assert(payout.includes("futureSponsorServiceFeePercent: null"), "future sponsor service fee must remain setup-safe.");
 
 assert(payout.includes("getChallengeMonetizationAccess"), "monetization access helper must exist.");
-assert(payout.includes("Free users can create basic non-monetized public challenges only."), "free users must be locked out of monetized challenge options.");
-assert(payout.includes("canPreparePaidEntry: earningAccount"), "creator/host/approved enterprise should be able to prepare paid-entry options.");
-assert(payout.includes("canPrepareSponsorReady: earningAccount"), "creator/host/approved enterprise should be able to prepare sponsor-ready options.");
-assert(payout.includes("canPreparePrizePool: earningAccount"), "creator/host/approved enterprise should be able to prepare prize-pool options.");
-assert(payout.includes("canPreparePaidVotes: earningAccount"), "creator/host/approved enterprise should be able to prepare paid-vote options.");
+assert(payout.includes("Free users can fund their own cash prize."), "free users may prepare creator-funded cash prizes.");
+assert(payout.includes("canPreparePaidEntry: paidCreatorFeatures"), "paid-entry setup must be plan-gated.");
+assert(payout.includes("canPrepareSponsorReady: ownerAccount && access.canCreateSponsoredChallenges"), "sponsor-ready setup must be plan-gated.");
+assert(payout.includes("canPreparePrizePool: ownerAccount"), "eligible challenge owners may prepare their own prize funding.");
+assert(payout.includes("canPreparePaidVotes: paidCreatorFeatures"), "paid-vote setup must be plan-gated.");
 assert(payout.includes("paidEntryPaymentActive: false"), "paid entry payment execution must remain disabled.");
 assert(payout.includes("sponsorFundingPaymentActive: false"), "sponsor funding payment execution must remain disabled.");
 
@@ -48,7 +49,8 @@ assert(payout.includes("paymentConfirmationRequired: true"), "sponsor contributi
 assert(payout.includes("sponsorContributionStatus: \"awaiting_provider_confirmation\""), "sponsor contribution must not be treated as funded before provider confirmation.");
 
 assert(payout.includes("validateSponsorFundingWindow"), "sponsor funding window helper must exist.");
-assert(payout.includes("votingClosed"), "sponsor funding must close when voting closes.");
+assert(payout.includes("votingStarted"), "new sponsor funding must close when voting starts.");
+assert(payout.includes("challenge.votingStartsAt ?? challenge.votingStartAt"), "sponsor funding cutoff must use the persisted voting start.");
 assert(payout.includes("winnersApprovedAt") && payout.includes("adminWinnersApprovedAt"), "sponsor funding must close after winners are approved.");
 assert(payout.includes("cancelled") && payout.includes("paused") && payout.includes("completed"), "sponsor funding must reject terminal challenge statuses.");
 
@@ -85,17 +87,23 @@ assert(revenuePage.includes("Paid Entry and Paid Vote Split Rules"), "revenue sh
 assert(revenuePage.includes("Sponsor contribution split"), "revenue share page must document sponsor contribution handling.");
 assert(!revenuePage.includes("Example uses $10,000") && !revenuePage.includes("$200 vote revenue"), "revenue share page must not show fake revenue examples.");
 
-assert(sponsorshipRoute.includes("validateSponsorFundingWindow"), "sponsor proposal route must validate funding window.");
-assert(sponsorshipRoute.includes("paymentConfirmationRequired: true"), "sponsor proposal must require payment confirmation.");
-assert(sponsorshipRoute.includes("prizePoolCreditStatus: \"awaiting_provider_confirmation\""), "sponsor proposal must not credit prize pool before payment confirmation.");
-assert(!sponsorshipRoute.includes("mergeSponsorPrizePoolPlaceholder("), "sponsor proposal route must not inflate prize pool before confirmed payment.");
+assert(sponsorshipRoute.includes("createPendingSponsorContribution"), "agreement-based sponsor checkout must create a pending source-linked contribution.");
+assert(sponsorshipRoute.includes("webhookConfirmationRequired: true"), "sponsor funding must remain pending until webhook confirmation.");
+assert(monetizationPayments.includes("validateSponsorFundingWindow(challenge).allowed"), "authoritative sponsor reservation must validate the funding window.");
+assert(monetizationPayments.includes("confirmSponsorContribution"), "provider confirmation must use the authoritative sponsor contribution service.");
+assert(!monetizationPayments.includes("mergeSponsorPrizePoolPlaceholder("), "sponsor pending state must not inflate the prize pool.");
 assert(prizePools.includes("visibleJackpotCents: 0"), "sponsor prize pool placeholder must not show fake visible jackpot.");
 assert(sponsorDiscovery.includes("metricsAreEstimated: false"), "sponsor discovery must not label fake estimated metrics as real.");
 assert(!sponsorDiscovery.includes("Estimated reach foundation only"), "sponsor discovery must not expose fake reach copy.");
 assert(!sponsorDiscovery.includes("Target audience foundation pending"), "sponsor discovery must not expose fake audience copy.");
 
-assert(planAccess.includes("PAID_ENTRY_DISABLED"), "existing challenge creation gate must keep paid entry disabled until backend is ready.");
-assert(!stripeWebhook.includes("sponsorContribution") && !stripeWebhook.includes("prizePoolCreditStatus"), "Stripe webhook must not release sponsor funds in this pass.");
+assert(planAccess.includes("if (paid && !access.canCreatePaidChallenges)"), "paid entry must be unavailable on Free plans and authorized for eligible paid plans.");
+assert(stripeWebhook.includes("confirmSponsorFundingFromProviderState(stripe, db, event, session)"), "Sponsor funding must verify the current Stripe Session and PaymentIntent before source-aware confirmation.");
+assert(stripeWebhook.includes("checkout.session.async_payment_succeeded"), "unexpected asynchronous Sponsor payment methods must be routed to the financial review path.");
+assert(monetizationPayments.includes("reservationCreatedAt") && monetizationPayments.includes("reservationExpiresAt"), "Sponsor reservations persist a fixed server timestamp and expiry.");
+assert(monetizationPayments.includes("payment_review_required") && monetizationPayments.includes("refundCases"), "successful ineligible Sponsor payments must be linked to the established refund review queue.");
+assert(stripeWebhook.includes("confirmCreatorPrizeFunding(db, event, session)"), "Creator prize funding must be confirmed through the source-aware webhook service.");
+assert(!stripeWebhook.includes("stripe.transfers.create"), "Stripe webhook must not execute winner payouts.");
 assert(withdrawalsRoute.includes("adminReviewRequired") && withdrawalsRoute.includes("payoutExecuted: false"), "withdrawal requests must remain admin-reviewed and non-paying.");
 assert(!withdrawalsRoute.includes("stripe.transfers.create") && !withdrawalsRoute.includes("paystack.") && !withdrawalsRoute.includes("providerTransferId: \""), "withdrawal route must not execute provider payouts.");
 

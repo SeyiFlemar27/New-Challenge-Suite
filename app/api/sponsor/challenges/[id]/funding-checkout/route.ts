@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getStripe } from "@/lib/stripe";
 import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { requireSponsorContext } from "@/lib/server/sponsor";
-import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
+import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { requireSponsorPermission } from "@/lib/server/sponsor";
 import { hasActiveSponsorSubscription, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorIsApproved } from "@/lib/sponsor-access";
 import { attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, createPendingSponsorContribution, releasePendingSponsorContribution } from "@/lib/server/monetization-payments";
@@ -39,13 +39,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const agreement = agreementSnap.data() ?? {};
   const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
   if (agreement.challengeId !== challengeId || agreement.sponsorOrganizationId !== context.organizationId) return fail("This agreement does not belong to this Sponsor organization and opportunity.", 403, undefined, "SPONSOR_AGREEMENT_SCOPE_MISMATCH");
-  if (agreement.status !== "accepted" || agreement.creatorAcceptedVersion !== agreement.termsVersion || agreement.sponsorAcceptedVersion !== agreement.termsVersion) return fail("Both parties must accept the current terms before funding.", 409, undefined, "SPONSOR_AGREEMENT_NOT_ACCEPTED");
+  const expectedContributionId = deterministicId("sponsor_funding", challengeId, context.sponsorId, idempotencyKey);
+  const retryingSamePendingReservation = agreement.status === "funding_pending"
+    && agreement.fundingStatus === "pending"
+    && agreement.fundingContributionId === expectedContributionId;
+  if ((!retryingSamePendingReservation && agreement.status !== "accepted") || agreement.creatorAcceptedVersion !== agreement.termsVersion || agreement.sponsorAcceptedVersion !== agreement.termsVersion) return fail("Both parties must accept the current terms before funding.", 409, undefined, "SPONSOR_AGREEMENT_NOT_ACCEPTED");
   const stripe = getStripe();
   if (!stripe) return fail("Sponsor funding checkout is temporarily unavailable. Try again later or contact support.", 503, { webhookConfirmationRequired: true, contributionConfirmed: false }, "PAYMENT_CONFIGURATION_ERROR");
   let contribution;
   try {
     contribution = await createPendingSponsorContribution(context.db, {
       sponsorId: context.sponsorId,
+      sponsorOrganizationId: context.organizationId,
       challengeId,
       agreementId: body.data.agreementId,
       idempotencyKey,
@@ -58,6 +63,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   } catch (error) {
     if (error instanceof Error && error.message === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge funding cannot exceed $10,000.", 422, undefined, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
+    if (error instanceof Error && error.message === "SPONSOR_RESERVATION_EXPIRED") {
+      const existing = await context.db.collection("sponsorContributions").doc(deterministicId("sponsor_funding", challengeId, context.sponsorId, idempotencyKey)).get();
+      const sessionId = String(existing.data()?.stripeCheckoutSessionId ?? "");
+      if (sessionId) await stripe.checkout.sessions.expire(sessionId).catch(() => undefined);
+      return fail("This funding reservation expired. Start a new agreement checkout before voting begins.", 409, undefined, "SPONSOR_RESERVATION_EXPIRED");
+    }
     return fail(error instanceof Error ? error.message : "Sponsor funding checkout could not be prepared.", 409, undefined, "SPONSOR_FUNDING_CHECKOUT_REJECTED");
   }
   if (contribution.status === "confirmed") return ok({ sponsorContributionId: contribution.id, status: "confirmed", contributionConfirmed: true }, "This funding request is already confirmed.");
@@ -66,6 +77,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
   session = await stripe.checkout.sessions.create({
     mode: "payment",
+    payment_method_types: ["card"],
+    payment_intent_data: { capture_method: "automatic" },
+    expires_at: Math.ceil(Date.now() / 1000) + 31 * 60,
     line_items: [checkoutLineItem({ amountCents: Number(contribution.amountCents), currency: "USD", name: `Sponsor funding - ${String(challenge.title ?? "Challenge")}` })],
     success_url: `${origin}/sponsor/funding/${encodeURIComponent(challengeId)}/success?sponsorContributionId=${encodeURIComponent(String(contribution.id))}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel?paymentPurpose=sponsor_funding&challengeId=${encodeURIComponent(challengeId)}`,

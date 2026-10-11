@@ -90,7 +90,7 @@ export async function createWithdrawalRequest(
   if (existing.exists) return { request: existing.data(), created: false };
   const sourceTotal = sourceSnaps.reduce((sum, snap) => {
     const source = snap.data() ?? {};
-    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit") {
+    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit" || source.disputeRestricted === true) {
       throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
     }
     return sum + Number(source.netAmountCents ?? source.amountCents ?? 0);

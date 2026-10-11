@@ -45,8 +45,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const readiness = winnerProposalLifecycleReadiness(challenge);
   if (!readiness.ready) return fail(readiness.message, 409, { readiness }, "WINNER_PROPOSAL_NOT_READY");
 
-  const winners = normalizeWinnerProposalWinners(parsed.body?.winners);
-  const validation = validateWinnerProposalWinners(winners);
+  const winners = normalizeWinnerProposalWinners(parsed.body?.winners, challenge);
+  const validation = validateWinnerProposalWinners(winners, challenge);
   if (!validation.valid) return validationError(validation.errors, "Winner proposal is invalid.");
   const [candidates, existingProposalSnap] = await Promise.all([
     getWinnerCandidates(db, challengeId),

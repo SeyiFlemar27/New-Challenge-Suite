@@ -23,8 +23,10 @@ const adminUi = read("components/admin/admin-control-center.tsx");
 
 assert.match(publicShell, /user\?<><Link href="\/profile"/);
 assert.doesNotMatch(publicShell, /if\(user\.isAdmin\)return"\/admin"/);
-assert.match(login, /Already signed in/);
-assert.match(login, /Switch account \/ Sign out/);
+assert.match(login, /router\.replace\(getAuthenticatedDestination\(profile\.data\.user, nextPath\)\)/);
+assert.match(login, /Sign out to switch account/);
+assert.doesNotMatch(login, /Already signed in|Continue with Google|signInWithGoogle/);
+assert.match(login, /authState\.user\?\.uid/);
 assert.match(login, /safeInternalPath/);
 assert.match(verify, /account was created, but we could not send the verification code/);
 assert.match(verify, /Resend Code/);
@@ -34,8 +36,8 @@ assert.match(otpRequest, /await sendEmail/);
 assert.match(otpRequest, /await ref\.delete\(\)/);
 assert.doesNotMatch(otpRequest, /return ok\([^]*before[^]*sendEmail/);
 
-assert.match(topbar, /User Dashboard/);
-assert.match(topbar, /label: "Sponsor"/);
+assert.match(topbar, /label="User access"|"User access"/);
+assert.match(topbar, /"Sponsor Panel" : "Become a Sponsor"/);
 assert.doesNotMatch(topbar, /label: "Host Control Center"/);
 assert.doesNotMatch(topbar, /label: "Admin Command Center"/);
 assert.doesNotMatch(topbar, /\/auth\/register/);

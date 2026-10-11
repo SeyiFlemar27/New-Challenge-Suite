@@ -1,4 +1,5 @@
 import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sponsor";
+import { normalizeSponsorReviewStatus, sponsorIsApproved } from "@/lib/sponsor-access";
 import { fail, ok, serverError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ agr
   if (!context) return serverError("Sponsor access could not be verified.");
   const denied = requireSponsorPermission(context, "sponsorship.manage");
   if (denied) return denied;
+  const reviewStatus = normalizeSponsorReviewStatus(context.sponsorProfile.sponsorVerificationStatus ?? context.sponsorProfile.businessVerificationStatus);
+  if (!sponsorIsApproved(reviewStatus)) return fail("Sponsor approval is required before accepting sponsorship agreements.", 403, { reviewStatus }, "SPONSOR_APPROVAL_REQUIRED");
   const { agreementId } = await params;
   const ref = context.db.collection("sponsorChallengeAgreements").doc(agreementId);
   try {

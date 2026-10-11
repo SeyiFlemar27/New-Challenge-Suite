@@ -13,7 +13,8 @@ import {
   expireChallengeEntryPayment,
   expirePaidVotePurchase,
   expireSponsorContribution,
-  expireSponsorWalletFunding
+  expireSponsorWalletFunding,
+  releasePendingSponsorContribution
 } from "@/lib/server/monetization-payments";
 import {
   invoicePaymentIntentId,
@@ -25,11 +26,19 @@ import { confirmPredictionPayment, expirePredictionPayment, PREDICTION_PAYMENT_P
 import { confirmCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE, expireCreatorPrizeFunding } from "@/lib/server/prize-funding";
 import { claimEnterpriseRefundLock, finalizeEnterprisePaidVoteRefund, finalizeEnterprisePrizeFundingRefund, releaseEnterpriseRefundLock } from "@/lib/server/enterprise-prize-exposure";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
+import { recordStripeSponsorDispute } from "@/lib/server/stripe-sponsor-disputes";
 
 const handledEventTypes = new Set<Stripe.Event.Type>([
   "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
   "checkout.session.expired",
   "refund.updated",
+  "charge.dispute.created",
+  "charge.dispute.updated",
+  "charge.dispute.closed",
+  "charge.dispute.funds_withdrawn",
+  "charge.dispute.funds_reinstated",
   "invoice.payment_succeeded",
   "invoice.payment_failed",
   "customer.subscription.updated",
@@ -80,6 +89,45 @@ async function beginEvent(db: FirebaseFirestore.Firestore, event: Stripe.Event) 
 
 async function retrieveSubscription(stripe: Stripe, subscriptionId: string) {
   return stripe.subscriptions.retrieve(subscriptionId);
+}
+
+async function confirmSponsorFundingFromProviderState(
+  stripe: Stripe,
+  db: FirebaseFirestore.Firestore,
+  event: Stripe.Event,
+  eventSession: Stripe.Checkout.Session
+) {
+  const session = await stripe.checkout.sessions.retrieve(eventSession.id);
+  if (session.id !== eventSession.id || session.metadata?.sponsorContributionId !== eventSession.metadata?.sponsorContributionId) {
+    throw new Error("Retrieved Stripe Checkout Session does not match its signed webhook event.");
+  }
+  const paymentIntentId = objectId(session.payment_intent);
+  const paymentIntent = paymentIntentId
+    ? await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] })
+    : undefined;
+  return confirmSponsorContribution(db, event, session, paymentIntent);
+}
+
+async function processSponsorDispute(stripe: Stripe, db: FirebaseFirestore.Firestore, event: Stripe.Event) {
+  const disputeId = objectId(event.data.object);
+  if (!disputeId) throw new Error("Stripe dispute event is missing its provider identifier.");
+  const dispute = await stripe.disputes.retrieve(disputeId);
+  if (dispute.id !== disputeId) throw new Error("Retrieved Stripe dispute does not match its signed webhook event.");
+  const chargeId = objectId(dispute.charge);
+  if (!chargeId) throw new Error("Stripe dispute is not linked to a Charge.");
+  const eventDispute = event.data.object as Stripe.Dispute;
+  if (objectId(eventDispute.charge) && objectId(eventDispute.charge) !== chargeId) throw new Error("Signed Stripe dispute event references a different Charge.");
+  const eventPaymentIntentId = objectId(eventDispute.payment_intent);
+  const disputePaymentIntentId = objectId(dispute.payment_intent);
+  if (eventPaymentIntentId && disputePaymentIntentId && eventPaymentIntentId !== disputePaymentIntentId) throw new Error("Signed Stripe dispute event references a different PaymentIntent.");
+  const charge = await stripe.charges.retrieve(chargeId);
+  if (charge.id !== chargeId) throw new Error("Retrieved Stripe Charge does not match the dispute reference.");
+  const paymentIntentId = objectId(charge.payment_intent);
+  if (!paymentIntentId) throw new Error("Stripe disputed Charge is not linked to a PaymentIntent.");
+  if (disputePaymentIntentId && paymentIntentId !== disputePaymentIntentId) throw new Error("Stripe dispute and Charge reference different PaymentIntents.");
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+  if (paymentIntent.id !== paymentIntentId) throw new Error("Retrieved Stripe PaymentIntent does not match the disputed Charge.");
+  return recordStripeSponsorDispute(db, { dispute, charge, paymentIntent, eventId: event.id, eventType: event.type });
 }
 
 async function processSubscriptionCheckout(
@@ -158,6 +206,13 @@ export async function POST(request: Request) {
   try {
     let outcome: Record<string, unknown> = { handled: false };
     switch (event.type) {
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.closed":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated":
+        outcome = await processSponsorDispute(stripe, db, event);
+        break;
       case "checkout.session.completed": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
@@ -166,7 +221,7 @@ export async function POST(request: Request) {
         } else if (paymentPurpose === "paid_vote") {
           outcome = await confirmPaidVotePurchase(db, event, session);
         } else if (paymentPurpose === "sponsor_funding") {
-          outcome = await confirmSponsorContribution(db, event, session);
+          outcome = await confirmSponsorFundingFromProviderState(stripe, db, event, session);
         } else if (paymentPurpose === "sponsor_wallet_funding") {
           outcome = await confirmSponsorWalletFunding(db, event, session);
         } else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) {
@@ -228,10 +283,34 @@ export async function POST(request: Request) {
         const paymentPurpose = session.metadata?.paymentPurpose;
         if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
         else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
-          else if (paymentPurpose === "sponsor_funding") outcome = await expireSponsorContribution(db, session);
+          else if (paymentPurpose === "sponsor_funding") {
+            const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+            outcome = currentSession.status === "expired" && currentSession.payment_status !== "paid"
+              ? await expireSponsorContribution(db, currentSession)
+              : { handled: true, kind: "sponsor_funding", id: currentSession.metadata?.sponsorContributionId ?? null, staleExpirationIgnored: true };
+          }
           else if (paymentPurpose === "sponsor_wallet_funding") outcome = await expireSponsorWalletFunding(db, session);
         else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) outcome = await expirePredictionPayment(db, session);
         else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) outcome = await expireCreatorPrizeFunding(db, session);
+        break;
+      }
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object;
+        if (session.metadata?.paymentPurpose === "sponsor_funding") {
+          outcome = await confirmSponsorFundingFromProviderState(stripe, db, event, session);
+        }
+        break;
+      }
+      case "checkout.session.async_payment_failed": {
+        const session = event.data.object;
+        if (session.metadata?.paymentPurpose === "sponsor_funding") {
+          const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+          if (currentSession.payment_status === "paid") {
+            outcome = { handled: true, kind: "sponsor_funding", id: currentSession.metadata?.sponsorContributionId ?? null, staleFailureIgnored: true };
+          } else {
+            outcome = await releasePendingSponsorContribution(db, String(currentSession.metadata?.sponsorContributionId ?? ""));
+          }
+        }
         break;
       }
       case "refund.updated": {
@@ -271,7 +350,7 @@ export async function POST(request: Request) {
           }
         } else if (status === "succeeded" && (refundRecord.paymentCollection === "sponsorContributions" || refundRecord.paymentCollection === "creatorPrizeFundingPayments" || refundRecord.paymentCollection === "challengeEntryPayments")) {
           const source = await db.collection(refundRecord.paymentCollection).doc(String(refundRecord.paymentId)).get();
-          if (source.data()?.organizationOwnerId && source.data()?.challengeId) {
+          if (source.data()?.organizationOwnerId && source.data()?.challengeId && refundRecord.financialCreditStatus !== "never_credited") {
             await claimEnterpriseRefundLock(db, {
               refundCaseId,
               paymentCollection: refundRecord.paymentCollection as "creatorPrizeFundingPayments" | "sponsorContributions" | "challengeEntryPayments",
@@ -294,7 +373,7 @@ export async function POST(request: Request) {
           if (status === "failed" && enterpriseFunding) {
             const source = await db.collection(refundRecord.paymentCollection).doc(String(refundRecord.paymentId)).get();
             const challengeId = String(source.data()?.challengeId ?? "");
-            if (source.data()?.organizationOwnerId && challengeId) {
+            if (source.data()?.organizationOwnerId && challengeId && refundRecord.financialCreditStatus !== "never_credited") {
               await releaseEnterpriseRefundLock(db, { refundCaseId, challengeId, refundStatus: "failed", providerStatus: refund.status ?? undefined, now });
             } else {
               await db.runTransaction(async (transaction) => {
@@ -312,7 +391,7 @@ export async function POST(request: Request) {
           }
         }
         if (status === "succeeded" && refundRecord.paymentCollection === "sponsorContributions") {
-          await applySponsorAgreementRefundState(db, { contributionId: String(refundRecord.paymentId), refundCaseId, amountCents: Number(refundRecord.amountCents ?? refundRecord.amount ?? 0), now: new Date().toISOString() });
+          await applySponsorAgreementRefundState(db, { contributionId: String(refundRecord.paymentId), refundCaseId, amountCents: Number(refundRecord.amountCents ?? refundRecord.amount ?? 0), neverCredited: refundRecord.financialCreditStatus === "never_credited", now: new Date().toISOString() });
         }
         outcome = { handled: true, kind: "refund", refundCaseId, status };
         break;

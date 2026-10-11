@@ -2,6 +2,7 @@ import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { deterministicId } from "@/lib/server/idempotency";
 import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
+import { editableDraftStatus } from "@/lib/server/challenge-drafts";
 
 export const CREATOR_PRIZE_PAYMENT_PURPOSE = "prize_pool_funding" as const;
 
@@ -25,17 +26,30 @@ export async function createPendingCreatorPrizeFunding(db: Firestore, input: {
   const amountCents = cents(input.amountCents);
   if (amountCents < 500) throw new Error("Creator prize funding must be at least $5.");
   const now = input.now ?? new Date().toISOString();
-  const id = deterministicId("creator_prize_funding", input.challengeId, input.creatorId, amountCents);
+  const id = deterministicId("creator_prize_funding", input.challengeId, input.creatorId);
   const ref = db.collection("creatorPrizeFundingPayments").doc(id);
   const challengeRef = db.collection("challenges").doc(input.challengeId);
-  const result = await db.runTransaction(async (transaction) => {
-    const [existing, challengeSnap] = await Promise.all([transaction.get(ref), transaction.get(challengeRef)]);
+  const result = await db.runTransaction<Record<string, unknown> & { id: string }>(async (transaction) => {
+    const [existing, challengeSnap, pendingPayments] = await Promise.all([
+      transaction.get(ref),
+      transaction.get(challengeRef),
+      transaction.get(db.collection("creatorPrizeFundingPayments").where("challengeId", "==", input.challengeId).where("status", "==", "pending").limit(2))
+    ]);
     if (existing.exists && existing.data()?.status === "confirmed" && existing.data()?.webhookConfirmed === true) {
       return { id: existing.id, ...existing.data(), idempotent: true };
     }
-    if (existing.exists && existing.data()?.status === "pending") return { id: existing.id, ...existing.data(), idempotent: true };
     if (!challengeSnap.exists) throw new Error("Challenge for creator prize funding was not found.");
     const challenge = challengeSnap.data() ?? {};
+    if (!editableDraftStatus(challenge)) throw new Error("CHALLENGE_NOT_EDITABLE");
+    if (existing.exists && existing.data()?.status === "pending") {
+      if (cents(existing.data()?.amountCents) !== amountCents) throw new Error("CREATOR_PRIZE_FUNDING_AMOUNT_CONFLICT");
+      return { id: existing.id, ...existing.data(), idempotent: true };
+    }
+    const pending = pendingPayments.docs.find((document) => document.data()?.reservationStatus !== "released");
+    if (pending) {
+      if (cents(pending.data()?.amountCents) !== amountCents) throw new Error("CREATOR_PRIZE_FUNDING_AMOUNT_CONFLICT");
+      return { id: pending.id, ...pending.data(), idempotent: true };
+    }
     const financialOwnership = resolveEnterpriseFinancialOwnership(challenge);
     const enterpriseOwned = financialOwnership.workspaceType === "enterprise";
     if (enterpriseOwned && financialOwnership.organizationOwnerId !== String(input.organizationOwnerId ?? "")) {

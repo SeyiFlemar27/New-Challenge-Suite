@@ -1,0 +1,21 @@
+export const rewardSpinMessages: Record<string, string> = {
+  INSUFFICIENT_REWARD_POINTS: "You do not have enough Reward Points for this Spin.",
+  BONUS_SPIN_UNAVAILABLE: "This Bonus Spin is no longer available.",
+  BONUS_SPIN_EXPIRED: "This Bonus Spin has expired.",
+  BONUS_SPIN_TIER_MISMATCH: "This Bonus Spin is not valid for the selected tier.",
+  NO_AVAILABLE_PRIZES: "No eligible rewards are currently available for this tier.",
+  WHEEL_DISABLED: "This Spin tier is paused right now.",
+  REWARDS_DISABLED: "Rewards are unavailable right now.",
+  REWARD_FULFILLMENT_PAUSED: "Spins are paused while reward fulfillment is under maintenance.",
+  REWARDS_ACCOUNT_RESTRICTED: "Your Rewards account is restricted. You can still view your history.",
+  REWARDS_ACCOUNT_NOT_ELIGIBLE: "This account context is not eligible for consumer Rewards.",
+  REWARD_DEBT_ACTIVE: "New Spins are unavailable while a Reward Point correction is outstanding.",
+  REWARD_POINT_RETURN_RATIO_BLOCKED: "This Spin configuration is paused for economic review.",
+  PRIZE_OUT_OF_STOCK: "That reward became unavailable. No points were charged; please try again.",
+  PRIZE_USER_WIN_LIMIT_REACHED: "You have reached the win limit for this reward. No points were charged.",
+  PRIZE_DAILY_WIN_LIMIT_REACHED: "This reward reached its daily win limit. No points were charged; please try again.",
+  REWARD_BUDGET_EXHAUSTED: "This reward budget is unavailable. No points were charged.",
+  NO_ACTIVE_WHEEL_VERSION: "This Spin tier is temporarily unavailable. No points were charged.",
+  WHEEL_MINIMUM_REWARDS_REQUIRED: "This Spin tier is temporarily unavailable while its reward pool is being reviewed. No points were charged.",
+  WHEEL_VERSION_CHANGED: "This Wheel was updated. Review the latest rewards and chances before spinning. No points were charged."
+};

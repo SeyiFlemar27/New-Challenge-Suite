@@ -12,17 +12,21 @@ const org = `${runId}_org`;
 const now = new Date().toISOString();
 const stripeSession = (metadata, amountCents) => ({
   id: `${runId}_session_${Math.random().toString(36).slice(2)}`,
+  object: "checkout.session",
   mode: "payment",
   payment_status: "paid",
   currency: "usd",
   amount_total: amountCents,
   payment_intent: `${runId}_pi_${Math.random().toString(36).slice(2)}`,
+  payment_method_types: ["card"],
+  status: "complete",
+  expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
   metadata,
 });
 
 try {
   const creatorChallengeId = `${runId}_creator`;
-  const creatorChallenge = { officialChallenge: true, organizationOwnerId: org, creatorId: "actor_1", prizeValue: 0, status: "active" };
+  const creatorChallenge = { officialChallenge: true, organizationOwnerId: org, creatorId: "actor_1", prizeValue: 0, status: "draft" };
   await db.collection("challenges").doc(creatorChallengeId).set(creatorChallenge);
   const creatorPayment = await createPendingCreatorPrizeFunding(db, { challengeId: creatorChallengeId, creatorId: "actor_1", organizationOwnerId: org, amountCents: 500000, now });
   let limit = (await db.collection("enterprisePrizeFundingLimits").doc(creatorChallengeId).get()).data();
@@ -47,14 +51,26 @@ try {
   assert.equal(limit.exposureCents, 500000, "the configured prize obligation remains, without a duplicate reservation");
 
   const sponsorChallengeId = `${runId}_sponsor`;
-  const sponsorChallenge = { ...creatorChallenge, prizeValue: 5000, sponsorEnabled: true };
+  const sponsorChallenge = { ...creatorChallenge, prizeValue: 5000, sponsorEnabled: true, status: "active" };
   await db.collection("challenges").doc(sponsorChallengeId).set(sponsorChallenge);
   const sponsorPayment = await createPendingSponsorContribution(db, { sponsorId: "sponsor_1", challengeId: sponsorChallengeId, challenge: sponsorChallenge, sponsorProfile: {}, amountCents: 100000, idempotencyKey: `${runId}_sponsor_key`, now });
   limit = (await db.collection("enterprisePrizeFundingLimits").doc(sponsorChallengeId).get()).data();
   assert.equal(limit.exposureCents, 600000, "pending Sponsor contribution adds to the configured $5,000 obligation");
   const sponsorSession = stripeSession({ paymentPurpose: "sponsor_funding", sponsorContributionId: sponsorPayment.id }, 100000);
-  await confirmSponsorContribution(db, { id: `${runId}_sponsor_event`, type: "checkout.session.completed" }, sponsorSession);
-  const duplicateSponsor = await confirmSponsorContribution(db, { id: `${runId}_sponsor_event_dup`, type: "checkout.session.completed" }, sponsorSession);
+  await db.collection("sponsorContributions").doc(sponsorPayment.id).set({ stripeCheckoutSessionId: sponsorSession.id, providerPaymentMethodTypes: ["card"] }, { merge: true });
+  const delayedCreatedAt = new Date(Date.now() - 20 * 60_000).toISOString();
+  const delayedVotingStart = new Date(Date.now() - 15 * 60_000).toISOString();
+  const delayedExpiresAt = new Date(Date.parse(delayedCreatedAt) + 15 * 60_000).toISOString();
+  await db.collection("sponsorContributions").doc(sponsorPayment.id).set({ createdAt: delayedCreatedAt, reservationCreatedAt: delayedCreatedAt, reservationExpiresAt: delayedExpiresAt, reservationDurationMs: 900_000 }, { merge: true });
+  await db.collection("challenges").doc(sponsorChallengeId).set({ votingStartsAt: delayedVotingStart }, { merge: true });
+  const chargeCreated = Math.floor(Date.parse(delayedCreatedAt) / 1000) + 60;
+  const sponsorPaymentIntent = { id: sponsorSession.payment_intent, status: "succeeded", capture_method: "automatic", amount_received: 100000, currency: "usd", latest_charge: { id: `${runId}_sponsor_charge`, object: "charge", status: "succeeded", paid: true, captured: true, disputed: false, refunded: false, review: null, outcome: { type: "authorized" }, fraud_details: {}, payment_intent: sponsorSession.payment_intent, amount: 100000, amount_captured: 100000, currency: "usd", payment_method_details: { type: "card" }, created: chargeCreated } };
+  const delayedEventCreated = Math.floor(Date.parse(delayedExpiresAt) / 1000) - 60;
+  const delayedEvent = { id: `${runId}_sponsor_event`, type: "checkout.session.completed", created: delayedEventCreated, data: { object: sponsorSession } };
+  await confirmSponsorContribution(db, delayedEvent, sponsorSession, sponsorPaymentIntent);
+  const confirmedSponsorRecord = (await db.collection("sponsorContributions").doc(sponsorPayment.id).get()).data();
+  assert.equal(confirmedSponsorRecord.status, "confirmed", `valid reservation should confirm before testing exposure transition: ${confirmedSponsorRecord.reservationStatus}/${confirmedSponsorRecord.paymentReviewReason ?? ""}`);
+  const duplicateSponsor = await confirmSponsorContribution(db, { ...delayedEvent, id: `${runId}_sponsor_event_dup` }, sponsorSession, sponsorPaymentIntent);
   limit = (await db.collection("enterprisePrizeFundingLimits").doc(sponsorChallengeId).get()).data();
   assert.equal(duplicateSponsor.duplicate, true);
   assert.equal(limit.exposureCents, 600000, "Sponsor reservation-to-confirmation transition is counted once");
@@ -62,7 +78,7 @@ try {
   assert.equal(limit.sponsorConfirmedCents, 100000);
 
   const entryChallengeId = `${runId}_entry`;
-  const entryChallenge = { ...creatorChallenge, prizeValue: 5000, paidEntryEnabled: true, entryFeeCents: 10000, maxParticipants: 10 };
+  const entryChallenge = { ...creatorChallenge, prizeValue: 5000, paidEntryEnabled: true, entryFeeCents: 10000, maxParticipants: 10, status: "active" };
   await db.collection("challenges").doc(entryChallengeId).set(entryChallenge);
   const entryPayment = await createPendingEntryPayment(db, { userId: "entrant_1", challengeId: entryChallengeId, challenge: entryChallenge, now });
   assert.equal(entryPayment.winnerShareCents, 6500, "only the canonical 65% winner share is allocated to the prize pool");
