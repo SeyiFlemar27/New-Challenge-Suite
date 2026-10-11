@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Isolate local browser E2E output so it cannot collide with another
+  // development server or the repository's regular .next build artifacts.
+  distDir: process.env.CHALLENGE_SUITE_NEXT_DIST_DIR || ".next",
   async redirects() {
     return [
       { source: "/auth/sign-in", destination: "/auth/login", permanent: false },

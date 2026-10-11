@@ -15,6 +15,7 @@ const tests = [
   "scripts/test-private-access-method-enforcement.mjs",
   "scripts/test-sponsor-proposal-retirement.mjs",
   "scripts/test-payment-return-routes.mjs",
+  "scripts/test-stripe-sponsor-disputes-emulator.mjs",
   "scripts/test-stripe-webhook-route-paid-vote.mjs",
   "scripts/test-enterprise-finance-route.mjs",
   "scripts/test-private-access-requests-route.mjs",
@@ -26,6 +27,7 @@ const tests = [
   "scripts/test-tournament-voting-route.mjs",
   "scripts/test-tournament-voting-judging.mjs",
   "scripts/test-sponsor-agreement-lifecycle.mjs",
+  "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
   "scripts/test-discovery-analytics-scalability.mjs",
 ];
 
