@@ -32,6 +32,7 @@ export interface CurrentUserProfile {
   avatarUrl?: string | null;
   role?: AppRole;
   accountType: AccountType;
+  accountTypeSelectionComplete?: boolean;
   dashboardType?: string;
   selectedAccountType?: string;
   roleIntent?: string;
@@ -45,6 +46,10 @@ export interface CurrentUserProfile {
   isSponsor: boolean;
   isAdmin: boolean;
   sponsorOnboardingStatus?: string | null;
+  accountIntroOnboardingStatus?: "in_progress" | "complete" | null;
+  accountIntroOnboardingType?: "creator" | "sponsor" | null;
+  accountIntroOnboardingStep?: number;
+  accountIntroOnboardingCompletedAt?: string | null;
   sponsorOnboardingComplete?: boolean;
   creatorOnboardingComplete?: boolean;
   hostOnboardingComplete?: boolean;
@@ -139,6 +144,7 @@ export function useCurrentUser() {
           avatarUrl: typeof profileRecord.avatarUrl === "string" ? profileRecord.avatarUrl : typeof profileRecord.photoURL === "string" ? profileRecord.photoURL : null,
           role: typeof profile.role === "string" ? profile.role as AppRole : undefined,
           accountType,
+          accountTypeSelectionComplete: profile.accountTypeSelectionComplete !== false,
           dashboardType: typeof profile.dashboardType === "string" ? profile.dashboardType : undefined,
           selectedAccountType: typeof profile.selectedAccountType === "string" ? profile.selectedAccountType : undefined,
           roleIntent: typeof profile.roleIntent === "string" ? profile.roleIntent : undefined,
@@ -152,6 +158,10 @@ export function useCurrentUser() {
           isSponsor: Boolean(profile.isSponsor || accountType === "sponsor"),
           isAdmin: Boolean(profile.isAdmin || accountType === "admin"),
           sponsorOnboardingStatus: typeof profile.sponsorOnboardingStatus === "string" ? profile.sponsorOnboardingStatus : null,
+          accountIntroOnboardingStatus: profile.accountIntroOnboardingStatus === "in_progress" || profile.accountIntroOnboardingStatus === "complete" ? profile.accountIntroOnboardingStatus : null,
+          accountIntroOnboardingType: profile.accountIntroOnboardingType === "creator" || profile.accountIntroOnboardingType === "sponsor" ? profile.accountIntroOnboardingType : null,
+          accountIntroOnboardingStep: Number.isInteger(profile.accountIntroOnboardingStep) ? Number(profile.accountIntroOnboardingStep) : 0,
+          accountIntroOnboardingCompletedAt: typeof profile.accountIntroOnboardingCompletedAt === "string" ? profile.accountIntroOnboardingCompletedAt : null,
           sponsorOnboardingComplete: Boolean(profile.sponsorOnboardingComplete),
           creatorOnboardingComplete: Boolean(profile.creatorOnboardingComplete),
           hostOnboardingComplete: Boolean(profile.hostOnboardingComplete),

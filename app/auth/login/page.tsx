@@ -2,24 +2,19 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { Chrome, Eye, EyeOff } from "lucide-react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
-import { getDefaultRouteForAccount } from "@/lib/account-routing";
-import { loginWithEmail, loginWithGoogle, logout } from "@/lib/firebase/auth-service";
+import { getAuthenticatedDestination } from "@/lib/account-routing";
+import { loginWithEmail, logout } from "@/lib/firebase/auth-service";
 import { useLanguage } from "@/lib/i18n/use-language";
 import { useAuth } from "@/components/auth-provider";
 
 function safeInternalPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
   return value;
-}
-
-function getNextPath() {
-  if (typeof window === "undefined") return "";
-  return safeInternalPath(new URLSearchParams(window.location.search).get("next"));
 }
 
 function LoginForm() {
@@ -30,17 +25,36 @@ function LoginForm() {
   const [form, setForm] = useState({ email: "", password: "", rememberMe: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [redirectError, setRedirectError] = useState("");
   const [loading, setLoading] = useState(false);
+  const routedUserId = useRef("");
   const nextPath = safeInternalPath(searchParams.get("next"));
 
-  async function routeAfterLogin() {
+  const routeAfterLogin = useCallback(async () => {
     const profile = await fetchBootstrapProfile();
     if (!profile.ok || !profile.data?.user) {
       throw new Error(profile.message || "Profile could not be loaded.");
     }
-    const destination = getNextPath() || getDefaultRouteForAccount(profile.data.user);
-    router.replace(destination);
-  }
+    router.replace(getAuthenticatedDestination(profile.data.user, nextPath));
+  }, [nextPath, router]);
+
+  useEffect(() => {
+    const uid = authState.user?.uid;
+    if (authState.loading) return;
+    if (!uid) {
+      routedUserId.current = "";
+      return;
+    }
+    if (routedUserId.current === uid) return;
+    routedUserId.current = uid;
+    let active = true;
+    void routeAfterLogin().catch((caught: unknown) => {
+      if (!active) return;
+      routedUserId.current = "";
+      setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
+    });
+    return () => { active = false; };
+  }, [authState.loading, authState.user?.uid, routeAfterLogin]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,7 +70,7 @@ function LoginForm() {
     setLoading(true);
     try {
       const result = await loginWithEmail(form.email, form.password, form.rememberMe);
-      const destination = getNextPath();
+      const destination = nextPath;
       if (result.mode === "firebase" && !result.emailVerified) {
         localStorage.setItem("challenge_suite_signup_email", form.email);
         router.push(destination ? `/auth/verify-email?returnUrl=${encodeURIComponent(destination)}` : "/auth/verify-email");
@@ -69,35 +83,14 @@ function LoginForm() {
     }
   }
 
-  async function signInWithGoogle() {
-    setError("");
-    setLoading(true);
-    try {
-      const result = await loginWithGoogle(form.rememberMe);
-      if (!result.emailVerified) {
-        router.push("/auth/verify-email");
-        return;
-      }
-      await routeAfterLogin();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not sign in with Google.");
-      setLoading(false);
-    }
-  }
-
-  if (!authState.loading && authState.user) {
-    const identity = authState.profile?.displayName || authState.user.displayName || authState.user.email || "Account";
-    const accountProfile = (authState.profile ?? {}) as unknown as Record<string, unknown>;
-    const destination = nextPath || (authState.profile?.isAdmin ? "/dashboard" : getDefaultRouteForAccount(accountProfile));
+  if (authState.loading || authState.user) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
+        <main className="auth-shell theme-workspace flex min-h-[100dvh] items-center justify-center bg-[var(--background)] px-5 py-10 text-[var(--foreground)] sm:px-6 sm:py-14 lg:px-8 lg:py-20">
         <Card className="w-full max-w-[480px] rounded-[12px] p-6 text-center sm:p-9">
           <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
-          <p className="text-xs font-black uppercase text-[var(--gold)]">Already signed in</p>
-          <h1 className="mt-3 break-words text-3xl font-black">{identity}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">Continue with this account or sign out to use a different one.</p>
-          <Button className="mt-7 w-full" onClick={() => router.replace(destination)}>Continue to dashboard</Button>
-          <Button className="mt-3 w-full" variant="secondary" onClick={() => void logout().then(() => window.location.reload())}>Switch account / Sign out</Button>
+          <h1 className="text-2xl font-black">{redirectError ? "We couldn't open your workspace" : "Opening your workspace…"}</h1>
+          {redirectError ? <p role="alert" className="mt-3 text-sm leading-6 text-red-700">{redirectError}</p> : <p role="status" className="mt-3 text-sm leading-6 text-[var(--muted)]">Taking you to the right place for your account.</p>}
+          {redirectError ? <div className="mt-7 grid gap-3"><Button onClick={() => void routeAfterLogin().catch((caught: unknown) => setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened."))}>Try again</Button><Button variant="secondary" onClick={() => void logout()}>Sign out to switch account</Button></div> : null}
         </Card>
       </main>
     );
@@ -123,8 +116,6 @@ function LoginForm() {
           {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
           <Button className="w-full" disabled={loading}>{t(loading ? "Signing in..." : "Sign In")}</Button>
         </form>
-        <div className="my-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500"><span className="h-px flex-1 bg-white/10" />or<span className="h-px flex-1 bg-white/10" /></div>
-        <Button className="w-full" variant="secondary" type="button" disabled={loading} onClick={() => void signInWithGoogle()}><Chrome size={18} /> Continue with Google</Button>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center text-sm sm:flex-row sm:justify-between">
           <Link href="/auth/forgot-password" className="text-[var(--gold)]">{t("Forgot password?")}</Link>
           <Link href="/auth/register" className="font-bold text-[var(--gold)]">{t("Create account")}</Link>

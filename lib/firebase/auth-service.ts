@@ -38,6 +38,10 @@ export interface AuthProfile {
   role: AppRole;
   accountTypeSelectionComplete?: boolean;
   selectedAccountType?: string;
+  accountIntroOnboardingStatus?: "in_progress" | "complete" | null;
+  accountIntroOnboardingType?: "creator" | "sponsor" | null;
+  accountIntroOnboardingStep?: number;
+  accountIntroOnboardingCompletedAt?: string | null;
   dashboardType?: string;
   planId?: UserPlanId;
   doroBalance?: number;

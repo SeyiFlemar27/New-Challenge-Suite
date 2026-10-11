@@ -8,7 +8,7 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 import { fetchBootstrapProfile, requestEmailVerificationCode, verifyEmailCode } from "@/lib/api/services";
-import { getDefaultRouteForAccount } from "@/lib/account-routing";
+import { getAuthenticatedDestination } from "@/lib/account-routing";
 import { auth } from "@/lib/firebase/client";
 
 const RESEND_SECONDS = 60;
@@ -32,10 +32,9 @@ function getSafeReturnUrl() {
 
 async function getVerifiedDestination() {
   const explicitReturnUrl = getSafeReturnUrl();
-  if (explicitReturnUrl) return explicitReturnUrl;
   const profile = await fetchBootstrapProfile();
-  if (!profile.ok || !profile.data?.user) return "/dashboard";
-  return getDefaultRouteForAccount(profile.data.user);
+  if (!profile.ok || !profile.data?.user) throw new Error(profile.message || "Account setup could not be confirmed.");
+  return getAuthenticatedDestination(profile.data.user, explicitReturnUrl || "");
 }
 
 export default function VerifyEmailPage() {
@@ -81,7 +80,9 @@ export default function VerifyEmailPage() {
     if (authState.loading) return;
     if (authState.verified) {
       const timer = window.setTimeout(() => {
-        void getVerifiedDestination().then((destination) => router.replace(destination));
+        void getVerifiedDestination().then((destination) => router.replace(destination)).catch(() => {
+          setError("We verified your email, but could not confirm your account setup. Please try again.");
+        });
       }, 900);
       return () => window.clearTimeout(timer);
     }
@@ -125,7 +126,14 @@ export default function VerifyEmailPage() {
     await auth?.currentUser?.getIdToken(true).catch(() => undefined);
     window.dispatchEvent(new Event("challenge-suite-profile-updated"));
     await authState.refreshProfile().catch(() => null);
-    const destination = await getVerifiedDestination();
+    let destination: string;
+    try {
+      destination = await getVerifiedDestination();
+    } catch {
+      setVerifying(false);
+      setError("Your email is verified, but we couldn't confirm your account setup. Please try again.");
+      return;
+    }
     localStorage.removeItem("challenge_suite_signup_email");
     setLocallyVerified(true);
     setLocallyRedirecting(true);
@@ -145,7 +153,8 @@ export default function VerifyEmailPage() {
             <p className="mt-7 text-xs font-black uppercase text-[var(--gold)]">Identity confirmed</p>
             <h1 className="mt-3 text-3xl font-black sm:text-4xl">Email verified</h1>
             <p className="mt-4 text-slate-300">Your Challenge Suite account is ready. We are opening your workspace now.</p>
-            <Button className="mt-8 w-full" onClick={() => void getVerifiedDestination().then((destination) => router.replace(destination))}>Continue</Button>
+            {error ? <p role="alert" className="mt-5 rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
+            <Button className="mt-8 w-full" onClick={() => void getVerifiedDestination().then((destination) => router.replace(destination)).catch(() => setError("We couldn't confirm your account setup. Please try again."))}>Continue</Button>
           </div>
         ) : (
           <>

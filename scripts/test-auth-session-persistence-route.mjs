@@ -8,7 +8,8 @@ assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "FIRESTORE_EMULATOR_HOST is requi
 assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST, "FIREBASE_AUTH_EMULATOR_HOST is required");
 const app = initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? "demo-challenge-suite" });
 const db = getFirestore(app);
-const { POST, DELETE, setSessionAuthForTests } = await import("../app/api/auth/session/route.ts");
+const { POST, DELETE } = await import("../app/api/auth/session/route.ts");
+const { setSessionAuthForTests } = await import("../lib/server/session-auth-test-boundary.ts");
 const { getRequestUser, SESSION_COOKIE_NAME } = await import("../lib/server/auth.ts");
 const runId = `session_policy_${randomUUID().replaceAll("-", "")}`;
 let assertions = 0;

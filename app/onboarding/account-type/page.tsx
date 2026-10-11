@@ -41,7 +41,7 @@ export default function AccountTypeOnboardingPage() {
         <div className="mt-8 max-w-3xl">
           <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--gold)]">Account setup</p>
           <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">How will you use Challenge Suite?</h1>
-          <p className="mt-4 text-base leading-7 text-slate-300 sm:text-lg">Choose the workspace that matches your goals. This selects account intent only and does not grant a paid subscription.</p>
+        <p className="mt-4 text-base leading-7 text-slate-300 sm:text-lg">Choose Creator or Sponsor to personalize your Challenge Suite introduction. Your selection does not grant a paid subscription.</p>
         </div>
         <div className="mt-10 grid gap-5 md:grid-cols-2">
           {options.map((option) => {
@@ -52,7 +52,7 @@ export default function AccountTypeOnboardingPage() {
         </div>
         {error ? <Card className="mt-6 border-red-500/20 bg-red-950/30 p-4 text-red-200">{error}</Card> : null}
         <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-2xl text-sm leading-6 text-slate-400">Sponsor accounts complete their business profile before the Sponsor workspace becomes available.</p>
+          <p className="max-w-2xl text-sm leading-6 text-slate-400">Sponsor business details and verification are handled separately before protected sponsorship actions become available.</p>
           <Button className="w-full sm:w-auto" disabled={!selected || saving} onClick={() => void continueOnboarding()}>{saving ? "Preparing workspace..." : "Continue"}</Button>
         </div>
       </div>

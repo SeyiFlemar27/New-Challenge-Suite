@@ -1,20 +1,13 @@
-import { getAdminAuth } from "@/lib/firebase/admin";
 import { SESSION_COOKIE_NAME } from "@/lib/server/auth";
 import { ok, readJson, serverUnavailable, unauthorized } from "@/lib/server/responses";
+import { getSessionAuthBoundary } from "@/lib/server/session-auth-test-boundary";
 
 const STANDARD_SESSION_DURATION_SECONDS = 60 * 60 * 24;
 const REMEMBERED_SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30;
 const FIREBASE_SESSION_COOKIE_MAX_SECONDS = 60 * 60 * 24 * 14;
 
-type SessionAuthBoundary = Pick<NonNullable<ReturnType<typeof getAdminAuth>>, "verifyIdToken" | "createSessionCookie">;
-let sessionAuthOverride: SessionAuthBoundary | null = null;
-
-export function setSessionAuthForTests(auth: SessionAuthBoundary | null) {
-  sessionAuthOverride = auth;
-}
-
 export async function POST(request: Request) {
-  const adminAuth = sessionAuthOverride ?? getAdminAuth();
+  const adminAuth = getSessionAuthBoundary();
   if (!adminAuth) return serverUnavailable("Session restoration");
 
   const authHeader = request.headers.get("authorization");

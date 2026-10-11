@@ -11,6 +11,7 @@ import { resolveProfileIdentity } from "@/lib/profile-identity";
 import { FINAL_ACCOUNT_DELETION_STATUSES, PENDING_ACCOUNT_DELETION_STATUSES, normalizedEmailHash, normalizeAccountDeletionStatus } from "@/lib/server/account-deletion";
 import { isEnterpriseAccessActive, normalizeEnterpriseAccess, resolveActiveWorkspace } from "@/lib/enterprise-access";
 import { isSponsorWorkspaceAvailable, resolveSponsorOrganizationAccess, type SponsorOrganizationAccess } from "@/lib/server/sponsor-organizations";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,10 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     creatorOnboardingComplete: Boolean(merged.creatorOnboardingComplete),
     hostOnboardingComplete: Boolean(merged.hostOnboardingComplete),
     walkthroughCompleted: merged.walkthroughCompleted === undefined ? true : Boolean(merged.walkthroughCompleted),
+    accountIntroOnboardingStatus: typeof merged.accountIntroOnboardingStatus === "string" ? merged.accountIntroOnboardingStatus : null,
+    accountIntroOnboardingType: typeof merged.accountIntroOnboardingType === "string" ? merged.accountIntroOnboardingType : null,
+    accountIntroOnboardingStep: Number.isInteger(merged.accountIntroOnboardingStep) ? Number(merged.accountIntroOnboardingStep) : 0,
+    accountIntroOnboardingCompletedAt: typeof merged.accountIntroOnboardingCompletedAt === "string" ? merged.accountIntroOnboardingCompletedAt : null,
     hasSponsorProfile,
     sponsorVerificationStatus: typeof merged.sponsorVerificationStatus === "string" ? merged.sponsorVerificationStatus : sponsorAccess ? "not_submitted" : null,
     isSponsor: sponsorAvailable,
@@ -295,43 +300,64 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return validationError({ accountType: "Choose a valid account type." });
 
   try {
-    const [accountSnap, profileSnap] = await Promise.all([
-      db.collection("users").doc(user.uid).get(),
-      db.collection("profiles").doc(user.uid).get()
-    ]);
-    const existing = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) };
-    if (existing.isAdmin || existing.accountType === "admin") return fail("Admin account type cannot be changed here.", 403, undefined, "PERMISSION_DENIED");
-    if (existing.accountTypeSelectionComplete === true) return fail("Account type has already been selected.", 409, undefined, "ACCOUNT_TYPE_ALREADY_SELECTED");
+    const accountRef = db.collection("users").doc(user.uid);
+    const profileRef = db.collection("profiles").doc(user.uid);
+    const selection = await db.runTransaction(async (transaction) => {
+      const [accountSnap, profileSnap] = await Promise.all([transaction.get(accountRef), transaction.get(profileRef)]);
+      const existing = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) };
+      if (existing.isAdmin || existing.accountType === "admin") return { kind: "admin" as const };
 
-    const selected = parsed.data.accountType;
-    const compatibilityAccountType = "user";
-    const role = selected === "sponsor" ? "user" : selected;
-    const roleIntent = selected === "creator" ? "create" : "sponsor";
-    const dashboardType = selected === "creator" ? "creator_studio" : "user_dashboard";
-    const now = new Date().toISOString();
-    const sponsorFields = selected === "sponsor" ? {
-      sponsorOnboardingStatus: "not_started",
-      sponsorVerificationStatus: "not_submitted",
-      hasSponsorProfile: false,
-      sponsorOnboardingComplete: false
-    } : {};
-    const fields = {
-      accountType: compatibilityAccountType,
-      account_type: selected,
-      dashboardType,
-      dashboard_type: dashboardType,
-      role,
-      roleIntent,
-      role_intent: roleIntent,
-      accountTypeSelectionComplete: true,
-      ...sponsorFields,
-      updatedAt: now
-    };
-    await Promise.all([
-      db.collection("users").doc(user.uid).set(fields, { merge: true }),
-      db.collection("profiles").doc(user.uid).set(fields, { merge: true })
-    ]);
-    return ok({ accountType: selected, dashboardType, roleIntent, destination: selected === "sponsor" ? "/sponsor/onboarding" : "/dashboard" }, "Account type selected. Paid plan access was not changed.");
+      const selected = parsed.data.accountType;
+      const priorSelection = existing.account_type ?? existing.selectedAccountType;
+      const selectionAlreadyComplete = existing.accountTypeSelectionComplete === true
+        || priorSelection === "creator"
+        || priorSelection === "sponsor"
+        || ["creator", "sponsor"].includes(String(existing.role ?? ""))
+        || existing.accountType === "sponsor";
+      if (selectionAlreadyComplete) {
+        if (priorSelection === selected || existing.role === selected || existing.accountType === selected) {
+          return { kind: "selected" as const, accountType: selected, destination: getDefaultRouteForAccount(existing) };
+        }
+        return { kind: "already_selected" as const };
+      }
+
+      const compatibilityAccountType = "user";
+      const role = selected === "sponsor" ? "user" : selected;
+      const roleIntent = selected === "creator" ? "create" : "sponsor";
+      const dashboardType = selected === "creator" ? "creator_studio" : "user_dashboard";
+      const now = new Date().toISOString();
+      const sponsorFields = selected === "sponsor" ? {
+        sponsorOnboardingStatus: "not_started",
+        sponsorVerificationStatus: "not_submitted",
+        hasSponsorProfile: false,
+        sponsorOnboardingComplete: false
+      } : {};
+      const fields = {
+        accountType: compatibilityAccountType,
+        account_type: selected,
+        dashboardType,
+        dashboard_type: dashboardType,
+        role,
+        roleIntent,
+        role_intent: roleIntent,
+        accountTypeSelectionComplete: true,
+        accountIntroOnboardingStatus: "in_progress",
+        accountIntroOnboardingType: selected,
+        accountIntroOnboardingStep: 0,
+        accountIntroOnboardingStartedAt: now,
+        accountIntroOnboardingCompletedAt: null,
+        ...sponsorFields,
+        updatedAt: now
+      };
+      transaction.set(accountRef, fields, { merge: true });
+      transaction.set(profileRef, fields, { merge: true });
+      return { kind: "selected" as const, accountType: selected, destination: "/onboarding/welcome" };
+    });
+    if (selection.kind === "admin") return fail("Admin account type cannot be changed here.", 403, undefined, "PERMISSION_DENIED");
+    if (selection.kind === "already_selected") return fail("Account type has already been selected.", 409, undefined, "ACCOUNT_TYPE_ALREADY_SELECTED");
+    const dashboardType = selection.accountType === "creator" ? "creator_studio" : "user_dashboard";
+    const roleIntent = selection.accountType === "creator" ? "create" : "sponsor";
+    return ok({ accountType: selection.accountType, dashboardType, roleIntent, destination: selection.destination }, "Account type selected. Paid plan access was not changed.");
   } catch (error) {
     return serverError("Account type could not be selected.", error instanceof Error ? error.message : error);
   }

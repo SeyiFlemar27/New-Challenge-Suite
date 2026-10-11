@@ -92,7 +92,7 @@ export default function RegisterPage() {
           </div>
           <Field label={t("Email Address")}><input className={inputClass} value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="name@example.com" type="email" /></Field>
           <Field label={t("Referral code (optional)")}><input className={inputClass} value={form.referralCode} onChange={(event) => update("referralCode", event.target.value)} placeholder={t("Referral code")} autoComplete="off" />{errors.referralCode ? <p className="mt-2 text-sm text-amber-300">{errors.referralCode}</p> : null}</Field>
-          <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">{t("After email verification, you will choose whether this account is for competing, creating, hosting, or sponsoring.")}</Card>
+          <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">{t("After email verification, choose Creator or Sponsor and get a short introduction tailored to your account.")}</Card>
           <PasswordField label={t("Password")} shown={showPassword} onToggle={() => setShowPassword((value) => !value)} value={form.password} onChange={(value) => update("password", value)} />
           <PasswordField label={t("Confirm Password")} shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} value={form.confirmPassword} onChange={(value) => update("confirmPassword", value)} />
           {authIssue ? <AuthIssuePanel issue={authIssue} onRetry={() => setAuthIssue(null)} /> : null}
