@@ -40,8 +40,9 @@ function hasResults(challenge: Record<string, unknown>) {
 
 function challengeType(challenge: Record<string, unknown>) {
   const type = text(challenge.type ?? challenge.competitionType).toLowerCase();
+  const tournamentType = text(challenge.tournamentType).toLowerCase();
   if (challenge.isLiveEvent === true || type.includes("live event")) return "live_event";
-  if (text(challenge.tournamentType).toLowerCase() !== "none" || type.includes("tournament")) return "tournament";
+  if ((tournamentType && tournamentType !== "none") || type.includes("tournament")) return "tournament";
   if (text(challenge.visibility).toLowerCase() === "private" || type.includes("private")) return "private";
   return "standard";
 }
@@ -195,10 +196,11 @@ export async function GET(request: NextRequest) {
     }
     const [publicSnap, lockedSnap, participantSnap] = await Promise.all([
       publicQuery.limit(EXPLORE_SCAN_PAGE + 1).get(),
-      lockedQuery.limit(EXPLORE_SCAN_PAGE + 1).get(),
+      typeFilter === "private" ? lockedQuery.limit(EXPLORE_SCAN_PAGE + 1).get() : Promise.resolve(null),
       user ? db.collection("challengeParticipants").where("userId", "==", user.uid).limit(200).get() : Promise.resolve(null)
     ]);
-    const candidateDocs = [...new Map([...publicSnap.docs, ...lockedSnap.docs].map((doc) => [doc.id, doc])).values()]
+    const lockedDocs = lockedSnap?.docs ?? [];
+    const candidateDocs = [...new Map([...publicSnap.docs, ...lockedDocs].map((doc) => [doc.id, doc])).values()]
       .sort((left, right) => compareExploreDocs(left, right, sortField, sortDirection))
       .slice(0, EXPLORE_SCAN_PAGE * 2);
     const participantByChallenge = new Map((participantSnap?.docs ?? []).map((doc) => [String(doc.data().challengeId ?? ""), { id: doc.id, ...doc.data() }]));
@@ -282,7 +284,7 @@ export async function GET(request: NextRequest) {
     });
     const pageItems = all.slice(0, limit);
     const hasExtraMatch = all.length > limit;
-    const hasMoreCandidates = publicSnap.size > EXPLORE_SCAN_PAGE || lockedSnap.size > EXPLORE_SCAN_PAGE || candidateDocs.length < publicSnap.size + lockedSnap.size;
+    const hasMoreCandidates = publicSnap.size > EXPLORE_SCAN_PAGE || Boolean(lockedSnap && lockedSnap.size > EXPLORE_SCAN_PAGE) || candidateDocs.length < publicSnap.size + lockedDocs.length;
     const hasMore = hasExtraMatch || hasMoreCandidates;
     const nextCursor = hasExtraMatch
       ? String(pageItems.at(-1)?._sortDocId ?? "")
@@ -296,7 +298,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 12)
       .map((item) => { const { _sortDocId: _cursorId, ...publicItem } = item; return withoutRankingSignals(publicItem); });
     const categories = NORMAL_CHALLENGE_CATEGORIES.map((item) => item.label);
-    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: null, hasMore, nextCursor: nextCursor || null, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: true, cursorPagination: true, scannedPageLimit: EXPLORE_SCAN_PAGE * 2, lockedPrivatePreviewsIncluded: true }, "Explore challenges loaded.");
+    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: null, hasMore, nextCursor: nextCursor || null, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: true, cursorPagination: true, scannedPageLimit: EXPLORE_SCAN_PAGE * (typeFilter === "private" ? 2 : 1), lockedPrivatePreviewsIncluded: typeFilter === "private", privateChallengesRequireExplicitFilter: true }, "Explore challenges loaded.");
   } catch (error) {
     return serverError("Explore challenges could not be loaded.", error instanceof Error ? error.message : error);
   }

@@ -22,12 +22,12 @@ const allowedDraftFields = new Set([
   "standardRules", "challengeRules", "policyTerms", "challengeGuidelines", "coverImageUrl", "coverImagePath", "promoImageUrl",
   "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls",
   "documentPaths", "challengeImages", "challengeVideo", "mediaUploadStatus", "mediaStatus", "usesPlaceholderMedia", "mediaFallbackType", "prizeType",
-  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode", "privateAccessMethod", "privateAccessCode", "privateAccessCodeExpiresAt", "privateAccessCodeMaxUses", "privateAccessInstructions", "privateParticipantQuestions", "privateParticipantAcknowledgements", "privateParticipantRequirements", "privateDirectInvitees",
+  "prizeTitle", "prizeDescription", "prizeValue", "numberOfWinners", "winnerPrizeAmountsCents", "winnerSelection", "inviteCode", "accessCode", "privateAccessMethod", "privateJoiningPolicy", "privateAccessCode", "privateAccessCodeExpiresAt", "privateAccessCodeMaxUses", "privateAccessInstructions", "privateParticipantQuestions", "privateParticipantAcknowledgements", "privateParticipantRequirements", "privateDirectInvitees",
   "votingSettings", "requiresSubmissionApproval", "requiresParticipantApproval", "participantApprovalMode", "participationMode", "locationEligibility", "eligibleCountries", "ageRestrictionMode", "capacityMode", "maxParticipants", "hideParticipantList", "waitlistEnabled", "eligibleCountry", "minimumAge", "maximumAge", "teamParticipationEnabled",
   "sponsorEnabled", "sponsorSlots", "minimumSponsorshipAmount", "sponsorPlacementOptions", "sponsorPackages",
   "monetization", "isLiveEvent", "venueName", "eventAddress", "eventCity", "eventState", "eventCountry",
   "eventMapUrl", "eventCapacity", "tournamentType", "tournamentStages", "divisionFormat", "scoringMode", "bestOfRounds",
-  "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "joinWindowMode", "submissionRequirements", "submissionRequirementsList", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt", "publishConfirmations"
+  "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "joinWindowMode", "submissionInstructionsList", "submissionRequirements", "submissionRequirementsList", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt", "publishConfirmations"
 ]);
 
 const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
@@ -96,7 +96,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!userOwnsChallenge(current, user.uid) && !access.enterpriseAccess && !user.isAdmin) throw new Error("PERMISSION_DENIED");
     const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
     const usesNormalBuilderFoundation = lockedType === "normal" && (
-      ["normal_v1", "normal_v2"].includes(String(current.builderVersion ?? "")) || String(current.challengeType ?? "") === "normal"
+      ["normal_v1", "normal_v2", "normal_v3"].includes(String(current.builderVersion ?? "")) || String(current.challengeType ?? "") === "normal"
     );
     if (patch.challengeType !== undefined && normalizeBuilderChallengeType(patch.challengeType) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");
     if (patch.type !== undefined && normalizeBuilderChallengeType(patch.type) !== lockedType) throw new Error("CHALLENGE_TYPE_LOCKED");

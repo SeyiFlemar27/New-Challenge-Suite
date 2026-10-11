@@ -1,5 +1,6 @@
 "use client";
 import { ContentImage } from "@/components/content-image";
+import { ChallengeDescription } from "@/components/challenge-description";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -217,12 +218,19 @@ export default function ChallengeDetailPage() {
   const commentsClosed = ["completed", "winners_announced", "voting_closed"].includes(phase);
   const prizeStatusLabel = publicPrizeStatus(prizePool);
   const prizeAmountKind = ["confirmed", "funded", "active", "locked"].includes(String(prizePool?.status ?? "").toLowerCase()) ? "Prize amount" : "Estimated prize";
+  const submissionInstructions = Array.isArray(rawChallenge?.submissionInstructionsList)
+    ? rawChallenge.submissionInstructionsList.map((item: unknown) => String(item ?? "").trim()).filter(Boolean)
+    : String(rawChallenge?.challengeGuidelines ?? "").split(/\r?\n/).map((item: string) => item.trim()).filter(Boolean);
+  const votingSettings = rawChallenge?.votingSettings && typeof rawChallenge.votingSettings === "object" ? rawChallenge.votingSettings as Record<string, unknown> : {};
+  const judging = String(rawChallenge?.winnerSelection ?? rawChallenge?.judgingMethod ?? rawChallenge?.scoringMode ?? "").replaceAll("_", " ").trim();
+  const winnerSplits = Array.isArray(prizePool?.winnerSplits) ? prizePool.winnerSplits as Array<{ position?: number; percent?: number; expectedAmountCents?: number }> : [];
+  const prizeBreakdown = winnerSplits.filter((split) => Number(split.expectedAmountCents ?? 0) > 0).map((split) => `Place ${Number(split.position ?? 0)}: ${(Number(split.expectedAmountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: String(prizePool?.currency ?? "USD").toUpperCase() })}${Number.isFinite(Number(split.percent)) ? ` (${Number(split.percent)}%)` : ""}`).join(" · ");
   const guideSections: Array<{ id: ChallengeGuideSection; label: string; body: string }> = [
     { id: "overview", label: "Overview", body: challenge.description },
-    { id: "rules", label: "Rules & Eligibility", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join(" ") : challenge.ageRestriction?.enabled ? `Minimum age: ${challenge.ageRestriction.minimumAge}.` : "Open to eligible platform users in supported regions." },
-    { id: "submission", label: "Submission", body: `Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ")}. Entries must follow the published challenge rules and be submitted before the deadline.` },
-    { id: "voting", label: "Voting & Judging", body: votingOpen ? "Voting is open for eligible submissions. One daily free vote and DoroCoin additional votes remain separate actions." : phase === "voting_pending" ? "Voting becomes available when eligible submissions are approved." : "Voting follows the published challenge schedule and eligibility rules." },
-    { id: "prizes", label: "Prizes", body: `${prizeStatusLabel}. ${Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `Published prize pool: ${prizeValue}.` : "No public prize amount is available."}` },
+    { id: "rules", label: "Rules & Eligibility", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join("\n") : String(rawChallenge?.standardRules ?? rawChallenge?.challengeRules ?? rawChallenge?.policyTerms ?? "").trim() || "No additional eligibility terms were published." },
+    { id: "submission", label: "Submission", body: `Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ") || "Not specified"}. Deadline: ${formatChallengeDateTime(rawChallenge?.submissionDeadline ?? rawChallenge?.submissionEndAt ?? "", challengeTimeZone) ?? "Not published"}.` },
+    { id: "voting", label: "Voting & Judging", body: `${votingOpen ? "Voting is open." : phase === "voting_pending" ? "Voting has not opened." : "Voting is closed or not currently available."} ${votingSettings.allowFreeVotes === true ? "Free votes are enabled." : votingSettings.allowFreeVotes === false ? "Free votes are disabled." : "Free-vote configuration is not published."} ${votingSettings.allowPaidVotes === true ? "DoroCoin additional votes are enabled." : votingSettings.allowPaidVotes === false ? "DoroCoin additional votes are disabled." : "Additional vote configuration is not published."} ${judging ? `Winner selection: ${judging}.` : "No separate judging method is published."}` },
+    { id: "prizes", label: "Prizes", body: `${prizeStatusLabel}. ${Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `Confirmed prize pool: ${prizeValue}.${prizeBreakdown ? ` ${prizeBreakdown}.` : ""}` : "No confirmed public prize amount is available."}` },
     { id: "leaderboard", label: "Leaderboard", body: leaderboardRelevant ? "The leaderboard is available below and contains eligible entries only." : "Leaderboard becomes available when voting opens." }
   ];
   const activeGuide = guideSections.find((section) => section.id === guideSection) ?? guideSections[0];
@@ -275,14 +283,12 @@ export default function ChallengeDetailPage() {
           {paidEntryReturnedPending ? <Card className="mt-4 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">Payment received. We are confirming your enrollment.</Card> : null}
           {paidEntryCanceled ? <Card className="mt-4 border-slate-600 bg-slate-900/60 p-4 text-sm text-slate-300">Payment canceled. You remain unenrolled.</Card> : null}
           {(details?.challenge as any)?.resultsConfirmed ? <Card className="mt-4 border-emerald-400/20 bg-emerald-950/20 p-4"><p className="font-black text-emerald-200">Results confirmed</p><p className="mt-1 text-sm text-slate-300">{(details?.challenge as any)?.settlementPrepared ? "Settlement prepared. Internal prize allocations remain subject to review." : "Winner results were approved."}</p></Card> : null}
-          <DynamicTranslatedText as="p" className="mt-4 break-words text-base leading-7 text-slate-200 sm:text-xl" text={challenge.description} translations={challengeTranslations.description} contentType="challenge_description" showUnavailable />
-
           <Card className="mt-10 p-5 sm:p-7">
             <h2 className="text-2xl font-black">Challenge Guide</h2>
             <div role="tablist" aria-label="Challenge guide sections" className="mt-5 flex gap-2 overflow-x-auto pb-2">
               {guideSections.map((section) => <button key={section.id} type="button" role="tab" aria-selected={guideSection === section.id} onClick={() => setGuideSection(section.id)} className={`min-h-11 shrink-0 rounded-[8px] px-4 py-2 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] ${guideSection === section.id ? "bg-[var(--gold)] text-black" : "bg-white/[0.05] text-slate-300 hover:bg-white/10"}`}>{section.label}</button>)}
             </div>
-            <div role="tabpanel" className="mt-4 rounded-[8px] border border-white/10 bg-black/30 p-5"><h3 className="font-black text-[var(--gold)]">{activeGuide.label}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{activeGuide.body}</p></div>
+            <div role="tabpanel" className="mt-4 rounded-[8px] border border-white/10 bg-black/30 p-5"><h3 className="font-black text-[var(--gold)]">{activeGuide.label}</h3>{activeGuide.id === "overview" ? <div className="mt-3"><ChallengeDescription description={challenge.description} translations={challengeTranslations.description} /></div> : <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{activeGuide.body}</p>}{activeGuide.id === "submission" ? <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">{submissionInstructions.length ? submissionInstructions.map((instruction, index) => <li key={`${index}-${instruction.slice(0, 24)}`}>{instruction}</li>) : <li>No submission instructions were published.</li>}</ol> : null}</div>
           </Card>
           <section className="mt-12">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

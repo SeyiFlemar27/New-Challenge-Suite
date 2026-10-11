@@ -33,7 +33,7 @@ function request(url, token, method = "GET", body) {
 }
 async function post(user, body) { return privatePost(request("http://localhost/api/private-exclusive", user?.token, "POST", body)); }
 async function seedChallenge(id, owner, overrides = {}) {
-  await db.collection("challenges").doc(id).set({ id, creatorId: owner.uid, visibility: "private", type: "Private / Exclusive", publicPreviewEnabled: true, privateAccessMethod: "invitation_code", status: "registration_open", lifecycleStatus: "registration_open", createdAt: new Date().toISOString(), startsAt: new Date(Date.now() - 60_000).toISOString(), registrationDeadline: new Date(Date.now() + 86_400_000).toISOString(), submissionDeadline: new Date(Date.now() + 86_400_000).toISOString(), votingDeadline: new Date(Date.now() + 172_800_000).toISOString(), maxParticipants: 20, participantCount: 0, title: `Private ${id}`, ...overrides });
+  await db.collection("challenges").doc(id).set({ id, creatorId: owner.uid, visibility: "private", type: "Private / Exclusive", publicPreviewEnabled: true, privateAccessMethod: "invitation_code", privateJoiningPolicy: "invite_and_request", status: "registration_open", lifecycleStatus: "registration_open", createdAt: new Date().toISOString(), startsAt: new Date(Date.now() - 60_000).toISOString(), registrationDeadline: new Date(Date.now() + 86_400_000).toISOString(), submissionDeadline: new Date(Date.now() + 86_400_000).toISOString(), votingDeadline: new Date(Date.now() + 172_800_000).toISOString(), maxParticipants: 20, participantCount: 0, title: `Private ${id}`, ...overrides });
 }
 
 try {
@@ -43,6 +43,10 @@ try {
   const privateRequester = await createUser("private_requester", { privateProfile: true });
   const challengeId = `${runId}_approval`;
   await seedChallenge(challengeId, owner, { privateParticipantRequirements: ["Follow the challenge rules"], privateParticipantAcknowledgements: ["I agree to the rules"], privateParticipantQuestions: ["What will you submit?"] });
+  const inviteOnlyChallengeId = `${runId}_invite_only`;
+  await seedChallenge(inviteOnlyChallengeId, owner, { privateJoiningPolicy: "invite_only" });
+  equal((await post(requester, { action: "request_access", challengeId: inviteOnlyChallengeId, reason: "Please let me join." })).status, 403, "Invite Only rejects access requests with a client-policy status");
+  equal((await db.collection("privateAccessRequests").doc(`${inviteOnlyChallengeId}_${requester.uid}`).get()).exists, false, "Invite Only rejection does not create a request record");
 
   const incompleteRequirements = await post(requester, { action: "request_access", challengeId, reason: "I want to participate." });
   if (incompleteRequirements.status !== 422) console.error("Incomplete requirement response:", await incompleteRequirements.clone().text());

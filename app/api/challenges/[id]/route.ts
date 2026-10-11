@@ -244,7 +244,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       predictionAccess,
       participation: participationState,
       submitted,
-      submissionId: userSubmissionSnap?.id ?? null,
+      submissionId: userSubmissionSnap?.exists ? userSubmissionSnap.id : null,
       votedSubmissionIds: userVotes.map((vote) => vote.submissionId).filter(Boolean),
       voteCount: userVotes.length,
       saved: Boolean(engagementSnap?.data()?.saved),

@@ -1,4 +1,4 @@
-import { NORMAL_CHALLENGE_STEPS, NORMAL_RESUBMIT_WINDOWS, isNormalChallengeV2 } from "@/lib/normal-challenge-config";
+import { calculateNormalWinnerAmountsCents, NORMAL_CHALLENGE_STEPS, NORMAL_RESUBMIT_WINDOWS, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, normalWinnerPercentages } from "@/lib/normal-challenge-config";
 import { NORMAL_CHALLENGE_CAPACITY_ERROR, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 
 export type NormalChallengeIssue = { code: string; field: string; step: number; message: string };
@@ -24,22 +24,25 @@ function hasStorageMedia(item: unknown) {
 
 export function getNormalChallengeReadiness(challenge: Record<string, unknown>): NormalChallengeReadiness {
   const issues: NormalChallengeIssue[] = [];
-  const v2 = isNormalChallengeV2(challenge);
+  const modern = isModernNormalChallenge(challenge);
+  const v3 = isNormalChallengeV3(challenge);
   const monetization = record(challenge.monetization);
 
   if (text(challenge.title).length < 3) issue(issues, "TITLE_REQUIRED", "title", 0, "Add a challenge title.");
-  if (v2 && text(challenge.shortDescription).length < 10) issue(issues, "SHORT_DESCRIPTION_REQUIRED", "shortDescription", 0, "Add a short description of at least 10 characters.");
+  if (isNormalChallengeV2(challenge) && text(challenge.shortDescription).length < 10) issue(issues, "SHORT_DESCRIPTION_REQUIRED", "shortDescription", 0, "Add a short description of at least 10 characters.");
   if (text(challenge.description).length < 20) issue(issues, "DESCRIPTION_REQUIRED", "description", 0, "Write a full description of at least 20 characters.");
+  if (v3 && text(challenge.description).length > 1200) issue(issues, "DESCRIPTION_TOO_LONG", "description", 0, "Keep the full description to 1,200 characters or fewer.");
   if (!text(challenge.category)) issue(issues, "CATEGORY_REQUIRED", "category", 0, "Choose a category.");
-  if (v2 && !text(challenge.subcategory)) issue(issues, "SUBCATEGORY_REQUIRED", "subcategory", 0, "Choose a subcategory.");
+  if (modern && !text(challenge.subcategory)) issue(issues, "SUBCATEGORY_REQUIRED", "subcategory", 0, "Choose a subcategory.");
 
   const mode = text(challenge.participationMode) || "open";
-  if (isNormalChallengeV2(challenge) && mode !== "open") issue(issues, "PARTICIPATION_MODE_REQUIRED", "participationMode", 1, "Normal Challenges use automatic eligible joining.");
+  if (modern && mode !== "open") issue(issues, "PARTICIPATION_MODE_REQUIRED", "participationMode", 1, "Normal Challenges use automatic eligible joining.");
   const locationMode = text(challenge.locationEligibility) || (text(challenge.eligibleCountry) ? "selected" : "worldwide");
-  if (v2 && locationMode === "selected" && !list(challenge.eligibleCountries).length) issue(issues, "COUNTRIES_REQUIRED", "eligibleCountries", 1, "Select at least one eligible country.");
+  if (modern && locationMode === "selected" && !list(challenge.eligibleCountries).length) issue(issues, "COUNTRIES_REQUIRED", "eligibleCountries", 1, "Select at least one eligible country.");
   const ageMode = text(challenge.ageRestrictionMode) || (number(challenge.minimumAge) > 0 ? "minimum" : "none");
   const minAge = number(challenge.minimumAge);
   if (ageMode === "minimum" && (minAge < 13 || minAge > 120)) issue(issues, "MINIMUM_AGE_INVALID", "minimumAge", 1, "Set a minimum age between 13 and 120.");
+  if (v3 && (locationMode !== "worldwide" || list(challenge.eligibleCountries).length > 0 || text(challenge.eligibleCountry) || ageMode !== "none" || minAge > 0)) issue(issues, "ELIGIBILITY_CONTROLS_RETIRED", "participationMode", 1, "New Normal Challenges use open participation; age and location restrictions are not configurable.");
   const capacityMode = challenge.capacityMode === "limited" ? "limited" : challenge.capacityMode === "unlimited" ? "unlimited" : undefined;
   const capacityIssue = normalChallengeCapacityError(challenge.maxParticipants, capacityMode);
   if (capacityIssue) issue(issues, "CAPACITY_INVALID", "maxParticipants", 1, capacityIssue);
@@ -50,15 +53,24 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
   const winners = Math.trunc(number(challenge.numberOfWinners));
   if (winners < 1 || winners > 3) issue(issues, "WINNER_COUNT_INVALID", "numberOfWinners", 2, "Choose between one and three winner placements.");
   const prizeAmounts = list(challenge.winnerPrizeAmountsCents).map(Number);
-  if (v2) {
+  if (modern) {
     if (text(challenge.prizeType) !== "money") issue(issues, "CASH_PRIZE_REQUIRED", "prizeType", 2, "Normal Challenges require a cash prize.");
     if (prizeAmounts.length !== winners || prizeAmounts.some((amount) => !Number.isInteger(amount) || amount <= 0)) issue(issues, "PRIZE_AMOUNTS_INVALID", "winnerPrizeAmountsCents", 2, "Add a valid cash amount for every winner placement.");
+    if (v3) {
+      const splits = list(challenge.winnerSplits).map(Number);
+      const totalCents = Math.round(number(challenge.prizeValue) * 100);
+      const expected = calculateNormalWinnerAmountsCents(totalCents, winners);
+      if (![1, 3].includes(winners)) issue(issues, "WINNER_COUNT_INVALID", "numberOfWinners", 2, "Choose one or three winners.");
+      const expectedSplits = normalWinnerPercentages(winners);
+      if (splits.length !== expectedSplits.length || splits.some((value, index) => value !== expectedSplits[index])) issue(issues, "WINNER_SPLIT_INVALID", "winnerSplits", 2, "Winner allocations are set by Challenge Suite.");
+      if (expected.length !== prizeAmounts.length || expected.some((value, index) => value !== prizeAmounts[index])) issue(issues, "PRIZE_ALLOCATION_INVALID", "winnerPrizeAmountsCents", 2, "Winner amounts must follow the Challenge Suite allocation.");
+    }
   } else {
     const splits = list(challenge.winnerSplits).map(Number);
     if (splits.length !== winners || Math.round(splits.reduce((sum, value) => sum + value, 0)) !== 100) issue(issues, "WINNER_SPLIT_INVALID", "winnerSplits", 2, "Winner placement percentages must total 100%.");
   }
 
-  if (v2) {
+  if (modern) {
     const images = list(challenge.challengeImages);
     if (!images.length || !hasStorageMedia(images[0])) issue(issues, "PRIMARY_IMAGE_REQUIRED", "challengeImages", 3, "Upload at least one storage-confirmed challenge image.");
     if (images.length > 3) issue(issues, "IMAGE_LIMIT_EXCEEDED", "challengeImages", 3, "You can upload up to three challenge images.");
@@ -92,11 +104,14 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
 
   const types = list(challenge.acceptedSubmissionTypes).map(String);
   if (!types.length || types.some((value) => !["image", "video"].includes(value))) issue(issues, "SUBMISSION_TYPE_REQUIRED", "acceptedSubmissionTypes", 5, "Choose Image, Video, or Image or Video.");
-  if (text(challenge.challengeGuidelines).length < 10) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "challengeGuidelines", 5, "Add submission instructions.");
+  const instructions = Array.isArray(challenge.submissionInstructionsList) ? challenge.submissionInstructionsList.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
+  if (isNormalChallengeV3(challenge)) {
+    if (instructions.length === 0) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "submissionInstructionsList", 5, "Add at least one submission instruction.");
+  } else if (text(challenge.challengeGuidelines).length < 10) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "challengeGuidelines", 5, "Add submission instructions.");
   const resubmitHours = number(challenge.fixAndResubmitHours ?? 24);
-  if (bool(challenge.fixAndResubmitEnabled) && !NORMAL_RESUBMIT_WINDOWS.includes(resubmitHours as 12 | 24 | 48 | 72)) issue(issues, "RESUBMIT_PERIOD_INVALID", "fixAndResubmitHours", 5, "Choose a 12, 24, 48, or 72 hour correction window.");
+  if (!isNormalChallengeV3(challenge) && bool(challenge.fixAndResubmitEnabled) && !NORMAL_RESUBMIT_WINDOWS.includes(resubmitHours as 12 | 24 | 48 | 72)) issue(issues, "RESUBMIT_PERIOD_INVALID", "fixAndResubmitHours", 5, "Choose a 12, 24, 48, or 72 hour correction window.");
 
-  if (v2) {
+  if (modern) {
     const confirmations = record(challenge.publishConfirmations);
     if (!bool(confirmations.accurate)) issue(issues, "CONFIRM_ACCURATE", "publishConfirmations", 7, "Confirm that the challenge details are accurate.");
     if (!bool(confirmations.rights)) issue(issues, "CONFIRM_RIGHTS", "publishConfirmations", 7, "Confirm that you have the rights to the content and media.");
@@ -122,6 +137,6 @@ export function normalChallengeSubmitIssue(details: unknown) {
   if (!fieldErrors || typeof fieldErrors !== "object" || Array.isArray(fieldErrors)) return null;
   if (Object.prototype.hasOwnProperty.call(fieldErrors, "maxParticipants")) return { field: "maxParticipants", step: 1, message: NORMAL_CHALLENGE_CAPACITY_ERROR };
   const firstField = Object.keys(fieldErrors)[0];
-  const stepByField: Record<string, number> = { title: 0, shortDescription: 0, description: 0, category: 0, subcategory: 0, maxParticipants: 1, minimumAge: 1, entryFeeAmountCents: 2, numberOfWinners: 2, winnerPrizeAmountsCents: 2, challengeImages: 3, timeZone: 4, submissionStartAt: 4, submissionDeadline: 4, votingStartsAt: 4, votingDeadline: 4, winnerAnnouncementAt: 4, acceptedSubmissionTypes: 5, challengeGuidelines: 5 };
+  const stepByField: Record<string, number> = { title: 0, shortDescription: 0, description: 0, category: 0, subcategory: 0, maxParticipants: 1, minimumAge: 1, entryFeeAmountCents: 2, numberOfWinners: 2, winnerPrizeAmountsCents: 2, challengeImages: 3, timeZone: 4, submissionStartAt: 4, submissionDeadline: 4, votingStartsAt: 4, votingDeadline: 4, winnerAnnouncementAt: 4, acceptedSubmissionTypes: 5, challengeGuidelines: 5, submissionInstructionsList: 5 };
   return { field: firstField || "challenge", step: stepByField[firstField] ?? null, message: "Some required details need attention." };
 }

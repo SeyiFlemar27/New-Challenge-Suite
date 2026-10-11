@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { PUBLIC_CHALLENGE_STATUS_VALUES } from "../lib/challenge-status.ts";
 
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "FIRESTORE_EMULATOR_HOST is required");
 assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST, "FIREBASE_AUTH_EMULATOR_HOST is required");
@@ -231,6 +232,8 @@ try {
     db.collection("challenges").doc(hiddenPublicId).set({ id: hiddenPublicId, title: "Needle Public Hidden", category: "Arts", visibility: "public", publicVisibility: false, status: "active", createdAt: "2026-06-02T00:00:00.000Z" })
   );
   await Promise.all(exploreWrites);
+  const lockedFixtureQuery = await db.collection("challenges").where("visibility", "==", "private").where("status", "in", PUBLIC_CHALLENGE_STATUS_VALUES).where("publicPreviewEnabled", "==", true).orderBy("createdAt", "desc").get();
+  check(lockedFixtureQuery.docs.some((doc) => doc.id === lockedId), "Firestore locked-preview query includes the discoverable fixture");
   const exploreIds = new Set();
   let firstExploreIds = [];
   cursor = ""; page = 1;
@@ -253,13 +256,32 @@ try {
   assert.deepEqual((await stableExplorePage.json()).data.challenges.map((challenge) => challenge.id), firstExploreIds, "Explore first-page ordering is stable across repeated requests");
   assertions += 1;
   check(exploreIds.has(`${runId}_explore_041`), "matching Explore challenge beyond the first 36 records is discoverable");
-  check(exploreIds.has(lockedId), "publicly locked Private Challenge remains discoverable");
+  check(!exploreIds.has(lockedId), "default Explore excludes locked Private Challenges unless the Private filter is selected");
   check(exploreIds.has(recentCompletedId), "challenge remains visible inside the five-minute winner window");
   check(!exploreIds.has(canceledId), "cancelled Challenge is not public");
   check(!exploreIds.has(expiredId) && !exploreIds.has(oldCompletedId), "completed challenges disappear after the five-minute winner window even with filters");
   check(!exploreIds.has(hiddenPrivateId) && !exploreIds.has(hiddenPublicId), "hidden/private content without public preview is excluded");
-  const lockedResponse = await exploreGet(new Request(`http://localhost/api/explore/challenges?q=${encodeURIComponent("Needle Locked Preview")}`));
-  const lockedResult = (await lockedResponse.json()).data.challenges.find((challenge) => challenge.id === lockedId);
+  const lockedPreviewIds = new Set();
+  let lockedResult;
+  let lockedCursor = "";
+  let lockedPage = 1;
+  let lockedHasMore = true;
+  while (lockedHasMore) {
+    const lockedUrl = `http://localhost/api/explore/challenges?type=private&q=${encodeURIComponent("Needle Locked Preview")}&page=${lockedPage}${lockedCursor ? `&cursor=${encodeURIComponent(lockedCursor)}` : ""}`;
+    const lockedResponse = await exploreGet(new Request(lockedUrl));
+    equal(lockedResponse.status, 200, `explicit Private filter page ${lockedPage} loads locked previews`);
+    const lockedPayload = (await lockedResponse.json()).data;
+    for (const challenge of lockedPayload.challenges) {
+      check(!lockedPreviewIds.has(challenge.id), "locked private cursor pages contain no duplicate challenges");
+      lockedPreviewIds.add(challenge.id);
+      if (challenge.id === lockedId) lockedResult = challenge;
+    }
+    lockedHasMore = lockedPayload.hasMore;
+    lockedCursor = lockedPayload.nextCursor ?? "";
+    lockedPage += 1;
+    if (lockedPage > 20) throw new Error("Locked private Explore pagination did not terminate.");
+  }
+  equal(lockedResult?.id, lockedId, `explicit Private filter returns the discoverable locked preview across cursor pages (pages=${lockedPage - 1}, ids=${lockedPreviewIds.size}, hasMore=${lockedHasMore})`);
   equal(lockedResult?.cta?.action, "locked_preview", "locked private preview routes viewers to the locked challenge detail");
   check(!JSON.stringify(lockedResult).includes("SECRET PRIVATE") && !Object.hasOwn(lockedResult ?? {}, "votingSettings") && !Object.hasOwn(lockedResult ?? {}, "rules"), "locked preview excludes protected challenge content");
 

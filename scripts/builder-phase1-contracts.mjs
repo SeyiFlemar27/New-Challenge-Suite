@@ -23,7 +23,7 @@ assert.match(page, /NormalChallengeBuilder/);
 assert.match(editor, /NormalChallengeBuilder draftId/);
 assert.match(shell, /Choose challenge type/);
 for (const label of ["Normal Challenge", "Private Challenge", "Live Event Challenge", "Tournament Challenge"]) assert.ok(foundation.includes(label), `missing ${label}`);
-for (const label of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(foundation.includes(`"${label}"`), `missing step ${label}`);
+for (const label of ["Overview", "Participation", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert.ok(foundation.includes(`"${label}"`), `missing step ${label}`);
 assert.match(shell, /createChallengeDraft\(payload\)/);
 assert.doesNotMatch(page, /createChallengeDraft|useEffect/);
 assert.match(createApi, /BASICS_INCOMPLETE/);

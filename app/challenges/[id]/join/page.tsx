@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { MediaUploadField, type MediaUploadStage } from "@/components/media-upload-field";
 import { Button, Card, Field, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
-import { fetchChallengeDetails, joinChallenge, submitEntry } from "@/lib/api/services";
+import { fetchChallengeDetails, fetchSubmissionDetails, joinChallenge, submitEntry, updateSubmission } from "@/lib/api/services";
 import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalizers";
 import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { mediaErrorMessage, type MediaUploadKind } from "@/lib/media-upload";
@@ -84,6 +84,9 @@ export default function JoinChallengePage() {
   const [submitting, setSubmitting] = useState(false);
   const [successSubmission, setSuccessSubmission] = useState<{ id?: string; title: string; pendingMedia?: boolean; status?: string } | null>(null);
   const [submissionMedia, setSubmissionMedia] = useState<UploadedSubmissionMedia | null>(null);
+  const [submissionMediaChanged, setSubmissionMediaChanged] = useState(false);
+  const [submissionTitleDraft, setSubmissionTitleDraft] = useState<string | null>(null);
+  const [submissionDescriptionDraft, setSubmissionDescriptionDraft] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<MediaUploadStage>("idle");
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
@@ -142,18 +145,21 @@ export default function JoinChallengePage() {
   const backendCanSubmit = submissionAccess?.canSubmit === true && participantJourney?.canSubmit === true;
   const canSubmitNow = backendCanSubmit && !submissionWindowExpired && !checkingSubmissionAccess;
   const existingSubmissionId = typeof userState?.submissionId === "string" ? userState.submissionId : null;
-  const pageTitle = participantJourney?.step === "fix_and_resubmit"
-    ? "Fix & Resubmit"
-    : existingSubmissionId
-      ? "Edit Entry"
-      : "Submit Entry";
-  const finalSubmitDisabled = !auth.user || !canSubmitNow || !agreed || !submissionMedia?.url || !submissionMedia.path || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus) || uploadStatus === "failed";
-  const finalSubmitLabel = submitting ? "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : participantJourney?.step === "fix_and_resubmit" ? "Resubmit Entry" : "Submit Entry";
+  const existingSubmissionQuery = useQuery({ queryKey: ["submission-details", existingSubmissionId, auth.user?.uid ?? "signed-out"], queryFn: () => fetchSubmissionDetails(existingSubmissionId as string), enabled: Boolean(existingSubmissionId && auth.user?.uid), staleTime: 0 });
+  const existingSubmission = existingSubmissionQuery.data?.ok ? existingSubmissionQuery.data.data?.submission as Record<string, unknown> : null;
+  const editableMedia = existingSubmission?.editableMedia && typeof existingSubmission.editableMedia === "object" ? existingSubmission.editableMedia as Record<string, unknown> : {};
+  const existingSubmissionMedia: UploadedSubmissionMedia | null = existingSubmission?.mediaUrl && editableMedia.mediaStoragePath
+    ? { url: String(existingSubmission.mediaUrl), path: String(editableMedia.mediaStoragePath), fileName: String(editableMedia.originalFileName ?? "Current submission media"), size: Number(editableMedia.fileSize ?? 0), contentType: String(existingSubmission.mediaType) === "video" ? "video/mp4" : "image/jpeg", mediaType: String(existingSubmission.mediaType) === "video" ? "video" : "image" }
+    : null;
+  const effectiveSubmissionMedia = submissionMediaChanged ? submissionMedia : submissionMedia ?? existingSubmissionMedia;
+  const pageTitle = existingSubmissionId ? "Edit Entry" : "Submit Entry";
+  const finalSubmitDisabled = !auth.user || !canSubmitNow || !agreed || !effectiveSubmissionMedia?.url || !effectiveSubmissionMedia.path || submitting || ["preparing", "uploading", "processing"].includes(uploadStatus) || uploadStatus === "failed" || existingSubmissionQuery.isLoading;
+  const finalSubmitLabel = submitting ? existingSubmissionId ? "Saving Entry" : "Submitting Entry" : ["preparing", "uploading", "processing"].includes(uploadStatus) ? "Waiting for Upload" : existingSubmissionId ? "Save Entry" : "Submit Entry";
   const submitDisabledReason = !auth.user
     ? "Sign in to submit."
     : !agreed
       ? "Accept the challenge rules before submitting."
-      : !submissionMedia?.url || !submissionMedia.path
+      : !effectiveSubmissionMedia?.url || !effectiveSubmissionMedia.path
         ? "Upload an accepted media file before submitting."
         : ["preparing", "uploading", "processing"].includes(uploadStatus)
           ? "Wait for the upload to finish."
@@ -283,28 +289,32 @@ export default function JoinChallengePage() {
       setError("Please retry the failed media upload before submitting.");
       return;
     }
-    if (!submissionMedia?.url || !submissionMedia.path) {
+    if (!effectiveSubmissionMedia?.url || !effectiveSubmissionMedia.path) {
       setError("Upload an accepted media file before submitting.");
       return;
     }
-    if (!currentChallenge.acceptedSubmissionTypes.includes(submissionMedia.mediaType)) {
+    if (!currentChallenge.acceptedSubmissionTypes.includes(effectiveSubmissionMedia.mediaType)) {
       setError(`This challenge accepts: ${currentChallenge.acceptedSubmissionTypes.join(", ")}.`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const submissionResult = await submitEntry({
-        challengeId: currentChallenge.id,
+      const submissionPayload = {
         title,
         description,
         caption: description,
-        mediaUrl: submissionMedia.url,
-        mediaType: submissionMedia.mediaType,
-        mediaUploadPending: false,
-        originalFileName: submissionMedia.fileName,
-        fileSize: submissionMedia.size,
-        mediaStoragePath: submissionMedia.path,
+        mediaUrl: effectiveSubmissionMedia.url,
+        mediaType: effectiveSubmissionMedia.mediaType,
+        originalFileName: effectiveSubmissionMedia.fileName,
+        fileSize: effectiveSubmissionMedia.size,
+        mediaStoragePath: effectiveSubmissionMedia.path,
+        ...(existingSubmissionId ? { expectedRevision: Number(editableMedia.revisionNumber ?? 0) } : { challengeId: currentChallenge.id, mediaUploadPending: false, entryAgreementAccepted: true, rulesAccepted: true })
+      };
+      const submissionResult = existingSubmissionId
+        ? await updateSubmission(existingSubmissionId, submissionPayload)
+        : await submitEntry({
+        ...submissionPayload,
         entryAgreementAccepted: true,
         rulesAccepted: true
       });
@@ -421,9 +431,9 @@ export default function JoinChallengePage() {
           ) : null}
           {canSubmitNow ? (
             <form id="challenge-submission-form" className="mt-6 space-y-5" onSubmit={submit}>
-              <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" /></Field>
-              <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" /></Field>
-              <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setError(""); }} />
+              <Field label="Submission Title"><input name="title" className={inputClass} required placeholder="Give your entry a title" value={submissionTitleDraft ?? String(existingSubmission?.title ?? "")} onChange={(event) => setSubmissionTitleDraft(event.target.value)} /></Field>
+              <Field label="Caption / Description"><textarea name="description" className={textareaClass} required placeholder="Describe your submission" value={submissionDescriptionDraft ?? String(existingSubmission?.description ?? "")} onChange={(event) => setSubmissionDescriptionDraft(event.target.value)} /></Field>
+              <SubmissionUploadField challengeId={currentChallenge.id} userId={auth.user?.uid ?? "anonymous"} acceptedSubmissionTypes={currentChallenge.acceptedSubmissionTypes} value={submissionMediaChanged ? submissionMedia?.url ?? "" : submissionMedia?.url ?? existingSubmissionMedia?.url ?? ""} disabled={!auth.user || firebaseClientConfigStatus.mediaUploadsDisabled} onStatusChange={setUploadStatus} onUploaded={(media) => { setSubmissionMedia(media); setSubmissionMediaChanged(true); setError(""); }} />
               <label className="flex items-start gap-3 font-bold leading-6"><input className="mt-1 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>I accept the challenge rules, voting policy, and prize terms.</span></label>
               {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-red-200">{error}</p> : null}
               {submitDisabledReason && !error ? <p className="text-sm text-slate-400">{submitDisabledReason}</p> : null}

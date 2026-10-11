@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdminStorage } from "@/lib/firebase/admin";
 import { inspectImageBytes, inspectVideoBytes, normalizeImageBytes, validateInspectedMedia, type InspectedMedia } from "@/lib/server/media-inspection";
-import { NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
+import { isModernNormalChallenge, NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
 
 type MediaCandidate = { path: string; expectedType: "image" | "video"; field: string };
 type VerifiedAsset = MediaCandidate & { generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
@@ -30,8 +30,8 @@ function candidates(challenge: Record<string, unknown>): MediaCandidate[] {
 
 export async function verifyChallengeMedia(db: Firestore, challengeId: string, challenge: Record<string, unknown>, creatorId: string) {
   const list = candidates(challenge);
-  const normalV2 = String(challenge.builderVersion ?? "") === "normal_v2";
-  const required = !challenge.usesPlaceholderMedia && (normalV2 || Boolean(challenge.coverImagePath || challenge.coverImageUrl));
+  const modernNormalChallenge = isModernNormalChallenge(challenge);
+  const required = !challenge.usesPlaceholderMedia && (modernNormalChallenge || Boolean(challenge.coverImagePath || challenge.coverImageUrl));
   if (!list.length) {
     if (required) throw new Error("MEDIA_REQUIRED");
     return { version: 1, status: "not_required", assets: [], verifiedAt: new Date().toISOString() };

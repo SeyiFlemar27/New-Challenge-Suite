@@ -97,10 +97,6 @@ function personalSections(capabilities: PersonalCapabilities, context: Workspace
       { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
       ...(creatorContext ? [{ href: submissionsHref, label: "Submissions", icon: ClipboardCheck }] : [])
     ] },
-    ...(capabilities.canUseCreatorAnalytics ? [{ label: "Performance", items: [{ href: "/creator/analytics", label: "Analytics", icon: BarChart3 }] }] : []),
-    ...((capabilities.canReceiveNewSponsorProposals || capabilities.canManageExistingSponsorObligations) ? [{ label: "Creator", items: [
-      { href: "/creator/sponsorships", label: "Sponsorships", icon: Target }
-    ] }] : []),
     { label: "Finance & Rewards", items: [
       { href: "/earnings", label: "Earnings", icon: ReceiptText },
       { href: "/rewards", label: "Rewards", icon: Gift },
@@ -145,7 +141,7 @@ function enterpriseSections(permissions: string[], isAdmin: boolean): NavSection
       label: "Build a Challenge",
       icon: Swords,
       children: [
-        { href: "/enterprise/challenges/create?type=normal", label: "Normal" },
+        { href: "/enterprise/challenges/create/official/normal", label: "Normal" },
         { href: "/enterprise/challenges/create?type=private", label: "Private" },
         { href: "/enterprise/challenges/create?type=live", label: "Live Event" },
         { href: "/enterprise/challenges/create?type=tournament", label: "Tournament" },

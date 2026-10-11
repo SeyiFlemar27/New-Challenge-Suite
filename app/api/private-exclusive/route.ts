@@ -37,6 +37,7 @@ function inviteError(error: unknown) {
     INVITE_ALREADY_CLAIMED: { status: 409, message: "This direct invitation has already been accepted." },
     SELF_ADMISSION_FORBIDDEN: { status: 403, message: "Challenge owners cannot admit themselves as participants." },
     CHALLENGE_UNAVAILABLE: { status: 404, message: "Private challenge is unavailable." },
+    ACCESS_REQUEST_DISABLED: { status: 403, message: "This challenge is invite only and is not accepting access requests." },
     CHALLENGE_NOT_JOINABLE: { status: 409, message: "This challenge is not currently accepting participants." },
     ACCOUNT_UNAVAILABLE: { status: 403, message: "This account cannot join challenges." },
     COUNTRY_NOT_ELIGIBLE: { status: 403, message: "Your verified account location is not eligible for this challenge." },
@@ -146,13 +147,11 @@ export async function GET(request: Request) {
         id: doc.id,
         privatePreview: true,
         title: String(record.title ?? "Private challenge"),
-        shortDescription: String(record.shortDescription ?? record.description ?? ""),
+        description: String(record.description ?? "").slice(0, 1200),
         category: String(record.category ?? ""),
         status,
         startsAt: toIso(record.startsAt),
-        privateParticipantRequirements: Array.isArray(record.privateParticipantRequirements) ? record.privateParticipantRequirements.map(String) : [],
-        privateParticipantAcknowledgements: Array.isArray(record.privateParticipantAcknowledgements) ? record.privateParticipantAcknowledgements.map(String) : [],
-        privateParticipantQuestions: Array.isArray(record.privateParticipantQuestions) ? record.privateParticipantQuestions.map(String) : [],
+        privateJoiningPolicy: record.privateJoiningPolicy === "invite_and_request" ? "invite_and_request" : "invite_only",
         accessRequest: requestByChallenge.get(doc.id) ?? null
       };
       return [publicPreview];
@@ -267,6 +266,8 @@ export async function POST(request: Request) {
         ]);
         if (!challengeSnap.exists) throw new Error("CHALLENGE_UNAVAILABLE");
         const challenge = { id: challengeId, ...challengeSnap.data() } as Record<string, unknown>;
+        const joiningPolicy = challenge.privateJoiningPolicy === "invite_and_request" ? "invite_and_request" : "invite_only";
+        if (joiningPolicy !== "invite_and_request") throw new Error("ACCESS_REQUEST_DISABLED");
         if (!isPrivateChallengeRecord(challenge) || challenge.publicPreviewEnabled !== true || !["published", "approved", "scheduled", "registration_open", "active"].includes(String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase()) || !isChallengeJoinable(challenge).allowed) throw new Error("CHALLENGE_UNAVAILABLE");
         if (userOwnsChallenge(challenge, user.uid)) throw new Error("OWNER_REQUEST_FORBIDDEN");
         if (accessSnap.exists && accessSnap.data()?.status === "approved") return { requestId: ref.id, status: "approved", duplicate: true };
@@ -289,6 +290,7 @@ export async function POST(request: Request) {
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
       if (code === "CHALLENGE_UNAVAILABLE") return fail("This private challenge is not accepting access requests.", 409, undefined, code);
+      if (code === "ACCESS_REQUEST_DISABLED") return fail("This challenge is invite only and is not accepting access requests.", 403, undefined, code);
       if (code === "OWNER_REQUEST_FORBIDDEN") return fail("Challenge owners do not need to request access.", 403, undefined, code);
       if (code === "REQUEST_ALREADY_REJECTED") return fail("This access request was rejected and cannot be resubmitted.", 409, undefined, code);
       if (code === "PARTICIPANT_REQUIREMENTS_REQUIRED" || code === "PARTICIPANT_ANSWERS_REQUIRED") return fail("Complete the participant requirements before requesting access.", 422, undefined, code);

@@ -94,8 +94,12 @@ export async function POST(request: Request) {
   const monetizationIntent = body.monetization;
   const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
   const requestedMonetization = Boolean(monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested);
-  const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs);
   const freePlan = planAccess.normalizedPlanId === "free";
+  const freeCreatorPrizeRequested = freePlan
+    && monetizationIntent.prizePoolRequested
+    && body.prizeType === "money"
+    && Number(body.prizeValue ?? 0) > 0;
+  const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs);
 
   if (planAccess.isSponsor) {
     return fail("Sponsors manage campaigns from the Brand Command Center. Use /sponsor instead of normal challenge creation.", 403, { redirectTo: "/sponsor/dashboard" }, "USER_ACCOUNT_REQUIRED");
@@ -141,8 +145,11 @@ export async function POST(request: Request) {
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
-  if (freePlan && (body.sponsorEnabled || body.isLiveEvent || body.tournamentType !== "none" || body.prizeType !== "bragging_rights" || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
-    return fail("Free Basic Challenges are public, non-monetized, and do not include prizes, sponsors, tournaments, live events, revenue sharing, or advanced voting.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
+  if (freePlan && body.publish && freeCreatorPrizeRequested) {
+    return fail("Complete and confirm creator prize funding on the draft before publishing.", 409, undefined, "CREATOR_PRIZE_FUNDING_REQUIRED");
+  }
+  if (freePlan && (body.sponsorEnabled || monetizationIntent.sponsorReady || monetizationIntent.paidEntryRequested || monetizationIntent.paidVotesRequested || body.isLiveEvent || body.tournamentType !== "none" || (body.prizeType !== "bragging_rights" && !freeCreatorPrizeRequested) || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {
+    return fail("Free challenges may use confirmed creator-funded cash prizes, but paid entry, sponsorship, paid votes, tournaments, live events, and advanced voting require an eligible paid plan.", 403, undefined, "FREE_BASIC_ADVANCED_LOCKED");
   }
   if (body.publish && body.visibility === "private" && planExperience.monthlyPrivateChallengeLimit !== null && privateChallengesThisMonth >= planExperience.monthlyPrivateChallengeLimit) {
     return fail(`Your ${planAccess.planName} plan allows ${planExperience.privateChallengeLimitLabel}.`, 409, undefined, "PRIVATE_CHALLENGE_LIMIT_REACHED");
@@ -161,7 +168,7 @@ export async function POST(request: Request) {
   if (body.publish) lifecycleStatus = "pending_review";
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const challengeInputForAccess = { ...body, ...moneyLocks, status: lifecycleStatus };
-  const creationAccess = canCreateChallenge(planProfile, { ...challengeInputForAccess, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested } as Record<string, unknown>, activeChallengeCount);
+  const creationAccess = canCreateChallenge(planProfile, { ...challengeInputForAccess, creatorPrizeFundingConfirmed: false, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested } as Record<string, unknown>, activeChallengeCount);
   if (!creationAccess.allowed) {
     return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess, activeChallengeCount }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
   }
@@ -212,6 +219,7 @@ export async function POST(request: Request) {
     visibility: body.visibility,
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
     privateAccessMethod: body.visibility === "private" ? privateAccessMethod : "",
+    privateJoiningPolicy: body.visibility === "private" ? body.privateJoiningPolicy : "invite_only",
     privateAccessCode: "",
     privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
     privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,

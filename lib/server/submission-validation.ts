@@ -32,6 +32,22 @@ export const submissionCreateSchema = z.object({
   }
 });
 
+export const submissionUpdateSchema = z.object({
+  title: z.string().trim().min(2, "Title is required.").max(120, "Title must be 120 characters or fewer."),
+  description: z.string().trim().max(2000).default(""),
+  caption: z.string().trim().max(2000).optional().default(""),
+  mediaUrl: z.string().trim().url("Media URL must be valid."),
+  mediaType: z.enum(["image", "video"], { message: "Media type must be image or video." }),
+  originalFileName: z.string().trim().max(240).default(""),
+  fileSize: z.coerce.number().int().positive(),
+  mediaStoragePath: z.string().trim().min(1).max(500),
+  expectedRevision: z.coerce.number().int().min(0).optional()
+}).superRefine((value, ctx) => {
+  const maxBytes = (value.mediaType === "video" ? 250 : 15) * 1024 * 1024;
+  if (value.fileSize > maxBytes) ctx.addIssue({ code: "custom", path: ["fileSize"], message: `${value.mediaType === "video" ? "Video" : "Image"} uploads exceed the allowed size.` });
+  if (value.mediaStoragePath.includes("..") || /^https?:/i.test(value.mediaStoragePath)) ctx.addIssue({ code: "custom", path: ["mediaStoragePath"], message: "Submission media must use an internal Storage path." });
+});
+
 export type SubmissionCreateInput = z.infer<typeof submissionCreateSchema>;
 
 export function zodFieldErrors(error: z.ZodError) {

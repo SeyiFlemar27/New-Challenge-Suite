@@ -22,18 +22,18 @@ const join = read("app/api/challenges/[id]/join/route.ts");
 const settlement = read("lib/server/challenge-settlement.ts");
 const economy = read("lib/server/economy-rules.ts");
 
-const orderedSteps = ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"];
+const orderedSteps = ["Overview", "Participation", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"];
 let previous = -1;
 for (const label of orderedSteps) {
   const index = foundation.indexOf(`navLabel: "${label}"`);
   assert(index > previous, `${label} must appear in the canonical eight-step order`);
   previous = index;
 }
-assert.match(foundation, /fields: \["participationMode"[\s\S]*"waitlistEnabled"[\s\S]*"hideParticipantList"\]/);
-assert.match(foundation, /fields: \["numberOfWinners"[\s\S]*"entryFeeAmountCents"[\s\S]*"sponsorReady"[\s\S]*"votingSettings"\]/);
+assert.match(foundation, /fields: \["maxParticipants", "waitlistEnabled", "hideParticipantList"\]/);
+assert.match(foundation, /fields: \["numberOfWinners", "prizeValue", "entryFeeAmountCents", "sponsorReady", "votingSettings"\]/);
 assert.match(foundation, /fields: \["challengeImages", "challengeVideo"\]/);
 assert.match(foundation, /fields: \["timeZone"[\s\S]*"winnerAnnouncementAt"\]/);
-assert.match(foundation, /fields: \["acceptedSubmissionTypes"[\s\S]*"fixAndResubmitEnabled"\]/);
+assert.match(foundation, /fields: \["acceptedSubmissionTypes", "submissionInstructionsList"\]/);
 assert.match(frame, /xl:grid-cols-\[270px_minmax\(0,760px\)_280px\]/);
 assert.match(frame, /Builder Guide/);
 assert.match(frame, /BuilderGuideSheet/);

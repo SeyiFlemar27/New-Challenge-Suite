@@ -1,5 +1,6 @@
 ﻿import { isChallengeActiveForDashboard } from "@/lib/challenge-status";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import { getEffectiveTier, getUserPlanAccess, normalizeAccountType } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { isQaDemoOrPlaceholderProfile, isQaOrDemoRecord, publicChallengeFields } from "@/lib/server/public-challenge";
@@ -120,12 +121,11 @@ export async function GET(request: Request) {
   const accountType = normalizeAccountType(planProfile);
   const sponsorOnboardingComplete = Boolean(planProfile.sponsorOnboardingComplete || planProfile.brandProfileComplete);
   const hasSponsorProfile = Boolean(planProfile.hasSponsorProfile || sponsorOnboardingComplete);
+  const defaultRoute = getDefaultRouteForAccount(planProfile);
   const safeTotalPoints = profileLooksSeeded ? 0 : Number(profile?.totalPoints ?? account?.totalPoints ?? 0);
 
   return ok({
-    redirectTo: planProfile.accountTypeSelectionComplete === false
-      ? "/onboarding/account-type"
-      : accountType === "sponsor" ? "/sponsor/dashboard" : null,
+    redirectTo: defaultRoute === "/dashboard" ? null : defaultRoute,
     user: {
       uid: user.uid,
       email: user.email ?? account?.email ?? profile?.email ?? "",
@@ -133,8 +133,13 @@ export async function GET(request: Request) {
       initials: profile?.initials ?? "",
       role: account?.role ?? profile?.role ?? null,
       accountType,
+      accountTypeSelectionComplete: planProfile.accountTypeSelectionComplete !== false,
       dashboardType: String(planProfile.dashboard_type ?? planProfile.dashboardType ?? (accountType === "sponsor" ? "sponsor_dashboard" : "user_dashboard")),
       selectedAccountType: String(planProfile.account_type ?? (accountType === "sponsor" ? "sponsor" : "user")),
+      accountIntroOnboardingStatus: planProfile.accountIntroOnboardingStatus === "in_progress" || planProfile.accountIntroOnboardingStatus === "complete" ? planProfile.accountIntroOnboardingStatus : null,
+      accountIntroOnboardingType: planProfile.accountIntroOnboardingType === "creator" || planProfile.accountIntroOnboardingType === "sponsor" ? planProfile.accountIntroOnboardingType : null,
+      accountIntroOnboardingStep: Number.isInteger(planProfile.accountIntroOnboardingStep) ? Number(planProfile.accountIntroOnboardingStep) : 0,
+      accountIntroOnboardingCompletedAt: typeof planProfile.accountIntroOnboardingCompletedAt === "string" ? planProfile.accountIntroOnboardingCompletedAt : null,
       planId: planAccess.normalizedPlanId,
       legacyPlanId: planAccess.planId,
       planName: planAccess.planName,

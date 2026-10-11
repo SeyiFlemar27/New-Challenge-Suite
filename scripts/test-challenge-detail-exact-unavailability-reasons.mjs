@@ -7,7 +7,7 @@ for (const copy of [
   "Maximum participant capacity has been reached.",
   "Creators cannot participate in their own challenge.",
   "Your registration is incomplete until payment succeeds.",
-  "The host is reviewing your registration.",
+  "The host is reviewing your request to join.",
   "New submissions are no longer accepted.",
   "Participation is no longer available."
 ]) assert(journey.includes(copy), copy);

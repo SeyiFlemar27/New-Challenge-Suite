@@ -54,12 +54,12 @@ function isPaid(status: unknown) {
   return ["paid", "confirmed"].includes(text(status).toLowerCase());
 }
 
-function isPendingPayment(status: unknown) {
-  return ["pending", "processing"].includes(text(status).toLowerCase());
-}
-
 function isRejectedSubmission(status: unknown) {
   return ["rejected", "requires_changes", "changes_required"].includes(text(status).toLowerCase());
+}
+
+function isPendingPayment(status: unknown) {
+  return ["pending", "processing"].includes(text(status).toLowerCase());
 }
 
 function isSubmitted(status: unknown) {
@@ -162,7 +162,7 @@ export function getParticipantJourneyState(input: JourneyInput) {
   if (isSponsorProfile(profile)) return result("blocked_sponsor", "Sponsors cannot participate as competitors", "Use sponsor tools for funding, messaging, and campaign activity.", null, input, flags, "sponsor_blocked");
   if (phase.phase === "timeline_needs_review") return result("timeline_needs_review", "Schedule pending", "The organizer is confirming the challenge schedule.", null, input, flags, "timeline_needs_review");
   if (!registered && challengeFull) return challenge.waitlistEnabled === true ? result("register", "Join Waitlist", "The challenge is full, but the waitlist is open.", "join_waitlist", input, flags, null) : result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
-  if (submission && isRejectedSubmission(submission.status) && phase.canSubmit && entered) return result("fix_and_resubmit", "Fix and resubmit", `Update your entry before ${submissionDeadline ?? "the deadline"}.`, "fix_and_resubmit", input, flags, null);
+  if (submission && phase.canSubmit && entered) return result("can_submit", "Edit your entry", `You can update your entry before ${submissionDeadline ?? "the deadline"}.`, "submit_entry", input, flags, null);
   if (submission && isSubmitted(submission.status)) return result("already_submitted", "Entry submitted", "Your entry has been submitted for this challenge.", "view_entry", input, flags, "already_submitted");
   if (participantStatus === "waitlisted") return result("waitlisted", "Waitlisted", "You are on the waitlist. We will update your status if a place becomes available.", null, input, flags, "waitlisted");
   if (requestStatus === "pending") return result("request_pending", "Awaiting Approval", "The host is reviewing your request to join.", null, input, flags, "request_pending");

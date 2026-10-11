@@ -73,6 +73,10 @@ export function fetchBootstrapProfile() {
       dashboardType?: string;
       selectedAccountType?: string;
       accountTypeSelectionComplete?: boolean;
+      accountIntroOnboardingStatus?: "in_progress" | "complete" | null;
+      accountIntroOnboardingType?: "creator" | "sponsor" | null;
+      accountIntroOnboardingStep?: number;
+      accountIntroOnboardingCompletedAt?: string | null;
       roleIntent?: string;
       planId?: string;
       legacyPlanId?: string | null;
@@ -349,6 +353,10 @@ export function joinChallenge(challengeId: string, payload: { entryAgreementAcce
 
 export function submitEntry(payload: unknown) {
   return apiRequest<{ submission: unknown }>("/api/submissions", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateSubmission(submissionId: string, payload: unknown) {
+  return apiRequest<{ submission: unknown }>(`/api/submissions/${encodeURIComponent(submissionId)}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
 export function fetchSubmissionDetails(submissionId: string) {
