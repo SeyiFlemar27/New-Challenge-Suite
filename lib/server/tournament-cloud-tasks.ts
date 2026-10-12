@@ -5,6 +5,7 @@ import type { Firestore } from "firebase-admin/firestore";
 
 const MAX_RECONCILE_SCAN = 500;
 const DISPATCH_LEASE_MS = 60_000;
+const SCHEDULABLE_TOURNAMENT_JOB_TYPES = ["activate_full_tournament", "process_tournament_match_lifecycle"] as const;
 
 export type TournamentActivationTask = { jobId: string; version: number; runAt: string };
 export type TournamentTaskScheduler = { scheduleActivation(task: TournamentActivationTask): Promise<{ taskName: string }> };
@@ -192,6 +193,7 @@ export async function dispatchTournamentActivationOutbox(db: Firestore, jobId: s
     const snapshot = await transaction.get(jobRef);
     if (!snapshot.exists) return { allowed: false as const, code: "JOB_MISSING" };
     const job = snapshot.data() ?? {};
+    if (!SCHEDULABLE_TOURNAMENT_JOB_TYPES.includes(job.type as typeof SCHEDULABLE_TOURNAMENT_JOB_TYPES[number])) return { allowed: false as const, code: "JOB_TYPE_UNSUPPORTED" };
     if (job.status !== "pending") return { allowed: false as const, code: "JOB_NOT_PENDING" };
     if (job.schedulerDispatchState === "scheduled") return { allowed: false as const, code: "ALREADY_SCHEDULED" };
     const retryAt = Date.parse(String(job.schedulerRetryAt ?? ""));
@@ -241,9 +243,40 @@ export async function reconcileTournamentActivationOutbox(db: Firestore, schedul
   if (!scheduler) return { scanned: 0, attempted: 0, scheduled: 0, pending: 0, configured: false };
   const boundedLimit = Math.max(1, Math.min(MAX_RECONCILE_SCAN, limit));
   const jobs = db.collection("tournamentJobs");
+  const staleDeliveryCutoff = new Date(now.getTime() - 15 * 60_000).toISOString();
+  const staleLifecycleTasks = await jobs.where("status", "==", "pending")
+    .where("type", "==", "process_tournament_match_lifecycle")
+    .where("schedulerDispatchState", "==", "scheduled")
+    .where("runAt", "<=", staleDeliveryCutoff)
+    .orderBy("runAt", "asc").limit(boundedLimit).get();
+  let recoveredDeliveries = 0;
+  for (const candidate of staleLifecycleTasks.docs) {
+    const recovered = await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(candidate.ref);
+      const job = current.data() ?? {};
+      if (!current.exists || job.status !== "pending" || job.type !== "process_tournament_match_lifecycle" || job.schedulerDispatchState !== "scheduled") return false;
+      const leaseUntil = Date.parse(String(job.executionLeaseUntilAt ?? ""));
+      if (Number.isFinite(leaseUntil) && leaseUntil > now.getTime()) return false;
+      if (Date.parse(String(job.runAt ?? "")) > now.getTime() - 15 * 60_000) return false;
+      transaction.set(candidate.ref, {
+        version: Number(job.version ?? 0) + 1,
+        runAt: now.toISOString(),
+        schedulerDispatchState: "pending",
+        schedulerRetryAt: now.toISOString(),
+        schedulerPreviousTaskName: job.schedulerTaskName ?? null,
+        schedulerTaskName: null,
+        schedulerLastErrorCode: "LIFECYCLE_TASK_DELIVERY_RECONCILED",
+        schedulerRecoveredAt: now.toISOString(),
+        executionLeaseUntilAt: null,
+        updatedAt: now.toISOString()
+      }, { merge: true });
+      return true;
+    });
+    if (recovered) recoveredDeliveries += 1;
+  }
   const [pendingDispatch, expiredLease] = await Promise.all([
-    jobs.where("status", "==", "pending").where("type", "==", "activate_full_tournament").where("schedulerDispatchState", "==", "pending").orderBy("createdAt", "asc").limit(boundedLimit).get(),
-    jobs.where("status", "==", "pending").where("type", "==", "activate_full_tournament").where("schedulerDispatchState", "==", "dispatching").where("schedulerDispatchLeaseUntilAt", "<=", now.toISOString()).orderBy("schedulerDispatchLeaseUntilAt", "asc").limit(boundedLimit).get()
+    jobs.where("status", "==", "pending").where("type", "in", [...SCHEDULABLE_TOURNAMENT_JOB_TYPES]).where("schedulerDispatchState", "==", "pending").orderBy("createdAt", "asc").limit(boundedLimit).get(),
+    jobs.where("status", "==", "pending").where("type", "in", [...SCHEDULABLE_TOURNAMENT_JOB_TYPES]).where("schedulerDispatchState", "==", "dispatching").where("schedulerDispatchLeaseUntilAt", "<=", now.toISOString()).orderBy("schedulerDispatchLeaseUntilAt", "asc").limit(boundedLimit).get()
   ]);
   const candidates = new Map([...pendingDispatch.docs, ...expiredLease.docs].map((snapshot) => [snapshot.id, snapshot]));
   let attempted = 0;
@@ -258,5 +291,5 @@ export async function reconcileTournamentActivationOutbox(db: Firestore, schedul
     if (result.status === "scheduled") scheduled += 1;
     else if (result.status === "pending") pending += 1;
   }
-  return { scanned: candidates.size, attempted, scheduled, pending, configured: true };
+  return { scanned: candidates.size + staleLifecycleTasks.size, attempted, scheduled, pending, recoveredDeliveries, configured: true };
 }

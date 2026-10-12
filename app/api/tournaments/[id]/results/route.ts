@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { reconcileTournamentLifecycleAfterStateChange } from "@/lib/server/tournament-match-lifecycle-jobs";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { advanceWinner, canUseLegacyTournamentAdminResultOverride, cumulativeTournamentScore, finalPlacements, resolveMatchResult, resolveTournamentVoteEventSequence, tournamentMatchVoteOutcome } from "@/lib/server/tournament-operations";
@@ -192,6 +193,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const failure = error as Error & { code?: string };
     if (failure.code) return fail(failure.message, 409, undefined, failure.code);
     throw error;
+  }
+  if (configVersion >= 3) {
+    try { await reconcileTournamentLifecycleAfterStateChange(db, id); }
+    catch (error) { console.error("Tournament advancement job reconciliation failed", { tournamentId: id, matchId, code: error instanceof Error && "code" in error ? String((error as Error & { code?: unknown }).code).slice(0, 80) : "RECONCILIATION_FAILED" }); }
   }
   return ok({ result, advancement, voteOutcome, grandFinalResetRequired: requiresGrandFinalReset }, requiresGrandFinalReset ? "A Grand Final reset is required because both finalists now have one loss." : "Tournament result confirmed server-side. Payout remains admin and ledger-gated.");
 }

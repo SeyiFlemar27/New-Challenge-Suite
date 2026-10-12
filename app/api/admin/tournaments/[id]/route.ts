@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { reconcileTournamentLifecycleAfterStateChange } from "@/lib/server/tournament-match-lifecycle-jobs";
 import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { adminTournamentActionFoundation, deriveTournamentCorrectionImpact } from "@/lib/server/tournament-operations";
@@ -84,7 +85,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const submissionId = String(body.submissionId ?? "").trim();
     if (!submissionId) return fail("Choose a Tournament submission to review.", 400, undefined, "TOURNAMENT_SUBMISSION_REQUIRED");
     const submissionRef = db.collection("tournamentSubmissions").doc(submissionId);
-    let result: { idempotent: boolean; status: string; matchId: string };
+    let result: { idempotent: boolean; status: string; matchId: string; configVersion: number };
     try {
       result = await db.runTransaction(async (transaction) => {
       const submissionSnap = await transaction.get(submissionRef);
@@ -97,21 +98,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (!tournamentSnap.exists || !matchSnap.exists || matchSnap.data()?.tournamentId !== id || matchSnap.data()?.roundId !== submission.roundId || ![matchSnap.data()?.participantAId, matchSnap.data()?.participantBId].includes(submission.participantId)) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID"), { code: "TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID" });
       const targetStatus = action === "submission_approved" ? "approved" : "rejected";
       const currentStatus = String(submission.status ?? "");
-      if (currentStatus === targetStatus) return { idempotent: true, status: targetStatus, matchId };
+      const configVersion = Number(tournamentSnap.data()?.configVersion ?? 1);
+      if (currentStatus === targetStatus) return { idempotent: true, status: targetStatus, matchId, configVersion };
       if (!["submitted", "pending_moderation", "under_review"].includes(currentStatus) || !["submissions_open", "submission_review"].includes(String(matchSnap.data()?.status ?? ""))) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_REVIEW_CLOSED"), { code: "TOURNAMENT_SUBMISSION_REVIEW_CLOSED" });
       transaction.set(submissionRef, { status: targetStatus, reviewedAt: now, reviewedBy: user.uid, reviewReason: reason, updatedAt: now }, { merge: true });
       const reviewRef = db.collection("tournamentSubmissionReviews").doc(`${submissionId}_${action}`);
       transaction.create(reviewRef, { id: reviewRef.id, tournamentId: id, submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, action, status: targetStatus, actorId: user.uid, reason, createdAt: now });
       const auditRef = db.collection("tournamentAuditEvents").doc(`${id}_${action}_${submissionId}`);
       transaction.create(auditRef, { id: auditRef.id, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, previousStatus: currentStatus, resultingStatus: targetStatus } });
-        return { idempotent: false, status: targetStatus, matchId };
+        return { idempotent: false, status: targetStatus, matchId, configVersion };
       });
     } catch (error) {
       const code = error instanceof Error && "code" in error ? String((error as Error & { code?: string }).code) : "TOURNAMENT_SUBMISSION_REVIEW_FAILED";
       const message = code === "TOURNAMENT_SUBMISSION_NOT_FOUND" ? "Tournament submission not found." : code === "TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID" ? "This submission is not assigned to the selected Tournament match." : "This submission can no longer be reviewed in its current state.";
       return fail(message, code === "TOURNAMENT_SUBMISSION_NOT_FOUND" ? 404 : 409, undefined, code);
     }
-    return ok({ action, submissionId, ...result }, result.idempotent ? "This Tournament submission already has that review outcome." : `Tournament submission ${result.status}.`);
+    if (!result.idempotent && result.configVersion >= 3) {
+      try { await reconcileTournamentLifecycleAfterStateChange(db, id, new Date(), [result.matchId]); }
+      catch (error) { console.error("Tournament moderation job reconciliation failed", { tournamentId: id, matchId: result.matchId, code: error instanceof Error && "code" in error ? String((error as Error & { code?: unknown }).code).slice(0, 80) : "RECONCILIATION_FAILED" }); }
+    }
+    const { configVersion: _configVersion, ...publicResult } = result;
+    return ok({ action, submissionId, ...publicResult }, result.idempotent ? "This Tournament submission already has that review outcome." : `Tournament submission ${result.status}.`);
   }
   await db.collection("tournamentAuditEvents").doc(`${id}_${action}_${now}`).set({ id: `${id}_${action}_${now}`, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { foundation } });
   return ok({ action, auditRequired: true, payoutProviderCalled: false, balanceOverwriteAllowed: false, rawVoteTotalEditable: false }, "Admin tournament action was audited. No payout, refund, raw vote edit, or balance overwrite occurred.");

@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { generateTournamentBracket, seedParticipants } from "@/lib/server/tournament-operations";
+import { ensureTournamentMatchLifecycleJobs, processTournamentMatchLifecycleJobById } from "@/lib/server/tournament-match-lifecycle-jobs";
 import type { TournamentFoundation, TournamentParticipantFoundation, TournamentTeamFoundation } from "@/lib/tournament-types";
 
 const ACTIVE_PARTICIPANT_STATES = new Set(["registered", "active"]);
@@ -10,6 +11,7 @@ type ActivationJob = { id: string; tournamentId: string; version: number; runAt:
 export async function processTournamentActivationJobs(db: Firestore, now = new Date(), limit = 10) {
   const dueJobs = await db.collection("tournamentJobs")
     .where("status", "==", "pending")
+    .where("type", "==", "activate_full_tournament")
     .where("runAt", "<=", now.toISOString())
     .orderBy("runAt", "asc")
     .limit(Math.max(1, Math.min(25, limit)))
@@ -18,6 +20,7 @@ export async function processTournamentActivationJobs(db: Firestore, now = new D
   for (const jobSnapshot of dueJobs.docs) {
     const job = { id: jobSnapshot.id, ...jobSnapshot.data() } as ActivationJob;
     const outcome = await processOneActivationJob(db, job, now);
+    if (outcome.status === "activated") await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now);
     outcomes.push({ jobId: job.id, ...outcome });
   }
   return outcomes;
@@ -33,7 +36,18 @@ export async function processTournamentActivationJobById(db: Firestore, jobId: s
   if (job.type !== "activate_full_tournament" || Number(job.version) !== expectedVersion) {
     return { status: "skipped" as const, code: "TASK_VERSION_STALE" };
   }
-  return processOneActivationJob(db, job, now);
+  const outcome = await processOneActivationJob(db, job, now);
+  if (outcome.status === "activated") await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now);
+  return outcome;
+}
+
+export async function processTournamentScheduledJobById(db: Firestore, jobId: string, expectedVersion: number, now = new Date()) {
+  const snapshot = await db.collection("tournamentJobs").doc(jobId).get();
+  if (!snapshot.exists) return { status: "skipped" as const, code: "JOB_MISSING" };
+  const type = String(snapshot.data()?.type ?? "");
+  if (type === "activate_full_tournament") return processTournamentActivationJobById(db, jobId, expectedVersion, now);
+  if (type === "process_tournament_match_lifecycle") return processTournamentMatchLifecycleJobById(db, jobId, expectedVersion, now);
+  return { status: "skipped" as const, code: "JOB_TYPE_UNSUPPORTED" };
 }
 
 async function processOneActivationJob(db: Firestore, job: ActivationJob, now: Date) {

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { createGoogleCloudTasksScheduler, dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady, reconcileTournamentActivationOutbox, verifyTournamentCloudTaskRequest } from "../lib/server/tournament-cloud-tasks.ts";
+import { ensureTournamentMatchLifecycleJobs, processTournamentMatchLifecycleJobById } from "../lib/server/tournament-match-lifecycle-jobs.ts";
 
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "FIRESTORE_EMULATOR_HOST is required");
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "demo-challenge-suite";
@@ -91,6 +92,12 @@ const duplicate = await dispatchTournamentActivationOutbox(db, jobId, emulatorSc
 equal(duplicate.status, "scheduled", "repeated dispatch is idempotent");
 equal(enqueueCalls, 1, "duplicate dispatch does not call Cloud Tasks again");
 
+const lifecycleDispatchId = runId + "_lifecycle_outbox_v1";
+await db.collection("tournamentJobs").doc(lifecycleDispatchId).set({ id: lifecycleDispatchId, tournamentId: runId, matchId: runId + "_match", type: "process_tournament_match_lifecycle", status: "pending", version: 1, runAt, schedulerDispatchState: "pending", schedulerDispatchAttempts: 0 });
+const lifecycleDispatch = await dispatchTournamentActivationOutbox(db, lifecycleDispatchId, emulatorScheduler, new Date());
+equal(lifecycleDispatch.status, "scheduled", "the shared durable outbox dispatches match lifecycle jobs");
+equal(enqueueCalls, 2, "one Cloud Task is submitted for the lifecycle outbox record");
+
 const failedJobId = runId + "_outbox_failure_v1";
 await db.collection("tournamentJobs").doc(failedJobId).set({ id: failedJobId, tournamentId: runId, type: "activate_full_tournament", status: "pending", version: 1, runAt, schedulerDispatchState: "pending", schedulerDispatchAttempts: 0 });
 const failed = await dispatchTournamentActivationOutbox(db, failedJobId, { scheduleActivation: async () => { throw Object.assign(new Error("sanitized"), { code: "CLOUD_TASKS_HTTP_503" }); } }, new Date());
@@ -128,4 +135,63 @@ const expiredLeaseResult = await reconcileTournamentActivationOutbox(db, { sched
 check(expiredLeaseResult.scanned >= 1, "expired dispatch leases are included in reconciliation");
 equal((await db.collection("tournamentJobs").doc(expiredLeaseId).get()).data().schedulerDispatchState, "scheduled", "an expired lease can be reclaimed and scheduled");
 
-console.log("PASS Cloud Tasks adapter, WIF/OIDC authorization, idempotent Firestore outbox, bounded retry, concurrency, and reconciliation: " + assertions + " assertions.");
+const lifecycleTournamentId = runId + "_lifecycle";
+const lifecycleNow = new Date();
+const participantAId = lifecycleTournamentId + "_a";
+const participantBId = lifecycleTournamentId + "_b";
+await db.collection("tournaments").doc(lifecycleTournamentId).set({ id: lifecycleTournamentId, configVersion: 3, status: "active", participationMode: "individual", format: "single_elimination", submissionDurationHours: 48, votingDurationHours: 24 });
+const futureMatchId = lifecycleTournamentId + "_future_match";
+const futureDeadline = new Date(lifecycleNow.getTime() + 20 * 60_000).toISOString();
+await db.collection("tournamentMatches").doc(futureMatchId).set({ id: futureMatchId, tournamentId: lifecycleTournamentId, roundId: lifecycleTournamentId + "_round", status: "submissions_open", participantAId, participantBId, submissionDeadlineAt: futureDeadline });
+const firstReconcile = await ensureTournamentMatchLifecycleJobs(db, lifecycleTournamentId, lifecycleNow);
+equal(firstReconcile.created, 1, "active match state creates a durable submission-deadline outbox job");
+equal((await ensureTournamentMatchLifecycleJobs(db, lifecycleTournamentId, lifecycleNow)).created, 0, "repeated lifecycle reconciliation does not duplicate a scheduled transition");
+const lifecycleOutboxJob = (await db.collection("tournamentJobs").where("tournamentId", "==", lifecycleTournamentId).get()).docs.map((doc) => doc.data()).find((job) => job.type === "process_tournament_match_lifecycle");
+check(lifecycleOutboxJob?.expectedStatus === "submissions_open" && lifecycleOutboxJob?.expectedDeadlineAt === futureDeadline, "lifecycle outbox records state and deadline guards for stale-task rejection");
+
+const dueMatchId = lifecycleTournamentId + "_due_match";
+const dueRoundId = lifecycleTournamentId + "_due_round";
+const dueDeadline = new Date(lifecycleNow.getTime() - 1_000).toISOString();
+await db.collection("tournamentRounds").doc(dueRoundId).set({ id: dueRoundId, tournamentId: lifecycleTournamentId, status: "active" });
+await db.collection("tournamentMatches").doc(dueMatchId).set({ id: dueMatchId, tournamentId: lifecycleTournamentId, roundId: dueRoundId, status: "submissions_open", participantAId, participantBId, submissionDeadlineAt: dueDeadline });
+await db.collection("tournamentParticipants").doc(participantAId).set({ id: participantAId, tournamentId: lifecycleTournamentId, userId: "user_a", status: "active" });
+await db.collection("tournamentParticipants").doc(participantBId).set({ id: participantBId, tournamentId: lifecycleTournamentId, userId: "user_b", status: "active" });
+for (const participantId of [participantAId, participantBId]) await db.collection("tournamentSubmissions").doc(`${lifecycleTournamentId}_${dueMatchId}_${participantId}`).set({ id: `${lifecycleTournamentId}_${dueMatchId}_${participantId}`, tournamentId: lifecycleTournamentId, matchId: dueMatchId, roundId: dueRoundId, participantId, status: "approved" });
+const dueJobId = lifecycleTournamentId + "_due_job_v1";
+await db.collection("tournamentJobs").doc(dueJobId).set({ id: dueJobId, tournamentId: lifecycleTournamentId, matchId: dueMatchId, type: "process_tournament_match_lifecycle", transition: "submission_deadline", expectedStatus: "submissions_open", expectedDeadlineAt: dueDeadline, status: "pending", version: 1, runAt: dueDeadline, schedulerDispatchState: "pending" });
+const lifecycleOutcomes = await Promise.all([
+  processTournamentMatchLifecycleJobById(db, dueJobId, 1, lifecycleNow),
+  processTournamentMatchLifecycleJobById(db, dueJobId, 1, lifecycleNow)
+]);
+check(lifecycleOutcomes.some((outcome) => outcome.code === "MATCH_LIFECYCLE_PROCESSED"), "due worker runs the shared authoritative deadline processor");
+check(lifecycleOutcomes.every((outcome) => ["MATCH_LIFECYCLE_PROCESSED", "TASK_ALREADY_RUNNING", "JOB_ALREADY_PROCESSED"].includes(outcome.code)), "concurrent delivery is leased or treated as an idempotent duplicate");
+equal((await db.collection("tournamentMatches").doc(dueMatchId).get()).data()?.status, "voting_open", "approved submissions open voting only after the server deadline check");
+equal((await db.collection("tournamentJobs").doc(dueJobId).get()).data()?.status, "completed", "processed lifecycle job is durably completed");
+const votingDeadlineJob = (await db.collection("tournamentJobs").where("tournamentId", "==", lifecycleTournamentId).get()).docs.map((doc) => doc.data()).find((job) => job.matchId === dueMatchId && job.transition === "voting_deadline");
+check(votingDeadlineJob?.expectedStatus === "voting_open", "opening voting is followed by a durable voting-close job");
+equal((await processTournamentMatchLifecycleJobById(db, dueJobId, 1, lifecycleNow)).code, "JOB_ALREADY_PROCESSED", "duplicate task delivery cannot process the same transition twice");
+const votingOpenedAudit = await db.collection("tournamentAuditEvents").doc(`${dueMatchId}_voting_opened`).get();
+check(votingOpenedAudit.exists, "concurrent duplicate deliveries preserve exactly one deterministic voting-open audit record");
+
+const reviewMatchId = lifecycleTournamentId + "_review_match";
+await db.collection("tournamentMatches").doc(reviewMatchId).set({ id: reviewMatchId, tournamentId: lifecycleTournamentId, roundId: dueRoundId, status: "submission_review", participantAId, participantBId, submissionDeadlineAt: dueDeadline });
+const reviewSchedule = await ensureTournamentMatchLifecycleJobs(db, lifecycleTournamentId, lifecycleNow);
+check(reviewSchedule.created >= 1, "moderation-dependent matches remain scheduled for readiness checks");
+const reviewRecord = (await db.collection("tournamentJobs").where("tournamentId", "==", lifecycleTournamentId).get()).docs.map((doc) => doc.data()).find((job) => job.matchId === reviewMatchId && job.transition === "submission_deadline");
+check(Date.parse(reviewRecord?.runAt) > lifecycleNow.getTime(), "pending moderation is rechecked later without shortening the submission window");
+const immediateReviewRecheck = await ensureTournamentMatchLifecycleJobs(db, lifecycleTournamentId, lifecycleNow, 500, [reviewMatchId]);
+check(immediateReviewRecheck.created >= 1, "moderation changes can trigger a durable immediate readiness recheck");
+
+const staleTaskId = runId + "_lifecycle_stale_v1";
+await db.collection("tournamentJobs").doc(staleTaskId).set({ id: staleTaskId, tournamentId: lifecycleTournamentId, matchId: dueMatchId, type: "process_tournament_match_lifecycle", transition: "submission_deadline", expectedStatus: "submissions_open", expectedDeadlineAt: dueDeadline, status: "pending", version: 1, runAt: dueDeadline });
+equal((await processTournamentMatchLifecycleJobById(db, staleTaskId, 1, lifecycleNow)).code, "MATCH_LIFECYCLE_STATE_STALE", "stale status/deadline tasks are rejected before transition work");
+
+const deliveryRecoveryId = runId + "_lifecycle_delivery_recovery_v1";
+await db.collection("tournamentJobs").doc(deliveryRecoveryId).set({ id: deliveryRecoveryId, tournamentId: lifecycleTournamentId, matchId: dueMatchId, type: "process_tournament_match_lifecycle", transition: "submission_deadline", expectedStatus: "voting_open", expectedDeadlineAt: (await db.collection("tournamentMatches").doc(dueMatchId).get()).data()?.votingClosesAt, status: "pending", version: 1, runAt: new Date(lifecycleNow.getTime() - 20 * 60_000).toISOString(), schedulerDispatchState: "scheduled", schedulerTaskName: "expired-task", createdAt: new Date(lifecycleNow.getTime() - 30 * 60_000).toISOString() });
+const recoveredOutbox = await reconcileTournamentActivationOutbox(db, emulatorScheduler, lifecycleNow, 100);
+check(recoveredOutbox.recoveredDeliveries >= 1, "reconciler recovers stale accepted-but-unprocessed lifecycle deliveries");
+const recoveredRecord = (await db.collection("tournamentJobs").doc(deliveryRecoveryId).get()).data();
+equal(recoveredRecord?.version, 2, "recovery advances the lifecycle job version so old tasks are rejected");
+equal(recoveredRecord?.schedulerDispatchState, "scheduled", "recovered task is resubmitted through the durable outbox");
+
+console.log("PASS Cloud Tasks adapter, WIF/OIDC authorization, durable activation and match lifecycle jobs, moderation rechecks, idempotency, bounded retry, concurrency, and reconciliation: " + assertions + " assertions.");

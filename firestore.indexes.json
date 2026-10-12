@@ -32,6 +32,25 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "runAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tournamentJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "schedulerDispatchState", "order": "ASCENDING" },
+        { "fieldPath": "runAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tournamentJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "schedulerDispatchState", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]

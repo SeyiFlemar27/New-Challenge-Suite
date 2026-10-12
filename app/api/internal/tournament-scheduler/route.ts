@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { createGoogleCloudTasksScheduler, reconcileTournamentActivationOutbox, verifyTournamentCloudTaskRequest } from "@/lib/server/tournament-cloud-tasks";
+import { reconcileActiveTournamentMatchLifecycleJobs } from "@/lib/server/tournament-match-lifecycle-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   try { scheduler = createGoogleCloudTasksScheduler(); }
   catch { return serverUnavailable("Tournament scheduler configuration"); }
   if (!scheduler) return serverUnavailable("Tournament scheduler configuration");
+  const lifecycle = await reconcileActiveTournamentMatchLifecycleJobs(db);
   const result = await reconcileTournamentActivationOutbox(db, scheduler);
-  return ok(result, "Tournament scheduler outbox reconciled.");
+  return ok({ lifecycle, dispatch: result }, "Tournament lifecycle jobs reconciled and dispatched.");
 }
