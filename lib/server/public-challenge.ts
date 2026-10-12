@@ -178,7 +178,7 @@ export function publicSubmissionFields(data: Record<string, unknown>) {
   const result = pick(data, [
     "challengeId", "title", "description", "mediaUrl", "mediaType", "thumbnailUrl",
     "status", "submittedAt", "createdAt", "updatedAt", "voteCount", "weightedVoteCount",
-    "participantName", "displayName", "username", "avatarUrl", "planBadge"
+    "planBadge"
   ]);
   const path = typeof data.mediaStoragePath === "string" ? data.mediaStoragePath.trim() : "";
   if (path) result.mediaUrl = challengeMediaDeliveryUrl(path);

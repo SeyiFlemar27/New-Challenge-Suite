@@ -6,7 +6,7 @@ import { getOptionalRequestUser } from "@/lib/server/auth";
 import { isPublicChallenge, isPublicSubmission, publicChallengeFields, publicSubmissionFields } from "@/lib/server/public-challenge";
 import { getAdminStorage } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
-import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
+import { challengeForPlanAccess, hasPublicVotingAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { getSubmissionDeadline, isChallengeSubmittable, isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { submissionUpdateSchema, zodFieldErrors } from "@/lib/server/submission-validation";
@@ -135,6 +135,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const challengeData = challengeSnap?.exists ? challengeSnap.data() ?? {} : null;
     const user = await getOptionalRequestUser(request);
+    const userPrivateAccess = Boolean(user && challengeSnap?.exists && challengeData && (await challengeForPlanAccess(db, { id: challengeSnap.id, ...challengeData }, user.uid)).hasAccessGrant);
+    const publicVotingAccess = Boolean(user && challengeData && hasPublicVotingAccess(challengeData) && isPublicSubmission(submissionSnap.id, submission));
     const publicAccess = Boolean(
       challengeSnap?.exists
       && challengeData
@@ -142,11 +144,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       && isPublicSubmission(submissionSnap.id, submission)
     );
     const ownerAccess = Boolean(user && (user.uid === userId || user.uid === String(challengeData?.creatorId ?? "")));
-    if (!publicAccess && !ownerAccess) {
+    const privateAuthorizedAccess = Boolean(userPrivateAccess && isPublicSubmission(submissionSnap.id, submission));
+    if (!publicAccess && !ownerAccess && !publicVotingAccess && !privateAuthorizedAccess) {
       return fail("Submission not found.", 404, undefined, "NOT_FOUND");
     }
 
-    const challenge = challengeSnap?.exists && challengeData
+    const challenge = publicVotingAccess && !privateAuthorizedAccess
+      ? null
+      : challengeSnap?.exists && challengeData
       ? { id: challengeSnap.id, ...publicChallengeFields(challengeData, challengeSnap.id) }
       : null;
     const creator = profileSnap?.exists ? toPublicProfile(profileSnap.id, profileSnap.data() ?? {}) : null;

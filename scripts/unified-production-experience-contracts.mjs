@@ -16,11 +16,11 @@ const sidebar = read("components/sidebar.tsx");
 const creatorStart = sidebar.indexOf("function personalSections");
 const sponsorStart = sidebar.indexOf("const sponsorSections");
 const creatorNavigation = sidebar.slice(creatorStart, sponsorStart);
-for (const required of ["Creator Studio", "Explore", "Saved", "My Challenges", "My Entries", "Submissions", "Analytics", "Earnings", "DoroCoins", "Rewards", "Profile", "Settings"]) {
+for (const required of ["Creator Studio", "Explore", "Saved", "My Challenges", "My Entries", "Submissions", "Earnings", "DoroCoins", "Rewards", "Profile", "Settings"]) {
   assert(creatorNavigation.includes(required), `Creator/Host navigation is missing ${required}`);
 }
 for (const contextual of ["Leaderboards", "Winners"]) assert(!creatorNavigation.includes(contextual), `${contextual} must remain contextual rather than a permanent primary destination`);
-for (const retired of ["Monthly Boosts", "Sponsor-Ready", "Creator Pro", "Vote multiplier"]) {
+for (const retired of ["Analytics", "Sponsorships", "Monthly Boosts", "Sponsor-Ready", "Creator Pro", "Vote multiplier"]) {
   assert(!creatorNavigation.includes(retired), `Creator/Host navigation must not permanently include ${retired}`);
 }
 
@@ -65,14 +65,17 @@ const pagination = read("lib/challenge-pagination.ts");
 assert(pagination.includes("CHALLENGE_PAGE_SIZE = 36"), "Challenge pagination must use 36 items");
 const paginator = read("components/challenge-pagination.tsx");
 assert(paginator.includes("total <= 0") && paginator.includes("aria-current"), "Paginator must hide only for zero results and expose accessible current state");
-for (const route of ["app/explore/page.tsx", "app/creator/challenges/page.tsx", "components/challenge-discovery-page.tsx", "components/public-site/category-experience.tsx"]) {
+for (const route of ["app/creator/challenges/page.tsx", "components/challenge-discovery-page.tsx", "components/public-site/category-experience.tsx"]) {
   const source = read(route);
   assert(source.includes("ChallengePagination"), `${route} must use the shared challenge paginator`);
 }
+const explorePage = read("app/explore/page.tsx");
+assert(explorePage.includes("nextCursor") && explorePage.includes("data.hasMore") && explorePage.includes('aria-label="Explore result pages"'), "Explore must continue its filtered dataset with accessible cursor pagination");
 
 const leaderboard = read("lib/server/leaderboard.ts");
 assert(leaderboard.includes("points: winCount * 1000 + validVotes"), "Global leaderboard score must be wins x 1000 plus valid votes received");
-assert(leaderboard.includes('competitionMode: "judges"') && leaderboard.includes('competitionMode: "tournament"') && leaderboard.includes('competitionMode: "public_voting"'), "Leaderboards must be competition-mode aware");
+const leaderboardRoute = read("app/api/leaderboards/route.ts");
+assert(leaderboard.includes('competitionMode: judgesMode ? "judges" : "public_voting"') && leaderboard.includes('competitionMode: "tournament"') && leaderboardRoute.includes('"public_voting"'), "Leaderboards must be competition-mode aware");
 assert(leaderboard.includes("pageSize ?? 36"), "Leaderboard pagination must use 36 rows");
 const leaderboardPage = read("app/leaderboards/page.tsx");
 for (const board of ["Global", "Challenge", "Tournament"]) assert(leaderboardPage.includes(board), `Leaderboard is missing ${board}`);

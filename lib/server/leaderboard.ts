@@ -1,7 +1,8 @@
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldPath, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
 import { canSubmissionReceiveVotes } from "@/lib/server/submission-lifecycle";
 import { isPublicSubmission, isQaDemoOrPlaceholderProfile } from "@/lib/server/public-challenge";
+import { challengeMediaDeliveryUrl, isFirebaseStorageDownloadUrl } from "@/lib/server/challenge-media-delivery";
 
 export type LeaderboardType = "challenge" | "global" | "tournament";
 export type ChallengeLeaderboardStatus = "live" | "hidden" | "locked" | "under_review" | "final" | "disputed" | "archived";
@@ -49,7 +50,7 @@ export interface LeaderboardResult {
   source: string;
   updatedAt: string | null;
   competitionMode?: "public_voting" | "judges" | "tournament" | "global";
-  pagination?: { page: number; pageSize: number; total: number; totalPages: number };
+  pagination?: { page: number; pageSize: number; total: number; totalPages: number; hasMore?: boolean; nextCursor?: string | null; eligibleTotal?: number };
   currentUserPosition?: LeaderboardRow | null;
 }
 
@@ -119,7 +120,7 @@ export function isLeaderboardVisible(status: ChallengeLeaderboardStatus, mode: L
 function sortSubmissionRows(a: Record<string, unknown>, b: Record<string, unknown>) {
   const voteDiff = numberValue(b.voteCount) - numberValue(a.voteCount);
   if (voteDiff !== 0) return voteDiff;
-  const reachedDiff = timestampMs(a.scoreReachedAt ?? a.voteTotalReachedAt) - timestampMs(b.scoreReachedAt ?? b.voteTotalReachedAt);
+  const reachedDiff = timestampMs(a.leaderboardSortAt ?? a.scoreReachedAt ?? a.voteTotalReachedAt ?? a.approvedAt ?? a.submittedAt ?? a.createdAt) - timestampMs(b.leaderboardSortAt ?? b.scoreReachedAt ?? b.voteTotalReachedAt ?? b.approvedAt ?? b.submittedAt ?? b.createdAt);
   if (reachedDiff !== 0) return reachedDiff;
   const submittedDiff = timestampMs(a.approvedAt ?? a.submittedAt ?? a.createdAt) - timestampMs(b.approvedAt ?? b.submittedAt ?? b.createdAt);
   if (submittedDiff !== 0) return submittedDiff;
@@ -158,7 +159,9 @@ export function rankSubmissions(submissions: Record<string, unknown>[], limit?: 
         avatarUrl: typeof submission.avatarUrl === "string" ? submission.avatarUrl : typeof submission.userAvatarUrl === "string" ? submission.userAvatarUrl : undefined,
         initials: String(submission.userInitials ?? displayName.slice(0, 2).toUpperCase()),
         title: String(submission.title ?? "Untitled Submission"),
-        mediaUrl: typeof submission.mediaUrl === "string" ? submission.mediaUrl : undefined,
+        mediaUrl: typeof submission.mediaStoragePath === "string" && submission.mediaStoragePath.trim()
+          ? challengeMediaDeliveryUrl(submission.mediaStoragePath.trim())
+          : typeof submission.mediaUrl === "string" && !isFirebaseStorageDownloadUrl(submission.mediaUrl) ? submission.mediaUrl : undefined,
         mediaType: typeof submission.mediaType === "string" ? submission.mediaType : undefined,
         voteCount: numberValue(submission.voteCount ?? submission.likes),
         weightedVoteCount: numberValue(submission.weightedVoteCount ?? submission.voteCount ?? submission.likes),
@@ -176,7 +179,7 @@ export function rankSubmissions(submissions: Record<string, unknown>[], limit?: 
   return typeof limit === "number" ? rows.slice(0, limit) : rows;
 }
 
-export async function buildChallengeLeaderboard(db: Firestore, challengeId: string, options: { page?: number; pageSize?: number; limit?: number; includeEligibleEntries?: boolean } = {}): Promise<LeaderboardResult & { challenge: Record<string, unknown> | null }> {
+export async function buildChallengeLeaderboard(db: Firestore, challengeId: string, options: { page?: number; pageSize?: number; limit?: number; cursor?: string | null; searchPrefix?: string; sort?: "highest_votes" | "newest" } = {}): Promise<LeaderboardResult & { challenge: Record<string, unknown> | null }> {
   const page = Math.max(1, options.page ?? 1);
   const pageSize = Math.min(36, Math.max(1, options.pageSize ?? options.limit ?? 36));
   const challengeSnap = await db.collection("challenges").doc(challengeId).get();
@@ -199,34 +202,64 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
   const status = resolveChallengeLeaderboardStatus(challenge);
   const visibilityMode = resolveLeaderboardVisibilityMode(challenge);
   const votingOpen = canVoteOnChallenge(challenge);
+  const effectivePageSize = visibilityMode === "top_10_only" ? Math.min(pageSize, 10) : pageSize;
   const visible = isLeaderboardVisible(status, visibilityMode, votingOpen);
   const message = visibilityMessage(status, visibilityMode, votingOpen);
   const judgesMode = [challenge.winnerSelection, challenge.votingMode, challenge.scoringMode].some((value) => String(value ?? "").toLowerCase().includes("judge")) || challenge.judgeScoringEnabled === true;
-  if (judgesMode) {
-    const final = status === "final";
-    const winnerSnap = final ? await db.collection("winners").where("challengeId", "==", challengeId).limit(20).get() : null;
-    const winnerRows = (winnerSnap?.docs ?? []).map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>)).filter((row) => ["verified", "announced", "paid", "approved", "final"].includes(String(row.status ?? "").toLowerCase())).sort((a, b) => numberValue(a.position ?? a.rank) - numberValue(b.position ?? b.rank));
-    const profileIds = [...new Set(winnerRows.map((row) => String(row.userId ?? "")).filter(Boolean))];
-    const profileSnaps = profileIds.length ? await db.getAll(...profileIds.map((id) => db.collection("profiles").doc(id))) : [];
-    const profiles = new Map(profileSnaps.map((snap) => [snap.id, snap.data() ?? {}]));
-    const allEntries = winnerRows.map((row, index) => { const profile = profiles.get(String(row.userId ?? "")) ?? {}; const displayName = String(profile.displayName ?? row.displayName ?? row.userName ?? "Participant"); return { id: String(row.id), rank: index + 1, previousRank: null, rankChange: 0, challengeId, userId: String(row.userId ?? ""), displayName, initials: String(profile.initials ?? displayName.slice(0, 2).toUpperCase()), avatarUrl: typeof profile.avatarUrl === "string" ? profile.avatarUrl : undefined, voteCount: 0, weightedVoteCount: 0, points: numberValue(row.finalScore ?? row.judgeScore), wins: index === 0 ? 1 : 0, status: "final" } satisfies LeaderboardRow; });
-    const start = (page - 1) * pageSize;
-    return { type: "challenge", board: challengeId, challengeId, challenge, status, visibilityMode, visible: final && allEntries.length > 0, message: final ? allEntries.length ? null : "Official judge results are not available yet." : "Judge results remain private until official review is complete.", entries: allEntries.slice(start, start + pageSize), source: "official_judge_results", updatedAt: toIso(challenge.updatedAt), competitionMode: "judges", pagination: { page, pageSize, total: allEntries.length, totalPages: Math.max(1, Math.ceil(allEntries.length / pageSize)) } };
-  }
-  const submissionSnap = await db.collection("submissions")
+  const submissions = db.collection("submissions");
+  const baseQuery = submissions
     .where("challengeId", "==", challengeId)
-    .limit(1000)
-    .get();
-  const rawSubmissions = submissionSnap.docs.flatMap((doc) => {
-    const data = doc.data();
-    return isPublicSubmission(doc.id, data) ? [{ id: doc.id, ...data } as Record<string, unknown>] : [];
-  });
-  const allEntries = visible || options.includeEligibleEntries ? rankSubmissions(rawSubmissions) : [];
-  const rankedEntries = visibilityMode === "top_10_only" ? allEntries.slice(0, 10) : allEntries;
-  const visibleEntries = challenge.hideVoteTotals === true
-    ? rankedEntries.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
-    : rankedEntries;
-  const start = (page - 1) * pageSize;
+    .where("leaderboardEligible", "==", true)
+    .where("visibility", "==", "public");
+  const filteredQuery = options.searchPrefix ? baseQuery.where("leaderboardSearchPrefixes", "array-contains", options.searchPrefix) : baseQuery;
+  let query = options.sort === "newest"
+    ? filteredQuery.orderBy("submittedAt", "desc").orderBy(FieldPath.documentId(), "desc")
+    : filteredQuery.orderBy("voteCount", "desc").orderBy("leaderboardSortAt", "asc").orderBy("submittedAt", "asc").orderBy(FieldPath.documentId(), "asc");
+  let start = (page - 1) * effectivePageSize;
+  if (options.cursor) {
+    let cursorPayload: { id?: unknown; rank?: unknown };
+    try {
+      cursorPayload = JSON.parse(Buffer.from(options.cursor, "base64url").toString("utf8")) as { id?: unknown; rank?: unknown };
+    } catch {
+      throw new Error("INVALID_CHALLENGE_LEADERBOARD_CURSOR");
+    }
+    if (typeof cursorPayload.id !== "string" || !Number.isSafeInteger(cursorPayload.rank) || Number(cursorPayload.rank) < 1) {
+      throw new Error("INVALID_CHALLENGE_LEADERBOARD_CURSOR");
+    }
+    const cursorSnap = await submissions.doc(cursorPayload.id).get();
+    const cursorData = cursorSnap.data() ?? {};
+    if (!cursorSnap.exists || cursorData.challengeId !== challengeId || cursorData.leaderboardEligible !== true || cursorData.visibility !== "public" || (options.searchPrefix && !Array.isArray(cursorData.leaderboardSearchPrefixes) || options.searchPrefix && !(cursorData.leaderboardSearchPrefixes as unknown[]).includes(options.searchPrefix))) {
+      throw new Error("INVALID_CHALLENGE_LEADERBOARD_CURSOR");
+    }
+    query = query.startAfter(cursorSnap as QueryDocumentSnapshot);
+    start = Number(cursorPayload.rank) - 1;
+  } else if (start > 0) {
+    query = query.offset(start);
+  }
+  const [submissionSnap, eligibleTotalSnap, totalSnap] = await Promise.all([
+    query.limit(effectivePageSize + 1).get(),
+    baseQuery.count().get(),
+    filteredQuery.count().get()
+  ]);
+  const hasMore = submissionSnap.docs.length > effectivePageSize;
+  const pageDocs = (hasMore ? submissionSnap.docs.slice(0, effectivePageSize) : submissionSnap.docs)
+    .filter((doc) => isPublicSubmission(doc.id, doc.data()));
+  const candidateRows = pageDocs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  const filteredRows = rankSubmissions(candidateRows);
+  const candidateTotal = totalSnap.data().count;
+  const total = visibilityMode === "top_10_only" ? Math.min(candidateTotal, 10) : candidateTotal;
+  const sortedRows = options.sort === "newest"
+    ? [...filteredRows].sort((a, b) => timestampMs(b.submittedAt) - timestampMs(a.submittedAt) || b.id.localeCompare(a.id))
+    : filteredRows;
+  const visibleEntries = visibilityMode === "top_10_only" && votingOpen
+    ? sortedRows.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
+    : challenge.hideVoteTotals === true
+      ? sortedRows.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
+      : sortedRows;
+  const rankOffset = start;
+  const rankedPage = visibleEntries.map((entry, index) => ({ ...entry, rank: rankOffset + index + 1 }));
+  const pageCursor = hasMore && pageDocs.length ? pageDocs.at(-1)!.id : null;
+  const nextCursor = pageCursor ? Buffer.from(JSON.stringify({ id: pageCursor, rank: rankOffset + rankedPage.length + 1 }), "utf8").toString("base64url") : null;
   return {
     type: "challenge",
     board: challengeId,
@@ -236,11 +269,11 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     visibilityMode,
     visible,
     message,
-    entries: visibleEntries.slice(start, start + pageSize),
+    entries: rankedPage,
     source: "submissions",
     updatedAt: toIso(challenge.updatedAt),
-    competitionMode: "public_voting",
-    pagination: { page, pageSize, total: visibleEntries.length, totalPages: Math.max(1, Math.ceil(visibleEntries.length / pageSize)) }
+    competitionMode: judgesMode ? "judges" : "public_voting",
+    pagination: { page, pageSize: effectivePageSize, total, totalPages: Math.max(1, Math.ceil(total / effectivePageSize)), hasMore, nextCursor, eligibleTotal: eligibleTotalSnap.data().count }
   };
 }
 

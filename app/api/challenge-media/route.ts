@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 import { isPublicChallenge, isPublicSubmission } from "@/lib/server/public-challenge";
-import { isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
+import { hasPublicVotingAccess, isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { getRequestUser } from "@/lib/server/auth";
 import { requireEnterpriseChallengeAccess } from "@/lib/server/enterprise-access";
 import { challengeMediaPaths, isPublicPrivatePreviewRecord, publicChallengeImagePaths } from "@/lib/server/challenge-media-delivery";
@@ -90,6 +90,7 @@ async function canReadSubmissionAsset(request: Request, db: FirebaseFirestore.Fi
   if (!uid) return { allowed: false, isPublic: false };
   const user = await getRequestUser(request);
   if (!user || user.uid !== uid) return { allowed: false, isPublic: false };
+  if (publicSubmission && hasPublicVotingAccess(challenge) && !isQaChallenge(challengeId, challenge)) return { allowed: true, isPublic: false };
   if (user.isAdmin || uid === ownerId || userOwnsChallenge(challenge, uid)) return { allowed: true, isPublic: publicSubmission };
   if (isPrivateChallengeRecord(challenge) && await hasPrivateViewerAccess(db, challengeId, uid)) return { allowed: true, isPublic: false };
   if (challenge.officialChallenge === true && await authorizedEnterpriseManager(request, challengeId)) return { allowed: true, isPublic: publicSubmission };

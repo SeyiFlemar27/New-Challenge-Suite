@@ -1,12 +1,12 @@
 ﻿import type { Firestore } from "firebase-admin/firestore";
 import { canVoteOnChallenge } from "@/lib/challenge-status";
-import { getVoteWeight } from "@/lib/plan-access";
 import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { writeAuditLog } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
 import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
-import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { hasPublicVotingAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { ECONOMY_V1_RULES, getActiveEconomyRules } from "@/lib/server/economy-rules";
+import { isPublicSubmission } from "@/lib/server/public-challenge";
 
 export type VoteMode = "free" | "dorocoin";
 export const DOROCOIN_COST_PER_VOTE = 5;
@@ -29,6 +29,7 @@ export interface CastVoteInput {
   requestIdempotencyKey?: string | null;
   timeZone?: string | null;
   confirmedLargeSpend?: boolean;
+  requirePublicSubmission?: boolean;
 }
 
 export function validVotingTimeZone(value: unknown) {
@@ -169,6 +170,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (input.requirePublicSubmission && !hasPublicVotingAccess(challenge)) {
+      throw voteReject("Public voting is not enabled for this challenge.", "PUBLIC_VOTING_DISABLED");
+    }
     if (!canVoteOnChallenge(challenge)) throw voteReject("Voting is closed for this challenge.", "VOTING_CLOSED");
     if (userOwnsChallenge(challenge, input.userId)) {
       throw voteReject("You cannot vote on your own challenge.", "CHALLENGE_OWNER_VOTING_BLOCKED");
@@ -181,6 +185,9 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (!submissionSnap.exists) throw voteReject("Submission not found.", "NOT_FOUND");
     const submission = { id: submissionSnap.id, ...submissionSnap.data() } as Record<string, unknown>;
+    if (input.requirePublicSubmission && !isPublicSubmission(submissionSnap.id, submission)) {
+      throw voteReject("Only approved public-facing submissions may receive public votes.", "SUBMISSION_NOT_PUBLIC");
+    }
     if (submission.challengeId !== input.challengeId) throw voteReject("Submission does not belong to this challenge.", "SUBMISSION_CHALLENGE_MISMATCH");
     if (String(submission.userId ?? "") === input.userId) throw voteReject("You cannot vote for your own submission.", "SELF_VOTING_NOT_ALLOWED");
     if (!canSubmissionReceiveVotes(submission.status)) {
@@ -238,7 +245,8 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       transaction.set(holdRef, { id: holdRef.id, userId: input.userId, challengeId: input.challengeId, submissionId: input.submissionId, quantity, doroCoinsSpent: creditCost, status: "held_pending_challenge_completion", releaseRequiresChallengeCompletion: true, releaseRequiresFraudClearance: true, releaseRequiresDisputeClearance: true, releaseRequiresVoteIntegrityClearance: true, cashEquivalentAmountCents: null, distributionStatus: "awaiting_confirmed_rule_and_value_attribution", ruleVersion: economyRules.version, createdAt: now, updatedAt: now }, { merge: true });
     }
 
-    const voteWeight = getVoteWeight(profile, settings.weightedVotes);
+    // Challenge rankings count verified votes one-for-one across free and DoroCoin voting.
+    const voteWeight = 1;
     const voteRecords: Record<string, unknown>[] = [];
     for (let index = 0; index < quantity; index += 1) {
       const voteRef = voteRequestId

@@ -62,6 +62,7 @@ try {
     { org: orgA, permissions: ["finance.view"], status: "active", expiresAt: "2000-01-01T00:00:00.000Z" },
     { org: orgC, permissions: ["finance.view"], status: "active", expiresAt: "2099-01-01T00:00:00.000Z" },
   ];
+  await Promise.all([orgA, orgB, orgC].map((organizationId) => db.collection("enterpriseOrganizations").doc(organizationId).set({ status: "active" })));
   await Promise.all(labels.map((label, index) => db.collection("users").doc(users[label].uid).set({
     emailVerified: true,
     enterpriseAccessStatus: "approved",

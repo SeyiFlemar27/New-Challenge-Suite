@@ -1,74 +1,67 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { Button, Card, Field, LinkButton, PageTitle } from "@/components/ui";
-import { fetchChallengeDetails, voteForSubmission } from "@/lib/api/services";
-import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { SubmissionMediaFrame } from "@/components/media-display";
+import { ChallengeParticipantCard, type PublicPredictionAccess, type PublicVotingAccess } from "@/components/challenge-participant-card";
+import { Card, LinkButton, PageTitle } from "@/components/ui";
+import { apiRequest } from "@/lib/api/client";
+import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
+
+interface VotingParticipantsResponse {
+  challenge: { id: string; title?: string; status?: string };
+  phaseSummary: { label?: string; votingOpen?: boolean };
+  participants: PublicChallengeParticipant[];
+  pagination: { page: number; pageSize: number; total: number | null; hasMore: boolean };
+  votingAccess: PublicVotingAccess;
+  predictionAccess: PublicPredictionAccess;
+}
 
 export default function ChallengeVotingPage() {
   const params = useParams<{ id: string }>();
   const challengeId = params.id;
   const auth = useAuth();
   const queryClient = useQueryClient();
-  const [submissionId, setSubmissionId] = useState("");
-  const [message, setMessage] = useState("");
-  const detailsQuery = useQuery({ queryKey: ["challenge-details", challengeId, auth.user?.uid ?? "signed-out"], queryFn: () => fetchChallengeDetails(challengeId), enabled: Boolean(challengeId) && !auth.loading, staleTime: 15_000 });
-  const details = detailsQuery.data?.ok ? detailsQuery.data.data : null;
-  const challenge = useMemo(() => details?.challenge ? normalizeChallenge(details.challenge as ChallengeApiRecord) : null, [details]);
-  const submissions = useMemo(() => challenge ? (details?.submissions ?? []).map((item) => normalizeSubmission(item as SubmissionApiRecord, challenge)).filter((item) => item.id) : [], [challenge, details?.submissions]);
-  const phaseSummary = (details as any)?.phaseSummary as { votingOpen?: boolean; eligibleSubmissionCount?: number | null } | undefined;
-  const votingAccess = (details as any)?.userState?.votingAccess as { authenticated?: boolean; canVote?: boolean; reason?: string | null; loginPath?: string; freeVote?: { available?: boolean; used?: boolean; voteDate?: string; timeZone?: string; resetsAt?: string } } | undefined;
-  const votingOpen = Boolean(phaseSummary?.votingOpen);
-  const eligibleSubmissionCount = Number(phaseSummary?.eligibleSubmissionCount ?? submissions.length);
-  const freeVoteUsed = Boolean(votingAccess?.freeVote?.used);
-  const freeVoteResetLabel = votingAccess?.freeVote?.resetsAt
-    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(votingAccess.freeVote.resetsAt))
-    : null;
-  const voteMutation = useMutation({
-    mutationFn: () => voteForSubmission({ challengeId, submissionId, voteMode: "free", quantity: 1, idempotencyKey: crypto.randomUUID() }),
-    onSuccess: async (result) => { setMessage(result.message); await queryClient.invalidateQueries({ queryKey: ["challenge-details", challengeId] }); },
-    onError: (error) => setMessage(error instanceof Error ? error.message : "Your vote could not be recorded.")
+  const query = useQuery({
+    queryKey: ["challenge-voting-participants", challengeId, auth.user?.uid ?? "signed-out"],
+    queryFn: () => apiRequest<VotingParticipantsResponse>(`/api/challenges/${challengeId}/participants?page=1&pageSize=36&sort=highest_votes`),
+    enabled: Boolean(challengeId) && !auth.loading,
+    staleTime: 15_000
   });
-  function voteAction(sticky = false) {
-    const className = sticky ? "w-full" : "mt-5 w-full";
-    if (!auth.user) return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}/votes`)}`} className={className}>Log in to Vote</LinkButton>;
-    if (votingAccess?.canVote === false) return <Button className={className} variant="secondary" disabled>{votingAccess.reason === "owner_blocked" ? "You cannot vote on your own challenge" : votingAccess.reason === "sponsor_blocked" ? "Voting unavailable for sponsor accounts" : "Voting unavailable"}</Button>;
-    if (freeVoteUsed) return <Button className={className} variant="secondary" disabled>Free Vote Used Today</Button>;
-    return <Button className={className} disabled={!submissionId || voteMutation.isPending} onClick={() => voteMutation.mutate()}>{voteMutation.isPending ? "Recording Vote..." : "Cast Free Vote"}</Button>;
-  }
+  const payload = query.data?.ok ? query.data.data : null;
+  const returnPath = `/challenges/${challengeId}/votes`;
 
-  if (auth.loading || detailsQuery.isLoading) return <AppShell><Card className="mx-auto h-64 max-w-4xl animate-pulse" /></AppShell>;
-  if (!challenge) return <AppShell><Card className="mx-auto max-w-4xl p-8"><PageTitle title="Voting" subtitle="Challenge unavailable" icon={<Vote className="text-[var(--gold)]" />} /><LinkButton href="/explore" className="mt-6">Back to Explore</LinkButton></Card></AppShell>;
+  if (auth.loading || query.isLoading) return <AppShell><Card className="mx-auto h-64 max-w-5xl animate-pulse" /></AppShell>;
+  if (!payload) return <AppShell><Card className="mx-auto max-w-5xl p-8"><PageTitle title="Challenge Voting" subtitle={query.data?.message ?? "Challenge voting is unavailable."} icon={<Vote className="text-[var(--gold)]" />} /><LinkButton href={`/challenges/${challengeId}`} className="mt-6" variant="secondary">Return to Challenge</LinkButton></Card></AppShell>;
+
+  const votingOpen = Boolean(payload.phaseSummary.votingOpen);
   return (
     <AppShell>
-      <Card data-mobile-voting-page className="mx-auto max-w-4xl p-5 sm:p-8">
-        <PageTitle title="Challenge Voting" subtitle={challenge.title} icon={<Vote className="text-[var(--gold)]" />} />
-        {!votingOpen ? <div className="mt-8"><h2 className="text-xl font-black">Voting is not open.</h2><p className="mt-2 text-slate-300">Return when the challenge voting window opens.</p></div>
-          : eligibleSubmissionCount <= 0 || !submissions.length ? <div className="mt-8"><h2 className="text-xl font-black">Voting unavailable</h2><p className="mt-2 text-slate-300">No eligible submissions are available for voting yet.</p></div>
-            : <div className="mt-8">
-              <div className="rounded-[8px] border border-white/10 bg-white/[0.04] p-4"><p className="font-black text-[var(--gold)]">{freeVoteUsed ? "Free vote used for today." : "Your free vote is available."}</p>{freeVoteUsed && freeVoteResetLabel ? <p className="mt-1 text-sm text-slate-400">Resets at {freeVoteResetLabel} in your saved timezone.</p> : <p className="mt-1 text-sm text-slate-400">One free vote total per challenge per local day.</p>}</div>
-              <Field label="Choose an eligible submission">
-                <div className="mobile-card-list mt-3 grid gap-4 sm:grid-cols-2">
-                  {submissions.map((submission) => <button type="button" key={submission.id} onClick={() => setSubmissionId(submission.id)} className={`overflow-hidden rounded-[8px] border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] ${submissionId === submission.id ? "border-[var(--gold)] bg-[var(--gold)]/10" : "border-white/10 bg-[#171717]"}`}>
-                    <SubmissionMediaFrame src={submission.mediaUrl} alt={submission.title} className="aspect-[16/10] h-auto rounded-none border-0" placeholder="Challenge entry" />
-                    <span className="block min-h-14 p-4 font-black">{submission.title}</span>
-                  </button>)}
+      <div className="mx-auto max-w-5xl">
+        <Card className="p-5 sm:p-8">
+          <PageTitle title="Challenge Voting" subtitle={payload.challenge.title ?? "Eligible challenge entries"} icon={<Vote className="text-[var(--gold)]" />} />
+          {!votingOpen ? <p className="mt-7 rounded-lg bg-slate-100 p-4 text-slate-700">Voting is not open. Return when the challenge voting window opens.</p>
+            : payload.participants.length === 0 ? <p className="mt-7 rounded-lg bg-slate-100 p-4 text-slate-700">No eligible submissions are available for voting yet.</p>
+              : <>
+                <p className="mt-6 text-sm text-slate-600">Choose an approved entry to cast your eligible vote. Each verified vote counts equally.</p>
+                <div className="mobile-card-list mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {payload.participants.map((participant) => <ChallengeParticipantCard
+                    key={participant.submissionId}
+                    challengeId={challengeId}
+                    participant={participant}
+                    votingAccess={payload.votingAccess}
+                    predictionAccess={payload.predictionAccess}
+                    returnPath={returnPath}
+                    onVoteRecorded={() => queryClient.invalidateQueries({ queryKey: ["challenge-voting-participants", challengeId] })}
+                  />)}
                 </div>
-                <select className="sr-only" tabIndex={-1} aria-hidden="true" value={submissionId} onChange={(event) => setSubmissionId(event.target.value)}><option value="">Select a submission</option>{submissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.title}</option>)}</select>
-              </Field>
-              {voteAction()}
-              {freeVoteUsed ? <LinkButton href={`/challenges/${challengeId}/bonus-votes`} className="mt-3 w-full" variant="secondary">Use DoroCoins for Additional Votes</LinkButton> : null}
-            </div>}
-        {message ? <p className="mt-4 rounded-[8px] bg-white/[0.05] p-3 text-sm text-slate-200">{message}</p> : null}
-        <LinkButton href={`/challenges/${challengeId}`} className="mt-8" variant="secondary">Return to Challenge</LinkButton>
-      </Card>
-      {votingOpen && eligibleSubmissionCount > 0 && submissions.length ? <><div className="h-24 lg:hidden" aria-hidden="true" /><div data-mobile-sticky-cta className="mobile-sticky-action fixed inset-x-0 bottom-0 z-40 border-t border-[var(--gold)]/25 bg-[#090909]/96 px-4 pt-3 backdrop-blur lg:hidden">{voteAction(true)}</div></> : null}
+                {payload.pagination.hasMore ? <LinkButton href={`/challenges/${challengeId}/participants`} className="mt-5" variant="secondary">See all eligible entries</LinkButton> : null}
+              </>}
+          <LinkButton href={`/challenges/${challengeId}`} className="mt-8" variant="secondary">Return to Challenge</LinkButton>
+        </Card>
+      </div>
     </AppShell>
   );
 }

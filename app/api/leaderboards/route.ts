@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { buildChallengeLeaderboard, buildGlobalLeaderboard, buildTournamentLeaderboard } from "@/lib/server/leaderboard";
+import { buildGlobalLeaderboard, buildTournamentLeaderboard } from "@/lib/server/leaderboard";
+import { buildPublicChallengeParticipants } from "@/lib/server/challenge-participants";
 import { fail, ok, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { isPublicChallenge } from "@/lib/server/public-challenge";
 import { getOptionalRequestUser } from "@/lib/server/auth";
@@ -22,13 +23,32 @@ export async function GET(request: Request) {
   try {
     if (type === "challenge") {
       if (!challengeId) return validationError({ challengeId: "Challenge ID is required for challenge leaderboards." });
-      const result = await buildChallengeLeaderboard(db, challengeId, { page, pageSize: limit });
+      const result = await buildPublicChallengeParticipants(db, challengeId, {
+        page,
+        pageSize: limit,
+        cursor: url.searchParams.get("cursor"),
+        search: url.searchParams.get("search") ?? "",
+        sort: url.searchParams.get("sort") === "newest" ? "newest" : "highest_votes"
+      });
       if (!result.challenge) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
       if (!isPublicChallenge(challengeId, result.challenge)) {
         return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
       }
-      const { challenge: _challenge, ...payload } = result;
-      return ok(payload, result.message ?? "Challenge leaderboard loaded.");
+      const challenge = result.challenge;
+      return ok({
+        type: "challenge",
+        board: challengeId,
+        challengeId,
+        status: result.leaderboard.status,
+        visibilityMode: result.leaderboard.visibilityMode,
+        visible: result.leaderboard.visible,
+        message: result.leaderboard.message,
+        entries: result.entries,
+        source: "submissions",
+        updatedAt: null,
+        competitionMode: [challenge.winnerSelection, challenge.votingMode, challenge.scoringMode].some((value) => String(value ?? "").toLowerCase().includes("judge")) || challenge.judgeScoringEnabled === true ? "judges" : "public_voting",
+        pagination: { ...result.pagination, eligibleTotal: result.eligibleTotal }
+      }, result.leaderboard.message ?? "Challenge leaderboard loaded.");
     }
 
     if (type === "tournament") {
@@ -41,6 +61,7 @@ export async function GET(request: Request) {
     const result = await buildGlobalLeaderboard(db, { page, pageSize: limit, period, currentUserId: viewer?.uid ?? null });
     return ok(result, result.message ?? "Leaderboard loaded.");
   } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_CHALLENGE_LEADERBOARD_CURSOR") return validationError({ cursor: "Leaderboard cursor is invalid." });
     console.error("[leaderboards] load failed", { board, type, challengeId, message: error instanceof Error ? error.message : String(error) });
     return serverError("Leaderboard could not be loaded.", error instanceof Error ? error.message : error);
   }

@@ -41,6 +41,10 @@ export function ChallengeMediaGallery({
   const activeIndex = Math.min(requestedIndex, Math.max(media.length - 1, 0));
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const active = media[activeIndex];
 
   useEffect(() => {
@@ -49,18 +53,39 @@ export function ChallengeMediaGallery({
 
   useEffect(() => {
     if (!lightboxOpen) return;
+    closeButtonRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setLightboxOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setLightboxOpen(false);
+      }
       if (event.key === "ArrowLeft") setActiveIndex((current) => Math.max(0, current - 1));
       if (event.key === "ArrowRight") setActiveIndex((current) => Math.min(media.length - 1, current + 1));
+      if (event.key === "Tab") {
+        const dialog = dialogRef.current;
+        const focusable = dialog ? Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], video[controls], [tabindex]:not([tabindex="-1"])')) : [];
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable.at(-1)!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      openerRef.current?.focus();
+    };
   }, [lightboxOpen, media.length]);
 
   if (!active) {
     return (
-      <div className="grid aspect-[16/10] place-items-center rounded-[12px] bg-[linear-gradient(135deg,#171717,#080808)] text-sm font-black uppercase tracking-[0.18em] text-[var(--gold)]">
+      <div className="grid aspect-video place-items-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold tracking-wide text-slate-500">
         Challenge Suite
       </div>
     );
@@ -68,26 +93,38 @@ export function ChallengeMediaGallery({
 
   const previous = () => setActiveIndex((current) => Math.max(0, current - 1));
   const next = () => setActiveIndex((current) => Math.min(media.length - 1, current + 1));
+  const openLightbox = (event: React.MouseEvent<HTMLButtonElement>) => {
+    openerRef.current = event.currentTarget;
+    setLightboxOpen(true);
+  };
 
   return (
     <div data-challenge-media-gallery data-video-first={media[0]?.type === "video"}>
-      <div
-        className="group relative aspect-[16/10] overflow-hidden rounded-[12px] bg-[#090909]"
-        onMouseEnter={() => {
-          if (active.type === "video") void videoRef.current?.play().catch(() => undefined);
-        }}
-        onMouseLeave={() => pause(videoRef.current)}
-      >
+      <div className="group relative aspect-video touch-pan-y overflow-hidden rounded-xl border border-slate-200 bg-slate-100" onTouchStart={(event) => {
+        if ((event.target as HTMLElement).closest("button, video")) return;
+        const touch = event.changedTouches[0];
+        touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      }} onTouchEnd={(event) => {
+        const start = touchStartRef.current;
+        touchStartRef.current = null;
+        if (!start || (event.target as HTMLElement).closest("button, video")) return;
+        const touch = event.changedTouches[0];
+        if (!touch) return;
+        const deltaX = touch.clientX - start.x;
+        const deltaY = touch.clientY - start.y;
+        if (Math.abs(deltaX) < 44 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+        setActiveIndex((current) => Math.max(0, Math.min(media.length - 1, current + (deltaX < 0 ? 1 : -1))));
+      }}>
         {active.type === "video" ? (
-          <video ref={videoRef} src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="h-full w-full object-contain" aria-label={active.alt} />
+          <video ref={videoRef} src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="h-full w-full object-cover" aria-label={active.alt} />
         ) : (
-          <button type="button" className="h-full w-full cursor-zoom-in" onClick={() => setLightboxOpen(true)} aria-label={`Enlarge ${active.alt}`}>
-            <ContentImage src={active.url} alt={active.alt} className="h-full w-full object-contain" loading="eager" />
+          <button type="button" className="h-full w-full cursor-zoom-in" onClick={openLightbox} aria-label={`Enlarge ${active.alt}`}>
+            <ContentImage src={active.url} alt={active.alt} className="h-full w-full object-cover" loading="eager" />
           </button>
         )}
         {activeIndex > 0 ? <GalleryArrow direction="previous" onClick={previous} /> : null}
         {activeIndex < media.length - 1 ? <GalleryArrow direction="next" onClick={next} /> : null}
-        <button type="button" onClick={() => setLightboxOpen(true)} className="absolute right-3 top-3 grid size-10 place-items-center rounded-full bg-black/65 text-white opacity-90 transition hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--gold)]" aria-label="Open enlarged media viewer">
+        <button type="button" onClick={openLightbox} className="absolute right-3 top-3 grid size-10 place-items-center rounded-full bg-black/65 text-white opacity-90 transition hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--gold)]" aria-label="Open enlarged media viewer">
           <Expand size={17} />
         </button>
       </div>
@@ -95,14 +132,14 @@ export function ChallengeMediaGallery({
         <div className="mt-3 flex gap-3 overflow-x-auto pb-1" aria-label="Challenge media thumbnails">
           {media.map((item, index) => (
             <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Show ${item.alt}`} aria-current={index === activeIndex ? "true" : undefined} className={cn("relative aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-[6px] border-2 bg-black transition sm:w-28", index === activeIndex ? "border-[var(--gold)]" : "border-transparent opacity-70 hover:opacity-100")}>
-              {item.type === "video" ? <><video src={item.url} poster={item.posterUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" /><span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play size={17} fill="currentColor" /></span></> : <ContentImage src={item.url} alt="" className="h-full w-full object-cover" loading="lazy" />}
+              {item.type === "video" ? <><div className="h-full w-full bg-slate-200" aria-hidden="true" />{item.posterUrl ? <ContentImage src={item.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" /> : null}<span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play size={17} fill="currentColor" /></span></> : <ContentImage src={item.url} alt="" className="h-full w-full object-cover" loading="lazy" />}
             </button>
           ))}
         </div>
       ) : null}
       {lightboxOpen ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/90 p-4" role="dialog" aria-modal="true" aria-label={`${title} media viewer`} onMouseDown={(event) => { if (event.target === event.currentTarget) setLightboxOpen(false); }}>
-          <button type="button" onClick={() => setLightboxOpen(false)} className="absolute right-4 top-4 grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close media viewer"><X /></button>
+        <div ref={dialogRef} className="fixed inset-0 z-[100] grid place-items-center bg-black/90 p-4" role="dialog" aria-modal="true" aria-label={`${title} media viewer`} onMouseDown={(event) => { if (event.target === event.currentTarget) setLightboxOpen(false); }}>
+          <button ref={closeButtonRef} type="button" onClick={() => setLightboxOpen(false)} className="absolute right-4 top-4 grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--gold)]" aria-label="Close media viewer"><X /></button>
           {active.type === "video" ? <video src={active.url} poster={active.posterUrl} controls muted playsInline preload="metadata" className="max-h-[88vh] max-w-[92vw] object-contain" /> : <ContentImage src={active.url} alt={active.alt} className="max-h-[88vh] max-w-[92vw] object-contain" />}
           {activeIndex > 0 ? <GalleryArrow direction="previous" onClick={previous} fixed /> : null}
           {activeIndex < media.length - 1 ? <GalleryArrow direction="next" onClick={next} fixed /> : null}

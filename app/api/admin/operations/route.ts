@@ -665,6 +665,12 @@ export async function PATCH(request: Request) {
       previousStatus = String(snap.data()?.[target.statusField] ?? "unknown");
       await ref.set({
         [target.statusField]: status,
+        ...(type === "submission" ? {
+          leaderboardEligible: ["approved", "active", "winner"].includes(status) && (snap.data()?.visibility ?? "public") === "public" && snap.data()?.publicVisibility !== false,
+          visibility: snap.data()?.visibility ?? "public",
+          publicVisibility: snap.data()?.publicVisibility !== false,
+          ...(status === "approved" ? { leaderboardSortAt: snap.data()?.scoreReachedAt ?? snap.data()?.voteTotalReachedAt ?? snap.data()?.approvedAt ?? now } : {})
+        } : {}),
         reviewedBy: user.uid,
         reviewedAt: now,
         moneyMovementEnabled: false,

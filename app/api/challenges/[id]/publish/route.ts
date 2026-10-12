@@ -226,6 +226,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ])] : [],
     privateAccessMethod,
     privateJoiningPolicy: body.visibility === "private" ? body.privateJoiningPolicy : "invite_only",
+    privateVotingAccess: body.visibility === "private" ? body.privateVotingAccess : "access_restricted",
     privateAccessCode: "",
     privateDirectInvitees: [],
     submissionStartAt: body.submissionStartAt || body.startsAt,

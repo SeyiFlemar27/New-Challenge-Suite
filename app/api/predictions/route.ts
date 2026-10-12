@@ -2,7 +2,7 @@ import { getStripe } from "@/lib/stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser, requireRequestUser } from "@/lib/server/auth";
 import { challengeForPlanAccess } from "@/lib/server/challenge-access";
-import { buildChallengeLeaderboard } from "@/lib/server/leaderboard";
+import { rankSubmissions } from "@/lib/server/leaderboard";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
 import {
@@ -22,6 +22,7 @@ import { hasPrivateChallengeAccess } from "@/lib/server/private-invites";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { checkoutLineItem } from "@/lib/server/monetization-payments";
+import { isPublicSubmission } from "@/lib/server/public-challenge";
 
 export const dynamic = "force-dynamic";
 
@@ -95,14 +96,18 @@ export async function GET(request: Request) {
     return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   }
 
-  const leaderboard = await buildChallengeLeaderboard(db, challengeId, { limit: 250, includeEligibleEntries: true });
+  const eligibleSubmissionQuery = db.collection("submissions")
+    .where("challengeId", "==", challengeId)
+    .where("leaderboardEligible", "==", true)
+    .where("visibility", "==", "public");
+  const eligibleSubmissionCount = (await eligibleSubmissionQuery.count().get()).data().count;
   const access = predictionAccessForViewer({
     challengeId,
     challenge,
     userId: user?.uid ?? null,
     user,
     profile,
-    eligibleSubmissionCount: leaderboard.entries.length
+    eligibleSubmissionCount
   });
   const predictionSnap = user
     ? await db.collection("predictionRecords").doc(predictionRecordId(challengeId, user.uid)).get()
@@ -184,20 +189,34 @@ export async function POST(request: Request) {
   if (privateVisibility && !(await hasPrivateChallengeAccess(db, challengeId, user.uid))) {
     return fail("A valid challenge invite or approval is required.", 403, undefined, "PRIVATE_ACCESS_REQUIRED");
   }
-  const leaderboard = await buildChallengeLeaderboard(db, challengeId, { limit: 250, includeEligibleEntries: true });
+  const eligibleSubmissionQuery = db.collection("submissions")
+    .where("challengeId", "==", challengeId)
+    .where("leaderboardEligible", "==", true)
+    .where("visibility", "==", "public");
+  const [eligibleSubmissionCountSnap, targetSubmissionSnap] = await Promise.all([
+    eligibleSubmissionQuery.count().get(),
+    db.collection("submissions").doc(predictedSubmissionId).get()
+  ]);
   const access = predictionAccessForViewer({
     challengeId,
     challenge,
     userId: user.uid,
     user,
     profile,
-    eligibleSubmissionCount: leaderboard.entries.length
+    eligibleSubmissionCount: eligibleSubmissionCountSnap.data().count
   });
   if (!access.canPredict) return fail(access.message, 403, { predictionAccess: access }, String(access.reason ?? "PREDICTION_BLOCKED").toUpperCase());
   if (profile.ageVerified !== true) return fail("Age verification is required before making a real-money prediction.", 403, undefined, "AGE_VERIFICATION_REQUIRED");
   if (profile.suspended === true || isSponsorProfile(profile)) return fail("This account cannot make predictions.", 403, undefined, "ACCOUNT_RESTRICTED");
 
-  const target = findEligiblePredictionTarget(leaderboard.entries, predictedSubmissionId);
+  const targetData = targetSubmissionSnap.exists ? targetSubmissionSnap.data() ?? {} : null;
+  const target = targetData
+    && targetData.challengeId === challengeId
+    && targetData.leaderboardEligible === true
+    && targetData.visibility === "public"
+    && isPublicSubmission(targetSubmissionSnap.id, targetData)
+    ? findEligiblePredictionTarget(rankSubmissions([{ id: targetSubmissionSnap.id, ...targetData }]), predictedSubmissionId)
+    : null;
   if (!target) return fail("Selected participant is not eligible for Prediction Arena.", 400, undefined, "PREDICTION_TARGET_NOT_ELIGIBLE");
   if (String(target.userId ?? "") === user.uid) return fail("You cannot predict yourself to win.", 403, undefined, "SELF_PREDICTION_NOT_ALLOWED");
   const amountCents = Math.round(stakeAmountUsd * 100);

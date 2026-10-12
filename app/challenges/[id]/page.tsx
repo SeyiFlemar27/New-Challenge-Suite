@@ -10,11 +10,9 @@ import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton, textareaClass } from "@/components/ui";
 import { fetchChallengeDetails } from "@/lib/api/services";
 import { apiRequest } from "@/lib/api/client";
-import { PremiumBadge } from "@/components/brand";
 import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type SubmissionApiRecord } from "@/lib/api/normalizers";
-import { getChallengeLifecycleState, getChallengeTimelineDisplay, statusClassName } from "@/lib/challenge-status";
+import { getChallengeLifecycleState, getChallengeTimelineDisplay } from "@/lib/challenge-status";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { getPlanExperience } from "@/lib/plan-access";
 import { ChallengeShare } from "@/components/challenge-share";
 import { ChallengeMediaGallery } from "@/components/media-display";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
@@ -25,16 +23,25 @@ import { ChallengeMilestoneCountdown } from "@/components/challenge-milestone-co
 import { SponsorPlacement, type PublicSponsorPlacement } from "@/components/sponsor-placement";
 import type { DynamicTranslations } from "@/lib/i18n/dynamic-content";
 
-type ChallengeGuideSection = "overview" | "rules" | "submission" | "voting" | "prizes" | "leaderboard";
+type ChallengeGuideSection = "overview" | "rules" | "entry" | "voting";
+type ChallengeComment = { id: string; username: string | null; avatarUrl: string | null; body: string; createdAt: string | null };
+type ChallengeCommentsPage = { comments: ChallengeComment[]; pagination: { total: number; hasMore: boolean; nextCursor: string | null } };
 
 export default function ChallengeDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const challengeId = params.id;
   const { user } = useCurrentUser();
+  const commentsIdentity = `${challengeId}:${user?.uid ?? "signed-out"}`;
   const [savedOverride, setSavedOverride] = useState<boolean | null>(null);
   const [engagementMessage, setEngagementMessage] = useState("");
-  const [comments, setComments] = useState<Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }>>([]);
+  const [comments, setComments] = useState<ChallengeComment[]>([]);
+  const [commentsTotal, setCommentsTotal] = useState(0);
+  const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
+  const [commentsLoadingState, setCommentsLoading] = useState(false);
+  const [commentsForIdentity, setCommentsForIdentity] = useState("");
+  const [commentsError, setCommentsError] = useState("");
+  const [commentPosting, setCommentPosting] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [commentMessage, setCommentMessage] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -42,7 +49,7 @@ export default function ChallengeDetailPage() {
   const [entryCheckoutLoading, setEntryCheckoutLoading] = useState(false);
   const [entryCheckoutMessage, setEntryCheckoutMessage] = useState("");
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["challenge-details", challengeId],
+    queryKey: ["challenge-details", challengeId, user?.uid ?? "signed-out"],
     queryFn: () => fetchChallengeDetails(challengeId),
     enabled: Boolean(challengeId),
     staleTime: 30_000
@@ -87,9 +94,38 @@ export default function ChallengeDetailPage() {
   }, [participantJourneyStep, refetch, waitingSubmissionStart]);
   useEffect(() => {
     if (!challengeId) return;
-    void apiRequest<{ comments: Array<{ id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean }> }>(`/api/challenges/${challengeId}/comments`)
-      .then((result) => setComments(result.ok ? result.data?.comments ?? [] : []));
-  }, [challengeId]);
+    let active = true;
+    void apiRequest<ChallengeCommentsPage>(`/api/challenges/${challengeId}/comments?pageSize=20`)
+      .then((result) => {
+        if (!active) return;
+        if (!result.ok || !result.data) {
+          setComments([]);
+          setCommentsTotal(0);
+          setCommentsCursor(null);
+          setCommentsForIdentity(commentsIdentity);
+          setCommentsError(result.message || "Comments could not be loaded.");
+          return;
+        }
+        setComments(result.data.comments ?? []);
+        setCommentsTotal(result.data.pagination?.total ?? 0);
+        setCommentsCursor(result.data.pagination?.nextCursor ?? null);
+        setCommentsForIdentity(commentsIdentity);
+        setCommentsError("");
+      })
+      .catch(() => {
+        if (!active) return;
+        setComments([]);
+        setCommentsTotal(0);
+        setCommentsCursor(null);
+        setCommentsForIdentity(commentsIdentity);
+        setCommentsError("Comments could not be loaded.");
+      })
+      .finally(() => { if (active) setCommentsLoading(false); });
+    return () => { active = false; };
+  }, [challengeId, commentsIdentity]);
+
+  const commentsLoading = commentsLoadingState || commentsForIdentity !== commentsIdentity;
+  const visibleCommentsError = commentsForIdentity === commentsIdentity ? commentsError : "";
 
   async function updateEngagement(action: "save_challenge", enabled: boolean) {
     setEngagementMessage("");
@@ -106,14 +142,45 @@ export default function ChallengeDetailPage() {
   }
 
   async function addComment() {
-    const result = await apiRequest<{ comment: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; body?: string; createdAt?: string; planId?: string; verified?: boolean } }>(`/api/challenges/${challengeId}/comments`, {
-      method: "POST",
-      body: JSON.stringify({ body: commentBody })
-    });
-    setCommentMessage(result.message);
-    if (result.ok && result.data?.comment) {
-      setComments((current) => [...current, result.data!.comment]);
-      setCommentBody("");
+    if (commentPosting || commentBody.trim().length < 2) return;
+    setCommentPosting(true);
+    setCommentMessage("");
+    try {
+      const result = await apiRequest<{ comment: ChallengeComment }>(`/api/challenges/${challengeId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body: commentBody })
+      });
+      setCommentMessage(result.message);
+      if (result.ok && result.data?.comment) {
+        setComments((current) => [result.data!.comment, ...current.filter((item) => item.id !== result.data!.comment.id)]);
+        setCommentsTotal((total) => total + 1);
+        setCommentsForIdentity(commentsIdentity);
+        setCommentBody("");
+      }
+    } catch {
+      setCommentMessage("Your comment could not be posted. Please try again.");
+    } finally {
+      setCommentPosting(false);
+    }
+  }
+
+  async function loadMoreComments() {
+    if (!commentsCursor || commentsLoading) return;
+    setCommentsLoading(true);
+    setCommentsError("");
+    try {
+      const result = await apiRequest<ChallengeCommentsPage>(`/api/challenges/${challengeId}/comments?pageSize=20&cursor=${encodeURIComponent(commentsCursor)}`);
+      if (!result.ok || !result.data) {
+        setCommentsError(result.message || "More comments could not be loaded.");
+        return;
+      }
+      setComments((current) => [...current, ...(result.data?.comments ?? []).filter((item) => !current.some((existing) => existing.id === item.id))]);
+      setCommentsTotal(result.data.pagination?.total ?? commentsTotal);
+      setCommentsCursor(result.data.pagination?.nextCursor ?? null);
+    } catch {
+      setCommentsError("More comments could not be loaded. Please try again.");
+    } finally {
+      setCommentsLoading(false);
     }
   }
 
@@ -180,12 +247,10 @@ export default function ChallengeDetailPage() {
   const votingOpen = Boolean(phaseSummary?.canVote ?? lifecycle.canVote);
   const userState = details?.userState;
   const leaderboard = (details as { leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; entries?: unknown[] } } | null)?.leaderboard;
-  const totalVotes = Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
+  const totalVotes = details?.voteCountVisible === false ? null : Number(details?.voteCount ?? challengeSubmissions.reduce((sum, item) => sum + item.likes, 0));
   const prizePool = details?.prizePool;
   const prizeValue = Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `$${(Number(prizePool?.visibleJackpotCents) / 100).toLocaleString()}` : challenge.prizeType === "Bragging Rights (Leaderboard Ranking)" ? "Ranking" : "Not published";
-  const planExperience = getPlanExperience({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
   const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
-  const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const ownerAccount = Boolean((userState as any)?.ownerAccount);
   const sponsorAccount = user?.accountType === "sponsor" || user?.role === "sponsor" || selectedAccountType === "sponsor";
   const challengeKind = String((challenge as any).challengeType ?? (challenge as any).type ?? "").toLowerCase();
@@ -214,8 +279,10 @@ export default function ChallengeDetailPage() {
   const creatorUsername = String(rawChallenge?.creatorUsername ?? rawChallenge?.hostUsername ?? "");
   const mobileJourneyAction = String(participantJourney?.primaryAction ?? "");
   const mobileJourneyActionVisible = ["pay_entry_fee", "refresh_payment", "wait_for_submission", "submit_entry", "register", "join_waitlist", "enter_challenge", "request_entry", "view_voting", "view_entry", "manage_challenge", "sign_in"].includes(mobileJourneyAction);
-  const leaderboardRelevant = Boolean(leaderboard?.visible && topParticipants.length > 0 && (votingOpen || ["voting_closed", "under_review", "winners_announced", "completed"].includes(phase)));
-  const commentsClosed = ["completed", "winners_announced", "voting_closed"].includes(phase);
+  const leaderboardRelevant = Boolean(leaderboard?.visible && (votingOpen || ["voting_closed", "under_review", "winners_announced", "completed"].includes(phase)));
+  const commentsClosed = ["completed", "cancelled", "paused", "postponed"].includes(phase);
+  const visibleComments = commentsForIdentity === commentsIdentity ? comments : [];
+  const visibleCommentsTotal = commentsForIdentity === commentsIdentity ? commentsTotal : 0;
   const prizeStatusLabel = publicPrizeStatus(prizePool);
   const prizeAmountKind = ["confirmed", "funded", "active", "locked"].includes(String(prizePool?.status ?? "").toLowerCase()) ? "Prize amount" : "Estimated prize";
   const submissionInstructions = Array.isArray(rawChallenge?.submissionInstructionsList)
@@ -225,15 +292,50 @@ export default function ChallengeDetailPage() {
   const judging = String(rawChallenge?.winnerSelection ?? rawChallenge?.judgingMethod ?? rawChallenge?.scoringMode ?? "").replaceAll("_", " ").trim();
   const winnerSplits = Array.isArray(prizePool?.winnerSplits) ? prizePool.winnerSplits as Array<{ position?: number; percent?: number; expectedAmountCents?: number }> : [];
   const prizeBreakdown = winnerSplits.filter((split) => Number(split.expectedAmountCents ?? 0) > 0).map((split) => `Place ${Number(split.position ?? 0)}: ${(Number(split.expectedAmountCents ?? 0) / 100).toLocaleString("en-US", { style: "currency", currency: String(prizePool?.currency ?? "USD").toUpperCase() })}${Number.isFinite(Number(split.percent)) ? ` (${Number(split.percent)}%)` : ""}`).join(" · ");
+  const submissionMediaRequirements = Array.isArray(rawChallenge?.acceptedSubmissionTypes) ? rawChallenge.acceptedSubmissionTypes : challenge.acceptedSubmissionTypes;
+  const entryFacts: Array<[string, string]> = [
+    ["Eligibility", typeof rawChallenge?.participantRequirements === "string" ? rawChallenge.participantRequirements.trim() : ""],
+    ["Entry", paidEntryRequired ? entryFeeLabel : "Free"],
+    ["Registration deadline", formatChallengeDateTime(rawChallenge?.registrationDeadline ?? rawChallenge?.registrationEndAt ?? "", challengeTimeZone) ?? ""],
+    ["Capacity", Number(rawChallenge?.maxParticipants ?? 0) > 0 ? Number(rawChallenge?.maxParticipants).toLocaleString() : ""],
+    ["Accepted media", submissionMediaRequirements.length ? submissionMediaRequirements.join(", ") : ""],
+    ["Submission deadline", formatChallengeDateTime(rawChallenge?.submissionDeadline ?? rawChallenge?.submissionEndAt ?? "", challengeTimeZone) ?? ""]
+  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>;
+  const votingFacts: Array<[string, string]> = [
+    ["Winner selection", judging],
+    ["Audience voting", votingSettings.enabled === false || votingSettings.allowFreeVotes === false ? "Not enabled" : "Enabled"],
+    ["Free votes", votingSettings.allowFreeVotes === true ? "Enabled" : votingSettings.allowFreeVotes === false ? "Disabled" : "Not specified"],
+    ["DoroCoin votes", votingSettings.allowPaidVotes === true ? "Enabled" : votingSettings.allowPaidVotes === false ? "Disabled" : "Not specified"],
+    ["Voting deadline", formatChallengeDateTime(rawChallenge?.votingDeadline ?? rawChallenge?.votingEndsAt ?? "", challengeTimeZone) ?? ""]
+  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>;
   const guideSections: Array<{ id: ChallengeGuideSection; label: string; body: string }> = [
     { id: "overview", label: "Overview", body: challenge.description },
-    { id: "rules", label: "Rules & Eligibility", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join("\n") : String(rawChallenge?.standardRules ?? rawChallenge?.challengeRules ?? rawChallenge?.policyTerms ?? "").trim() || "No additional eligibility terms were published." },
-    { id: "submission", label: "Submission", body: `Accepted uploads: ${challenge.acceptedSubmissionTypes.join(", ") || "Not specified"}. Deadline: ${formatChallengeDateTime(rawChallenge?.submissionDeadline ?? rawChallenge?.submissionEndAt ?? "", challengeTimeZone) ?? "Not published"}.` },
-    { id: "voting", label: "Voting & Judging", body: `${votingOpen ? "Voting is open." : phase === "voting_pending" ? "Voting has not opened." : "Voting is closed or not currently available."} ${votingSettings.allowFreeVotes === true ? "Free votes are enabled." : votingSettings.allowFreeVotes === false ? "Free votes are disabled." : "Free-vote configuration is not published."} ${votingSettings.allowPaidVotes === true ? "DoroCoin additional votes are enabled." : votingSettings.allowPaidVotes === false ? "DoroCoin additional votes are disabled." : "Additional vote configuration is not published."} ${judging ? `Winner selection: ${judging}.` : "No separate judging method is published."}` },
-    { id: "prizes", label: "Prizes", body: `${prizeStatusLabel}. ${Number(prizePool?.visibleJackpotCents ?? 0) > 0 ? `Confirmed prize pool: ${prizeValue}.${prizeBreakdown ? ` ${prizeBreakdown}.` : ""}` : "No confirmed public prize amount is available."}` },
-    { id: "leaderboard", label: "Leaderboard", body: leaderboardRelevant ? "The leaderboard is available below and contains eligible entries only." : "Leaderboard becomes available when voting opens." }
+    { id: "rules", label: "Rules", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join("\n") : String(rawChallenge?.standardRules ?? rawChallenge?.challengeRules ?? rawChallenge?.policyTerms ?? "").trim() },
+    { id: "entry", label: "How to Enter", body: "" },
+    { id: "voting", label: "Voting & Results", body: "" }
   ];
   const activeGuide = guideSections.find((section) => section.id === guideSection) ?? guideSections[0];
+
+  async function refetchComments() {
+    if (commentsLoading) return;
+    setCommentsLoading(true);
+    setCommentsError("");
+    try {
+      const result = await apiRequest<ChallengeCommentsPage>(`/api/challenges/${challengeId}/comments?pageSize=20`);
+      if (!result.ok || !result.data) {
+        setCommentsError(result.message || "Comments could not be loaded.");
+        return;
+      }
+      setComments(result.data.comments ?? []);
+      setCommentsTotal(result.data.pagination?.total ?? 0);
+      setCommentsCursor(result.data.pagination?.nextCursor ?? null);
+      setCommentsForIdentity(commentsIdentity);
+    } catch {
+      setCommentsError("Comments could not be loaded. Please try again.");
+    } finally {
+      setCommentsLoading(false);
+    }
+  }
 
   return (
     <AppShell>
@@ -242,27 +344,24 @@ export default function ChallengeDetailPage() {
           <div data-mobile-challenge-meta className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.12em]">
             <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)]">{challenge.category || challenge.type}</span>
           </div>
-          <div className="relative overflow-hidden rounded-[16px]">
+          <div className="relative overflow-hidden rounded-[16px] border border-slate-200 bg-slate-50 p-2">
             <ChallengeMediaGallery title={challenge.title} videoUrl={challenge.trailerUrl ?? rawChallenge?.trailerVideoUrl ?? rawChallenge?.promoVideoUrl} images={[...(Array.isArray(rawChallenge?.challengeImages) ? rawChallenge.challengeImages.map((item: any) => typeof item === "string" ? item : item?.url) : []), challenge.imageUrl, rawChallenge?.promoImageUrl, rawChallenge?.galleryImageUrl]} />
-            <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--gold)] px-3 py-2 text-xs font-black uppercase text-black sm:right-5 sm:top-5 sm:px-5 sm:py-3 sm:text-sm">{challenge.type}</span>
-            <span data-status-badge className={`absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-full px-3 py-2 text-xs font-black sm:bottom-5 sm:left-5 sm:px-5 sm:py-3 sm:text-sm ${statusClassName(displayStatus as any)}`}>{displayStatus}</span>
           </div>
           <DynamicTranslatedText as="h1" className="mt-6 break-words text-3xl font-black sm:mt-8 md:text-5xl" text={challenge.title} translations={challengeTranslations.title} contentType="challenge_title" />
           <div data-mobile-creator-row className="mt-4 flex min-h-12 items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{creatorDisplayName.slice(0, 2).toUpperCase()}</span>
-            <div className="min-w-0"><p className="text-xs font-bold text-slate-500">Created by</p>{creatorUsername ? <a href={`/profile/${creatorUsername}`} className="block truncate font-black hover:text-[var(--gold)]">{creatorDisplayName}</a> : <p className="truncate font-black">{creatorDisplayName}</p>}</div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-xs font-black text-slate-900">{rawChallenge?.creatorAvatarUrl ? <ContentImage src={String(rawChallenge.creatorAvatarUrl)} alt="" className="h-full w-full object-cover" /> : creatorDisplayName.slice(0, 2).toUpperCase()}</span>
+            <div className="min-w-0">{creatorUsername ? <a href={`/profile/${encodeURIComponent(creatorUsername)}`} className="block truncate font-black hover:text-[var(--gold)]">{creatorDisplayName}</a> : <p className="truncate font-black">{creatorDisplayName}</p>}</div>
           </div>
           <div data-challenge-summary-strip className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-white/10 bg-white/10 lg:grid-cols-4">
-            <SummaryItem value={challenge.participants.toLocaleString()} label="Participants" />
-            <SummaryItem value={prizeValue} label="Prize" />
+            <SummaryItem value={rawChallenge?.participantCountVisible === false ? "Hidden" : challenge.participants.toLocaleString()} label="Participants" />
+            <SummaryItem value={prizeValue} label="Prize Pool" />
             <SummaryItem value={displayStatus} label="Current phase" support={nextImportantTime ?? undefined} />
-            <SummaryItem value={votingOpen ? "Voting open" : eligibleSubmissionCount <= 0 ? "Voting unavailable" : "Voting not started"} label={`${totalVotes.toLocaleString()} verified votes`} />
+            <SummaryItem value={totalVotes?.toLocaleString() ?? "Hidden"} label="Verified votes" support={votingOpen ? "Voting is open" : eligibleSubmissionCount <= 0 ? "No eligible entries to vote on" : "Voting is not open"} />
           </div>
           <div className="mt-4"><ChallengeMilestoneCountdown challenge={rawChallenge ?? (challenge as unknown as Record<string, unknown>)} /></div>
           <Card data-mobile-primary-action className="mt-5 p-5 sm:p-8">
             <ParticipantJourneyPanel
               journey={participantJourney}
-              phaseLabel={displayStatus}
               challengeId={challenge.id}
               entryFeeLabel={entryFeeLabel}
               paidEntryRequired={paidEntryRequired}
@@ -286,19 +385,28 @@ export default function ChallengeDetailPage() {
           <Card className="mt-10 p-5 sm:p-7">
             <h2 className="text-2xl font-black">Challenge Guide</h2>
             <div role="tablist" aria-label="Challenge guide sections" className="mt-5 flex gap-2 overflow-x-auto pb-2">
-              {guideSections.map((section) => <button key={section.id} type="button" role="tab" aria-selected={guideSection === section.id} onClick={() => setGuideSection(section.id)} className={`min-h-11 shrink-0 rounded-[8px] px-4 py-2 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] ${guideSection === section.id ? "bg-[var(--gold)] text-black" : "bg-white/[0.05] text-slate-300 hover:bg-white/10"}`}>{section.label}</button>)}
+              {guideSections.map((section) => <button id={`challenge-guide-${section.id}`} key={section.id} type="button" role="tab" aria-controls="challenge-guide-panel" aria-selected={guideSection === section.id} tabIndex={guideSection === section.id ? 0 : -1} onClick={() => setGuideSection(section.id)} onKeyDown={(event) => { if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault(); const direction = event.key === "ArrowRight" ? 1 : -1; const next = (guideSections.findIndex((item) => item.id === section.id) + direction + guideSections.length) % guideSections.length; setGuideSection(guideSections[next].id); document.getElementById(`challenge-guide-${guideSections[next].id}`)?.focus(); }} className={`min-h-11 shrink-0 rounded-[8px] px-4 py-2 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] ${guideSection === section.id ? "bg-amber-300 text-slate-950" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>{section.label}</button>)}
             </div>
-            <div role="tabpanel" className="mt-4 rounded-[8px] border border-white/10 bg-black/30 p-5"><h3 className="font-black text-[var(--gold)]">{activeGuide.label}</h3>{activeGuide.id === "overview" ? <div className="mt-3"><ChallengeDescription description={challenge.description} translations={challengeTranslations.description} /></div> : <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{activeGuide.body}</p>}{activeGuide.id === "submission" ? <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">{submissionInstructions.length ? submissionInstructions.map((instruction, index) => <li key={`${index}-${instruction.slice(0, 24)}`}>{instruction}</li>) : <li>No submission instructions were published.</li>}</ol> : null}</div>
+            <div id="challenge-guide-panel" role="tabpanel" aria-labelledby={`challenge-guide-${activeGuide.id}`} className="mt-4 rounded-[8px] border border-slate-200 bg-white p-5 text-slate-900">
+              <h3 className="font-black text-amber-700">{activeGuide.label}</h3>
+              {activeGuide.id === "overview" ? <div className="mt-3"><ChallengeDescription description={challenge.description} translations={challengeTranslations.description} /></div> : null}
+              {activeGuide.id === "rules" ? activeGuide.body ? <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{activeGuide.body}</p> : <p className="mt-2 text-sm text-slate-600">No additional challenge-specific rules were published.</p> : null}
+              {activeGuide.id === "entry" ? <GuideFacts facts={entryFacts} empty="Entry requirements have not been published." /> : null}
+              {activeGuide.id === "entry" && submissionInstructions.length ? <><h4 className="mt-5 font-bold">Submission instructions</h4><ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">{submissionInstructions.map((instruction, index) => <li key={`${index}-${instruction.slice(0, 24)}`}>{instruction}</li>)}</ol></> : null}
+              {activeGuide.id === "voting" ? <GuideFacts facts={votingFacts} empty="Voting and judging details have not been published." /> : null}
+              {activeGuide.id === "voting" && details?.resultsUnavailable ? <p role="status" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950">Results Temporarily Unavailable. The announcement is being reviewed.</p> : null}
+            </div>
           </Card>
-          <section className="mt-12">
+            <section id="challenge-rankings" className="mt-12 scroll-mt-24">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-black">Leading Participants</h2>
-                <p className="mt-2 text-sm text-slate-400">Top eligible entries ranked by verified votes.</p>
+                <h2 className="text-2xl font-black">Audience Rankings</h2>
+                <p className="mt-2 text-sm text-slate-600">Eligible entries ranked by verified votes. Official results are shown separately.</p>
               </div>
               <LinkButton href={`/challenges/${challenge.id}/participants`} variant="secondary">See all participants</LinkButton>
             </div>
-            {leaderboardRelevant ? (
+            {Array.isArray((details as any)?.officialWinners) && (details as any).officialWinners.length ? <section aria-labelledby="official-winners-heading" className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 text-slate-900"><h3 id="official-winners-heading" className="text-lg font-black">Official Winners</h3><ol className="mt-3 space-y-2">{(details as any).officialWinners.map((winner: any) => <li key={String(winner.id)} className="flex flex-wrap items-center justify-between gap-3"><span className="font-semibold">{ordinal(Number(winner.position))} place · {String(winner.publicDisplayName ?? "Winner")}</span>{winner.submissionId ? <LinkButton href={`/winners/${encodeURIComponent(String(winner.id))}`} variant="secondary">View Results</LinkButton> : null}</li>)}</ol></section> : null}
+            {leaderboardRelevant && topParticipants.length > 0 ? (
               <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {topParticipants.map((participant) => (
                   <ChallengeParticipantCard
@@ -312,23 +420,29 @@ export default function ChallengeDetailPage() {
                   />
                 ))}
               </div>
-            ) : <p className="mt-5 rounded-[8px] border border-dashed border-white/15 px-4 py-3 text-sm text-slate-400">Leaderboard becomes available when voting opens.</p>}
+            ) : <p className="mt-5 rounded-[8px] border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600">{details?.resultsUnavailable ? "Results Temporarily Unavailable." : leaderboardRelevant || votingOpen ? "No votes yet." : "Audience rankings are not available yet."}</p>}
           </section>
 
           <section className="mt-12 border-t border-white/10 pt-10">
             <button type="button" aria-expanded={commentsOpen} onClick={() => setCommentsOpen((open) => !open)} className="flex min-h-12 w-full items-center justify-between gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
-              <span className="text-2xl font-black">Comments ({comments.length})</span><ChevronDown className={`shrink-0 transition-transform ${commentsOpen ? "rotate-180" : ""}`} />
+              <span id="challenge-comments-heading" className="text-2xl font-black">Comments ({visibleCommentsTotal.toLocaleString()})</span><ChevronDown className={`shrink-0 transition-transform ${commentsOpen ? "rotate-180" : ""}`} />
             </button>
             {commentsOpen ? <Card className="mt-5 p-5 sm:p-6">
-              {commentsClosed ? <p className="rounded-[8px] bg-white/[0.04] p-4 text-sm text-slate-300">Comments are closed for this completed challenge.</p> : <><textarea className={textareaClass} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Add to the conversation..." maxLength={1000} />
+              {commentsClosed ? <p className="rounded-[8px] bg-slate-100 p-4 text-sm text-slate-700">Comments are temporarily unavailable for this challenge state.</p> : <>
+              {user ? <><label htmlFor="challenge-comment" className="mb-2 block text-sm font-semibold text-slate-800">Add a comment</label><textarea id="challenge-comment" className={textareaClass} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Add to the conversation..." maxLength={1000} aria-describedby="challenge-comment-help" />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-slate-400">Comments include moderation status and may be reviewed.</p>
-                <Button onClick={() => void addComment()} disabled={commentBody.trim().length < 2}>Post Comment</Button>
+                <p id="challenge-comment-help" className="text-xs text-slate-600">Comments may be reviewed under our moderation rules.</p>
+                <Button onClick={() => void addComment()} disabled={commentBody.trim().length < 2 || commentPosting}>{commentPosting ? "Posting…" : "Post Comment"}</Button>
               </div>
-              {commentMessage ? <p className="mt-3 text-sm text-slate-300">{commentMessage}</p> : null}</>}
+              {commentMessage ? <p className="mt-3 text-sm text-slate-700">{commentMessage}</p> : null}</> : null}
+              {!commentsClosed && !user ? <p className="rounded-lg bg-slate-100 p-4 text-sm text-slate-700"><LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challenge.id}`)}`} variant="secondary">Sign in to comment</LinkButton></p> : null}
+              {visibleCommentsError ? <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-900"><span>{visibleCommentsError}</span><Button variant="secondary" onClick={() => void refetchComments()}>Retry</Button></div> : null}
+              {commentsLoading && visibleComments.length === 0 ? <p role="status" className="mt-5 text-sm text-slate-600">Loading comments…</p> : null}
               <div className="mt-6 space-y-3">
-                {comments.length ? comments.map((comment) => { const profileHref = comment.username ? `/profile/${comment.username}` : "/profile"; const name = comment.displayName || "Challenge Suite member"; return <div key={comment.id} className="rounded-[8px] bg-[#191919] p-4"><div className="flex flex-wrap items-center gap-3"><a href={profileHref} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--gold)] text-xs font-black text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`View ${name} profile`}>{comment.avatarUrl ? <ContentImage src={comment.avatarUrl} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</a><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 font-black text-[var(--gold)]"><a href={profileHref} className="break-words hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">{name}</a><PremiumBadge planId={comment.planId as any} compact />{comment.verified ? <span className="text-xs text-[var(--gold-2)]">Verified</span> : null}</div>{comment.username ? <p className="text-xs text-slate-500">@{comment.username}</p> : null}</div></div><p className="mt-3 whitespace-pre-wrap break-words text-slate-200">{comment.body}</p></div>; }) : <p className="rounded-[8px] bg-[#191919] p-4 text-slate-300">No comments yet. Start the conversation.</p>}
+                {visibleComments.length ? visibleComments.map((comment) => { const username = comment.username?.replace(/^@/, ""); const name = username ? `@${username}` : "Challenge Suite member"; const profileHref = username ? `/profile/${encodeURIComponent(username)}` : null; const createdAt = comment.createdAt ? Date.parse(comment.createdAt) : Number.NaN; return <article key={comment.id} className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900"><div className="flex items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-xs font-bold text-slate-900">{comment.avatarUrl ? <ContentImage src={comment.avatarUrl} alt="" className="size-full object-cover" /> : name.slice(0, 2).toUpperCase()}</span><div className="min-w-0"><div className="font-bold">{profileHref ? <a href={profileHref} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">{name}</a> : <span>{name}</span>}</div><time className="text-xs text-slate-600" dateTime={comment.createdAt ?? undefined}>{Number.isFinite(createdAt) ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(createdAt) : "Time unavailable"}</time></div></div><p className="mt-3 whitespace-pre-wrap break-words text-slate-800">{comment.body}</p></article>; }) : !commentsLoading && !visibleCommentsError ? <p className="rounded-lg bg-slate-100 p-4 text-slate-700">No comments yet. Start the conversation.</p> : null}
               </div>
+              {commentsCursor ? <Button className="mt-4" variant="secondary" onClick={() => void loadMoreComments()} disabled={commentsLoading}>{commentsLoading ? "Loading…" : "Load more comments"}</Button> : null}
+              </>}
             </Card> : null}
           </section>
           <section className="mt-12 border-t border-white/10 pt-8">
@@ -336,14 +450,14 @@ export default function ChallengeDetailPage() {
           </section>
         </div>
 
-        <aside className="space-y-5 xl:pt-[432px]">
+        <aside className="space-y-5 xl:pt-0">
           {(Array.isArray(details?.sponsorships) ? details.sponsorships as PublicSponsorPlacement[] : []).map((item) => <SponsorPlacement key={String(item.id)} item={item} challengeId={challenge.id} />)}
           {sponsorAccount ? <Card className="border-yellow-500/30 bg-yellow-950/10 p-5 text-center sm:p-8">
             <h3 className="text-xl font-black text-[var(--gold)]">Sponsorship</h3>
             <p className="mt-3">Submit a sponsor contribution request. Sponsor contributions are confirmed before any public funding status updates. No investment return is promised.</p>
             <LinkButton href={`/challenges/${challenge.id}/sponsor`} className="mt-5 w-full sm:w-auto">Propose Sponsorship</LinkButton>
           </Card> : null}
-          {!freeCompetitor && prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/5 p-5 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-sm font-bold text-slate-300">{prizeStatusLabel}</p>{prizePool.visibleJackpotCents > 0 ? <><p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-slate-400">{prizeAmountKind}</p><p className="mt-1 text-3xl font-black text-[var(--gold)]">{prizeValue}</p></> : null}{String(prizePool.status).includes("pending_funding") ? <p className="mt-3 text-sm text-slate-300">Funding verification is pending. Prize distribution will occur after confirmation.</p> : null}<div className="mt-5 grid gap-3 sm:grid-cols-3">{prizePool.winnerSplits.map((split) => <div key={split.position} className="rounded-[8px] bg-black/30 p-4 text-center"><p className="font-black">{split.position === 1 ? "1st place" : split.position === 2 ? "2nd place" : "3rd place"} - {split.percent}%</p><p className="mt-1 text-sm font-black text-[var(--gold)]">${(split.expectedAmountCents / 100).toLocaleString()}</p></div>)}</div></Card> : null}
+          {prizePool && (prizePool.visibleJackpotCents > 0 || prizePool.status !== "disabled") ? <Card className="border-amber-200 bg-amber-50 p-5 text-slate-900 sm:p-7"><h2 className="text-2xl font-black">Prize Pool</h2><p className="mt-2 text-sm font-bold text-slate-700">{prizeStatusLabel}</p>{prizePool.visibleJackpotCents > 0 ? <><p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-slate-600">{prizeAmountKind}</p><p className="mt-1 text-3xl font-black text-amber-800">{prizeValue}</p></> : null}{String(prizePool.status).includes("pending_funding") ? <p className="mt-3 text-sm text-slate-700">Funding verification is pending. Prize distribution will occur after confirmation.</p> : null}<div className={`mt-5 grid gap-3 ${winnerSplits.length === 1 ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>{winnerSplits.map((split) => <div key={split.position} className="rounded-lg bg-white p-4 text-center"><p className="font-black">{split.position === 1 ? "1st place" : split.position === 2 ? "2nd place" : `${split.position}th place`} · {split.percent}%</p><p className="mt-1 text-sm font-black text-amber-800">{new Intl.NumberFormat(undefined, { style: "currency", currency: String(prizePool.currency ?? "USD").toUpperCase() }).format(Number(split.expectedAmountCents ?? 0) / 100)}</p></div>)}</div>{prizeBreakdown ? <p className="mt-4 text-sm text-slate-700">{prizeBreakdown}</p> : null}</Card> : null}
           {predictionAccess?.visible || predictionAccess?.available ? <Card className="border-[var(--gold)]/30 bg-[var(--gold)]/5 p-5 sm:p-7">
             <div className="flex items-start gap-3"><Coins className="mt-1 text-[var(--gold)]" /><div><h3 className="text-xl font-black">Prediction Arena</h3><p className="mt-2 text-sm leading-6 text-slate-300">Predict who you think will win before voting opens.</p></div></div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><p className="text-slate-500">Total staked</p><p className="font-black">${(predictionPoolCents / 100).toLocaleString()}</p></div><div><p className="text-slate-500">Predictors</p><p className="font-black">{predictionCount.toLocaleString()}</p></div></div>
@@ -369,22 +483,16 @@ export default function ChallengeDetailPage() {
 }
 
 
-function ParticipantJourneyPanel({ journey, phaseLabel, challengeId, entryFeeLabel, paidEntryRequired, entryCheckoutLoading, entryCheckoutMessage, onPay, onRefresh, timeZone, registrationClosesAt }: { journey: any; phaseLabel: string; challengeId: string; entryFeeLabel: string; paidEntryRequired: boolean; entryCheckoutLoading: boolean; entryCheckoutMessage: string; onPay: () => void; onRefresh: () => void; timeZone: string; registrationClosesAt?: string | null }) {
+function ParticipantJourneyPanel({ journey, challengeId, entryFeeLabel, paidEntryRequired, entryCheckoutLoading, entryCheckoutMessage, onPay, onRefresh, timeZone, registrationClosesAt }: { journey: any; challengeId: string; entryFeeLabel: string; paidEntryRequired: boolean; entryCheckoutLoading: boolean; entryCheckoutMessage: string; onPay: () => void; onRefresh: () => void; timeZone: string; registrationClosesAt?: string | null }) {
   const action = String(journey?.primaryAction ?? "back_to_challenge");
   const label = String(journey?.label ?? "Challenge Entry");
   const message = String(journey?.message ?? "Open the entry page for the next step.");
   const checklist = journey?.checklist ?? {};
   const registered = Boolean(checklist.registered || checklist.entered);
   const waitLabel = checklist.submissionOpensAt ? `Submission opens at ${formatChallengeDateTime(checklist.submissionOpensAt, timeZone)}` : "Submission opens soon";
-  const progressItems = [
-    ["Registration", checklist.registered ? "Complete" : "Required"],
-    ["Approval", checklist.approvalRequired ? checklist.approvalGranted ? "Approved" : "Pending" : "Not required"],
-    ["Payment", checklist.paymentRequired ? checklist.paymentConfirmed ? "Confirmed" : action === "refresh_payment" ? "Processing" : "Required" : "Not required"],
-    ["Submission", submissionChecklistLabel(checklist, timeZone)],
-    ["Deadline", checklist.submissionDeadline ? formatChallengeDateTime(checklist.submissionDeadline, timeZone) : "Not published"],
-    ["Entry", checklist.alreadySubmitted ? "Submitted" : "Not submitted"]
-  ];
-  return <div className="text-left"><div className="grid gap-4 sm:grid-cols-3"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Current phase</p><p className="mt-1 text-lg font-black text-white">{phaseLabel}</p></div><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Entry fee</p><p className="mt-1 text-lg font-black text-[var(--gold)]">{paidEntryRequired ? entryFeeLabel : "Free"}</p></div><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{registered ? "Next action" : "Registration deadline"}</p><p className="mt-1 text-sm font-black leading-6 text-white">{registered ? label : registrationClosesAt ? formatChallengeDateTime(registrationClosesAt, timeZone) : "Not published"}</p></div></div><div className="mt-5 rounded-[8px] border border-white/10 bg-black/30 p-4"><h3 className="font-black text-white">{label}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p></div>{registered ? <div className="mt-5 grid gap-2 sm:grid-cols-2"><p className="col-span-full text-xs font-black uppercase tracking-[0.16em] text-slate-500">Participation progress</p>{progressItems.map(([name, value]) => <div key={name} className="flex min-w-0 items-center justify-between gap-3 rounded-[8px] bg-white/[0.04] px-3 py-2 text-sm"><span className="font-bold text-slate-300">{name}</span><span className="text-right font-black text-white">{value}</span></div>)}</div> : <div className="mt-4"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Eligibility</p><p className="mt-1 text-sm text-slate-300">{message}</p></div>}<JourneyAction action={action} blockerCode={journey?.blockerCode} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} registered={registered} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} submissionOpensAt={checklist.submissionOpensAt} />{entryCheckoutMessage ? <p className="mt-3 rounded-[8px] bg-red-950/40 p-3 text-sm text-red-200">{entryCheckoutMessage}</p> : null}</div>;
+  const relevantDeadline = ["submit_entry", "view_entry"].includes(action) ? checklist.submissionDeadline : registrationClosesAt;
+  const deadlineLabel = relevantDeadline ? formatChallengeDateTime(relevantDeadline, timeZone) : null;
+  return <div className="text-left"><div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-900"><h3 className="text-lg font-black">{label}</h3><p className="mt-2 text-sm leading-6 text-slate-700">{message}</p><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm"><span><span className="font-semibold text-slate-600">Entry:</span> <span className="font-bold">{paidEntryRequired ? entryFeeLabel : "Free"}</span></span>{deadlineLabel ? <span><span className="font-semibold text-slate-600">Deadline:</span> <time className="font-bold">{deadlineLabel}</time></span> : null}</div></div><JourneyAction action={action} blockerCode={journey?.blockerCode} href={journey?.primaryHref} challengeId={challengeId} entryFeeLabel={entryFeeLabel} registered={registered} loading={entryCheckoutLoading} onPay={onPay} onRefresh={onRefresh} waitLabel={waitLabel} submissionOpensAt={checklist.submissionOpensAt} />{entryCheckoutMessage ? <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-900">{entryCheckoutMessage}</p> : null}</div>;
 }
 function JourneyAction({ action, blockerCode, href, challengeId, entryFeeLabel, registered = false, loading, onPay, onRefresh, waitLabel, submissionOpensAt }: { action: string; blockerCode?: string | null; href?: string | null; challengeId: string; entryFeeLabel: string; registered?: boolean; loading: boolean; onPay: () => void; onRefresh: () => void; waitLabel?: string; submissionOpensAt?: string | null }) {
   if (action === "pay_entry_fee") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{registered ? "Continue Payment" : `Pay ${entryFeeLabel} & Join Challenge`}</LinkButton>;
@@ -393,8 +501,8 @@ function JourneyAction({ action, blockerCode, href, challengeId, entryFeeLabel, 
   if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
   if (["register", "join_waitlist", "enter_challenge", "request_entry"].includes(action)) return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "request_entry" ? "Request to Join" : action === "join_waitlist" ? "Join Waitlist" : "Join Challenge"}</LinkButton>;
   if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">Vote Now</LinkButton>;
-  if (action === "view_winners") return <LinkButton href="/winners" className="mt-5 w-full">View Winners</LinkButton>;
-  if (action === "view_results") return <LinkButton href="/winners" className="mt-5 w-full">View Results</LinkButton>;
+  if (action === "view_winners") return <LinkButton href={href || `/challenges/${challengeId}#challenge-rankings`} className="mt-5 w-full">View Winners</LinkButton>;
+  if (action === "view_results") return <LinkButton href={href || `/challenges/${challengeId}#challenge-rankings`} className="mt-5 w-full">View Results</LinkButton>;
   if (action === "view_entry" && href) return <LinkButton href={href} className="mt-5 w-full">View My Entry</LinkButton>;
   if (action === "manage_challenge") return <LinkButton href="/challenges" className="mt-5 w-full">Manage Challenge</LinkButton>;
   if (action === "sign_in") return <LinkButton href={`/auth/login?next=${encodeURIComponent(`/challenges/${challengeId}`)}`} className="mt-5 w-full">Sign In to Continue</LinkButton>;
@@ -437,17 +545,20 @@ function SubmissionCountdown({ opensAt, formattedOpenAt, onOpen }: { opensAt?: s
   return <div className="mt-5"><p className="text-center text-sm font-black text-[var(--gold)]">Submissions open in {countdown}</p>{formattedOpenAt ? <p className="mt-1 text-center text-xs text-slate-400">{formattedOpenAt.replace(/^Submission opens at\s+/i, "")}</p> : null}<Button className="mt-3 w-full" variant="secondary" disabled>Submission opens soon</Button></div>;
 }
 function SummaryItem({ value, label, support }: { value: string; label: string; support?: string }) {
-  return <div className="min-w-0 bg-[#111] px-4 py-4"><p className="whitespace-normal break-normal text-base font-black leading-6 text-white">{value}</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-slate-500">{label}</p>{support ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{support}</p> : null}</div>;
+  return <div className="min-w-0 bg-white px-4 py-4"><p className="whitespace-normal break-normal text-base font-black leading-6 text-slate-950">{value}</p>{label ? <p className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-slate-600">{label}</p> : null}{support ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{support}</p> : null}</div>;
 }
 
-
-function submissionChecklistLabel(checklist: any, timeZone: string) {
-  if (checklist.timelineNeedsReview) return "Schedule pending";
-  if (checklist.submissionOpen) return "Open";
-  if (checklist.submissionDeadline && Date.now() > new Date(String(checklist.submissionDeadline)).getTime()) return "Closed";
-  if (checklist.submissionOpensAt) return `Opens ${formatChallengeDateTime(checklist.submissionOpensAt, timeZone)}`;
-  return "Not open yet";
+function GuideFacts({ facts, empty }: { facts: Array<[string, string]>; empty: string }) {
+  if (!facts.length) return <p className="mt-2 text-sm leading-6 text-slate-600">{empty}</p>;
+  return <dl className="mt-3 grid gap-3 sm:grid-cols-2">{facts.map(([label, value]) => <div key={label} className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 whitespace-pre-line break-words text-sm font-semibold text-slate-900">{value}</dd></div>)}</dl>;
 }
+
+function ordinal(value: number) {
+  if (!Number.isFinite(value) || value < 1) return "Winner";
+  const suffix = value % 100 >= 11 && value % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[value % 10] ?? "th";
+  return `${value}${suffix}`;
+}
+
 
 function publicChallengePhaseLabel(value: string) {
   return value.toLowerCase().includes("timeline needs review") ? "Schedule pending" : value;
@@ -459,12 +570,4 @@ function publicPrizeStatus(prizePool: { visibleJackpotCents?: number; status?: s
   if (status === "pending_funding" || (status.includes("sponsor") && ["pending", "proposed", "awaiting_confirmation"].some((value) => status.includes(value)))) return `Sponsor-funded prize pool: $${(Number(prizePool?.visibleJackpotCents ?? 0) / 100).toLocaleString()}`;
   if (["review", "verification", "pending_confirmation"].some((value) => status.includes(value))) return "Prize under verification";
   return "Prize breakdown not published";
-}
-function ChallengeMediaPlaceholder() {
-  return <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(246,198,75,.24),transparent_45%),linear-gradient(135deg,#161616,#050505)] px-6 text-center">
-    <div>
-      <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--gold)]">Challenge Suite</p>
-      <p className="mt-3 text-3xl font-black text-white sm:text-5xl">Live Challenge</p>
-    </div>
-  </div>;
 }

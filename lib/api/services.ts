@@ -146,8 +146,15 @@ export function requestPrivateAccess(payload: { challengeId?: string; reason: st
 export function fetchChallengeDetails(challengeId: string) {
   return apiRequest<{
     challenge: unknown;
+    phaseSummary?: unknown;
+    participationState?: unknown;
     submissions: unknown[];
     sponsorships: unknown[];
+    topParticipants?: unknown[];
+    officialWinners?: Array<{ id: string; submissionId?: string | null; position?: number | null; status?: string; prizeAmountCents?: number | null; currency?: string | null; publicDisplayName?: string | null; avatarUrl?: string | null }>;
+    resultsUnavailable?: boolean;
+    leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; competitionMode?: string; entries?: unknown[] };
+    participants?: unknown[];
     prizePool?: {
       status: string;
       visibleJackpotCents: number;
@@ -157,7 +164,8 @@ export function fetchChallengeDetails(challengeId: string) {
       transferEnabled: false;
       prizeReleaseEnabled: false;
     };
-    voteCount: number;
+    voteCount: number | null;
+    voteCountVisible?: boolean;
     userState: {
       authenticated: boolean;
       joined: boolean;
@@ -167,7 +175,14 @@ export function fetchChallengeDetails(challengeId: string) {
       watchLater?: boolean;
       interested?: boolean;
       reminderStatus?: string | null;
+      participantJourney?: unknown;
+      votingAccess?: unknown;
+      submissionAccess?: unknown;
+      paidEntry?: unknown;
+      ownerAccount?: boolean;
+      submission?: unknown;
     };
+    voteBreakdown?: { freeVoteCount: number; paidVoteCount: number; paidVoteCurrency?: string; paidVoteCostCredits?: number } | null;
   }>(`/api/challenges/${challengeId}`);
 }
 

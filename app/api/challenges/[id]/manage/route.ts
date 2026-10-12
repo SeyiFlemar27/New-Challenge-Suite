@@ -118,11 +118,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (targetType === "submission") {
     nextStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : action === "flag" ? "flagged" : "resubmission_requested";
-    Object.assign(update, { status: nextStatus, moderationStatus: nextStatus, reviewedBy: access.user.uid, reviewedAt: now });
+    Object.assign(update, { status: nextStatus, moderationStatus: nextStatus, leaderboardEligible: action === "approve" && (current.visibility ?? "public") === "public" && current.publicVisibility !== false, visibility: current.visibility ?? "public", publicVisibility: current.publicVisibility !== false, reviewedBy: access.user.uid, reviewedAt: now });
     if (action === "reject") Object.assign(update, { rejectionReason: reason, rejectedAt: now });
     if (action === "flag") Object.assign(update, { flagReason: reason, flaggedAt: now, publicEligible: false });
     if (action === "request_resubmission") Object.assign(update, { requestedChanges, resubmissionDeadline, resubmissionNote: note || null, resubmissionRequestedAt: now, publicEligible: false });
-    if (action === "approve") Object.assign(update, { approvedAt: now, publicEligible: true, rejectionReason: null, flagReason: null });
+    if (action === "approve") Object.assign(update, { approvedAt: now, leaderboardSortAt: current.scoreReachedAt ?? current.voteTotalReachedAt ?? now, publicEligible: true, rejectionReason: null, flagReason: null });
   } else if (targetType === "participant") {
     if (action === "check_in") {
       const type = String(access.challenge.type ?? access.challenge.competitionType ?? "").toLowerCase();

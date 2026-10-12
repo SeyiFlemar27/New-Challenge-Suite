@@ -89,6 +89,7 @@ export const serverChallengeCreateSchema = z.object({
   privateDirectInvitees: z.array(z.string().trim().email()).max(500).default([]),
   privateAccessMethod: z.enum(["", "invite_link", "invitation_code", "direct_invitations", "access_code", "link_and_code"]).default(""),
   privateJoiningPolicy: z.enum(["invite_only", "invite_and_request"]).default("invite_only"),
+  privateVotingAccess: z.enum(["access_restricted", "public_voting"]).default("access_restricted"),
   publicPreviewEnabled: z.coerce.boolean().default(false),
   votingSettings: z.object({
     allowFreeVotes: z.coerce.boolean().default(true),

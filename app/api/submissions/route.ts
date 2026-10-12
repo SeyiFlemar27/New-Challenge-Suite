@@ -15,6 +15,7 @@ import { submissionCreateSchema, zodFieldErrors } from "@/lib/server/submission-
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
+import { leaderboardSearchPrefixes } from "@/lib/server/leaderboard-search";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
   const participantRef = db.collection("challengeParticipants").doc(`${body.challengeId}_${user.uid}`);
   const displayName = String(profile.displayName ?? profile.fullName ?? user.email ?? "Participant");
   const userInitials = String(profile.initials ?? initialsFromName(displayName)).slice(0, 2).toUpperCase();
+  const publicIdentity = profile.publicProfile !== false && profile.profileVisibility !== "private";
   const status = resolveSubmissionStatus(challenge, body.mediaUploadPending);
   const duplicateBlockingStatuses = new Set(["draft", "submitted", "pending_review", "approved", "flagged", "active", "eliminated", "winner"]);
 
@@ -130,6 +132,8 @@ export async function POST(request: Request) {
         mediaUrl: body.mediaUrl ?? "",
         mediaType: body.mediaType,
         status,
+        leaderboardEligible: ["approved", "active", "winner"].includes(status),
+        leaderboardSearchPrefixes: leaderboardSearchPrefixes(body.title, publicIdentity ? profile.username : null, publicIdentity ? profile.displayName : null),
         mediaUploadPending: body.mediaUploadPending,
         originalFileName: body.originalFileName ?? "",
         fileSize: Number(body.fileSize ?? 0),
@@ -148,6 +152,8 @@ export async function POST(request: Request) {
         paidEntryEnabled: false,
         entryFeeCents: 0,
         visibility: "public",
+        publicVisibility: true,
+        leaderboardSortAt: now,
         submittedAt: now,
         reviewedAt: null,
         reviewedBy: null,

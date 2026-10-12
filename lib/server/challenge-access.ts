@@ -11,6 +11,11 @@ export function isPrivateChallengeRecord(challenge: Record<string, unknown>) {
     || type.includes("invite");
 }
 
+/** Public voting is a narrow exception for approved public submissions. It does not grant private challenge access. */
+export function hasPublicVotingAccess(challenge: Record<string, unknown>) {
+  return isPrivateChallengeRecord(challenge) && challenge.privateVotingAccess === "public_voting";
+}
+
 export function userOwnsChallenge(challenge: Record<string, unknown>, userId: string) {
   return String(challenge.creatorId ?? challenge.hostId ?? "") === userId;
 }

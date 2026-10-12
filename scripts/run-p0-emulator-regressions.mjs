@@ -13,6 +13,8 @@ const tests = [
   "scripts/test-storage-rules-document-access-limit.mjs",
   "scripts/test-challenge-media-delivery-emulator.mjs",
   "scripts/test-challenge-media-serialization.mjs",
+  "scripts/test-challenge-comments-route.mjs",
+  "scripts/test-challenge-leaderboard-emulator.mjs",
   "scripts/test-media-upload-storage-rules.mjs",
   "scripts/test-enterprise-ownership-migration.mjs",
   "scripts/test-authoritative-media-verification.mjs",

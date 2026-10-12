@@ -220,6 +220,7 @@ export async function POST(request: Request) {
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
     privateAccessMethod: body.visibility === "private" ? privateAccessMethod : "",
     privateJoiningPolicy: body.visibility === "private" ? body.privateJoiningPolicy : "invite_only",
+    privateVotingAccess: body.visibility === "private" ? body.privateVotingAccess : "access_restricted",
     privateAccessCode: "",
     privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
     privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,

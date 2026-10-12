@@ -14,7 +14,7 @@ interface ParticipantsResponse {
   challenge: { id: string; title?: string; status?: string };
   phaseSummary: { label?: string; votingOpen?: boolean };
   participants: PublicChallengeParticipant[];
-  pagination: { page: number; pageSize: number; total: number; hasMore: boolean };
+  pagination: { page: number; pageSize: number; total: number | null; hasMore: boolean; nextCursor?: string | null };
   votingAccess: PublicVotingAccess;
   predictionAccess: PublicPredictionAccess;
 }
@@ -27,10 +27,12 @@ export default function ChallengeParticipantsPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"highest_votes" | "newest">("highest_votes");
   const [page, setPage] = useState(1);
-  const queryKey = ["challenge-participants", challengeId, search, sort, page];
+  const [cursors, setCursors] = useState<string[]>([]);
+  const cursor = page > 1 ? cursors[page - 2] ?? null : null;
+  const queryKey = ["challenge-participants", challengeId, search, sort, page, cursor];
   const query = useQuery({
     queryKey,
-    queryFn: () => apiRequest<ParticipantsResponse>(`/api/challenges/${challengeId}/participants?search=${encodeURIComponent(search)}&sort=${sort}&page=${page}&pageSize=12`),
+    queryFn: () => apiRequest<ParticipantsResponse>(`/api/challenges/${challengeId}/participants?search=${encodeURIComponent(search)}&sort=${sort}&page=${page}&pageSize=12${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
     enabled: Boolean(challengeId),
     staleTime: 15_000
   });
@@ -40,6 +42,7 @@ export default function ChallengeParticipantsPage() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     setPage(1);
+    setCursors([]);
     setSearch(searchDraft.trim());
   }
 
@@ -54,7 +57,7 @@ export default function ChallengeParticipantsPage() {
         <div className="flex flex-col gap-5 border-b border-white/10 pb-7 lg:flex-row lg:items-end lg:justify-between">
           <PageTitle title="Challenge Participants" subtitle={payload.challenge.title || "Eligible challenge entries"} icon={<Users />} />
           <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-slate-300">
-            <span>{payload.pagination.total.toLocaleString()} eligible</span>
+            <span>{payload.pagination.total === null ? "Participant count hidden" : `${payload.pagination.total.toLocaleString()} eligible`}</span>
             <span className="rounded-full bg-[var(--gold)]/10 px-3 py-1 text-[var(--gold)]">{payload.phaseSummary.label || "Challenge"}</span>
           </div>
         </div>
@@ -70,7 +73,7 @@ export default function ChallengeParticipantsPage() {
           </form>
           <label>
             <span className="sr-only">Sort participants</span>
-            <select className={inputClass} value={sort} onChange={(event) => { setSort(event.target.value as "highest_votes" | "newest"); setPage(1); }}>
+            <select className={inputClass} value={sort} onChange={(event) => { setSort(event.target.value as "highest_votes" | "newest"); setPage(1); setCursors([]); }}>
               <option value="highest_votes">Highest votes</option>
               <option value="newest">Newest entries</option>
             </select>
@@ -95,11 +98,11 @@ export default function ChallengeParticipantsPage() {
           <Card className="mt-7 border-dashed"><EmptyState icon={<Users />} title="No eligible participants" body={search ? "No participants or entries match your search." : "Approved entries will appear here when they are available."} /></Card>
         )}
 
-        {payload.pagination.total > payload.pagination.pageSize ? (
+        {payload.pagination.total !== null && payload.pagination.total > payload.pagination.pageSize ? (
           <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="min-h-11 rounded-[8px] border border-white/10 px-5 font-bold disabled:opacity-40">Previous</button>
             <span className="text-sm font-bold text-slate-400">Page {page}</span>
-            <button type="button" disabled={!payload.pagination.hasMore} onClick={() => setPage((value) => value + 1)} className="min-h-11 rounded-[8px] border border-white/10 px-5 font-bold disabled:opacity-40">Next</button>
+            <button type="button" disabled={!payload.pagination.hasMore || !payload.pagination.nextCursor} onClick={() => { if (!payload.pagination.nextCursor) return; setCursors((current) => [...current.slice(0, page), payload.pagination.nextCursor!]); setPage((value) => value + 1); }} className="min-h-11 rounded-[8px] border border-white/10 px-5 font-bold disabled:opacity-40">Next</button>
           </div>
         ) : null}
       </div>

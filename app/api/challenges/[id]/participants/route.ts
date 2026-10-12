@@ -1,12 +1,12 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
-import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
+import { challengeForPlanAccess, hasPublicVotingAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { buildPublicChallengeParticipants, type ParticipantSort } from "@/lib/server/challenge-participants";
 import { getChallengePhaseSummary } from "@/lib/challenge-status";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
-import { fail, ok, serverUnavailable } from "@/lib/server/responses";
+import { fail, ok, serverUnavailable, validationError } from "@/lib/server/responses";
 import { predictionAccessForViewer } from "@/lib/server/predictions";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!user && !isPublicChallenge(id, challenge)) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
 
   let profile: Record<string, unknown> = {};
+  let publicVotingOnly = false;
   if (user) {
     const [accountSnap, profileSnap, accessContext] = await Promise.all([
       db.collection("users").doc(user.uid).get(),
@@ -28,25 +29,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       challengeForPlanAccess(db, challenge, user.uid)
     ]);
     profile = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) };
-    if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
+    publicVotingOnly = accessContext.privateOnly && !accessContext.hasAccessGrant && hasPublicVotingAccess(challenge);
+    if (accessContext.privateOnly && !accessContext.hasAccessGrant && !publicVotingOnly) {
       return fail("A valid private challenge invite or approval is required.", 403, undefined, "PRIVATE_INVITE_REQUIRED");
     }
-    const access = canAccessChallenge(profile, accessContext.challenge);
+    const access = canAccessChallenge(profile, publicVotingOnly ? { ...challenge, visibility: "public" } : accessContext.challenge);
     if (!access.allowed) return fail("Plan access is required for this challenge.", 403, undefined, access.code ?? "PLAN_ACCESS_DENIED");
   }
 
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page") ?? 1);
   const pageSize = Number(url.searchParams.get("pageSize") ?? 12);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 10_000) return validationError({ page: "Page must be an integer between 1 and 10,000." });
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 48) return validationError({ pageSize: "Page size must be an integer between 1 and 48." });
   const sort = url.searchParams.get("sort") === "newest" ? "newest" : "highest_votes";
-  const result = await buildPublicChallengeParticipants(db, id, {
-    search: url.searchParams.get("search") ?? "",
-    sort: sort as ParticipantSort,
-    page,
-    pageSize
-  });
+  let result: Awaited<ReturnType<typeof buildPublicChallengeParticipants>>;
+  try {
+    result = await buildPublicChallengeParticipants(db, id, {
+      search: url.searchParams.get("search") ?? "",
+      sort: sort as ParticipantSort,
+      page,
+      pageSize,
+      cursor: url.searchParams.get("cursor")
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_CHALLENGE_LEADERBOARD_CURSOR") return validationError({ cursor: "Leaderboard cursor is invalid." });
+    throw error;
+  }
   const phaseSummary = getChallengePhaseSummary(challenge, new Date(), { eligibleSubmissionCount: result.eligibleTotal });
   const ownerBlocked = Boolean(user && userOwnsChallenge(challenge, user.uid));
+  const hideParticipantList = challenge.hideParticipantList === true && !ownerBlocked;
   const sponsorBlocked = isSponsorProfile(profile);
   const canVote = Boolean(user && phaseSummary.votingOpen && result.eligibleTotal > 0 && !ownerBlocked && !sponsorBlocked);
   const votingReason = !user
@@ -70,11 +82,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
 
   return ok({
-    challenge: { id, ...publicChallengeFields(challenge, id) },
+    challenge: publicVotingOnly
+      ? { id, title: challenge.title ?? "Private Challenge", category: challenge.category ?? null, status: challenge.status ?? null, votingDeadline: challenge.votingDeadline ?? challenge.votingEndsAt ?? null, timeZone: challenge.timeZone ?? challenge.timezone ?? "UTC" }
+      : { id, ...publicChallengeFields(challenge, id) },
     phaseSummary,
-    participants: result.entries,
-    pagination: result.pagination,
-    eligibleSubmissionCount: result.eligibleTotal,
+    participants: hideParticipantList ? [] : result.entries,
+    pagination: hideParticipantList ? { ...result.pagination, total: null, hasMore: false, nextCursor: null } : result.pagination,
+    eligibleSubmissionCount: hideParticipantList ? null : result.eligibleTotal,
     filters: { search: result.search, sort: result.sort },
     leaderboard: result.leaderboard,
     votingAccess: {

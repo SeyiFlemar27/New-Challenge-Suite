@@ -28,6 +28,11 @@ assert.equal(privateFields.challengeImages.length, 0, "private gallery token URL
 const submission = publicSubmissionFields({ mediaStoragePath: "challenges/ch/submissions/user/images/entry.png", mediaUrl: tokenUrl, thumbnailUrl: tokenUrl });
 assert.equal(submission.mediaUrl, challengeMediaDeliveryUrl("challenges/ch/submissions/user/images/entry.png"));
 assert.equal(submission.thumbnailUrl, undefined, "Firebase token thumbnails are not serialized");
+const privateIdentitySubmission = publicSubmissionFields({ displayName: "Private Person", username: "private-handle", participantName: "Private Legal Name", avatarUrl: "https://example.test/private.png" });
+assert.equal(privateIdentitySubmission.displayName, undefined, "public submission projection does not trust cached display names");
+assert.equal(privateIdentitySubmission.username, undefined, "public submission projection does not trust cached usernames");
+assert.equal(privateIdentitySubmission.participantName, undefined, "public submission projection never exposes legal identity fields");
+assert.equal(privateIdentitySubmission.avatarUrl, undefined, "public submission projection does not trust cached profile images");
 const legacySubmission = publicSubmissionFields({ mediaUrl: tokenUrl });
 assert.equal(legacySubmission.mediaUrl, undefined, "legacy submission token URLs are not serialized without a storage path");
 assert.equal(isFirebaseStorageDownloadUrl(tokenUrl), true);

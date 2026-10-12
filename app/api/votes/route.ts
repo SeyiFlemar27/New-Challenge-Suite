@@ -6,7 +6,7 @@ import { canAccessChallenge, getUserPlanAccess } from "@/lib/plan-access";
 import { voteRequestSchema, zodFieldErrors } from "@/lib/server/vote-validation";
 import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-signals";
 import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
-import { challengeForPlanAccess } from "@/lib/server/challenge-access";
+import { challengeForPlanAccess, hasPublicVotingAccess } from "@/lib/server/challenge-access";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { grantRewardPointsForEvent } from "@/lib/server/reward-economy";
 
@@ -38,11 +38,12 @@ export async function POST(request: Request) {
 
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
-    if (accessContext.privateOnly && !accessContext.hasAccessGrant) {
+    const publicVotingOnly = accessContext.privateOnly && !accessContext.hasAccessGrant && hasPublicVotingAccess(challenge);
+    if (accessContext.privateOnly && !accessContext.hasAccessGrant && !publicVotingOnly) {
       return fail("A valid private challenge invite or approval is required.", 403, { redirectTo: "/private-exclusive" }, "PRIVATE_INVITE_REQUIRED");
     }
 
-    const challengeAccess = canAccessChallenge(profile, accessContext.challenge);
+    const challengeAccess = canAccessChallenge(profile, publicVotingOnly ? { ...challenge, visibility: "public" } : accessContext.challenge);
     if (!challengeAccess.allowed) {
       return fail(
         challengeAccess.code === "PREMIUM_REQUIRED" ? "Premium membership is required to vote on this challenge." : "Plan access is required for this challenge.",
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
       suspiciousSignals: signals,
       requestIdempotencyKey,
       timeZone: String(profile.timeZone ?? profile.timezone ?? "UTC"),
-      confirmedLargeSpend: body.confirmedLargeSpend
+      confirmedLargeSpend: body.confirmedLargeSpend,
+      requirePublicSubmission: publicVotingOnly
     });
     if (body.voteMode === "free" && !result.idempotentReplay) {
       await grantRewardPointsForEvent(db, { userId: user.uid, eventType: "valid_free_vote", sourceId: String(result.vote?.id ?? ""), sourceEventKey: `free-vote:${String(result.vote?.id ?? "")}:${user.uid}`, metadata: { challengeId: body.challengeId, submissionId: body.submissionId } }).catch(async () => {
