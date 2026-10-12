@@ -18,7 +18,7 @@ export interface PublicChallengeParticipant {
   submissionMediaType: string | null;
   submissionPath: string;
   status: string;
-  rank: number;
+  rank: number | null;
   voteCount: number | null;
   exactVoteCountVisible: boolean;
   submittedAt: string | null;
@@ -64,7 +64,7 @@ export async function buildPublicChallengeParticipants(
     sort: options.sort === "newest" ? "newest" : "highest_votes"
   });
   const profiles = await loadPublicProfiles(db, leaderboard.entries);
-  const exactVoteCountVisible = leaderboard.visible && leaderboard.challenge?.hideVoteTotals !== true && !predictionRankingOnly(leaderboard.challenge, leaderboard.pagination?.total ?? 0);
+  const exactVoteCountVisible = leaderboard.exactVoteCountVisible === true && !predictionRankingOnly(leaderboard.challenge, leaderboard.pagination?.total ?? 0);
   const sort = options.sort === "newest" ? "newest" : "highest_votes";
   const pageSize = Math.min(48, Math.max(1, Math.trunc(options.pageSize ?? 12)));
   const page = Math.max(1, Math.trunc(options.page ?? 1));
@@ -101,8 +101,10 @@ export async function buildPublicChallengeParticipants(
     challenge: leaderboard.challenge,
     leaderboard: publicLeaderboardState(leaderboard),
     entries,
+    participantDiscoveryAllowed: leaderboard.participantDiscoveryAllowed !== false,
     pagination: { page, pageSize: Number(leaderboard.pagination?.pageSize ?? pageSize), total, hasMore: Boolean(leaderboard.pagination?.hasMore), nextCursor: leaderboard.pagination?.nextCursor ?? null },
     eligibleTotal,
+    hasVerifiedVotes: leaderboard.hasVerifiedVotes === true,
     sort,
     search,
     exactVoteCountVisible

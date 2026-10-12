@@ -58,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   const phaseSummary = getChallengePhaseSummary(challenge, new Date(), { eligibleSubmissionCount: result.eligibleTotal });
   const ownerBlocked = Boolean(user && userOwnsChallenge(challenge, user.uid));
-  const hideParticipantList = challenge.hideParticipantList === true && !ownerBlocked;
+  const hideParticipantList = (challenge.hideParticipantList === true && !ownerBlocked) || !result.participantDiscoveryAllowed;
   const sponsorBlocked = isSponsorProfile(profile);
   const canVote = Boolean(user && phaseSummary.votingOpen && result.eligibleTotal > 0 && !ownerBlocked && !sponsorBlocked);
   const votingReason = !user
@@ -85,7 +85,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     challenge: publicVotingOnly
       ? { id, title: challenge.title ?? "Private Challenge", category: challenge.category ?? null, status: challenge.status ?? null, votingDeadline: challenge.votingDeadline ?? challenge.votingEndsAt ?? null, timeZone: challenge.timeZone ?? challenge.timezone ?? "UTC" }
       : { id, ...publicChallengeFields(challenge, id) },
-    phaseSummary,
+    phaseSummary: hideParticipantList ? { ...phaseSummary, eligibleSubmissionCount: null } : phaseSummary,
     participants: hideParticipantList ? [] : result.entries,
     pagination: hideParticipantList ? { ...result.pagination, total: null, hasMore: false, nextCursor: null } : result.pagination,
     eligibleSubmissionCount: hideParticipantList ? null : result.eligibleTotal,

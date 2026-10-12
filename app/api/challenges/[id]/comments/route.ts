@@ -32,7 +32,7 @@ async function authorizeChallengeComments(request: Request, challengeId: string)
   return { db, challenge, user, profile, allowed: accessContext.hasAccessGrant && access.allowed };
 }
 
-function visibleCommentFields(doc: DocumentSnapshot, profile?: Record<string, unknown>) {
+function visibleCommentFields(doc: DocumentSnapshot, profile?: Record<string, unknown>, canDelete = false) {
   const data = doc.data() ?? {};
   const publicIdentity = profile?.publicProfile !== false && profile?.profileVisibility !== "private";
   return {
@@ -40,7 +40,8 @@ function visibleCommentFields(doc: DocumentSnapshot, profile?: Record<string, un
     username: publicIdentity && typeof (profile?.username ?? data.username) === "string" ? String(profile?.username ?? data.username) : null,
     avatarUrl: publicIdentity && typeof (profile?.avatarUrl ?? data.avatarUrl) === "string" ? String(profile?.avatarUrl ?? data.avatarUrl) : null,
     body: typeof data.body === "string" ? data.body : "",
-    createdAt: data.createdAt ?? null
+    createdAt: data.createdAt ?? null,
+    canDelete
   };
 }
 
@@ -76,7 +77,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const authorSnaps = authorIds.length ? await access.db.getAll(...authorIds.map((authorId) => access.db!.collection("profiles").doc(authorId))) : [];
   const authorProfiles = new Map(authorSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data() ?? {}]));
   return ok({
-    comments: pageDocs.map((doc) => visibleCommentFields(doc, authorProfiles.get(String(doc.data().userId ?? "")))),
+    comments: pageDocs.map((doc) => visibleCommentFields(doc, authorProfiles.get(String(doc.data().userId ?? "")), Boolean(access.user && (access.user.uid === doc.data().userId || access.user.isAdmin)))),
     pagination: { pageSize, total: countSnap.data().count, hasMore, nextCursor: hasMore ? pageDocs.at(-1)?.id ?? null : null }
   }, "Comments loaded.");
 }
@@ -121,7 +122,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const challengeOwnerId = String(access.challenge.creatorId ?? access.challenge.ownerId ?? access.challenge.hostId ?? "");
   const reward = await awardDoroCoinEngagementSafely(db, { userId: user.uid, sourceType: "comment_challenge", actionId: ref.id, challengeId: id, challengeOwnerId, suspiciousSignals: body.length < 8 ? ["very_short_comment"] : [] });
   const created = await ref.get();
-  return ok({ comment: visibleCommentFields(created, profile), reward }, "Comment added.");
+  return ok({ comment: visibleCommentFields(created, profile, true), reward }, "Comment added.");
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

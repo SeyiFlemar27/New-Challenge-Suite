@@ -18,6 +18,10 @@ const { POST: votePost } = await import("../app/api/votes/route.ts");
 const prefix = `leaderboard_${randomUUID().replaceAll("-", "")}`;
 const publicId = `${prefix}_public`;
 const privateId = `${prefix}_private`;
+const zeroVoteId = `${prefix}_zero_votes`;
+const hiddenRankingId = `${prefix}_hidden_ranking`;
+const topTenId = `${prefix}_top_ten`;
+const disputedId = `${prefix}_disputed`;
 const mediaPath = `challenges/${privateId}/submissions/private-user/images/entry.png`;
 let checks = 0;
 let token = "";
@@ -75,7 +79,7 @@ try {
       publicVisibility: true,
       leaderboardEligible: true,
       leaderboardSearchPrefixes: index === 43 ? ["needle", "target", "entry", "needle target entry"] : ["entry", "submitter"],
-      voteCount: 45 - index,
+      voteCount: index === 0 ? 45 : 0,
       leaderboardSortAt: new Date(now - (45 - index) * 1000).toISOString(),
       submittedAt: new Date(now - (45 - index) * 1000).toISOString(),
       createdAt: new Date(now - (45 - index) * 1000).toISOString(),
@@ -83,6 +87,12 @@ try {
     });
   }
   await submissionBatch.commit();
+  const voteBatch = db.batch();
+  for (let index = 0; index < 45; index += 1) {
+    const voteRef = db.collection("votes").doc(`${prefix}_verified_vote_${String(index).padStart(3, "0")}`);
+    voteBatch.set(voteRef, { id: voteRef.id, challengeId: publicId, submissionId: `${prefix}_submission_000`, voterId: `${prefix}_voter_${index}`, status: "counted", voteMode: "free", createdAt: new Date(now - index * 1000).toISOString() });
+  }
+  await voteBatch.commit();
 
   const firstResponse = await participantsGet(request(`http://localhost/api/challenges/${publicId}/participants?page=1&pageSize=12`), routeParams(publicId));
   equal(firstResponse.status, 200, "first public participant page loads through the real handler");
@@ -121,6 +131,55 @@ try {
   equal(publicDetails.submissions.length, 5, "Challenge Details loads only the top-five preview page");
   equal(publicDetails.topParticipants.length, 5, "Challenge Details exposes the five ranked preview entries");
   check(!("userId" in publicDetails.topParticipants[0]), "Challenge Details preview omits internal participant IDs");
+
+  await db.collection("challenges").doc(zeroVoteId).set({ id: zeroVoteId, title: "No verified votes", visibility: "public", type: "Normal Challenge", creatorId: `${prefix}_owner`, ...votingFields });
+  await db.collection("submissions").doc(`${prefix}_zero_submission`).set({ id: `${prefix}_zero_submission`, challengeId: zeroVoteId, userId: `${prefix}_zero_submitter`, title: "Approved entry", status: "approved", visibility: "public", publicVisibility: true, leaderboardEligible: true, voteCount: 0, submittedAt: new Date(now - 3000).toISOString() });
+  const zeroResponse = await participantsGet(request(`http://localhost/api/challenges/${zeroVoteId}/participants`), routeParams(zeroVoteId));
+  equal(zeroResponse.status, 200, "eligible entries remain browsable before the first verified vote");
+  equal((await zeroResponse.json()).data.participants.length, 1, "no-vote challenge retains participant browsing");
+  const zeroDetailsResponse = await detailGet(request(`http://localhost/api/challenges/${zeroVoteId}`), routeParams(zeroVoteId));
+  equal(zeroDetailsResponse.status, 200, "no-vote challenge details still load");
+  const zeroDetails = (await zeroDetailsResponse.json()).data;
+  equal(zeroDetails.topParticipants.length, 0, "ranked preview is omitted until the first verified vote");
+  equal(zeroDetails.leaderboard.hasVerifiedVotes, false, "zero-vote state uses counted vote records");
+  const zeroLeaderboardResponse = await leaderboardGet(request(`http://localhost/api/leaderboards?type=challenge&challengeId=${zeroVoteId}`));
+  const zeroLeaderboard = (await zeroLeaderboardResponse.json()).data;
+  equal(zeroLeaderboard.hasVerifiedVotes, false, "full challenge board uses verified vote existence rather than submission count");
+  check(zeroLeaderboard.entries.every((entry) => entry.rank === null && entry.voteCount === null), "pre-vote entries remain browseable without exposing a ranked order or vote totals");
+
+  await db.collection("challenges").doc(hiddenRankingId).set({ id: hiddenRankingId, visibility: "public", type: "Normal Challenge", creatorId: `${prefix}_owner`, hideRankings: true, ...votingFields });
+  await db.collection("submissions").doc(`${prefix}_hidden_submission`).set({ id: `${prefix}_hidden_submission`, challengeId: hiddenRankingId, userId: `${prefix}_hidden_submitter`, title: "Hidden entry", status: "approved", visibility: "public", publicVisibility: true, leaderboardEligible: true, voteCount: 4, submittedAt: new Date(now - 1000).toISOString() });
+  await db.collection("votes").doc(`${prefix}_hidden_vote`).set({ id: `${prefix}_hidden_vote`, challengeId: hiddenRankingId, submissionId: `${prefix}_hidden_submission`, voterId: `${prefix}_hidden_voter`, status: "counted", createdAt: new Date(now).toISOString() });
+  const hiddenRankingResponse = await leaderboardGet(request(`http://localhost/api/leaderboards?type=challenge&challengeId=${hiddenRankingId}`));
+  const hiddenRankingData = (await hiddenRankingResponse.json()).data;
+  equal(hiddenRankingResponse.status, 200, "hidden ranking request returns a safe response");
+  check(hiddenRankingData.entries.every((entry) => entry.rank === null && entry.voteCount === null), "hidden rankings redact rank and vote totals at the API layer");
+  equal(hiddenRankingData.entries.length, 1, "hidden rankings still permit neutral participant browsing");
+  const hiddenDetailsResponse = await detailGet(request(`http://localhost/api/challenges/${hiddenRankingId}`), routeParams(hiddenRankingId));
+  const hiddenDetails = (await hiddenDetailsResponse.json()).data;
+  equal(hiddenDetailsResponse.status, 200, "hidden rankings do not block the main challenge details");
+  equal(hiddenDetails.topParticipants.length, 0, "challenge details do not expose top-participant aliases while ranks are hidden");
+
+  await db.collection("challenges").doc(topTenId).set({ id: topTenId, title: "Top ten only", visibility: "public", type: "Normal Challenge", creatorId: `${prefix}_owner`, leaderboardVisibilityMode: "top_10_only", ...votingFields });
+  const topTenBatch = db.batch();
+  for (let index = 0; index < 12; index += 1) {
+    const submissionId = `${prefix}_top_ten_submission_${String(index).padStart(2, "0")}`;
+    topTenBatch.set(db.collection("submissions").doc(submissionId), { id: submissionId, challengeId: topTenId, userId: `${prefix}_top_ten_user_${index}`, title: `Top ten entry ${index}`, status: "approved", visibility: "public", leaderboardEligible: true, voteCount: 12 - index, leaderboardSortAt: new Date(now - index * 1000).toISOString(), submittedAt: new Date(now - index * 1000).toISOString() });
+    topTenBatch.set(db.collection("votes").doc(`${prefix}_top_ten_vote_${String(index).padStart(2, "0")}`), { challengeId: topTenId, submissionId, voterId: `${prefix}_top_ten_voter_${index}`, status: "counted", createdAt: new Date(now - index * 1000).toISOString() });
+  }
+  await topTenBatch.commit();
+  const topTenPageOneResponse = await leaderboardGet(request(`http://localhost/api/leaderboards?type=challenge&challengeId=${topTenId}&page=1&pageSize=36`));
+  const topTenPageOne = (await topTenPageOneResponse.json()).data;
+  equal(topTenPageOneResponse.status, 200, "top-ten leaderboard is available while voting is open");
+  equal(topTenPageOne.entries.length, 10, "top-ten-only returns no more than ten entries");
+  equal(topTenPageOne.pagination.total, 10, "top-ten pagination exposes only the configured ten entries");
+  equal(topTenPageOne.pagination.eligibleTotal, 10, "top-ten pagination does not expose the complete participant count");
+  equal(topTenPageOne.pagination.hasMore, false, "top-ten pagination does not imply additional hidden entries");
+  check(topTenPageOne.entries.every((entry) => typeof entry.rank === "number" && entry.voteCount === null), "top-ten mode exposes positions but not exact vote totals while voting is open");
+  const topTenPageTwoResponse = await leaderboardGet(request(`http://localhost/api/leaderboards?type=challenge&challengeId=${topTenId}&page=2&pageSize=10`));
+  const topTenPageTwo = (await topTenPageTwoResponse.json()).data;
+  equal(topTenPageTwo.entries.length, 0, "page two cannot reveal entries outside the top ten");
+  equal(topTenPageTwo.pagination.hasMore, false, "page two does not expose hidden continuation metadata");
 
   await db.collection("challenges").doc(privateId).set({
     id: privateId,
@@ -168,12 +227,20 @@ try {
   const hiddenData = (await hiddenPage.json()).data;
   equal(hiddenData.pagination.total, null, "hidden participant total is not disclosed");
   equal(hiddenData.pagination.hasMore, false, "hidden list does not disclose continuation state");
+
+  await db.collection("challenges").doc(disputedId).set({ id: disputedId, visibility: "public", type: "Normal Challenge", creatorId: `${prefix}_owner`, leaderboardStatus: "disputed", ...votingFields });
+  await db.collection("submissions").doc(`${prefix}_disputed_submission`).set({ id: `${prefix}_disputed_submission`, challengeId: disputedId, userId: `${prefix}_disputed_submitter`, title: "Restricted entry", status: "approved", visibility: "public", leaderboardEligible: true, voteCount: 3, submittedAt: new Date(now).toISOString() });
+  const disputedResponse = await leaderboardGet(request(`http://localhost/api/leaderboards?type=challenge&challengeId=${disputedId}`));
+  const disputedData = (await disputedResponse.json()).data;
+  equal(disputedResponse.status, 200, "disputed rankings return a safe unavailable state");
+  equal(disputedData.entries.length, 0, "disputed participant entries are withheld");
+  equal(disputedData.pagination, null, "disputed participant counts and continuation metadata are withheld");
 } finally {
   for (const collection of ["submissions", "votes", "voteRequests", "freeVoteDailyGuards", "paidVoteDailyGuards", "challengeParticipants", "challengeComments"]) {
-    const snapshot = await db.collection(collection).where("challengeId", "in", [publicId, privateId, `${prefix}_hidden`]).get().catch(() => null);
+    const snapshot = await db.collection(collection).where("challengeId", "in", [publicId, privateId, `${prefix}_hidden`, zeroVoteId, hiddenRankingId, disputedId, topTenId]).get().catch(() => null);
     if (snapshot) await Promise.all(snapshot.docs.map((doc) => doc.ref.delete()));
   }
-  await Promise.all([publicId, privateId, `${prefix}_hidden`].map((id) => db.collection("challenges").doc(id).delete().catch(() => undefined)));
+  await Promise.all([publicId, privateId, `${prefix}_hidden`, zeroVoteId, hiddenRankingId, disputedId, topTenId].map((id) => db.collection("challenges").doc(id).delete().catch(() => undefined)));
   await db.collection("profiles").doc(`${prefix}_private_profile`).delete().catch(() => undefined);
   if (viewerId) {
     await Promise.all([db.collection("users").doc(viewerId).delete(), db.collection("profiles").doc(viewerId).delete(), auth.deleteUser(viewerId).catch(() => undefined)]);

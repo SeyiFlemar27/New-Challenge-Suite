@@ -127,18 +127,44 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const voteTimeZone = validVotingTimeZone(requestProfile.timeZone ?? requestProfile.timezone ?? "UTC");
   const voteDate = voteDateKeyForTimeZone(new Date(), voteTimeZone);
   const freeVoteGuardSnap = user ? await db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(user.uid, id, voteDate)).get() : null;
-  const publicParticipantPage = await buildPublicChallengeParticipants(db, id, {
-    sort: "highest_votes",
-    page: 1,
-    pageSize: 5
-  });
-  const eligibleSubmissionCount = publicParticipantPage.eligibleTotal;
-  const leaderboardPayload = {
+  let publicParticipantPage: Awaited<ReturnType<typeof buildPublicChallengeParticipants>> | null = null;
+  try {
+    publicParticipantPage = await buildPublicChallengeParticipants(db, id, {
+      sort: "highest_votes",
+      page: 1,
+      pageSize: 5
+    });
+  } catch (error) {
+    const errorCode = typeof error === "object" && error && "code" in error ? String(error.code) : "UNKNOWN";
+    const correlationId = crypto.randomUUID();
+    console.error("[challenge-details] optional leaderboard unavailable", {
+      route: "/api/challenges/[id]",
+      category: errorCode === "9" || errorCode.includes("FAILED_PRECONDITION") ? "firestore_index" : "leaderboard_query",
+      errorCode,
+      correlationId,
+      challengeId: id
+    });
+  }
+  const eligibleSubmissionCount = publicParticipantPage?.eligibleTotal
+    ?? approvedSubmissionCountSnap.data().count + activeSubmissionCountSnap.data().count;
+  const leaderboardPayload = publicParticipantPage ? {
     status: publicParticipantPage.leaderboard.status,
     visibilityMode: publicParticipantPage.leaderboard.visibilityMode,
     visible: publicParticipantPage.leaderboard.visible,
+    hasVerifiedVotes: publicParticipantPage.hasVerifiedVotes,
+    participantDiscoveryAllowed: publicParticipantPage.participantDiscoveryAllowed,
+    unavailable: false,
     message: publicParticipantPage.leaderboard.message,
     pagination: { ...publicParticipantPage.pagination, eligibleTotal: publicParticipantPage.eligibleTotal, nextCursor: undefined }
+  } : {
+    status: "unavailable",
+    visibilityMode: "unavailable",
+    visible: false,
+    hasVerifiedVotes: false,
+    participantDiscoveryAllowed: true,
+    unavailable: true,
+    message: "Audience rankings are temporarily unavailable.",
+    pagination: null
   };
 
   const publicChallenge = publicChallengeFields(challengeData, id);
@@ -192,7 +218,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const lifecycle = getChallengeLifecycleState({ id: challengeSnap.id, ...challengeData });
   const sponsorAccount = isSponsorProfile(requestProfile);
   const ownerAccount = Boolean(user && userOwnsChallenge({ id: challengeSnap.id, ...challengeData }, user.uid));
-  const hideParticipantList = challengeData.hideParticipantList === true && !ownerAccount;
+  const hideParticipantList = (challengeData.hideParticipantList === true && !ownerAccount)
+    || publicParticipantPage?.participantDiscoveryAllowed === false;
   const voteTotalsVisible = challengeData.hideVoteTotals !== true || ownerAccount;
   publicChallenge.participantCountVisible = !hideParticipantList;
   const boostAccess = getChallengeBoostAccess({ challenge: { id: challengeSnap.id, ...challengeData }, userId: user?.uid, profile: requestProfile });
@@ -271,8 +298,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return ok({
     phaseSummary: hideParticipantList ? { ...phaseSummary, eligibleSubmissionCount: null } : phaseSummary,
     challenge: { id: challengeSnap.id, ...publicChallenge, creatorDisplayName, creatorUsername, creatorAvatarUrl, paidEntry: { required: paidEntryState.required, amountCents: paidEntryState.amountCents, currency: paidEntryState.currency, joinWindowOpen: paidEntryState.joinWindowOpen } },
-    submissions: hideParticipantList ? [] : publicParticipantPage.entries,
-    topParticipants: hideParticipantList ? [] : publicParticipantPage.entries.slice(0, 5),
+    submissions: hideParticipantList ? [] : publicParticipantPage?.entries ?? [],
+    topParticipants: hideParticipantList || !publicParticipantPage?.leaderboard.visible || !publicParticipantPage.hasVerifiedVotes
+      ? []
+      : publicParticipantPage.entries.filter((entry) => entry.rank !== null).slice(0, 5),
     officialWinners,
     resultsUnavailable,
     leaderboard: hideParticipantList ? { ...leaderboardPayload, pagination: leaderboardPayload.pagination ? { ...leaderboardPayload.pagination, total: null, eligibleTotal: null, hasMore: false } : null } : leaderboardPayload,

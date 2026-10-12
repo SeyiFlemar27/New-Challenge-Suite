@@ -151,9 +151,9 @@ export function fetchChallengeDetails(challengeId: string) {
     submissions: unknown[];
     sponsorships: unknown[];
     topParticipants?: unknown[];
-    officialWinners?: Array<{ id: string; submissionId?: string | null; position?: number | null; status?: string; prizeAmountCents?: number | null; currency?: string | null; publicDisplayName?: string | null; avatarUrl?: string | null }>;
+    officialWinners?: Array<{ id: string; submissionId?: string | null; position?: number | null; status?: string; prizeAmountCents?: number | null; currency?: string | null; publicDisplayName?: string | null; username?: string | null; avatarUrl?: string | null }>;
     resultsUnavailable?: boolean;
-    leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; competitionMode?: string; entries?: unknown[] };
+    leaderboard?: { visible?: boolean; message?: string | null; status?: string; visibilityMode?: string; competitionMode?: string; hasVerifiedVotes?: boolean; unavailable?: boolean; participantDiscoveryAllowed?: boolean; entries?: unknown[] };
     participants?: unknown[];
     prizePool?: {
       status: string;

@@ -10,7 +10,7 @@ export type LeaderboardVisibilityMode = "public_live" | "hidden_until_close" | "
 
 export interface LeaderboardRow {
   id: string;
-  rank: number;
+  rank: number | null;
   previousRank: number | null;
   rankChange: number;
   submissionId?: string;
@@ -50,6 +50,9 @@ export interface LeaderboardResult {
   source: string;
   updatedAt: string | null;
   competitionMode?: "public_voting" | "judges" | "tournament" | "global";
+  hasVerifiedVotes?: boolean;
+  participantDiscoveryAllowed?: boolean;
+  exactVoteCountVisible?: boolean;
   pagination?: { page: number; pageSize: number; total: number; totalPages: number; hasMore?: boolean; nextCursor?: string | null; eligibleTotal?: number };
   currentUserPosition?: LeaderboardRow | null;
 }
@@ -192,6 +195,7 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
       status: "archived",
       visibilityMode: "public_live",
       visible: false,
+      participantDiscoveryAllowed: false,
       message: "Challenge not found.",
       entries: [],
       source: "submissions",
@@ -212,7 +216,28 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     .where("leaderboardEligible", "==", true)
     .where("visibility", "==", "public");
   const filteredQuery = options.searchPrefix ? baseQuery.where("leaderboardSearchPrefixes", "array-contains", options.searchPrefix) : baseQuery;
-  let query = options.sort === "newest"
+  const [eligibleTotalSnap, totalSnap, verifiedVotesSnap] = await Promise.all([
+    baseQuery.count().get(),
+    filteredQuery.count().get(),
+    db.collection("votes").where("challengeId", "==", challengeId).where("status", "==", "counted").count().get()
+  ]);
+  const candidateTotal = totalSnap.data().count;
+  const total = visibilityMode === "top_10_only" ? Math.min(candidateTotal, 10) : candidateTotal;
+  const eligibleTotal = visibilityMode === "top_10_only" ? Math.min(eligibleTotalSnap.data().count, 10) : eligibleTotalSnap.data().count;
+  const hasVerifiedVotes = verifiedVotesSnap.data().count > 0;
+  const participantDiscoveryAllowed = !["hidden", "archived", "disputed", "under_review"].includes(status)
+    && visibilityMode !== "private_review";
+  const rankingAllowed = visible && hasVerifiedVotes && participantDiscoveryAllowed;
+  const exactVoteCountVisible = visible
+    && hasVerifiedVotes
+    && challenge.hideVoteTotals !== true
+    && (visibilityMode !== "top_10_only" || !votingOpen);
+  const requestedSort = options.sort === "newest" ? "newest" : "highest_votes";
+  const rankOrderAllowed = rankingAllowed && requestedSort === "highest_votes";
+  // A hidden board must not reveal rank order through its query order, page contents,
+  // cursors, or positional metadata. Use a neutral submission-time order instead.
+  const effectiveSort = rankOrderAllowed ? requestedSort : "newest";
+  let query = effectiveSort === "newest"
     ? filteredQuery.orderBy("submittedAt", "desc").orderBy(FieldPath.documentId(), "desc")
     : filteredQuery.orderBy("voteCount", "desc").orderBy("leaderboardSortAt", "asc").orderBy("submittedAt", "asc").orderBy(FieldPath.documentId(), "asc");
   let start = (page - 1) * effectivePageSize;
@@ -236,28 +261,28 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
   } else if (start > 0) {
     query = query.offset(start);
   }
-  const [submissionSnap, eligibleTotalSnap, totalSnap] = await Promise.all([
-    query.limit(effectivePageSize + 1).get(),
-    baseQuery.count().get(),
-    filteredQuery.count().get()
-  ]);
-  const hasMore = submissionSnap.docs.length > effectivePageSize;
+  const maxVisibleEntries = Math.max(0, total - start);
+  const queryLimit = visibilityMode === "top_10_only"
+    ? Math.min(effectivePageSize, maxVisibleEntries)
+    : effectivePageSize + 1;
+  const submissionSnap = participantDiscoveryAllowed && queryLimit > 0
+    ? await query.limit(queryLimit).get()
+    : { docs: [] as QueryDocumentSnapshot[] };
+  const hasMore = visibilityMode === "top_10_only"
+    ? start + submissionSnap.docs.length < total
+    : submissionSnap.docs.length > effectivePageSize;
   const pageDocs = (hasMore ? submissionSnap.docs.slice(0, effectivePageSize) : submissionSnap.docs)
     .filter((doc) => isPublicSubmission(doc.id, doc.data()));
   const candidateRows = pageDocs.map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
   const filteredRows = rankSubmissions(candidateRows);
-  const candidateTotal = totalSnap.data().count;
-  const total = visibilityMode === "top_10_only" ? Math.min(candidateTotal, 10) : candidateTotal;
-  const sortedRows = options.sort === "newest"
+  const sortedRows = effectiveSort === "newest"
     ? [...filteredRows].sort((a, b) => timestampMs(b.submittedAt) - timestampMs(a.submittedAt) || b.id.localeCompare(a.id))
     : filteredRows;
-  const visibleEntries = visibilityMode === "top_10_only" && votingOpen
-    ? sortedRows.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
-    : challenge.hideVoteTotals === true
+  const visibleEntries = !exactVoteCountVisible
       ? sortedRows.map((entry) => ({ ...entry, voteCount: 0, weightedVoteCount: 0, votes: undefined, points: undefined }))
       : sortedRows;
   const rankOffset = start;
-  const rankedPage = visibleEntries.map((entry, index) => ({ ...entry, rank: rankOffset + index + 1 }));
+  const rankedPage = visibleEntries.map((entry, index) => ({ ...entry, rank: rankOrderAllowed ? rankOffset + index + 1 : null }));
   const pageCursor = hasMore && pageDocs.length ? pageDocs.at(-1)!.id : null;
   const nextCursor = pageCursor ? Buffer.from(JSON.stringify({ id: pageCursor, rank: rankOffset + rankedPage.length + 1 }), "utf8").toString("base64url") : null;
   return {
@@ -268,12 +293,15 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
     status,
     visibilityMode,
     visible,
+    participantDiscoveryAllowed,
+    exactVoteCountVisible,
     message,
     entries: rankedPage,
+    hasVerifiedVotes,
     source: "submissions",
     updatedAt: toIso(challenge.updatedAt),
     competitionMode: judgesMode ? "judges" : "public_voting",
-    pagination: { page, pageSize: effectivePageSize, total, totalPages: Math.max(1, Math.ceil(total / effectivePageSize)), hasMore, nextCursor, eligibleTotal: eligibleTotalSnap.data().count }
+    pagination: { page, pageSize: effectivePageSize, total, totalPages: Math.max(1, Math.ceil(total / effectivePageSize)), hasMore, nextCursor, eligibleTotal }
   };
 }
 

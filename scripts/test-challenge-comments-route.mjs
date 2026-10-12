@@ -74,9 +74,14 @@ try {
   const posted = await POST(req(`http://localhost/api/challenges/${publicChallengeId}/comments`, author.token, "POST", { body: "A new eligible comment" }), { params: Promise.resolve({ id: publicChallengeId }) });
   equal(posted.status, 200, "authorized signed-in viewer can comment without participating");
   const postedData = (await posted.json()).data.comment;
+  equal(postedData.canDelete, true, "author receives the server-authorized delete capability");
   check(typeof postedData.username === "string" && !("displayName" in postedData) && !("verified" in postedData), "new comment stores public username without full-name or verification identity");
   const afterPost = await GET(req(`http://localhost/api/challenges/${publicChallengeId}/comments?pageSize=20`), { params: Promise.resolve({ id: publicChallengeId }) });
   equal((await afterPost.json()).data.pagination.total, 45, "authoritative total includes the newly posted comment");
+  equal((await DELETE(req(`http://localhost/api/challenges/${publicChallengeId}/comments`, outsider.token, "DELETE", { commentId: postedData.id }), { params: Promise.resolve({ id: publicChallengeId }) })).status, 403, "unrelated user cannot remove another author's comment");
+  equal((await DELETE(req(`http://localhost/api/challenges/${publicChallengeId}/comments`, author.token, "DELETE", { commentId: postedData.id }), { params: Promise.resolve({ id: publicChallengeId }) })).status, 200, "author can remove their comment through the handler");
+  const afterDelete = await GET(req(`http://localhost/api/challenges/${publicChallengeId}/comments?pageSize=20`), { params: Promise.resolve({ id: publicChallengeId }) });
+  equal((await afterDelete.json()).data.pagination.total, 44, "comment count is updated after deletion");
 
   const privateChallengeId = `${prefix}_private`;
   await db.collection("challenges").doc(privateChallengeId).set({ id: privateChallengeId, creatorId: owner.uid, title: "Private comments", visibility: "private", type: "Private / Exclusive", status: "active", lifecycleStatus: "active", privateVotingAccess: "public_voting", privateJoiningPolicy: "invite_only", createdAt: new Date().toISOString() });
@@ -90,13 +95,20 @@ try {
   await db.collection("challenges").doc(completionId).set({ id: completionId, creatorId: owner.uid, visibility: "public", type: "Normal Challenge", status: "completed", lifecycleStatus: "completed", createdAt: new Date().toISOString() });
   equal((await POST(req(`http://localhost/api/challenges/${completionId}/comments`, author.token, "POST", { body: "Too late" }), { params: Promise.resolve({ id: completionId }) })).status, 409, "completed challenge rejects new comments");
   equal((await GET(req(`http://localhost/api/challenges/${completionId}/comments`), { params: Promise.resolve({ id: completionId }) })).status, 200, "completed challenge comments remain readable");
+  for (const status of ["paused", "postponed", "cancelled"]) {
+    const challengeId = `${prefix}_${status}`;
+    await db.collection("challenges").doc(challengeId).set({ id: challengeId, creatorId: owner.uid, visibility: "public", type: "Normal Challenge", status, lifecycleStatus: status, createdAt: new Date().toISOString() });
+    equal((await GET(req(`http://localhost/api/challenges/${challengeId}/comments`), { params: Promise.resolve({ id: challengeId }) })).status, 200, `${status} challenge comment history remains readable`);
+    equal((await POST(req(`http://localhost/api/challenges/${challengeId}/comments`, author.token, "POST", { body: "New comments are closed" }), { params: Promise.resolve({ id: challengeId }) })).status, 409, `${status} challenge rejects new comments`);
+  }
 
   console.log(`challenge comments route emulator tests passed (${assertions} assertions)`);
 } finally {
   await db.recursiveDelete(db.collection("challenges").doc(`${prefix}_public`)).catch(() => undefined);
   await db.recursiveDelete(db.collection("challenges").doc(`${prefix}_private`)).catch(() => undefined);
+  for (const status of ["paused", "postponed", "cancelled"]) await db.recursiveDelete(db.collection("challenges").doc(`${prefix}_${status}`)).catch(() => undefined);
   await db.recursiveDelete(db.collection("challenges").doc(`${prefix}_complete`)).catch(() => undefined);
-  const own = await db.collection("challengeComments").where("challengeId", "in", [`${prefix}_public`, `${prefix}_private`, `${prefix}_complete`]).get().catch(() => null);
+  const own = await db.collection("challengeComments").where("challengeId", "in", [`${prefix}_public`, `${prefix}_private`, `${prefix}_complete`, `${prefix}_paused`, `${prefix}_postponed`, `${prefix}_cancelled`]).get().catch(() => null);
   if (own) await Promise.all(own.docs.map((doc) => doc.ref.delete()));
   await db.collection("privateChallengeAccess").doc(`${prefix}_private_${createdUsers[3]?.uid}`).delete().catch(() => undefined);
   await Promise.all(createdUsers.map(async (created) => {
