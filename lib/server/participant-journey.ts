@@ -3,6 +3,7 @@ import { paidEntryAmountCents, isPaidEntryChallenge } from "@/lib/server/monetiz
 import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { resubmissionWindowOpen } from "@/lib/server/submission-resubmission";
 
 export type ParticipantJourneyStep =
   | "auth_required"
@@ -101,6 +102,7 @@ function result(step: ParticipantJourneyStep, label: string, message: string, pr
       registrationClosesAt: input.phaseSummary.registrationEndAt,
       submissionOpensAt: input.phaseSummary.submissionStartAt,
       submissionDeadline: input.phaseSummary.submissionDeadline,
+      resubmissionDeadline: input.submission?.resubmissionDeadline ?? null,
       timeZone: input.phaseSummary.timeZone,
       timelineNeedsReview: input.phaseSummary.phase === "timeline_needs_review",
       alreadySubmitted: flags.alreadySubmitted
@@ -150,6 +152,7 @@ export function getParticipantJourneyState(input: JourneyInput) {
   const fee = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(paidEntryAmountCents(challenge) / 100);
   const submissionOpenAt = formatChallengeDateTime(phase.submissionStartAt, phase.timeZone);
   const submissionDeadline = formatChallengeDateTime(phase.submissionDeadline, phase.timeZone);
+  const resubmissionDeadline = formatChallengeDateTime(submission?.resubmissionDeadline, phase.timeZone);
   const registrationClosesAt = formatChallengeDateTime(phase.registrationEndAt, phase.timeZone);
   const maxParticipants = Math.max(0, Math.trunc(Number(challenge.maxParticipants ?? challenge.participantLimit ?? 0) || 0));
   const challengeFull = maxParticipants > 0 && Number(input.participantCount ?? challenge.participantCount ?? 0) >= maxParticipants;
@@ -162,6 +165,18 @@ export function getParticipantJourneyState(input: JourneyInput) {
   if (isSponsorProfile(profile)) return result("blocked_sponsor", "Sponsors cannot participate as competitors", "Use sponsor tools for funding, messaging, and campaign activity.", null, input, flags, "sponsor_blocked");
   if (phase.phase === "timeline_needs_review") return result("timeline_needs_review", "Schedule pending", "The organizer is confirming the challenge schedule.", null, input, flags, "timeline_needs_review");
   if (!registered && challengeFull) return challenge.waitlistEnabled === true ? result("register", "Join Waitlist", "The challenge is full, but the waitlist is open.", "join_waitlist", input, flags, null) : result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
+  if (submission && text(submission.status).toLowerCase() === "resubmission_requested") {
+    const feedback = text(submission.requestedChanges) || text(submission.rejectionReason) || "The reviewer requested changes to your submission.";
+    if (entered && phase.canSubmit && resubmissionWindowOpen({ submission, challenge, now: new Date() })) {
+      const deadlineMessage = resubmissionDeadline ? ` Submit your correction by ${resubmissionDeadline}.` : " Submit your correction before the resubmission deadline.";
+      return result("fix_and_resubmit", "Changes requested", `${feedback}${deadlineMessage}`, "fix_and_resubmit", input, flags, null);
+    }
+    return result("already_submitted", "Resubmission period ended", `${feedback} The correction window has expired or submissions are closed.`, "view_entry", input, flags, "resubmission_window_closed");
+  }
+  if (submission && isRejectedSubmission(submission.status)) {
+    const feedback = text(submission.rejectionReason) || "Your submission was not approved.";
+    return result("already_submitted", "Submission not approved", feedback, "view_entry", input, flags, "submission_rejected");
+  }
   if (submission && phase.canSubmit && entered) return result("can_submit", "Edit your entry", `You can update your entry before ${submissionDeadline ?? "the deadline"}.`, "submit_entry", input, flags, null);
   if (submission && isSubmitted(submission.status)) return result("already_submitted", "Entry submitted", "Your entry has been submitted for this challenge.", "view_entry", input, flags, "already_submitted");
   if (participantStatus === "waitlisted") return result("waitlisted", "Waitlisted", "You are on the waitlist. We will update your status if a place becomes available.", null, input, flags, "waitlisted");

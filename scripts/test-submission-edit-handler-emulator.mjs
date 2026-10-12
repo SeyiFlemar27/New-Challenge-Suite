@@ -72,9 +72,22 @@ try {
   equal((await db.collection("submissionRevisions").doc(`${submissionId}_v1`).get()).exists, true, "immutable revision history record is created");
   equal((await PATCH(jsonRequest(owner.token, body), params)).status, 409, "stale concurrent retry cannot overwrite a newer revision");
   equal((await PATCH(jsonRequest(unrelated.token, { ...body, expectedRevision: 1 }), params)).status, 403, "unrelated user cannot edit the submission");
+  const requestDeadline = new Date(Date.now() + 30 * 60_000).toISOString();
+  await submissionRef.set({ status: "resubmission_requested", moderationStatus: "resubmission_requested", requestedChanges: "Replace the image caption.", resubmissionRequestId: "request-once", resubmissionDeadline: requestDeadline, resubmissionCompletedRequestId: null }, { merge: true });
+  const correctionResponse = await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 1, title: "Corrected submission" }), params);
+  equal(correctionResponse.status, 200, "owner can correct a requested resubmission before its persisted deadline");
+  const corrected = (await submissionRef.get()).data();
+  equal(corrected.status, "pending_review", "corrected submission returns to review");
+  equal(corrected.resubmissionCompletedRequestId, "request-once", "resubmission request is consumed exactly once");
+  equal(corrected.revisionNumber, 2, "correction creates the next revision");
+  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 1 }), params)).status, 409, "duplicate correction cannot replay a consumed request");
+  await submissionRef.set({ status: "resubmission_requested", moderationStatus: "resubmission_requested", resubmissionRequestId: "request-expired", resubmissionDeadline: new Date(Date.now() - 1).toISOString(), resubmissionCompletedRequestId: null }, { merge: true });
+  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 2 }), params)).status, 409, "expired resubmission is rejected");
+  equal((await PATCH(jsonRequest(unrelated.token, { ...body, expectedRevision: 2 }), params)).status, 403, "unauthorized user cannot use an open resubmission request");
+  equal((await submissionRef.get()).data().revisionNumber, 2, "expired and unauthorized corrections create no revision");
   await challengeRef.set({ submissionDeadline: new Date(Date.now() - 1).toISOString() }, { merge: true });
-  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 1 }), params)).status, 409, "edit at or after the deadline is rejected");
-  equal((await submissionRef.get()).data().revisionNumber, 1, "deadline rejection writes no new revision");
+  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 2 }), params)).status, 409, "edit at or after the challenge deadline is rejected");
+  equal((await submissionRef.get()).data().revisionNumber, 2, "deadline rejection writes no new revision");
   console.log(`PASS actual submission PATCH handler against Auth, Firestore, and Storage Emulators: ${assertionCount} assertions.`);
 } finally {
   await app.delete();

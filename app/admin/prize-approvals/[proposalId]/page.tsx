@@ -44,18 +44,19 @@ export default function AdminPrizeApprovalDetailPage() {
   const settlement = detail?.settlement;
   const challengeId = String(proposal?.challengeId ?? "");
 
-  async function action(kind: "approve" | "reject" | "request-changes" | "finalize-ledger") {
+  async function action(kind: "approve" | "reject" | "request-changes" | "finalize-ledger" | "announce") {
     if (!proposal || !challengeId) return;
-    if ((kind === "reject" || kind === "request-changes") && !adminNote.trim()) {
-      setNotice("Admin note is required for this action.");
+    if ((kind === "reject" || kind === "request-changes" || kind === "announce") && !adminNote.trim()) {
+      setNotice(kind === "announce" ? "A reason is required to announce winners." : "Admin note is required for this action.");
       return;
     }
+    if (kind === "announce" && !window.confirm("Announce these verified winners to the public? This action records the official challenge results.")) return;
     setSubmitting(kind);
     setNotice("");
     const path = kind === "finalize-ledger"
       ? `/api/admin/challenges/${challengeId}/winner-proposals/${proposal.id}/finalize-ledger`
-      : `/api/admin/challenges/${challengeId}/winner-proposals/${proposal.id}/${kind}`;
-    const result = await apiRequest(path, { method: "POST", body: JSON.stringify({ adminNote }) });
+      : `/api/admin/challenges/${challengeId}/winner-proposals/${proposal.id}/${kind === "request-changes" ? "request-changes" : kind === "announce" ? "announce" : kind}`;
+    const result = await apiRequest(path, { method: "POST", body: JSON.stringify(kind === "announce" ? { confirmation: true, reason: adminNote } : { adminNote }) });
     setSubmitting("");
     setNotice(result.message);
     if (result.ok) void refetch();
@@ -64,7 +65,7 @@ export default function AdminPrizeApprovalDetailPage() {
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageTitle title="Prize Approval Detail" subtitle="Review confirmed revenue, approve winners, and prepare internal settlement credits." icon={<ClipboardCheck />} />
+        <PageTitle title="Prize Approval Detail" subtitle="Review confirmed revenue, approve winners, prepare internal settlement credits, and announce verified results when scheduled." icon={<ClipboardCheck />} />
         <LinkButton href="/admin/prize-approvals" variant="secondary">Back to Queue</LinkButton>
       </div>
 
@@ -164,10 +165,11 @@ export default function AdminPrizeApprovalDetailPage() {
 
           <Card className="p-5">
             <Field label="Admin note">
-              <textarea className={textareaClass} value={adminNote} onChange={(event) => setAdminNote(event.target.value)} placeholder="Required for reject or request changes." />
+              <textarea className={textareaClass} value={adminNote} onChange={(event) => setAdminNote(event.target.value)} placeholder="Required reason for reject, request changes, or announcing winners." />
             </Field>
             <div className="mt-5 grid gap-3">
               <Button onClick={() => void action("approve")} disabled={Boolean(submitting) || Boolean(settlement)}><CheckCircle2 size={17} /> {submitting === "approve" ? "Creating Settlement..." : proposal.status === "approved" ? "Create Internal Settlement" : "Approve winners & create settlement"}</Button>
+              {proposal.status === "approved" && settlement ? <Button variant="primary" onClick={() => void action("announce")} disabled={Boolean(submitting) || String(challenge?.status ?? challenge?.lifecycleStatus ?? "").toLowerCase() === "winners_announced"}>{submitting === "announce" ? "Verifying & Announcing..." : "Announce Winners"}</Button> : null}
               <Button variant="secondary" onClick={() => void action("request-changes")} disabled={Boolean(submitting)}>{submitting === "request-changes" ? "Saving..." : "Request Changes"}</Button>
               <Button variant="secondary" onClick={() => void action("reject")} disabled={Boolean(submitting)}><XCircle size={17} /> {submitting === "reject" ? "Rejecting..." : "Reject Proposal"}</Button>
               {proposal.status === "approved" && !settlement ? <Button variant="ghost" onClick={() => void action("finalize-ledger")} disabled={Boolean(submitting)}>{submitting === "finalize-ledger" ? "Checking..." : "Retry Internal Settlement"}</Button> : null}

@@ -42,21 +42,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return fail(readiness.message, 409, readiness, "WINNER_APPROVAL_NOT_READY");
   }
   const candidates = await getWinnerCandidates(db, challengeId);
-  const eligible = new Map(candidates.map((candidate) => [candidate.userId, candidate]));
-  const ineligibleWinner = winners.find((winner) => {
-    const candidate = eligible.get(winner.userId);
-    return !candidate || (winner.submissionId && candidate.submissionId !== winner.submissionId);
-  });
+  if (proposal.status === "approved" && winners.some((winner) => !winner.submissionId)) {
+    return fail("This approved legacy proposal does not identify the exact winning submissions and requires Admin review.", 409, undefined, "WINNER_SUBMISSION_REFERENCE_REQUIRED");
+  }
+  const selectedCandidates = winners.map((winner) => candidates.find((candidate) =>
+    candidate.userId === winner.userId && (!winner.submissionId || candidate.submissionId === winner.submissionId)
+  ) ?? null);
+  const ineligibleWinnerIndex = selectedCandidates.findIndex((candidate) => !candidate);
+  const ineligibleWinner = ineligibleWinnerIndex >= 0 ? winners[ineligibleWinnerIndex] : null;
   if (ineligibleWinner) {
     return fail("Every approved winner must have an eligible challenge submission.", 409, {
       userId: ineligibleWinner.userId,
       submissionId: ineligibleWinner.submissionId
     }, "WINNER_NOT_ELIGIBLE");
   }
+  const approvedWinners = winners.map((winner, index) => ({ ...winner, submissionId: selectedCandidates[index]!.submissionId }));
   const adminNote = typeof parsed.body?.adminNote === "string" ? parsed.body.adminNote.trim().slice(0, 2000) : "";
-  const selectedIds = new Set(winners.map((winner) => winner.userId));
-  const selectedScores = candidates.filter((candidate) => selectedIds.has(candidate.userId)).map((candidate) => candidate.weightedVoteCount);
-  const unselectedScores = candidates.filter((candidate) => !selectedIds.has(candidate.userId)).map((candidate) => candidate.weightedVoteCount);
+  const selectedIds = new Set(approvedWinners.map((winner) => winner.submissionId));
+  const selectedScores = candidates.filter((candidate) => selectedIds.has(candidate.submissionId)).map((candidate) => candidate.weightedVoteCount);
+  const unselectedScores = candidates.filter((candidate) => !selectedIds.has(candidate.submissionId)).map((candidate) => candidate.weightedVoteCount);
   const tieAtWinnerBoundary = selectedScores.some((score) => unselectedScores.includes(score));
   const configuredTieBreaker = Boolean(challenge.tieBreaker || challenge.tieBreakerRule || challenge.winnerTieBreaker);
   if (tieAtWinnerBoundary && !configuredTieBreaker && !adminNote) {
@@ -67,9 +71,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const now = new Date().toISOString();
-  const preview = await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners });
+  const preview = await buildConfirmedSettlementPreview(db, { challengeId, challenge, winners: approvedWinners });
   const update = {
     status: "approved",
+    winners: approvedWinners,
     reviewedAt: now,
     reviewedByAdminId: user.uid,
     adminDecision: "approved",
@@ -91,7 +96,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     proposalId,
     adminId: user.uid,
     challenge,
-    winners,
+    winners: approvedWinners,
     approvedAt: proposal.status === "approved" && typeof proposal.reviewedAt === "string" ? proposal.reviewedAt : now
   });
   await writeAuditLog({
@@ -114,9 +119,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }, db);
 
   if (!isPaidEntryChallenge(challenge)) {
-    const winnerIds = new Set(winners.map((winner) => winner.userId));
+    const winnerIds = new Set(approvedWinners.map((winner) => winner.userId));
     const rewardJobs = [
-      ...winners.map((winner) => awardDoroCoinEngagement(db, { userId: winner.userId, sourceType: "win_free_challenge" as const, actionId: challengeId, challengeId })),
+      ...approvedWinners.map((winner) => awardDoroCoinEngagement(db, { userId: winner.userId, sourceType: "win_free_challenge" as const, actionId: challengeId, challengeId })),
       ...candidates.slice(0, 10).map((candidate) => awardDoroCoinEngagement(db, { userId: candidate.userId, sourceType: "top_10_finish" as const, actionId: challengeId, challengeId, suspiciousSignals: winnerIds.has(candidate.userId) ? ["winner_and_top_10_rewards_are_separate_rules"] : [] }))
     ];
     const rewardResults = await Promise.allSettled(rewardJobs);
@@ -131,7 +136,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const challengeType = String(challenge.challengeType ?? challenge.type ?? "normal").toLowerCase();
     const individualTournament = challengeType.includes("tournament") && challenge.teamBased !== true;
     const completionJobs = candidates.map((candidate) => grantRewardPointsForEvent(db, { userId: candidate.userId, eventType: "challenge_participation_completed", sourceId: challengeId, sourceEventKey: `challenge-completed:${challengeId}:${candidate.userId}`, metadata: { proposalId } }));
-    const placementJobs = winners.map((winner) => {
+    const placementJobs = approvedWinners.map((winner) => {
       const placement = Number(winner.placement ?? 0);
       const eventType = individualTournament
         ? (placement === 1 ? "individual_tournament_champion" : undefined)

@@ -3,6 +3,7 @@ import { writeAuditLog } from "@/lib/server/audit";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { grantRewardPointsForEvent, recordMeaningfulRewardActivity } from "@/lib/server/reward-economy";
+import { resolveResubmissionDeadline } from "@/lib/server/submission-resubmission";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +84,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (["reject", "flag"].includes(action) && !reason) return validationError({ reason: action === "reject" ? "A rejection reason is required." : "A flag reason is required." });
   if (action === "request_resubmission") {
     if (!requestedChanges) return validationError({ requestedChanges: "Requested changes are required." });
-    const deadline = Date.parse(resubmissionDeadline);
-    if (!resubmissionDeadline || !Number.isFinite(deadline) || deadline <= Date.now()) return validationError({ resubmissionDeadline: "A future resubmission deadline is required." });
+    if (!resubmissionDeadline || !Number.isFinite(Date.parse(resubmissionDeadline))) return validationError({ resubmissionDeadline: "A valid resubmission deadline is required." });
   }
   if (action === "request_info" && !reason) return validationError({ reason: "Describe the information needed from the participant." });
   if (action === "request_disqualification" && !reason) return validationError({ reason: "A disqualification reason is required for admin review." });
@@ -94,6 +94,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!snap.exists || String(snap.data()?.challengeId ?? "") !== id) return fail("Management record not found.", 404, undefined, "NOT_FOUND");
   const current = snap.data() ?? {};
   const now = new Date().toISOString();
+  if (targetType === "submission" && action === "request_resubmission") {
+    const requestId = access.db.collection("submissions").doc().id;
+    try {
+      const requested = await access.db.runTransaction(async (transaction) => {
+        const [submissionSnap, challengeSnap] = await Promise.all([
+          transaction.get(ref),
+          transaction.get(access.db!.collection("challenges").doc(id))
+        ]);
+        if (!submissionSnap.exists || String(submissionSnap.data()?.challengeId ?? "") !== id) throw new Error("MANAGEMENT_RECORD_NOT_FOUND");
+        if (!challengeSnap.exists) throw new Error("CHALLENGE_NOT_FOUND");
+        const latest = submissionSnap.data() ?? {};
+        if (["resubmission_requested", "approved", "flagged", "disqualified", "withdrawn", "eliminated", "winner"].includes(String(latest.status ?? "").toLowerCase())) throw new Error("RESUBMISSION_NOT_ALLOWED");
+        const deadline = resolveResubmissionDeadline({ requestedDeadline: resubmissionDeadline, challenge: challengeSnap.data() ?? {} });
+        if (!deadline.allowed) throw new Error("RESUBMISSION_DEADLINE_INVALID");
+        const update = {
+          status: "resubmission_requested",
+          moderationStatus: "resubmission_requested",
+          requestedChanges,
+          resubmissionDeadline: deadline.deadline,
+          resubmissionRequestId: requestId,
+          resubmissionCompletedRequestId: null,
+          resubmissionNote: note || null,
+          resubmissionRequestedAt: now,
+          reviewedBy: access.user!.uid,
+          reviewedAt: now,
+          publicEligible: false,
+          updatedAt: now
+        };
+        transaction.set(ref, update, { merge: true });
+        return { beforeStatus: String(latest.status ?? null), update };
+      });
+      const participantId = String(current.userId ?? current.participantId ?? "");
+      if (participantId) await createNotification(access.db, { userId: participantId, type: "submission_request_resubmission", title: "Submission changes requested", body: requestedChanges, actionUrl: `/challenges/${id}`, targetId, idempotencyKey: `submission_resubmission_${targetId}_${requestId}` }).catch(() => undefined);
+      await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: "submission.request_resubmission", targetType, targetId, before: { status: requested.beforeStatus }, after: { status: "resubmission_requested", resubmissionDeadline: requested.update.resubmissionDeadline, resubmissionRequestId: requestId }, reason: requestedChanges, metadata: { challengeId: id, note: note || null, resubmissionWindowHours: 24 } }, access.db);
+      return ok({ targetId, targetType, status: "resubmission_requested", action, resubmissionDeadline: requested.update.resubmissionDeadline }, "Resubmission requested.");
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "RESUBMISSION_REQUEST_FAILED";
+      if (code === "RESUBMISSION_DEADLINE_INVALID") return validationError({ resubmissionDeadline: "The resubmission window must end before the challenge submission deadline and within 24 hours." });
+      if (code === "RESUBMISSION_NOT_ALLOWED") return fail("This submission cannot receive another resubmission request in its current state.", 409, undefined, code);
+      if (code === "MANAGEMENT_RECORD_NOT_FOUND" || code === "CHALLENGE_NOT_FOUND") return fail("Management record not found.", 404, undefined, "NOT_FOUND");
+      return serverUnavailable("Resubmission review");
+    }
+  }
   if (targetType === "participant" && action === "check_in") {
     const type = String(access.challenge.type ?? access.challenge.competitionType ?? "").toLowerCase();
     if (!access.challenge.isLiveEvent && !type.includes("live")) return fail("Check-in is available only for Live Events.", 409, undefined, "LIVE_EVENT_REQUIRED");

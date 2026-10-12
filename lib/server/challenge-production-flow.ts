@@ -1,5 +1,6 @@
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { calculatePaidRevenueSplit } from "@/lib/server/payout-structure";
+import { validateAuthoritativeWinnerRecords, type OfficialWinnerRecord } from "@/lib/server/official-winner-records";
 
 export type ChallengeFlowAction = "close_submissions" | "open_voting" | "close_voting" | "start_review" | "announce_winners" | "complete_challenge";
 export type PreliminaryResultStatus = "pending_calculation" | "calculated" | "needs_review" | "blocked" | "failed";
@@ -57,24 +58,33 @@ export function canStartWinnerReview(challenge: Record<string, unknown>, now = n
   return { allowed: close.allowed && !unresolved, reason: unresolved ? "review_hold_required" : close.reason };
 }
 
-export function canAnnounceWinners(challenge: Record<string, unknown>) {
+export function canAnnounceWinners(challenge: Record<string, unknown>, winnerRecords: OfficialWinnerRecord[] = []) {
   const approved = Boolean(challenge.winnersApprovedAt || challenge.adminWinnersApprovedAt || challenge.winnerProposalApprovedAt);
+  const recordsReady = validateAuthoritativeWinnerRecords(String(challenge.id ?? ""), winnerRecords, Number(challenge.numberOfWinners) || undefined).valid;
+  const reviewHold = Boolean(challenge.unresolvedReportsCount || challenge.fraudReviewRequired || challenge.disputeStatus === "open");
   const monetized = Boolean(challenge.sponsorReady || challenge.sponsorEnabled || challenge.entryFeeRequired || challenge.paidEntryEnabled || challenge.monetization);
-  return { allowed: approved && !terminal(challenge), reason: approved ? null : monetized ? "admin_winner_validation_required" : "winner_review_required" };
+  if (terminal(challenge)) return { allowed: false, reason: "challenge_terminal" };
+  if (reviewHold) return { allowed: false, reason: "winner_review_hold_required" };
+  if (!approved) return { allowed: false, reason: monetized ? "admin_winner_validation_required" : "winner_review_required" };
+  if (!recordsReady) return { allowed: false, reason: "authoritative_winner_records_required" };
+  return { allowed: true, reason: null };
 }
 
 export function canCompleteChallenge(challenge: Record<string, unknown>) {
-  const announced = ["winners_announced", "completed"].includes(status(challenge)) || Boolean(challenge.winnersAnnouncedAt);
+  const announced = ["winners_announced", "completed"].includes(status(challenge));
   return { allowed: announced, reason: announced ? null : "winners_not_announced" };
 }
 
-export function lifecycleUpdateForAction(action: ChallengeFlowAction, actorId: string, now = new Date().toISOString()) {
+export function lifecycleUpdateForAction(action: ChallengeFlowAction, actorId: string, now = new Date().toISOString(), announcement?: { challenge: Record<string, unknown>; winnerRecords: OfficialWinnerRecord[] }) {
   const common = { updatedAt: now, updatedBy: actorId, lastLifecycleActionAt: now, lastLifecycleActionBy: actorId };
   if (action === "close_submissions") return { ...common, status: "submission_closed", lifecycleStatus: "submission_closed", submissionsClosedAt: now, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.close_submissions };
   if (action === "open_voting") return { ...common, status: "voting_open", lifecycleStatus: "voting_open", votingOpenedAt: now, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.open_voting };
   if (action === "close_voting") return { ...common, status: "voting_closed", lifecycleStatus: "voting_closed", votingClosedAt: now, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.close_voting };
   if (action === "start_review") return { ...common, status: "under_review", lifecycleStatus: "under_review", winnerReviewStartedAt: now, adminValidationRequired: true, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.start_review };
-  if (action === "announce_winners") return { ...common, status: "winners_announced", lifecycleStatus: "winners_announced", winnersAnnouncedAt: now, payoutExecuted: false, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.winners_announced };
+  if (action === "announce_winners") {
+    if (!announcement || !canAnnounceWinners(announcement.challenge, announcement.winnerRecords).allowed) throw new Error("AUTHORITATIVE_WINNER_RECORDS_REQUIRED");
+    return { ...common, status: "winners_announced", lifecycleStatus: "winners_announced", winnersAnnouncedAt: now, officialWinnerRecordsValidatedAt: now, officialWinnerRecordCount: announcement.winnerRecords.length, officialWinnerRecordIds: announcement.winnerRecords.map((winner) => String(winner.id ?? "")), payoutExecuted: false, auditEvent: CHALLENGE_FLOW_AUDIT_EVENTS.winners_announced };
+  }
   return { ...common, status: "completed", lifecycleStatus: "completed", completedAt: now, payoutExecuted: false, auditEvent: "CHALLENGE_COMPLETED" };
 }
 

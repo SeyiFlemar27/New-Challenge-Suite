@@ -324,7 +324,7 @@ export default function ChallengeDetailPage() {
   const creatorDisplayName = String(rawChallenge?.creatorDisplayName ?? rawChallenge?.hostDisplayName ?? rawChallenge?.creatorName ?? "Challenge creator");
   const creatorUsername = String(rawChallenge?.creatorUsername ?? rawChallenge?.hostUsername ?? "");
   const mobileJourneyAction = String(participantJourney?.primaryAction ?? "");
-  const mobileJourneyActionVisible = ["pay_entry_fee", "refresh_payment", "wait_for_submission", "submit_entry", "register", "join_waitlist", "enter_challenge", "request_entry", "view_voting", "view_entry", "manage_challenge", "sign_in"].includes(mobileJourneyAction);
+  const mobileJourneyActionVisible = ["pay_entry_fee", "refresh_payment", "wait_for_submission", "submit_entry", "fix_and_resubmit", "register", "join_waitlist", "enter_challenge", "request_entry", "view_voting", "view_entry", "manage_challenge", "sign_in"].includes(mobileJourneyAction);
   const leaderboardRelevant = Boolean(leaderboard?.visible && (votingOpen || ["voting_closed", "under_review", "winners_announced", "completed"].includes(phase)));
   const commentsClosed = ["completed", "cancelled", "canceled", "paused", "postponed"].includes(phase.toLowerCase());
   const commentsTemporarilyPaused = ["paused", "postponed"].includes(phase.toLowerCase());
@@ -539,6 +539,7 @@ function JourneyAction({ action, blockerCode, href, challengeId, entryFeeLabel, 
   if (action === "refresh_payment") return <Button className="mt-5 w-full" variant="secondary" onClick={onRefresh}>Refresh Status</Button>;
   if (action === "wait_for_submission") return <SubmissionCountdown opensAt={submissionOpensAt} formattedOpenAt={waitLabel} onOpen={onRefresh} />;
   if (action === "submit_entry") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Submit Entry</LinkButton>;
+  if (action === "fix_and_resubmit") return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">Fix &amp; Resubmit</LinkButton>;
   if (["register", "join_waitlist", "enter_challenge", "request_entry"].includes(action)) return <LinkButton href={`/challenges/${challengeId}/join`} className="mt-5 w-full">{action === "request_entry" ? "Request to Join" : action === "join_waitlist" ? "Join Waitlist" : "Join Challenge"}</LinkButton>;
   if (action === "view_voting") return <LinkButton href={`/challenges/${challengeId}/votes`} className="mt-5 w-full" variant="secondary">Vote Now</LinkButton>;
   if (action === "view_winners") return <LinkButton href={href || `/challenges/${challengeId}#challenge-rankings`} className="mt-5 w-full">View Winners</LinkButton>;

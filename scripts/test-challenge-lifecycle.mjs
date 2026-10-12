@@ -97,7 +97,8 @@ state = getChallengeLifecycleState(base, d("2026-08-06T14:00:00.001Z"));
 assert.equal(state.livestreamStatus, "livestream_not_scheduled");
 
 state = getChallengeLifecycleState(base, d("2026-08-21T10:00:00.000Z"));
-assert.equal(state.primaryStatus, "winners_announced");
+assert.notEqual(state.primaryStatus, "winners_announced", "scheduled date alone cannot announce winners without authoritative Admin action");
+assert.equal(getChallengeLifecycleState({ ...base, status: "winners_announced", officialWinnerRecordsValidatedAt: "2026-08-21T10:00:00.000Z", officialWinnerRecordIds: ["winner-1"], officialWinnerRecordCount: 1 }, d("2026-08-21T10:00:00.000Z")).primaryStatus, "winners_announced");
 
 assert.equal(getChallengeLifecycleState({ ...base, status: "cancelled" }, d("2026-08-11T10:00:00.000Z")).canJoin, false);
 assert.equal(getChallengeLifecycleState({ ...base, status: "paused" }, d("2026-08-01T10:00:00.000Z")).canJoin, false);

@@ -498,7 +498,7 @@ export function getChallengeTimelineDisplay(challenge: Challenge | Record<string
   if (persisted === "cancelled") return result("Cancelled");
   if (persisted === "draft") return result("Draft");
   if (persisted === "pending_review") return result("Pending Review");
-  if (["winners_announced", "completed"].includes(persisted) || (timeline.winnersAnnouncedAt && now >= timeline.winnersAnnouncedAt)) {
+  if (["winners_announced", "completed"].includes(persisted)) {
     return result("Winners Announced");
   }
   if (timeline.registrationClosesAt && now < timeline.registrationClosesAt) {
@@ -741,7 +741,6 @@ function resolvePrimaryStatus(persisted: CanonicalChallengeStatus, timeline: Nor
   if (terminalStatuses.has(persisted)) return persisted;
   if (persisted === "draft" || persisted === "pending_review" || persisted === "paused" || persisted === "postponed" || persisted === "cancelled") return persisted;
   if (persisted === "winners_announced") return "winners_announced";
-  if (timeline.winnersAnnouncedAt && now >= timeline.winnersAnnouncedAt) return "winners_announced";
   if (submissionStatus === "submissions_open") return "submission_open";
   if (votingStatus === "voting_open") return "voting_open";
   if (timeline.challengeStartsAt && now < timeline.challengeStartsAt) {

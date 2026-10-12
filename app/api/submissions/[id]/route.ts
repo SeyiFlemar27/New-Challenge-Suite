@@ -13,6 +13,7 @@ import { submissionUpdateSchema, zodFieldErrors } from "@/lib/server/submission-
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
+import { resubmissionWindowOpen } from "@/lib/server/submission-resubmission";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -53,8 +54,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!Number.isFinite(deadlineMs) || now.getTime() >= deadlineMs || !isChallengeSubmittable(challenge, now).allowed) {
     return fail("Submission edits are locked at or after the submission deadline.", 409, undefined, "SUBMISSION_EDIT_WINDOW_CLOSED");
   }
-  const lockedStatuses = new Set(["flagged", "disqualified", "withdrawn", "eliminated", "winner"]);
-  if (lockedStatuses.has(String(initial.status ?? "").toLowerCase())) return fail("This submission is locked by its current review or result status.", 409, undefined, "SUBMISSION_MODERATION_LOCKED");
+  const initialStatus = String(initial.status ?? "").toLowerCase();
+  const isResubmission = initialStatus === "resubmission_requested";
+  if (isResubmission && !resubmissionWindowOpen({ submission: initial, challenge, now })) return fail("The requested resubmission window has expired or is no longer valid.", 409, undefined, "RESUBMISSION_WINDOW_CLOSED");
+  const lockedStatuses = new Set(["rejected", "flagged", "disqualified", "withdrawn", "eliminated", "winner"]);
+  if (lockedStatuses.has(initialStatus)) return fail("This submission is locked by its current review or result status.", 409, undefined, "SUBMISSION_MODERATION_LOCKED");
   const expectedPrefix = submissionMediaPath(challengeId, auth.user.uid, submissionFolderForMediaType(body.mediaType)) + "/";
   if (!body.mediaStoragePath.startsWith(expectedPrefix)) return fail("Submission media must belong to your authenticated challenge submission folder.", 400, undefined, "INVALID_MEDIA_STORAGE_PATH");
   const ownedMedia = validateOwnedStorageMedia({ url: body.mediaUrl, path: body.mediaStoragePath, prefixes: [expectedPrefix] });
@@ -91,11 +95,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (Number(current.revisionNumber ?? 0) !== expectedRevision) throw new Error("SUBMISSION_REVISION_CONFLICT");
       const freshDeadline = Date.parse(String(getSubmissionDeadline(freshChallenge) ?? ""));
       if (!Number.isFinite(freshDeadline) || Date.now() >= freshDeadline || !isChallengeSubmittable(freshChallenge, new Date()).allowed) throw new Error("SUBMISSION_EDIT_WINDOW_CLOSED");
+      const currentStatus = String(current.status ?? "").toLowerCase();
+      const resubmissionRequested = currentStatus === "resubmission_requested";
+      if (resubmissionRequested && !resubmissionWindowOpen({ submission: current, challenge: freshChallenge, now: new Date() })) throw new Error("RESUBMISSION_WINDOW_CLOSED");
       if (!participantSnap.exists || !isEnteredParticipantStatus(participant.status)) throw new Error("PARTICIPANT_NOT_ELIGIBLE");
       if (isPaidEntryChallenge(freshChallenge) && !["paid", "confirmed"].includes(String(participant.entryPaymentStatus ?? ""))) throw new Error("PAID_ENTRY_PAYMENT_REQUIRED");
-      if (lockedStatuses.has(String(current.status ?? "").toLowerCase())) throw new Error("SUBMISSION_MODERATION_LOCKED");
+      if (lockedStatuses.has(currentStatus)) throw new Error("SUBMISSION_MODERATION_LOCKED");
       const revisionNumber = Number(current.revisionNumber ?? 0) + 1;
-      const next = { ...current, title: body.title, description: body.description || body.caption || "", caption: body.caption || body.description || "", mediaUrl: body.mediaUrl, mediaType: body.mediaType, mediaStoragePath: body.mediaStoragePath, originalFileName: body.originalFileName, fileSize: body.fileSize, revisionNumber, revisedAt: nowIso, updatedAt: nowIso, mediaUploadPending: false };
+      const next = { ...current, title: body.title, description: body.description || body.caption || "", caption: body.caption || body.description || "", mediaUrl: body.mediaUrl, mediaType: body.mediaType, mediaStoragePath: body.mediaStoragePath, originalFileName: body.originalFileName, fileSize: body.fileSize, revisionNumber, ...(resubmissionRequested ? { status: "pending_review", moderationStatus: "pending_review", resubmissionCompletedRequestId: current.resubmissionRequestId ?? null, resubmissionCompletedAt: nowIso } : {}), revisedAt: nowIso, updatedAt: nowIso, mediaUploadPending: false };
       const revisionRef = db.collection("submissionRevisions").doc(`${id}_v${revisionNumber}`);
       transaction.create(revisionRef, { id: revisionRef.id, submissionId: id, challengeId, userId: auth.user!.uid, revisionNumber, before: { title: current.title ?? "", description: current.description ?? "", mediaUrl: current.mediaUrl ?? "", mediaType: current.mediaType ?? "", mediaStoragePath: current.mediaStoragePath ?? "" }, after: { title: next.title, description: next.description, mediaUrl: next.mediaUrl, mediaType: next.mediaType, mediaStoragePath: next.mediaStoragePath }, priorModerationStatus: current.status ?? null, priorReviewReason: current.rejectionReason ?? null, createdAt: nowIso, createdBy: auth.user!.uid, immutable: true });
       transaction.set(submissionRef, next, { merge: true });
@@ -106,6 +113,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const code = error instanceof Error ? error.message : "SUBMISSION_UPDATE_FAILED";
     if (code === "SUBMISSION_REVISION_CONFLICT") return fail("This submission changed in another request. Reload it before editing again.", 409, undefined, code);
     if (code === "SUBMISSION_EDIT_WINDOW_CLOSED") return fail("Submission edits are locked at or after the submission deadline.", 409, undefined, code);
+    if (code === "RESUBMISSION_WINDOW_CLOSED") return fail("The requested resubmission window has expired or is no longer valid.", 409, undefined, code);
     if (code === "SUBMISSION_MODERATION_LOCKED") return fail("This submission is locked by its current review or result status.", 409, undefined, code);
     if (code === "PARTICIPANT_NOT_ELIGIBLE") return fail("An active participant record is required to edit this submission.", 403, undefined, code);
     if (code === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("The paid entry must be confirmed before this submission can be edited.", 402, undefined, code);
