@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { apiRequest } from "@/lib/api/client";
 import { Button, Card, EmptyState, Field, inputClass } from "@/components/ui";
 
 type Identity = { id: string; displayName: string; username: string };
-type Team = { id: string; name: string; captainUserId: string; memberUserIds: string[]; status: string; paymentStatus: string; rosterLockedAt: string | null };
+type Team = { id: string; name: string; captainUserId: string; memberUserIds: string[]; status: string; paymentStatus: string; rosterLockedAt: string | null; paymentReservationExpiresAt?: string | null; paymentReservationActive?: boolean };
 type TeamBundle = {
   viewerTeam: Team | null;
   viewerCanManage: boolean;
@@ -16,7 +16,21 @@ type TeamBundle = {
   identities: Record<string, Identity>;
 };
 
-export function TournamentTeamManager({ tournamentId, minimumSize, maximumSize }: { tournamentId: string; minimumSize: number; maximumSize: number }) {
+const TERMINAL_ENTRY_PAYMENT_STATES = new Set([
+  "confirmed", "expired", "payment_failed", "refunded", "refund_pending",
+  "refund_required", "refund_review_required",
+]);
+
+function entryPaymentMessage(status: string | undefined, checking: boolean) {
+  if (status === "confirmed") return "Team entry payment confirmed. Your Tournament team is registered.";
+  if (status === "refund_pending" || status === "refund_required" || status === "refund_review_required") return "Payment requires reconciliation. Do not submit another payment; the outcome is being reviewed.";
+  if (status === "refunded") return "The payment was refunded because this team could not be registered.";
+  if (status === "expired" || status === "payment_failed") return "The payment was not completed and this team is not registered. You may try again if registration remains open.";
+  if (checking) return "Verifying payment with the provider…";
+  return "Payment confirmation is pending. Your team is not registered until it is confirmed.";
+}
+
+export function TournamentTeamManager({ tournamentId, minimumSize, maximumSize, entryType = "free", sessionId = "", paymentReturn = "" }: { tournamentId: string; minimumSize: number; maximumSize: number; entryType?: string; sessionId?: string; paymentReturn?: string }) {
   const [bundle, setBundle] = useState<TeamBundle | null>(null);
   const [message, setMessage] = useState("");
   const [teamName, setTeamName] = useState("");
@@ -24,20 +38,25 @@ export function TournamentTeamManager({ tournamentId, minimumSize, maximumSize }
   const [results, setResults] = useState<Identity[]>([]);
   const [nextMemberCursor, setNextMemberCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<{ status?: string } | null>(null);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const paidEntry = entryType !== "free";
   const team = bundle?.viewerTeam ?? null;
   const locked = Boolean(team?.rosterLockedAt);
+  const reservationActive = team?.paymentReservationActive === true;
   const remaining = Math.max(0, maximumSize - (team?.memberUserIds.length ?? 0));
   const isCaptain = Boolean(bundle?.viewerCanManage);
   const pendingInvites = useMemo(() => bundle?.invitations.filter((item) => item.teamId === team?.id && item.status === "pending") ?? [], [bundle, team?.id]);
   const pendingRequests = useMemo(() => bundle?.requests.filter((item) => item.teamId === team?.id && item.status === "pending") ?? [], [bundle, team?.id]);
   const pendingCaptainTransfer = useMemo(() => bundle?.captainTransfers.find((item) => item.teamId === team?.id && item.toUserId && item.status === "pending") ?? null, [bundle, team?.id]);
 
-  async function load() {
+  const load = useCallback(async () => {
     const result = await apiRequest<TeamBundle>(`/api/tournaments/${encodeURIComponent(tournamentId)}/teams`);
     if (!result.ok || !result.data) return setMessage(result.message || "Team details could not be loaded.");
     setBundle(result.data);
     setMessage("");
-  }
+  }, [tournamentId]);
 
   useEffect(() => {
     let active = true;
@@ -50,11 +69,41 @@ export function TournamentTeamManager({ tournamentId, minimumSize, maximumSize }
     return () => { active = false; };
   }, [tournamentId]);
 
+  useEffect(() => {
+    if (!sessionId || paymentReturn !== "processing") return;
+    let active = true;
+    let attempts = 0;
+    const check = async () => {
+      if (!active || attempts >= 10) return;
+      attempts += 1;
+      setCheckingPayment(true);
+      const result = await apiRequest<{ status?: string }>(`/api/tournaments/${encodeURIComponent(tournamentId)}/entry-payment?session_id=${encodeURIComponent(sessionId)}`);
+      if (!active) return;
+      if (result.ok) {
+        setPaymentStatus(result.data ?? null);
+        if (TERMINAL_ENTRY_PAYMENT_STATES.has(String(result.data?.status))) {
+          setCheckingPayment(false);
+          await load();
+          return;
+        }
+      }
+      if (attempts < 10) window.setTimeout(() => void check(), 2_000);
+      else setCheckingPayment(false);
+    };
+    void check();
+    return () => { active = false; };
+  }, [load, paymentReturn, sessionId, tournamentId]);
+
   async function action(actionName: string, values: Record<string, unknown> = {}) {
     setBusy(true);
     const result = await apiRequest(`/api/tournaments/${encodeURIComponent(tournamentId)}/teams`, { method: "POST", body: JSON.stringify({ action: actionName, teamId: team?.id, ...values }) });
     setBusy(false);
     setMessage(result.message);
+    const checkoutUrl = (result.data as { checkoutUrl?: string } | undefined)?.checkoutUrl;
+    if (result.ok && checkoutUrl) {
+      window.location.assign(checkoutUrl);
+      return;
+    }
     if (result.ok) await load();
   }
 
@@ -82,7 +131,7 @@ export function TournamentTeamManager({ tournamentId, minimumSize, maximumSize }
 
   const identity = (userId: unknown) => bundle.identities[String(userId ?? "")] ?? { id: String(userId ?? ""), displayName: "Tournament member", username: "" };
   return <section className="mt-6 space-y-5" aria-label="Tournament Team management">
-    <Card className="p-5 sm:p-6"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Your Team</p><h2 className="mt-2 text-2xl font-black">{team.name}</h2><p className="mt-2 text-sm text-slate-600">{team.memberUserIds.length} of {maximumSize} members. Minimum {minimumSize}. {remaining} place{remaining === 1 ? "" : "s"} remaining.</p></div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black capitalize">{team.status.replaceAll("_", " ")}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black capitalize">Payment {team.paymentStatus.replaceAll("_", " ")}</span><span className={`rounded-full px-3 py-1 text-xs font-black ${locked ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>{locked ? "Roster Locked" : "Roster Open"}</span></div></div>{message ? <p className="mt-4 rounded-[8px] bg-slate-50 p-3 text-sm font-bold text-slate-700">{message}</p> : null}{pendingCaptainTransfer ? <div className="mt-5 rounded-[8px] border border-amber-300 bg-amber-50 p-4"><p className="font-black text-amber-950">Captain transfer requested</p><p className="mt-1 text-sm text-amber-900">Accepting makes you responsible for Team readiness, payment, and check-in.</p><Button className="mt-3" disabled={busy} onClick={() => void action("confirm_captain_transfer")}>Accept Captain Role</Button></div> : null}<div className="mt-6 grid gap-3">{team.memberUserIds.map((memberId) => { const member = identity(memberId); const captain = memberId === team.captainUserId; return <div key={memberId} className="flex flex-col gap-3 rounded-[8px] border border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">{member.displayName}</p><p className="text-sm text-slate-500">{captain ? "Team Captain" : "Team member"}{member.username ? ` · @${member.username}` : ""}</p></div>{isCaptain && !captain && !locked ? <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => window.confirm(`Transfer the Captain role to ${member.displayName}? They must accept before the role changes.`) && void action("transfer_captain", { userId: memberId })}>Transfer Captain</Button><Button variant="ghost" disabled={busy} onClick={() => window.confirm(`Remove ${member.displayName} from this Team?`) && void action("remove_member", { userId: memberId })}>Remove</Button></div> : null}</div>; })}</div>{!locked ? <div className="mt-6 flex flex-wrap gap-3"><Button disabled={busy || team.memberUserIds.length < minimumSize} onClick={() => void action("ready")}><Check size={16} /> Mark Team Ready</Button></div> : null}</Card>
+    <Card className="p-5 sm:p-6"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Your Team</p><h2 className="mt-2 text-2xl font-black">{team.name}</h2><p className="mt-2 text-sm text-slate-600">{team.memberUserIds.length} of {maximumSize} members. Minimum {minimumSize}. {remaining} place{remaining === 1 ? "" : "s"} remaining.</p></div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black capitalize">{team.status.replaceAll("_", " ")}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black capitalize">Payment {team.paymentStatus.replaceAll("_", " ")}</span><span className={`rounded-full px-3 py-1 text-xs font-black ${locked || reservationActive ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>{locked ? "Roster Locked" : reservationActive ? "Checkout Reserved" : "Roster Open"}</span></div></div>{message ? <p className="mt-4 rounded-[8px] bg-slate-50 p-3 text-sm font-bold text-slate-700">{message}</p> : null}{paymentReturn === "processing" ? <p role="status" aria-live="polite" className="mt-4 rounded-[8px] border border-black/10 p-4 text-sm">{entryPaymentMessage(paymentStatus?.status, checkingPayment)}</p> : null}{paymentReturn === "canceled" ? <p role="status" className="mt-4 text-sm text-slate-500">Checkout was canceled. The reservation expires automatically after ten minutes.</p> : null}{pendingCaptainTransfer ? <div className="mt-5 rounded-[8px] border border-amber-300 bg-amber-50 p-4"><p className="font-black text-amber-950">Captain transfer requested</p><p className="mt-1 text-sm text-amber-900">Accepting makes you responsible for Team readiness, payment, and check-in.</p><Button className="mt-3" disabled={busy} onClick={() => void action("confirm_captain_transfer")}>Accept Captain Role</Button></div> : null}<div className="mt-6 grid gap-3">{team.memberUserIds.map((memberId) => { const member = identity(memberId); const captain = memberId === team.captainUserId; return <div key={memberId} className="flex flex-col gap-3 rounded-[8px] border border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">{member.displayName}</p><p className="text-sm text-slate-500">{captain ? "Team Captain" : "Team member"}{member.username ? ` · @${member.username}` : ""}</p></div>{isCaptain && !captain && !locked && !reservationActive ? <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => window.confirm(`Transfer the Captain role to ${member.displayName}? They must accept before the role changes.`) && void action("transfer_captain", { userId: memberId })}>Transfer Captain</Button><Button variant="ghost" disabled={busy} onClick={() => window.confirm(`Remove ${member.displayName} from this Team?`) && void action("remove_member", { userId: memberId })}>Remove</Button></div> : null}</div>; })}</div>{!locked && isCaptain && team.memberUserIds.length >= minimumSize ? <div className="mt-6 space-y-3">{paidEntry ? <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={rulesAccepted} onChange={(event) => setRulesAccepted(event.target.checked)} /><span>I accept the Tournament rules and the Captain payment terms for this Team.</span></label> : null}<Button disabled={busy || team.memberUserIds.length < minimumSize || paidEntry && !rulesAccepted} onClick={() => void action("ready", { rulesAccepted: !paidEntry || rulesAccepted })}><Check size={16} /> {paidEntry ? reservationActive ? "Resume Card Checkout" : "Reserve Team Slot & Pay" : "Mark Team Ready"}</Button></div> : reservationActive && isCaptain ? <div className="mt-6"><p className="mb-3 text-sm text-slate-600">This checkout holds the team slot until {new Date(team.paymentReservationExpiresAt!).toLocaleTimeString()}.</p><Button disabled={busy} onClick={() => void action("ready", { rulesAccepted: true })}>Resume Card Checkout</Button></div> : null}</Card>
     {isCaptain && !locked ? <Card className="p-5 sm:p-6"><h2 className="text-xl font-black">Invite Members</h2><p className="mt-2 text-sm text-slate-600">Search by public username. Private profiles are excluded, and results use cursor pagination.</p><div className="mt-5 flex gap-3"><div className="flex-1"><Field label="Username prefix"><input className={inputClass} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void search(); } }} /></Field></div><Button className="mt-6" variant="secondary" onClick={() => void search()} disabled={query.trim().length < 2}><Search size={16} /> Search</Button></div><div className="mt-4 grid gap-3">{results.map((member) => <div key={member.id} className="flex items-center justify-between gap-3 rounded-[8px] border border-black/10 p-4"><div><p className="font-black">{member.displayName}</p>{member.username ? <p className="text-sm text-slate-500">@{member.username}</p> : null}</div><Button disabled={busy || remaining === 0} onClick={() => void action("invite", { userId: member.id })}><UserPlus size={16} /> Invite</Button></div>)}</div>{nextMemberCursor ? <Button className="mt-4" variant="secondary" onClick={() => void loadMoreMembers()} disabled={busy}>Load more public profiles</Button> : null}</Card> : null}
     <div className="grid gap-5 lg:grid-cols-2"><Card className="p-5"><h2 className="text-lg font-black">Invitations · {pendingInvites.length}</h2>{pendingInvites.length ? <div className="mt-4 grid gap-3">{pendingInvites.map((invite) => { const member = identity(invite.inviteeUserId); return <div key={invite.id} className="rounded-[8px] border border-black/10 p-4"><p className="font-black">{member.displayName}</p><p className="mt-1 text-sm capitalize text-slate-500">{String(invite.status)}</p>{isCaptain && !locked ? <Button className="mt-3" variant="ghost" disabled={busy} onClick={() => window.confirm("Revoke this pending invitation?") && void action("revoke_invite", { userId: invite.inviteeUserId })}>Revoke</Button> : null}</div>; })}</div> : <p className="mt-3 text-sm text-slate-500">No pending invitations.</p>}</Card><Card className="p-5"><h2 className="text-lg font-black">Join Requests · {pendingRequests.length}</h2>{pendingRequests.length ? <div className="mt-4 grid gap-3">{pendingRequests.map((request) => { const member = identity(request.userId); return <div key={request.id} className="rounded-[8px] border border-black/10 p-4"><p className="font-black">{member.displayName}</p><div className="mt-3 flex gap-2"><Button disabled={busy} onClick={() => void action("accept_request", { userId: request.userId })}><ShieldCheck size={16} /> Accept</Button><Button variant="secondary" disabled={busy} onClick={() => void action("reject_request", { userId: request.userId })}>Reject</Button></div></div>; })}</div> : <p className="mt-3 text-sm text-slate-500">No pending join requests.</p>}</Card></div>
   </section>;

@@ -1,8 +1,10 @@
 import type Stripe from "stripe";
+import { createHash } from "node:crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
+import { createNotification } from "@/lib/server/notifications";
 import { awardDoroCoinPurchaseRewards } from "@/lib/server/rewards";
 import {
   applySponsorAgreementRefundState,
@@ -27,6 +29,7 @@ import { confirmCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE, expireCreato
 import { claimEnterpriseRefundLock, finalizeEnterprisePaidVoteRefund, finalizeEnterprisePrizeFundingRefund, releaseEnterpriseRefundLock } from "@/lib/server/enterprise-prize-exposure";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { recordStripeSponsorDispute } from "@/lib/server/stripe-sponsor-disputes";
+import { confirmTournamentEntryPayment, expireTournamentEntryReservation, initiateTournamentEntryRefund, reconcileTournamentEntryRefund, recordTournamentEntryDispute } from "@/lib/server/tournament-paid-entry";
 
 const handledEventTypes = new Set<Stripe.Event.Type>([
   "checkout.session.completed",
@@ -108,6 +111,118 @@ async function confirmSponsorFundingFromProviderState(
   return confirmSponsorContribution(db, event, session, paymentIntent);
 }
 
+async function confirmTournamentEntryFromProviderState(
+  stripe: Stripe,
+  db: FirebaseFirestore.Firestore,
+  eventSession: Stripe.Checkout.Session
+) {
+  const session = await stripe.checkout.sessions.retrieve(eventSession.id);
+  if (session.id !== eventSession.id
+    || session.metadata?.paymentPurpose !== "tournament_entry"
+    || session.metadata?.reservationId !== eventSession.metadata?.reservationId
+    || session.metadata?.paymentId !== eventSession.metadata?.paymentId) {
+    throw new Error("Retrieved Tournament Checkout Session does not match its signed webhook event.");
+  }
+  const paymentIntentId = objectId(session.payment_intent);
+  if (!paymentIntentId) throw new Error("Paid Tournament Checkout Session is missing its PaymentIntent.");
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+  const charge = typeof paymentIntent.latest_charge === "object" && paymentIntent.latest_charge
+    ? paymentIntent.latest_charge as Stripe.Charge
+    : null;
+  if (!charge) throw new Error("Tournament PaymentIntent is missing a retrievable Charge.");
+  const outcome = await confirmTournamentEntryPayment(db, session, { paymentIntent, charge });
+  if (outcome.status === "refund_required" || outcome.refundRetryRequired === true) {
+    outcome.refund = await initiateTournamentEntryRefund(stripe, db, String(session.metadata?.paymentId ?? ""));
+  }
+  const paymentStatusSnap = await db.collection("tournamentEntryPayments").doc(String(session.metadata?.paymentId ?? "")).get();
+  const finalStatus = String(paymentStatusSnap.data()?.status ?? outcome.status);
+  const notification = tournamentEntryPaymentNotification(finalStatus);
+  if (notification && session.metadata?.userId && session.metadata?.tournamentId && session.metadata?.paymentId) {
+    await createNotification(db, {
+      userId: String(session.metadata.userId),
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      entityType: "tournament",
+      entityId: String(session.metadata.tournamentId),
+      actionUrl: `/tournaments/${encodeURIComponent(String(session.metadata.tournamentId))}/me`,
+      idempotencyKey: tournamentEntryNotificationKey(String(session.metadata.paymentId), finalStatus),
+      metadata: { paymentId: String(session.metadata.paymentId), paymentStatus: finalStatus }
+    });
+  }
+  return outcome;
+}
+
+function tournamentEntryNotificationKey(paymentId: string, status: string) {
+  const paymentHash = createHash("sha256").update(paymentId).digest("hex");
+  return `tournament_entry_${paymentHash}_${status}`;
+}
+
+function tournamentEntryPaymentNotification(status: string) {
+  if (status === "confirmed") return { type: "tournament_entry_confirmed", title: "Tournament entry confirmed", message: "Your card payment is confirmed and your Tournament registration is complete." };
+  if (status === "payment_failed") return { type: "tournament_entry_payment_failed", title: "Tournament payment was not completed", message: "Your Tournament entry was not registered. You may try again if registration remains open." };
+  if (status === "refund_pending" || status === "refund_required" || status === "refund_review_required") return { type: "tournament_entry_payment_review", title: "Tournament payment needs review", message: "Your payment could not be matched to an eligible Tournament slot. It is being reconciled; please do not submit another payment." };
+  if (status === "refunded") return { type: "tournament_entry_refunded", title: "Tournament entry payment refunded", message: "Your payment was refunded because the entry could not be completed." };
+  return null;
+}
+
+async function recordTournamentEntryCheckoutFailure(
+  db: FirebaseFirestore.Firestore,
+  session: Stripe.Checkout.Session
+) {
+  const reservationId = String(session.metadata?.reservationId ?? "");
+  if (!reservationId) throw new Error("Failed Tournament Checkout Session is missing its reservation reference.");
+  const reservationRef = db.collection("tournamentEntryReservations").doc(reservationId);
+  const paymentRef = db.collection("tournamentEntryPayments").doc(reservationId);
+  const entrantType = String(session.metadata?.entrantType ?? "");
+  const entrantId = String(session.metadata?.entrantId ?? "");
+  const teamRef = entrantType === "team" && entrantId ? db.collection("tournamentTeams").doc(entrantId) : null;
+  const lockRef = db.collection("tournamentEntryReservationLocks").doc(deterministicId(
+    String(session.metadata?.tournamentId ?? ""),
+    entrantType,
+    entrantId
+  ));
+  const outcome = await db.runTransaction(async (transaction) => {
+    const [reservationSnap, paymentSnap, teamSnap, lockSnap] = await Promise.all([
+      transaction.get(reservationRef), transaction.get(paymentRef),
+      teamRef ? transaction.get(teamRef) : Promise.resolve(null), transaction.get(lockRef)
+    ]);
+    if (!reservationSnap.exists || !paymentSnap.exists) throw new Error("Failed Tournament Checkout Session has no persisted reservation.");
+    const payment = paymentSnap.data() ?? {};
+    if (payment.providerSessionId !== session.id) return { handled: true, staleFailureIgnored: true };
+    if (session.payment_status === "paid" || ["confirmed", "refunded", "refund_pending"].includes(String(payment.status))) {
+      return { handled: true, staleFailureIgnored: true };
+    }
+    const now = new Date().toISOString();
+    transaction.set(reservationRef, { status: "payment_failed", failedAt: now, updatedAt: now }, { merge: true });
+    transaction.set(paymentRef, { status: "payment_failed", reservationStatus: "payment_failed", updatedAt: now }, { merge: true });
+    if (teamRef && teamSnap?.data()?.paymentReservationId === reservationId) {
+      transaction.set(teamRef, { paymentReservationId: null, paymentReservationExpiresAt: null, updatedAt: now }, { merge: true });
+    }
+    if (lockSnap.data()?.activeReservationId === reservationId) transaction.set(lockRef, { activeReservationId: null, updatedAt: now }, { merge: true });
+    transaction.set(db.collection("tournamentAuditEvents").doc(`${reservationId}_payment_failed`), {
+      id: `${reservationId}_payment_failed`, tournamentId: session.metadata?.tournamentId ?? null,
+      actorId: "stripe", action: "tournament_entry_payment_failed", createdAt: now,
+      metadata: { reservationId, providerSessionId: session.id }
+    }, { merge: true });
+    return { handled: true, kind: "tournament_entry", status: "payment_failed" };
+  });
+  if (outcome.status === "payment_failed" && session.metadata?.userId && session.metadata?.tournamentId) {
+    await createNotification(db, {
+      userId: String(session.metadata.userId),
+      type: "tournament_entry_payment_failed",
+      title: "Tournament payment was not completed",
+      message: "Your Tournament entry was not registered. You may try again if registration remains open.",
+      entityType: "tournament",
+      entityId: String(session.metadata.tournamentId),
+      actionUrl: `/tournaments/${encodeURIComponent(String(session.metadata.tournamentId))}/join`,
+      idempotencyKey: tournamentEntryNotificationKey(reservationId, "payment_failed"),
+      metadata: { paymentId: reservationId, paymentStatus: "payment_failed" }
+    });
+  }
+  return outcome;
+}
+
 async function processSponsorDispute(stripe: Stripe, db: FirebaseFirestore.Firestore, event: Stripe.Event) {
   const disputeId = objectId(event.data.object);
   if (!disputeId) throw new Error("Stripe dispute event is missing its provider identifier.");
@@ -127,6 +242,10 @@ async function processSponsorDispute(stripe: Stripe, db: FirebaseFirestore.Fires
   if (disputePaymentIntentId && paymentIntentId !== disputePaymentIntentId) throw new Error("Stripe dispute and Charge reference different PaymentIntents.");
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
   if (paymentIntent.id !== paymentIntentId) throw new Error("Retrieved Stripe PaymentIntent does not match the disputed Charge.");
+  const tournamentPayment = await db.collection("tournamentEntryPayments").where("providerPaymentIntentId", "==", paymentIntentId).limit(2).get();
+  if (tournamentPayment.size > 0) {
+    return recordTournamentEntryDispute(db, { dispute, charge, paymentIntent, eventId: event.id, eventType: event.type });
+  }
   return recordStripeSponsorDispute(db, { dispute, charge, paymentIntent, eventId: event.id, eventType: event.type });
 }
 
@@ -224,6 +343,8 @@ export async function POST(request: Request) {
           outcome = await confirmSponsorFundingFromProviderState(stripe, db, event, session);
         } else if (paymentPurpose === "sponsor_wallet_funding") {
           outcome = await confirmSponsorWalletFunding(db, event, session);
+        } else if (paymentPurpose === "tournament_entry") {
+          outcome = await confirmTournamentEntryFromProviderState(stripe, db, session);
         } else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) {
           outcome = await confirmPredictionPayment(db, event, session);
         } else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) {
@@ -281,7 +402,10 @@ export async function POST(request: Request) {
       case "checkout.session.expired": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
-        if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
+        if (paymentPurpose === "tournament_entry") {
+          const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+          outcome = await expireTournamentEntryReservation(db, currentSession);
+        } else if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
         else if (paymentPurpose === "paid_vote") outcome = await expirePaidVotePurchase(db, session);
           else if (paymentPurpose === "sponsor_funding") {
             const currentSession = await stripe.checkout.sessions.retrieve(session.id);
@@ -298,6 +422,8 @@ export async function POST(request: Request) {
         const session = event.data.object;
         if (session.metadata?.paymentPurpose === "sponsor_funding") {
           outcome = await confirmSponsorFundingFromProviderState(stripe, db, event, session);
+        } else if (session.metadata?.paymentPurpose === "tournament_entry") {
+          outcome = await confirmTournamentEntryFromProviderState(stripe, db, session);
         }
         break;
       }
@@ -310,6 +436,11 @@ export async function POST(request: Request) {
           } else {
             outcome = await releasePendingSponsorContribution(db, String(currentSession.metadata?.sponsorContributionId ?? ""));
           }
+        } else if (session.metadata?.paymentPurpose === "tournament_entry") {
+          const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+          outcome = currentSession.payment_status === "paid"
+            ? await confirmTournamentEntryFromProviderState(stripe, db, currentSession)
+            : await recordTournamentEntryCheckoutFailure(db, currentSession);
         }
         break;
       }
@@ -330,7 +461,9 @@ export async function POST(request: Request) {
           outcome = { handled: true, kind: "refund", refundCaseId, status: "succeeded", staleProviderEventIgnored: true };
           break;
         }
-        if (status === "succeeded" && refundRecord.paymentCollection === "paidVotePurchases") {
+        if (refundRecord.paymentCollection === "tournamentEntryPayments") {
+          outcome = await reconcileTournamentEntryRefund(db, { refundCaseId, providerRefundId: refund.id, providerStatus: String(refund.status ?? "unknown"), status, providerAmountCents: refund.amount, providerPaymentIntentId: objectId(refund.payment_intent), providerCurrency: refund.currency, now: new Date() });
+        } else if (status === "succeeded" && refundRecord.paymentCollection === "paidVotePurchases") {
           const source = await db.collection("paidVotePurchases").doc(String(refundRecord.paymentId)).get();
           if (source.data()?.organizationOwnerId && source.data()?.challengeId) {
             await claimEnterpriseRefundLock(db, {

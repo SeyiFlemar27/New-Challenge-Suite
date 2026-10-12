@@ -37,6 +37,7 @@ try {
   const otherTournamentId = `${runId}_other_tournament`;
   const teamId = `${runId}_team`;
   const otherTeamId = `${runId}_other_team`;
+  const searchPrefix = `fan${runId.slice(-8)}`;
   const tournament = { id: tournamentId, status: "registration_open", participationMode: "team", entryType: "free", teamConfig: { joiningMode: "invite_and_requests", maximumSize: 20 } };
   await Promise.all([
     db.collection("tournaments").doc(tournamentId).set(tournament),
@@ -50,7 +51,7 @@ try {
   const accounts = [];
   for (let i = 0; i < 275; i += 1) {
     const id = `${runId}_candidate_${String(i).padStart(3, "0")}`;
-    const username = `fan${String(i).padStart(3, "0")}`;
+    const username = `${searchPrefix}${String(i).padStart(3, "0")}`;
     profiles.push({ ref: db.collection("profiles").doc(id), data: { email: `${username}@private.test`, username, usernameNormalized: username, displayName: `Display ${i}`, profileVisibility: i === 260 ? "private" : "public", publicProfileHidden: i === 261, privatePhoneNumber: "+15550000000" } });
     const ineligible = i === 262 || i === 263;
     accounts.push({ ref: db.collection("users").doc(id), data: { email: `${username}@private.test`, role: i === 262 ? "sponsor" : "user", accountStatus: i === 263 ? "suspended" : "active", suspended: false, emailVerified: true } });
@@ -73,8 +74,8 @@ try {
   ]);
 
   const context = { params: Promise.resolve({ id: tournamentId }) };
-  equal((await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams?q=fan&teamId=${teamId}`, null), context)).status, 401, "unauthenticated discovery is denied");
-  equal((await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams?q=fan&teamId=${teamId}`, other.token), context)).status, 403, "non-captain cannot discover team members");
+  equal((await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams?q=${searchPrefix}&teamId=${teamId}`, null), context)).status, 401, "unauthenticated discovery is denied");
+  equal((await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams?q=${searchPrefix}&teamId=${teamId}`, other.token), context)).status, 403, "non-captain cannot discover team members");
   equal((await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams?q=fan&teamId=${otherTeamId}`, captain.token), context)).status, 403, "a team from another Tournament cannot be used for discovery");
   const teamBundleResponse = await GET(request(`http://localhost/api/tournaments/${tournamentId}/teams`, captain.token), context);
   equal(teamBundleResponse.status, 200, "captain can load their Tournament team bundle");
@@ -89,7 +90,7 @@ try {
   let privatePhoneLeak = false;
   do {
     const url = new URL(`http://localhost/api/tournaments/${tournamentId}/teams`);
-    url.searchParams.set("q", "fan");
+    url.searchParams.set("q", searchPrefix);
     url.searchParams.set("teamId", teamId);
     url.searchParams.set("limit", "12");
     if (cursor) url.searchParams.set("cursor", cursor);

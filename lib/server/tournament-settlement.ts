@@ -1,6 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { createInternalChallengeSettlement, type SettlementWinner } from "@/lib/server/challenge-settlement";
 import { deterministicId } from "@/lib/server/idempotency";
+import { validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -101,6 +102,7 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
   ]);
   if (!tournamentSnap.exists) throw new Error("TOURNAMENT_NOT_FOUND");
   const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as Row;
+  if (tournament.financialHold === true) throw new Error("TOURNAMENT_FINANCIAL_HOLD");
   if (!["under_review", "final", "completed", "winners_announced"].includes(String(tournament.status ?? ""))) throw new Error("TOURNAMENT_RESULTS_NOT_FINAL");
   const expectedEndAt = Date.parse(String(tournament.expectedEndAt ?? ""));
   if (Number.isFinite(expectedEndAt) && expectedEndAt > Date.now()) throw new Error("TOURNAMENT_RESULTS_NOT_FINAL");
@@ -108,10 +110,22 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
   if (!placements.some((item) => Number(item.placement) === 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const orderedPositions = placements.map((item) => Number(item.placement)).sort((a, b) => a - b);
   if (new Set(orderedPositions).size !== orderedPositions.length || orderedPositions.some((position, index) => position !== index + 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+  const placedCompetitors = placements.map((item) => String(item.participantId ?? ""));
+  if (placedCompetitors.some((id) => !id) || new Set(placedCompetitors).size !== placedCompetitors.length) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+  const evidence = await Promise.all(placements.map(async (placement) => {
+    const sourceMatchId = String(placement.sourceMatchId ?? "");
+    if (!sourceMatchId) return false;
+    const source = await db.collection("tournamentMatches").doc(sourceMatchId).get();
+    return source.exists && validateTournamentPlacementEvidence(tournament, placement, { id: source.id, ...source.data() });
+  }));
+  if (evidence.some((valid) => !valid)) throw new Error("TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID");
   const fingerprint = tournamentPlacementFingerprint(placements);
   if (tournament.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_CREATOR_REVIEW_REQUIRED");
   if (tournament.settlementPlacementFingerprint && tournament.settlementPlacementFingerprint !== fingerprint) throw new Error("TOURNAMENT_SETTLEMENT_CORRECTION_REQUIRED");
 
+  const competitorCollection = tournament.participationMode === "team" ? "tournamentTeams" : "tournamentParticipants";
+  const placedCompetitorSnaps = await Promise.all(placedCompetitors.map((competitorId) => db.collection(competitorCollection).doc(competitorId).get()));
+  if (placedCompetitorSnaps.some((snapshot) => !snapshot.exists || snapshot.data()?.tournamentId !== input.tournamentId)) throw new Error("TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID");
   const winnerGroups = await Promise.all(placements.map((placement) => tournament.participationMode === "team"
     ? resolveTeamWinners(db, input.tournamentId, placement)
     : resolveIndividualWinner(db, input.tournamentId, placement).then((winner) => [winner])));

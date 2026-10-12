@@ -84,7 +84,7 @@ export function buildRoundRobinPlan(capacity: number, resultMethod: TournamentRe
 }
 
 export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
-  return [{ placement: 1, percent: 25 }, { placement: 2, percent: 20 }, { placement: 3, percent: 20 }];
+  return [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }];
 }
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
@@ -107,33 +107,35 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     coverMedia: { url: text(input.coverImageUrl) || null, path: text(input.coverImagePath) || null, status: text(input.coverImageUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
     trailerMedia: { url: text(input.trailerUrl) || null, path: text(input.trailerPath) || null, status: text(input.trailerUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
     status: "draft",
-    configVersion: 2,
+    configVersion: Math.max(3, positiveInteger(input.configVersion, 3)),
     format: text(input.format, "single_elimination") as TournamentFoundation["format"],
     participationMode: text(input.participationMode, "individual") === "team" ? "team" : "individual",
     participantCapacity: positiveInteger(input.participantCapacity, 8),
     participantCount: 0,
     privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
     registrationType: text(input.registrationType, "open") === "invite_only" ? "invite_only" : "open",
-    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), text(input.resultMethod, "votes") as TournamentResultMethod, text(input.thirdPlaceMethod, "none")),
-    registrationOpensAt: text(input.registrationOpensAt) || null,
-    registrationClosesAt: text(input.registrationClosesAt) || null,
-    tournamentStartsAt: text(input.tournamentStartsAt) || null,
-    expectedEndAt: text(input.expectedEndAt) || null,
+    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), "votes", text(input.format) === "single_elimination" ? "third_place_match" : "none"),
+    registrationOpensAt: null,
+    registrationClosesAt: null,
+    tournamentStartsAt: null,
+    expectedEndAt: null,
+    submissionDurationHours: ([12, 24, 48, 72].includes(Number(input.submissionDurationHours)) ? Number(input.submissionDurationHours) : 48) as 12 | 24 | 48 | 72,
+    votingDurationHours: ([12, 24, 48, 72].includes(Number(input.votingDurationHours)) ? Number(input.votingDurationHours) : 72) as 12 | 24 | 48 | 72,
     entryType: text(input.entryType, "free") === "paid_entry_setup_required" ? "paid_entry_setup_required" : "free",
     entryFeeAmountMinor: text(input.entryType, "free") === "paid_entry_setup_required" ? Math.max(0, Math.trunc(Number(input.entryFeeAmountMinor ?? 0))) : null,
     currency: text(input.currency, "USD").toUpperCase(),
     eligibility: input.eligibility && typeof input.eligibility === "object" ? input.eligibility as Record<string, unknown> : {},
-    requiresCheckIn: Boolean(input.requiresCheckIn),
-    checkInClosesAt: text(input.checkInClosesAt) || null,
-    teamConfig: text(input.participationMode) === "team" ? { minimumSize: positiveInteger(input.minimumTeamSize, 2), maximumSize: Math.min(20, positiveInteger(input.maximumTeamSize, 5)), joiningMode: text(input.teamJoiningMode) === "invite_and_requests" ? "invite_and_requests" : "invite_only", captainPaysEntryFee: true, rosterLocksAtCheckInClose: true } : null,
-    seedingMethod: "ranking",
-    resultMethod: text(input.resultMethod, "votes") as TournamentFoundation["resultMethod"],
-    advancementMethod: text(input.advancementMethod, "bracket") as TournamentFoundation["advancementMethod"],
-    voting: { paidVotesActive: false, webhookConfirmationRequired: true },
-    judging: { setupRequired: true },
-    tieBreaker: text(input.tieBreaker, "host_review") as TournamentFoundation["tieBreaker"],
-    thirdPlaceMethod: text(input.thirdPlaceMethod, "none") as TournamentFoundation["thirdPlaceMethod"],
-    scoreVisibility: text(input.scoreVisibility, "final_only") as TournamentFoundation["scoreVisibility"],
+    requiresCheckIn: false,
+    checkInClosesAt: null,
+    teamConfig: text(input.participationMode) === "team" ? { minimumSize: positiveInteger(input.minimumTeamSize, 2), maximumSize: Math.min(20, positiveInteger(input.maximumTeamSize, 5)), joiningMode: text(input.teamJoiningMode) === "invite_and_requests" ? "invite_and_requests" : "invite_only", captainPaysEntryFee: true, rosterLocksAtCapacity: true, rosterLocksAtCheckInClose: false } : null,
+    seedingMethod: "random",
+    resultMethod: "votes",
+    advancementMethod: "bracket",
+    voting: { paidVotesActive: (input.voting as Record<string, unknown> | undefined)?.paidVotesActive === true, webhookConfirmationRequired: true, freeVotePolicy: "one_per_match_per_local_day" },
+    judging: { setupRequired: false, disabledForConfigVersion: 3 },
+    tieBreaker: "pre_recorded_priority",
+    thirdPlaceMethod: text(input.format) === "single_elimination" ? "third_place_match" : "none",
+    scoreVisibility: "final_only",
     prizeDistribution: Array.isArray(input.prizeDistribution) ? input.prizeDistribution as TournamentPrizeDistribution[] : defaultPrizeDistribution(),
     readiness: { readyToLaunch: false, lastCheckedAt: now, blockingErrors: [], warnings: [] },
     currentRoundId: null,
@@ -186,11 +188,20 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
     const maximum = Number(config?.maximumSize ?? 0);
     if (!Number.isInteger(minimum) || !Number.isInteger(maximum) || minimum < 1 || minimum > maximum || maximum > 20) errors.push("Team size must satisfy 1 <= minimum <= maximum <= 20.");
   }
-  if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Registration and tournament dates are required.");
+  const configVersion = Number(tournament.configVersion ?? 1);
+  if (configVersion >= 3) {
+    if (![12, 24, 48, 72].includes(Number(tournament.submissionDurationHours)) || ![12, 24, 48, 72].includes(Number(tournament.votingDurationHours))) errors.push("Choose approved submission and voting durations.");
+    if (tournament.registrationOpensAt || tournament.registrationClosesAt || tournament.tournamentStartsAt || tournament.expectedEndAt || tournament.requiresCheckIn || tournament.checkInClosesAt) errors.push("New Tournament configuration cannot use fixed registration dates or mandatory check-in.");
+    if (text(tournament.registrationType) === "approval_required") errors.push("New Tournament registrations are automatic after eligibility and payment checks.");
+    if (text(tournament.resultMethod) !== "votes" || text(tournament.seedingMethod) !== "random" || text(tournament.tieBreaker) !== "pre_recorded_priority") errors.push("New Tournament matches require public voting, secure random seeding, and the approved deterministic tie rule.");
+    if (text(tournament.format) === "single_elimination" && text(tournament.thirdPlaceMethod) !== "third_place_match") errors.push("Single Elimination requires a third-place match.");
+    if (text(tournament.format) === "double_elimination" && text(tournament.thirdPlaceMethod) !== "none") errors.push("Double Elimination uses its verified losers-bracket placement and grand-final rules.");
+  } else if (!text(tournament.registrationOpensAt) || !text(tournament.registrationClosesAt) || !text(tournament.tournamentStartsAt)) errors.push("Legacy registration and tournament dates are required.");
   if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
   if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");
   const distribution = Array.isArray(tournament.prizeDistribution) ? tournament.prizeDistribution as TournamentPrizeDistribution[] : [];
-  if (distribution.reduce((sum, item) => sum + Number(item.percent ?? 0), 0) !== 65) errors.push("Winner allocations must total 65% of eligible generated revenue.");
+  const expectedDistribution = configVersion >= 3 ? [60, 25, 15] : [25, 20, 20];
+  if (distribution.length !== 3 || distribution.some((item, index) => Number(item.placement) !== index + 1 || Number(item.percent) !== expectedDistribution[index])) errors.push("Winner placement allocations do not match the approved Tournament policy.");
   if (text(tournament.entryType) === "paid_entry_setup_required") warnings.push("Paid entry requires provider-confirmed checkout before registrations can become paid.");
   if (Number((tournament.prizePool as Record<string, unknown> | undefined)?.confirmedPrizePoolMinor ?? 0) <= 0) warnings.push("No confirmed prize funding is available yet.");
   return { ready: errors.length === 0, errors, warnings };

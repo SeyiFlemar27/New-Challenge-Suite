@@ -8,13 +8,13 @@ assert(read("app/tournaments/create/page.tsx").includes("TournamentBuilder"), "T
 const builder = read("components/tournament-builder.tsx");
 const registry = read("lib/challenge-builder-registry.ts");
 const frame = read("components/challenge-builder-frame.tsx");
-for (const step of ["Overview", "Tournament Format", "Eligibility & Participation", "Monetization & Prize Pool", "Media & Branding", "Competition Method", "Schedule & Round Timing", "Entry & Round Submissions", "Review", "Publish"]) assert(registry.includes(`"${step}"`), `Builder must include ${step}.`);
+for (const step of ["Overview", "Tournament Format & Bracket", "Eligibility & Registration", "Monetization & Prize Pool", "Media & Branding", "Voting & Advancement", "Round Timing", "Round Submissions", "Review & Publish"]) assert(registry.includes(`"${step}"`), `Builder must include ${step}.`);
 assert(builder.includes("MediaUploadField") && builder.includes("tournamentDraftMediaPath"), "Builder must use real media upload infrastructure.");
 assert(builder.includes("single_elimination") && builder.includes("double_elimination"), "Builder must expose Single and Double Elimination.");
 assert(read("lib/server/tournament-validation.ts").includes("[4, 8, 16, 32, 64, 128]"), "Builder must support canonical bracket sizes.");
 assert(builder.includes('"individual", "team"'), "Builder must expose Individual and Team participation.");
-assert(builder.includes("Hybrid scoring must total 100%"), "Hybrid scoring validation must exist.");
-assert(builder.includes("Winner allocations must total 65%"), "Generated-revenue winner allocation validation must exist.");
+assert(builder.includes('resultMethod: "votes"') && !builder.includes("Hybrid scoring"), "New Tournament Builder uses the approved public-vote result mode.");
+assert(builder.includes("60% / 25% / 15%") && builder.includes("65% is allocated to winners"), "Builder distinguishes winner placements from paid-entry revenue shares.");
 assert(builder.includes("/api/tournaments"), "Draft save must use backend tournament API.");
 assert(builder.includes("ChallengeBuilderFrame") && frame.includes("Builder Guide") && frame.includes("Finish Later"), "Builder must use the canonical guide and Finish Later interaction.");
 console.log("Tournament builder flow checks passed.");

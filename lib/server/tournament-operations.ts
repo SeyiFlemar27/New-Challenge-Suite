@@ -47,14 +47,15 @@ export function evaluateTournamentJoinEligibility(params: {
   if (params.tournament.entryType !== "free" && !params.paymentConfirmed) return { allowed: false, code: "PAYMENT_CONFIRMATION_REQUIRED", message: "Confirmed tournament entry payment is required." };
   if (params.participants.some((item) => item.userId === params.actor?.uid && item.status !== "withdrawn")) return { allowed: false, code: "DUPLICATE_PARTICIPANT", message: "You already have a tournament registration state." };
   if (params.tournament.status !== "registration_open") return { allowed: false, code: "REGISTRATION_NOT_OPEN", message: "Tournament registration is not open." };
-  if (params.tournament.registrationClosesAt && now >= new Date(params.tournament.registrationClosesAt)) return { allowed: false, code: "REGISTRATION_CLOSED", message: "Registration has closed." };
+  if (Number(params.tournament.configVersion ?? 1) < 3 && params.tournament.registrationClosesAt && now >= new Date(params.tournament.registrationClosesAt)) return { allowed: false, code: "REGISTRATION_CLOSED", message: "Registration has closed." };
   if (params.tournament.registrationType === "invite_only") {
     if (!params.invitation || params.invitation.status !== "pending" || params.invitation.inviteeUserId !== params.actor.uid) return { allowed: false, code: "INVITATION_REQUIRED", message: "A valid tournament invitation is required." };
     if (params.invitation.expiresAt && now >= new Date(params.invitation.expiresAt)) return { allowed: false, code: "INVITATION_EXPIRED", message: "This tournament invitation has expired." };
   }
   if (params.profileComplete === false) return { allowed: false, code: "PROFILE_REQUIRED", message: "Complete your profile before joining." };
   if (!params.rulesAccepted) return { allowed: false, code: "RULES_REQUIRED", message: "Tournament rules must be accepted." };
-  if (confirmedParticipantCount(params.participants) >= params.tournament.participantCapacity) return { allowed: true, outcome: "waitlisted", code: "WAITLIST_AVAILABLE", message: "Tournament is full. Join the waitlist." };
+  if (Number(params.tournament.configVersion ?? 1) >= 3 && Number(params.tournament.participantCount ?? 0) >= params.tournament.participantCapacity) return { allowed: false, code: "TOURNAMENT_CAPACITY_REACHED", message: "Every Tournament bracket slot is full." };
+  if (Number(params.tournament.configVersion ?? 1) < 3 && confirmedParticipantCount(params.participants) >= params.tournament.participantCapacity) return { allowed: true, outcome: "waitlisted", code: "WAITLIST_AVAILABLE", message: "Tournament is full. Join the waitlist." };
   if (params.tournament.registrationType === "approval_required" && Number(params.tournament.configVersion ?? 1) < 2) return { allowed: true, outcome: "pending_approval", code: "APPLICATION_REQUIRED", message: "Legacy tournament application will be submitted for host review." };
   return { allowed: true, outcome: "registered", code: "REGISTRATION_ALLOWED", message: "Registration can be created." };
 }
@@ -90,8 +91,10 @@ function matchId(tournamentId: string, roundNumber: number, matchNumber: number)
 export function generateSingleEliminationBracket(params: { tournament: TournamentFoundation; participants: TournamentParticipantFoundation[]; existingMatches: TournamentMatchFoundation[]; now?: string }) {
   const eligible = params.participants.filter((item) => ["registered", "checked_in", "active"].includes(item.status)).sort((a, b) => Number(a.seed ?? 9999) - Number(b.seed ?? 9999));
   if (params.existingMatches.length) return { created: false, code: "BRACKET_ALREADY_GENERATED", rounds: [], matches: [] };
+  const configVersion = Number(params.tournament.configVersion ?? 1);
+  if (configVersion >= 3 && eligible.length !== params.tournament.participantCapacity) return { created: false, code: "BRACKET_REQUIRES_FULL_CAPACITY", rounds: [], matches: [] };
   if (eligible.length < 2 || eligible.length > params.tournament.participantCapacity) return { created: false, code: "PARTICIPANT_COUNT_INVALID", rounds: [], matches: [] };
-  const bracketSize = bracketSizeForParticipants(eligible.length);
+  const bracketSize = configVersion >= 3 ? params.tournament.participantCapacity : bracketSizeForParticipants(eligible.length);
   const plan = buildRoundPlan(bracketSize, params.tournament.resultMethod, params.tournament.thirdPlaceMethod);
   const rounds: TournamentRoundFoundation[] = plan.map((round) => ({
     id: `${params.tournament.id}_round_${round.roundNumber}`,
@@ -113,7 +116,7 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
       const firstRound = roundNumber === 1;
       const participantA = firstRound ? slots[index - 1] ?? null : null;
       const participantB = firstRound ? slots[bracketSize - index] ?? null : null;
-      const byeWinner = firstRound && Boolean(participantA || participantB) && !(participantA && participantB) ? participantA || participantB : null;
+      const byeWinner = configVersion < 3 && firstRound && Boolean(participantA || participantB) && !(participantA && participantB) ? participantA || participantB : null;
       matches.push({
         id: matchId(params.tournament.id, roundNumber, index),
         tournamentId: params.tournament.id,
@@ -129,7 +132,8 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
         nextMatchId: roundNumber < Math.log2(bracketSize) ? matchId(params.tournament.id, roundNumber + 1, Math.ceil(index / 2)) : null,
         nextSlot: roundNumber < Math.log2(bracketSize) ? (index % 2 === 1 ? "A" : "B") : null,
         resultMethod: params.tournament.resultMethod,
-        resultStatus: null
+        resultStatus: null,
+        ...(configVersion >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {})
       });
     }
     matchesInRound /= 2;
@@ -164,7 +168,8 @@ export function generateSingleEliminationBracket(params: { tournament: Tournamen
       nextMatchId: null,
       nextSlot: null,
       resultMethod: params.tournament.resultMethod,
-      resultStatus: null
+      resultStatus: null,
+      ...(configVersion >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {})
     });
   }
   return { created: true, code: "BRACKET_GENERATED", expectedMatchCount: singleEliminationMatchCount(eligible.length, Boolean(bronzeRound)), rounds, matches };
@@ -188,7 +193,7 @@ export function generateDoubleEliminationBracket(params: { tournament: Tournamen
       const nextCount = Math.max(1, Math.ceil(count / 2));
       const nextRound = loserRound + 1;
       const hasNext = loserRound < 2 * (winnerRounds - 1);
-      losers.push({ id: `${params.tournament.id}_lb_r${loserRound}_m${index}`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_lb_round_${loserRound}`, roundNumber: winnerRounds + loserRound, matchNumber: index, bracket: "losers", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: hasNext ? `${params.tournament.id}_lb_r${nextRound}_m${Math.min(nextCount, loserRound % 2 === 1 ? index : Math.ceil(index / 2))}` : `${params.tournament.id}_grand_final`, nextSlot: hasNext ? (loserRound % 2 === 1 ? "A" : index % 2 === 1 ? "A" : "B") : "B", resultMethod: params.tournament.resultMethod, resultStatus: null });
+      losers.push({ id: `${params.tournament.id}_lb_r${loserRound}_m${index}`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_lb_round_${loserRound}`, roundNumber: winnerRounds + loserRound, matchNumber: index, bracket: "losers", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: hasNext ? `${params.tournament.id}_lb_r${nextRound}_m${Math.min(nextCount, loserRound % 2 === 1 ? index : Math.ceil(index / 2))}` : `${params.tournament.id}_grand_final`, nextSlot: hasNext ? (loserRound % 2 === 1 ? "A" : index % 2 === 1 ? "A" : "B") : "B", resultMethod: params.tournament.resultMethod, resultStatus: null, ...(Number(params.tournament.configVersion ?? 1) >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {}) });
     }
   }
   winners.forEach((match) => {
@@ -200,8 +205,8 @@ export function generateDoubleEliminationBracket(params: { tournament: Tournamen
   const winnerFinal = winners.find((item) => !item.nextMatchId);
   if (winnerFinal) { winnerFinal.nextMatchId = `${params.tournament.id}_grand_final`; winnerFinal.nextSlot = "A"; }
   const grandFinalResetId = `${params.tournament.id}_grand_final_reset`;
-  const grandFinal: TournamentMatchFoundation = { id: `${params.tournament.id}_grand_final`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_round`, roundNumber: winnerRounds * 3, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: grandFinalResetId, resultMethod: params.tournament.resultMethod, resultStatus: null };
-  const grandFinalReset: TournamentMatchFoundation = { id: grandFinalResetId, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_reset_round`, roundNumber: winnerRounds * 3 + 1, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: null, resultMethod: params.tournament.resultMethod, resultStatus: null };
+  const grandFinal: TournamentMatchFoundation = { id: `${params.tournament.id}_grand_final`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_round`, roundNumber: winnerRounds * 3, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: grandFinalResetId, resultMethod: params.tournament.resultMethod, resultStatus: null, ...(Number(params.tournament.configVersion ?? 1) >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {}) };
+  const grandFinalReset: TournamentMatchFoundation = { id: grandFinalResetId, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_grand_final_reset_round`, roundNumber: winnerRounds * 3 + 1, matchNumber: 1, bracket: "grand_final", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: null, nextSlot: null, resetMatchId: null, resultMethod: params.tournament.resultMethod, resultStatus: null, ...(Number(params.tournament.configVersion ?? 1) >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {}) };
   const rounds = [
     ...single.rounds.map((round) => ({ ...round, id: round.id.replace("_round_", "_wb_round_"), title: `Winners ${round.title}` })),
     ...Array.from({ length: Math.max(1, 2 * (winnerRounds - 1)) }, (_, index) => ({ id: `${params.tournament.id}_lb_round_${index + 1}`, tournamentId: params.tournament.id, roundNumber: winnerRounds + index + 1, title: `Losers Round ${index + 1}`, brief: "A second loss eliminates a participant.", status: "draft" as const, startsAt: null, endsAt: null, votingOpensAt: null, votingClosesAt: null })),
@@ -224,6 +229,7 @@ export function validateTournamentSubmission(params: { tournament: TournamentFou
   if (!params.mediaUrl || !params.mediaPath) return { valid: false, code: "UPLOADED_MEDIA_REQUIRED", message: "Tournament submissions require uploaded media URL and storage path." };
   if (!["image", "video"].includes(String(params.mediaType))) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "Tournament submissions support image or video media." };
   if (params.existingStatus === "submitted" && !params.replacementAllowed) return { valid: false, code: "REPLACEMENT_NOT_ALLOWED", message: "Submission replacement is not allowed by tournament rules." };
+  if (params.existingStatus && params.existingStatus !== "submitted") return { valid: false, code: "SUBMISSION_ALREADY_RECORDED", message: "An official submission has already been recorded for this match." };
   return { valid: true, code: "SUBMISSION_VALID", message: "Submission can be recorded." };
 }
 
@@ -237,14 +243,26 @@ export function validateTournamentVote(params: {
   const voting = (params.tournament.voting ?? {}) as Record<string, unknown>;
   if (params.tournament.status !== "active" && params.tournament.status !== "round_active") return { valid: false, code: "TOURNAMENT_NOT_VOTING", message: "This tournament is not accepting votes." };
   if (params.tournament.resultMethod !== "votes" || params.match.resultMethod !== "votes") return { valid: false, code: "PUBLIC_VOTING_DISABLED", message: "Public voting is not the configured decision method for this match." };
-  if (params.match.status !== "active" || params.match.resultStatus === "confirmed" || params.round.status !== "active") return { valid: false, code: "MATCH_NOT_VOTING", message: "This match is not accepting votes." };
+  const versionThree = Number(params.tournament.configVersion ?? 1) >= 3;
+  if (params.match.resultStatus === "confirmed" || (versionThree
+    ? params.match.status !== "voting_open"
+    : params.match.status !== "active" || params.round.status !== "active")) return { valid: false, code: "MATCH_NOT_VOTING", message: "This match is not accepting votes." };
   if (!params.match.participantAId || !params.match.participantBId || params.match.participantAId === params.match.participantBId) return { valid: false, code: "MATCH_COMPETITORS_INVALID", message: "Both eligible competitors must be assigned before voting opens." };
   if (params.round.tournamentId !== params.tournament.id || params.match.tournamentId !== params.tournament.id || params.match.roundId !== params.round.id || params.round.roundNumber !== params.match.roundNumber) return { valid: false, code: "MATCH_ROUND_MISMATCH", message: "The match and round do not belong to this tournament round." };
-  const opensAt = Date.parse(String(params.round.votingOpensAt ?? ""));
-  const closesAt = Date.parse(String(params.round.votingClosesAt ?? ""));
+  const opensAt = Date.parse(String(versionThree ? params.match.votingOpenedAt ?? "" : params.round.votingOpensAt ?? ""));
+  const closesAt = Date.parse(String(versionThree ? params.match.votingClosesAt ?? "" : params.round.votingClosesAt ?? ""));
   if (!Number.isFinite(opensAt) || !Number.isFinite(closesAt) || now.getTime() < opensAt || now.getTime() >= closesAt) return { valid: false, code: "VOTING_WINDOW_CLOSED", message: "Voting is not open for this match." };
-  if (voting.paidVotesActive === true) return { valid: false, code: "PAID_TOURNAMENT_VOTING_UNSUPPORTED", message: "Paid Tournament voting is not supported." };
-  return { valid: true, code: "VOTE_ALLOWED", message: "One free vote can be recorded for this match." };
+  if (voting.paidVotesActive === true && Number(params.tournament.configVersion ?? 1) < 3) return { valid: false, code: "PAID_TOURNAMENT_VOTING_UNSUPPORTED", message: "Paid voting is unavailable for this legacy Tournament." };
+  return { valid: true, code: "VOTE_ALLOWED", message: "The configured eligible Tournament vote can be recorded." };
+}
+
+export function isTournamentCompetitorVoter(params: { userId: string; participationMode: unknown; competitor: Record<string, unknown>; membership?: Record<string, unknown> | null; teamId: string }) {
+  if (params.participationMode === "team") {
+    const members = Array.isArray(params.competitor.memberUserIds) ? params.competitor.memberUserIds : [];
+    return members.includes(params.userId)
+      || (params.membership?.status === "active" && params.membership.teamId === params.teamId);
+  }
+  return params.competitor.userId === params.userId;
 }
 
 export function tournamentMatchVoteOutcome(match: TournamentMatchFoundation) {
@@ -257,6 +275,47 @@ export function tournamentMatchVoteOutcome(match: TournamentMatchFoundation) {
     tied: votesA === votesB,
     totalVotes: votesA + votesB
   };
+}
+
+export function resolveTournamentVoteEventSequence(params: {
+  match: TournamentMatchFoundation;
+  votes: Array<Record<string, unknown>>;
+  maximumEvents?: number;
+}) {
+  const { match, votes } = params;
+  const maximumEvents = params.maximumEvents ?? 5000;
+  if (votes.length > maximumEvents) return { valid: false, code: "VOTE_EVENT_LIMIT_EXCEEDED", votesA: 0, votesB: 0, winnerParticipantId: null, tied: false, totalVotes: votes.length, resolution: "held" as const };
+  const ordered = [...votes].sort((a, b) => Number(a.voteSequence) - Number(b.voteSequence));
+  const seen = new Set<number>();
+  let votesA = 0;
+  let votesB = 0;
+  const sequencesA: number[] = [];
+  const sequencesB: number[] = [];
+  for (const [index, event] of ordered.entries()) {
+    const sequence = Number(event.voteSequence);
+    const participantId = String(event.selectedParticipantId ?? event.participantId ?? "");
+    if (!Number.isSafeInteger(sequence) || sequence !== index + 1 || seen.has(sequence) || ![match.participantAId, match.participantBId].includes(participantId) || event.status !== "recorded") {
+      return { valid: false, code: "VOTE_EVENT_INTEGRITY_FAILED", votesA, votesB, winnerParticipantId: null, tied: false, totalVotes: ordered.length, resolution: "held" as const };
+    }
+    seen.add(sequence);
+    if (participantId === match.participantAId) { votesA += 1; sequencesA.push(sequence); }
+    else { votesB += 1; sequencesB.push(sequence); }
+  }
+  if (ordered.length !== Number(match.voteSequence ?? 0) || seen.size !== Number(match.voteSequence ?? 0)) {
+    return { valid: false, code: "VOTE_EVENT_SEQUENCE_MISMATCH", votesA, votesB, winnerParticipantId: null, tied: votesA === votesB, totalVotes: ordered.length, resolution: "held" as const };
+  }
+  if (votesA !== Number(match.voteCountA ?? 0) || votesB !== Number(match.voteCountB ?? 0)) {
+    return { valid: false, code: "VOTE_TALLY_MISMATCH", votesA, votesB, winnerParticipantId: null, tied: votesA === votesB, totalVotes: ordered.length, resolution: "held" as const };
+  }
+  if (votesA !== votesB) return { valid: true, code: "VOTE_SEQUENCE_WINNER", votesA, votesB, winnerParticipantId: votesA > votesB ? match.participantAId : match.participantBId, tied: false, totalVotes: ordered.length, resolution: "vote_total" as const };
+  if (votesA > 0) {
+    const sequenceA = sequencesA[votesA - 1];
+    const sequenceB = sequencesB[votesB - 1];
+    if (sequenceA !== sequenceB) return { valid: true, code: "TIE_RESOLVED_BY_FINAL_TALLY_SEQUENCE", votesA, votesB, winnerParticipantId: sequenceA < sequenceB ? match.participantAId : match.participantBId, tied: true, totalVotes: ordered.length, resolution: "final_tally_sequence" as const };
+  }
+  const priority = match.tiePrioritySlot === "A" ? match.participantAId : match.tiePrioritySlot === "B" ? match.participantBId : null;
+  if (!priority) return { valid: false, code: "TIE_PRIORITY_MISSING", votesA, votesB, winnerParticipantId: null, tied: true, totalVotes: ordered.length, resolution: "held" as const };
+  return { valid: true, code: "TIE_RESOLVED_BY_PRE_RECORDED_PRIORITY", votesA, votesB, winnerParticipantId: priority, tied: true, totalVotes: ordered.length, resolution: "pre_recorded_priority" as const };
 }
 
 export function validateJudgeRubric(criteria: Array<{ name: string; weight: number }>) {
@@ -297,6 +356,38 @@ export function resolveTournamentNoSubmission(params: { participantASubmitted: b
   return { action: "continue" as const, winnerSlot: null, extensionHours: 0 };
 }
 
+const VALID_TOURNAMENT_SUBMISSION_STATUSES = new Set(["approved", "active"]);
+const PENDING_TOURNAMENT_SUBMISSION_STATUSES = new Set(["submitted", "pending_moderation", "under_review", "submission_review"]);
+
+export function resolveTournamentSubmissionDeadline(params: {
+  participantAStatus?: string | null;
+  participantBStatus?: string | null;
+  extensionAlreadyUsed: boolean;
+  submissionDeadlineAt: string;
+  now: Date;
+}) {
+  const deadline = Date.parse(params.submissionDeadlineAt);
+  if (!Number.isFinite(deadline)) return { action: "hold" as const, code: "SUBMISSION_DEADLINE_INVALID" };
+  if (params.now.getTime() < deadline) return { action: "waiting" as const, code: "SUBMISSION_WINDOW_OPEN" };
+  const statusA = String(params.participantAStatus ?? "");
+  const statusB = String(params.participantBStatus ?? "");
+  if ([statusA, statusB].some((status) => PENDING_TOURNAMENT_SUBMISSION_STATUSES.has(status))) {
+    return { action: "review" as const, code: "SUBMISSION_MODERATION_PENDING" };
+  }
+  const submittedA = VALID_TOURNAMENT_SUBMISSION_STATUSES.has(statusA);
+  const submittedB = VALID_TOURNAMENT_SUBMISSION_STATUSES.has(statusB);
+  if (submittedA && submittedB) return { action: "open_voting" as const, code: "SUBMISSIONS_VALID" };
+  const noSubmission = resolveTournamentNoSubmission({ participantASubmitted: submittedA, participantBSubmitted: submittedB, extensionAlreadyUsed: params.extensionAlreadyUsed });
+  if (noSubmission.action === "extend") return { action: "extend" as const, code: "NO_VALID_SUBMISSIONS" };
+  if (noSubmission.action === "forfeit") return { action: "forfeit" as const, winnerSlot: noSubmission.winnerSlot, code: "SINGLE_VALID_SUBMISSION" };
+  if (noSubmission.action === "admin_review") return { action: "double_forfeit_hold" as const, code: "DOUBLE_FORFEIT_REQUIRES_PATH_HOLD" };
+  return { action: "hold" as const, code: "SUBMISSION_STATE_UNRESOLVED" };
+}
+
+export function canUseLegacyTournamentAdminResultOverride(params: { configVersion: number; isAdmin: boolean; reason?: string | null }) {
+  return params.configVersion < 3 && params.isAdmin && Boolean(params.reason?.trim());
+}
+
 export function resolveMatchResult(params: { match: TournamentMatchFoundation; winnerParticipantId: string; loserParticipantId: string; fraudFlag?: boolean; moderationIssue?: boolean; unresolvedTie?: boolean; overrideReason?: string; actor?: TournamentActor }) {
   if (params.unresolvedTie) return { confirmed: false, status: "under_review" as TournamentResultStatus, code: "TIE_REQUIRES_CONFIGURED_RESOLUTION" };
   if (params.fraudFlag || params.moderationIssue) return { confirmed: false, status: "under_review" as TournamentResultStatus, code: "MATCH_REQUIRES_REVIEW" };
@@ -311,10 +402,12 @@ export function advanceWinner(params: { match: TournamentMatchFoundation; existi
   const nextMatch = { ...params.existingNextMatch };
   if (params.match.nextSlot === "A") {
     if (nextMatch.participantAId === params.match.winnerParticipantId) return { advanced: false, code: "ADVANCEMENT_ALREADY_APPLIED", nextMatch };
+    if (nextMatch.participantAId) return { advanced: false, code: "ADVANCEMENT_SLOT_OCCUPIED", nextMatch };
     nextMatch.participantAId = params.match.winnerParticipantId;
   }
   if (params.match.nextSlot === "B") {
     if (nextMatch.participantBId === params.match.winnerParticipantId) return { advanced: false, code: "ADVANCEMENT_ALREADY_APPLIED", nextMatch };
+    if (nextMatch.participantBId) return { advanced: false, code: "ADVANCEMENT_SLOT_OCCUPIED", nextMatch };
     nextMatch.participantBId = params.match.winnerParticipantId;
   }
   nextMatch.status = nextMatch.participantAId && nextMatch.participantBId ? "ready" : nextMatch.status;
@@ -349,7 +442,7 @@ export function auditEvent(params: { id: string; tournamentId: string; actorId: 
 export const TOURNAMENT_MANAGEMENT_ROLES = ["host", "manager", "participant_manager", "submission_reviewer", "moderator", "judge_coordinator", "finance_viewer"] as const;
 
 export function adminTournamentActionFoundation(action: string) {
-  const sensitive = ["approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation"];
+  const sensitive = ["approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation", "submission_approved", "submission_rejected"];
   return { action, adminRequired: sensitive.includes(action), auditRequired: sensitive.includes(action), payoutProviderCalled: false, rawVoteTotalEditable: false, balanceOverwriteAllowed: false };
 }
 

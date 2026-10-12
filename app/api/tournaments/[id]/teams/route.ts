@@ -1,13 +1,20 @@
 import { createHash } from "node:crypto";
-import { FieldPath } from "firebase-admin/firestore";
+import { FieldPath, type Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { conflict, fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import type { TournamentFoundation, TournamentTeamFoundation } from "@/lib/tournament-types";
+import { getStripe } from "@/lib/stripe";
+import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
+import { dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
 
 export const dynamic = "force-dynamic";
 const normalizedName = (value: unknown) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 const teamId = (tournamentId: string, name: string) => `${tournamentId}_${createHash("sha256").update(name).digest("hex").slice(0, 20)}`;
+function hasActivePaymentReservation(team: Record<string, unknown>, now = Date.now()) {
+  const expiresAt = Date.parse(String(team.paymentReservationExpiresAt ?? ""));
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
 function decodeMemberCursor(value: string) {
   try {
     const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { usernameNormalized?: unknown; id?: unknown };
@@ -86,7 +93,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   ]);
   const records = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as TournamentTeamFoundation));
   const viewerTeamId = String(membershipSnap.data()?.teamId ?? "");
-  const viewerTeam = records.find((team) => team.id === viewerTeamId) ?? null;
+  const viewerTeamRecord = records.find((team) => team.id === viewerTeamId) ?? null;
+  const viewerTeam = viewerTeamRecord
+    ? { ...viewerTeamRecord, paymentReservationActive: hasActivePaymentReservation(viewerTeamRecord) }
+    : null;
   const captainTeamIds = new Set(records.filter((team) => team.captainUserId === user.uid).map((team) => team.id));
   const visibleInvitations = invitationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as {
     id: string;
@@ -213,7 +223,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ]);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
         const transfer = transferSnap.data();
-        if (!currentTeamSnap.exists || currentTeam.rosterLockedAt || !transferSnap.exists || transfer?.status !== "pending" || transfer?.fromUserId !== currentTeam.captainUserId || transfer?.toUserId !== user.uid || !currentCaptainMembership.exists || !nextCaptainMembership.exists) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
+        if (!currentTeamSnap.exists || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>) || !transferSnap.exists || transfer?.status !== "pending" || transfer?.fromUserId !== currentTeam.captainUserId || transfer?.toUserId !== user.uid || !currentCaptainMembership.exists || !nextCaptainMembership.exists) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
         transaction.set(teamRef, { captainUserId: user.uid, updatedAt: now }, { merge: true });
         transaction.set(currentCaptainMembership.ref, { role: "member", updatedAt: now }, { merge: true });
         transaction.set(nextMembershipRef, { role: "captain", updatedAt: now }, { merge: true });
@@ -236,7 +246,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         if (!invitationSnap.exists || invitationSnap.data()?.status !== "pending") throw new Error("INVITATION_NOT_PENDING");
         if (invitationSnap.data()?.expiresAt && new Date(String(invitationSnap.data()?.expiresAt)).getTime() <= Date.now()) throw new Error("INVITATION_EXPIRED");
         if (currentMembership.exists) throw new Error("ALREADY_ON_TEAM");
-        if (currentTeam.rosterLockedAt) throw new Error("ROSTER_LOCKED");
+        if (currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>)) throw new Error("ROSTER_LOCKED");
         if (currentTeam.memberUserIds.length >= Number(tournament.teamConfig?.maximumSize ?? 20)) throw new Error("TEAM_FULL");
         transaction.set(teamRef, { memberUserIds: [...currentTeam.memberUserIds, user.uid], updatedAt: now }, { merge: true });
         transaction.create(membershipRef, { id: membershipRef.id, tournamentId: id, teamId: targetTeamId, userId: user.uid, role: "member", status: "active", createdAt: now, updatedAt: now });
@@ -258,7 +268,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await db.runTransaction(async (transaction) => {
         const [currentTeamSnap, currentMembership] = await Promise.all([transaction.get(teamRef), transaction.get(membershipRef)]);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-        if (!currentMembership.exists || currentTeam.rosterLockedAt) throw new Error("ROSTER_CHANGED");
+        if (!currentMembership.exists || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>)) throw new Error("ROSTER_CHANGED");
         transaction.set(teamRef, { memberUserIds: currentTeam.memberUserIds.filter((memberId) => memberId !== user.uid), status: "forming", updatedAt: now }, { merge: true });
         transaction.delete(membershipRef);
       });
@@ -270,6 +280,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (team.captainUserId !== user.uid) return fail("Only the Team Captain can manage this roster.", 403, undefined, "TEAM_CAPTAIN_REQUIRED");
+  if (team.paymentReservationExpiresAt && Date.parse(String(team.paymentReservationExpiresAt)) > Date.now() && action !== "ready") return conflict("Team roster changes are paused while its entry checkout reservation is active.");
   if (team.rosterLockedAt) return conflict("This team roster is locked.");
 
   if (action === "invite") {
@@ -307,7 +318,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await db.runTransaction(async (transaction) => {
         const [currentTeamSnap, requestSnap, membershipSnap] = await Promise.all([transaction.get(teamRef), transaction.get(requestRef), transaction.get(targetMembershipRef)]);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-        if (!currentTeamSnap.exists || currentTeam.rosterLockedAt) throw new Error("ROSTER_LOCKED");
+        if (!currentTeamSnap.exists || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>)) throw new Error("ROSTER_LOCKED");
         if (!requestSnap.exists || requestSnap.data()?.status !== "pending") throw new Error("REQUEST_NOT_PENDING");
         if (membershipSnap.exists) throw new Error("ALREADY_ON_TEAM");
         if (currentTeam.memberUserIds.length >= Number(tournament.teamConfig?.maximumSize ?? 20)) throw new Error("TEAM_FULL");
@@ -348,7 +359,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await db.runTransaction(async (transaction) => {
       const currentTeamSnap = await transaction.get(teamRef);
       const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-      if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || !currentTeam.memberUserIds.includes(removedUserId)) throw new Error("ROSTER_CHANGED");
+      if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>) || !currentTeam.memberUserIds.includes(removedUserId)) throw new Error("ROSTER_CHANGED");
       transaction.set(teamRef, { memberUserIds: currentTeam.memberUserIds.filter((memberId) => memberId !== removedUserId), status: "forming", updatedAt: now }, { merge: true });
       transaction.delete(removedMembershipRef);
       transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_member_removed_${removedUserId}`), { id: `${targetTeamId}_member_removed_${removedUserId}`, tournamentId: id, actorId: user.uid, action: "team_member_removed", createdAt: now, metadata: { teamId: targetTeamId, removedUserId } });
@@ -364,7 +375,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await db.runTransaction(async (transaction) => {
         const [currentTeamSnap, nextCaptainMembership, existingTransfer] = await Promise.all([transaction.get(teamRef), transaction.get(db.collection("tournamentTeamMemberships").doc(`${id}_${nextCaptainId}`)), transaction.get(transferRef)]);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || !currentTeam.memberUserIds.includes(nextCaptainId) || !nextCaptainMembership.exists || (existingTransfer.exists && existingTransfer.data()?.status === "pending")) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
+        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>) || !currentTeam.memberUserIds.includes(nextCaptainId) || !nextCaptainMembership.exists || (existingTransfer.exists && existingTransfer.data()?.status === "pending")) throw new Error("CAPTAIN_TRANSFER_STATE_CHANGED");
         transaction.set(transferRef, { id: transferRef.id, tournamentId: id, teamId: targetTeamId, fromUserId: user.uid, toUserId: nextCaptainId, status: "pending", requestedAt: now, createdAt: now, updatedAt: now });
         transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_captain_transfer_requested_${nextCaptainId}`), { id: `${targetTeamId}_captain_transfer_requested_${nextCaptainId}`, tournamentId: id, actorId: user.uid, action: "team_captain_transfer_requested", createdAt: now, metadata: { teamId: targetTeamId, nextCaptainId } });
       });
@@ -381,7 +392,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await db.runTransaction(async (transaction) => {
         const currentTeamSnap = await transaction.get(teamRef);
         const currentTeam = currentTeamSnap.data() as TournamentTeamFoundation;
-        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt) throw new Error("TEAM_CANNOT_DISBAND");
+        if (!currentTeamSnap.exists || currentTeam.captainUserId !== user.uid || currentTeam.rosterLockedAt || hasActivePaymentReservation(currentTeam as unknown as Record<string, unknown>)) throw new Error("TEAM_CANNOT_DISBAND");
         transaction.delete(teamRef);
         memberSnaps.docs.forEach((memberSnap) => transaction.delete(memberSnap.ref));
         transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_disbanded`), { id: `${targetTeamId}_disbanded`, tournamentId: id, actorId: user.uid, action: "team_disbanded", createdAt: now, metadata: { teamId: targetTeamId } });
@@ -396,6 +407,26 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (action === "ready") {
     const minimum = Number(tournament.teamConfig?.minimumSize ?? 1);
     if (team.memberUserIds.length < minimum) return fail(`Add at least ${minimum} team members before marking the team ready.`, 422, undefined, "TEAM_MINIMUM_NOT_MET");
+    if (Number(tournament.configVersion ?? 1) >= 3) {
+      if (process.env.NODE_ENV === "production" && !isTournamentV3SchedulingReady()) return fail("Tournament registration is temporarily unavailable while its background scheduler is not configured.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");
+      if (tournament.entryType !== "free") {
+        if (process.env.TOURNAMENT_ENTRY_PAYMENTS_ENABLED !== "true") return fail("Tournament entry payments are not enabled in this environment.", 503, undefined, "TOURNAMENT_PAYMENT_DISABLED");
+        const stripe = getStripe();
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!stripe || !appUrl) return fail("Tournament entry payment processing is not configured.", 503, undefined, "PAYMENT_CONFIGURATION_ERROR");
+        try {
+          const checkout = await createTournamentEntryCheckout(db, stripe, { tournamentId: id, target: { mode: "team", teamId: targetTeamId, userId: user.uid }, rulesAccepted: body.rulesAccepted === true, appUrl });
+          if (!checkout.checkoutUrl) return conflict("This entry reservation is being connected to checkout. Refresh in a moment.");
+          return ok({ teamId: targetTeamId, paymentStatus: "pending", reservationId: checkout.reservationId, reservationExpiresAt: checkout.expiresAt, checkoutUrl: checkout.checkoutUrl }, "A ten-minute Tournament team slot is reserved. Captain payment must be confirmed before the team is registered.");
+        } catch (error) {
+          const failure = error as Error & { code?: string; status?: number };
+          if (failure.code) return fail(failure.message, failure.status ?? 409, undefined, failure.code);
+          console.error("[tournament-team-entry-checkout] checkout creation failed", { tournamentId: id, teamId: targetTeamId, userId: user.uid, errorName: failure.name });
+          return serverUnavailable("Tournament team entry checkout");
+        }
+      }
+      return reserveVersionThreeTeamSlot({ db, id, userId: user.uid, teamId: targetTeamId, now });
+    }
     const paymentSnap = await db.collection("tournamentEntryPayments").doc(`${id}_${user.uid}`).get();
     if (tournament.entryType !== "free" && !(paymentSnap.exists && paymentSnap.data()?.status === "confirmed" && paymentSnap.data()?.webhookConfirmed === true)) return fail("Confirmed Captain payment is required before the team can become ready.", 422, undefined, "TEAM_PAYMENT_CONFIRMATION_REQUIRED");
     await teamRef.set({ status: "ready", paymentStatus: tournament.entryType === "free" ? "not_required" : "confirmed", readyAt: now, updatedAt: now }, { merge: true });
@@ -403,4 +434,79 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   return validationError({ action: "Select a valid team action." });
+}
+
+async function reserveVersionThreeTeamSlot(params: { db: Firestore; id: string; userId: string; teamId: string; now: string }) {
+  const { db, id, userId, teamId: targetTeamId, now } = params;
+  const tournamentRef = db.collection("tournaments").doc(id);
+  const teamRef = db.collection("tournamentTeams").doc(targetTeamId);
+  let participantCount = 0;
+  let activationQueued = false;
+  let activationJobId: string | null = null;
+  try {
+    await db.runTransaction(async (transaction) => {
+      const [tournamentSnap, teamSnap, teamsSnap] = await Promise.all([
+        transaction.get(tournamentRef),
+        transaction.get(teamRef),
+        transaction.get(db.collection("tournamentTeams").where("tournamentId", "==", id).limit(129))
+      ]);
+      if (!tournamentSnap.exists || !teamSnap.exists) throw Object.assign(new Error("Tournament team was not found."), { code: "TOURNAMENT_TEAM_NOT_FOUND", status: 404 });
+      const currentTournament = { id, ...tournamentSnap.data() } as TournamentFoundation;
+      const currentTeam = { id: teamSnap.id, ...teamSnap.data() } as TournamentTeamFoundation;
+      if (Number(currentTournament.configVersion ?? 1) < 3 || currentTournament.participationMode !== "team") throw Object.assign(new Error("Version-three team registration is not configured."), { code: "TOURNAMENT_TEAM_MODE_REQUIRED", status: 409 });
+      if (currentTeam.tournamentId !== id || currentTeam.captainUserId !== userId) throw Object.assign(new Error("Only this Tournament team's captain can reserve its slot."), { code: "TEAM_CAPTAIN_REQUIRED", status: 403 });
+      if (currentTeam.slotReservedAt) { participantCount = Number(currentTournament.participantCount ?? 0); return; }
+      if (currentTournament.status !== "registration_open") throw Object.assign(new Error("Tournament registration is closed."), { code: "REGISTRATION_NOT_OPEN", status: 409 });
+      if (teamsSnap.docs.length >= 129) throw Object.assign(new Error("Tournament team capacity requires reconciliation."), { code: "TOURNAMENT_CAPACITY_RECONCILIATION_REQUIRED", status: 409 });
+      const teamConfig = currentTournament.teamConfig;
+      const members = [...new Set(Array.isArray(currentTeam.memberUserIds) ? currentTeam.memberUserIds.map(String).filter(Boolean) : [])];
+      if (!teamConfig || members.length !== currentTeam.memberUserIds.length || members.length < teamConfig.minimumSize || members.length > teamConfig.maximumSize) throw Object.assign(new Error("Complete a valid Tournament roster before reserving its bracket slot."), { code: "TEAM_ROSTER_INVALID", status: 422 });
+      const membershipRefs = members.map((memberId) => db.collection("tournamentTeamMemberships").doc(`${id}_${memberId}`));
+      const accountRefs = members.map((memberId) => db.collection("users").doc(memberId));
+      const [memberships, accounts] = await Promise.all([
+        transaction.getAll(...membershipRefs),
+        transaction.getAll(...accountRefs)
+      ]);
+      const memberIsAuthorized = members.every((memberId, index) => {
+        const membership = memberships[index].data() ?? {};
+        const account = accounts[index].data() ?? {};
+        const accountStatus = String(account.accountStatus ?? (account.suspended ? "suspended" : "active")).toLowerCase();
+        const accountType = String(account.accountType ?? account.role ?? "user").toLowerCase();
+        return memberships[index].exists && membership.teamId === targetTeamId && membership.status === "active"
+          && accounts[index].exists && !account.disabled && !account.suspended
+          && !["disabled", "suspended", "deactivated", "blocked", "deleted", "deletion_requested", "anonymized"].includes(accountStatus)
+          && !["sponsor", "enterprise"].includes(accountType);
+      });
+      if (!memberIsAuthorized) throw Object.assign(new Error("Every active Tournament team member must pass account and membership verification."), { code: "TEAM_MEMBER_REVALIDATION_FAILED", status: 403 });
+      const reservedCount = teamsSnap.docs.map((doc) => doc.data()).filter((candidate) => candidate.slotReservedAt && ["ready", "active"].includes(String(candidate.status))).length;
+      if (reservedCount >= currentTournament.participantCapacity) throw Object.assign(new Error("Every Tournament team bracket slot is full."), { code: "TOURNAMENT_CAPACITY_REACHED", status: 409 });
+      participantCount = reservedCount + 1;
+      activationQueued = participantCount === currentTournament.participantCapacity;
+      const activationVersion = Math.max(0, Number(currentTournament.activationVersion ?? 0)) + (activationQueued ? 1 : 0);
+      const activationWindowEndsAt = activationQueued ? new Date(Date.parse(now) + 5_000).toISOString() : null;
+      transaction.set(teamRef, { status: "ready", paymentStatus: "not_required", rosterLockedAt: now, slotReservedAt: now, updatedAt: now }, { merge: true });
+      transaction.update(tournamentRef, {
+        participantCount,
+        firstConfirmedEntrantAt: currentTournament.firstConfirmedEntrantAt ?? now,
+        timingLockedAt: currentTournament.timingLockedAt ?? now,
+        ...(activationQueued ? { activationVersion, activationState: "provisional", activationWindowEndsAt, registrationFullAt: now } : {}),
+        updatedAt: now
+      });
+      transaction.create(db.collection("tournamentAuditEvents").doc(`${targetTeamId}_slot_reserved`), { id: `${targetTeamId}_slot_reserved`, tournamentId: id, actorId: userId, action: "team_slot_reserved", createdAt: now, metadata: { teamId: targetTeamId, participantCount, capacity: currentTournament.participantCapacity } });
+      if (activationQueued) {
+        activationJobId = id + "_activation_v" + activationVersion;
+        transaction.create(db.collection("tournamentJobs").doc(activationJobId), { id: activationJobId, tournamentId: id, type: "activate_full_tournament", status: "pending", version: activationVersion, runAt: activationWindowEndsAt, schedulerDispatchState: "pending", schedulerDispatchAttempts: 0, createdAt: now, updatedAt: now });
+      }
+    });
+  } catch (error) {
+    const failure = error as Error & { code?: string; status?: number };
+    if (failure.code) return fail(failure.message, failure.status ?? 409, undefined, failure.code);
+    throw error;
+  }
+  const activationScheduleStatus = activationJobId ? (await dispatchTournamentActivationOutbox(db, activationJobId)).status : null;
+  return ok({ teamId: targetTeamId, status: "ready", participantCount, activationQueued, activationScheduleStatus }, activationQueued
+    ? activationScheduleStatus === "scheduled"
+      ? "The final Tournament team slot is reserved and the server activation task is scheduled after the five-second confirmation window."
+      : "The final Tournament team slot is reserved. Activation is pending scheduler reconciliation after the five-second confirmation window."
+    : "Tournament team slot reserved and its roster is locked.");
 }

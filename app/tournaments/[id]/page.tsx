@@ -2,7 +2,7 @@ import { CalendarDays, Swords, Trophy, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChallengeMediaFrame } from "@/components/media-display";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
-import { getTournamentBundle, participantEligibilitySummary } from "@/lib/server/tournament-public";
+import { getServerTournamentViewer, getTournamentBundle, participantEligibilitySummary } from "@/lib/server/tournament-public";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,7 +11,7 @@ function friendly(value: unknown) { return String(value ?? "not available").repl
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const bundle = await getTournamentBundle(id);
+  const bundle = await getTournamentBundle(id, await getServerTournamentViewer());
   if (!bundle.tournament) return <AppShell><Card><EmptyState icon={<Trophy />} title="Tournament unavailable" body={bundle.message || "This tournament could not be loaded from backend state."} /></Card></AppShell>;
   const tournament = bundle.tournament as Record<string, unknown>;
   const eligibility = participantEligibilitySummary(tournament);

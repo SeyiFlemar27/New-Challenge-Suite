@@ -441,18 +441,22 @@ try {
   await Promise.all([
     db.collection("sponsorOrganizations").doc(sponsorOrg).set({ id: sponsorOrg, name: "Journey Sponsor", status: "active", sponsorOnboardingComplete: true, verificationStatus: "verified", primary: true }),
     db.collection("sponsorMemberships").doc(`membership_${runId}`).set({ id: `membership_${runId}`, sponsorOrganizationId: sponsorOrg, userId: sponsor.uid, role: "owner", status: "active" }),
+    db.collection("enterpriseOrganizations").doc(enterpriseOrg).set({ id: enterpriseOrg, status: "active" }),
     db.collection("enterpriseFinanceWallets").doc(enterpriseOrg).set({ organizationId: enterpriseOrg, currency: "USD", pendingBalanceCents: 0, lifetimeChallengeRevenueCents: 0, withdrawalsEnabled: false })
   ]);
   const publicChallengeId = `journey_${runId}_normal`;
+  const publicChallengeTitle = `Autumn Portrait Challenge ${runId.slice(0, 6)}`;
   const privateChallengeId = `journey_${runId}_private`;
   const liveEventId = `journey_${runId}_event`;
   const tournamentId = `journey_${runId}_tournament`;
+  const tournamentMatchId = `${tournamentId}_round1_match1`;
+  const tournamentRoundId = `${tournamentId}_round1`;
   const now = new Date().toISOString();
   const past = new Date(Date.now() - 3600000).toISOString();
   const future = new Date(Date.now() + 86400000).toISOString();
   await Promise.all([
     db.collection("challenges").doc(publicChallengeId).set({
-      id: publicChallengeId, creatorId: creator.uid, creatorName: "Journey creator", title: "Autumn Portrait Challenge",
+      id: publicChallengeId, creatorId: creator.uid, creatorName: "Journey creator", title: publicChallengeTitle,
       shortDescription: "A browser journey challenge fixture.", description: "Create a portrait entry.", category: "Photography",
       type: "standard", visibility: "public", status: "published", lifecycleStatus: "published", sponsorReady: true,
       startsAt: past, registrationDeadline: future, submissionDeadline: future, votingDeadline: future,
@@ -501,14 +505,14 @@ try {
     const page = await login(desktop, creator);
     const cookie = (await page.context().cookies()).find((item) => item.name === "challenge_suite_session");
     check(Boolean(cookie?.httpOnly), "Login should establish an HttpOnly server session cookie.");
-    const exploreResponse = await page.request.get(`${baseUrl}/api/explore/challenges?q=Autumn%20Portrait`);
+    const exploreResponse = await page.request.get(`${baseUrl}/api/explore/challenges?q=${encodeURIComponent(publicChallengeTitle)}`);
     check(exploreResponse.ok(), `Explore API should return success (HTTP ${exploreResponse.status()}).`);
     const exploreData = await exploreResponse.json();
     check(exploreData.data?.challenges?.some((item) => item.id === publicChallengeId), "Seeded published challenge should be returned by Explore API.");
-    await page.getByPlaceholder("Search challenges, creators, categories").fill("Autumn Portrait");
+    await page.getByPlaceholder("Search challenges, creators, categories").fill(publicChallengeTitle);
     await page.getByRole("button", { name: "Search", exact: true }).click();
-    await page.getByText("Autumn Portrait Challenge").first().waitFor({ timeout: 15000 });
-    check(await page.getByText("Autumn Portrait Challenge").count() > 0, "Explore UI should render the API-backed challenge.");
+    await page.getByRole("heading", { name: publicChallengeTitle, exact: true }).first().waitFor({ timeout: 15000 });
+    check(await page.getByRole("heading", { name: publicChallengeTitle, exact: true }).count() > 0, "Explore UI should render the API-backed challenge.");
     await page.screenshot({ path: join(artifacts, "creator-explore-desktop.png"), fullPage: true });
   });
 
@@ -516,13 +520,13 @@ try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await login(context, participant, { rememberMe: true });
     await page.goto(`${baseUrl}/private-exclusive`, { waitUntil: "domcontentloaded" });
-    await page.getByText("Locked Art Opportunity").waitFor({ timeout: 15000 }).catch(async () => {
+    await page.getByRole("heading", { name: "Locked Art Opportunity", exact: true }).first().waitFor({ timeout: 15000 }).catch(async () => {
       const response = await page.request.get(`${baseUrl}/api/private-exclusive`);
       const body = await response.text();
       const storage = await page.evaluate(async () => ({ localStorageKeys: Object.keys(localStorage), sessionStorageKeys: Object.keys(sessionStorage), databases: (await indexedDB.databases()).map((database) => database.name) }));
       throw new Error(`Private UI did not render the public locked preview; API HTTP ${response.status()} body=${body.slice(0, 1600)}; page=${(await page.locator("body").innerText()).slice(0, 1000)}; storage=${JSON.stringify(storage)}`);
     });
-    await page.getByRole("button", { name: "Request Access" }).click();
+    await page.getByRole("button", { name: "Request Access" }).first().click();
     await page.getByLabel("Reason for access").fill("I would like to join this art challenge.");
     const accessRequestResponse = page.waitForResponse((response) => {
       return new URL(response.url()).pathname === "/api/private-exclusive" && response.request().method() === "POST";
@@ -595,8 +599,8 @@ try {
     check(sponsorApi.ok(), `Sponsor discovery API should authorize the seeded owner (HTTP ${sponsorApi.status()}).`);
     const sponsorData = await sponsorApi.json();
     check(sponsorData.ok === true && sponsorData.data?.challenges?.some((item) => item.id === publicChallengeId), "Sponsor UI API should return the published Sponsor-ready challenge.");
-    await sponsorPage.getByText("Autumn Portrait Challenge").waitFor({ timeout: 15000 });
-    check(await sponsorPage.getByText("Autumn Portrait Challenge").count() > 0, "Sponsor discovery UI should render the API-backed opportunity.");
+    await sponsorPage.getByRole("heading", { name: publicChallengeTitle, exact: true }).first().waitFor({ timeout: 15000 });
+    check(await sponsorPage.getByRole("heading", { name: publicChallengeTitle, exact: true }).count() > 0, "Sponsor discovery UI should render the API-backed opportunity.");
     await sponsorContext.close();
 
     const enterpriseContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
@@ -619,7 +623,8 @@ try {
     await tournamentPage.goto(`${baseUrl}/tournaments/${tournamentId}`, { waitUntil: "domcontentloaded" });
     const tournamentJoinLink = tournamentPage.getByRole("link", { name: "Join / Apply" });
     const tournamentJoinHref = await tournamentJoinLink.getAttribute("href");
-    const tournamentJoinNavigation = tournamentPage.waitForURL(`**/tournaments/${tournamentId}/join`, { timeout: navigationTimeout });
+    const tournamentJoinPath = `/tournaments/${tournamentId}/join`;
+    const tournamentJoinNavigation = tournamentPage.waitForURL((url) => url.pathname === tournamentJoinPath, { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
     await Promise.all([tournamentJoinNavigation, tournamentJoinLink.click()]).catch(async (error) => {
       throw new Error(`Tournament join navigation failed; href=${tournamentJoinHref}; finalUrl=${tournamentPage.url()}; ${error instanceof Error ? error.message : String(error)}`);
     });
@@ -639,15 +644,47 @@ try {
     const tournamentParticipant = await db.collection("tournamentParticipants").doc(`${tournamentId}_${participant.uid}`).get();
     check(tournamentParticipant.exists && tournamentParticipant.data()?.status === "registered", "Tournament registration must create one confirmed participant record.");
     check((await db.collection("tournaments").doc(tournamentId).get()).data()?.participantCount === 1, "Tournament participant count must reflect confirmed registration.");
+
+    const opponentParticipantId = `${tournamentId}_${sponsor.uid}`;
+    const secondOpponentParticipantId = `${tournamentId}_${enterprise.uid}`;
+    await Promise.all([
+      db.collection("tournaments").doc(tournamentId).set({ status: "active", configVersion: 3, participantCount: 3, resultMethod: "votes", voting: { enabled: true, paidVotesActive: false }, updatedAt: new Date().toISOString() }, { merge: true }),
+      db.collection("tournamentParticipants").doc(opponentParticipantId).set({ id: opponentParticipantId, tournamentId, userId: sponsor.uid, status: "registered", createdAt: new Date().toISOString() }),
+      db.collection("tournamentParticipants").doc(secondOpponentParticipantId).set({ id: secondOpponentParticipantId, tournamentId, userId: enterprise.uid, status: "registered", createdAt: new Date().toISOString() }),
+      db.collection("tournamentRounds").doc(tournamentRoundId).set({ id: tournamentRoundId, tournamentId, roundNumber: 1, status: "active", startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString() }),
+      db.collection("tournamentMatches").doc(tournamentMatchId).set({ id: tournamentMatchId, tournamentId, roundId: tournamentRoundId, roundNumber: 1, matchNumber: 1, status: "voting_open", resultMethod: "votes", participantAId: opponentParticipantId, participantBId: secondOpponentParticipantId, voteCountA: 0, voteCountB: 0, voteSequence: 0, votingOpenedAt: new Date(Date.now() - 60000).toISOString(), votingClosesAt: new Date(Date.now() + 3600000).toISOString() }),
+      db.collection("tournamentSubmissions").doc(`${tournamentId}_${tournamentMatchId}_${opponentParticipantId}`).set({ id: `${tournamentId}_${tournamentMatchId}_${opponentParticipantId}`, tournamentId, roundId: tournamentRoundId, matchId: tournamentMatchId, participantId: opponentParticipantId, status: "approved", mediaUrl: "https://example.test/entry-a.jpg", mediaType: "image" }),
+      db.collection("tournamentSubmissions").doc(`${tournamentId}_${tournamentMatchId}_${secondOpponentParticipantId}`).set({ id: `${tournamentId}_${tournamentMatchId}_${secondOpponentParticipantId}`, tournamentId, roundId: tournamentRoundId, matchId: tournamentMatchId, participantId: secondOpponentParticipantId, status: "approved", mediaUrl: "https://example.test/entry-b.jpg", mediaType: "image" })
+    ]);
+
+    await tournamentPage.goto(`${baseUrl}/tournaments/${tournamentId}/matches/${tournamentMatchId}`, { waitUntil: "domcontentloaded" });
+    await tournamentPage.getByRole("heading", { name: "Vote in this match" }).waitFor({ timeout: 15000 });
+    check(await tournamentPage.getByRole("button", { name: "Free vote" }).count() === 2, "eligible entrant in an unrelated match sees one free-vote action for each approved submission");
+    check(!(await tournamentPage.locator("body").innerText()).includes("Verified final votes:"), "live vote totals remain hidden in the Match Details UI");
+    const tournamentVoteResponsePromise = tournamentPage.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === `/api/tournaments/${tournamentId}/votes` && response.request().method() === "POST";
+    }, { timeout: interactionTimeout });
+    await tournamentPage.getByRole("button", { name: "Free vote" }).first().click();
+    const tournamentVoteResponse = await tournamentVoteResponsePromise;
+    const tournamentVoteEnvelope = await tournamentVoteResponse.json().catch(() => null);
+    check(tournamentVoteResponse.ok() && tournamentVoteEnvelope?.ok === true, `Match Details free vote should reach the authorized handler (HTTP ${tournamentVoteResponse.status()}, code=${String(tournamentVoteEnvelope?.code ?? "unknown")}).`);
+    const storedVotes = await db.collection("tournamentVotes").where("tournamentId", "==", tournamentId).where("matchId", "==", tournamentMatchId).where("voterId", "==", participant.uid).get();
+    check(storedVotes.size === 1 && storedVotes.docs[0].data()?.status === "recorded", "free vote persists once through the actual Match Details API flow");
+    const matchAfterVote = (await db.collection("tournamentMatches").doc(tournamentMatchId).get()).data();
+    const selectedParticipantId = String(storedVotes.docs[0]?.data()?.participantId ?? "");
+    check(Number(matchAfterVote?.voteCountA) === (selectedParticipantId === String(matchAfterVote?.participantAId) ? 1 : 0)
+      && Number(matchAfterVote?.voteCountB) === (selectedParticipantId === String(matchAfterVote?.participantBId) ? 1 : 0), "verified server state increments the selected participant's authoritative match tally only");
     await tournamentContext.close();
 
     const eventContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const eventPage = await login(eventContext, participant, { rememberMe: true });
     await eventPage.goto(`${baseUrl}/live-events`, { waitUntil: "domcontentloaded" });
-    await eventPage.getByText("In-Person Art Gathering").waitFor({ timeout: 15000 });
-    const eventRegisterLink = eventPage.getByRole("link", { name: "Register to Attend" });
+    const eventRegisterPath = `/live-events/${liveEventId}/register`;
+    await eventPage.getByRole("heading", { name: "In-Person Art Gathering", exact: true }).first().waitFor({ timeout: 15000 });
+    const eventRegisterLink = eventPage.locator(`a[href="${eventRegisterPath}"]`);
     const eventRegisterHref = await eventRegisterLink.getAttribute("href");
-    const eventRegisterNavigation = eventPage.waitForURL(`**/live-events/${liveEventId}/register`, { timeout: navigationTimeout });
+    const eventRegisterNavigation = eventPage.waitForURL((url) => url.pathname === eventRegisterPath, { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
     await Promise.all([eventRegisterNavigation, eventRegisterLink.click()]).catch(async () => {
       throw new Error(`Live Event register link did not navigate; href=${eventRegisterHref}; url=${eventPage.url()}; page=${(await eventPage.locator("body").innerText()).slice(0, 1200)}`);
     });

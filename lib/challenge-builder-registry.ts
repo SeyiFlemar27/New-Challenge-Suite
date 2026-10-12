@@ -20,10 +20,9 @@ export const CHALLENGE_BUILDER_REGISTRY: Record<CanonicalBuilderType, readonly C
     ["submission", "Entry & Submission"], ["review", "Review"], ["publish", "Publish"]
   ].map(([key, label]) => ({ key, label, guide: { title: label, description: "Configure the private challenge without exposing protected access details.", points: ["Link and code access is verified by the server.", "Eligibility still applies after access verification.", "Private drafts never appear in public discovery."] } })),
   tournament: [
-    ["overview", "Overview"], ["format", "Tournament Format"], ["eligibility", "Eligibility & Participation"],
-    ["monetization", "Monetization & Prize Pool"], ["media", "Media & Branding"], ["method", "Competition Method"],
-    ["schedule", "Schedule & Round Timing"], ["submissions", "Entry & Round Submissions"], ["review", "Review"],
-    ["publish", "Publish"]
+    ["overview", "Overview"], ["format", "Tournament Format & Bracket"], ["eligibility", "Eligibility & Registration"],
+    ["monetization", "Monetization & Prize Pool"], ["media", "Media & Branding"], ["method", "Voting & Advancement"],
+    ["schedule", "Round Timing"], ["submissions", "Round Submissions"], ["review", "Review & Publish"]
   ].map(([key, label]) => ({ key, label, guide: { title: label, description: "Configure a tournament using bracket-safe operational rules.", points: ["Bracket size is the tournament capacity.", "Round results control advancement.", "Competition state is locked when live play begins."] } })),
   live_event: [
     ["basics", "Basics"], ["venue", "Venue & Schedule"], ["registration", "Registration & Tickets"],

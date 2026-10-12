@@ -12,6 +12,7 @@ function locate(base) {
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === "next/server") return nextResolve("next/server.js", context);
+  if (specifier === "next/headers") return nextResolve("next/headers.js", context);
   if (specifier.startsWith("@/")) {
     const target = locate(path.resolve(process.cwd(), specifier.slice(2)));
     if (target) return { url: pathToFileURL(target).href, shortCircuit: true };

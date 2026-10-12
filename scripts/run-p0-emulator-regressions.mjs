@@ -21,6 +21,8 @@ const tests = [
   "scripts/test-private-access-method-enforcement.mjs",
   "scripts/test-sponsor-proposal-retirement.mjs",
   "scripts/test-payment-return-routes.mjs",
+  "scripts/test-tournament-paid-entry-emulator.mjs",
+  "scripts/test-tournament-cloud-tasks.mjs",
   "scripts/test-stripe-sponsor-disputes-emulator.mjs",
   "scripts/test-stripe-webhook-route-paid-vote.mjs",
   "scripts/test-enterprise-finance-route.mjs",
@@ -39,7 +41,10 @@ const tests = [
 
 for (const test of tests) {
   console.log(`\n=== ${test} ===`);
-  const result = spawnSync(process.execPath, ["--experimental-loader", "./scripts/ts-alias-loader.mjs", test], { stdio: "inherit", env: process.env });
+  const testLoaders = test === "scripts/test-tournament-paid-entry-emulator.mjs"
+    ? ["--experimental-loader", "./scripts/tournament-paid-entry-stripe-loader.mjs"]
+    : [];
+  const result = spawnSync(process.execPath, ["--experimental-loader", "./scripts/ts-alias-loader.mjs", ...testLoaders, test], { stdio: "inherit", env: process.env });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

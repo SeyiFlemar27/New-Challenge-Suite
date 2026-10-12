@@ -37,7 +37,7 @@ async function createUser(label) {
   return { uid: body.localId, token: body.idToken };
 }
 function tournament(id, overrides = {}) {
-  return { id, hostId: host.uid, status: "round_active", resultMethod: "votes", participationMode: "individual", voting: { paidVotesActive: false }, tieBreaker: "host_review", scoreVisibility: "final_only", ...overrides };
+  return { id, hostId: host.uid, privacy: "public", status: "round_active", resultMethod: "votes", participationMode: "individual", voting: { paidVotesActive: false }, tieBreaker: "host_review", scoreVisibility: "final_only", ...overrides };
 }
 async function seedMatch({ matchId, id = tournamentId, tournamentData = {}, roundData = {}, matchData = {}, participantAId, participantBId, submissionAId, submissionBId }) {
   const now = Date.now();
@@ -100,7 +100,7 @@ try {
   const liveDetailResponse = await loadTournament(new Request(`http://localhost/api/tournaments/${liveTournamentId}`), { params: Promise.resolve({ id: liveTournamentId }) });
   const liveDetail = (await liveDetailResponse.json()).data;
   const liveMatch = liveDetail.matches.find((item) => item.id === liveMatchId);
-  equal(liveMatch.voteCountA, 3, "live Tournament scores follow the configured live visibility");
+  equal(liveMatch.verifiedVoteCountA, undefined, "live vote totals remain hidden from public Tournament details before a result is verified");
 
   const concurrentMatch = `${runId}_concurrent_match`;
   const concurrentA = `${runId}_concurrent_a`;
@@ -161,9 +161,11 @@ try {
   await db.collection("tournamentTeams").doc(teamA).set({ id: teamA, tournamentId: teamTournamentId, status: "active", captainUserId: voters[4].uid, memberUserIds: [voters[4].uid] });
   await db.collection("tournamentTeams").doc(teamB).set({ id: teamB, tournamentId: teamTournamentId, status: "active", captainUserId: voters[5].uid, memberUserIds: [voters[5].uid] });
   await db.collection("tournamentSubmissions").doc(teamSubmission).set({ tournamentId: teamTournamentId, matchId: teamMatchId, roundId: `${teamMatchId}_round`, participantId: teamA, teamId: teamA, status: "submitted" }, { merge: true });
-  const validTeamVote = await vote({ voter: voters[4], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
-  equal(validTeamVote.status, 200, "valid Team target and Team-owned submission are accepted");
-  const forgedTeamVote = await vote({ voter: voters[5], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamB, tournament: teamTournamentId });
+  const ownTeamVote = await vote({ voter: voters[4], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
+  equal(ownTeamVote.status, 403, "a Team member cannot vote in their own Team's match");
+  const validTeamVote = await vote({ voter: voters[0], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
+  equal(validTeamVote.status, 200, "an unrelated eligible voter can vote for a valid Team-owned submission");
+  const forgedTeamVote = await vote({ voter: voters[2], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamB, tournament: teamTournamentId });
   equal(forgedTeamVote.status, 403, "Team submission cannot be attributed to another Team");
 
   const scoringMatchId = `${runId}_scoring_match`;
@@ -191,7 +193,7 @@ try {
   const finalDetailResponse = await loadTournament(new Request(`http://localhost/api/tournaments/${tournamentId}`), { params: Promise.resolve({ id: tournamentId }) });
   const finalDetail = (await finalDetailResponse.json()).data;
   const finalMatch = finalDetail.matches.find((item) => item.id === scoringMatchId);
-  equal(finalMatch.voteCountA, 2, "final-only vote scores become visible after server confirmation");
+  equal(finalMatch.verifiedVoteCountA, 2, "verified vote scores become visible only after server confirmation");
   const wrongResultMatchId = `${runId}_wrong_result_match`;
   const wrongA = `${runId}_wrong_a`;
   const wrongB = `${runId}_wrong_b`;

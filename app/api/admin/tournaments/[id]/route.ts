@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const { id } = await context.params;
   const tournamentSnap = await db.collection("tournaments").doc(id).get();
   if (!tournamentSnap.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-  const [participants, rounds, matches, submissions, votes, judges, judgeScores, prizePools, proposals, reports, disputes, audits] = await Promise.all([
+  const [participants, rounds, matches, submissions, votes, judges, judgeScores, prizePools, proposals, reports, disputes, entryPaymentDisputes, audits] = await Promise.all([
     db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentRounds").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentMatches").where("tournamentId", "==", id).limit(200).get(),
@@ -26,6 +26,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     db.collection("tournamentSponsorProposals").where("tournamentId", "==", id).limit(50).get(),
     db.collection("tournamentReports").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentDisputes").where("tournamentId", "==", id).limit(100).get(),
+    db.collection("tournamentEntryDisputes").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentAuditEvents").where("tournamentId", "==", id).limit(100).get()
   ]);
   const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((doc) => ({
@@ -41,7 +42,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     judging: rows(judgeScores).filter((item) => impact.affectedMatchIds.includes(String(item.matchId ?? ""))).length,
     settlementSensitive: impact.hasResolvedDownstream || ["results_under_review", "completed"].includes(String(tournamentSnap.data()?.status ?? ""))
   } : null;
-  return ok({ tournament: { id: tournamentSnap.id, ...tournamentSnap.data() }, participants: rows(participants), rounds: rows(rounds), matches: matchRows, submissions: rows(submissions), votes: rows(votes), judges: rows(judges), judgeScores: rows(judgeScores), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), audits: rows(audits), correctionImpact: impact ? { ...impact, activity, automaticCorrectionAllowed: impact.futureOnly && !activity?.submissions && !activity?.votes && !activity?.judging && !activity?.settlementSensitive } : null }, "Admin tournament detail loaded.");
+  return ok({ tournament: { id: tournamentSnap.id, ...tournamentSnap.data() }, participants: rows(participants), rounds: rows(rounds), matches: matchRows, submissions: rows(submissions), votes: rows(votes), judges: rows(judges), judgeScores: rows(judgeScores), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), entryPaymentDisputes: rows(entryPaymentDisputes), audits: rows(audits), correctionImpact: impact ? { ...impact, activity, automaticCorrectionAllowed: impact.futureOnly && !activity?.submissions && !activity?.votes && !activity?.judging && !activity?.settlementSensitive } : null }, "Admin tournament detail loaded.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -71,11 +72,46 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED: "Competition-derived official placements are required.",
         TOURNAMENT_CREATOR_REVIEW_REQUIRED: "The Creator or Host must review the competition-derived placements first.",
         TOURNAMENT_SETTLEMENT_CORRECTION_REQUIRED: "A settlement-sensitive result correction requires Finance review.",
+        TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID: "A placement does not match a confirmed competition result. Admin finalization is blocked.",
         TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID: "A placed participant record needs Admin review.",
-        TOURNAMENT_LOCKED_ROSTER_REQUIRED: "A placed Team requires its canonical locked roster before settlement."
+        TOURNAMENT_LOCKED_ROSTER_REQUIRED: "A placed Team requires its canonical locked roster before settlement.",
+        TOURNAMENT_FINANCIAL_HOLD: "Tournament entry refunds or disputes require reconciliation before settlement."
       };
       return fail(messages[code] ?? "Tournament settlement could not be prepared safely.", code === "TOURNAMENT_NOT_FOUND" ? 404 : 409, { payoutProviderCalled: false }, code);
     }
+  }
+  if (action === "submission_approved" || action === "submission_rejected") {
+    const submissionId = String(body.submissionId ?? "").trim();
+    if (!submissionId) return fail("Choose a Tournament submission to review.", 400, undefined, "TOURNAMENT_SUBMISSION_REQUIRED");
+    const submissionRef = db.collection("tournamentSubmissions").doc(submissionId);
+    let result: { idempotent: boolean; status: string; matchId: string };
+    try {
+      result = await db.runTransaction(async (transaction) => {
+      const submissionSnap = await transaction.get(submissionRef);
+      if (!submissionSnap.exists || submissionSnap.data()?.tournamentId !== id) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_NOT_FOUND"), { code: "TOURNAMENT_SUBMISSION_NOT_FOUND" });
+      const submission = submissionSnap.data() ?? {};
+      const matchId = String(submission.matchId ?? "");
+      if (!matchId) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_MATCH_MISSING"), { code: "TOURNAMENT_SUBMISSION_MATCH_MISSING" });
+      const matchRef = db.collection("tournamentMatches").doc(matchId);
+      const [tournamentSnap, matchSnap] = await Promise.all([transaction.get(db.collection("tournaments").doc(id)), transaction.get(matchRef)]);
+      if (!tournamentSnap.exists || !matchSnap.exists || matchSnap.data()?.tournamentId !== id || matchSnap.data()?.roundId !== submission.roundId || ![matchSnap.data()?.participantAId, matchSnap.data()?.participantBId].includes(submission.participantId)) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID"), { code: "TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID" });
+      const targetStatus = action === "submission_approved" ? "approved" : "rejected";
+      const currentStatus = String(submission.status ?? "");
+      if (currentStatus === targetStatus) return { idempotent: true, status: targetStatus, matchId };
+      if (!["submitted", "pending_moderation", "under_review"].includes(currentStatus) || !["submissions_open", "submission_review"].includes(String(matchSnap.data()?.status ?? ""))) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_REVIEW_CLOSED"), { code: "TOURNAMENT_SUBMISSION_REVIEW_CLOSED" });
+      transaction.set(submissionRef, { status: targetStatus, reviewedAt: now, reviewedBy: user.uid, reviewReason: reason, updatedAt: now }, { merge: true });
+      const reviewRef = db.collection("tournamentSubmissionReviews").doc(`${submissionId}_${action}`);
+      transaction.create(reviewRef, { id: reviewRef.id, tournamentId: id, submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, action, status: targetStatus, actorId: user.uid, reason, createdAt: now });
+      const auditRef = db.collection("tournamentAuditEvents").doc(`${id}_${action}_${submissionId}`);
+      transaction.create(auditRef, { id: auditRef.id, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, previousStatus: currentStatus, resultingStatus: targetStatus } });
+        return { idempotent: false, status: targetStatus, matchId };
+      });
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String((error as Error & { code?: string }).code) : "TOURNAMENT_SUBMISSION_REVIEW_FAILED";
+      const message = code === "TOURNAMENT_SUBMISSION_NOT_FOUND" ? "Tournament submission not found." : code === "TOURNAMENT_SUBMISSION_ASSIGNMENT_INVALID" ? "This submission is not assigned to the selected Tournament match." : "This submission can no longer be reviewed in its current state.";
+      return fail(message, code === "TOURNAMENT_SUBMISSION_NOT_FOUND" ? 404 : 409, undefined, code);
+    }
+    return ok({ action, submissionId, ...result }, result.idempotent ? "This Tournament submission already has that review outcome." : `Tournament submission ${result.status}.`);
   }
   await db.collection("tournamentAuditEvents").doc(`${id}_${action}_${now}`).set({ id: `${id}_${action}_${now}`, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { foundation } });
   return ok({ action, auditRequired: true, payoutProviderCalled: false, balanceOverwriteAllowed: false, rawVoteTotalEditable: false }, "Admin tournament action was audited. No payout, refund, raw vote edit, or balance overwrite occurred.");

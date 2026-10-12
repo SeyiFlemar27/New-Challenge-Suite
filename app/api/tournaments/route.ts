@@ -3,6 +3,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateTournament } from "@/lib/server/tournament-permissions";
 import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
+import { publicTournamentView } from "@/lib/server/tournament-public-policy";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
@@ -16,13 +17,15 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status");
   const category = url.searchParams.get("category");
   try {
-    const snap = await db.collection("tournaments").limit(100).get();
+    const snap = await db.collection("tournaments").where("privacy", "==", "public").limit(100).get();
     const tournaments = (snap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data(), bracketExecutionEnabled: true, fakeBracketData: false }) as Record<string, unknown> & { id: string })
+      .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, unknown> & { id: string })
+      .filter((item) => item.privacy === "public")
       .filter((item) => !status || item.status === status)
       .filter((item) => !category || item.category === category)
       .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
-      .slice(0, 50));
+      .slice(0, 50)
+      .map((item) => publicTournamentView(item)));
     return ok({ tournaments, foundation: tournamentSubdomainFoundation(), emptyState: tournaments.length ? null : "No tournaments found from backend state." }, "Tournament records loaded.");
   } catch (error) {
     if (isFirestoreMissingIndexError(error)) {
