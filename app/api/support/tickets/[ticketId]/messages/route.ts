@@ -3,7 +3,7 @@ import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 import { operationalTaskId } from "@/lib/server/admin-operations";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, mayReopenSupportTicket, supportAttachmentBytesMatchType, supportNotificationRecord } from "@/lib/server/support-tickets";
+import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, mayReopenSupportTicket, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled, supportNotificationRecord } from "@/lib/server/support-tickets";
 import { normalizeSupportTicketStatus } from "@/lib/support/catalog";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
   const parsed = await readJson(request); if (parsed.response) return parsed.response;
   const body = typeof parsed.body?.message === "string" ? parsed.body.message.trim() : "";
   const paths = Array.isArray(parsed.body?.attachmentPaths) ? parsed.body.attachmentPaths.filter((value: unknown): value is string => typeof value === "string") : [];
+  if (paths.length && !supportAttachmentUploadsEnabled()) return fail("Support attachment uploads are unavailable until security scanning and quarantine access are configured.", 503, undefined, "SUPPORT_ATTACHMENTS_UNAVAILABLE");
   if ((!body && !paths.length) || body.length > 10_000) return validationError({ message: "Add a message or attachment. Messages are limited to 10,000 characters." });
   const attachments = await validateAttachments(user!.uid, paths);
   if (!attachments) return validationError({ attachments: "Attachments must be private, owned by this account, and within the approved type and size limits." });

@@ -74,6 +74,10 @@ equal((await getCases(req("http://localhost/api/admin/cases?kind=support", suspe
 equal((await getCases(req("http://localhost/api/admin/cases?kind=support", expiredAdmin.token))).status, 403, "expired Admin access denied");
 
 const { POST: createTicket, GET: listUserTickets } = await import("../app/api/support/tickets/route.ts");
+const originalAttachmentUploadsEnabled = process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED;
+delete process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED;
+equal((await createTicket(req("http://localhost/api/support/tickets", user.token, "POST", { category: "account_security", issueType: "login", subject: "Upload configuration guard", description: "This upload must remain unavailable before configuration.", attachmentPaths: [pdfPath] }))).status, 503, "attachment registration is disabled by default before scanning and quarantine configuration");
+process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED = "true";
 const ticketResponse = await createTicket(req("http://localhost/api/support/tickets", user.token, "POST", { category: "account_security", issueType: "login", subject: "Need help signing in", description: "I cannot access my account after the latest update.", attachmentPaths: [pdfPath, imagePath] }, { "idempotency-key": `${runId}_create_ticket` }));
 equal(ticketResponse.status, 200, "user creates ticket through production route");
 const created = await data(ticketResponse); check(/^CS-\d{5,}$/.test(created.ticketNumber), "ticket receives a readable CS number");
@@ -96,6 +100,7 @@ equal((await ticketAttachment(req(attachmentUrl, other.token), attachmentContext
 equal((await ticketAttachment(req(attachmentUrl, admin.token), attachmentContext)).status, 423, "Admin cannot download a quarantined attachment before scanning");
 
 const oldFetch = globalThis.fetch; const originalEnv = { RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM, SUPPORT_INBOUND_EMAIL: process.env.SUPPORT_INBOUND_EMAIL, RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET, SUPPORT_EMAIL_DELIVERY_ENABLED: process.env.SUPPORT_EMAIL_DELIVERY_ENABLED };
+originalEnv.SUPPORT_ATTACHMENT_UPLOADS_ENABLED = originalAttachmentUploadsEnabled;
 process.env.RESEND_API_KEY = "re_test_deterministic"; process.env.EMAIL_FROM = "Challenge Suite <support@example.test>"; process.env.SUPPORT_INBOUND_EMAIL = "support@example.test";
 process.env.SUPPORT_EMAIL_DELIVERY_ENABLED = "true";
 const secretBytes = Buffer.from("deterministic-inbound-secret"); process.env.RESEND_WEBHOOK_SECRET = `whsec_${secretBytes.toString("base64")}`;
@@ -172,6 +177,9 @@ try {
   const audit = await db.collection("auditLogs").where("action", "==", "support.resolve").where("targetId", "==", ticketId).get();
   equal(audit.size, 1, "decision creates one audit record"); equal(audit.docs[0].data().actorId, admin.uid, "audit records Admin actor"); check(Boolean(audit.docs[0].data().reason), "audit records required reason"); check(audit.docs[0].data().after?.outcome === "success", "audit records outcome");
   const { POST: userReply } = await import("../app/api/support/tickets/[ticketId]/messages/route.ts");
+  delete process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED;
+  equal((await userReply(req(`http://localhost/api/support/tickets/${ticketId}/messages`, user.token, "POST", { message: "The unconfigured upload cannot be attached.", attachmentPaths: [pdfPath] }), { params: Promise.resolve({ ticketId }) })).status, 503, "reply attachment registration is disabled without configuration");
+  process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED = "true";
   const userReplyUrl = `http://localhost/api/support/tickets/${ticketId}/messages`;
   equal((await userReply(req(userReplyUrl, user.token, "POST", { message: "Thanks, I can sign in now." }, { "idempotency-key": `${runId}_user_reopen` }), { params: Promise.resolve({ ticketId }) })).status, 200, "user reopens within seven days");
   equal((await ticketRef.get()).data()?.status, "open", "in-window customer reply reopens the resolved ticket to the canonical open status");

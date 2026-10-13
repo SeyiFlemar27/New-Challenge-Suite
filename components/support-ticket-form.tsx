@@ -13,6 +13,7 @@ import { SUPPORT_CATEGORIES } from "@/lib/support/catalog";
 
 const ACCEPTED_FILES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_BYTES = 5 * 1024 * 1024;
+const attachmentUploadsEnabled = process.env.NEXT_PUBLIC_SUPPORT_ATTACHMENT_UPLOADS_ENABLED === "true";
 
 export function SupportTicketForm() {
   const auth = useAuth();
@@ -30,6 +31,7 @@ export function SupportTicketForm() {
   const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
 
   async function upload(files: FileList | null) {
+    if (!attachmentUploadsEnabled) { setNotice("Support attachment uploads are unavailable until scanning and quarantine access are configured."); return; }
     if (!files?.length || !storage || !auth.user?.uid) { setNotice("File upload is unavailable until storage and sign-in are ready."); return; }
     const uploadStorage = storage;
     const selected = Array.from(files);
@@ -91,7 +93,7 @@ export function SupportTicketForm() {
         <Field label="Subject"><input className={inputClass} value={subject} onChange={(event) => setSubject(event.target.value)} minLength={5} maxLength={200} autoComplete="off" /></Field>
         <Field label="Description"><textarea className={textareaClass} value={description} onChange={(event) => setDescription(event.target.value)} minLength={10} maxLength={10_000} rows={8} /><span className="mt-1 block text-xs text-slate-500">10–10,000 characters. Do not include passwords, one-time codes, full card data, or authentication tokens.</span></Field>
         <Field label="Contact email (optional)"><input className={inputClass} type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} maxLength={254} placeholder={auth.user.email ?? "Use your account email"} /><span className="mt-1 block text-xs text-slate-500">If supplied, this unverified address receives ticket correspondence. It does not authorize account changes or access.</span></Field>
-        <Field label="Attachments (optional)"><input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={uploading || attachmentPaths.length >= 3} onChange={(event) => { void upload(event.target.files); event.currentTarget.value = ""; }} /><span className="mt-1 block text-xs text-slate-500">Up to three JPG, PNG, WebP, or PDF files, 5 MB each. Files remain quarantined until a scanner is configured.</span>{uploading ? <progress className="mt-2 w-full" value={uploadProgress} max={100} aria-label="Attachment upload progress">{uploadProgress}%</progress> : null}</Field>
+        <Field label="Attachments (optional)"><input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={!attachmentUploadsEnabled || uploading || attachmentPaths.length >= 3} onChange={(event) => { void upload(event.target.files); event.currentTarget.value = ""; }} /><span className="mt-1 block text-xs text-slate-500">{attachmentUploadsEnabled ? "Up to three JPG, PNG, WebP, or PDF files, 5 MB each. Files remain quarantined until a trusted scan clears them." : "Attachment uploads are unavailable until scanning and quarantine access are configured. You can submit a text request."}</span>{uploading ? <progress className="mt-2 w-full" value={uploadProgress} max={100} aria-label="Attachment upload progress">{uploadProgress}%</progress> : null}</Field>
         {attachmentPaths.length ? <ul aria-label="Attached files" className="grid gap-2">{attachmentPaths.map((path, index) => <li key={path} className="flex items-center justify-between rounded-[8px] border border-white/10 px-3 py-2 text-sm"><span className="inline-flex items-center gap-2"><Paperclip size={15} />Attachment {index + 1} · Quarantined</span><button type="button" className="rounded p-2 text-slate-400 hover:text-white" aria-label={`Remove attachment ${index + 1}`} onClick={() => void removeAttachment(path)}><X size={16} /></button></li>)}</ul> : null}
         <Button onClick={() => void submit()} disabled={saving || uploading || subject.trim().length < 5 || description.trim().length < 10}><Send size={17} /> {saving ? "Submitting…" : "Submit request"}</Button>
         {notice ? <p role="status" aria-live="polite" className="text-sm">{notice}</p> : null}

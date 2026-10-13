@@ -10,6 +10,10 @@ export const SUPPORT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
 export const SUPPORT_ATTACHMENT_MAX_COUNT = 3;
 export const SUPPORT_ATTACHMENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 
+export function supportAttachmentUploadsEnabled() {
+  return process.env.SUPPORT_ATTACHMENT_UPLOADS_ENABLED === "true";
+}
+
 export function supportTicketNumber(value: unknown) {
   return typeof value === "string" && /^CS-\d{5,}$/.test(value) ? value : null;
 }

@@ -5,7 +5,7 @@ import { operationalTaskId } from "@/lib/server/admin-operations";
 import { requireRequestUser } from "@/lib/server/auth";
 import { dispatchSupportEmailOutbox, supportEmailContent } from "@/lib/server/support-email";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, supportAttachmentBytesMatchType, supportNotificationRecord } from "@/lib/server/support-tickets";
+import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled, supportNotificationRecord } from "@/lib/server/support-tickets";
 import { SUPPORT_CATEGORIES, supportIssueTypeAllowed } from "@/lib/support/catalog";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +83,7 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(parsedBody.body);
   if (!parsed.success) return validationError({ request: parsed.error.issues[0]?.message ?? "Complete the required support fields." });
   const { category, issueType, relatedType, relatedId, attachmentPaths } = parsed.data;
+  if (attachmentPaths.length && !supportAttachmentUploadsEnabled()) return fail("Support attachment uploads are unavailable until security scanning and quarantine access are configured.", 503, undefined, "SUPPORT_ATTACHMENTS_UNAVAILABLE");
   if (!Object.hasOwn(SUPPORT_CATEGORIES, category) || !supportIssueTypeAllowed(category, issueType)) return validationError({ issueType: "Choose an issue type for the selected support category." });
   if (Boolean(relatedType) !== Boolean(relatedId)) return validationError({ relatedRecord: "Choose both a related record type and record." });
   if (relatedType && relatedId && !await userOwnsRelatedRecord(db, user!.uid, relatedType, relatedId)) return fail("That related record is unavailable for this account.", 404);

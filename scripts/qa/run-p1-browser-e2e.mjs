@@ -65,6 +65,8 @@ for (const [name, value] of Object.entries({
   FIREBASE_AUTH_EMULATOR_HOST: `${host}:${authEmulatorPort}`,
   FIREBASE_STORAGE_EMULATOR_HOST: `${host}:${storageEmulatorPort}`,
   NEXT_PUBLIC_DISABLE_MEDIA_UPLOADS: "true",
+  NEXT_PUBLIC_SUPPORT_ATTACHMENT_UPLOADS_ENABLED: "false",
+  SUPPORT_ATTACHMENT_UPLOADS_ENABLED: "false",
   NEXT_PUBLIC_INITIAL_ADMIN_EMAILS: "",
   ADMIN_EMAIL_ALLOWLIST: "",
   STRIPE_SECRET_KEY: "",
@@ -723,6 +725,7 @@ try {
     const subject = `Support browser ${runId}`;
     await page.goto(`${baseUrl}/support/new`, { waitUntil: "domcontentloaded" });
     await page.getByLabel("Subject", { exact: true }).fill(subject);
+    check(await page.getByLabel(/^Attachments/).isDisabled(), "Support attachment upload controls remain disabled pending configuration");
     await page.getByLabel(/^Description/).fill("Please explain the local test account access settings.");
     await page.getByLabel(/^Contact email/).fill(`alternate-${runId}@example.test`);
     const creationResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/support/tickets" && response.request().method() === "POST");
@@ -733,6 +736,7 @@ try {
     const ticketId = created.data.ticketId;
     await page.waitForURL(`${baseUrl}/support/tickets/${ticketId}`);
     await page.getByRole("heading", { level: 1, name: subject, exact: true }).waitFor();
+    check(await page.getByLabel(/Add files/).isDisabled(), "Ticket reply uploads remain disabled pending configuration");
     const ticketRef = db.collection("supportTickets").doc(ticketId);
     const ticket = (await ticketRef.get()).data();
     check(ticket?.userId === creator.uid, "Browser-created ticket remains owned by the authenticated customer");
