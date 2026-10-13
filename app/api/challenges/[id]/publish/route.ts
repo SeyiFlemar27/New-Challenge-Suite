@@ -267,7 +267,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const submitAuditRef = db.collection("auditLogs").doc(`challenge_submit_${id}_${revisionSuffix}`);
   const revisionAuditRef = db.collection("auditLogs").doc(`challenge_revision_${id}_${revisionSuffix}`);
   const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "pending_review", revision: reviewRevisionNumber, submittedAt: now, createdAt: now, updatedAt: now };
-  const revenue = revenueShareFoundation({ challengeId: id, creatorId: user.uid, sponsorEnabled, now });
+  const revenue = revenueShareFoundation({ challengeId: id, creatorId: user.uid, challenge: current, sponsorEnabled, now });
   const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true }, createdAt: now }, submitAuditRef.id, now);
   const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: reviewRevisionNumber }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
 

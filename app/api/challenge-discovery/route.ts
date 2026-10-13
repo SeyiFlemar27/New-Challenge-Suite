@@ -2,7 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
-import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
+import { FieldPath, type Query } from "firebase-admin/firestore";
 import { challengeMediaDeliveryUrl, isFirebaseStorageDownloadUrl, isPublicPrivatePreviewRecord } from "@/lib/server/challenge-media-delivery";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ function publicRecord(id: string, data: Record<string, unknown>, kind: string, c
     registrationDeadline: data.registrationDeadline ?? data.registrationEndAt ?? null,
     prizeSummary: text(data.prizeTitle ?? data.prizeDescription),
     accessRequired: kind === "private",
-    accessMethod: kind === "private" ? "Link + Code" : null,
+    accessMethod: kind === "private" && ["invite_link", "invitation_code", "direct_invitations"].includes(text(data.privateAccessMethod)) ? text(data.privateAccessMethod) : null,
     venueName: kind === "live" ? text(data.venueName ?? data.location) : null,
     tournamentFormat: kind === "tournament" ? text(data.format ?? data.tournamentFormat ?? data.tournamentType) : null
   };
@@ -67,6 +67,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const kind = url.searchParams.get("type") ?? "";
     const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+    const cursor = url.searchParams.get("cursor")?.trim() ?? "";
+    if (cursor.length > 1500 || cursor.includes("/") || (page > 1 && !cursor)) return fail("A valid discovery cursor is required.", 400, undefined, "DISCOVERY_CURSOR_INVALID");
   if (!["private", "live", "tournament"].includes(kind)) return fail("A supported challenge discovery type is required.", 400, undefined, "DISCOVERY_TYPE_INVALID");
   try {
     const [userSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
@@ -77,24 +79,26 @@ export async function GET(request: Request) {
     const forbiddenCode = kind === "private" ? "PRIVATE_DISCOVERY_FORBIDDEN" : kind === "live" ? "LIVE_EVENT_DISCOVERY_FORBIDDEN" : "TOURNAMENT_DISCOVERY_FORBIDDEN";
     if (kind === "private" ? !isHost && !isCreator : !isHost) return fail("This discovery workspace is not available for your account type.", 403, undefined, forbiddenCode);
 
-    const challengeQueries = kind === "private"
-      ? [db.collection("challenges").where("visibility", "in", ["private", "exclusive"]).get(), db.collection("challenges").where("challengeType", "==", "private").get()]
+    const challengeQueries: Query[] = kind === "private"
+      ? [db.collection("challenges").where("visibility", "in", ["private", "exclusive"]).where("publicPreviewEnabled", "==", true), db.collection("challenges").where("challengeType", "==", "private").where("publicPreviewEnabled", "==", true)]
       : kind === "live"
-        ? [db.collection("challenges").where("isLiveEvent", "==", true).get(), db.collection("challenges").where("challengeType", "==", "live_event").get()]
-        : [db.collection("challenges").where("challengeType", "==", "tournament").get()];
-    const challengeSnaps = await Promise.all(challengeQueries);
-    const records: Array<{ id: string; data: Record<string, unknown> }> = challengeSnaps.flatMap((snapshot) => snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> })));
-    if (kind === "live") {
-      const liveSnap = await db.collection("liveEvents").get();
-      records.push(...liveSnap.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> })));
-    }
-    if (kind === "tournament") {
-      const tournamentSnap = await db.collection("tournaments").get();
-      records.push(...tournamentSnap.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> })));
-    }
-    const filtered = [...new Map(records.filter((item) => kindOf(item.data) === kind
+        ? [db.collection("challenges").where("isLiveEvent", "==", true), db.collection("challenges").where("challengeType", "==", "live_event"), db.collection("liveEvents")]
+        : [db.collection("challenges").where("challengeType", "==", "tournament"), db.collection("tournaments")];
+    const snapshots = await Promise.all(challengeQueries.map((base) => {
+      let query = base.where("status", "in", [...DISCOVERABLE]).orderBy(FieldPath.documentId(), "asc");
+      if (cursor) query = query.startAfter(cursor);
+      return query.limit(CHALLENGE_PAGE_SIZE + 1).get();
+    }));
+    // Merge bounded compatibility streams in the same order as Firestore. The
+    // cursor advances over scanned records, including hidden records, so sparse
+    // pages cannot repeat or permanently skip a later eligible challenge.
+    const records = [...new Map(snapshots.flatMap((snapshot) => snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))).map((record) => [record.id, record])).values()]
+      .sort((left, right) => Buffer.compare(Buffer.from(left.id), Buffer.from(right.id)));
+    const scanned = records.slice(0, CHALLENGE_PAGE_SIZE);
+    const hasMore = records.length > CHALLENGE_PAGE_SIZE;
+    const filtered = scanned.filter((item) => kindOf(item.data) === kind
       && discoverable(item.data)
-      && (kind !== "private" || isPublicPrivatePreviewRecord(item.data))).map((item) => [item.id, item])).values()];
+      && (kind !== "private" || isPublicPrivatePreviewRecord(item.data)));
     const creatorIds = [...new Set(filtered.map((item) => ownerId(item.data)).filter(Boolean))];
     const profileSnaps = creatorIds.length ? await db.getAll(...creatorIds.map((id) => db.collection("profiles").doc(id))) : [];
     const profiles = new Map(profileSnaps.map((snap) => [snap.id, snap.data() ?? {}]));
@@ -102,10 +106,9 @@ export async function GET(request: Request) {
       const profile = profiles.get(ownerId(item.data)) ?? {};
       const fullName = [profile.firstName, profile.lastName].map((value) => text(value)).filter(Boolean).join(" ");
       const displayName = [profile.displayName, profile.name, fullName, profile.username, item.data.creatorName, item.data.hostName].map((value) => text(value)).find(Boolean) ?? "Challenge creator";
-      return { ...publicRecord(item.id, item.data, kind, displayName, user.uid), rankingScore: monthlyBoostRankingWeight(item.data) };
-    }).sort((left, right) => Number(right.rankingScore) - Number(left.rankingScore) || String(left.startsAt ?? "").localeCompare(String(right.startsAt ?? "")));
-    const start = (page - 1) * CHALLENGE_PAGE_SIZE;
-    return ok({ challenges: challenges.slice(start, start + CHALLENGE_PAGE_SIZE).map(({ rankingScore: _rankingScore, ...challenge }) => challenge), type: kind, total: challenges.length, page, limit: CHALLENGE_PAGE_SIZE, hasMore: start + CHALLENGE_PAGE_SIZE < challenges.length }, "Challenge discovery loaded.");
+      return publicRecord(item.id, item.data, kind, displayName, user.uid);
+    });
+    return ok({ challenges, type: kind, total: null, page, limit: CHALLENGE_PAGE_SIZE, hasMore, nextCursor: hasMore ? scanned.at(-1)?.id ?? null : null }, "Challenge discovery loaded.");
   } catch (error) {
     return serverError("Challenge discovery could not be loaded.", error instanceof Error ? error.message : error);
   }

@@ -8,9 +8,11 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { fetchBootstrapProfile } from "@/lib/api/services";
 import { getAuthenticatedDestination } from "@/lib/account-routing";
-import { loginWithEmail, logout } from "@/lib/firebase/auth-service";
+import { loginWithEmail, loginWithGoogle, logout } from "@/lib/firebase/auth-service";
 import { useLanguage } from "@/lib/i18n/use-language";
 import { useAuth } from "@/components/auth-provider";
+
+const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
 function safeInternalPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
@@ -99,6 +101,26 @@ function LoginForm() {
     }
   }
 
+  async function googleSignIn() {
+    setError("");
+    setLoading(true);
+    interactiveLoginInProgress.current = true;
+    try {
+      const result = await loginWithGoogle(form.rememberMe);
+      routedUserId.current = result.user.uid;
+      try {
+        await routeAfterLogin();
+      } catch (caught) {
+        setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not sign in with Google.");
+    } finally {
+      interactiveLoginInProgress.current = false;
+      setLoading(false);
+    }
+  }
+
   if ((authState.loading || authState.user) && !redirectError) return null;
 
   if (authState.user && redirectError) {
@@ -134,6 +156,7 @@ function LoginForm() {
           {error ? <p className="rounded-[8px] bg-red-950/50 p-3 text-sm text-red-200">{error}</p> : null}
           <Button className="w-full" disabled={loading}>{t(loading ? "Signing in..." : "Sign In")}</Button>
         </form>
+        {googleAuthEnabled ? <Button type="button" variant="secondary" className="mt-4 w-full" disabled={loading} onClick={() => void googleSignIn()}>{t("Continue with Google")}</Button> : null}
         <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center text-sm sm:flex-row sm:justify-between">
           <Link href="/auth/forgot-password" className="text-[var(--gold)]">{t("Forgot password?")}</Link>
           <Link href="/auth/register" className="font-bold text-[var(--gold)]">{t("Create account")}</Link>

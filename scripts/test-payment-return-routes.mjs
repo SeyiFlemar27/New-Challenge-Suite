@@ -508,7 +508,7 @@ try {
   const retryEventA = { ...delayedSponsorEvent, id: `${runId}_sponsor_concurrent_a` };
   const retryEventB = { ...delayedSponsorEvent, id: `${runId}_sponsor_concurrent_b` };
   const [sponsorWebhook, concurrentSponsorWebhook] = await Promise.all([sendWebhook(retryEventA), sendWebhook(retryEventB)]);
-  const sponsorWebhookFailure = (await db.collection("stripeWebhookEvents").doc(delayedSponsorEvent.id).get()).data()?.error;
+  const sponsorWebhookFailure = (await db.collection("stripeWebhookEvents").doc(retryEventA.id).get()).data()?.error;
   assert.equal(sponsorWebhook.status, 200, `${await sponsorWebhook.clone().text()} cause=${String(sponsorWebhookFailure ?? "not recorded")}`);
   assert.equal(concurrentSponsorWebhook.status, 200, "concurrent distinct Stripe event deliveries are handled idempotently");
   const sponsorRetryWebhook = await sendWebhook(stripeEvent(`${runId}_sponsor_retry_event`, createdSponsorSession));

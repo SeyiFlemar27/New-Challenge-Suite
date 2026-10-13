@@ -6,7 +6,10 @@ const verify = read("app/api/verify-checkout/route.ts");
 const status = read("components/payment-status-journey.tsx");
 
 assert.match(verify, /requireRequestUser/);
-assert.match(verify, /metadata\.userId !== user\.uid/);
+assert.match(verify, /checkoutOwnedByRequester = metadata\.userId === user\.uid/);
+assert.match(verify, /resolveSponsorOrganizationAccess\(db, user\.uid\)/);
+assert.match(verify, /sponsorAccess\.organizationId === \(metadata\.sponsorId \?\? metadata\.userId\)/);
+assert.match(verify, /if \(!checkoutOwnedByRequester\) return fail/);
 assert.match(verify, /This checkout is not available for the current account/);
 assert.match(verify, /session\.payment_status/);
 assert.match(verify, /webhookConfirmed/);

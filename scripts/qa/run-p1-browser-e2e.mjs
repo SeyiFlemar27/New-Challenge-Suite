@@ -72,7 +72,8 @@ for (const [name, value] of Object.entries({
   RESEND_API_KEY: "",
   GOOGLE_CLIENT_ID: "",
   GOOGLE_CLIENT_SECRET: "",
-  NEXT_PUBLIC_GOOGLE_CLIENT_ID: ""
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: "",
+  NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: "false"
 })) process.env[name] = value;
 
 // Do not let Next load real credentials from the developer's ignored .env.local.
@@ -267,6 +268,7 @@ async function login(context, user, { rememberMe = false } = {}) {
     }
   }
   if (page.url().includes("/auth/login")) {
+    check(await page.getByRole("button", { name: "Continue with Google", exact: true }).count() === 0, "Google sign-in remains unavailable until explicitly enabled");
     const signInSubmit = page.locator('form button[type="submit"], form button:not([type="button"])');
     const submitCount = await signInSubmit.count();
     if (submitCount !== 1) throw new Error(`Login form must expose exactly one submit control (found ${submitCount}).`);
@@ -712,6 +714,61 @@ try {
       check((await page.locator("body").innerText()).trim().length > 0, `${path} should render non-empty page content.`);
     }
     await page.screenshot({ path: join(artifacts, "admin-mobile.png"), fullPage: true });
+    await context.close();
+  });
+
+  await test("Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls", async () => {
+    const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+    const page = await login(context, creator);
+    const subject = `Support browser ${runId}`;
+    await page.goto(`${baseUrl}/support/new`, { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Subject", { exact: true }).fill(subject);
+    await page.getByLabel(/^Description/).fill("Please explain the local test account access settings.");
+    await page.getByLabel(/^Contact email/).fill(`alternate-${runId}@example.test`);
+    const creationResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/support/tickets" && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Submit request", exact: true }).click();
+    const createdResponse = await creationResponse;
+    const created = await createdResponse.json();
+    check(createdResponse.status() === 200 && created.ok === true, "Support browser submission returns a successful application envelope");
+    const ticketId = created.data.ticketId;
+    await page.waitForURL(`${baseUrl}/support/tickets/${ticketId}`);
+    await page.getByRole("heading", { level: 1, name: subject, exact: true }).waitFor();
+    const ticketRef = db.collection("supportTickets").doc(ticketId);
+    const ticket = (await ticketRef.get()).data();
+    check(ticket?.userId === creator.uid, "Browser-created ticket remains owned by the authenticated customer");
+    check(ticket?.contactEmail === `alternate-${runId}@example.test`, "Alternative contact address is persisted without changing ownership");
+    check(ticket?.primaryIssueId === null, "New ticket awaits Admin primary-issue confirmation");
+    const adminContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+    const adminPage = await login(adminContext, admin);
+    await adminPage.goto(`${baseUrl}/admin/safety-support/support-tickets`, { waitUntil: "domcontentloaded" });
+    await adminPage.getByRole("button", { name: new RegExp(subject) }).click();
+    await adminPage.getByRole("heading", { level: 2, name: subject, exact: true }).waitFor();
+    check(await adminPage.getByRole("button", { name: "Confirm as primary issue", exact: true }).isDisabled(), "Admin confirmation cannot run without confirmation and a reason");
+    await adminPage.getByLabel("Required Admin reason", { exact: true }).fill("Verified the original account access complaint.");
+    await adminPage.getByRole("checkbox").check();
+    const primaryResponse = adminPage.waitForResponse((response) => new URL(response.url()).pathname.endsWith(`/${ticketId}/primary`) && response.request().method() === "POST");
+    await adminPage.getByRole("button", { name: "Confirm as primary issue", exact: true }).click();
+    check((await primaryResponse).status() === 200, "Admin browser primary confirmation succeeds");
+    await adminPage.getByText("Admin-confirmed primary", { exact: false }).waitFor();
+    check(Boolean((await ticketRef.get()).data()?.primaryIssueId), "Admin browser action persists the primary issue");
+    await adminPage.getByLabel("Required Admin reason", { exact: true }).fill("Provide the verified account access explanation.");
+    await adminPage.getByRole("checkbox").check();
+    const reply = "Your local test account access is active; this reply changes no financial records.";
+    await adminPage.getByLabel("Reply", { exact: true }).fill(reply);
+    const replyResponse = adminPage.waitForResponse((response) => new URL(response.url()).pathname.endsWith(`/${ticketId}/messages`) && response.request().method() === "POST");
+    await adminPage.getByRole("button", { name: "Save reply and queue email", exact: true }).click();
+    const replied = await replyResponse;
+    check(replied.status() === 200, "Admin browser reply is stored successfully");
+    const replyRecords = await ticketRef.collection("messages").where("body", "==", reply).get();
+    check(replyRecords.size === 1, "Exactly one authoritative ticket reply is persisted");
+    const outboxes = await db.collection("supportEmailOutbox").where("ticketId", "==", ticketId).get();
+    check(outboxes.docs.every((record) => record.data().status !== "sent"), "Unconfigured outbound email is never reported as sent");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByText(reply, { exact: true }).waitFor();
+    check((await db.collection("cashLedger").where("sourceId", "==", ticketId).get()).empty, "Support browser actions create no cash ledger mutations");
+    await page.screenshot({ path: join(artifacts, "support-customer-ticket.png"), fullPage: true });
+    await adminPage.screenshot({ path: join(artifacts, "support-admin-ticket.png"), fullPage: true });
+    await adminContext.close();
     await context.close();
   });
 

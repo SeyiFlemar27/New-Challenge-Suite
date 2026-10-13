@@ -22,7 +22,7 @@ export function validateInspectedMedia(candidate: { expectedType: "image" | "vid
   } else {
     if (size >= NORMAL_MEDIA_LIMITS.videoBytes) throw new Error(`MEDIA_VIDEO_TOO_LARGE:${candidate.field}`);
     if (inspected.width < NORMAL_MEDIA_LIMITS.videoMinWidth || inspected.height < NORMAL_MEDIA_LIMITS.videoMinHeight || inspected.width <= inspected.height) throw new Error(`MEDIA_VIDEO_DIMENSIONS_INVALID:${candidate.field}`);
-    if (!Number.isFinite(inspected.durationSeconds) || (inspected.durationSeconds ?? Infinity) > NORMAL_MEDIA_LIMITS.videoMaxDurationSeconds) throw new Error(`MEDIA_VIDEO_DURATION_INVALID:${candidate.field}`);
+    if (!Number.isFinite(inspected.durationSeconds) || (inspected.durationSeconds ?? 0) <= 0 || (inspected.durationSeconds ?? Infinity) > NORMAL_MEDIA_LIMITS.videoMaxDurationSeconds) throw new Error(`MEDIA_VIDEO_DURATION_INVALID:${candidate.field}`);
     const codecAllowed = inspected.format === "mp4" ? ["avc1", "hvc1", "hev1"] : ["H264", "XVID", "MJPG"];
     if (!codecAllowed.includes(inspected.codec ?? "")) throw new Error(`MEDIA_VIDEO_CODEC_INVALID:${candidate.field}`);
   }

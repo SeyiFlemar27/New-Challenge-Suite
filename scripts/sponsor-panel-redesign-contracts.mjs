@@ -30,7 +30,10 @@ export function runSponsorPanelContract(name) {
     all(topbar, ["Sponsor Panel", "Become a Sponsor", 'activeWorkspace === "personal"'], name);
     assert(!shell.includes("WorkspaceSwitcher"), "Sponsor Panel must have a dedicated shell");
   } else if (name === "shell-navigation") {
-    all(shell, ["Brand Profile", "Connected Channels", "Plan & Billing", "Return to Challenge Suite", "Sign Out", 'label: "Sponsor Studio"', 'label: "Discover"', 'label: "Saved"', 'label: "Sponsorships"', 'label: "Proposals"', 'label: "Deliverables"', 'label: "Analytics"', 'label: "Reports"', 'label: "Wallet"', 'label: "Settings"', 'label: "Support"'], name);
+    const navigation = shell.slice(shell.indexOf("const groups:"), shell.indexOf("function initials"));
+    const labels = [...navigation.matchAll(/label: "([^"]+)", href:/g)].map((match) => match[1]);
+    assert.deepEqual(labels, ["Dashboard", "Discover Opportunities", "My Campaigns", "Analytics", "Wallet", "Transactions", "Saved Opportunities"]);
+    all(shell, ['label="Profile"', "Return to Challenge Suite", "Sign Out"], name);
     assert(!shell.includes('label: "Campaigns"') && !shell.includes('label: "Team"') && !shell.includes('label: "Messages"') && !shell.includes("View public site"), "Retired Sponsor navigation must not render");
   } else if (name === "brand-identity") {
     all(shell, ["brandName", "squareIconUrl", "logoUrl", "initials(brandName)", "Sponsor Account"], name);

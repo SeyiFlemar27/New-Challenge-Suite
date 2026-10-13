@@ -36,7 +36,7 @@ type JourneyCopy = {
 const PURPOSE_PROGRESS: Record<PaymentPurpose, readonly [string, string, string]> = {
   subscription_payment: ["Payment received", "Activating membership", "Membership active"],
   dorocoin_purchase: ["Payment received", "Adding DoroCoins", "DoroCoins available"],
-  challenge_credit_purchase: ["Payment received", "Adding Challenge Credits", "Challenge Credits available"],
+  challenge_credit_purchase: ["Historical payment received", "Checking historical record", "Historical payment confirmed"],
   challenge_entry_payment: ["Payment received", "Confirming challenge entry", "Challenge entry confirmed"],
   prize_pool_funding: ["Payment received", "Confirming prize funding", "Prize funding confirmed"],
   sponsor_contribution: ["Payment received", "Confirming sponsorship", "Sponsorship confirmed"],

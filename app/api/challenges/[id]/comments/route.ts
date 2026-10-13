@@ -12,6 +12,18 @@ import { FieldPath, type DocumentSnapshot, type QueryDocumentSnapshot } from "fi
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 40;
+const PUBLIC_COMMENT_HISTORY_STATES = new Set(["paused", "postponed", "cancelled", "canceled"]);
+
+function canReadPublicCommentHistory(challengeId: string, challenge: Record<string, unknown>) {
+  if (isPublicChallenge(challengeId, challenge)) return true;
+  const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
+  if (!PUBLIC_COMMENT_HISTORY_STATES.has(status)) return false;
+  // Paused and cancelled public challenges are no longer discoverable, but their
+  // existing comment history remains visible as promised by the challenge page.
+  // Re-evaluate all public/private/demo/media visibility guards using a public
+  // lifecycle status; only the lifecycle gate is relaxed for this read-only API.
+  return isPublicChallenge(challengeId, { ...challenge, status: "active", lifecycleStatus: "active" });
+}
 
 async function authorizeChallengeComments(request: Request, challengeId: string) {
   const db = getAdminDb();
@@ -20,7 +32,7 @@ async function authorizeChallengeComments(request: Request, challengeId: string)
   if (!challengeSnap.exists) return { db, challenge: null, user: null, profile: {}, allowed: false };
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
   const user = await getOptionalRequestUser(request);
-  if (isPublicChallenge(challengeId, challenge)) return { db, challenge, user, profile: {}, allowed: true };
+  if (canReadPublicCommentHistory(challengeId, challenge)) return { db, challenge, user, profile: {}, allowed: true };
   if (!user) return { db, challenge, user, profile: {}, allowed: false };
   const [accountSnap, profileSnap, accessContext] = await Promise.all([
     db.collection("users").doc(user.uid).get(),

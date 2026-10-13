@@ -404,9 +404,9 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const [privateAccess] = await Promise.all([
+  const [, , privateAccess] = await Promise.all([
     Promise.resolve(challengeWrite),
-    db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`).set(revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, sponsorEnabled, now }), { merge: true }),
+    db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`).set(revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, challenge, sponsorEnabled, now }), { merge: true }),
     privateInvitePromise,
     writeChallengePrizePoolFoundation(db, {
       challengeId: ref.id,

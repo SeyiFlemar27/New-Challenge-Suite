@@ -7,14 +7,15 @@ const provider = readFileSync("components/auth-provider.tsx", "utf8");
 const sessionRoute = readFileSync("app/api/auth/session/route.ts", "utf8");
 
 assert(firebaseClient.includes("browserLocalPersistence"), "Firebase auth must persist across same-domain tabs.");
-assert(firebaseClient.includes("initializeAuth(firebaseApp, { persistence: browserLocalPersistence })"));
+assert.match(firebaseClient, /getRememberMePreference\(\)\s*\? \[browserLocalPersistence, browserSessionPersistence\]\s*: \[browserSessionPersistence, browserLocalPersistence\]/);
+assert(firebaseClient.includes("initializeAuth(firebaseApp, { persistence })"), "startup must search both persistence stores with the selected policy first");
 assert(authService.includes('fetch("/api/auth/session"') && authService.includes('credentials: "same-origin"'));
 assert(provider.includes("syncServerSession(nextUser)"), "restored Firebase users must sync the server session.");
 assert(provider.includes("syncServerSession(nextUser).catch(() => undefined)"), "session sync failure must not discard restored client auth.");
 assert(authService.includes("onIdTokenChanged(auth, callback)"), "server session sync must refresh when Firebase rotates the ID token.");
 assert(sessionRoute.includes("createSessionCookie"));
 assert(sessionRoute.includes("httpOnly: true"));
-assert(sessionRoute.includes('sameSite: "lax"'));
+assert(sessionRoute.includes('sameSite: "strict"'), "session cookies retain the stronger cross-site restriction");
 assert(!authService.includes("localStorage") && !sessionRoute.includes("searchParams"), "auth tokens must not be stored manually or placed in URLs.");
 
 console.log("Same-domain new-tab auth persistence checks passed.");

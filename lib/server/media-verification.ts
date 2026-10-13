@@ -6,7 +6,7 @@ import { inspectImageBytes, inspectVideoBytes, normalizeImageBytes, validateInsp
 import { isModernNormalChallenge, NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
 
 type MediaCandidate = { path: string; expectedType: "image" | "video"; field: string };
-type VerifiedAsset = MediaCandidate & { generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
+type VerifiedAsset = MediaCandidate & { sourcePath: string; generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
 type StorageFile = ReturnType<ReturnType<NonNullable<ReturnType<typeof getAdminStorage>>["bucket"]>["file"]>;
 
 function candidates(challenge: Record<string, unknown>): MediaCandidate[] {
@@ -55,7 +55,8 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
   for (const candidate of list) {
     const ownerDraftPath = candidate.path.startsWith(`challenges/drafts/${creatorId}/`);
     const challengePath = candidate.path.startsWith(`challenges/${challengeId}/`);
-    if ((!ownerDraftPath && !challengePath) || candidate.path.includes("..") || candidate.path.startsWith("/")) throw new Error(`MEDIA_PATH_NOT_CHALLENGE_SCOPED:${candidate.field}`);
+    const verifiedChallengePath = candidate.path.startsWith(`verified-challenge-media/${challengeId}/`);
+    if ((!ownerDraftPath && !challengePath && !verifiedChallengePath) || candidate.path.includes("..") || candidate.path.startsWith("/")) throw new Error(`MEDIA_PATH_NOT_CHALLENGE_SCOPED:${candidate.field}`);
     const file = bucket.file(candidate.path);
     const [exists] = await file.exists();
     if (!exists) throw new Error(`MEDIA_OBJECT_MISSING:${candidate.field}`);
@@ -105,7 +106,7 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
     // Persist only an application URL. Firebase download-token URLs are bearer
     // capabilities and bypass Storage Rules after they have been shared.
     const verifiedUrl = challengeMediaDeliveryUrl(verifiedPath);
-    assets.push({ ...candidate, path: verifiedPath, generation: verifiedGeneration, size: verifiedBytes.length, sha256: createHash("sha256").update(verifiedBytes).digest("hex"), inspected, url: verifiedUrl });
+    assets.push({ ...candidate, sourcePath: candidate.path, path: verifiedPath, generation: verifiedGeneration, size: verifiedBytes.length, sha256: createHash("sha256").update(verifiedBytes).digest("hex"), inspected, url: verifiedUrl });
   }
   const verification = { version: 1, status: "verified", verifiedAt: new Date().toISOString(), assets };
   return verification;
@@ -135,19 +136,22 @@ export async function deleteUnpublishedChallengeMedia(db: Firestore, challengeId
 export function applyVerifiedChallengeMedia(challenge: Record<string, unknown>, verification: Record<string, unknown>) {
   const assets = Array.isArray(verification.assets) ? verification.assets as Array<Record<string, unknown>> : [];
   const byField = new Map(assets.map((asset) => [String(asset.field), asset]));
+  // One uploaded object can be referenced by both the cover and the gallery.
+  // Inspection is deduplicated by path, but every reference must be rewritten.
+  const bySourcePath = new Map(assets.filter((asset) => typeof asset.sourcePath === "string").map((asset) => [String(asset.sourcePath), asset]));
   const direct: Array<[string, string]> = [["coverImagePath", "coverImageUrl"], ["promoImagePath", "promoImageUrl"], ["trailerVideoPath", "trailerVideoUrl"], ["promoVideoPath", "promoVideoUrl"]];
   for (const [pathField, urlField] of direct) {
-    const asset = byField.get(pathField);
+    const asset = byField.get(pathField) ?? bySourcePath.get(String(challenge[pathField] ?? ""));
     if (asset) { challenge[pathField] = asset.path; challenge[urlField] = asset.url; }
   }
   if (Array.isArray(challenge.challengeImages)) {
     challenge.challengeImages = (challenge.challengeImages as Array<Record<string, unknown>>).map((image, index) => {
-      const asset = byField.get(`challengeImages.${index}.path`);
+      const asset = byField.get(`challengeImages.${index}.path`) ?? bySourcePath.get(String(image.path ?? ""));
       return asset ? { ...image, path: asset.path, url: asset.url } : image;
     });
   }
   if (challenge.challengeVideo && typeof challenge.challengeVideo === "object") {
-    const asset = byField.get("challengeVideo.path");
+    const asset = byField.get("challengeVideo.path") ?? bySourcePath.get(String((challenge.challengeVideo as Record<string, unknown>).path ?? ""));
     if (asset) challenge.challengeVideo = { ...(challenge.challengeVideo as Record<string, unknown>), path: asset.path, url: asset.url };
   }
   // Storage Rules cannot inspect an array of objects to authorize one exact

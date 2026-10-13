@@ -1,5 +1,6 @@
 import { PLATFORM_FEE_CONFIG, calculateGrossToNet } from "@/lib/server/wallet-architecture";
 import { PAID_REVENUE_SPLIT, calculatePaidRevenueSplit, calculateSponsorContributionSplit } from "@/lib/server/payout-structure";
+import { resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
 
 export const GENERATED_REVENUE_SPLIT = {
   winnersPercent: PAID_REVENUE_SPLIT.winnerSharePercent,
@@ -40,11 +41,17 @@ export function calculateChallengerVoteRevenueBonus(voteRevenueCents: number) {
   };
 }
 
-export function revenueShareFoundation(input: { challengeId: string; creatorId: string; sponsorEnabled: boolean; now: string }) {
+export function revenueShareFoundation(input: { challengeId: string; creatorId: string; challenge: Record<string, unknown>; sponsorEnabled: boolean; now: string }) {
+  const ownership = resolveEnterpriseFinancialOwnership(input.challenge);
+  const enterpriseOwned = ownership.workspaceType === "enterprise";
+  const personalOwnerId = String(input.challenge.creatorId ?? input.challenge.hostId ?? input.creatorId);
   return {
     id: `revenue_share_${input.challengeId}`,
     challengeId: input.challengeId,
-    creatorId: input.creatorId,
+    creatorId: enterpriseOwned ? null : personalOwnerId,
+    initiatedByUserId: input.creatorId,
+    ...ownership,
+    financialOwnerId: enterpriseOwned ? ownership.organizationOwnerId : personalOwnerId,
     initialPrizePoolCents: 0,
     initialPrizePoolRule: "100_percent_to_winners_after_admin_review",
     ...calculateGeneratedRevenueSplit(0),

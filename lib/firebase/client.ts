@@ -1,8 +1,9 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { browserLocalPersistence, getAuth, initializeAuth } from "firebase/auth";
+import { browserLocalPersistence, browserSessionPersistence, getAuth, initializeAuth } from "firebase/auth";
 import { connectAuthEmulator } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { getRememberMePreference } from "./session-persistence";
 
 function normalizeStorageBucket(value: string | undefined) {
   const trimmed = value?.trim() ?? "";
@@ -36,7 +37,13 @@ try {
 export const firebaseApp: FirebaseApp | null = app;
 export const auth = firebaseApp ? (() => {
   try {
-    return initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
+    // Restore the selected policy after a full navigation. Searching only local
+    // storage loses standard tab sessions; making local storage primary for
+    // every session would silently remember users who opted out.
+    const persistence = getRememberMePreference()
+      ? [browserLocalPersistence, browserSessionPersistence]
+      : [browserSessionPersistence, browserLocalPersistence];
+    return initializeAuth(firebaseApp, { persistence });
   } catch {
     return getAuth(firebaseApp);
   }

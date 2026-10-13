@@ -15,6 +15,10 @@ const auth = getAuth(app);
 const runId = `discovery_${randomUUID().replaceAll("-", "")}`;
 const orgA = `${runId}_org_a`;
 const orgB = `${runId}_org_b`;
+const creatorSearchPrefix = `e2e${runId.slice(-8)}`;
+const createdProfileRefs = [];
+const createdChallengeRefs = [];
+const createdAuthUserIds = [];
 let assertions = 0;
 
 function check(condition, message) { assert.ok(condition, message); assertions += 1; }
@@ -26,6 +30,7 @@ async function createUser(label) {
   });
   const body = await response.json();
   assert.equal(response.ok, true, JSON.stringify(body));
+  createdAuthUserIds.push(body.localId);
   await db.collection("users").doc(body.localId).set({ emailVerified: true, accountStatus: "active" });
   return { uid: body.localId, token: body.idToken };
 }
@@ -52,12 +57,14 @@ try {
   equal((await creatorsGet(request("http://localhost/api/sponsor/discover/creators", ordinary.token))).status, 403, "creator discovery rejects users without Sponsor workspace access");
   const profileBatch = [];
   for (let index = 0; index < 275; index += 1) {
-    const id = `${runId}_profile_${String(index).padStart(3, "0")}`;
+    const id = `000_${runId}_profile_${String(index).padStart(3, "0")}`;
     const privateProfile = index === 245;
     const disabled = index === 246;
-    profileBatch.push(db.collection("profiles").doc(id).set({
-      displayName: `Creator ${String(index).padStart(3, "0")}`,
-      username: `creator${String(index).padStart(3, "0")}`,
+    const profileRef = db.collection("profiles").doc(id);
+    createdProfileRefs.push(profileRef);
+    profileBatch.push(profileRef.set({
+      displayName: `${creatorSearchPrefix} Creator ${String(index).padStart(3, "0")}`,
+      username: `${creatorSearchPrefix}creator${String(index).padStart(3, "0")}`,
       accountType: "creator",
       creatorProfileCompletedAt: "2026-01-01T00:00:00.000Z",
       sponsorReadyEnabled: true,
@@ -72,7 +79,7 @@ try {
   let cursor = "";
   let page = 1;
   do {
-    const url = `http://localhost/api/sponsor/discover/creators?page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const url = `http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent(creatorSearchPrefix)}&page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const response = await creatorsGet(request(url, sponsor.token));
     equal(response.status, 200, `Sponsor creator page ${page} is authorized`);
     const payload = (await response.json()).data;
@@ -87,21 +94,23 @@ try {
     page += 1;
     if (page > 20) throw new Error("Creator discovery pagination did not terminate.");
   } while (cursor);
-  const stableCreatorPage = await creatorsGet(request("http://localhost/api/sponsor/discover/creators", sponsor.token));
+  const stableCreatorPage = await creatorsGet(request(`http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent(creatorSearchPrefix)}`, sponsor.token));
   const stableCreatorIds = (await stableCreatorPage.json()).data.creators.map((creator) => creator.id);
   assert.deepEqual(stableCreatorIds, creatorPages[0].map((creator) => creator.id), "creator first-page ordering is stable across repeated requests");
   assertions += 1;
-  check(discoveredCreatorIds.has(`${runId}_profile_274`), "eligible creator beyond the prior 200-profile boundary is discoverable");
-  check(!discoveredCreatorIds.has(`${runId}_profile_245`), "private creator profiles are excluded");
-  check(!discoveredCreatorIds.has(`${runId}_profile_246`), "suspended creator accounts are excluded");
+  check(discoveredCreatorIds.has(`000_${runId}_profile_274`), "eligible creator beyond the prior 200-profile boundary is discoverable");
+  check(!discoveredCreatorIds.has(`000_${runId}_profile_245`), "private creator profiles are excluded");
+  check(!discoveredCreatorIds.has(`000_${runId}_profile_246`), "suspended creator accounts are excluded");
   const creatorSearch = await creatorsGet(request(`http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent("spectral niche")}`, sponsor.token));
   const creatorSearchPayload = (await creatorSearch.json()).data;
-  check(creatorSearchPayload.creators.some((creator) => creator.id === `${runId}_profile_274`), "contains search finds a matching creator beyond the former cap");
-  equal((await creatorsGet(request("http://localhost/api/sponsor/discover/creators?page=2", sponsor.token))).status, 400, "page-number continuation without a cursor is rejected");
+  check(creatorSearchPayload.creators.some((creator) => creator.id === `000_${runId}_profile_274`), "contains search finds a matching creator beyond the former cap");
+  equal((await creatorsGet(request(`http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent(creatorSearchPrefix)}&page=2`, sponsor.token))).status, 400, "page-number continuation without a cursor is rejected");
   const tailProfiles = [];
   for (let index = 0; index < 510; index += 1) {
-    const id = `${runId}_tail_${String(index).padStart(3, "0")}`;
-    tailProfiles.push(db.collection("profiles").doc(id).set({ displayName: `Tail Creator ${index}`, username: `tailcreator${index}`, accountType: "creator", creatorProfileCompletedAt: "2026-01-01T00:00:00.000Z", sponsorReadyEnabled: true, profileVisibility: "public", accountStatus: "active", creatorNiche: index === 509 ? "tail-only-match" : "ceramics" }));
+    const id = `000_${runId}_tail_${String(index).padStart(3, "0")}`;
+    const profileRef = db.collection("profiles").doc(id);
+    createdProfileRefs.push(profileRef);
+    tailProfiles.push(profileRef.set({ displayName: `Tail Creator ${index}`, username: `tailcreator${index}`, accountType: "creator", creatorProfileCompletedAt: "2026-01-01T00:00:00.000Z", sponsorReadyEnabled: true, profileVisibility: "public", accountStatus: "active", creatorNiche: index === 509 ? "tail-only-match" : "ceramics" }));
   }
   await Promise.all(tailProfiles);
   const firstTailSearchPage = await creatorsGet(request(`http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent("tail-only-match")}`, sponsor.token));
@@ -111,29 +120,32 @@ try {
   const lastTailSearchPage = await creatorsGet(request(`http://localhost/api/sponsor/discover/creators?q=${encodeURIComponent("tail-only-match")}&page=2&cursor=${encodeURIComponent(firstTailPayload.pagination.nextCursor)}`, sponsor.token));
   const lastTailPayload = (await lastTailSearchPage.json()).data;
   equal(lastTailPayload.creators.length, 1, "cursor continuation finds a search match beyond 500 scanned profiles");
-  equal(lastTailPayload.creators[0].id, `${runId}_tail_509`, "late creator search result is returned without an unbounded request scan");
+  equal(lastTailPayload.creators[0].id, `000_${runId}_tail_509`, "late creator search result is returned without an unbounded request scan");
 
   const { GET: sponsorChallengesGet } = await import("../app/api/sponsor/discover/challenges/route.ts");
   const challengeWrites = [];
   for (let index = 0; index < 80; index += 1) {
     const id = `${runId}_opportunity_${String(index).padStart(3, "0")}`;
     const ended = index === 1;
-    challengeWrites.push(db.collection("challenges").doc(id).set({
-      id, title: index === 79 ? "Rare Needle Opportunity" : `Public Opportunity ${String(index).padStart(3, "0")}`,
+    const challengeRef = db.collection("challenges").doc(id);
+    createdChallengeRefs.push(challengeRef);
+    challengeWrites.push(challengeRef.set({
+      id, title: index === 79 ? `Rare Needle ${creatorSearchPrefix} Opportunity` : `Public ${creatorSearchPrefix} Opportunity ${String(index).padStart(3, "0")}`,
       creatorId: `creator_${index}`, creatorName: "Creator Opportunity", category: index % 2 ? "Arts" : "Dance",
       visibility: "public", status: "active", sponsorEnabled: true, publishedAt: "2026-01-01T00:00:00.000Z",
       createdAt: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),
       ...(ended ? { votingDeadline: "2020-01-01T00:00:00.000Z" } : {})
     }));
   }
-  challengeWrites.push(db.collection("challenges").doc(`${runId}_hidden_opportunity`).set({ id: `${runId}_hidden_opportunity`, title: "Rare Needle Hidden", visibility: "private", status: "active", sponsorEnabled: true, createdAt: "2026-02-01T00:00:00.000Z" }));
-  challengeWrites.push(db.collection("challenges").doc(`${runId}_cancelled_opportunity`).set({ id: `${runId}_cancelled_opportunity`, title: "Rare Needle Cancelled", visibility: "public", status: "cancelled", sponsorEnabled: true, createdAt: "2026-02-02T00:00:00.000Z" }));
+  for (const id of [`${runId}_hidden_opportunity`, `${runId}_cancelled_opportunity`]) createdChallengeRefs.push(db.collection("challenges").doc(id));
+  challengeWrites.push(createdChallengeRefs.at(-2).set({ id: `${runId}_hidden_opportunity`, title: `Rare Needle ${creatorSearchPrefix} Hidden`, visibility: "private", status: "active", sponsorEnabled: true, createdAt: "2026-02-01T00:00:00.000Z" }));
+  challengeWrites.push(createdChallengeRefs.at(-1).set({ id: `${runId}_cancelled_opportunity`, title: `Rare Needle ${creatorSearchPrefix} Cancelled`, visibility: "public", status: "cancelled", sponsorEnabled: true, createdAt: "2026-02-02T00:00:00.000Z" }));
   await Promise.all(challengeWrites);
   const opportunityIds = new Set();
   let firstOpportunityIds = [];
   cursor = ""; page = 1;
   do {
-    const response = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, sponsor.token));
+    const response = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent(creatorSearchPrefix)}&page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, sponsor.token));
     equal(response.status, 200, `Sponsor opportunity page ${page} is authorized`);
     const payload = (await response.json()).data;
     if (page === 1) firstOpportunityIds = payload.challenges.map((challenge) => challenge.id);
@@ -146,17 +158,17 @@ try {
     page += 1;
     if (page > 10) throw new Error("Sponsor opportunity pagination did not terminate.");
   } while (cursor);
-  const stableOpportunityPage = await sponsorChallengesGet(request("http://localhost/api/sponsor/discover/challenges", sponsor.token));
+  const stableOpportunityPage = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent(creatorSearchPrefix)}`, sponsor.token));
   assert.deepEqual((await stableOpportunityPage.json()).data.challenges.map((challenge) => challenge.id), firstOpportunityIds, "Sponsor opportunity first-page ordering is stable across repeated requests");
   assertions += 1;
   equal(opportunityIds.size, 80, "all 80 public sponsor-ready opportunities paginate beyond the 36-result threshold");
   check(!opportunityIds.has(`${runId}_hidden_opportunity`), "private unavailable opportunities are not disclosed");
   check(!opportunityIds.has(`${runId}_cancelled_opportunity`), "cancelled opportunities are excluded");
-  const rareOpportunity = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent("needle")}`, sponsor.token));
+  const rareOpportunity = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent(`needle ${creatorSearchPrefix}`)}`, sponsor.token));
   const rarePayload = (await rareOpportunity.json()).data;
   equal(rarePayload.challenges.length, 1, "filtered opportunity search scans past the first 36 candidates");
   equal(rarePayload.challenges[0].id, `${runId}_opportunity_079`, "the late matching opportunity is returned");
-  const endedOpportunity = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent("opportunity 001")}`, sponsor.token));
+  const endedOpportunity = await sponsorChallengesGet(request(`http://localhost/api/sponsor/discover/challenges?q=${encodeURIComponent(`${creatorSearchPrefix} opportunity 001`)}`, sponsor.token));
   const endedPayload = (await endedOpportunity.json()).data;
   if (endedPayload.challenges.length) check(endedPayload.challenges[0].fundable === false, "closed funding windows are never presented as fundable");
   equal((await sponsorChallengesGet(request("http://localhost/api/sponsor/discover/challenges?page=2", sponsor.token))).status, 400, "opportunity page-number continuation without a cursor is rejected");
@@ -213,7 +225,9 @@ try {
   const exploreWrites = [];
   for (let index = 0; index < 42; index += 1) {
     const id = `${runId}_explore_${String(index).padStart(3, "0")}`;
-    exploreWrites.push(db.collection("challenges").doc(id).set({ id, title: `Needle Arts Challenge ${String(index).padStart(2, "0")}`, shortDescription: "Public challenge", category: "Arts", type: "Public Challenge", visibility: "public", status: index === 40 ? "scheduled" : "active", createdAt: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(), publishedAt: "2026-01-01T00:00:00.000Z", publicVisibility: true }));
+    const ref = db.collection("challenges").doc(id);
+    createdChallengeRefs.push(ref);
+    exploreWrites.push(ref.set({ id, title: `${creatorSearchPrefix} Needle Arts Challenge ${String(index).padStart(2, "0")}`, shortDescription: "Public challenge", category: "Arts", type: "Public Challenge", visibility: "public", status: index === 40 ? "scheduled" : "active", createdAt: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(), publishedAt: "2026-01-01T00:00:00.000Z", publicVisibility: true }));
   }
   const lockedId = `${runId}_explore_locked`;
   const canceledId = `${runId}_explore_cancelled`;
@@ -222,15 +236,20 @@ try {
   const oldCompletedId = `${runId}_explore_old_completed`;
   const hiddenPrivateId = `${runId}_explore_private_hidden`;
   const hiddenPublicId = `${runId}_explore_public_hidden`;
-  exploreWrites.push(
-    db.collection("challenges").doc(lockedId).set({ id: lockedId, title: "Needle Locked Preview", shortDescription: "Public preview text", description: "SECRET PRIVATE DESCRIPTION", votingSettings: { secret: true }, rules: "SECRET RULES", category: "Arts", type: "Private / Exclusive", visibility: "private", publicPreviewEnabled: true, status: "active", createdAt: "2026-03-01T00:00:00.000Z", publishedAt: "2026-01-01T00:00:00.000Z" }),
-    db.collection("challenges").doc(canceledId).set({ id: canceledId, title: "Needle Cancelled", category: "Arts", visibility: "public", status: "cancelled", createdAt: "2026-04-01T00:00:00.000Z" }),
-    db.collection("challenges").doc(expiredId).set({ id: expiredId, title: "Needle Old Winners", category: "Arts", visibility: "public", status: "completed", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), createdAt: "2026-05-01T00:00:00.000Z" }),
-    db.collection("challenges").doc(recentCompletedId).set({ id: recentCompletedId, title: "Needle Recent Winners", category: "Arts", visibility: "public", status: "completed", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 60 * 1000).toISOString(), createdAt: "2026-05-02T00:00:00.000Z" }),
-    db.collection("challenges").doc(oldCompletedId).set({ id: oldCompletedId, title: "Needle Hidden Results", category: "Arts", visibility: "public", status: "winners_announced", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), createdAt: "2026-05-03T00:00:00.000Z" }),
-    db.collection("challenges").doc(hiddenPrivateId).set({ id: hiddenPrivateId, title: "Needle Private No Preview", category: "Arts", type: "Private / Exclusive", visibility: "private", publicPreviewEnabled: false, status: "active", createdAt: "2026-06-01T00:00:00.000Z" }),
-    db.collection("challenges").doc(hiddenPublicId).set({ id: hiddenPublicId, title: "Needle Public Hidden", category: "Arts", visibility: "public", publicVisibility: false, status: "active", createdAt: "2026-06-02T00:00:00.000Z" })
-  );
+  const exploreFixtures = [
+    { id: lockedId, title: `${creatorSearchPrefix} Needle Locked Preview`, shortDescription: "Public preview text", description: "SECRET PRIVATE DESCRIPTION", votingSettings: { secret: true }, rules: "SECRET RULES", category: "Arts", type: "Private / Exclusive", visibility: "private", publicPreviewEnabled: true, status: "active", createdAt: "2026-03-01T00:00:00.000Z", publishedAt: "2026-01-01T00:00:00.000Z" },
+    { id: canceledId, title: `${creatorSearchPrefix} Needle Cancelled`, category: "Arts", visibility: "public", status: "cancelled", createdAt: "2026-04-01T00:00:00.000Z" },
+    { id: expiredId, title: `${creatorSearchPrefix} Needle Old Winners`, category: "Arts", visibility: "public", status: "completed", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), createdAt: "2026-05-01T00:00:00.000Z" },
+    { id: recentCompletedId, title: `${creatorSearchPrefix} Needle Recent Winners`, category: "Arts", visibility: "public", status: "completed", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 60 * 1000).toISOString(), createdAt: "2026-05-02T00:00:00.000Z" },
+    { id: oldCompletedId, title: `${creatorSearchPrefix} Needle Hidden Results`, category: "Arts", visibility: "public", status: "winners_announced", winnersAnnounced: true, winnersAnnouncedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), createdAt: "2026-05-03T00:00:00.000Z" },
+    { id: hiddenPrivateId, title: `${creatorSearchPrefix} Needle Private No Preview`, category: "Arts", type: "Private / Exclusive", visibility: "private", publicPreviewEnabled: false, status: "active", createdAt: "2026-06-01T00:00:00.000Z" },
+    { id: hiddenPublicId, title: `${creatorSearchPrefix} Needle Public Hidden`, category: "Arts", visibility: "public", publicVisibility: false, status: "active", createdAt: "2026-06-02T00:00:00.000Z" }
+  ];
+  for (const fixture of exploreFixtures) {
+    const ref = db.collection("challenges").doc(String(fixture.id));
+    createdChallengeRefs.push(ref);
+    exploreWrites.push(ref.set(fixture));
+  }
   await Promise.all(exploreWrites);
   const lockedFixtureQuery = await db.collection("challenges").where("visibility", "==", "private").where("status", "in", PUBLIC_CHALLENGE_STATUS_VALUES).where("publicPreviewEnabled", "==", true).orderBy("createdAt", "desc").get();
   check(lockedFixtureQuery.docs.some((doc) => doc.id === lockedId), "Firestore locked-preview query includes the discoverable fixture");
@@ -238,7 +257,7 @@ try {
   let firstExploreIds = [];
   cursor = ""; page = 1;
   do {
-    const url = `http://localhost/api/explore/challenges?q=needle&category=arts&page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const url = `http://localhost/api/explore/challenges?q=${encodeURIComponent(`${creatorSearchPrefix} needle`)}&category=arts&page=${page}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const response = await exploreGet(new Request(url));
     equal(response.status, 200, `Explore filtered page ${page} loads`);
     const payload = (await response.json()).data;
@@ -252,7 +271,7 @@ try {
     page += 1;
     if (page > 10) throw new Error("Explore pagination did not terminate.");
   } while (cursor);
-  const stableExplorePage = await exploreGet(new Request("http://localhost/api/explore/challenges?q=needle&category=arts"));
+  const stableExplorePage = await exploreGet(new Request(`http://localhost/api/explore/challenges?q=${encodeURIComponent(`${creatorSearchPrefix} needle`)}&category=arts`));
   assert.deepEqual((await stableExplorePage.json()).data.challenges.map((challenge) => challenge.id), firstExploreIds, "Explore first-page ordering is stable across repeated requests");
   assertions += 1;
   check(exploreIds.has(`${runId}_explore_041`), "matching Explore challenge beyond the first 36 records is discoverable");
@@ -267,7 +286,7 @@ try {
   let lockedPage = 1;
   let lockedHasMore = true;
   while (lockedHasMore) {
-    const lockedUrl = `http://localhost/api/explore/challenges?type=private&q=${encodeURIComponent("Needle Locked Preview")}&page=${lockedPage}${lockedCursor ? `&cursor=${encodeURIComponent(lockedCursor)}` : ""}`;
+    const lockedUrl = `http://localhost/api/explore/challenges?type=private&q=${encodeURIComponent(`${creatorSearchPrefix} Needle Locked Preview`)}&page=${lockedPage}${lockedCursor ? `&cursor=${encodeURIComponent(lockedCursor)}` : ""}`;
     const lockedResponse = await exploreGet(new Request(lockedUrl));
     equal(lockedResponse.status, 200, `explicit Private filter page ${lockedPage} loads locked previews`);
     const lockedPayload = (await lockedResponse.json()).data;
@@ -290,5 +309,13 @@ try {
   check(sponsorDailyAfter.data().count >= sponsorDailyBefore.data().count, "finance-safe analytics reads do not remove source aggregates");
   console.log(`Discovery and analytics scalability tests passed (${assertions} assertions).`);
 } finally {
+  for (const refs of [createdProfileRefs, createdChallengeRefs]) {
+    for (let offset = 0; offset < refs.length; offset += 400) {
+      const batch = db.batch();
+      for (const ref of refs.slice(offset, offset + 400)) batch.delete(ref);
+      await batch.commit().catch(() => undefined);
+    }
+  }
+  await Promise.all(createdAuthUserIds.map((uid) => auth.deleteUser(uid).catch(() => undefined)));
   await app.delete();
 }

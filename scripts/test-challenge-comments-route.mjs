@@ -98,9 +98,18 @@ try {
   for (const status of ["paused", "postponed", "cancelled"]) {
     const challengeId = `${prefix}_${status}`;
     await db.collection("challenges").doc(challengeId).set({ id: challengeId, creatorId: owner.uid, visibility: "public", type: "Normal Challenge", status, lifecycleStatus: status, createdAt: new Date().toISOString() });
-    equal((await GET(req(`http://localhost/api/challenges/${challengeId}/comments`), { params: Promise.resolve({ id: challengeId }) })).status, 200, `${status} challenge comment history remains readable`);
+    await comments.doc(`${challengeId}_history`).set({ id: `${challengeId}_history`, challengeId, userId: author.uid, username: "comment_author", body: `Existing ${status} history`, status: "active", createdAt: new Date().toISOString() });
+    const historyResponse = await GET(req(`http://localhost/api/challenges/${challengeId}/comments`), { params: Promise.resolve({ id: challengeId }) });
+    equal(historyResponse.status, 200, `${status} public challenge comment history remains readable`);
+    const historyBody = await historyResponse.json();
+    equal(historyBody.data.comments.length, 1, `${status} history returns the existing comment`);
+    equal(historyBody.data.comments[0].body, `Existing ${status} history`, `${status} history contains the persisted comment body`);
     equal((await POST(req(`http://localhost/api/challenges/${challengeId}/comments`, author.token, "POST", { body: "New comments are closed" }), { params: Promise.resolve({ id: challengeId }) })).status, 409, `${status} challenge rejects new comments`);
   }
+
+  await db.collection("challenges").doc(`${prefix}_private`).set({ status: "paused", lifecycleStatus: "paused" }, { merge: true });
+  equal((await GET(req(`http://localhost/api/challenges/${prefix}_private/comments`), { params: Promise.resolve({ id: `${prefix}_private` }) })).status, 404, "paused private challenge history remains hidden from an outsider");
+  equal((await GET(req(`http://localhost/api/challenges/${prefix}_private/comments`, granted.token), { params: Promise.resolve({ id: `${prefix}_private` }) })).status, 200, "approved private access continues to read paused challenge history");
 
   console.log(`challenge comments route emulator tests passed (${assertions} assertions)`);
 } finally {

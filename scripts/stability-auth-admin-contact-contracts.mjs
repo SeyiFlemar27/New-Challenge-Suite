@@ -27,7 +27,12 @@ assert.match(login, /router\.replace\(getAuthenticatedDestination\(profile, next
 assert.match(login, /routeAfterLogin\(result\.profile\)/);
 assert.doesNotMatch(login, /Opening your workspace|Taking you to the right place for your account/);
 assert.match(login, /Sign out to switch account/);
-assert.doesNotMatch(login, /Already signed in|Continue with Google|signInWithGoogle/);
+assert.doesNotMatch(login, /Already signed in|signInWithGoogle/);
+assert.match(login, /process\.env\.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"/);
+assert.match(login, /googleAuthEnabled \? <Button[^]*Continue with Google[^]*<\/Button> : null/);
+const register = read("app/auth/register/page.tsx");
+assert.match(register, /process\.env\.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"/);
+assert.match(register, /googleAuthEnabled \? <Button[^]*Continue with Google[^]*<\/Button> : null/);
 assert.match(login, /authState\.user\?\.uid/);
 assert.match(login, /safeInternalPath/);
 assert.match(verify, /account was created, but we could not send the verification code/);

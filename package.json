@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:p0": "node scripts/run-p0-emulator-regressions.mjs",
     "audit:entitlements": "node --experimental-strip-types scripts/audit-entitlements.ts",
     "seed:firestore": "node --experimental-strip-types scripts/seed-firestore.ts"
   },

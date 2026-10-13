@@ -3,11 +3,14 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { assertNoUndefinedFirestoreValues } from "@/lib/server/firestore-payload";
 import { mergeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
-import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize-exposure";
+import { isEnterpriseFinanceResource, prepareEnterprisePrizeValueUpdate, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
+import { enterpriseChallengeInScope, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 
 export class ChallengeReviewTransitionError extends Error {
-  constructor(readonly code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED", message: string) {
+  readonly code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED";
+  constructor(code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED", message: string) {
     super(message);
+    this.code = code;
     this.name = "ChallengeReviewTransitionError";
   }
 }
@@ -49,7 +52,23 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     ]);
     if (!latestChallengeSnap.exists) throw new ChallengeReviewTransitionError("CHALLENGE_NOT_FOUND", "Challenge draft not found.");
     const latestChallenge = { id: latestChallengeSnap.id, ...latestChallengeSnap.data() } as Record<string, unknown>;
-    if (!userOwnsChallenge(latestChallenge, input.userId)) throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "You can only submit your own challenge for review.");
+    const enterpriseOwned = isEnterpriseFinanceResource(latestChallenge);
+    if (enterpriseOwned) {
+      const [account, profile] = await Promise.all([
+        transaction.get(db.collection("users").doc(input.userId)),
+        transaction.get(db.collection("profiles").doc(input.userId)),
+      ]);
+      const access = normalizeEnterpriseAccess({ ...(profile.data() ?? {}), ...(account.data() ?? {}) });
+      if (!access?.organizationId || !hasEnterprisePermission(access, "challenge.edit") || !enterpriseChallengeInScope(access, latestChallenge, input.userId, true)) {
+        throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "Your Enterprise access does not allow this review submission.");
+      }
+      const organization = await transaction.get(db.collection("enterpriseOrganizations").doc(access.organizationId));
+      if (!organization.exists || organization.data()?.status !== "active") {
+        throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "This Enterprise organization is not active.");
+      }
+    } else if (!userOwnsChallenge(latestChallenge, input.userId)) {
+      throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "You can only submit your own challenge for review.");
+    }
     const latestStatus = String(latestChallenge.status ?? latestChallenge.lifecycleStatus ?? "draft").toLowerCase();
     if (latestStatus === "pending_review") return { idempotent: true, challenge: latestChallenge };
     if (latestStatus !== input.expectedStatus) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This challenge changed while it was being submitted. Please refresh and try again.");
@@ -74,7 +93,14 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     transaction.set(challengeRef, input.update, { merge: true });
     enterpriseSlot.apply();
     transaction.set(revisionRef, input.revision, { merge: true });
-    transaction.set(revenueRef, input.revenue, { merge: true });
+    const ownership = resolveEnterpriseFinancialOwnership(latestChallenge);
+    transaction.set(revenueRef, {
+      ...input.revenue,
+      ...ownership,
+      creatorId: enterpriseOwned ? null : String(latestChallenge.creatorId ?? latestChallenge.hostId ?? input.userId),
+      financialOwnerId: enterpriseOwned ? ownership.organizationOwnerId : String(latestChallenge.creatorId ?? latestChallenge.hostId ?? input.userId),
+      initiatedByUserId: input.userId,
+    }, { merge: true });
     transaction.set(prizePoolRef, prizePool, { merge: true });
     transaction.set(submitAuditRef, input.submitAudit, { merge: true });
     transaction.set(revisionAuditRef, input.revisionAudit, { merge: true });

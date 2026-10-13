@@ -7,9 +7,13 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
-import { signUpWithProfile } from "@/lib/firebase/auth-service";
+import { loginWithGoogle, signUpWithProfile } from "@/lib/firebase/auth-service";
+import { fetchBootstrapProfile } from "@/lib/api/services";
+import { getAuthenticatedDestination } from "@/lib/account-routing";
 import { AuthFlowError, type SignupEmailState } from "@/lib/firebase/auth-errors";
 import { useLanguage } from "@/lib/i18n/use-language";
+
+const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
 function safeInternalPath(value: string | null) {
   return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : "";
@@ -79,6 +83,25 @@ export default function RegisterPage() {
     }
   }
 
+  async function googleSignUp() {
+    if (!accepted.terms || !accepted.privacy || !accepted.community) {
+      setErrors({ agreements: t("Accept all account agreements to continue.") });
+      return;
+    }
+    setLoading(true);
+    setErrors({});
+    setAuthIssue(null);
+    try {
+      await loginWithGoogle();
+      const response = await fetchBootstrapProfile();
+      if (!response.ok || !response.data?.user) throw new Error(response.message || "Profile could not be loaded.");
+      router.replace(getAuthenticatedDestination(response.data.user, requestedReturnPath()));
+    } catch (caught) {
+      setErrors({ google: caught instanceof Error ? caught.message : "Could not sign in with Google." });
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-black px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
       <Card className="w-full max-w-[600px] rounded-[12px] p-6 sm:p-8 lg:p-10">
@@ -103,6 +126,7 @@ export default function RegisterPage() {
           <p className="rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-slate-300">{legalDocuments.master_account.body}</p>
           <Button className="mt-3 w-full" disabled={loading}>{t(loading ? "Creating account..." : "Sign Up")}</Button>
         </form>
+        {googleAuthEnabled ? <Button type="button" variant="secondary" className="mt-4 w-full" disabled={loading} onClick={() => void googleSignUp()}>{t("Continue with Google")}</Button> : null}
         <div className="mt-8 border-t border-white/10 pt-6 text-center text-slate-300">{t("Already have an account?")} <Link href="/auth/login" className="font-bold text-[var(--gold)]">{t("Sign In")}</Link></div>
       </Card>
     </main>

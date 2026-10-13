@@ -35,7 +35,8 @@ for (const raw of ["CHALLENGE_MEDIA_UNAVAILABLE", "HTTP 503", "FirebaseError", "
 assert(builderSource.indexOf("persist(NORMAL_CHALLENGE_MAX_STEP)") < builderSource.indexOf("publishChallengeDraft(id, payload)"), "Submit for Review must persist latest changes first");
 assert(!draftRoute.includes("createNotification") && !builder.includes("Draft saved."), "autosave must remain silent");
 assert(preview.includes("redirect(`/challenges/create/${draftId}`)") && !preview.includes("ChallengeMediaGallery"), "creation preview must redirect to editing");
-for (const title of ["Overview", "Eligibility", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert((builder + read("lib/challenge-builder-foundation.ts")).includes(`"${title}"`), `missing Normal Challenge step ${title}`);
+for (const title of ["Overview", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert((builder + read("lib/challenge-builder-foundation.ts")).includes(`"${title}"`), `missing Normal Challenge step ${title}`);
+assert((builder + read("lib/challenge-builder-foundation.ts")).includes('navLabel: "Participation"'), "Normal Builder must retain capacity and waitlist controls under Participation.");
 assert((builder + frame).includes("Submit for Review") && frame.includes("Back") && frame.includes('"Continue"'), "builder must expose only sequential navigation actions");
 assert(readiness.includes("VOTING_BEFORE_SUBMISSION_CLOSE") && readiness.includes("PRIZE_AMOUNTS_INVALID") && readiness.includes("VIDEO_NOT_CONFIRMED"), "cross-step readiness checks are incomplete");
 assert(!publishRoute.includes("KYC_REQUIRED") && !builder.includes("KYC_REQUIRED"), "KYC must not block challenge review submission");
