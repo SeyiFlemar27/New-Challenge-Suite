@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/firebase/admin";
 import { serverError, serverUnavailable } from "@/lib/server/responses";
 import { mayReopenSupportTicket, supportInboundMessageId, supportInboundTicketNumber } from "@/lib/server/support-tickets";
+import { normalizeSupportTicketStatus } from "@/lib/support/catalog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,15 +42,28 @@ export async function POST(request: Request) {
     const payload = await response.json() as Record<string, unknown>;
     received = (payload.data && typeof payload.data === "object" ? payload.data : payload) as Record<string, unknown>;
   } catch { return new Response("Received email content is temporarily unavailable.", { status: 503 }); }
-  const db = getAdminDb(); const auth = getAdminAuth();
-  if (!db || !auth) return serverUnavailable("Support inbound email");
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Support inbound email");
   try {
     const match = await db.collection("supportTickets").where("ticketNumber", "==", ticketNumber).limit(1).get();
     if (match.empty) return new Response("Ticket not found.", { status: 202 });
     const ticketRef = match.docs[0].ref; const ticket = match.docs[0].data();
     const sender = emailAddress(received.from ?? data?.from);
-    const account = await auth.getUser(String(ticket.userId ?? ""));
-    if (!sender || sender !== String(account.email ?? ticket.userEmail ?? "").toLowerCase()) return new Response("Sender is not the ticket owner.", { status: 403 });
+    // The approved email-threading policy matches the provider-authenticated
+    // sender address to this ticket's recorded contact address and its unique
+    // ticket reference. This is not proof of account identity and must never
+    // authorize financial, account, access, or other sensitive operations.
+    const approvedSender = emailAddress(ticket.contactEmail ?? ticket.userEmail);
+    if (!sender || !approvedSender || sender !== approvedSender) {
+      const quarantineId = supportInboundMessageId(String(request.headers.get("svix-id")));
+      try {
+        await db.collection("supportInboundQuarantine").doc(quarantineId).create({ id: quarantineId, provider: "resend", ticketId: ticketRef.id, eventIdHash: quarantineId, senderDomain: sender.includes("@") ? sender.split("@").pop() : null, reason: "sender_does_not_match_ticket_contact", receivedAt: new Date().toISOString(), state: "needs_admin_review" });
+      } catch (error) {
+        const code = (error as { code?: unknown })?.code;
+        if (code !== 6 && code !== "already-exists") return new Response("Sender verification failed and the event could not be recorded for review.", { status: 503 });
+      }
+      return new Response("Sender does not match the contact address for this ticket.", { status: 403 });
+    }
     const text = String(received.text ?? received.html ?? "").trim();
     if (!text || text.length > 10000) return new Response("Reply content is empty or exceeds the limit.", { status: 400 });
     const providerMessageId = String(received.message_id ?? data?.message_id ?? event.id ?? emailId);
@@ -63,11 +77,13 @@ export async function POST(request: Request) {
       if (!ticketSnap.exists) { ignored = true; return; }
       if (eventSnap.exists || messageSnap.exists) { ignored = true; return; }
       const current = ticketSnap.data() ?? {};
-      if (current.userId !== account.uid || !mayReopenSupportTicket(current, Date.now())) { ignored = true; return; }
-      const wasResolved = current.status === "resolved";
-      transaction.create(messageRef, { id: messageId, authorType: "user", authorId: account.uid, body: text, createdAt: now, provider: "resend", providerMessageId });
+      if (emailAddress(current.contactEmail ?? current.userEmail) !== sender || !mayReopenSupportTicket(current, Date.now())) { ignored = true; return; }
+      const currentStatus = normalizeSupportTicketStatus(current.status);
+      const wasResolved = currentStatus === "resolved";
+      const nextStatus = wasResolved ? "open" : currentStatus === "waiting_for_you" ? "in_review" : currentStatus;
+      transaction.create(messageRef, { id: messageId, authorType: "customer", authorId: String(current.userId), visibility: "customer", body: text, attachmentPaths: [], createdAt: now, provider: "resend", providerMessageId });
       transaction.create(eventRef, { id: eventId, provider: "resend", ticketId: ticketRef.id, messageId, processedAt: now });
-      transaction.set(ticketRef, { status: wasResolved ? "reopened" : "waiting_for_admin", reopenedAt: wasResolved ? now : current.reopenedAt ?? null, resolvedAt: wasResolved ? null : current.resolvedAt ?? null, reopenUntil: wasResolved ? null : current.reopenUntil ?? null, lastUserResponseAt: now, updatedAt: now }, { merge: true });
+      transaction.set(ticketRef, { status: nextStatus, reopenedAt: wasResolved ? now : current.reopenedAt ?? null, resolvedAt: wasResolved ? null : current.resolvedAt ?? null, reopenUntil: wasResolved ? null : current.reopenUntil ?? null, lastCustomerResponseAt: now, lastActivityAt: now, version: Number(current.version ?? 0) + 1, updatedAt: now }, { merge: true });
     });
     return Response.json({ accepted: !ignored, duplicateOrIneligible: ignored }, { status: 200 });
   } catch (error) { return serverError("Inbound support reply could not be processed.", error instanceof Error ? error.message : error); }

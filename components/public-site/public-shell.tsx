@@ -14,7 +14,7 @@ const footerGroups=[
  {label:"Create",items:[["Create a Challenge","/challenges/create"],["Private Challenges","/private-exclusive"],["Creator Plans","/subscriptions"],["Creator Earnings","/earnings"]]},
  {label:"Host",items:[["Host Tools","/dashboard/host"],["Tournament Management","/host/tournaments"],["Event Management","/host/live-events"],["Host Pricing","/subscriptions"]]},
  {label:"Sponsors",items:[["Sponsorship Opportunities","/explore?sponsorReady=true"],["Sponsor a Challenge","/sponsor/campaigns"],["Brand Campaigns","/sponsor/dashboard"],["Sponsor Plans","/sponsor/plans"]]},
- {label:"Support",items:[["Payments","/wallet"],["Safety","/community-guidelines"],["Community Guidelines","/community-guidelines"],["Contact Support","/contact"]]},
+ {label:"Support",items:[["Help Center","/help"],["Payments & Refunds","/refund-policy"],["Safety","/community-guidelines"],["Community Guidelines","/community-guidelines"],["Contact Support","/support/new"]]},
  {label:"Company",items:[["About","/about"],["Terms","/terms"],["Privacy","/privacy"],["Cookies","/cookie-policy"],["Sitemap","/sitemap.xml"]]}
 ] as const;
 function dashboardHref(user:ReturnType<typeof useCurrentUser>["user"]){if(!user)return"/dashboard";if(user.isSponsor)return user.sponsorOnboardingComplete?"/sponsor/dashboard":user.hasSponsorProfile?"/sponsor/onboarding":"/sponsor/start";return"/dashboard"}

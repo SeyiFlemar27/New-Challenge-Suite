@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Flag, LifeBuoy, ShieldAlert } from "lucide-react";
 import { apiRequest } from "@/lib/api/client";
 import { Button, Card, EmptyState, PageTitle } from "@/components/ui";
+import { AdminSupportWorkspace as AdminSupportWorkspaceV1 } from "@/components/admin/admin-support-workspace";
 export function AdminCaseWorkspace({ kind }: { kind: "support" | "disputes" | "appeals" | "safety" }) {
-  if (kind === "support") return <AdminSupportWorkspace />;
+  if (kind === "support") return <AdminSupportWorkspaceV1 />;
   return <AdminRecordsWorkspace kind={kind} />;
 }
 

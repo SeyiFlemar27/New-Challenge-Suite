@@ -12,20 +12,20 @@ const publicFooterSections = [
   { title: "Creators", links: [["Profiles", "/profile"], ["Leaderboards", "/leaderboards"], ["Create a challenge", "/challenges/create"]] },
   { title: "Sponsors", links: [["Become a sponsor", "/sponsor/start"], ["Discover challenges", "/sponsor/discover/challenges"], ["Sponsor plans", "/sponsor/plans"]] },
   { title: "Company", links: [["About", "/about"], ["Contact", "/contact"], ["Enterprise", "/enterprise"]] },
-  { title: "Support", links: [["Contact support", "/contact"], ["Community guidelines", "/community-guidelines"], ["Refund policy", "/refund-policy"]] },
+  { title: "Support", links: [["Help Center", "/help"], ["Payments & Refunds", "/refund-policy"], ["Safety", "/community-guidelines"], ["Community guidelines", "/community-guidelines"], ["Contact support", "/support/new"]] },
   { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookie policy", "/cookie-policy"]] }
 ] as const;
 
 const enterpriseFooterSections = [
   { title: "Enterprise", links: [["Enterprise Studio", "/enterprise"], ["Official challenges", "/enterprise/challenges"], ["Assigned to me", "/enterprise/assigned"], ["Saved", "/enterprise/saved"]] },
   { title: "Community", links: [["Explore", "/explore"], ["Leaderboards", "/leaderboards"], ["Winners", "/winners"]] },
-  { title: "Account", links: [["Profile", "/profile"], ["Settings", "/settings"], ["Contact support", "/contact"]] },
+  { title: "Account", links: [["Profile", "/profile"], ["Settings", "/settings"], ["Help Center", "/help"], ["Contact support", "/support/new"]] },
   { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookie policy", "/cookie-policy"]] }
 ] as const;
 
 const sponsorFooterSections = [
   { title: "Sponsor", links: [["Sponsor Dashboard", "/sponsor/dashboard"], ["Discover challenges", "/sponsor/discover/challenges"], ["Proposals", "/sponsor/proposals"], ["Saved", "/sponsor/saved"]] },
-  { title: "Account", links: [["Sponsor reports", "/sponsor/reports"], ["Wallet & payments", "/sponsor/wallet"], ["Settings", "/settings"], ["Contact support", "/contact"]] },
+  { title: "Account", links: [["Sponsor reports", "/sponsor/reports"], ["Wallet & payments", "/sponsor/wallet"], ["Settings", "/settings"], ["Help Center", "/help"], ["Contact support", "/support/new"]] },
   { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookie policy", "/cookie-policy"]] }
 ] as const;
 

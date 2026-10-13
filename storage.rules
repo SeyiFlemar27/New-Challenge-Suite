@@ -258,7 +258,7 @@ service firebase.storage {
 
     function isSupportAttachment() {
       return request.resource != null
-        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     }
 
@@ -347,7 +347,10 @@ service firebase.storage {
     }
 
     match /users/{userId}/support/{uploadId}/{fileName} {
-      allow read: if isOwner(userId) || isAdmin();
+      // Support files stay private and quarantined until a configured scanner
+      // marks the ticket attachment cleared. All downloads use the server
+      // endpoint, which checks ticket ownership and scan state.
+      allow read: if false;
       allow write: if isOwner(userId) && (isSupportAttachment() || request.resource == null);
     }
 

@@ -14,10 +14,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ tick
   if (!isOwner) { const admin = await requireAdminPermission(request, "tickets.view"); if (admin.response) return admin.response; }
   const ownerId = String(data.userId ?? "");
   if (!supportAttachmentPathAllowed(ownerId, path)) return fail("Attachment path is invalid.", 400);
-  const initial = await ticketRef.collection("messages").doc("initial").get();
-  const allowedPaths = Array.isArray(data.attachmentPaths) ? data.attachmentPaths : [];
-  const initialPaths = Array.isArray(initial.data()?.attachmentPaths) ? initial.data()?.attachmentPaths as string[] : [];
-  if (![...allowedPaths, ...initialPaths].includes(path)) return fail("Attachment is not associated with this ticket.", 404);
+  const attachments = Array.isArray(data.attachments) ? data.attachments as Array<Record<string, unknown>> : [];
+  const attachment = attachments.find((item) => item.path === path);
+  if (!attachment) return fail("Attachment is not associated with this ticket.", 404);
+  if (attachment.scanStatus !== "cleared") return fail("This file remains quarantined while security scanning is unavailable or pending.", 423, undefined, "ATTACHMENT_QUARANTINED");
   try {
     const file = storage.bucket().file(path); const [exists] = await file.exists(); if (!exists) return fail("Attachment not found.", 404);
     const [[bytes], [metadata]] = await Promise.all([file.download(), file.getMetadata()]);

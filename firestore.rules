@@ -418,6 +418,26 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /supportTicketRequests/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /supportEmailOutbox/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /supportInboundEvents/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /supportInboundQuarantine/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /helpArticles/{document=**} {
+      allow read, write: if false;
+    }
+
     match /voteRequests/{document=**} {
       allow read, write: if false;
     }
