@@ -97,6 +97,7 @@ export function resolveChallengeLeaderboardStatus(challenge: Record<string, unkn
 }
 
 export function resolveLeaderboardVisibilityMode(challenge: Record<string, unknown>): LeaderboardVisibilityMode {
+  if (challenge.normalLifecyclePolicyVersion === 1) return "public_live";
   if (challenge.hideRankings === true) return "hidden_until_close";
   const value = String(challenge.leaderboardVisibilityMode ?? challenge.leaderboardVisibility ?? "public_live").toLowerCase();
   if (["public_live", "hidden_until_close", "top_10_only", "private_review"].includes(value)) return value as LeaderboardVisibilityMode;
@@ -230,7 +231,7 @@ export async function buildChallengeLeaderboard(db: Firestore, challengeId: stri
   const rankingAllowed = visible && hasVerifiedVotes && participantDiscoveryAllowed;
   const exactVoteCountVisible = visible
     && hasVerifiedVotes
-    && challenge.hideVoteTotals !== true
+    && (challenge.normalLifecyclePolicyVersion === 1 || challenge.hideVoteTotals !== true)
     && (visibilityMode !== "top_10_only" || !votingOpen);
   const requestedSort = options.sort === "newest" ? "newest" : "highest_votes";
   const rankOrderAllowed = rankingAllowed && requestedSort === "highest_votes";

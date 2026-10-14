@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 import { canAccessChallenge } from "@/lib/plan-access";
 import { requireRequestUser } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -16,6 +16,9 @@ import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-upload-paths";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { leaderboardSearchPrefixes } from "@/lib/server/leaderboard-search";
+import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { dispatchConfiguredNormalLifecycle } from "@/lib/server/normal-lifecycle-scheduler";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -70,15 +73,32 @@ export async function POST(request: Request) {
   if (!body.mediaStoragePath.startsWith(expectedSubmissionPrefix)) {
     return validationError({ mediaStoragePath: "Submission media must be uploaded to your authenticated challenge submission path." });
   }
+  const ownedMedia = validateOwnedStorageMedia({ url: body.mediaUrl ?? "", path: body.mediaStoragePath, prefixes: [expectedSubmissionPrefix] });
+  if (!ownedMedia.valid) return validationError({ mediaStoragePath: ownedMedia.message });
+  const storage = getAdminStorage();
+  if (!storage) return serverUnavailable("Submission media verification");
+  try {
+    const file = storage.bucket().file(body.mediaStoragePath);
+    const [exists] = await file.exists();
+    if (!exists) return fail("The uploaded submission media was not found.", 400, undefined, "SUBMISSION_MEDIA_MISSING");
+    const [metadata] = await file.getMetadata();
+    const size = Number(metadata.size ?? 0);
+    const types = body.mediaType === "image" ? ["image/jpeg", "image/png", "image/webp"] : ["video/mp4", "video/avi", "video/x-msvideo"];
+    if (!types.includes(String(metadata.contentType ?? "").toLowerCase()) || !Number.isSafeInteger(size) || size <= 0 || size !== body.fileSize || size > (body.mediaType === "image" ? 15 : 250) * 1024 * 1024) {
+      return fail("Uploaded media does not match the accepted format or size.", 400, undefined, "SUBMISSION_MEDIA_INVALID");
+    }
+  } catch {
+    return serverUnavailable("Submission media verification");
+  }
 
   const now = new Date().toISOString();
-  const allowMultipleEntries = challenge.allowMultipleEntries === true;
+  const allowMultipleEntries = challenge.builderVersion !== "normal_v3" && challenge.allowMultipleEntries === true;
   const submissionRef = allowMultipleEntries ? db.collection("submissions").doc() : db.collection("submissions").doc(`${body.challengeId}_${user.uid}`);
   const participantRef = db.collection("challengeParticipants").doc(`${body.challengeId}_${user.uid}`);
   const displayName = String(profile.displayName ?? profile.fullName ?? user.email ?? "Participant");
   const userInitials = String(profile.initials ?? initialsFromName(displayName)).slice(0, 2).toUpperCase();
   const publicIdentity = profile.publicProfile !== false && profile.profileVisibility !== "private";
-  const status = resolveSubmissionStatus(challenge, body.mediaUploadPending);
+  const status = challenge.normalLifecyclePolicyVersion === 1 ? body.mediaUploadPending ? "submitted" : "pending_review" : resolveSubmissionStatus(challenge, body.mediaUploadPending);
   const duplicateBlockingStatuses = new Set(["draft", "submitted", "pending_review", "approved", "flagged", "active", "eliminated", "winner"]);
 
   let submission: Record<string, unknown> = {};
@@ -86,7 +106,8 @@ export async function POST(request: Request) {
   let participantWasCreated = false;
   try {
     await db.runTransaction(async (transaction) => {
-      const userSubmissionsQuery = db.collection("submissions").where("userId", "==", user.uid).limit(100);
+      const allUserSubmissions = db.collection("submissions").where("userId", "==", user.uid);
+      const userSubmissionsQuery = challenge.builderVersion === "normal_v3" ? allUserSubmissions : allUserSubmissions.limit(100);
       const [freshChallengeSnap, participantSnap, directSubmissionSnap, userSubmissionsSnap] = await Promise.all([
         transaction.get(db.collection("challenges").doc(body.challengeId)),
         transaction.get(participantRef),
@@ -97,6 +118,8 @@ export async function POST(request: Request) {
       const freshChallenge = { id: freshChallengeSnap.id, ...freshChallengeSnap.data() } as Record<string, unknown>;
       const freshSubmittable = isChallengeSubmittable(freshChallenge);
       if (!freshSubmittable.allowed) throw new Error(freshSubmittable.reason ?? "Challenge is not accepting submissions.");
+      const freshAcceptedTypes = Array.isArray(freshChallenge.acceptedSubmissionTypes) ? freshChallenge.acceptedSubmissionTypes.map(String) : ["image"];
+      if (!freshAcceptedTypes.includes(body.mediaType)) throw new Error("MEDIA_TYPE_NOT_ACCEPTED");
 
       if (!allowMultipleEntries) {
         if (directSubmissionSnap.exists) throw new Error("DUPLICATE_SUBMISSION");
@@ -108,7 +131,7 @@ export async function POST(request: Request) {
       }
 
       const participantData = participantSnap.exists ? participantSnap.data() ?? {} : null;
-      if (!participantData) {
+      if (!participantData || !isEnteredParticipantStatus(participantData.status)) {
         throw new Error("NOT_ENROLLED_FOR_SUBMISSION");
       }
       if (isPaidEntryChallenge(freshChallenge) && !["paid", "confirmed"].includes(String(participantData?.entryPaymentStatus ?? ""))) {
@@ -164,6 +187,10 @@ export async function POST(request: Request) {
 
       submissionCreated = true;
       transaction.set(submissionRef, submission);
+      if (freshChallenge.normalLifecyclePolicyVersion === 1) {
+        wakeNormalLifecycleJob(db, transaction, body.challengeId, now);
+        transaction.create(db.collection("auditLogs").doc(`normal_submission_created_${submissionRef.id}`), { actorId: user.uid, action: "normal.submission_created", challengeId: body.challengeId, targetId: submissionRef.id, after: { status, revisionNumber: 0 }, createdAt: now });
+      }
       transaction.set(participantRef, {
         submissionId: submissionRef.id,
         lastSubmissionId: submissionRef.id,
@@ -186,6 +213,7 @@ export async function POST(request: Request) {
   }
 
   if (!submissionCreated) return serverError("Submission could not be created.");
+  if (challenge.normalLifecyclePolicyVersion === 1) await dispatchConfiguredNormalLifecycle(db);
 
   void writeAuditLog({
     actorId: user.uid,

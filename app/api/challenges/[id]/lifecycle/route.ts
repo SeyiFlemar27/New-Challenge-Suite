@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireRequestUser } from "@/lib/server/auth";
+import { requireRequestUser, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { writeAuditLog } from "@/lib/server/audit";
 import { challengeIntegritySources, challengeLifecycleActions } from "@/lib/server/challenge-deletion";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
@@ -43,6 +43,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (parsed.data.confirmed !== true) return validationError({ confirmed: "Confirm challenge deletion before continuing." });
       await state.db.collection("challenges").doc(id).delete();
     } else if (parsed.data.action === "cancel") {
+      if (state.challenge.normalLifecyclePolicyVersion === 1 && !state.user.isAdmin) {
+        if (!reason) return validationError({ reason: "A cancellation request reason is required." });
+        await state.db.runTransaction(async transaction => {
+          const challengeRef = state.db!.collection("challenges").doc(id);
+          const requestRef = state.db!.collection("challengeCancellationRequests").doc(id);
+          const [latest, existing] = await Promise.all([transaction.get(challengeRef), transaction.get(requestRef)]);
+          if (!latest.exists || !userOwnsChallenge(latest.data() ?? {}, state.user!.uid)) throw new Error("PERMISSION_DENIED");
+          if (latest.data()?.effectiveVotingStartsAt) throw new Error("ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED");
+          if (existing.exists && existing.data()?.status === "pending_admin_review") return;
+          transaction.set(requestRef, { id, challengeId: id, userId: state.user!.uid, status: "pending_admin_review", reason, createdAt: now, updatedAt: now });
+          transaction.set(state.db!.collection("adminActionTasks").doc(`normal_cancel_${id}`), { type: "normal_cancellation_request", challengeId: id, status: "open", reason, createdAt: now });
+          transaction.create(state.db!.collection("auditLogs").doc(), { actorId: state.user!.uid, action: "normal.cancellation_requested", challengeId: id, reason, challengeContinues: true, createdAt: now });
+        });
+        return ok({ id, cancellationRequested: true, challengeContinues: true }, "Cancellation requested. The challenge continues until Admin decides.");
+      }
+      if (state.challenge.normalLifecyclePolicyVersion === 1) {
+        const admin = await requireRecentAdminAuthentication(request, "challenges.cancel");
+        if (admin.response) return admin.response;
+        if (parsed.data.confirmed !== true) return validationError({ confirmed: "Confirm this cancellation." });
+      }
       if (!actions.cancelAllowed) return fail("This challenge can no longer be cancelled.", 409);
       if (!reason) return validationError({ reason: "A cancellation reason is required." });
       const challengeRef = state.db.collection("challenges").doc(id);
@@ -50,8 +70,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const latest = await transaction.get(challengeRef);
         if (!latest.exists) throw new Error("CHALLENGE_NOT_FOUND");
         const data = latest.data() ?? {};
+        if (data.normalLifecyclePolicyVersion === 1 && (data.effectiveVotingStartsAt || data.winnersApprovedAt)) throw new Error("ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED");
         const release = await prepareEnterpriseActiveChallengeRelease(state.db!, transaction, String(data.organizationOwnerId ?? "") || null, id);
-        transaction.set(challengeRef, { status: "cancelled", lifecycleStatus: "cancelled", visibility: "hidden", cancellationReason: reason, cancelledAt: now, cancelledBy: state.user!.uid, updatedAt: now }, { merge: true });
+        transaction.set(challengeRef, { status: "cancelled", lifecycleStatus: "cancelled", visibility: "hidden", cancellationReason: reason, cancelledAt: now, cancelledBy: state.user!.uid, ...(data.normalLifecyclePolicyVersion === 1 ? { approvedCancellationAt: now, approvedCancellationBy: state.user!.uid } : {}), updatedAt: now }, { merge: true });
         release.apply();
       });
     } else if (parsed.data.action === "archive") {
@@ -67,6 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await writeAuditLog({ actorId: state.user.uid, actorType: state.user.isAdmin ? "admin" : "creator", action: `challenge.${parsed.data.action}`, targetType: "challenge", targetId: id, reason: reason || "Owner-confirmed no-activity deletion.", metadata: { activityFlags: state.activityFlags, recordsPreserved: parsed.data.action !== "delete" } }, state.db);
     return ok({ id, action: parsed.data.action, deleted: parsed.data.action === "delete" }, parsed.data.action === "delete" ? "Challenge deleted." : parsed.data.action === "cancel" ? "Challenge cancelled and hidden from Explore." : parsed.data.action === "archive" ? "Challenge archived." : "Admin deletion review requested.");
   } catch (error) {
+    if (error instanceof Error && error.message === "ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED") return fail("Voting has started. Exceptional legal or safety concerns require Support/Admin review.", 409, undefined, error.message);
     return serverError("Challenge lifecycle action could not be completed.", error instanceof Error ? error.message : error);
   }
 }

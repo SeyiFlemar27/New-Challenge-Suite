@@ -1,6 +1,6 @@
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
 import { calculatePaidRevenueSplit } from "@/lib/server/payout-structure";
-import { validateAuthoritativeWinnerRecords, type OfficialWinnerRecord } from "@/lib/server/official-winner-records";
+import { validateAuthoritativeWinnerRecords, authoritativeWinnerCount, type OfficialWinnerRecord } from "@/lib/server/official-winner-records";
 
 export type ChallengeFlowAction = "close_submissions" | "open_voting" | "close_voting" | "start_review" | "announce_winners" | "complete_challenge";
 export type PreliminaryResultStatus = "pending_calculation" | "calculated" | "needs_review" | "blocked" | "failed";
@@ -60,7 +60,7 @@ export function canStartWinnerReview(challenge: Record<string, unknown>, now = n
 
 export function canAnnounceWinners(challenge: Record<string, unknown>, winnerRecords: OfficialWinnerRecord[] = []) {
   const approved = Boolean(challenge.winnersApprovedAt || challenge.adminWinnersApprovedAt || challenge.winnerProposalApprovedAt);
-  const recordsReady = validateAuthoritativeWinnerRecords(String(challenge.id ?? ""), winnerRecords, Number(challenge.numberOfWinners) || undefined).valid;
+  const recordsReady = validateAuthoritativeWinnerRecords(String(challenge.id ?? ""), winnerRecords, authoritativeWinnerCount(challenge)).valid;
   const reviewHold = Boolean(challenge.unresolvedReportsCount || challenge.fraudReviewRequired || challenge.disputeStatus === "open");
   const monetized = Boolean(challenge.sponsorReady || challenge.sponsorEnabled || challenge.entryFeeRequired || challenge.paidEntryEnabled || challenge.monetization);
   if (terminal(challenge)) return { allowed: false, reason: "challenge_terminal" };

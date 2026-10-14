@@ -1,4 +1,5 @@
 "use client";
+import { NormalMaterialAdminReview } from "@/components/normal-material-review";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -81,7 +82,7 @@ const queueActions: Record<string, Array<{ action: string; label: string; danger
   submissions: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request resubmission" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
   participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }, { action: "add_note", label: "Add note" }],
   winners: [{ action: "approve", label: "Approve announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request review" }, { action: "flag", label: "Flag" }, { action: "add_note", label: "Add note" }],
-  withdrawals: [{ action: "approve", label: "First approval" }, { action: "second_approve", label: "Second approval" }, { action: "mark_paid", label: "Mark paid manually" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
+  withdrawals: [{ action: "approve", label: "Approve review — await provider" }, { action: "request_info", label: "Request information" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
   "enterprise-applications": [{ action: "approve", label: "Approve" }, { action: "request_info", label: "Request Info" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add Internal Note" }]
 };
 const typeBySection: Record<string, string> = { sponsors: "sponsor", hosts: "host", challenges: "challenge", submissions: "submission", participants: "participant", winners: "winner", withdrawals: "withdrawal", "enterprise-applications": "enterprise" };
@@ -163,13 +164,13 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   }
   async function confirmAction() {
     if (!pendingAction) return;
-    if (reasonRequired.has(pendingAction.action) && !reason.trim()) return setNotice("A reason is required for this action.");
+    if ((reasonRequired.has(pendingAction.action) || (normalizedSection === "withdrawals" && pendingAction.action === "approve")) && !reason.trim()) return setNotice("A reason is required for this action.");
     if (pendingAction.action === "add_note" && !note.trim()) return setNotice("Enter an internal note.");
     setSubmitting(true);
     const enterpriseProvisioning = normalizedSection === "enterprise-applications" && pendingAction.action === "approve"
       ? { enterpriseRole, enterpriseScope, enterpriseDepartment }
       : {};
-    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note, expectedVersion: pendingAction.record.currentRevision ?? pendingAction.record.version, ...enterpriseProvisioning }) });
+    const result = await apiRequest("/api/admin/operations", { method: "PATCH", body: JSON.stringify({ type: typeBySection[normalizedSection], id: pendingAction.record.id, action: pendingAction.action, reason, note, confirmed: true, expectedVersion: pendingAction.record.currentRevision ?? pendingAction.record.version, ...enterpriseProvisioning }) });
     setSubmitting(false);
     setNotice(result.message);
     if (result.ok) {
@@ -182,6 +183,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   return (
     <>
       <PageTitle title={meta.title} subtitle={meta.description} icon={<ShieldCheck />} />
+      {normalizedSection === "overview" ? <NormalMaterialAdminReview /> : null}
       {notice ? <Card className="mt-6 border-yellow-500/20 p-4 text-sm text-slate-200">{notice}</Card> : null}
       {loading ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : null}
       {!loading && data && normalizedSection === "overview" ? <Overview data={data} /> : null}

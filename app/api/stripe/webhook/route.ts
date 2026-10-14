@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { createHash } from "node:crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
+import { reconcileNormalRefund } from "@/lib/server/normal-refunds";
 import { applyDoroCoinTransaction } from "@/lib/server/dorocoin";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createNotification } from "@/lib/server/notifications";
@@ -453,6 +454,15 @@ export async function POST(request: Request) {
         if (!refundCase.exists) throw new Error("Stripe refund event has no matching refund case.");
         const refundRecord = refundCase.data() ?? {};
         const status = refund.status === "succeeded" ? "succeeded" : refund.status === "failed" || refund.status === "canceled" ? "failed" : "processing";
+        if (refundRecord.normalLifecyclePolicyVersion === 1 && status === "succeeded") {
+          outcome = await reconcileNormalRefund(db, { refundCaseId, providerRefundId: refund.id, paymentIntentId: typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id ?? "", amountCents: refund.amount, currency: refund.currency, providerStatus: status });
+          break;
+        }
+        if (refundRecord.normalLifecyclePolicyVersion === 1 && refundRecord.sourceReconciledAt) {
+          await db.collection("adminActionTasks").doc(`normal_refund_conflict_${refundCaseId}`).set({ type: "normal_refund_provider_outcome_conflict", refundCaseId, challengeId: refundRecord.challengeId, status: "open", providerEventId: event.id, providerStatus: status, reason: "A provider event conflicts with a reconciled refund; retain financial history pending verification.", createdAt: new Date().toISOString() }, { merge: true });
+          outcome = { handled: true, reviewRequired: true };
+          break;
+        }
         if (refundRecord.status === "succeeded" && status === "succeeded") {
           outcome = { handled: true, kind: "refund", refundCaseId, status: "succeeded", duplicate: true };
           break;

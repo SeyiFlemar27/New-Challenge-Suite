@@ -1,4 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { dispatchConfiguredNormalLifecycle } from "@/lib/server/normal-lifecycle-scheduler";
+import { moderateNormalSubmission } from "@/lib/server/normal-submission-moderation";
+import { disqualifyNormalParticipant } from "@/lib/server/normal-disqualification";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
@@ -413,11 +417,12 @@ export async function PATCH(request: Request) {
   const note = String(parsed.body?.note ?? "").trim().slice(0, 1000);
   if (!allowedActions[type]?.has(action)) return validationError({ action: "Select a valid admin action." });
   const permission = permissionForAction(type, action);
-  const authorization = action === "mark_paid" || action === "second_approve"
+  const authorization = action === "mark_paid" || action === "second_approve" || (type === "withdrawal" && ["approve", "reject"].includes(action)) || (type === "challenge" && action === "cancel") || (type === "participant" && action === "disqualify")
     ? await requireRecentAdminAuthentication(request, permission)
     : await requireAdminPermission(request, permission);
   if (authorization.response) return authorization.response;
   const user = authorization.user;
+  if (type === "withdrawal" && action === "mark_paid") return fail("Payout completion requires verified provider confirmation. Manual paid status is unavailable.", 409, undefined, "PAYOUT_PROVIDER_CONFIRMATION_REQUIRED");
   if (!id) return validationError({ id: "Target ID is required." });
   if (reasonRequired.has(action) && !reason) return validationError({ reason: "A reason is required for this action." });
   if (action === "add_note" && !note) return validationError({ note: "Enter an internal admin note." });
@@ -536,16 +541,19 @@ export async function PATCH(request: Request) {
         const record = snap.data() ?? {};
         const withdrawalSources = Array.isArray(record.sourceIds) ? record.sourceIds.map((sourceId: unknown) => db.collection("cashLedger").doc(String(sourceId))) : [];
         const withdrawalSourceSnaps = await Promise.all(withdrawalSources.map((sourceRef: FirebaseFirestore.DocumentReference) => transaction.get(sourceRef)));
-        if (["approve", "second_approve", "mark_paid"].includes(action) && withdrawalSourceSnaps.some((sourceSnap) => sourceSnap.data()?.disputeRestricted === true)) throw new Error("DISPUTE_RESTRICTED_PAYOUT");
+        if ((["approve", "second_approve", "mark_paid"].includes(action) || (action === "reject" && record.reservationVersion === 2)) && withdrawalSourceSnaps.some((sourceSnap) => sourceSnap.data()?.disputeRestricted === true)) throw new Error("DISPUTE_RESTRICTED_PAYOUT");
         previousStatus = String(record.status ?? "pending_review");
         const validTransition = action === "mark_paid"
           ? previousStatus === "approved_for_manual_payout"
           : action === "second_approve"
             ? previousStatus === "pending_second_approval"
-            : ["pending_review", "needs_kyc"].includes(previousStatus);
+            : ["pending_review", "needs_kyc", ...(action === "reject" && record.reservationVersion === 2 ? ["approved_awaiting_provider"] : [])].includes(previousStatus);
         if (!validTransition) throw new Error("INVALID_STATE");
-        if (["approve", "second_approve"].includes(action) && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
-        if (action === "second_approve" && record.firstApprovedBy === user.uid) throw new Error("SECOND_APPROVER_REQUIRED");
+        if (record.reservationVersion === 2 && ["approve", "reject"].includes(action)) {
+          if (!reason || typeof parsed.body?.reason !== "string" || parsed.body?.confirmed !== true) throw new Error("CONFIRMATION_AND_REASON_REQUIRED");
+          if (action === "approve") status = "approved_awaiting_provider";
+        }
+        if (record.reservationVersion !== 2 && ["approve", "second_approve"].includes(action) && record.kycStatus !== "verified") throw new Error("KYC_REQUIRED");
         const walletRef = action === "reject" || action === "mark_paid" ? db.collection("cashWallets").doc(String(record.userId)) : null;
         const walletSnap = walletRef ? await transaction.get(walletRef) : null;
         const wallet = walletSnap?.data() ?? {};
@@ -555,8 +563,8 @@ export async function PATCH(request: Request) {
           reason: reason || null,
           firstApprovedAt: action === "approve" ? now : record.firstApprovedAt ?? null,
           firstApprovedBy: action === "approve" ? user.uid : record.firstApprovedBy ?? null,
-          approvedAt: action === "second_approve" ? now : record.approvedAt ?? null,
-          approvedBy: action === "second_approve" ? user.uid : record.approvedBy ?? null,
+          approvedAt: action === "second_approve" || (record.reservationVersion === 2 && action === "approve") ? now : record.approvedAt ?? null,
+          approvedBy: action === "second_approve" || (record.reservationVersion === 2 && action === "approve") ? user.uid : record.approvedBy ?? null,
           paidManuallyAt: action === "mark_paid" ? now : record.paidManuallyAt ?? null,
           paidManuallyBy: action === "mark_paid" ? user.uid : record.paidManuallyBy ?? null,
           transferEnabled: false,
@@ -572,6 +580,14 @@ export async function PATCH(request: Request) {
             : { underReviewBalanceCents: underReview, lockedBalanceCents: underReview, withdrawnBalanceCents: Number(wallet.withdrawnBalanceCents ?? 0) + amount, updatedAt: now }, { merge: true });
           const ledgerSuffix = action === "reject" ? "rejected" : "paid_manual";
           for (const sourceId of Array.isArray(record.sourceIds) ? record.sourceIds : []) {
+            if (record.reservationVersion === 2) {
+              const allocation = (Array.isArray(record.sourceAllocations) ? record.sourceAllocations : []).find((item: Record<string, unknown>) => item.sourceId === sourceId);
+              if (!allocation) continue;
+              const source = withdrawalSourceSnaps.find((document: FirebaseFirestore.DocumentSnapshot) => document.id === String(sourceId))?.data() ?? {};
+              if (Number(source.reservedAmountCents ?? 0) < Number(allocation.amountCents)) throw new Error("WITHDRAWAL_RESERVATION_RECONCILIATION_REQUIRED");
+              transaction.set(db.collection("cashLedger").doc(String(sourceId)), { status: "available", availableAmountCents: Number(source.availableAmountCents ?? 0) + Number(allocation.amountCents), reservedAmountCents: Number(source.reservedAmountCents ?? 0) - Number(allocation.amountCents), updatedAt: now }, { merge: true });
+              continue;
+            }
             transaction.set(db.collection("cashLedger").doc(String(sourceId)), {
               status: action === "reject" ? "available" : "paid_out",
               withdrawalRequestId: id,
@@ -589,6 +605,7 @@ export async function PATCH(request: Request) {
             metadata: { reason, reviewOnly: true, manualStatusUpdateOnly: true, externalPayoutExecuted: false }, createdAt: now
           });
         }
+        transaction.create(db.collection("auditLogs").doc(`${id}_${action}_${status}`), { actorId: user.uid, actorType: "admin", action: `withdrawal.${action}`, targetId: id, reason: reason || note || "Withdrawal reviewed.", before: { status: previousStatus }, after: { status, payoutExecuted: false }, createdAt: now });
       });
     } else if (type === "challenge") {
       const ref = db.collection("challenges").doc(id);
@@ -618,11 +635,26 @@ export async function PATCH(request: Request) {
         const latest = await transaction.get(ref);
         if (!latest.exists) throw new Error("Challenge record not found.");
         const latestChallenge = latest.data() ?? {};
+        if (latestChallenge.builderVersion === "normal_v3") {
+          if (latestChallenge.updatedAt !== challenge.updatedAt) throw new Error("CHALLENGE_STATE_CHANGED");
+          if (action === "cancel") {
+            if (!reason || parsed.body?.confirmed !== true) throw new Error("CONFIRMATION_AND_REASON_REQUIRED");
+            if (latestChallenge.effectiveVotingStartsAt || latestChallenge.winnersApprovedAt) throw new Error("ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED");
+            Object.assign(update, { status: "cancelled", lifecycleStatus: "cancelled", approvedCancellationAt: now, approvedCancellationBy: user.uid, cancellationReason: reason, cancelledAt: now });
+          }
+          if (action === "approve") {
+            const required = Math.round(Number(latestChallenge.prizeValue ?? 0) * 100);
+            const funding = await transaction.get(db.collection("creatorPrizeFundingPayments").where("challengeId", "==", id));
+            const confirmed = funding.docs.filter(document => document.data().status === "confirmed" && document.data().webhookConfirmed === true && document.data().paymentPurpose === "prize_pool_funding").reduce((sum, document) => sum + Number(document.data().amountCents ?? 0), 0);
+            if (!Number.isSafeInteger(required) || required < 0 || (required > 0 && required < 500) || confirmed < required) throw new Error("CREATOR_PRIZE_FUNDING_REQUIRED");
+          }
+        }
         const leavesActiveSet = !["pending_review", "scheduled", "active", "submission_open", "voting_open", "voting_closed", "under_review"].includes(String(update.status ?? ""));
         const release = leavesActiveSet
           ? await prepareEnterpriseActiveChallengeRelease(db, transaction, String(latestChallenge.organizationOwnerId ?? "") || null, id)
           : { apply: () => undefined };
         transaction.set(ref, { ...update, moneyMovementEnabled: false, transferEnabled: false }, { merge: true });
+        if (latestChallenge.normalLifecyclePolicyVersion === 1) wakeNormalLifecycleJob(db, transaction, id, now);
         release.apply();
       });
       const creatorId = String(challenge.creatorId ?? challenge.ownerId ?? "");
@@ -663,7 +695,20 @@ export async function PATCH(request: Request) {
       const snap = await ref.get();
       if (!snap.exists) return fail(`${type} record not found.`, 404, undefined, "NOT_FOUND");
       previousStatus = String(snap.data()?.[target.statusField] ?? "unknown");
-      await ref.set({
+      const sourceChallenge = snap.data()?.challengeId ? await db.collection("challenges").doc(String(snap.data()?.challengeId)).get() : null;
+      const normal = sourceChallenge?.data()?.builderVersion === "normal_v3";
+      let handledNormal = false;
+      if (normal && type === "submission" && ["approve", "reject", "flag", "request_changes"].includes(action)) {
+        const decision = await moderateNormalSubmission(db, { challengeId: sourceChallenge!.id, submissionId: id, actorId: user.uid, admin: true, action: action === "request_changes" ? "reject" : action as "approve" | "reject" | "flag", reason, expectedUpdatedAt: snap.data()?.updatedAt });
+        status = decision.status;
+        handledNormal = true;
+      }
+      if (normal && type === "participant" && action === "disqualify") {
+        await disqualifyNormalParticipant(db, { participantId: id, adminId: user.uid, reason, confirmed: parsed.body?.confirmed === true });
+        status = "disqualified";
+        handledNormal = true;
+      }
+      if (!handledNormal) await ref.set({
         [target.statusField]: status,
         ...(type === "submission" ? {
           leaderboardEligible: ["approved", "active", "winner"].includes(status) && (snap.data()?.visibility ?? "public") === "public" && snap.data()?.publicVisibility !== false,
@@ -709,8 +754,10 @@ export async function PATCH(request: Request) {
         metadata: { note: note || null, transferEnabled: false }
       }, db);
     }
+    if (type === "challenge") await dispatchConfiguredNormalLifecycle(db);
     return ok({ type, id, action, previousStatus, newStatus: status }, "Admin decision saved. No money movement was performed.");
   } catch (error) {
+    if (error instanceof Error && error.message === "CONFIRMATION_AND_REASON_REQUIRED") return validationError({ confirmed: "Confirm the financial decision and provide a reason." });
     if (error instanceof Error && error.message === "NOT_FOUND") return fail("Record not found.", 404, undefined, "NOT_FOUND");
     if (error instanceof Error && error.message === "INVALID_STATE") return fail("This record is no longer eligible for that action.", 409, undefined, "INVALID_STATE");
     if (error instanceof Error && error.message === "STALE_APPLICATION_VERSION") return fail("This application changed after it was opened. Refresh it before making a decision.", 409, undefined, "STALE_APPLICATION_VERSION");

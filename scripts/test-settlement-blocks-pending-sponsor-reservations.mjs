@@ -25,7 +25,7 @@ try {
       proposalId: proposalRef.id,
       adminId: `${id}_admin`,
       challenge,
-      winners: [],
+      winners: [{ userId: `${id}_winner`, submissionId: `${id}_submission`, placement: 1, splitPercent: 100 }],
       confirmedSources: {
         confirmedEntryRevenueCents: 0,
         confirmedPaidVoteRevenueCents: 0,
@@ -53,7 +53,7 @@ try {
       proposalId: proposalRef.id,
       adminId: `${id}_admin`,
       challenge,
-      winners: [],
+      winners: [{ userId: `${id}_winner`, submissionId: `${id}_submission`, placement: 1, splitPercent: 100 }],
       confirmedSources: {
         confirmedEntryRevenueCents: 0,
         confirmedPaidVoteRevenueCents: 0,
@@ -81,7 +81,7 @@ try {
       proposalId: proposalRef.id,
       adminId: `${id}_admin`,
       challenge,
-      winners: [],
+      winners: [{ userId: `${id}_winner`, submissionId: `${id}_submission`, placement: 1, splitPercent: 100 }],
       confirmedSources: {
         confirmedEntryRevenueCents: 0,
         confirmedPaidVoteRevenueCents: 0,

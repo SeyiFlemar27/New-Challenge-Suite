@@ -35,6 +35,11 @@ export function resolveResubmissionDeadline(input: {
   now?: Date;
 }) {
   const nowMs = (input.now ?? new Date()).getTime();
+  if (input.challenge.builderVersion === "normal_v3") {
+    const blocked = ["cancelled", "canceled", "paused", "completed", "winners_announced"].includes(String(input.challenge.status ?? "").toLowerCase()) || Boolean(input.challenge.effectiveVotingStartsAt || input.challenge.winnersApprovedAt);
+    if (!Number.isFinite(nowMs) || blocked) return { allowed: false as const, deadline: null, reason: "invalid_or_expired_request" as const };
+    return { allowed: true as const, deadline: new Date(nowMs + SUBMISSION_RESUBMISSION_WINDOW_MS).toISOString(), reason: null };
+  }
   const requestedMs = timestamp(input.requestedDeadline);
   if (!Number.isFinite(nowMs) || !Number.isFinite(requestedMs) || requestedMs <= nowMs) {
     return { allowed: false as const, deadline: null, reason: "invalid_or_expired_request" as const };
@@ -64,6 +69,10 @@ export function resubmissionWindowOpen(input: {
   if (requestId && input.submission.resubmissionCompletedRequestId === requestId) return false;
   const nowMs = (input.now ?? new Date()).getTime();
   const correctionDeadlineMs = timestamp(input.submission.resubmissionDeadline);
+  if (input.challenge.builderVersion === "normal_v3") {
+    const blocked = ["cancelled", "canceled", "paused", "completed", "winners_announced"].includes(String(input.challenge.status ?? "").toLowerCase()) || Boolean(input.challenge.effectiveVotingStartsAt || input.challenge.winnersApprovedAt);
+    return !blocked && Number.isFinite(nowMs) && Number.isFinite(correctionDeadlineMs) && nowMs < correctionDeadlineMs;
+  }
   const challengeDeadlineValue = challengeDeadline(input.challenge);
   const challengeDeadlineMs = challengeDeadlineValue === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : timestamp(challengeDeadlineValue);
   return Number.isFinite(nowMs)

@@ -18,11 +18,24 @@ for (const name of ["FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "C
   process.env[name] = projectId;
 }
 process.env.CHALLENGE_SUITE_USE_FIREBASE_EMULATORS = "true";
+process.env.NORMAL_LIFECYCLE_SCHEDULER_ENABLED = "false";
+process.env.NORMAL_AUTOMATIC_REFUNDS_ENABLED = "false";
 
 process.env.STRIPE_SECRET_KEY ??= "sk_test_deterministic_p0_regressions";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_deterministic_p0_regressions";
 
 const tests = [
+  "scripts/test-normal-base-prize-policy.mjs",
+  "scripts/test-normal-review-funding-emulator.mjs",
+  "scripts/test-normal-paid-entry-emulator.mjs",
+  "scripts/test-normal-lifecycle-emulator.mjs",
+  "scripts/test-normal-financial-lifecycle-emulator.mjs",
+  "scripts/test-normal-settlement-emulator.mjs",
+  "scripts/test-normal-scheduler-emulator.mjs",
+  "scripts/test-normal-qualified-prizes.mjs",
+  "scripts/test-submission-edit-handler-emulator.mjs",
+  "scripts/test-submission-resubmission-policy.mjs",
+  "scripts/test-sponsor-reservation-policy.mjs",
   "scripts/test-enterprise-prize-exposure.mjs",
   "scripts/test-revenue-foundation-ownership.mjs",
   "scripts/test-enterprise-prize-pool-lifecycle.mjs",

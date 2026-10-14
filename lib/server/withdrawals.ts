@@ -4,6 +4,7 @@ import { createCashWalletDefaults } from "@/lib/server/cash-wallet";
 import { WITHDRAWAL_ARCHITECTURE_CONFIG, type WithdrawalRequestStatus } from "@/lib/server/wallet-architecture";
 
 export const MIN_WITHDRAWAL_CENTS = WITHDRAWAL_ARCHITECTURE_CONFIG.minimumWithdrawalAmountCents;
+export const WITHDRAWABLE_CASH_SOURCE_TYPES = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
 export const MAX_DAILY_WITHDRAWAL_CENTS = null as number | null;
 export const MINIMUM_WITHDRAWAL_PROCESSING_HOURS = WITHDRAWAL_ARCHITECTURE_CONFIG.minimumProcessingHours;
 
@@ -82,23 +83,35 @@ export async function createWithdrawalRequest(
   const walletRef = db.collection("cashWallets").doc(input.userId);
   const payoutMethodRef = db.collection("payoutMethods").doc(deterministicId("payout_method", input.userId, input.payoutMethodType));
   const sourceRefs = input.sourceIds.map((id) => db.collection("cashLedger").doc(id));
-  const [existing, walletSnap, ...sourceSnaps] = await Promise.all([
-    transaction.get(requestRef),
-    transaction.get(walletRef),
-    ...sourceRefs.map((ref) => transaction.get(ref))
-  ]);
-  if (existing.exists) return { request: existing.data(), created: false };
+  const [existing, walletSnap, ...sourceSnaps] = await transaction.getAll(requestRef, walletRef, ...sourceRefs);
+  if (existing.exists) {
+    if (Number(existing.data()?.amountCents) !== input.amountCents || existing.data()?.payoutMethodType !== input.payoutMethodType || JSON.stringify(existing.data()?.sourceIds) !== JSON.stringify(input.sourceIds)) throw new Error("WITHDRAWAL_IDEMPOTENCY_CONFLICT");
+    return { request: existing.data(), created: false };
+  }
+  if (!Number.isSafeInteger(input.amountCents) || input.amountCents < MIN_WITHDRAWAL_CENTS || new Set(input.sourceIds).size !== input.sourceIds.length || input.sourceIds.length > 200) throw new Error("INVALID_WITHDRAWAL_AMOUNT");
+  const priorRequests = await transaction.get(db.collection("withdrawalRequests").where("userId", "==", input.userId).limit(1));
   const sourceTotal = sourceSnaps.reduce((sum, snap) => {
     const source = snap.data() ?? {};
-    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit" || source.disputeRestricted === true) {
+    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit" || source.disputeRestricted === true || !WITHDRAWABLE_CASH_SOURCE_TYPES.has(String(source.sourceType))) {
       throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
     }
-    return sum + Number(source.netAmountCents ?? source.amountCents ?? 0);
+    if (String(source.currency ?? "USD").toUpperCase() !== "USD") throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+    const available = Number(source.availableAmountCents ?? source.netAmountCents ?? source.amountCents ?? 0);
+    if (!Number.isSafeInteger(available) || available < 0) throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+    return sum + available;
   }, 0);
-  if (!sourceSnaps.length || sourceTotal !== input.amountCents) throw new Error("WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
+  if (!sourceSnaps.length || sourceTotal < input.amountCents) throw new Error("WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
+  const sourceChallenges = await Promise.all(sourceSnaps.map(source => source.data()?.challengeId ? transaction.get(db.collection("challenges").doc(String(source.data()?.challengeId))) : Promise.resolve(null)));
+  if (sourceChallenges.some(challenge => challenge?.data()?.settlementRestricted === true)) throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+  let remaining = input.amountCents;
+  const sourceAllocations = sourceSnaps.map(source => {
+    const available = Number(source.data()?.availableAmountCents ?? source.data()?.netAmountCents ?? source.data()?.amountCents ?? 0);
+    const amountCents = Math.min(remaining, available); remaining -= amountCents;
+    return { sourceId: source.id, amountCents };
+  }).filter(allocation => allocation.amountCents > 0);
 
   const defaults = createCashWalletDefaults(input.userId, input.now);
-  const wallet = { ...defaults, ...(walletSnap.data() ?? {}) };
+  const wallet: ReturnType<typeof createCashWalletDefaults> & Record<string, unknown> = { ...defaults, ...(walletSnap.data() ?? {}) };
   const available = Number(wallet.availableBalanceCents ?? 0);
   if (input.amountCents > available) throw new Error("INSUFFICIENT_AVAILABLE_BALANCE");
 
@@ -112,10 +125,12 @@ export async function createWithdrawalRequest(
     currency: input.currency,
     sourceType: input.sourceType,
     sourceIds: input.sourceIds,
+    sourceAllocations,
+    reservationVersion: 2,
     payoutMethodType: input.payoutMethodType,
     payoutMethodLabel: input.payoutMethodLabel,
     payoutMethodLast4: input.payoutMethodLast4,
-    payoutProvider: "manual",
+    payoutProvider: null,
     payoutProviderReference: null,
     providerWebhookStatus: "not_connected",
     status: "pending_review" as WithdrawalStatus,
@@ -124,8 +139,10 @@ export async function createWithdrawalRequest(
     kycStatus: input.kycStatusAtRequest,
     transferEnabled: false,
     payoutExecuted: false,
-    feeAmountCents: 0,
-    earliestProcessingAt: new Date(Date.parse(input.now) + MINIMUM_WITHDRAWAL_PROCESSING_HOURS * 60 * 60 * 1000).toISOString(),
+    feeAmountCents: null,
+    providerFeeVerified: false,
+    firstWithdrawalSecurityHold: priorRequests.empty && !wallet.firstWithdrawalRequestedAt,
+    earliestProcessingAt: new Date(Date.parse(input.now) + (priorRequests.empty && !wallet.firstWithdrawalRequestedAt ? MINIMUM_WITHDRAWAL_PROCESSING_HOURS : 0) * 60 * 60 * 1000).toISOString(),
     requestedBy: input.userId,
     idempotencyKey: input.idempotencyKey,
     immutable: true,
@@ -141,6 +158,7 @@ export async function createWithdrawalRequest(
     status: "review_only",
     withdrawalsEnabled: false,
     payoutProviderConnected: false,
+    firstWithdrawalRequestedAt: wallet.firstWithdrawalRequestedAt ?? input.now,
     updatedAt: input.now
   }, { merge: true });
   transaction.set(payoutMethodRef, {
@@ -162,8 +180,14 @@ export async function createWithdrawalRequest(
     createdAt: input.now
   }, { merge: true });
   for (const sourceRef of sourceRefs) {
+    const allocation = sourceAllocations.find(item => item.sourceId === sourceRef.id);
+    if (!allocation) continue;
+    const source = sourceSnaps.find(item => item.id === sourceRef.id)!.data() ?? {};
+    const remainingAvailable = Number(source.availableAmountCents ?? source.netAmountCents ?? source.amountCents ?? 0) - allocation.amountCents;
     transaction.set(sourceRef, {
-      status: "withdrawal_requested",
+      status: remainingAvailable > 0 ? "available" : "withdrawal_requested",
+      availableAmountCents: remainingAvailable,
+      reservedAmountCents: Number(source.reservedAmountCents ?? 0) + allocation.amountCents,
       withdrawalRequestId: requestId,
       updatedAt: input.now
     }, { merge: true });

@@ -13,9 +13,10 @@ import {
 } from "@/lib/server/payout-structure";
 import { createNotification } from "@/lib/server/notifications";
 import { calculateGrowthWalletAllocation, calculatePaidEntrySplit, ECONOMY_V1_RULES, ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
-import { getConfirmedCreatorPrizeFunding } from "@/lib/server/prize-funding";
+import { getConfirmedCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE } from "@/lib/server/prize-funding";
 import { getConfirmedEnterprisePromotionalPrizeFunding, isEnterpriseFinanceResource, organizationOwnerForFinance, reserveEnterpriseSettlementLockInTransaction } from "@/lib/server/enterprise-prize-exposure";
-import { normalWinnerDistribution } from "@/lib/normal-challenge-prize-allocation";
+import { normalQualifiedWinnerDistribution, allocateNormalQualifiedPrizeCents } from "@/lib/normal-challenge-prize-allocation";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
 
 export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
@@ -215,20 +216,36 @@ export function buildSettlementBreakdown(input: {
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
   const placementCount = new Set(input.winners.map((winner) => winner.placement)).size;
   const fixedNormalPrizeDistribution = input.challenge.builderVersion === "normal_v3"
-    ? normalWinnerDistribution(placementCount)
+    ? normalQualifiedWinnerDistribution(Number(input.challenge.numberOfWinners), placementCount)
     : null;
+  if (input.challenge.builderVersion === "normal_v3" && !fixedNormalPrizeDistribution?.length) throw new Error("NORMAL_WINNER_CONFIGURATION_INVALID");
   const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : defaultPlacementSplit(placementCount);
   const generatedPlacementDistribution = fixedNormalPrizeDistribution?.length
-    ? distributeByPercent(generatedSplit.winnerShareCents, prizePlacementDistribution)
+    ? allocateNormalQualifiedPrizeCents(generatedSplit.winnerShareCents, Number(input.challenge.numberOfWinners), placementCount)
     : distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
-  const creatorPlacementDistribution = distributeByPercent(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, prizePlacementDistribution);
-  const challengeDistribution = generatedPlacementDistribution.map((item) => ({ ...item, amountCents: item.amountCents + (creatorPlacementDistribution.find((creator) => creator.position === item.position)?.amountCents ?? 0) }));
+  const creatorPlacementDistribution = fixedNormalPrizeDistribution?.length ? allocateNormalQualifiedPrizeCents(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, Number(input.challenge.numberOfWinners), placementCount) : distributeByPercent(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, prizePlacementDistribution);
+  let challengeDistribution = generatedPlacementDistribution.map((item) => ({ ...item, amountCents: item.amountCents + (creatorPlacementDistribution.find((creator) => creator.position === item.position)?.amountCents ?? 0) }));
+  let normalSponsorDistribution: typeof challengeDistribution | null = null;
+  if (fixedNormalPrizeDistribution?.length) {
+    const challengePool = generatedSplit.winnerShareCents + grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount;
+    const totalPool = challengePool + grossConfirmedSponsorPrizeAmount;
+    const target = allocateNormalQualifiedPrizeCents(totalPool, Number(input.challenge.numberOfWinners), placementCount);
+    challengeDistribution = target.map(item => ({ ...item, amountCents: totalPool ? Number(BigInt(item.amountCents) * BigInt(challengePool) / BigInt(totalPool)) : 0 }));
+    let remaining = challengePool - challengeDistribution.reduce((sum, item) => sum + item.amountCents, 0);
+    for (let index = target.length - 1; index >= 0 && remaining > 0; index--) {
+      const addition = Math.min(remaining, target[index].amountCents - challengeDistribution[index].amountCents);
+      challengeDistribution[index].amountCents += addition;
+      remaining -= addition;
+    }
+    normalSponsorDistribution = target.map((item, index) => ({ ...item, amountCents: item.amountCents - challengeDistribution[index].amountCents }));
+  }
   const memberChallengeDistribution = distributePlacementMembers(challengeDistribution, input.winners);
   const sponsorSplits = fixedNormalPrizeDistribution?.length
     ? prizePlacementDistribution
     : customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(placementCount);
-  const sponsorGrossDistribution = customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount)
-    ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
+  const sponsorGrossDistribution = input.challenge.builderVersion === "normal_v3"
+    ? normalSponsorDistribution!
+    : customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount) ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
   const sponsorFeeDistribution = distributeByWeights(sponsorPrizePlatformFeeAmount, sponsorGrossDistribution);
   const sponsorNetDistribution = sponsorGrossDistribution.map((gross) => {
     const fee = sponsorFeeDistribution.find((item) => item.position === gross.position);
@@ -437,6 +454,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
   entityCollection?: "challenges" | "tournaments";
   sourceProvenance?: Record<string, unknown>;
   proposalMetadata?: Record<string, unknown>;
+  proposalApproval?: { update: Record<string, unknown>; expectedUpdatedAt?: unknown };
   confirmedSources?: Awaited<ReturnType<typeof getConfirmedSettlementSources>>;
 }) {
   const sources = input.confirmedSources ?? await getConfirmedSettlementSources(db, input.challengeId);
@@ -497,11 +515,51 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
         platformLedgerEntriesCreated: 0
       };
     }
-    if (!proposalSnap.exists || proposalSnap.data()?.status !== "approved") {
+    const atomicNormalApproval = input.proposalApproval && challengeSnap.data()?.normalLifecyclePolicyVersion === 1 && entityCollection === "challenges";
+    if (!proposalSnap.exists || (proposalSnap.data()?.status !== "approved" && !atomicNormalApproval)) {
       throw new Error("Admin-approved winners are required before settlement.");
     }
+    if (atomicNormalApproval && (proposalSnap.data()?.challengeId !== input.challengeId || ["rejected", "cancelled"].includes(String(proposalSnap.data()?.status)) || (input.proposalApproval!.expectedUpdatedAt !== undefined && proposalSnap.data()?.updatedAt !== input.proposalApproval!.expectedUpdatedAt))) throw new Error("WINNER_PROPOSAL_CHANGED");
     if (!challengeSnap.exists) throw new Error("Challenge not found.");
     const latestChallenge = challengeSnap.data() ?? {};
+    if (latestChallenge.normalLifecyclePolicyVersion === 1) {
+      if (latestChallenge.normalOutcome === "no_winners" || latestChallenge.settlementRestricted === true || latestChallenge.financialResolutionStatus === "held_for_admin_review") throw new Error("NORMAL_SETTLEMENT_RESTRICTED");
+      if (latestChallenge.settlementId && latestChallenge.settlementId !== settlementId) throw new Error("CHALLENGE_ALREADY_ALLOCATED");
+      const fundingGroups = [
+        { collection: "challengeEntryPayments", ids: sources.sourceBreakdown.confirmedEntryPaymentIds, amount: sources.confirmedEntryRevenueCents, purposes: ["challenge_entry_fee", "challenge_entry"] },
+        { collection: "paidVotePurchases", ids: sources.sourceBreakdown.confirmedPaidVotePaymentIds, amount: sources.confirmedPaidVoteRevenueCents, purposes: ["paid_vote"] },
+        { collection: "sponsorContributions", ids: sources.sourceBreakdown.confirmedSponsorPaymentIds, amount: sources.confirmedSponsorPrizeCents, purposes: ["sponsor_funding"] },
+        { collection: "creatorPrizeFundingPayments", ids: sources.sourceBreakdown.confirmedCreatorPrizePaymentIds, amount: sources.confirmedCreatorPrizeCents ?? 0, purposes: [CREATOR_PRIZE_PAYMENT_PURPOSE] },
+        { collection: "enterprisePromotionalPrizeFunding", ids: sources.sourceBreakdown.confirmedPromotionalPrizeFundingIds, amount: sources.confirmedPromotionalPrizeCents ?? 0, purposes: [] },
+      ];
+      for (const group of fundingGroups) {
+        const current = await transaction.get(db.collection(group.collection).where("challengeId", "==", input.challengeId));
+        const verified = current.docs.filter(document => {
+          const payment = document.data();
+          return ["paid", "confirmed"].includes(String(payment.status)) && (group.purposes.length === 0 || (group.purposes.includes(String(payment.paymentPurpose)) && payment.webhookConfirmed === true)) && payment.settlementRestricted !== true && payment.refundLiabilityStatus !== "pending" && payment.stripeDisputeRestricted !== true;
+        });
+        const ids = verified.map(document => document.id).sort();
+        const amount = verified.reduce((sum, document) => sum + cents(document.data().amountCents ?? document.data().grossAmountCents ?? document.data().amount), 0);
+        if (JSON.stringify(ids) !== JSON.stringify([...group.ids].sort()) || amount !== group.amount || verified.some(document => {
+          const payment = document.data();
+          const rawAmount = Number(payment.amountCents ?? payment.grossAmountCents ?? payment.amount);
+          return !Number.isSafeInteger(rawAmount) || rawAmount < 0 || String(payment.currency ?? "USD").toUpperCase() !== "USD";
+        })) throw new Error("NORMAL_SETTLEMENT_FUNDING_CHANGED");
+      }
+      if (!latestChallenge.finalVoteSnapshotId) throw new Error("FINAL_VOTE_SNAPSHOT_REQUIRED");
+      const finalVotes = await transaction.get(db.collection("normalLifecycleEvents").doc(String(latestChallenge.finalVoteSnapshotId)));
+      if (!finalVotes.exists || finalVotes.data()?.challengeId !== input.challengeId) throw new Error("FINAL_VOTE_SNAPSHOT_REQUIRED");
+      const finalCandidates = Array.isArray(finalVotes.data()?.candidates) ? finalVotes.data()!.candidates as Array<Record<string, unknown>> : [];
+      const winners = await Promise.all(input.winners.map(async winner => {
+        const submission = await transaction.get(db.collection("submissions").doc(String(winner.submissionId)));
+        const participant = await transaction.get(db.collection("challengeParticipants").doc(`${input.challengeId}_${winner.userId}`));
+        const paidEntry = latestChallenge.paidEntryEnabled || (latestChallenge.monetization as Record<string, unknown> | undefined)?.paidEntryRequested;
+        return submission.exists && submission.data()?.userId === winner.userId && ["approved", "active", "winner"].includes(String(submission.data()?.status)) && !["flagged", "rejected", "disqualified"].includes(String(submission.data()?.moderationStatus)) && participant.exists && ["active", "approved", "entered", "enrolled", "winner"].includes(String(participant.data()?.status)) && !participant.data()?.disqualifiedAt && (!paidEntry || ["paid", "confirmed"].includes(String(participant.data()?.entryPaymentStatus))) && finalCandidates.some(candidate => candidate.submissionId === winner.submissionId && candidate.userId === winner.userId && Number(candidate.validVotes) > 0);
+      }));
+      if (winners.some(valid => !valid)) throw new Error("WINNER_ELIGIBILITY_CHANGED");
+      const liabilities = await transaction.get(db.collection("refundCases").where("challengeId", "==", input.challengeId));
+      if (liabilities.docs.some(doc => !["succeeded", "rejected", "cancelled"].includes(String(doc.data().status)))) throw new Error("UNRESOLVED_REFUND_LIABILITY");
+    }
     const latestEnterpriseOwned = isEnterpriseOwnedChallenge(latestChallenge);
     const latestEnterpriseFinanceId = enterpriseFinanceContextId(latestChallenge);
     if (latestEnterpriseOwned !== enterpriseOwned || latestEnterpriseFinanceId !== enterpriseFinanceId) {
@@ -719,7 +777,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       settlementId,
       challengeId: input.challengeId,
       proposalId: input.proposalId,
-      status: hasConfirmedMoney ? "created_pending_review" : "awaiting_confirmed_revenue",
+      status: hasConfirmedMoney ? "created_pending_review" : latestChallenge.normalLifecyclePolicyVersion === 1 ? "no_cash_allocation_required" : "awaiting_confirmed_revenue",
       ...breakdown,
       sourceBreakdown: sources.sourceBreakdown,
       approvedWinnerIds: input.winners.map((winner) => winner.userId),
@@ -747,6 +805,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     };
     transaction.set(settlementRef, settlement);
     transaction.set(proposalRef, {
+      ...(atomicNormalApproval ? input.proposalApproval!.update : {}),
       ...(input.proposalMetadata ?? {}),
       settlementId,
       settlementStatus: settlement.status,
@@ -772,6 +831,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       settlementPrepared: true,
       updatedAt: now
     }, { merge: true });
+    if (entityCollection === "challenges" && challengeSnap.data()?.normalLifecyclePolicyVersion === 1 && holdUntil) wakeNormalLifecycleJob(db, transaction, input.challengeId, holdUntil);
     transaction.set(db.collection("auditLogs").doc(String(settlement.auditLogId)), {
       id: settlement.auditLogId,
       actorId: input.adminId,

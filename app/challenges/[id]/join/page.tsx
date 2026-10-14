@@ -17,6 +17,7 @@ import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import { apiRequest } from "@/lib/api/client";
 import { useDeadlineReached } from "@/lib/hooks/use-deadline-reached";
+import { NormalSubmissionAppeal } from "@/components/normal-submission-appeal";
 
 type UploadedSubmissionMedia = { url: string; path: string; fileName: string; size: number; contentType: string; mediaType: "image" | "video" };
 type SubmissionAccess = { canSubmit: boolean; reason: string | null; action: string | null; title: string; message: string };
@@ -143,7 +144,10 @@ export default function JoinChallengePage() {
   const alreadyJoined = Boolean(userState?.joined);
   const joinUnavailable = !joinOpen || isFull || isPrivate || ["cancelled", "rejected"].includes(String(rawChallenge?.status ?? ""));
   const backendCanSubmit = submissionAccess?.canSubmit === true && participantJourney?.canSubmit === true;
-  const canSubmitNow = backendCanSubmit && !submissionWindowExpired && !checkingSubmissionAccess;
+  const correctionDeadline = Date.parse(String(participantJourney?.checklist?.resubmissionDeadline ?? ""));
+  const correctionWindowExpired = useDeadlineReached(correctionDeadline);
+  const correctionAllowed = participantJourney?.step === "fix_and_resubmit" && Number.isFinite(correctionDeadline) && !correctionWindowExpired;
+  const canSubmitNow = backendCanSubmit && (!submissionWindowExpired || correctionAllowed) && !checkingSubmissionAccess;
   const existingSubmissionId = typeof userState?.submissionId === "string" ? userState.submissionId : null;
   const existingSubmissionQuery = useQuery({ queryKey: ["submission-details", existingSubmissionId, auth.user?.uid ?? "signed-out"], queryFn: () => fetchSubmissionDetails(existingSubmissionId as string), enabled: Boolean(existingSubmissionId && auth.user?.uid), staleTime: 0 });
   const existingSubmission = existingSubmissionQuery.data?.ok ? existingSubmissionQuery.data.data?.submission as Record<string, unknown> : null;
@@ -405,6 +409,7 @@ export default function JoinChallengePage() {
         </Card>
         <Card className="p-5 sm:p-8">
           <h2 className="text-xl font-black sm:text-2xl">{pageTitle}</h2>
+          {rawChallenge?.builderVersion === "normal_v3" && existingSubmissionId && existingSubmission?.status === "rejected" && existingSubmission.finalRejectedAt ? <NormalSubmissionAppeal submissionId={existingSubmissionId} onComplete={() => { void existingSubmissionQuery.refetch(); }} /> : null}
           {checkingSubmissionAccess ? (
             <Card className="mt-5 border-[var(--gold)]/30 bg-[var(--gold)]/10 p-4 text-sm text-yellow-50">
               <h3 className="font-black">Checking submission access...</h3>

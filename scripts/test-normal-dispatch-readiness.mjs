@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { createGoogleCloudTasksScheduler, verifyTournamentCloudTaskRequest } from "../lib/server/tournament-cloud-tasks.ts";
+const env = { GOOGLE_CLOUD_PROJECT: "demo-normal-infrastructure", GOOGLE_CLOUD_PROJECT_NUMBER: "123456789012", CLOUD_TASKS_LOCATION: "us-central1", GOOGLE_WORKLOAD_IDENTITY_POOL_ID: "fixture-pool", GOOGLE_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: "fixture-provider", TOURNAMENT_CLOUD_TASKS_QUEUE: "normal-lifecycle", TOURNAMENT_CLOUD_TASKS_WORKER_URL: "https://fixture.example.invalid/api/internal/normal-lifecycle", TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT: "enqueuer@demo-normal-infrastructure.iam.gserviceaccount.com", TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT: "invoker@demo-normal-infrastructure.iam.gserviceaccount.com" };
+let count = 0;
+const equal = (a,b,m) => { assert.equal(a,b,m); count++; };
+const requests = [];
+const scheduler = createGoogleCloudTasksScheduler({ env, getAccessToken: async () => "fixture-only-token", fetcher: async (url, options) => { requests.push({ url, options }); return Response.json({ permissions: ["cloudtasks.tasks.create"] }); } });
+equal(await scheduler.verifyDispatchAccess(), true, "readiness verifies permission without enqueueing work");
+equal(requests[0].url.endsWith(":testIamPermissions"), true, "probe calls only IAM permission test");
+equal(JSON.parse(requests[0].options.body).permissions.join(), "cloudtasks.tasks.create", "probe requests only required permission");
+const denied = createGoogleCloudTasksScheduler({ env, getAccessToken: async () => "fixture-only-token", fetcher: async () => Response.json({ permissions: [] }) });
+equal(await denied.verifyDispatchAccess(), false, "missing enqueue permission fails closed");
+const failed = createGoogleCloudTasksScheduler({ env, getAccessToken: async () => "fixture-only-token", fetcher: async () => Response.json({}, { status: 403 }) });
+equal(await failed.verifyDispatchAccess(), false, "provider rejection fails closed");
+equal(await verifyTournamentCloudTaskRequest(new Request(env.TOURNAMENT_CLOUD_TASKS_WORKER_URL), { env }), false, "missing worker authentication rejected");
+equal(await verifyTournamentCloudTaskRequest(new Request(env.TOURNAMENT_CLOUD_TASKS_WORKER_URL, { headers: { authorization: "Bearer fixture-only-token" } }), { env, verifyToken: async () => ({ iss: "https://accounts.google.com", aud: env.TOURNAMENT_CLOUD_TASKS_WORKER_URL, email_verified: true, email: "unrelated@demo-normal-infrastructure.iam.gserviceaccount.com" }) }), false, "unrelated identity rejected");
+console.log(`Normal dispatch readiness: ${count} assertions passed (local fixtures).`);

@@ -5,6 +5,8 @@ import { mergeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
 import { isEnterpriseFinanceResource, prepareEnterprisePrizeValueUpdate, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
 import { enterpriseChallengeInScope, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
+import { freeBasicUsage, FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage } from "@/lib/server/free-challenge-limits";
 
 export class ChallengeReviewTransitionError extends Error {
   readonly code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED";
@@ -19,6 +21,7 @@ type ReviewSubmissionInput = {
   challengeId: string;
   userId: string;
   expectedStatus: string;
+  expectedUpdatedAt?: unknown;
   update: Record<string, unknown>;
   revision: Record<string, unknown> & { id: string };
   revenue: Record<string, unknown>;
@@ -72,6 +75,33 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     const latestStatus = String(latestChallenge.status ?? latestChallenge.lifecycleStatus ?? "draft").toLowerCase();
     if (latestStatus === "pending_review") return { idempotent: true, challenge: latestChallenge };
     if (latestStatus !== input.expectedStatus) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This challenge changed while it was being submitted. Please refresh and try again.");
+    if (input.expectedUpdatedAt !== undefined && latestChallenge.updatedAt !== input.expectedUpdatedAt) {
+      throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This draft or its funding changed. Refresh before submitting again.");
+    }
+    if (latestChallenge.builderVersion === "normal_v3") {
+      if (!enterpriseOwned && (input.update.freeBasicChallenge ?? latestChallenge.freeBasicChallenge) === true) {
+        const owned = await transaction.get(db.collection("challenges").where("creatorId", "==", input.userId));
+        const used = freeBasicUsage(owned.docs.filter(document => document.id !== input.challengeId));
+        if (used >= FREE_BASIC_CHALLENGE_LIFETIME_LIMIT) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", `${freeBasicLimitMessage(used)}. Your Free Basic creation entitlement is fully used.`);
+      }
+      const required = normalBasePrizeCents(input.update.prizeValue ?? latestChallenge.prizeValue);
+      if (required === null) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Choose no Base Prize or a Base Prize of at least $5 USD.");
+      const funding = await transaction.get(db.collection("creatorPrizeFundingPayments").where("challengeId", "==", input.challengeId));
+      const ownerId = String(latestChallenge.creatorId ?? latestChallenge.ownerId ?? latestChallenge.hostId ?? "");
+      const organizationId = String(latestChallenge.organizationOwnerId ?? "");
+      const confirmed = funding.docs.reduce((total, document) => {
+        const payment = document.data();
+        const owned = enterpriseOwned ? Boolean(organizationId) && payment.organizationOwnerId === organizationId : payment.userId === ownerId && !payment.organizationOwnerId;
+        const amount = Number(payment.amountCents);
+        return owned && payment.paymentPurpose === "prize_pool_funding" && payment.status === "confirmed"
+          && payment.webhookConfirmed === true && payment.settlementRestricted !== true && payment.refundLiabilityStatus !== "pending" && String(payment.currency).toUpperCase() === "USD"
+          && Number.isSafeInteger(amount) && amount > 0 ? total + amount : total;
+      }, 0);
+      if ((confirmed > 0 || latestChallenge.creatorPrizeGuaranteeLockedAt) && Number(input.update.prizeValue ?? latestChallenge.prizeValue) !== Number(latestChallenge.prizeValue)) {
+        throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "A confirmed Base Prize cannot be changed through publication.");
+      }
+      if (confirmed < required) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Confirm the full creator-funded Base Prize before submitting for review.");
+    }
 
     const enterpriseSlot = await prepareEnterpriseActiveChallengeSlot(
       db,
@@ -90,7 +120,8 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
 
     const prizePool = mergeChallengePrizePoolFoundation(prizePoolSnap.exists ? prizePoolSnap.data() ?? {} : {}, { challengeId: input.challengeId, ...input.prizePool });
     assertNoUndefinedFirestoreValues(prizePool, "prizePool");
-    transaction.set(challengeRef, input.update, { merge: true });
+    const reviewUpdate = { ...input.update, ...(latestChallenge.builderVersion === "normal_v3" && !enterpriseOwned && input.update.freeBasicChallenge === true ? { reviewCreatorPlanId: "free" } : {}) };
+    transaction.set(challengeRef, reviewUpdate, { merge: true });
     enterpriseSlot.apply();
     transaction.set(revisionRef, input.revision, { merge: true });
     const ownership = resolveEnterpriseFinancialOwnership(latestChallenge);
@@ -104,6 +135,6 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     transaction.set(prizePoolRef, prizePool, { merge: true });
     transaction.set(submitAuditRef, input.submitAudit, { merge: true });
     transaction.set(revisionAuditRef, input.revisionAudit, { merge: true });
-    return { idempotent: false, challenge: input.update };
+    return { idempotent: false, challenge: reviewUpdate };
   });
 }

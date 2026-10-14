@@ -39,8 +39,8 @@ async function newUser(label) {
   return { uid: body.localId, token: signedInBody.idToken };
 }
 
-function jsonRequest(token, body) {
-  return new Request("http://localhost/api/submissions/test_submission", { method: "PATCH", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+function jsonRequest(token, body, method = "PATCH") {
+  return new Request("http://localhost/api/submissions/test_submission", { method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
 try {
@@ -88,6 +88,129 @@ try {
   await challengeRef.set({ submissionDeadline: new Date(Date.now() - 1).toISOString() }, { merge: true });
   equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 2 }), params)).status, 409, "edit at or after the challenge deadline is rejected");
   equal((await submissionRef.get()).data().revisionNumber, 2, "deadline rejection writes no new revision");
+  await challengeRef.set({ builderVersion: "normal_v3", normalLifecyclePolicyVersion: 1, normalVotingGate: "moderation_pending" }, { merge: true });
+  await submissionRef.set({ status: "resubmission_requested", moderationStatus: "resubmission_requested", resubmissionRequestId: "normal-full-window", resubmissionCompletedRequestId: null, resubmissionDeadline: new Date(Date.now() + 24 * 60 * 60_000).toISOString() }, { merge: true });
+  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 2 }), params)).status, 200, "Normal correction remains accepted after initial submission deadline");
+  const normalCorrection = (await submissionRef.get()).data();
+  equal(normalCorrection.revisionNumber, 3, "normal correction creates an immutable revision");
+  equal(normalCorrection.safetyReviewStatus, "pending", "validated media is not fabricated as a clean safety scan");
+  ok(Date.parse(normalCorrection.correctionAutoReviewAt) - Date.parse(normalCorrection.resubmissionCompletedAt) === 5 * 60_000, "correction review is due five minutes after server-confirmed correction");
+  equal((await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 3 }), params)).status, 409, "consumed correction cannot become a late ordinary edit");
+  const delayedChallengeId = `${testId}_delayed_validation`;
+  const delayedSubmissionId = `${delayedChallengeId}_${owner.uid}`;
+  const delayedPath = `challenges/${delayedChallengeId}/submissions/${owner.uid}/images/delayed.jpg`;
+  await db.collection("challenges").doc(delayedChallengeId).set({ ...(await challengeRef.get()).data(), id: delayedChallengeId });
+  await db.collection("challengeParticipants").doc(delayedSubmissionId).set({ challengeId: delayedChallengeId, userId: owner.uid, status: "active", entryPaymentStatus: "not_required" });
+  await db.collection("submissions").doc(delayedSubmissionId).set({ ...normalCorrection, id: delayedSubmissionId, challengeId: delayedChallengeId, participantId: delayedSubmissionId, revisionNumber: 0, status: "resubmission_requested", moderationStatus: "resubmission_requested", resubmissionRequestId: "delayed_validation_request", resubmissionCompletedRequestId: null, resubmissionCompletedAt: null });
+  const delayedFile = storage.bucket(bucketName).file(delayedPath);
+  await delayedFile.save(Buffer.from("image-bytes"), { resumable: false, metadata: { contentType: "image/jpeg" } });
+  const nativeDate = globalThis.Date;
+  let acceptedClock = nativeDate.now();
+  function ControlledDate(...args) { return new nativeDate(...(args.length ? args : [acceptedClock])); }
+  ControlledDate.prototype = nativeDate.prototype;
+  Object.setPrototypeOf(ControlledDate, nativeDate);
+  ControlledDate.now = () => acceptedClock;
+  const metadataPrototype = Object.getPrototypeOf(delayedFile);
+  const nativeGetMetadata = metadataPrototype.getMetadata;
+  let delayedResponse;
+  try {
+    globalThis.Date = ControlledDate;
+    metadataPrototype.getMetadata = async function (...args) { const result = await nativeGetMetadata.apply(this, args); if (this.name === delayedPath) acceptedClock += 1000; return result; };
+    delayedResponse = await PATCH(jsonRequest(owner.token, { ...body, expectedRevision: 0, mediaStoragePath: delayedPath, mediaUrl: `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(delayedPath)}?alt=media` }), { params: Promise.resolve({ id: delayedSubmissionId }) });
+  } finally { globalThis.Date = nativeDate; metadataPrototype.getMetadata = nativeGetMetadata; }
+  equal(delayedResponse.status, 200, "valid correction survives deterministic media-validation latency");
+  const delayedCorrection = (await db.collection("submissions").doc(delayedSubmissionId).get()).data();
+  equal(Date.parse(delayedCorrection.resubmissionCompletedAt), acceptedClock, "correction completion records acceptance after media validation");
+  equal(Date.parse(delayedCorrection.correctionAutoReviewAt) - acceptedClock, 5 * 60_000, "validation latency cannot shorten the five-minute review delay");
+  equal(delayedCorrection.serverMediaVerifiedAt, delayedCorrection.resubmissionCompletedAt, "accepted media and revision share the transaction timestamp");
+  const appealHandlers = await import("../app/api/submissions/[id]/appeal/route.ts");
+  const finalRejectedAt = new Date().toISOString();
+  await submissionRef.update({ status: "rejected", moderationStatus: "rejected", finalRejectedAt, appealDeadline: new Date(Date.now() - 1).toISOString() });
+  const appealBody = { reason: "Please review the corrected submission evidence." };
+  equal((await appealHandlers.POST(jsonRequest(owner.token, appealBody, "POST"), params)).status, 409, "expired final-rejection appeal cannot be filed");
+  await submissionRef.update({ appealDeadline: new Date(Date.now() + 24 * 60 * 60_000).toISOString() });
+  equal((await appealHandlers.POST(jsonRequest(unrelated.token, appealBody, "POST"), params)).status, 403, "unrelated participant cannot file the appeal");
+  equal((await appealHandlers.POST(jsonRequest(owner.token, { reason: "short" }, "POST"), params)).status, 422, "appeal requires a meaningful reason");
+  equal((await appealHandlers.POST(jsonRequest(owner.token, appealBody, "POST"), params)).status, 200, "owner can file within the persisted appeal window");
+  equal((await appealHandlers.POST(jsonRequest(owner.token, appealBody, "POST"), params)).status, 200, "duplicate appeal returns the existing record");
+  equal((await db.collection("appeals").where("submissionId", "==", submissionId).get()).size, 1, "duplicate appeal creates one authoritative case");
+  const admin = await newUser("admin");
+  await db.collection("users").doc(admin.uid).update({ isAdmin: true });
+  const resolution = { reason: "Reviewed original and corrected evidence; approval is justified.", decision: "approve", confirmed: true };
+  equal((await appealHandlers.PATCH(jsonRequest(owner.token, resolution), params)).status, 403, "participant cannot decide their own appeal");
+  await participantRef.update({ status: "disqualified" });
+  equal((await appealHandlers.PATCH(jsonRequest(admin.token, resolution), params)).status, 409, "Admin appeal cannot restore disqualified participation");
+  equal((await db.collection("appeals").doc(`normal_submission_${submissionId}`).get()).data().status, "submitted", "failed eligibility check leaves appeal unresolved");
+  await participantRef.update({ status: "active" });
+  equal((await appealHandlers.PATCH(jsonRequest(admin.token, resolution), params)).status, 200, "authorized recent Admin can resolve a valid appeal");
+  equal((await submissionRef.get()).data().status, "approved", "appeal approval persists the approved revision");
+  const proposalId = `${testId}_proposal`;
+  const settlementId = `challenge_settlement_${challengeId}_${proposalId}`;
+  const endedAt = new Date(Date.now() - 60_000).toISOString();
+  await challengeRef.update({ status: "under_review", numberOfWinners: 1, effectiveVotingStartsAt: new Date(Date.now() - 3_600_000).toISOString(), effectiveVotingEndsAt: endedAt, winnerAnnouncementAt: endedAt, approvedWinnerIds: [owner.uid], settlementId, winnersApprovedAt: endedAt });
+  await db.collection("winnerProposals").doc(proposalId).set({ challengeId, status: "approved", settlementId, winners: [{ userId: owner.uid, submissionId, placement: 1, splitPercent: 100 }] });
+  await db.collection("challengeSettlements").doc(settlementId).set({ challengeId, proposalId, status: "no_cash_allocation_required", externalPayoutExecuted: false });
+  const announcement = await import("../app/api/admin/challenges/[id]/winner-proposals/[proposalId]/announce/route.ts");
+  const announcementParams = { params: Promise.resolve({ id: challengeId, proposalId }) };
+  const announcementBody = { confirmation: true, reason: "Verified final eligible winner and completed voting window." };
+  await participantRef.update({ status: "disqualified" });
+  equal((await announcement.POST(jsonRequest(admin.token, announcementBody, "POST"), announcementParams)).status, 409, "announcement rejects a newly disqualified allocated winner");
+  equal((await db.collection("winners").where("challengeId", "==", challengeId).get()).size, 0, "failed announcement creates no official winner");
+  await participantRef.update({ status: "active" });
+  equal((await announcement.POST(jsonRequest(admin.token, announcementBody, "POST"), announcementParams)).status, 200, "verified eligible winner can be announced by recent Admin");
+  equal((await announcement.POST(jsonRequest(admin.token, announcementBody, "POST"), announcementParams)).status, 200, "duplicate announcement is idempotent");
+  equal((await db.collection("winners").where("challengeId", "==", challengeId).get()).size, 1, "official winner is recorded exactly once");
+  const noWinnerId = `${testId}_no_winners`;
+  await db.collection("challenges").doc(noWinnerId).set({ ...(await challengeRef.get()).data(), id: noWinnerId, creatorId: owner.uid, status: "completed", normalOutcome: "no_winners", outcomeReason: "no_valid_votes", approvedWinnerIds: [], settlementId: null, winnersApprovedAt: null, officialWinnerRecordIds: [], officialWinnerRecordCount: 0, officialWinnerRecordsValidatedAt: null, publishedAt: endedAt, settlementRestricted: true });
+  const challengeHandler = await import("../app/api/challenges/[id]/route.ts");
+  const noWinnerResponse = await challengeHandler.GET(new Request(`http://localhost/api/challenges/${noWinnerId}`), { params: Promise.resolve({ id: noWinnerId }) });
+  equal(noWinnerResponse.status, 200, "signed-out visitors can read the completed public No Winners outcome");
+  const noWinnerData = (await noWinnerResponse.json()).data;
+  equal(noWinnerData.resultsUnavailable, false, "intentional No Winners is not described as unavailable results");
+  equal((await db.collection("adminActionTasks").doc(`challenge_results_missing_${noWinnerId}`).get()).exists, false, "No Winners does not create a false missing-results incident");
+  const paidId = `${testId}_expired_paid_entry`;
+  const paidChallenge = { id: paidId, creatorId: "another_creator", builderVersion: "normal_v3", normalLifecyclePolicyVersion: 1, type: "Public Challenge", challengeType: "normal", visibility: "public", status: "registration_open", publishedAt: endedAt, title: "Expired checkout fixture", paidEntryEnabled: true, entryFeeAmountCents: 500, registrationOpensAt: endedAt, registrationDeadline: new Date(Date.now() + 3_600_000).toISOString(), startsAt: new Date(Date.now() + 3_600_000).toISOString(), submissionStartAt: new Date(Date.now() + 3_600_000).toISOString(), submissionDeadline: new Date(Date.now() + 7_200_000).toISOString(), votingStartsAt: new Date(Date.now() + 7_200_000).toISOString(), votingDeadline: new Date(Date.now() + 10_800_000).toISOString(), endsAt: new Date(Date.now() + 14_400_000).toISOString() };
+  await db.collection("users").doc(owner.uid).update({ planId: "creator", planStatus: "active" });
+  await db.collection("challenges").doc(paidId).set(paidChallenge);
+  const payments = await import("../lib/server/monetization-payments.ts");
+  const previousCheckout = await payments.createPendingEntryPayment(db, { userId: owner.uid, challengeId: paidId, challenge: paidChallenge });
+  await db.collection("challengeEntryPayments").doc(previousCheckout.id).update({ reservationExpiresAt: new Date(Date.now() - 1).toISOString() });
+  const entryHandler = await import("../app/api/challenges/[id]/entry-checkout/route.ts");
+  const expiredCheckoutResponse = await entryHandler.POST(jsonRequest(owner.token, { entryAgreementAccepted: true }, "POST"), { params: Promise.resolve({ id: paidId }) });
+  equal(expiredCheckoutResponse.status, 409, "expired original checkout remains fail-closed without another payment");
+  const expiredCheckoutEnvelope = await expiredCheckoutResponse.json();
+  equal(expiredCheckoutEnvelope.code, "ENTRY_RESERVATION_EXPIRED", "expired reservation is distinguished from other checkout rejection policies");
+  const expiredCheckoutData = expiredCheckoutEnvelope.details;
+  equal(expiredCheckoutData.reconciliationRequired, true, "participant receives an actionable reconciliation state");
+  equal(expiredCheckoutData.supportUrl, "/support/new", "reconciliation action targets the existing Support creation route");
+  equal((await db.collection("challengeEntryPayments").where("challengeId", "==", paidId).get()).size, 1, "expired checkout response does not create or overwrite a replacement payment");
+  const withdrawalId = `${testId}_withdrawal`;
+  const cashSourceId = `${testId}_reserved_cash`;
+  await db.collection("cashWallets").doc(owner.uid).set({ userId: owner.uid, availableBalanceCents: 0, pendingBalanceCents: 0, underReviewBalanceCents: 5000 });
+  await db.collection("cashLedger").doc(cashSourceId).set({ userId: owner.uid, direction: "credit", sourceType: "challenge_winner_prize", status: "withdrawal_reserved", amountCents: 5000, netAmountCents: 5000, availableAmountCents: 0, reservedAmountCents: 5000, disputeRestricted: false });
+  await db.collection("withdrawalRequests").doc(withdrawalId).set({ userId: owner.uid, status: "pending_review", reservationVersion: 2, amountCents: 5000, currency: "USD", sourceIds: [cashSourceId], sourceAllocations: [{ sourceId: cashSourceId, amountCents: 5000 }], payoutExecuted: false });
+  const adminOperations = await import("../app/api/admin/operations/route.ts");
+  const rejectWithdrawal = { type: "withdrawal", id: withdrawalId, action: "reject", reason: "The customer requested cancellation of this reserved withdrawal." };
+  const originalNow = Date.now;
+  let staleAdminResponse;
+  try {
+    Date.now = () => originalNow() + 11 * 60_000;
+    staleAdminResponse = await adminOperations.PATCH(jsonRequest(admin.token, { ...rejectWithdrawal, confirmed: true }));
+  } finally { Date.now = originalNow; }
+  equal(staleAdminResponse.status, 403, "stale Admin authentication cannot release a withdrawal reservation");
+  ok((await staleAdminResponse.json()).message.includes("Recent authentication"), "rejection specifically enforces the step-up policy");
+  equal((await adminOperations.PATCH(jsonRequest(admin.token, rejectWithdrawal))).status, 400, "financial rejection requires explicit confirmation");
+  equal((await db.collection("cashWallets").doc(owner.uid).get()).data().underReviewBalanceCents, 5000, "unconfirmed rejection cannot release reserved funds");
+  await db.collection("cashLedger").doc(cashSourceId).update({ disputeRestricted: true });
+  equal((await adminOperations.PATCH(jsonRequest(admin.token, { ...rejectWithdrawal, confirmed: true }))).status, 409, "rejection cannot release disputed reserved funding");
+  equal((await db.collection("cashWallets").doc(owner.uid).get()).data().underReviewBalanceCents, 5000, "disputed funds remain held for reconciliation");
+  await db.collection("cashLedger").doc(cashSourceId).update({ disputeRestricted: false });
+  equal((await adminOperations.PATCH(jsonRequest(admin.token, { ...rejectWithdrawal, confirmed: true }))).status, 200, "recent authorized Admin may reject an unrestricted reservation");
+  equal((await db.collection("cashWallets").doc(owner.uid).get()).data().availableBalanceCents, 5000, "rejection releases only the original reserved amount");
+  equal((await db.collection("withdrawalRequests").doc(withdrawalId).get()).data().status, "rejected", "rejection persists its authoritative outcome");
+  equal((await db.collection("cashLedger").doc(cashSourceId).get()).data().netAmountCents, 5000, "rejection preserves the original earning commitment");
+  equal((await adminOperations.PATCH(jsonRequest(admin.token, { ...rejectWithdrawal, confirmed: true }))).status, 409, "duplicate rejection cannot release balances twice");
+  equal((await db.collection("cashWallets").doc(owner.uid).get()).data().availableBalanceCents, 5000, "duplicate rejection conserves the available balance");
   console.log(`PASS actual submission PATCH handler against Auth, Firestore, and Storage Emulators: ${assertionCount} assertions.`);
 } finally {
   await app.delete();

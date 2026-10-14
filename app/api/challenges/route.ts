@@ -145,7 +145,7 @@ export async function POST(request: Request) {
   if (monetizationIntent.paidEntryRequested && !paidEntryValidation.valid) {
     return fail(paidEntryValidation.message, 422, { minimumEntryFeeCents: paidEntryValidation.minimumEntryFeeCents }, "ENTRY_FEE_MINIMUM");
   }
-  if (freePlan && body.publish && freeCreatorPrizeRequested) {
+  if (body.publish && ((body.builderVersion === "normal_v3" && Number(body.prizeValue) > 0) || (freePlan && freeCreatorPrizeRequested))) {
     return fail("Complete and confirm creator prize funding on the draft before publishing.", 409, undefined, "CREATOR_PRIZE_FUNDING_REQUIRED");
   }
   if (freePlan && (body.sponsorEnabled || monetizationIntent.sponsorReady || monetizationIntent.paidEntryRequested || monetizationIntent.paidVotesRequested || body.isLiveEvent || body.tournamentType !== "none" || (body.prizeType !== "bragging_rights" && !freeCreatorPrizeRequested) || body.requiresSubmissionApproval || body.votingSettings.weightedVotes)) {

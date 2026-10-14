@@ -7,6 +7,7 @@ import { challengeForPlanAccess, userOwnsChallenge } from "@/lib/server/challeng
 import { createPendingEntryPayment, attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, confirmRewardEntitledEntry, isPaidEntryChallenge, releasePendingEntryPayment } from "@/lib/server/monetization-payments";
 import { releaseEntryEntitlementReservation } from "@/lib/server/reward-economy";
 import { isChallengeJoinable, isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { reconcileNormalEntryCheckout } from "@/lib/server/normal-entry-reconciliation";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -41,7 +42,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     record = await createPendingEntryPayment(db, { userId: user.uid, challengeId, challenge, rewardEntitlementId: typeof parsed.body?.rewardEntitlementId === "string" ? parsed.body.rewardEntitlementId : undefined });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "Paid entry checkout could not be prepared.", 409, undefined, "PAID_ENTRY_CHECKOUT_REJECTED");
+    const code = error instanceof Error ? error.message : "";
+    if (challenge.builderVersion === "normal_v3" && ["ENTRY_RESERVATION_EXPIRED", "ENTRY_RESERVATION_RECONCILIATION_REQUIRED"].includes(code)) {
+      const provider = getStripe();
+      if (!provider) return fail("Checkout reconciliation is unavailable. No additional payment was started.", 503);
+      try {
+        const reconciled = await reconcileNormalEntryCheckout(db, provider, challengeId, user.uid);
+        if (!reconciled.restartAllowed) return fail("Your original payment is awaiting provider confirmation or review. No additional charge was started.", 409, { reconciliationRequired: true, supportUrl: "/support/new" }, "ENTRY_RECONCILIATION_REQUIRED");
+        record = await createPendingEntryPayment(db, { userId: user.uid, challengeId, challenge, rewardEntitlementId: typeof parsed.body?.rewardEntitlementId === "string" ? parsed.body.rewardEntitlementId : undefined });
+      } catch { return fail("The previous checkout could not be safely reconciled. No additional payment was started.", 409, { supportUrl: "/support/new" }, "ENTRY_RECONCILIATION_REQUIRED"); }
+    } else return fail(error instanceof Error ? error.message : "Paid entry checkout could not be prepared.", 409, undefined, "PAID_ENTRY_CHECKOUT_REJECTED");
   }
   if (record.amountCents === 0 && record.rewardEntitlementId) {
     try {
@@ -63,6 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
+      ...(challenge.builderVersion === "normal_v3" ? { payment_method_types: ["card" as const], payment_intent_data: { capture_method: "automatic" as const } } : {}),
       line_items: [checkoutLineItem({ amountCents: record.amountCents, currency: "usd", name: `Challenge entry - ${String(challenge.title ?? "Challenge")}` })],
       success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/registration-success?entryPaymentId=${encodeURIComponent(record.id)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/challenges/${encodeURIComponent(challengeId)}?payment=canceled`,

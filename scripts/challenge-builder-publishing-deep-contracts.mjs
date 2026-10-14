@@ -19,7 +19,7 @@ const verification = read("components/verification-guard.tsx");
 const tournament = read("components/tournament-builder.tsx");
 const hostBuilder = read("components/host/host-competition-wizard.tsx");
 
-assert(builder.includes("getNormalChallengeReadiness") && publishRoute.includes("getNormalChallengeReadiness"), "builder and submit route must share Normal Challenge readiness");
+assert(builder.includes("getNormalFrontendReadiness") && read("lib/normal-challenge-frontend.ts").includes("getNormalChallengeReadiness") && publishRoute.includes("getNormalChallengeReadiness"), "frontend adapter retains authoritative server checks and reports policy differences");
 assert(!publishRoute.includes('"PRIZE_FUNDING_REQUIRED"') && !createRoute.includes('"PRIZE_FUNDING_REQUIRED"'), "operational prize review must not block base challenge submission");
 assert(publishRoute.includes("paidEntryEnabled: monetizationIntent.paidEntryRequested") && createRoute.includes("paidEntryEnabled: monetizationIntent.paidEntryRequested"), "paid-entry intent must reach canonical plan gates");
 assert(planAccess.match(/creator:[\s\S]*?canCreatePaidChallenges: true/) && planAccess.match(/host:[\s\S]*?canCreatePaidChallenges: true/), "Creator and Host plans must allow paid-entry review submission");
@@ -32,11 +32,11 @@ assert(!builder.includes("Ready to publish.") && !builder.includes("Publish Chal
 assert(builder.includes("ApiErrorPanel") && feedback.includes("Publishing failed. Please try again."), "submission failures must retain safe user feedback");
 for (const raw of ["CHALLENGE_MEDIA_UNAVAILABLE", "HTTP 503", "FirebaseError", "StripeError"]) assert(!builder.includes(raw), `builder must not expose ${raw}`);
 
-assert(builderSource.indexOf("persist(NORMAL_CHALLENGE_MAX_STEP)") < builderSource.indexOf("publishChallengeDraft(id, payload)"), "Submit for Review must persist latest changes first");
+assert(builderSource.indexOf("persist(NORMAL_CHALLENGE_MAX_STEP)") < builderSource.indexOf("publishChallengeDraft(id, {"), "Submit for Review must persist latest changes first");
 assert(!draftRoute.includes("createNotification") && !builder.includes("Draft saved."), "autosave must remain silent");
 assert(preview.includes("redirect(`/challenges/create/${draftId}`)") && !preview.includes("ChallengeMediaGallery"), "creation preview must redirect to editing");
 for (const title of ["Overview", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review", "Publish"]) assert((builder + read("lib/challenge-builder-foundation.ts")).includes(`"${title}"`), `missing Normal Challenge step ${title}`);
-assert((builder + read("lib/challenge-builder-foundation.ts")).includes('navLabel: "Participation"'), "Normal Builder must retain capacity and waitlist controls under Participation.");
+assert(!read("components/normal-challenge-builder-steps.tsx").includes('label="Participation"'), "Normal creation UI removes Participation while server compatibility stays unchanged.");
 assert((builder + frame).includes("Submit for Review") && frame.includes("Back") && frame.includes('"Continue"'), "builder must expose only sequential navigation actions");
 assert(readiness.includes("VOTING_BEFORE_SUBMISSION_CLOSE") && readiness.includes("PRIZE_AMOUNTS_INVALID") && readiness.includes("VIDEO_NOT_CONFIRMED"), "cross-step readiness checks are incomplete");
 assert(!publishRoute.includes("KYC_REQUIRED") && !builder.includes("KYC_REQUIRED"), "KYC must not block challenge review submission");

@@ -38,16 +38,16 @@ assert(workspaceApi.includes("resolveActiveWorkspace"), "Last workspace must be 
 const enterpriseStart = sidebar.indexOf("function enterpriseSections");
 const enterpriseEnd = sidebar.indexOf("export function workspaceNavigationContext", enterpriseStart);
 const enterpriseNavigation = sidebar.slice(enterpriseStart, enterpriseEnd);
-for (const label of ["Enterprise Studio", "Explore", "Saved", "Build a Challenge", "Official Challenges", "Assigned to Me", "Submissions", "Reviews", "Analytics", "Finance", "Sponsorships", "Team", "Activity", "Profile", "Settings"]) {
+for (const label of ["Enterprise Studio", "Explore", "Saved", "Challenge Studio", "Official Challenges", "Assigned to Me", "Submissions", "Reviews", "Analytics", "Finance", "Sponsorships", "Team", "Activity", "Profile", "Settings"]) {
   assert(enterpriseNavigation.includes(label), "Enterprise navigation missing " + label);
 }
 for (const forbidden of ["Host Control Center", "Creator Studio", "My Entries", "DoroCoins", "Rewards", "Become a Sponsor", "Host Plan", "Sponsor Wallet"]) {
   assert(!enterpriseNavigation.includes(forbidden), "Enterprise navigation must not include " + forbidden);
 }
 assert(enterpriseNavigation.includes('allowed("finance.view")') && enterpriseNavigation.includes('allowed("sponsors.view")'), "Sensitive Enterprise navigation must be permission-gated.");
-assert(enterpriseNavigation.includes("canCreate ?") && enterpriseNavigation.includes('challenge.create_official'), "Build a Challenge must be hidden without official creation permission.");
-for (const label of ["Normal", "Private", "Live Event", "Tournament"]) assert(enterpriseNavigation.includes('label: "' + label + '"'), "Build a Challenge missing " + label);
-assert(sidebar.includes("useState(childRouteActive)") && sidebar.includes("if (childRouteActive) setOpen(true)"), "Build a Challenge must be collapsed by default and expand for an active creation route.");
+assert(enterpriseNavigation.includes("canCreate ?") && enterpriseNavigation.includes('challenge.create_official'), "Challenge Studio must be hidden without official creation permission.");
+for (const label of ["Normal Challenge", "Private", "Live Event", "Tournament"]) assert(enterpriseNavigation.includes('label: "' + label + '"'), "Challenge Studio missing " + label);
+assert(sidebar.includes("useState(childRouteActive)") && sidebar.includes('key={`${item.href ?? item.label}:${pathname}`}'), "Challenge Studio must be collapsed by default and expand for an active creation route.");
 assert(sidebar.includes('personalEconomyContext ? <Link href="/dorocoins"'), "Personal economy controls must remain available in Personal navigation.");
 assert(!sidebar.includes("Enterprise Access</div>"), "Enterprise footer must not render a redundant oversized access badge.");
 

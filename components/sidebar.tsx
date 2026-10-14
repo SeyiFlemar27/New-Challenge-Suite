@@ -36,6 +36,7 @@ import { BrandLogo, planBadgeLabel } from "./brand";
 import { findCustomizationOption } from "@/lib/customization/options";
 import { getEffectiveTier, getPersonalCapabilities, type PersonalCapabilities } from "@/lib/plan-access";
 import { logout } from "@/lib/firebase/auth-service";
+import { fetchChallengeUsage } from "@/lib/api/services";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { workspaceForRoute } from "@/lib/workspace-routing";
 
@@ -76,7 +77,7 @@ function personalSections(capabilities: PersonalCapabilities, context: Workspace
   const hostContext = context === "host" && capabilities.canManageHostOperations;
   const creatorContext = context === "creator" || capabilities.canCreatePrivateChallenge;
   const createChildren = [
-    capabilities.canCreateNormalChallenge ? { href: hostContext ? "/host/challenges/create" : "/challenges/create", label: "Normal" } : null,
+    capabilities.canCreateNormalChallenge ? { href: hostContext ? "/host/challenges/create" : "/challenges/create", label: "Normal Challenge" } : null,
     capabilities.canCreatePrivateChallenge ? { href: hostContext ? "/host/private/create" : "/private/create", label: "Private" } : null,
     capabilities.canCreateTournament ? { href: hostContext ? "/host/tournaments/create" : "/tournaments/create", label: "Tournament" } : null,
     capabilities.canCreateLiveEvent ? { href: "/host/live/create", label: "Live Event" } : null
@@ -91,7 +92,7 @@ function personalSections(capabilities: PersonalCapabilities, context: Workspace
       { href: "/explore", label: "Explore", icon: LayoutGrid },
       { href: "/favorites", label: "Saved", icon: Star }
     ] },
-    ...(createChildren.length ? [{ label: "Create", items: [{ label: "Build a Challenge", icon: Swords, children: createChildren }] }] : []),
+    ...(createChildren.length ? [{ label: "Create", items: [{ label: "Challenge Studio", icon: Swords, children: createChildren }] }] : []),
     { label: "Challenges", items: [
       { href: "/my-challenges", label: "My Challenges", icon: Medal },
       { href: "/my-entries", label: "My Entries", icon: ClipboardCheck },
@@ -138,10 +139,10 @@ function enterpriseSections(permissions: string[], isAdmin: boolean): NavSection
       { href: "/enterprise/saved", label: "Saved", icon: Star },
     ] },
     ...(canCreate ? [{ label: "Create", items: [{
-      label: "Build a Challenge",
+      label: "Challenge Studio",
       icon: Swords,
       children: [
-        { href: "/enterprise/challenges/create/official/normal", label: "Normal" },
+        { href: "/enterprise/challenges/create/official/normal", label: "Normal Challenge" },
         { href: "/enterprise/challenges/create?type=private", label: "Private" },
         { href: "/enterprise/challenges/create?type=live", label: "Live Event" },
         { href: "/enterprise/challenges/create?type=tournament", label: "Tournament" },
@@ -244,9 +245,16 @@ export function Sidebar() {
     role: user?.role
   });
   const workspaceContext = workspaceNavigationContext(pathname, user?.activeWorkspace, user?.availableWorkspaces ?? ["personal"]);
+  const [normalAllowance, setNormalAllowance] = useState<{ uid: string; remaining: number } | null>(null);
+  useEffect(() => {
+    if (!user || capabilities.normalChallengeQuota.period !== "lifetime" || !capabilities.canCreateNormalChallenge) return;
+    let active = true;
+    void fetchChallengeUsage().then((result) => { if (active && result.ok && result.data) setNormalAllowance({ uid: user.uid, remaining: result.data.freeBasic.remaining }); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [user, capabilities.normalChallengeQuota.period, capabilities.canCreateNormalChallenge]);
   const sections = signedOut
     ? guestSections
-    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, capabilities, user?.accountType === "sponsor", user?.enterprisePermissions ?? [], effectiveTier.dashboardName);
+    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, { ...capabilities, canCreateNormalChallenge: capabilities.canCreateNormalChallenge && (capabilities.normalChallengeQuota.period !== "lifetime" || (normalAllowance?.uid === user?.uid && (normalAllowance?.remaining ?? 0) > 0)) }, user?.accountType === "sponsor", user?.enterprisePermissions ?? [], effectiveTier.dashboardName);
   const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName, capabilities);
   const activeHref = activeNavigationHref(pathname);
   const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);

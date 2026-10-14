@@ -1,0 +1,126 @@
+# Current implementation file inventory
+
+This inventory includes the preserved pre-existing frontend and test work plus the
+uncommitted Normal lifecycle continuation. It is not a staging list or an assertion
+that every change originated in this continuation. No file was committed or discarded.
+Generated type/build files, local caches, local environment files, and lint reports
+are intentionally omitted from this source inventory and remain in the worktree.
+
+- `app/api/admin/cases/route.ts`
+- `app/api/admin/challenges/[id]/winner-proposals/[proposalId]/announce/route.ts`
+- `app/api/admin/challenges/[id]/winner-proposals/[proposalId]/approve/route.ts`
+- `app/api/admin/operations/route.ts`
+- `app/api/admin/refunds/route.ts`
+- `app/api/challenges/[id]/entry-checkout/route.ts`
+- `app/api/challenges/[id]/join/route.ts`
+- `app/api/challenges/[id]/lifecycle/route.ts`
+- `app/api/challenges/[id]/manage/route.ts`
+- `app/api/challenges/[id]/prize-funding/checkout/route.ts`
+- `app/api/challenges/[id]/publish/route.ts`
+- `app/api/challenges/drafts/[id]/route.ts`
+- `app/api/challenges/route.ts`
+- `app/api/challenges/[id]/route.ts`
+- `app/api/stripe/webhook/route.ts`
+- `app/api/submissions/[id]/route.ts`
+- `app/api/submissions/route.ts`
+- `app/api/withdrawals/route.ts`
+- `app/challenges/[id]/join/page.tsx`
+- `app/challenges/[id]/manage/page.tsx`
+- `app/challenges/[id]/page.tsx`
+- `app/wallet/withdraw/page.tsx`
+- `components/admin/admin-case-workspace.tsx`
+- `components/admin/admin-control-center.tsx`
+- `components/challenge-builder-frame.tsx`
+- `components/normal-challenge-builder-steps.tsx`
+- `components/normal-challenge-builder.tsx`
+- `components/sidebar.tsx`
+- `firestore.indexes.json`
+- `lib/challenge-status.ts`
+- `lib/normal-challenge-prize-allocation.ts`
+- `lib/normal-challenge-readiness.ts`
+- `lib/plan-access.ts`
+- `lib/server/challenge-production-flow.ts`
+- `lib/server/challenge-review-submission.ts`
+- `lib/server/challenge-settlement.ts`
+- `lib/server/challenge-validation.ts`
+- `lib/server/challenge-viewer-state.ts`
+- `lib/server/leaderboard.ts`
+- `lib/server/monetization-payments.ts`
+- `lib/server/official-winner-records.ts`
+- `lib/server/participant-journey.ts`
+- `lib/server/payout-structure.ts`
+- `lib/server/prize-approvals.ts`
+- `lib/server/prize-funding.ts`
+- `lib/server/public-challenge.ts`
+- `lib/server/sponsor-reservation-policy.ts`
+- `lib/server/submission-resubmission.ts`
+- `lib/server/withdrawals.ts`
+- `scripts/builder-phase1-contracts.mjs`
+- `scripts/challenge-builder-publishing-deep-contracts.mjs`
+- `scripts/challenge-publishing-enterprise-contracts.mjs`
+- `scripts/challenge-redesign-contracts.mjs`
+- `scripts/enterprise-workspace-isolation-contracts.mjs`
+- `scripts/normal-challenge-capacity-review-contracts.mjs`
+- `scripts/normal-challenge-v2-contracts.mjs`
+- `scripts/qa/run-p1-browser-e2e.mjs`
+- `scripts/rewards-spin-wheel-final-contracts.mjs`
+- `scripts/rewards-wheel-corrective-contracts.mjs`
+- `scripts/run-p0-emulator-regressions.mjs`
+- `scripts/test-navigation-production-cleanup.mjs`
+- `scripts/test-normal-submission-instructions-runtime.mjs`
+- `scripts/test-official-winner-records.mjs`
+- `scripts/test-phase3-financial-rules.mjs`
+- `scripts/test-role-access-and-navigation-consistency.mjs`
+- `scripts/test-settlement-blocks-pending-sponsor-reservations.mjs`
+- `scripts/test-sponsor-reservation-policy.mjs`
+- `scripts/test-submission-edit-handler-emulator.mjs`
+- `scripts/test-submission-resubmission-policy.mjs`
+- `app/api/challenges/[id]/published-details/route.ts`
+- `app/api/challenges/[id]/withdraw/route.ts`
+- `app/api/internal/normal-lifecycle/route.ts`
+- `app/api/submissions/[id]/appeal/route.ts`
+- `components/normal-participation-withdrawal.tsx`
+- `components/normal-published-details-editor.tsx`
+- `components/normal-submission-appeal.tsx`
+- `docs/normal-builder-frontend-policy.md`
+- `docs/normal-lifecycle-implementation.md`
+- `lib/normal-base-prize-policy.ts`
+- `lib/normal-challenge-frontend.ts`
+- `lib/server/normal-disqualification.ts`
+- `lib/server/normal-earnings-clearance.ts`
+- `lib/server/normal-lifecycle-jobs.ts`
+- `lib/server/normal-lifecycle-outbox.ts`
+- `lib/server/normal-lifecycle-policy.ts`
+- `lib/server/normal-lifecycle-scheduler.ts`
+- `lib/server/normal-notifications.ts`
+- `lib/server/normal-refunds.ts`
+- `lib/server/normal-submission-moderation.ts`
+- `lib/server/payout-provider.ts`
+- `scripts/test-normal-base-prize-policy.mjs`
+- `scripts/test-normal-builder-frontend.mjs`
+- `scripts/test-normal-financial-lifecycle-emulator.mjs`
+- `scripts/test-normal-lifecycle-emulator.mjs`
+- `scripts/test-normal-paid-entry-emulator.mjs`
+- `scripts/test-normal-qualified-prizes.mjs`
+- `scripts/test-normal-review-funding-emulator.mjs`
+- `scripts/test-normal-scheduler-emulator.mjs`
+- `scripts/test-normal-settlement-emulator.mjs`
+
+This inventory document is also newly added.
+
+Additional continuation changes:
+- `lib/server/tournament-cloud-tasks.ts` (additive read-only dispatch readiness probe)
+- `scripts/test-normal-dispatch-readiness.mjs`
+- `docs/normal-lifecycle-production.md`
+- `lib/server/normal-material-review.ts`
+- `lib/server/normal-entry-reconciliation.ts`
+- `components/normal-material-review.tsx`
+- `app/api/admin/normal-material-changes/route.ts`
+- `app/api/challenges/[id]/material-changes/route.ts`
+- `scripts/test-normal-material-review-emulator.mjs`
+- `lib/server/financial-transaction.ts`
+- `lib/server/normal-email.ts`
+- `scripts/test-financial-transaction-retry.mjs`
+- `lib/server/free-challenge-limits.ts`
+- `docs/normal-lifecycle-verification.md`
+- `scripts/test-enterprise-active-cap-concurrency.mjs` (sanitized assertion diagnostics; strict expectations retained)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Landmark, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, EmptyState, Field, inputClass, LinkButton, PageTitle } from "@/components/ui";
@@ -13,7 +13,7 @@ type WithdrawalData = {
   minimumWithdrawalCents: number | null;
   pendingClearanceDays: number;
   minimumProcessingHours: number;
-  withdrawalFeeCents: number;
+  withdrawalFeeCents: number | null;
   kycStatus: string;
   disabledReasons: string[];
   policy?: { dorocoinNotCash?: string; rewardPointsNotCash?: string };
@@ -37,6 +37,7 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState("");
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const requestKey = useRef<string | null>(null);
 
   const request = useCallback(() => apiRequest<WithdrawalData>("/api/withdrawals"), []);
   const applyResult = useCallback((result: Awaited<ReturnType<typeof request>>) => {
@@ -44,7 +45,7 @@ export default function WithdrawPage() {
     if (!result.ok || !result.data) return setNotice(result.message);
     const payload = result.data;
     setData(payload);
-    setSourceId((current) => current || payload.eligibleSources?.[0]?.id || "");
+    setSourceId((current) => current || (payload.eligibleSources?.length ? "all" : ""));
     setPayoutMethodId((current) => current || payload.payoutMethods?.[0]?.id || "");
   }, []);
   async function load() { setLoading(true); applyResult(await request()); }
@@ -60,11 +61,14 @@ export default function WithdrawPage() {
     setNotice("");
     const amountCents = Math.round(Number(amount || 0) * 100);
     setSubmitting(true);
+    requestKey.current ??= crypto.randomUUID();
     const result = await apiRequest<{ request: WithdrawalRecord }>("/api/withdrawals", {
       method: "POST",
       body: JSON.stringify({
         amountCents,
-        sourceId,
+        sourceId: sourceId === "all" ? undefined : sourceId,
+        sourceIds: sourceId === "all" ? data?.eligibleSources.map(source => source.id) : [sourceId],
+        idempotencyKey: requestKey.current,
         method,
         methodDetails: method === "paypal" || method === "payoneer"
           ? { accountHolderName, email: paypalEmail }
@@ -74,6 +78,7 @@ export default function WithdrawPage() {
     setSubmitting(false);
     setNotice(result.message);
     if (result.ok) {
+      requestKey.current = null;
       setAmount("");
       setAccountHolderName("");
       setBankName("");
@@ -108,17 +113,18 @@ export default function WithdrawPage() {
           <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
             <Card className="p-6 sm:p-8">
               <h2 className="text-2xl font-black">Withdrawal request</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">Bank, PayPal, and Payoneer requests are reviewed before payout. Minimum withdrawal is $50 with no withdrawal fee.</p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">Combine cleared earnings or request a partial withdrawal of at least $50. Bank payouts await provider approval. Any verified provider fee must be disclosed before payout confirmation; a fee has not been quoted yet.</p>
               <form className="mt-6 space-y-5" onSubmit={submitRequest}>
                 <Field label="Eligible earning">
                   <select className={inputClass} value={sourceId} onChange={(event) => { const next = event.target.value; setSourceId(next); const source = data.eligibleSources.find((item) => item.id === next); setAmount(source ? (source.netAmountCents / 100).toFixed(2) : ""); }} required>
                     <option value="">Choose an earning source</option>
+                    <option value="all">All cleared eligible earnings</option>
                     {(data.eligibleSources ?? []).map((source) => <option key={source.id} value={source.id}>{withdrawalSourceLabel(source.sourceType)} - ${(source.netAmountCents / 100).toFixed(2)}</option>)}
                   </select>
                 </Field>
                 {selectedSource ? <div className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 sm:grid-cols-3"><BalanceDetail label="Gross" value={selectedSource.grossAmountCents} /><BalanceDetail label="Fees already deducted" value={selectedSource.feeAmountCents} /><BalanceDetail label="Net available" value={selectedSource.netAmountCents} /></div> : null}
                 {data.payoutMethods?.length ? <Field label="Saved payout method"><select className={inputClass} value={payoutMethodId} onChange={(event) => { const id = event.target.value; setPayoutMethodId(id); const saved = data.payoutMethods.find((item) => item.id === id); if (saved) setMethod(saved.type); }}><option value="">Choose a saved payout method</option>{data.payoutMethods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field> : <p className="rounded-[8px] border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-slate-300">Add a payout method from Earnings, or enter details below for this reviewed request.</p>}
-                {!payoutMethodId ? <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer</option><option value="paypal">PayPal</option><option value="payoneer">Payoneer</option></select></Field> : null}
+                {!payoutMethodId ? <Field label="Payout method"><select className={inputClass} value={method} onChange={(event) => setMethod(event.target.value as Method)}><option value="bank_transfer">Bank Transfer — provider activation pending</option><option value="paypal" disabled>PayPal — future option</option><option value="payoneer" disabled>Payoneer — future option</option></select></Field> : null}
                 <Field label="Amount"><input className={inputClass} type="number" min={min} max={available || undefined} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={`Available $${available.toFixed(2)}`} /></Field>
                 {!payoutMethodId ? <Field label="Account holder name"><input className={inputClass} value={accountHolderName} onChange={(event) => setAccountHolderName(event.target.value)} /></Field> : null}
                 {!payoutMethodId && method === "bank_transfer" ? <div className="grid gap-5 sm:grid-cols-2"><Field label="Bank name"><input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field><Field label="Account number"><input className={inputClass} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field></div> : !payoutMethodId ? <Field label={`${method === "payoneer" ? "Payoneer" : "PayPal"} email`}><input className={inputClass} type="email" value={paypalEmail} onChange={(event) => setPaypalEmail(event.target.value)} /></Field> : null}
@@ -131,8 +137,8 @@ export default function WithdrawPage() {
               <div className="mt-6 space-y-3 text-sm text-slate-400">
                 <p>Withdrawal requests are reviewed before payout processing.</p>
                 <p>New earnings remain in pending clearance for at least {data.pendingClearanceDays} days.</p>
-                <p>Approved requests require at least {data.minimumProcessingHours} hours of processing.</p>
-                <p>Withdrawal fee: $0.00.</p>
+                <p>The first withdrawal request has an additional {data.minimumProcessingHours}-hour security hold. Later requests do not repeat that first-request hold.</p>
+                <p>Provider payout fee: unavailable until a verified quote is supplied.</p>
                 <p>Requests are created as pending review.</p>
                 <p>No instant payout is available.</p>
                 <p>Payout processing is handled through admin and provider review.</p>

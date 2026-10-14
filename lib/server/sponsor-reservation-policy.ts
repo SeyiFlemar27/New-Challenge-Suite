@@ -20,6 +20,7 @@ export function isSponsorPaymentWithinReservation(input: {
   paymentCompletedAt: unknown;
   paymentTimestampPrecisionMs?: number;
   votingStartsAt: unknown;
+  requireCompletionBeforeVoting?: boolean;
 }): boolean {
   const created = Date.parse(String(input.reservationCreatedAt ?? ""));
   const expires = Date.parse(String(input.reservationExpiresAt ?? ""));
@@ -41,5 +42,7 @@ export function isSponsorPaymentWithinReservation(input: {
   // Require the entire interval to end strictly before expiry; equality is not
   // proof that payment completed before the reservation expired.
   if (completed < created || completed >= expires || (precision > 0 && completed + precision >= expires)) return false;
+  if (input.requireCompletionBeforeVoting && (votingStarts === null || !Number.isFinite(votingStarts)
+    || completed >= votingStarts || completed + precision >= votingStarts)) return false;
   return votingStarts === null || (Number.isFinite(votingStarts) && created < votingStarts);
 }

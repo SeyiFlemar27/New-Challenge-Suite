@@ -34,6 +34,7 @@ export async function PATCH(request: Request) {
       const [snap, priorAudit] = await Promise.all([transaction.get(ref), transaction.get(auditRef)]);
       if (!snap.exists) throw new Error("NOT_FOUND");
       const data = snap.data() ?? {}; finalStatus = String(data.status ?? "submitted");
+      if (data.type === "normal_submission_appeal" && ["resolve", "close", "reopen"].includes(parsed.data.action)) throw new Error("USE_SUBMISSION_APPEAL_DECISION");
       if (parsed.data.action === "view_reported_message" && data.reportedMessageId == null && data.validInvestigationReason !== true) throw new Error("PRIVATE_MESSAGE_NOT_AUTHORIZED");
       if (priorAudit.exists) { duplicate = true; return; }
       let nextStatus: string | undefined;

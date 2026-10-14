@@ -8,7 +8,7 @@ const DISPATCH_LEASE_MS = 60_000;
 const SCHEDULABLE_TOURNAMENT_JOB_TYPES = ["activate_full_tournament", "process_tournament_match_lifecycle"] as const;
 
 export type TournamentActivationTask = { jobId: string; version: number; runAt: string };
-export type TournamentTaskScheduler = { scheduleActivation(task: TournamentActivationTask): Promise<{ taskName: string }> };
+export type TournamentTaskScheduler = { scheduleActivation(task: TournamentActivationTask): Promise<{ taskName: string }>; verifyDispatchAccess?(): Promise<boolean> };
 
 type CloudTasksConfig = {
   projectId: string;
@@ -106,6 +106,13 @@ export function createGoogleCloudTasksScheduler(options?: {
   });
 
   return {
+    async verifyDispatchAccess() {
+      const queuePath = `projects/${config.projectId}/locations/${config.location}/queues/${config.queue}`;
+      const response = await fetcher(`https://cloudtasks.googleapis.com/v2/${queuePath}:testIamPermissions`, { method: "POST", headers: { authorization: `Bearer ${await getAccessToken()}`, "content-type": "application/json" }, body: JSON.stringify({ permissions: ["cloudtasks.tasks.create"] }) });
+      if (!response.ok) return false;
+      const result = await response.json() as { permissions?: string[] };
+      return result.permissions?.includes("cloudtasks.tasks.create") === true;
+    },
     async scheduleActivation(task) {
       const runAt = Date.parse(task.runAt);
       if (!task.jobId || !Number.isSafeInteger(task.version) || !Number.isFinite(runAt)) throw new Error("Tournament activation task payload is invalid.");

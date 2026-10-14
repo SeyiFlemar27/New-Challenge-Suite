@@ -4,7 +4,7 @@ import { createAuditLogRecord } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { normalizeWinnerProposalWinners, validateWinnerProposalWinners } from "@/lib/server/prize-approvals";
-import { validateAuthoritativeWinnerRecords } from "@/lib/server/official-winner-records";
+import { validateAuthoritativeWinnerRecords, authoritativeWinnerCount } from "@/lib/server/official-winner-records";
 
 function safeId(value: string) { return value.replace(/[^a-zA-Z0-9_.:-]/g, "_"); }
 
@@ -72,7 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       status: "announced"
     };
   });
-  const recordValidation = validateAuthoritativeWinnerRecords(challengeId, records, challenge.builderVersion === "normal_v3" ? Number(challenge.numberOfWinners) : undefined);
+  const recordValidation = validateAuthoritativeWinnerRecords(challengeId, records, challenge.builderVersion === "normal_v3" ? authoritativeWinnerCount(challenge) : undefined);
   if (!recordValidation.valid) return fail("Every winner must reference an authoritative eligible submission.", 409, undefined, "WINNER_RECORDS_INVALID");
 
   const settlementId = safeId(`challenge_settlement_${challengeId}_${proposalId}`);
@@ -94,6 +94,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!latestChallengeSnap.exists || !latestProposalSnap.exists) throw new Error("ANNOUNCEMENT_RECORD_MISSING");
       const latestChallenge = latestChallengeSnap.data() ?? {};
       const latestProposal = latestProposalSnap.data() ?? {};
+      if (latestChallenge.normalLifecyclePolicyVersion === 1) {
+        if (latestChallenge.normalOutcome === "no_winners" || latestChallenge.settlementRestricted === true) throw new Error("WINNER_ANNOUNCEMENT_ON_HOLD");
+        if (authoritativeWinnerCount(latestChallenge) !== records.length || !Array.isArray(latestChallenge.approvedWinnerIds) || records.some(winner => !latestChallenge.approvedWinnerIds.includes(winner.userId))) throw new Error("WINNER_PROPOSAL_CHANGED");
+        const participants = await Promise.all(records.map(winner => transaction.get(db.collection("challengeParticipants").doc(`${challengeId}_${String(winner.userId)}`))));
+        const paidEntry = latestChallenge.paidEntryEnabled || (latestChallenge.monetization as Record<string, unknown> | undefined)?.paidEntryRequested;
+        if (participants.some(participant => !participant.exists || !["active", "approved", "entered", "enrolled", "winner", "submitted"].includes(String(participant.data()?.status)) || participant.data()?.disqualifiedAt || (paidEntry && !["paid", "confirmed"].includes(String(participant.data()?.entryPaymentStatus))))) throw new Error("WINNER_RECORDS_INVALID");
+        const effectiveEnd = dateMillis(latestChallenge.effectiveVotingEndsAt);
+        if (!Number.isFinite(effectiveEnd) || Date.now() < effectiveEnd) throw new Error("WINNER_ANNOUNCEMENT_NOT_DUE");
+      }
       if (["cancelled", "canceled"].includes(String(latestChallenge.status ?? latestChallenge.lifecycleStatus ?? "").toLowerCase())) throw new Error("CHALLENGE_CANCELLED");
       if (String(latestProposal.status ?? "") !== "approved") throw new Error("WINNER_PROPOSAL_NOT_APPROVED");
       if ((latestChallenge.settlementId && String(latestChallenge.settlementId) !== settlementId)

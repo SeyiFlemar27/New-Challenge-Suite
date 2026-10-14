@@ -4,6 +4,7 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { formatChallengeDateTime } from "@/lib/challenge-date-time";
+import { resubmissionWindowOpen } from "@/lib/server/submission-resubmission";
 
 export type ChallengeBlockerCode =
   | "AUTH_REQUIRED"
@@ -204,6 +205,7 @@ export type ChallengeSubmissionAccessAction =
   | "view_entry"
   | "manage_challenge"
   | "submit"
+  | "fix_and_resubmit"
   | null;
 
 export interface ChallengeSubmissionAccess {
@@ -244,6 +246,7 @@ export function resolveChallengeSubmissionAccess(input: {
   if (paidEntryRequired && paymentStatus === "pending") return { canSubmit: false, reason: "payment_pending", action: "refresh_status", title: "Payment processing", message: "We are confirming your payment." };
   if (paidEntryRequired && !paymentPaid) return { canSubmit: false, reason: "payment_required", action: phaseSummary.canJoin ? "pay_entry_fee" : "back_to_challenge", title: "Entry fee required", message: `Pay the $${(paidEntryAmountCents(challenge) / 100).toFixed(2)} entry fee before submitting.` };
   if (!participantActive && !paymentPaid) return { canSubmit: false, reason: "not_enrolled", action: phaseSummary.canJoin ? "join" : "back_to_challenge", title: "Enrollment required", message: "Join this challenge before submitting." };
+  if (challenge.builderVersion === "normal_v3" && participantActive && input.submission && resubmissionWindowOpen({ submission: input.submission, challenge, now })) return { canSubmit: true, reason: null, action: "fix_and_resubmit", title: "Fix & Resubmit", message: "Submit your correction before its recorded deadline." };
   const submissionOpensAt = formatChallengeDateTime(phaseSummary.submissionStartAt, phaseSummary.timeZone);
   if (!phaseSummary.canSubmit && phaseSummary.phase === "registration_open") return { canSubmit: false, reason: "registration_open", action: "back_to_challenge", title: "Registration still open", message: submissionOpensAt ? `Submissions open at ${submissionOpensAt}.` : "Waiting for submissions." };
   if (!phaseSummary.canSubmit && ["registration_closed", "scheduled"].includes(phaseSummary.phase)) return { canSubmit: false, reason: "submission_not_open", action: "back_to_challenge", title: "Waiting for submissions", message: submissionOpensAt ? `Submissions open at ${submissionOpensAt}.` : "Submission is not open yet." };

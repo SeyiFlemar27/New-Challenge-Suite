@@ -14,7 +14,7 @@ const COUNTED_FREE_STATUSES = new Set([
 ]);
 
 export function isCountedFreeBasicChallenge(data: Record<string, unknown>) {
-  const creatorPlanId = String(data.creatorPlanId ?? data.planId ?? "free").toLowerCase();
+  const creatorPlanId = String(data.reviewCreatorPlanId ?? data.creatorPlanId ?? data.planId ?? "free").toLowerCase();
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();
   return creatorPlanId === "free"
     && COUNTED_FREE_STATUSES.has(status)

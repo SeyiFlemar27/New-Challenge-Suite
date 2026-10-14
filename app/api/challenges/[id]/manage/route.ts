@@ -4,6 +4,9 @@ import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { grantRewardPointsForEvent, recordMeaningfulRewardActivity } from "@/lib/server/reward-economy";
 import { resolveResubmissionDeadline } from "@/lib/server/submission-resubmission";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { dispatchConfiguredNormalLifecycle } from "@/lib/server/normal-lifecycle-scheduler";
+import { moderateNormalSubmission } from "@/lib/server/normal-submission-moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +87,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (["reject", "flag"].includes(action) && !reason) return validationError({ reason: action === "reject" ? "A rejection reason is required." : "A flag reason is required." });
   if (action === "request_resubmission") {
     if (!requestedChanges) return validationError({ requestedChanges: "Requested changes are required." });
-    if (!resubmissionDeadline || !Number.isFinite(Date.parse(resubmissionDeadline))) return validationError({ resubmissionDeadline: "A valid resubmission deadline is required." });
+    if (access.challenge.builderVersion !== "normal_v3" && (!resubmissionDeadline || !Number.isFinite(Date.parse(resubmissionDeadline)))) return validationError({ resubmissionDeadline: "A valid resubmission deadline is required." });
   }
   if (action === "request_info" && !reason) return validationError({ reason: "Describe the information needed from the participant." });
   if (action === "request_disqualification" && !reason) return validationError({ reason: "A disqualification reason is required for admin review." });
@@ -105,6 +108,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (!submissionSnap.exists || String(submissionSnap.data()?.challengeId ?? "") !== id) throw new Error("MANAGEMENT_RECORD_NOT_FOUND");
         if (!challengeSnap.exists) throw new Error("CHALLENGE_NOT_FOUND");
         const latest = submissionSnap.data() ?? {};
+        if (challengeSnap.data()?.builderVersion === "normal_v3" && latest.resubmissionRequestId) throw new Error("RESUBMISSION_NOT_ALLOWED");
         if (["resubmission_requested", "approved", "flagged", "disqualified", "withdrawn", "eliminated", "winner"].includes(String(latest.status ?? "").toLowerCase())) throw new Error("RESUBMISSION_NOT_ALLOWED");
         const deadline = resolveResubmissionDeadline({ requestedDeadline: resubmissionDeadline, challenge: challengeSnap.data() ?? {} });
         if (!deadline.allowed) throw new Error("RESUBMISSION_DEADLINE_INVALID");
@@ -120,14 +124,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           reviewedBy: access.user!.uid,
           reviewedAt: now,
           publicEligible: false,
+          leaderboardEligible: false,
           updatedAt: now
         };
         transaction.set(ref, update, { merge: true });
+        if (challengeSnap.data()?.builderVersion === "normal_v3") transaction.set(challengeSnap.ref, { normalVotingGate: "moderation_pending", updatedAt: now }, { merge: true });
+        if (challengeSnap.data()?.normalLifecyclePolicyVersion === 1) wakeNormalLifecycleJob(access.db!, transaction, id, now);
         return { beforeStatus: String(latest.status ?? null), update };
       });
       const participantId = String(current.userId ?? current.participantId ?? "");
       if (participantId) await createNotification(access.db, { userId: participantId, type: "submission_request_resubmission", title: "Submission changes requested", body: requestedChanges, actionUrl: `/challenges/${id}`, targetId, idempotencyKey: `submission_resubmission_${targetId}_${requestId}` }).catch(() => undefined);
       await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: "submission.request_resubmission", targetType, targetId, before: { status: requested.beforeStatus }, after: { status: "resubmission_requested", resubmissionDeadline: requested.update.resubmissionDeadline, resubmissionRequestId: requestId }, reason: requestedChanges, metadata: { challengeId: id, note: note || null, resubmissionWindowHours: 24 } }, access.db);
+      if (access.challenge.normalLifecyclePolicyVersion === 1) await dispatchConfiguredNormalLifecycle(access.db);
       return ok({ targetId, targetType, status: "resubmission_requested", action, resubmissionDeadline: requested.update.resubmissionDeadline }, "Resubmission requested.");
     } catch (error) {
       const code = error instanceof Error ? error.message : "RESUBMISSION_REQUEST_FAILED";
@@ -186,7 +194,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     Object.assign(update, { status: nextStatus, reason });
   }
 
-  await ref.set(update, { merge: true });
+  if (targetType === "submission" && access.challenge.builderVersion === "normal_v3") {
+    try {
+      const moderated = await moderateNormalSubmission(access.db, { challengeId: id, submissionId: targetId, actorId: access.user.uid, admin: Boolean(access.user.isAdmin), enterpriseAuthorized: Boolean(access.enterpriseAccess), action: action as "approve" | "reject" | "flag", reason, expectedUpdatedAt: current.updatedAt, now: new Date(now) });
+      nextStatus = moderated.status;
+      Object.assign(update, moderated.update);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "MODERATION_STATE_CHANGED";
+      return fail("This submission requires a current authorized moderation or appeal decision. Refresh before retrying.", 409, undefined, code);
+    }
+  } else await ref.set(update, { merge: true });
   const participantId = String(current.userId ?? current.participantId ?? "");
   if (targetType === "submission" && action === "approve" && String(current.status ?? "") !== "approved" && participantId) {
     await grantRewardPointsForEvent(access.db, { userId: participantId, eventType: "approved_submission", sourceId: targetId, sourceEventKey: `submission-approved:${targetId}:${participantId}`, metadata: { challengeId: id } }).catch(() => undefined);
@@ -195,5 +212,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await createNotification(access.db, { userId: participantId, type: `${targetType}_${action}`, title: action === "approve" ? "Entry approved" : action === "reject" ? "Review update" : action === "request_resubmission" ? "Submission changes requested" : action === "request_info" ? "Information requested" : "Disqualification review requested", body: requestedChanges || reason || note || "Your competition record was updated.", actionUrl: targetType === "submission" ? `/submissions/${targetId}` : `/challenges/${id}`, targetId, idempotencyKey: `${targetType}_${targetId}_${action}_${now.slice(0, 16)}` }).catch(() => undefined);
   }
   await writeAuditLog({ actorId: access.user.uid, actorType: access.user.isAdmin ? "admin" : "creator", action: `${targetType}.${action}`, targetType, targetId, before: { status: current.status ?? null }, after: { status: nextStatus, ...update }, reason: reason || requestedChanges || null, metadata: { challengeId: id, resubmissionDeadline: resubmissionDeadline || null, note: note || null, adminReviewRequired: action === "request_disqualification" } }, access.db);
+  if (access.challenge.normalLifecyclePolicyVersion === 1) await dispatchConfiguredNormalLifecycle(access.db);
   return ok({ targetId, targetType, status: nextStatus, action, adminReviewRequired: action === "request_disqualification" }, action === "request_disqualification" ? "Disqualification request sent for admin review." : "Management action recorded.");
 }

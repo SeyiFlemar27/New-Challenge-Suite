@@ -6,6 +6,19 @@ export type OfficialWinnerRecord = Record<string, unknown> & {
   status?: unknown;
 };
 
+export function authoritativeWinnerCount(challenge: Record<string, unknown>) {
+  const configured = Number(challenge.numberOfWinners);
+  const approved = Array.isArray(challenge.approvedWinnerIds) ? challenge.approvedWinnerIds : [];
+  if (challenge.normalLifecyclePolicyVersion === 1 && [1, 3].includes(configured) && approved.length > 0 && approved.length <= configured && approved.every(id => typeof id === "string" && id.length > 0) && new Set(approved).size === approved.length) return approved.length;
+  return configured || undefined;
+}
+
+export function hasExplicitNoWinnersOutcome(challenge: Record<string, unknown>) {
+  return challenge.builderVersion === "normal_v3" && challenge.normalLifecyclePolicyVersion === 1
+    && challenge.status === "completed" && challenge.normalOutcome === "no_winners"
+    && ["no_approved_submissions", "no_valid_votes"].includes(String(challenge.outcomeReason));
+}
+
 export function validateAuthoritativeWinnerRecords(
   challengeId: string,
   winners: OfficialWinnerRecord[],

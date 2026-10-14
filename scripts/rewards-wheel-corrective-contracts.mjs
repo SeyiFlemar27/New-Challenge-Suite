@@ -116,8 +116,8 @@ assert.match(rewardEconomy, /deterministicId\("reward_adjustment"/);
 assert.match(rewardEconomy, /rewardLedgerEntries/);
 assert.ok(!adjustmentPage.includes("setAvailablePoints"));
 
-assert.match(sidebar, /label: "Build a Challenge"/);
-for (const label of ["Normal", "Private", "Live Event", "Tournament", "Challenges", "My Entries", "Submissions"]) assert.ok(sidebar.includes(`label: "${label}"`), `missing Personal navigation label ${label}`);
+assert.match(sidebar, /label: "Challenge Studio"/);
+for (const label of ["Normal Challenge", "Private", "Live Event", "Tournament", "Challenges", "My Entries", "Submissions"]) assert.ok(sidebar.includes(`label: "${label}"`), `missing Personal navigation label ${label}`);
 for (const route of ["/creator/private-challenges", "/host/private", "/host/live-events", "/host/tournaments"]) assert.ok(!sidebar.includes(`href: "${route}"`), `duplicate standalone sidebar route remains: ${route}`);
 for (const file of ["app/creator/private-challenges/page.tsx", "app/host/private/page.tsx", "app/host/live-events/page.tsx", "app/host/tournaments/page.tsx"]) assert.ok(exists(file), `underlying deep route must remain: ${file}`);
 

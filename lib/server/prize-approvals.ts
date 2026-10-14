@@ -10,7 +10,7 @@ import {
   calculateWinnerPrizePool,
   holdUntilFromApproval
 } from "@/lib/server/payout-structure";
-import { normalWinnerDistribution } from "@/lib/normal-challenge-prize-allocation";
+import { normalQualifiedWinnerDistribution } from "@/lib/normal-challenge-prize-allocation";
 import {
   buildConfirmedSettlementPreview,
   createInternalChallengeSettlement
@@ -70,7 +70,7 @@ export function normalizeWinnerProposalWinners(input: unknown, challenge?: Recor
   const raw = Array.isArray(input) ? input as WinnerProposalWinnerInput[] : [];
   const defaults = defaultWinnerSplit(raw.length);
   const fixedNormalDistribution = challenge?.builderVersion === "normal_v3"
-    ? normalWinnerDistribution(raw.length)
+    ? normalQualifiedWinnerDistribution(Number(challenge.numberOfWinners), raw.length)
     : null;
   return raw.slice(0, 20).map((winner, index) => {
     const fallback = defaults[index] ?? { position: index + 1, percent: 0 };
@@ -96,8 +96,8 @@ export function validateWinnerProposalWinners(winners: NormalizedProposalWinner[
   if (!winners.length) errors.winners = "At least one proposed winner is required.";
   if (challenge?.builderVersion === "normal_v3") {
     const expectedCount = Number(challenge.numberOfWinners);
-    if (![1, 3].includes(expectedCount) || winners.length !== expectedCount) errors.winnerCount = "Winner selection must match this challenge's configured one or three winners.";
-    const expectedPlacements = new Set(Array.from({ length: expectedCount }, (_, index) => index + 1));
+    if (![1, 3].includes(expectedCount) || winners.length < 1 || winners.length > expectedCount) errors.winnerCount = "Winner selection cannot exceed the configured winner count.";
+    const expectedPlacements = new Set(Array.from({ length: winners.length }, (_, index) => index + 1));
     if (winners.some((winner) => !expectedPlacements.has(winner.placement))) errors.winnerPlacement = "Winner placements must match the configured prize positions.";
   }
   if (totalPercent !== 100) errors.winnerSplit = "Winner split must equal 100%.";
@@ -152,7 +152,7 @@ export function canProposeChallengeWinners(user: RequestUser, challenge: Record<
     || challenge.sponsorReady
     || challenge.sponsorEnabled
   );
-  const freeMonetizedBlock = monetized && role === "user" && !admin;
+  const freeMonetizedBlock = monetized && role === "user" && !admin && challenge.builderVersion !== "normal_v3";
   return {
     allowed: (admin || eligibleOperator) && !blockedStatus && !freeMonetizedBlock,
     owned,
@@ -321,7 +321,24 @@ export function buildLedgerFinalizationFoundation(input: {
 }
 
 export async function getWinnerCandidates(db: Firestore, challengeId: string) {
-  const snap = await db.collection("submissions").where("challengeId", "==", challengeId).limit(250).get();
+  const challengeSnap = await db.collection("challenges").doc(challengeId).get();
+  const challenge = challengeSnap.data() ?? {};
+  const normal = challenge.builderVersion === "normal_v3";
+  const [snap, participants, votes, snapshot] = await Promise.all([
+    db.collection("submissions").where("challengeId", "==", challengeId).get(),
+    normal ? db.collection("challengeParticipants").where("challengeId", "==", challengeId).get() : null,
+    normal ? db.collection("votes").where("challengeId", "==", challengeId).get() : null,
+    normal && challenge.finalVoteSnapshotId ? db.collection("normalLifecycleEvents").doc(String(challenge.finalVoteSnapshotId)).get() : null,
+  ]);
+  const participantByUser = new Map(participants?.docs.map(doc => [String(doc.data().userId), doc.data()]) ?? []);
+  const normalTotals = new Map<string, number>();
+  if (snapshot?.exists && snapshot.data()?.challengeId === challengeId) {
+    for (const candidate of snapshot.data()?.candidates ?? []) normalTotals.set(String(candidate.submissionId), Number(candidate.validVotes));
+  } else for (const vote of votes?.docs ?? []) {
+    const data = vote.data();
+    const quantity = Number(data.quantity ?? 1);
+    if (data.status === "counted" && data.reversed !== true && data.invalidated !== true && Number.isSafeInteger(quantity) && quantity > 0) normalTotals.set(String(data.submissionId), (normalTotals.get(String(data.submissionId)) ?? 0) + quantity);
+  }
   const eligibleStatuses = new Set(["approved", "active", "winner"]);
   return snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
@@ -330,6 +347,11 @@ export async function getWinnerCandidates(db: Firestore, challengeId: string) {
       const paymentStatus = status(submission.paymentStatus ?? submission.entryPaymentStatus);
       const moderationStatus = status(submission.moderationStatus);
       const unresolvedFlag = moderationStatus === "flagged" && status(submission.flagResolutionStatus) !== "resolved";
+      if (normal) {
+        const participant = participantByUser.get(String(submission.userId));
+        const paid = challenge.paidEntryEnabled || (challenge.monetization as Record<string, unknown> | undefined)?.paidEntryRequested;
+        if (!participant || !["active", "approved", "entered", "enrolled", "submitted", "winner", "joined", "checked_in"].includes(String(participant.status)) || (paid && !["paid", "confirmed"].includes(String(participant.entryPaymentStatus))) || (normalTotals.get(submission.id) ?? 0) < 1) return false;
+      }
       return eligibleStatuses.has(status(submission.status))
         && !["pending", "pending_review", "pending_payment", "rejected", "withdrawn", "disqualified", "incomplete"].includes(participantStatus)
         && !["pending", "pending_payment", "failed", "cancelled", "refunded", "disputed"].includes(paymentStatus)
@@ -344,8 +366,8 @@ export async function getWinnerCandidates(db: Firestore, challengeId: string) {
       displayName: text(submission.userName ?? submission.userDisplayName ?? submission.displayName, 120) || "Participant",
       title: text(submission.title, 160) || "Untitled submission",
       status: text(submission.status, 80) || "approved",
-      voteCount: cents(submission.voteCount ?? submission.likes),
-      weightedVoteCount: cents(submission.weightedVoteCount ?? submission.voteCount ?? submission.likes),
+      voteCount: normal ? normalTotals.get(submission.id) ?? 0 : cents(submission.voteCount ?? submission.likes),
+      weightedVoteCount: normal ? normalTotals.get(submission.id) ?? 0 : cents(submission.weightedVoteCount ?? submission.voteCount ?? submission.likes),
       submittedAt: typeof submission.submittedAt === "string" ? submission.submittedAt : typeof submission.createdAt === "string" ? submission.createdAt : null,
       eligible: Boolean(text(submission.userId ?? submission.participantUserId, 160)),
       source: "submissions"

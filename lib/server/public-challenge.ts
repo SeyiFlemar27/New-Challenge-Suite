@@ -130,7 +130,7 @@ export function publicChallengeFields(data: Record<string, unknown>, challengeId
     "creatorUsername", "creatorAvatarUrl", "resultsConfirmed", "settlementPrepared", "settlementStatus",
     "predictionEnabled", "predictionArenaEnabled", "predictionMarketEnabled", "predictionMarketApproved", "predictionMarketStatus",
     "confirmedPredictionPoolCents", "confirmedPredictionCount",
-    "publishedAt", "createdAt", "updatedAt"
+    "publishedAt", "createdAt", "updatedAt", "normalOutcome", "outcomeReason", "normalVotingGate", "normalLifecyclePolicyVersion", "effectiveVotingStartsAt", "effectiveVotingEndsAt"
   ]);
   const id = challengeId ?? (typeof data.id === "string" ? data.id : typeof data.challengeId === "string" ? data.challengeId : "");
   if (id) {

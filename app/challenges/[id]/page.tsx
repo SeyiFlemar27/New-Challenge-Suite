@@ -1,6 +1,7 @@
 "use client";
 import { ContentImage } from "@/components/content-image";
 import { ChallengeDescription } from "@/components/challenge-description";
+import { NormalParticipationWithdrawal } from "@/components/normal-participation-withdrawal";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -387,6 +388,8 @@ export default function ChallengeDetailPage() {
     <AppShell>
       <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
         <div className="min-w-0">
+          {rawChallenge?.normalOutcome === "no_winners" ? <div role="status" className="mb-4 rounded-xl border border-[var(--gold)]/30 p-4"><h2 className="font-bold">No Winners</h2><p className="mt-2 text-sm">This challenge completed without an eligible winner. No winner payout was created.</p></div> : null}
+          {rawChallenge?.normalLifecyclePolicyVersion === 1 && userState?.joined && !rawChallenge.effectiveVotingStartsAt && !["completed", "cancelled", "winners_announced"].includes(String(rawChallenge.status)) ? <NormalParticipationWithdrawal challengeId={challengeId} onComplete={() => { void refetch(); }} /> : null}
           <div data-mobile-challenge-meta className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.12em]">
             <span className="rounded-full bg-[var(--gold)]/10 px-3 py-2 text-[var(--gold)]">{challenge.category || challenge.type}</span>
           </div>

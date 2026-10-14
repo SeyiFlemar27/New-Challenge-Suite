@@ -144,8 +144,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const creatorPrizeFundingConfirmed = requiredCreatorFundingCents > 0
     && confirmedCreatorFundingCents >= requiredCreatorFundingCents
     && confirmedCreatorFundingCents >= configuredPrizeCents;
-  if (freePlan && monetizationIntent.prizePoolRequested && !creatorPrizeFundingConfirmed) {
-    return rejectPublish("Confirm the full creator-funded cash prize before publishing this Free challenge.", 409, {
+  if (((body.builderVersion === "normal_v3" && configuredPrizeCents > 0) || (freePlan && body.builderVersion !== "normal_v3" && monetizationIntent.prizePoolRequested)) && !creatorPrizeFundingConfirmed) {
+    return rejectPublish("Confirm the full creator-funded Base Prize before submitting for review.", 409, {
       requiredCreatorFundingCents,
       confirmedCreatorFundingCents,
       configuredPrizeCents
@@ -260,7 +260,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     lastPublishedAt: now,
     reviewRevisionId: `challenge_review_${id}_${revisionSuffix}`,
     reviewRevisionNumber,
-    reviewReason: null
+    reviewReason: null,
+    ...(body.builderVersion === "normal_v3" ? { normalLifecyclePolicyVersion: 1, normalVotingGate: "awaiting_submission_deadline", cashRewardClassification: configuredPrizeCents > 0 || monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady ? "cash_reward_enabled" : "non_cash", cashRewardClassificationLockedAt: now, configuredVotingStartsAt: body.votingStartsAt, configuredVotingEndsAt: body.votingDeadline } : {})
   };
 
   const revisionId = `challenge_review_${id}_${revisionSuffix}`;
@@ -304,6 +305,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       challengeId: id,
       userId: user.uid,
       expectedStatus: currentStatus,
+      expectedUpdatedAt: current.updatedAt,
       update,
       revision,
       revenue,

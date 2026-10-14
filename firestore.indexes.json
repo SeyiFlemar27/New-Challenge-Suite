@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "normalLifecycleJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dispatchState", "order": "ASCENDING" },
+        { "fieldPath": "runAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "challenges",
       "queryScope": "COLLECTION",
       "fields": [

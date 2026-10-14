@@ -167,7 +167,7 @@ export function getParticipantJourneyState(input: JourneyInput) {
   if (!registered && challengeFull) return challenge.waitlistEnabled === true ? result("register", "Join Waitlist", "The challenge is full, but the waitlist is open.", "join_waitlist", input, flags, null) : result("registration_closed", "Challenge full", "Maximum participant capacity has been reached.", null, input, flags, "challenge_full");
   if (submission && text(submission.status).toLowerCase() === "resubmission_requested") {
     const feedback = text(submission.requestedChanges) || text(submission.rejectionReason) || "The reviewer requested changes to your submission.";
-    if (entered && phase.canSubmit && resubmissionWindowOpen({ submission, challenge, now: new Date() })) {
+    if (entered && (phase.canSubmit || challenge.builderVersion === "normal_v3") && resubmissionWindowOpen({ submission, challenge, now: new Date() })) {
       const deadlineMessage = resubmissionDeadline ? ` Submit your correction by ${resubmissionDeadline}.` : " Submit your correction before the resubmission deadline.";
       return result("fix_and_resubmit", "Changes requested", `${feedback}${deadlineMessage}`, "fix_and_resubmit", input, flags, null);
     }

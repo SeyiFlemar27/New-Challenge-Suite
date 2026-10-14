@@ -37,15 +37,13 @@ for (const value of ["Review", Number.NaN, -1, 99, 3.5]) {
 }
 
 assert.match(model, /normalizeNormalChallengeCapacity\(form\.maxParticipants, "limited"\)/);
-assert.match(builder, /normalizeNormalChallengeStep\(challenge\.builderCurrentStep \?\? challenge\.creationStep \?\? 1, loadedReadiness\)/);
-assert.match(steps, /if \(step === 6\) return <Review/);
+assert.match(builder, /normalRestoredStep\(challenge\.builderCurrentStep/);
+assert.match(steps, /key === "review"\) return <Review/);
 assert.match(builder, /step === NORMAL_CHALLENGE_MAX_STEP[\s\S]*Submit for Review/);
-assert.match(builder, /normalChallengeSubmitIssue\(result\.details\)/);
+assert.match(builder, /normalFrontendSubmitIssue\(result\.details\)/);
 assert.match(builder, /Some required details need attention\./);
-assert.match(steps, /No fixed capacity\./);
-assert.match(steps, /Limited to \$\{form\.maxParticipants/);
-assert.match(steps, /label="Waitlist"/);
-assert.match(steps, /Enable when capacity is reached/);
+assert.doesNotMatch(steps, /Participant capacity|label="Waitlist"/);
+assert.match(read("lib/normal-challenge-frontend.ts"), /maxParticipants/);
 assert.doesNotMatch(builder, /Too small: expected number to be >=2/);
 assert.match(capacitySource, /Set capacity to at least 2, or leave it blank for no fixed capacity\./);
 

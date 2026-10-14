@@ -30,7 +30,7 @@ const allowedDraftFields = new Set([
   "pointsToWin", "timerEnabled", "timerDuration", "roundDuration", "judgeScoringEnabled", "hostOperations", "creationStep", "builderCurrentStep", "maxUnlockedStep", "joinWindowMode", "submissionInstructionsList", "submissionRequirements", "submissionRequirementsList", "fixAndResubmitEnabled", "fixAndResubmitHours", "oneEntryPerParticipant", "hideVoteTotals", "hideRankings", "winnerSplits", "prizeCurrency", "registrationEnabled", "registrationOpensAt", "publishConfirmations"
 ]);
 
-const allowedMonetizationFields = new Set(["enabled", "paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements", "status", "paymentActive", "checkoutActive", "ledgerCreationEnabled", "prizeReleaseActive", "payoutReleaseActive"]);
+const allowedMonetizationFields = new Set(["paidEntryRequested", "entryFeeAmountCents", "currency", "sponsorReady", "prizePoolRequested", "paidVotesRequested", "sponsorshipGoal", "preferredSponsorCategory", "sponsorNote", "placements"]);
 const mediaDraftFields = new Set(["coverImageUrl", "coverImagePath", "promoImageUrl", "promoImagePath", "trailerVideoUrl", "trailerVideoPath", "promoVideoUrl", "promoVideoPath", "documentUrls", "documentPaths", "challengeImages", "challengeVideo"]);
 
 function sanitizeDraftPatch(body: Record<string, unknown>) {
@@ -106,6 +106,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return { ...current, ...calculateChallengeDraftProgress(current), retiredCompetition: true, archived: true };
     }
     if (!editableDraftStatus(current)) throw new Error("CHALLENGE_NOT_EDITABLE");
+    if (usesNormalBuilderFoundation && patch.prizeValue !== undefined) {
+      const monetization = current.monetization as Record<string, unknown> | undefined;
+      const confirmed = Number(current.confirmedCreatorPrizeFundingCents ?? monetization?.confirmedCreatorPrizeFundingCents ?? 0);
+      if ((confirmed > 0 || current.creatorPrizeGuaranteeLockedAt) && Number(patch.prizeValue) !== Number(current.prizeValue ?? 0)) throw new Error("FUNDED_BASE_PRIZE_LOCKED");
+    }
     const normalizedPatch = normalizeChallengeTimelineForStorage(patch, current);
     if (normalizedPatch.monetization && typeof normalizedPatch.monetization === "object") {
       const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
@@ -151,6 +156,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (code === "CHALLENGE_OWNERSHIP_LOCKED") return fail("Challenge ownership can't be changed after the draft is created.", 409, undefined, code);
     if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
     if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
+    if (code === "FUNDED_BASE_PRIZE_LOCKED") return fail("Confirmed Base Prize commitments require an authorized financial review before they can change.", 409, undefined, code);
     if (code === "INVALID_MEDIA_UPLOAD") return fail("Uploaded media must come from your confirmed Challenge Suite storage path.", 422, undefined, code);
     if (code === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, undefined, code);
     if (code === "ENTERPRISE_ORGANIZATION_REQUIRED" || code === "ENTERPRISE_FINANCE_OWNER_MISMATCH") return fail("Enterprise financial ownership could not be verified.", 409, undefined, code);

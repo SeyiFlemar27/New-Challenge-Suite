@@ -16,6 +16,7 @@ import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { predictionAccessForViewer } from "@/lib/server/predictions";
 import { freeVoteGuardId, nextVoteResetAt, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
 import { getChallengeBoostAccess } from "@/lib/server/boosts";
+import { hasExplicitNoWinnersOutcome } from "@/lib/server/official-winner-records";
 
 async function flagMissingOfficialWinners(db: NonNullable<ReturnType<typeof getAdminDb>>, challengeId: string) {
   const ref = db.collection("adminActionTasks").doc(`challenge_results_missing_${challengeId}`);
@@ -196,7 +197,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       avatarUrl: isPublicProfile && typeof profile.avatarUrl === "string" ? profile.avatarUrl : null
     };
   });
-  const resultsUnavailable = ["winners_announced", "completed"].includes(String(challengeData.status ?? challengeData.lifecycleStatus ?? "").toLowerCase()) && officialWinners.length === 0;
+  const resultsUnavailable = !hasExplicitNoWinnersOutcome(challengeData) && ["winners_announced", "completed"].includes(String(challengeData.status ?? challengeData.lifecycleStatus ?? "").toLowerCase()) && officialWinners.length === 0;
   if (resultsUnavailable) await flagMissingOfficialWinners(db, id).catch(() => undefined);
   const creatorPublic = creatorProfile.publicProfile !== false && creatorProfile.profileVisibility !== "private";
   const creatorDisplayName = [creatorPublic ? creatorProfile.displayName : null, creatorPublic ? creatorProfile.username : null, creatorPublic ? challengeData.creatorUsername : null]

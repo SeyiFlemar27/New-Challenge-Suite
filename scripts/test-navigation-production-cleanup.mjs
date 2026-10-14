@@ -5,7 +5,7 @@ const personalNavigation = sidebar.slice(sidebar.indexOf("function personalSecti
 assert(personalNavigation.includes('{ href: "/my-challenges", label: "My Challenges"'), "personal challenge management remains available");
 assert(!personalNavigation.includes('label: "Sponsorships"'), "personal sidebar does not expose Sponsorships");
 assert(!personalNavigation.includes('label: "Analytics"'), "personal sidebar does not expose Analytics");
-assert(personalNavigation.includes('label: "Normal"'), "Build a Challenge keeps the Normal builder option");
+assert(personalNavigation.includes('label: "Normal Challenge"'), "Challenge Studio keeps the Normal builder option");
 assert(sidebar.includes('{ href: "/challenges", label: "Challenges"'), "Challenges nav must point to /challenges");
 assert(sidebar.includes('{ href: "/explore", label: "Explore"'), "Explore must remain in navigation");
 assert(!sidebar.includes('Voting Control'), "Voting Control must not be global navigation");

@@ -48,9 +48,9 @@ for (const message of [
 assert.doesNotMatch(sources.builder, /response\.message \|\| "Challenge could not be published/);
 
 for (const title of ["Overview", "Participation", "Monetization & Prize Pool", "Media & Branding", "Schedule", "Entry & Submission", "Review Your Challenge", "Ready to Submit?"]) assert.ok(sources.builderFoundation.includes(`"${title}"`));
-assert.match(sources.normalBuilder, /NORMAL_CHALLENGE_(?:STEPS\[step\]|STEP_DEFINITIONS\[step\])/);
+assert.match(sources.normalBuilder, /NORMAL_FRONTEND_STEPS\[step\]/);
 assert.match(sources.normalBuilder, /createChallengeDraft\(payload\)/);
-assert.match(sources.normalBuilder, /publishChallengeDraft\(id, payload\)/);
+assert.match(sources.normalBuilder, /publishChallengeDraft\(id, \{/);
 assert.match(sources.normalBuilder, /Submit for Review/);
 assert.doesNotMatch(sources.normalBuilder, /setPreview\(true\)|function Preview\(|\/preview/);
 assert.match(sources.preview, /redirect\(`\/challenges\/create\/\$\{draftId\}`\)/);

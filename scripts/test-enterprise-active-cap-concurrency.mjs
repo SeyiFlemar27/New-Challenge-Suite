@@ -31,7 +31,8 @@ try {
   ids.push(...competing);
   const outcomes = await Promise.allSettled(competing.map((challengeId) => reserve(orgA, challengeId)));
   assert.equal(outcomes.filter((item) => item.status === "fulfilled").length, 1, "only one of two concurrent activations can consume slot ten");
-  assert.equal(outcomes.filter((item) => item.status === "rejected" && String(item.reason).includes("EnterpriseActiveChallengeLimitError")).length, 1);
+  assert.equal(outcomes.filter((item) => item.status === "rejected" && String(item.reason).includes("EnterpriseActiveChallengeLimitError")).length, 1,
+    `capacity rejection must be the policy error; outcomes=${JSON.stringify(outcomes.map((item) => item.status === "fulfilled" ? { status: item.status } : { status: item.status, name: item.reason?.name, code: item.reason?.code }))}`);
   assert.equal((await db.collection("enterpriseChallengeQuotas").doc(orgA).get()).data()?.activeCount, 10);
 
   const activeReservations = await db.collection("enterpriseChallengeReservations").where("organizationId", "==", orgA).where("status", "==", "active").get();

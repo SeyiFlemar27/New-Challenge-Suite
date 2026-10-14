@@ -4,6 +4,7 @@ import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 import { calculateNormalWinnerAmountsCents, isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS, normalWinnerPercentages } from "@/lib/normal-challenge-config";
 import { isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
+import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
 
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -496,10 +497,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   requireText(errors, challenge, "competitionFormat", "Format & Rules", "Select a competition format.");
   if (!list(challenge.acceptedSubmissionTypes).length) makeIssue(errors, "REQUIRED_ACCEPTED_MEDIA_TYPE", "acceptedSubmissionTypes", "Format & Rules", "Select at least one accepted media type.");
   if (!normalV2) requireText(errors, challenge, "standardRules", "Format & Rules", "Add at least one competition rule.", 10);
-  if (isNormalChallengeV3(challenge)) {
-    const instructions = list(challenge.submissionInstructionsList).map((item) => String(item ?? "").trim()).filter(Boolean);
-    if (!instructions.length) makeIssue(errors, "SUBMISSION_INSTRUCTIONS_REQUIRED", "submissionInstructionsList", "Format & Rules", "Add at least one submission instruction.");
-  } else {
+  if (!isNormalChallengeV3(challenge)) {
     requireText(errors, challenge, "challengeGuidelines", "Format & Rules", "Add submission requirements or challenge guidelines.", 10);
   }
   if (!normalV2) requireText(errors, challenge, "policyTerms", "Format & Rules", "Add eligibility or participation terms.", 10);
@@ -578,10 +576,11 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   if (normalV2) {
     const winnerCount = numberValue(challenge.numberOfWinners);
     const amounts = list(challenge.winnerPrizeAmountsCents).map(numberValue);
-    if (winnerCount < 1 || winnerCount > 3 || amounts.length !== winnerCount || amounts.some((amount) => amount <= 0)) {
+    if (winnerCount < 1 || winnerCount > 3 || amounts.length !== winnerCount || amounts.some((amount) => !Number.isSafeInteger(amount) || (isNormalChallengeV3(challenge) ? amount < 0 : amount <= 0))) {
       makeIssue(errors, "INVALID_CASH_PLACEMENTS", "winnerPrizeAmountsCents", "Monetization & Prize Pool", "Add a valid cash amount for every winner placement.");
     }
     if (isNormalChallengeV3(challenge)) {
+      if (normalBasePrizeCents(challenge.prizeValue) === null) makeIssue(errors, "BASE_PRIZE_INVALID", "prizeValue", "Monetization & Prize Pool", "Choose no Base Prize or enter at least $5 USD with at most two decimal places.");
       const locationMode = text(challenge.locationEligibility) || (text(challenge.eligibleCountry) ? "selected" : "worldwide");
       if (locationMode !== "worldwide" || list(challenge.eligibleCountries).length > 0 || text(challenge.eligibleCountry) || text(challenge.ageRestrictionMode) === "minimum" || numberValue(challenge.minimumAge) > 0) makeIssue(errors, "ELIGIBILITY_CONTROLS_RETIRED", "locationEligibility", "Participation", "New Normal Challenges use open participation without age or location restrictions.");
       const splits = list(challenge.winnerSplits).map(numberValue);

@@ -190,6 +190,7 @@ export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Ev
     }, { merge: true });
     transaction.set(challengeRef, {
       confirmedCreatorPrizeFundingCents: FieldValue.increment(amountCents),
+      ...(challenge.builderVersion === "normal_v3" ? { creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: challenge.creatorPrizeGuaranteeCents ?? Math.round(Number(challenge.prizeValue ?? 0) * 100) } : {}),
       "monetization.confirmedCreatorPrizeFundingCents": totalConfirmed,
       "monetization.creatorPrizeFundingStatus": fundingStatus,
       "monetization.prizePoolFundingSource": "creator_funded",
@@ -285,7 +286,7 @@ export async function getConfirmedCreatorPrizeFunding(db: Firestore, challengeId
   const snap = await db.collection("creatorPrizeFundingPayments").where("challengeId", "==", challengeId).get();
   const records = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
-    .filter((item) => item.paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE && item.webhookConfirmed === true && item.status === "confirmed");
+    .filter((item) => item.paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE && item.webhookConfirmed === true && item.status === "confirmed" && item.settlementRestricted !== true && item.refundLiabilityStatus !== "pending");
   return {
     grossAmountCents: records.reduce((sum, item) => sum + cents(item.amountCents ?? item.grossAmountCents), 0),
     recordCount: records.length,

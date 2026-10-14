@@ -41,3 +41,10 @@ check(journey.includes("text(submission.rejectionReason)") && journey.includes('
 check(detailsPage.includes("Fix &amp; Resubmit") && detailsPage.includes('"fix_and_resubmit"'), "details UI renders the correction action on desktop and mobile");
 
 console.log(`PASS resubmission deadline policy: ${assertions} assertions.`);
+const normal = { builderVersion: "normal_v3", status: "submission_open", submissionDeadline: now.toISOString() };
+equal(resolveResubmissionDeadline({ requestedDeadline: hours(1), challenge: normal, now }).deadline, hours(24), "Normal correction receives a full 24 hours after initial deadline");
+check(resubmissionWindowOpen({ submission, challenge: normal, now }), "Normal correction remains available after initial submission deadline");
+equal(resubmissionWindowOpen({ submission, challenge: normal, now: new Date(hours(24)) }), false, "Normal correction closes exactly at persisted expiration");
+equal(resubmissionWindowOpen({ submission, challenge: { ...normal, effectiveVotingStartsAt: now.toISOString() }, now }), false, "correction cannot overwrite an activated voting lifecycle");
+equal(resolveResubmissionDeadline({ requestedDeadline: hours(48), challenge: { ...normal, status: "cancelled" }, now }).allowed, false, "cancelled challenge cannot grant correction");
+console.log(`PASS legacy and Normal correction policies: ${assertions} assertions.`);

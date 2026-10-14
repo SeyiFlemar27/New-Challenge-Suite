@@ -57,10 +57,10 @@ for (const heading of ["Spin & Win", "Daily streak", "Earn Points", "Achievement
 assert(!hub.includes("Lifetime Earned"));
 assert(!hub.includes("Available rewards"));
 
-assert.match(sidebar, /label: "Build a Challenge"/);
-for (const label of ["Normal", "Private", "Live Event", "Tournament"]) assert(sidebar.includes(`label: "${label}"`));
-assert.match(sidebar, /const \[open, setOpen\] = useState\(false\)/);
-assert(!sidebar.includes("useState(childRouteActive)"));
+assert.match(sidebar, /label: "Challenge Studio"/);
+for (const label of ["Normal Challenge", "Private", "Live Event", "Tournament"]) assert(sidebar.includes(`label: "${label}"`));
+assert.match(sidebar, /const \[open, setOpen\] = useState\(childRouteActive\)/);
+assert.match(sidebar, /key=\{`\$\{item\.href \?\? item\.label\}:\$\{pathname\}`\}/);
 assert.match(sidebar, /toLocaleString\(\)\} DC/);
 assert.match(sidebar, /DoroCoins\. Open DoroCoin wallet/);
 

@@ -12,7 +12,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("@playwright/test");
+const { chromium, expect } = require("@playwright/test");
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 if (resolve(process.cwd()) !== repoRoot) {
   throw new Error(`Run this browser suite from its repository root: ${repoRoot}`);
@@ -64,7 +64,7 @@ for (const [name, value] of Object.entries({
   FIRESTORE_EMULATOR_HOST: `${host}:${firestoreEmulatorPort}`,
   FIREBASE_AUTH_EMULATOR_HOST: `${host}:${authEmulatorPort}`,
   FIREBASE_STORAGE_EMULATOR_HOST: `${host}:${storageEmulatorPort}`,
-  NEXT_PUBLIC_DISABLE_MEDIA_UPLOADS: "true",
+  NEXT_PUBLIC_DISABLE_MEDIA_UPLOADS: process.env.CHALLENGE_SUITE_E2E_MEDIA_UPLOADS_ENABLED === "true" ? "false" : "true",
   NEXT_PUBLIC_SUPPORT_ATTACHMENT_UPLOADS_ENABLED: "false",
   SUPPORT_ATTACHMENT_UPLOADS_ENABLED: "false",
   NEXT_PUBLIC_INITIAL_ADMIN_EMAILS: "",
@@ -122,9 +122,13 @@ function check(condition, message) {
   assertions += 1;
 }
 
-async function test(name, fn) {
+async function test(name, fn, { requiresMedia = false } = {}) {
   if (journeyFilter && !name.toLowerCase().includes(journeyFilter)) {
     results.push({ name, status: "SKIP", assertions: 0, message: "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY." });
+    return;
+  }
+  if (requiresMedia && process.env.CHALLENGE_SUITE_E2E_MEDIA_UPLOADS_ENABLED !== "true") {
+    results.push({ name, status: "SKIP", assertions: 0, message: "Requires CHALLENGE_SUITE_E2E_MEDIA_UPLOADS_ENABLED=true and the isolated Storage emulator." });
     return;
   }
   const assertionsAtStart = assertions;
@@ -505,6 +509,143 @@ try {
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 
+  await test("Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit", async () => {
+    const builderUser = await seedUser("normalbuilder", { role: "creator" });
+    await Promise.all([db.collection("users").doc(builderUser.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true }), db.collection("profiles").doc(builderUser.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true })]);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await login(context, builderUser, { rememberMe: true });
+    await page.goto(`${baseUrl}/challenges/create`, { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Challenge title *", { exact: true }).waitFor();
+    check(await page.getByText("Choose challenge type", { exact: true }).count() === 0, "Normal opens directly at Overview");
+    const navigation = page.getByRole("navigation", { name: "Challenge builder steps" });
+    check(await navigation.getByRole("button").count() === 7, "exactly seven visible steps");
+    check(!(await navigation.innerText()).includes("Participation"), "no Participation step");
+    await page.getByLabel("Challenge title *", { exact: true }).fill("Normal frontend verification");
+    await page.getByLabel("Category", { exact: true }).selectOption("Fitness");
+    await page.getByLabel("Subcategory", { exact: true }).selectOption("Strength");
+    await page.getByLabel("Full description *", { exact: true }).fill("An isolated local fixture for the approved Normal Builder frontend.");
+    await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+    await page.getByLabel("Challenge rules 1", { exact: true }).fill("Respect every participant.");
+    const creationResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/challenges/drafts" && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const created = await creationResponse; const envelope = await created.json();
+    check(created.ok() && envelope.ok, "Overview creates a real authorized emulator draft");
+    const draftId = envelope.data.challenge.id; const draftRef = db.collection("challenges").doc(draftId);
+    await page.getByLabel("Base prize (USD)", { exact: true }).waitFor();
+    await expect(page.getByText("No Base Prize funding required", { exact: true }), "blank Base Prize does not create funding").toBeVisible({ timeout: interactionTimeout });
+    check(true, "blank Base Prize does not create funding");
+    await page.getByLabel("Open this challenge to sponsors", { exact: true }).check();
+    check(await page.getByLabel("Sponsor support focus (optional)").count() === 0 && await page.getByLabel("Sponsor note").count() === 0, "no sponsor-preference fields");
+    await page.getByLabel("Base prize (USD)", { exact: true }).fill("100");
+    await expect(page.getByText("Creator funding required", { exact: true }), "unfunded positive Base Prize state").toBeVisible({ timeout: interactionTimeout });
+    check(true, "unfunded positive Base Prize state");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByText("Add a cover image and optional additional images.", { exact: true }).waitFor();
+    check(!(await page.locator("main").innerText()).includes("712 x 430"), "media guidance is clean");
+    const image = await require("sharp")({ create: { width: 800, height: 500, channels: 3, background: "#f5d90a" } }).png().toBuffer();
+    await page.locator('input[type="file"]').first().setInputFiles({ name: "normal-cover.png", mimeType: "image/png", buffer: image });
+    await page.getByText("Upload complete.", { exact: true }).first().waitFor({ timeout: 30000 });
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByLabel("Timezone", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByLabel("Voting configuration", { exact: true }).waitFor();
+    check(await page.getByText("Submission Instructions (optional)", { exact: true }).isVisible(), "instructions are optional");
+    await page.getByLabel("Voting configuration", { exact: true }).selectOption("dorocoin");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator("[data-builder-surface]").getByRole("heading", { name: "Review Your Challenge", exact: true }).waitFor();
+    check(!(await page.locator("main").innerText()).includes("Participant visibility"), "Review omits Participation");
+    check((await page.locator("[data-builder-surface]").innerText()).includes("An isolated local fixture for the approved Normal Builder frontend.") && (await page.locator("[data-builder-surface]").innerText()).includes("Respect every participant."), "Review renders the actual description and creator rules");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator("[data-builder-surface]").getByRole("heading", { name: "Ready to Submit?", exact: true }).waitFor();
+    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isDisabled(), "unfunded and server-incompatible draft cannot submit");
+    check((await page.locator("main").innerText()).includes("Fund the remaining $100.00"), "accurate outstanding amount");
+    await navigation.getByRole("button", { name: "Monetization & Prize Pool", exact: true }).click();
+    // These are explicit demo-server fixtures, not simulated live Stripe confirmation.
+    await draftRef.update({ confirmedCreatorPrizeFundingCents: 6000 });
+    await page.getByRole("button", { name: "Refresh funding status", exact: true }).click();
+    await page.getByText("Partially funded", { exact: true }).waitFor();
+    check((await page.locator("main").innerText()).includes("Outstanding: $40.00"), "partial creator funding never counts as fully funded");
+    await draftRef.update({ confirmedCreatorPrizeFundingCents: 10000, "monetization.status": "active_foundation", "monetization.paymentActive": true, "monetization.checkoutActive": true });
+    await page.getByRole("button", { name: "Refresh funding status", exact: true }).click();
+    await page.getByText("Fully creator-funded", { exact: true }).waitFor();
+    check(await page.getByLabel("Base prize (USD)", { exact: true }).isDisabled(), "confirmed monetary commitment is protected from accidental editing");
+    await navigation.getByRole("button", { name: "Entry & Submission", exact: true }).click();
+    await page.getByRole("button", { name: "Add Instruction", exact: true }).click();
+    await page.getByLabel("Submission instruction 1", { exact: true }).fill("An optional saved instruction.");
+    await page.getByRole("button", { name: "Add Instruction", exact: true }).click();
+    await page.getByLabel("Submission instruction 2", { exact: true }).fill("A second optional instruction.");
+    await page.getByRole("button", { name: "Move instruction 2 up", exact: true }).click();
+    check(await page.getByLabel("Submission instruction 1", { exact: true }).inputValue() === "A second optional instruction.", "instruction order can be changed");
+    await navigation.getByRole("button", { name: "Review", exact: true }).click();
+    const instructionReview = await page.locator("[data-builder-surface]").innerText();
+    check(instructionReview.includes("A second optional instruction.") && instructionReview.indexOf("A second optional instruction.") < instructionReview.indexOf("An optional saved instruction."), "Review preserves actual ordered instructions");
+    await navigation.getByRole("button", { name: /Publish$/ }).click();
+    await page.getByLabel("I confirm the challenge details are accurate.", { exact: true }).check();
+    await page.getByLabel("I have the rights to publish the content and media.", { exact: true }).check();
+    await page.getByLabel("I understand editing is unavailable while the challenge is under review.", { exact: true }).check();
+    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isEnabled(), "full authoritative creator funding satisfies the frontend checkpoint when all other requirements are valid");
+    // Never invoke publication or a payment: verify gating only using demo funding records.
+    await navigation.getByRole("button", { name: "Entry & Submission", exact: true }).click();
+    await page.getByRole("button", { name: "Remove instruction 2", exact: true }).click();
+    await page.getByRole("button", { name: "Remove instruction 1", exact: true }).click();
+    check(await page.getByLabel("Submission instruction 1", { exact: true }).count() === 0, "all instructions can be removed");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Builder Guide", exact: true }).click();
+    await page.getByRole("dialog", { name: "Builder Guide" }).waitFor();
+    await page.keyboard.press("Escape");
+    check(await page.getByRole("dialog", { name: "Builder Guide" }).count() === 0, "Guide dismisses on Escape");
+    check(await page.getByRole("button", { name: "Builder Guide", exact: true }).evaluate((element) => element === document.activeElement), "Guide restores focus");
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Normal Builder fits mobile width");
+    await page.screenshot({ path: join(artifacts, "normal-builder-mobile.png"), fullPage: true });
+    await page.setViewportSize({ width: 768, height: 1024 });
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Normal Builder fits tablet width");
+    await page.screenshot({ path: join(artifacts, "normal-builder-tablet.png"), fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const draftPath = `/api/challenges/drafts/${draftId}`;
+    await page.route(`**${draftPath}`, async (route) => route.request().method() === "PATCH" ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, code: "SERVER_UNAVAILABLE", message: "Isolated save failure fixture" }) }) : route.continue());
+    await page.getByRole("button", { name: "Finish Later", exact: true }).click();
+    await page.getByText("We couldn't save your changes. Check your connection and try again.", { exact: true }).first().waitFor();
+    check(new URL(page.url()).pathname.includes(draftId), "failed Finish Later stays on the draft");
+    await page.unroute(`**${draftPath}`);
+    await page.getByRole("button", { name: "Try Again", exact: true }).click();
+    await page.getByText("We couldn't save your changes. Check your connection and try again.", { exact: true }).first().waitFor({ state: "hidden" });
+    check(new URL(page.url()).pathname.includes(draftId), "successful save retry clears the error without leaving the draft");
+    await page.getByRole("button", { name: "Finish Later", exact: true }).click();
+    await page.waitForURL("**/challenges");
+    const saved = (await draftRef.get()).data();
+    check(saved.submissionInstructionsList.length === 0 && saved.votingSettings.allowPaidVotes === true, "latest optional instructions and existing voting setting persist before leaving");
+    check(saved.builderCurrentStep === 5, "wire step remains compatible with the existing server");
+    check(saved.monetization.status === "active_foundation" && saved.monetization.paymentActive === true && saved.monetization.checkoutActive === true, "frontend draft saves preserve authoritative financial status flags");
+    check(saved.status === "draft", "no false submission success or financial operation occurs");
+    await context.close();
+
+    const legacyFreeUser = await seedUser("normalfreelegacy", { role: "creator" });
+    const legacyContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const legacyPage = await login(legacyContext, legacyFreeUser);
+    await legacyPage.goto(`${baseUrl}/challenges/create`, { waitUntil: "domcontentloaded" });
+    await legacyPage.getByLabel("Challenge title *", { exact: true }).fill("Legacy voting compatibility");
+    await legacyPage.getByLabel("Category", { exact: true }).selectOption("Fitness");
+    await legacyPage.getByLabel("Subcategory", { exact: true }).selectOption("Strength");
+    await legacyPage.getByLabel("Full description *", { exact: true }).fill("A local fixture for preserving a restored voting configuration.");
+    const legacyCreationResponse = legacyPage.waitForResponse((response) => new URL(response.url()).pathname === "/api/challenges/drafts" && response.request().method() === "POST");
+    await legacyPage.getByRole("button", { name: "Continue", exact: true }).click();
+    const legacyCreation = await legacyCreationResponse;
+    const legacyEnvelope = await legacyCreation.json();
+    check(legacyCreation.ok() && legacyEnvelope.ok, `Free fixture creates a draft through the actual UI (HTTP ${legacyCreation.status()}, code=${legacyEnvelope.code ?? "OK"})`);
+    const legacyId = legacyEnvelope.data.challenge.id;
+    await legacyPage.getByLabel("Base prize (USD)", { exact: true }).waitFor();
+    await legacyPage.getByRole("button", { name: "Finish Later", exact: true }).click();
+    await legacyPage.waitForURL("**/challenges");
+    await db.collection("challenges").doc(legacyId).update({ "votingSettings.allowPaidVotes": true, "monetization.paidVotesRequested": true, builderCurrentStep: 5, maxUnlockedStep: 5 });
+    await legacyPage.goto(`${baseUrl}/challenges/create/${legacyId}`, { waitUntil: "domcontentloaded" });
+    await legacyPage.getByRole("button", { name: "Use Free Vote Only", exact: true }).waitFor();
+    check((await legacyPage.locator("[data-normal-step-heading]").innerText()) === "Entry & Submission", "legacy wire position five restores to Entry & Submission");
+    check(await legacyPage.getByLabel("Voting configuration", { exact: true }).isDisabled() && await legacyPage.getByLabel("Voting configuration", { exact: true }).inputValue() === "dorocoin", "Free draft accurately displays its existing DoroCoin setting read-only");
+    await legacyPage.getByRole("button", { name: "Use Free Vote Only", exact: true }).click();
+    check(await legacyPage.getByLabel("Voting configuration", { exact: true }).inputValue() === "free" && await legacyPage.getByLabel("Voting configuration", { exact: true }).locator("option").count() === 1, "explicit Free Vote Only action cannot re-enable paid voting");
+    await legacyContext.close();
+  }, { requiresMedia: true });
+
   await test("Creator login establishes a server session and Explore renders API-backed challenge", async () => {
     const page = await login(desktop, creator);
     const cookie = (await page.context().cookies()).find((item) => item.name === "challenge_suite_session");
@@ -806,7 +947,7 @@ try {
   removeNextGeneratedTsconfigIncludes();
   restoreNextGeneratedRouteTypeImport();
   await firebaseApp.delete().catch(() => undefined);
-  writeFileSync(join(artifacts, "results.json"), JSON.stringify({ passed, failed: results.length - passed, assertions, results, pageErrors, authResponses, authStorageSnapshots, browserDiagnostics, nextLog: serverLog.join("").slice(-12000) }, null, 2));
+  writeFileSync(join(artifacts, "results.json"), JSON.stringify({ passed, failed: results.filter((result) => result.status === "FAIL").length, skipped: results.filter((result) => result.status === "SKIP").length, assertions, results, pageErrors, authResponses, authStorageSnapshots, browserDiagnostics, nextLog: serverLog.join("").slice(-12000) }, null, 2));
   console.log(`Browser QA artifacts: ${artifacts}`);
   console.log(`Browser journeys: ${passed}/${results.filter((result) => result.status !== "SKIP").length} passed; ${assertions} assertions.`);
   if (results.some((result) => result.status === "FAIL") || pageErrors.length) process.exitCode = 1;

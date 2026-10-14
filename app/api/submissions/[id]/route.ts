@@ -14,6 +14,8 @@ import { submissionFolderForMediaType, submissionMediaPath } from "@/lib/media-u
 import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { isPaidEntryChallenge } from "@/lib/server/monetization-payments";
 import { resubmissionWindowOpen } from "@/lib/server/submission-resubmission";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { dispatchConfiguredNormalLifecycle } from "@/lib/server/normal-lifecycle-scheduler";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -51,7 +53,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const now = new Date();
   const deadlineValue = getSubmissionDeadline(challenge);
   const deadlineMs = Date.parse(String(deadlineValue ?? ""));
-  if (!Number.isFinite(deadlineMs) || now.getTime() >= deadlineMs || !isChallengeSubmittable(challenge, now).allowed) {
+  const normalCorrection = challenge.builderVersion === "normal_v3" && resubmissionWindowOpen({ submission: initial, challenge, now });
+  if (!normalCorrection && (!Number.isFinite(deadlineMs) || now.getTime() >= deadlineMs || !isChallengeSubmittable(challenge, now).allowed)) {
     return fail("Submission edits are locked at or after the submission deadline.", 409, undefined, "SUBMISSION_EDIT_WINDOW_CLOSED");
   }
   const initialStatus = String(initial.status ?? "").toLowerCase();
@@ -81,7 +84,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const participantRef = db.collection("challengeParticipants").doc(`${challengeId}_${auth.user.uid}`);
   const challengeRef = db.collection("challenges").doc(challengeId);
   const expectedRevision = body.expectedRevision ?? Number(initial.revisionNumber ?? 0);
-  const nowIso = now.toISOString();
   try {
     const updated = await db.runTransaction(async (transaction) => {
       const [submissionSnap, freshChallengeSnap, participantSnap] = await Promise.all([
@@ -91,10 +93,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const current = submissionSnap.data() ?? {};
       const freshChallenge = { id: freshChallengeSnap.id, ...freshChallengeSnap.data() } as Record<string, unknown>;
       const participant = participantSnap.data() ?? {};
+      const transactionNow = new Date();
+      const nowIso = transactionNow.toISOString();
       if (String(current.userId ?? "") !== auth.user!.uid || String(current.challengeId ?? "") !== challengeId) throw new Error("SUBMISSION_OWNER_OR_CHALLENGE_CHANGED");
       if (Number(current.revisionNumber ?? 0) !== expectedRevision) throw new Error("SUBMISSION_REVISION_CONFLICT");
       const freshDeadline = Date.parse(String(getSubmissionDeadline(freshChallenge) ?? ""));
-      if (!Number.isFinite(freshDeadline) || Date.now() >= freshDeadline || !isChallengeSubmittable(freshChallenge, new Date()).allowed) throw new Error("SUBMISSION_EDIT_WINDOW_CLOSED");
+      const freshNormalCorrection = freshChallenge.builderVersion === "normal_v3" && resubmissionWindowOpen({ submission: current, challenge: freshChallenge, now: new Date() });
+      if (!freshNormalCorrection && (!Number.isFinite(freshDeadline) || Date.now() >= freshDeadline || !isChallengeSubmittable(freshChallenge, new Date()).allowed)) throw new Error("SUBMISSION_EDIT_WINDOW_CLOSED");
       const currentStatus = String(current.status ?? "").toLowerCase();
       const resubmissionRequested = currentStatus === "resubmission_requested";
       if (resubmissionRequested && !resubmissionWindowOpen({ submission: current, challenge: freshChallenge, now: new Date() })) throw new Error("RESUBMISSION_WINDOW_CLOSED");
@@ -103,11 +108,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (lockedStatuses.has(currentStatus)) throw new Error("SUBMISSION_MODERATION_LOCKED");
       const revisionNumber = Number(current.revisionNumber ?? 0) + 1;
       const next = { ...current, title: body.title, description: body.description || body.caption || "", caption: body.caption || body.description || "", mediaUrl: body.mediaUrl, mediaType: body.mediaType, mediaStoragePath: body.mediaStoragePath, originalFileName: body.originalFileName, fileSize: body.fileSize, revisionNumber, ...(resubmissionRequested ? { status: "pending_review", moderationStatus: "pending_review", resubmissionCompletedRequestId: current.resubmissionRequestId ?? null, resubmissionCompletedAt: nowIso } : {}), revisedAt: nowIso, updatedAt: nowIso, mediaUploadPending: false };
+      if (freshNormalCorrection) Object.assign(next, { correctionAutoReviewAt: new Date(transactionNow.getTime() + 5 * 60_000).toISOString(), correctionRevision: revisionNumber, serverMediaVerifiedAt: nowIso, safetyReviewStatus: "pending", leaderboardEligible: false, publicEligible: false });
       const revisionRef = db.collection("submissionRevisions").doc(`${id}_v${revisionNumber}`);
       transaction.create(revisionRef, { id: revisionRef.id, submissionId: id, challengeId, userId: auth.user!.uid, revisionNumber, before: { title: current.title ?? "", description: current.description ?? "", mediaUrl: current.mediaUrl ?? "", mediaType: current.mediaType ?? "", mediaStoragePath: current.mediaStoragePath ?? "" }, after: { title: next.title, description: next.description, mediaUrl: next.mediaUrl, mediaType: next.mediaType, mediaStoragePath: next.mediaStoragePath }, priorModerationStatus: current.status ?? null, priorReviewReason: current.rejectionReason ?? null, createdAt: nowIso, createdBy: auth.user!.uid, immutable: true });
       transaction.set(submissionRef, next, { merge: true });
+      if (freshNormalCorrection && freshChallenge.normalLifecyclePolicyVersion === 1) wakeNormalLifecycleJob(db, transaction, challengeId, new Date(transactionNow.getTime() + 5 * 60_000).toISOString());
       return next;
     });
+    if (challenge.normalLifecyclePolicyVersion === 1) await dispatchConfiguredNormalLifecycle(db);
     return ok({ submission: { id, ...updated } }, "Submission updated successfully.");
   } catch (error) {
     const code = error instanceof Error ? error.message : "SUBMISSION_UPDATE_FAILED";
@@ -169,7 +177,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       submission: {
         id: submissionSnap.id,
         ...publicSubmissionFields(submission),
-        ...(ownerAccess ? { editableMedia: { mediaStoragePath: submission.mediaStoragePath ?? "", fileSize: submission.fileSize ?? 0, originalFileName: submission.originalFileName ?? "", revisionNumber: submission.revisionNumber ?? 0 } } : {})
+        ...(ownerAccess ? { rejectionReason: submission.rejectionReason ?? null, finalRejectedAt: submission.finalRejectedAt ?? null, appealDeadline: submission.appealDeadline ?? null, appealStatus: submission.appealStatus ?? null, resubmissionDeadline: submission.resubmissionDeadline ?? null, editableMedia: { mediaStoragePath: submission.mediaStoragePath ?? "", fileSize: submission.fileSize ?? 0, originalFileName: submission.originalFileName ?? "", revisionNumber: submission.revisionNumber ?? 0 } } : {})
       },
       challenge,
       creator,

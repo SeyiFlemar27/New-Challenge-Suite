@@ -40,6 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (confirmedCents > 0) return fail("This challenge already has confirmed creator prize funding. Contact support before changing a funded guarantee.", 409, { confirmedCents }, "PRIZE_FUNDING_ALREADY_CONFIRMED");
 
   const amountCents = body.data.amountCents;
+  if (challenge.builderVersion === "normal_v3" && amountCents !== Math.round(Number(challenge.prizeValue ?? 0) * 100)) return fail("Fund the exact Base Prize saved on this draft. Save any unfunded amount change before checkout.", 409, undefined, "BASE_PRIZE_FUNDING_AMOUNT_MISMATCH");
   const officialEnterprise = challenge.officialChallenge === true || challenge.ownershipType === "challenge_suite_official" || Boolean(challenge.organizationOwnerId);
   if (officialEnterprise && confirmedCents + amountCents > ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents) return fail("Enterprise challenge prize funding cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
 

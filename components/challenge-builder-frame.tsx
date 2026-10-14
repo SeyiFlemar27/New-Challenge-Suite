@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, Circle, LockKeyhole, X } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui";
 
 export type BuilderGuideContent = {
@@ -19,6 +20,8 @@ export function ChallengeBuilderFrame({
   onStepChange,
   completedSteps,
   guideStatus,
+  guideKeyboardSupport = false,
+  normalLayout = false,
   children
 }: {
   steps: readonly string[];
@@ -30,10 +33,12 @@ export function ChallengeBuilderFrame({
   onStepChange: (step: number) => void;
   completedSteps?: readonly boolean[];
   guideStatus?: React.ReactNode;
+  guideKeyboardSupport?: boolean;
+  normalLayout?: boolean;
   children: React.ReactNode;
 }) {
   return <>
-    <div className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,760px)_280px] 2xl:grid-cols-[290px_minmax(0,840px)_300px]">
+    <div className={normalLayout ? "mt-8 grid min-w-0 gap-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_240px] 2xl:grid-cols-[220px_minmax(0,840px)_260px]" : "mt-8 grid min-w-0 gap-8 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,760px)_280px] 2xl:grid-cols-[290px_minmax(0,840px)_300px]"}>
       <BuilderRail steps={steps} currentStep={currentStep} unlockedStep={unlockedStep} completedSteps={completedSteps} onStepChange={onStepChange} />
       <section className="min-w-0">
         <div className="mb-5 lg:hidden">
@@ -49,7 +54,7 @@ export function ChallengeBuilderFrame({
       </section>
       <BuilderGuide guide={guide} status={guideStatus} />
     </div>
-    {guideOpen ? <BuilderGuideSheet guide={guide} close={() => setGuideOpen(false)} /> : null}
+    {guideOpen ? <BuilderGuideSheet guide={guide} close={() => setGuideOpen(false)} keyboardSupport={guideKeyboardSupport} /> : null}
   </>;
 }
 
@@ -105,6 +110,26 @@ function BuilderGuide({ guide, status }: { guide: BuilderGuideContent; status?: 
   return <aside className="hidden xl:block"><div className="sticky top-24 rounded-[12px] border border-black/[0.08] bg-white p-6 shadow-[0_14px_44px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700"><Circle size={8} fill="currentColor" /> Builder Guide</div><h2 className="mt-4 text-lg font-black text-slate-950">{guide.title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{guide.description}</p><ul className="mt-5 space-y-4">{guide.points.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={16} /><span>{item}</span></li>)}</ul>{status}</div></aside>;
 }
 
-function BuilderGuideSheet({ guide, close }: { guide: BuilderGuideContent; close: () => void }) {
-  return <div className="fixed inset-0 z-[100] bg-black/45 xl:hidden" role="dialog" aria-modal="true" aria-label="Builder Guide" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-[16px] bg-white p-6 text-slate-950 shadow-2xl"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Builder Guide</p><button type="button" onClick={close} className="grid size-10 place-items-center rounded-full bg-slate-100" aria-label="Close Builder Guide"><X size={18} /></button></div><h2 className="mt-4 text-2xl font-black">{guide.title}</h2><p className="mt-2 leading-7 text-slate-600">{guide.description}</p><ul className="mt-6 space-y-4">{guide.points.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={17} /><span>{item}</span></li>)}</ul></div></div>;
+function BuilderGuideSheet({ guide, close, keyboardSupport }: { guide: BuilderGuideContent; close: () => void; keyboardSupport: boolean }) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(close);
+  useEffect(() => { closeRef.current = close; }, [close]);
+  useEffect(() => {
+    if (!keyboardSupport) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const controls = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],[tabindex="0"]') ?? []);
+    controls()[0]?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key !== "Tab") return;
+      const items = controls(); const first = items[0]; const last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", handleKey); previous?.focus(); };
+  }, [keyboardSupport]);
+  return <div ref={dialog} className="fixed inset-0 z-[100] bg-black/45 xl:hidden" role="dialog" aria-modal="true" aria-label="Builder Guide" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-[16px] bg-white p-6 text-slate-950 shadow-2xl"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Builder Guide</p><button type="button" onClick={close} className="grid size-10 place-items-center rounded-full bg-slate-100" aria-label="Close Builder Guide"><X size={18} /></button></div><h2 className="mt-4 text-2xl font-black">{guide.title}</h2><p className="mt-2 leading-7 text-slate-600">{guide.description}</p><ul className="mt-6 space-y-4">{guide.points.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600"><Check className="mt-1 shrink-0 text-amber-700" size={17} /><span>{item}</span></li>)}</ul></div></div>;
 }

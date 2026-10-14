@@ -1,5 +1,6 @@
 import { calculateNormalWinnerAmountsCents, NORMAL_CHALLENGE_STEPS, NORMAL_RESUBMIT_WINDOWS, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, normalWinnerPercentages } from "@/lib/normal-challenge-config";
 import { NORMAL_CHALLENGE_CAPACITY_ERROR, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
+import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
 
 export type NormalChallengeIssue = { code: string; field: string; step: number; message: string };
 export type NormalChallengeReadiness = {
@@ -55,8 +56,9 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
   const prizeAmounts = list(challenge.winnerPrizeAmountsCents).map(Number);
   if (modern) {
     if (text(challenge.prizeType) !== "money") issue(issues, "CASH_PRIZE_REQUIRED", "prizeType", 2, "Normal Challenges require a cash prize.");
-    if (prizeAmounts.length !== winners || prizeAmounts.some((amount) => !Number.isInteger(amount) || amount <= 0)) issue(issues, "PRIZE_AMOUNTS_INVALID", "winnerPrizeAmountsCents", 2, "Add a valid cash amount for every winner placement.");
+    if (prizeAmounts.length !== winners || prizeAmounts.some((amount) => !Number.isSafeInteger(amount) || (v3 ? amount < 0 : amount <= 0))) issue(issues, "PRIZE_AMOUNTS_INVALID", "winnerPrizeAmountsCents", 2, "Add a valid amount for every winner placement.");
     if (v3) {
+      if (normalBasePrizeCents(challenge.prizeValue) === null) issue(issues, "BASE_PRIZE_INVALID", "prizeValue", 2, "Choose no Base Prize or enter at least $5 USD with at most two decimal places.");
       const splits = list(challenge.winnerSplits).map(Number);
       const totalCents = Math.round(number(challenge.prizeValue) * 100);
       const expected = calculateNormalWinnerAmountsCents(totalCents, winners);
@@ -104,10 +106,7 @@ export function getNormalChallengeReadiness(challenge: Record<string, unknown>):
 
   const types = list(challenge.acceptedSubmissionTypes).map(String);
   if (!types.length || types.some((value) => !["image", "video"].includes(value))) issue(issues, "SUBMISSION_TYPE_REQUIRED", "acceptedSubmissionTypes", 5, "Choose Image, Video, or Image or Video.");
-  const instructions = Array.isArray(challenge.submissionInstructionsList) ? challenge.submissionInstructionsList.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
-  if (isNormalChallengeV3(challenge)) {
-    if (instructions.length === 0) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "submissionInstructionsList", 5, "Add at least one submission instruction.");
-  } else if (text(challenge.challengeGuidelines).length < 10) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "challengeGuidelines", 5, "Add submission instructions.");
+  if (!v3 && text(challenge.challengeGuidelines).length < 10) issue(issues, "SUBMISSION_INSTRUCTIONS_REQUIRED", "challengeGuidelines", 5, "Add submission instructions.");
   const resubmitHours = number(challenge.fixAndResubmitHours ?? 24);
   if (!isNormalChallengeV3(challenge) && bool(challenge.fixAndResubmitEnabled) && !NORMAL_RESUBMIT_WINDOWS.includes(resubmitHours as 12 | 24 | 48 | 72)) issue(issues, "RESUBMIT_PERIOD_INVALID", "fixAndResubmitHours", 5, "Choose a 12, 24, 48, or 72 hour correction window.");
 

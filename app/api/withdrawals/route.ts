@@ -2,7 +2,8 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { ensureCashWalletFoundation, normalizeCashWallet } from "@/lib/server/cash-wallet";
-import { createWithdrawalRequest, maskAccount, MAX_DAILY_WITHDRAWAL_CENTS, MIN_WITHDRAWAL_CENTS } from "@/lib/server/withdrawals";
+import { createWithdrawalRequest, maskAccount, MAX_DAILY_WITHDRAWAL_CENTS, MIN_WITHDRAWAL_CENTS, WITHDRAWABLE_CASH_SOURCE_TYPES } from "@/lib/server/withdrawals";
+import { runFinancialTransaction } from "@/lib/server/financial-transaction";
 import { currentKycPolicyStatus } from "@/lib/server/kyc-policy";
 import { WALLET_POLICY_COPY, WITHDRAWAL_ARCHITECTURE_CONFIG, getWithdrawalDisabledReasons, isEligibleEarningAccount } from "@/lib/server/wallet-architecture";
 
@@ -35,10 +36,10 @@ export async function GET(request: Request) {
     .map((doc) => ({ id: doc.id, ...doc.data(), payoutProviderReference: null } as Record<string, unknown> & { id: string }))
     .sort((left, right) => Date.parse(String(right.createdAt ?? "")) - Date.parse(String(left.createdAt ?? "")));
   const payoutMethods = payoutMethodSnap.docs.map((doc) => ({ id: doc.id, type: doc.data().type, label: doc.data().maskedAccount, verificationStatus: doc.data().verificationStatus, providerConnected: false, transferEnabled: false }));
-  const eligibleSourceTypes = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
+  const eligibleSourceTypes = WITHDRAWABLE_CASH_SOURCE_TYPES;
   const eligibleSources = earningSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string }))
-    .filter((item) => item.direction === "credit" && item.status === "available" && eligibleSourceTypes.has(String(item.sourceType ?? "")))
+    .filter((item) => item.direction === "credit" && item.status === "available" && item.disputeRestricted !== true && eligibleSourceTypes.has(String(item.sourceType ?? "")))
     .map((item) => ({
       id: item.id,
       sourceType: item.sourceType,
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
       settlementId: item.settlementId ?? null,
       grossAmountCents: Number(item.grossAmountCents ?? item.amountCents ?? 0),
       feeAmountCents: Number(item.feeAmountCents ?? 0),
-      netAmountCents: Number(item.netAmountCents ?? item.amountCents ?? 0),
+      netAmountCents: Number(item.availableAmountCents ?? item.netAmountCents ?? item.amountCents ?? 0),
       currency: item.currency ?? "USD",
       status: item.status
     }));
@@ -68,10 +69,12 @@ export async function GET(request: Request) {
     disabledReasons,
     policy: WALLET_POLICY_COPY,
     eligibilitySourceTypes: accountType === "host" ? ["prize_winnings", "host_earnings"] : accountType === "creator" ? ["prize_winnings", "creator_earnings"] : accountType === "sponsor" ? [] : ["prize_winnings"],
-    supportedPayoutMethods: ["bank_transfer", "paypal", "payoneer"],
+    supportedPayoutMethods: ["bank_transfer"],
+    futurePayoutMethods: ["paypal", "payoneer"],
     pendingClearanceDays: WITHDRAWAL_ARCHITECTURE_CONFIG.pendingClearanceDays,
     minimumProcessingHours: WITHDRAWAL_ARCHITECTURE_CONFIG.minimumProcessingHours,
-    withdrawalFeeCents: WITHDRAWAL_ARCHITECTURE_CONFIG.withdrawalFeeCents,
+    withdrawalFeeCents: null,
+    providerFeeVerified: false,
     eligibleSources,
     payoutMethods
   }, "Withdrawal review data loaded.");
@@ -87,23 +90,23 @@ export async function POST(request: Request) {
   const body = parsed.body ?? {};
   const method = String((body as any).method ?? "").toLowerCase();
   const sourceId = String((body as any).sourceId ?? "").trim();
-  const amountCents = Math.round(Number((body as any).amountCents ?? 0));
+  const amountCents = Number((body as any).amountCents ?? 0);
+  const sourceIds = Array.isArray((body as any).sourceIds) ? (body as any).sourceIds.map(String) as string[] : sourceId ? [sourceId] : [];
   const minimumWithdrawalCents = MIN_WITHDRAWAL_CENTS;
   const accountSnap = await db.collection("users").doc(user.uid).get();
   const accountType = String(accountSnap.data()?.accountType ?? accountSnap.data()?.role ?? "user");
   if (accountType === "sponsor") return fail("Sponsor accounts do not use standard earnings withdrawals.", 403, undefined, "WITHDRAWAL_NOT_AVAILABLE");
-  if (!["bank_transfer", "paypal", "payoneer"].includes(method)) return fail("Choose Bank Transfer, PayPal, or Payoneer.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
+  if (method !== "bank_transfer") return fail("Bank Transfer is the supported initial payout destination. Provider activation remains unavailable.", 400, undefined, "UNSUPPORTED_WITHDRAWAL_METHOD");
   if (!Number.isInteger(amountCents) || amountCents < minimumWithdrawalCents) return fail(`Minimum withdrawal is ${(minimumWithdrawalCents / 100).toFixed(2)}.`, 400, undefined, "INVALID_WITHDRAWAL_AMOUNT");
-  if (!sourceId) return fail("Choose an eligible cash earning source.", 400, undefined, "WITHDRAWAL_SOURCE_REQUIRED");
-  const sourceSnap = await db.collection("cashLedger").doc(sourceId).get();
+  if (!sourceIds.length || sourceIds.length > 200 || sourceIds.some(id => !id || id.includes("/"))) return fail("Choose eligible cash earning sources.", 400, undefined, "WITHDRAWAL_SOURCE_REQUIRED");
+  const sourceSnaps = await db.getAll(...sourceIds.map(id => db.collection("cashLedger").doc(id)));
+  const sourceSnap = sourceSnaps[0];
   const source = sourceSnap.data() ?? {};
-  const eligibleSourceTypes = new Set(["challenge_winner_prize", "sponsor_prize", "prediction_reward", "creator_challenge_earning"]);
+  const eligibleSourceTypes = WITHDRAWABLE_CASH_SOURCE_TYPES;
   if (!sourceSnap.exists || source.userId !== user.uid || source.direction !== "credit" || source.status !== "available" || !eligibleSourceTypes.has(String(source.sourceType ?? ""))) {
     return fail("Choose an available cash earning that belongs to your wallet.", 403, undefined, "WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
   }
-  if (amountCents !== Number(source.netAmountCents ?? source.amountCents ?? 0)) {
-    return fail("Request the full net amount available from the selected earning.", 400, undefined, "WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
-  }
+  if (sourceSnaps.some(document => !document.exists || document.data()?.userId !== user.uid || document.data()?.direction !== "credit" || document.data()?.status !== "available" || !eligibleSourceTypes.has(String(document.data()?.sourceType)))) return fail("Choose available cash earnings belonging to your wallet.", 403, undefined, "WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
   const now = new Date().toISOString();
   const payoutMethodId = String((body as any).payoutMethodId ?? "").trim();
   const savedMethodSnap = payoutMethodId ? await db.collection("payoutMethods").doc(payoutMethodId).get() : null;
@@ -123,12 +126,12 @@ export async function POST(request: Request) {
       : `${bankName} ${maskAccount(accountNumber)}`;
   const payoutMethodLast4 = resolvedMethod === "bank_transfer" ? accountNumber.replace(/\D/g, "").slice(-4) : resolvedMethod;
   try {
-    const result = await db.runTransaction((transaction) => createWithdrawalRequest(db, transaction, {
+    const result = await runFinancialTransaction(db, (transaction) => createWithdrawalRequest(db, transaction, {
       userId: user.uid,
       amountCents,
       currency: "usd",
-      sourceType: String(source.sourceType),
-      sourceIds: [sourceId],
+      sourceType: sourceIds.length > 1 ? "aggregated_earnings" : String(source.sourceType),
+      sourceIds,
       payoutMethodType: resolvedMethod,
       payoutMethodLabel,
       payoutMethodLast4,
@@ -136,7 +139,7 @@ export async function POST(request: Request) {
       bankName,
       country: String(details.country ?? "US"),
       kycStatusAtRequest: currentKycPolicyStatus(),
-      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceId}-${amountCents}-${resolvedMethod}`),
+      idempotencyKey: String((body as any).idempotencyKey ?? `${user.uid}-${sourceIds.join("-")}-${amountCents}-${resolvedMethod}`),
       now
     }));
     return ok({ request: result.request, created: result.created, payoutExecuted: false }, "Withdrawal request submitted for review.");

@@ -61,13 +61,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const selectedIds = new Set(approvedWinners.map((winner) => winner.submissionId));
   const selectedScores = candidates.filter((candidate) => selectedIds.has(candidate.submissionId)).map((candidate) => candidate.weightedVoteCount);
   const unselectedScores = candidates.filter((candidate) => !selectedIds.has(candidate.submissionId)).map((candidate) => candidate.weightedVoteCount);
-  const tieAtWinnerBoundary = selectedScores.some((score) => unselectedScores.includes(score));
+  const tiedWinningScores = selectedScores.filter(score => candidates.filter(candidate => candidate.weightedVoteCount === score).length > 1);
+  const tieAtWinnerBoundary = challenge.builderVersion === "normal_v3" ? tiedWinningScores.length > 0 : selectedScores.some((score) => unselectedScores.includes(score));
   const configuredTieBreaker = Boolean(challenge.tieBreaker || challenge.tieBreakerRule || challenge.winnerTieBreaker);
-  if (tieAtWinnerBoundary && !configuredTieBreaker && !adminNote) {
+  if (tieAtWinnerBoundary && (challenge.builderVersion === "normal_v3" || !configuredTieBreaker) && !adminNote) {
     return fail("Tied winner candidates require an explicit admin review note.", 409, {
       tieRequiresAdminReview: true,
       tiedScores: [...new Set(selectedScores.filter((score) => unselectedScores.includes(score)))]
     }, "WINNER_TIE_REQUIRES_ADMIN_REVIEW");
+  }
+  if (challenge.normalLifecyclePolicyVersion === 1 && !challenge.finalVoteSnapshotId) return fail("Final authoritative vote results are required before winner approval.", 409, undefined, "FINAL_VOTE_SNAPSHOT_REQUIRED");
+  if (challenge.builderVersion === "normal_v3") {
+    const ordered = [...approvedWinners].sort((a, b) => a.placement - b.placement);
+    const count = Math.min(Number(challenge.numberOfWinners), candidates.length);
+    if (ordered.length !== count || ordered.some((winner, index) => selectedCandidates.find(candidate => candidate?.submissionId === winner.submissionId)!.weightedVoteCount !== candidates[index].weightedVoteCount)) return fail("Winner placements must follow the final eligible vote totals. Ties require an Admin resolution reason.", 409, undefined, "WINNER_RANKING_MISMATCH");
   }
 
   const now = new Date().toISOString();
@@ -79,6 +86,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     reviewedByAdminId: user.uid,
     adminDecision: "approved",
     adminNote,
+    tieResolution: tieAtWinnerBoundary ? { reason: adminNote, actorId: user.uid, resolvedAt: now, tiedCandidates: candidates.filter(candidate => tiedWinningScores.includes(candidate.weightedVoteCount)).map(candidate => ({ submissionId: candidate.submissionId, userId: candidate.userId, validVotes: candidate.weightedVoteCount })), selectedPlacements: approvedWinners.map(winner => ({ submissionId: winner.submissionId, placement: winner.placement })) } : null,
     settlementPreview: preview,
     ledgerFinalizationStatus: "creating_internal_settlement",
     payoutProviderCalled: false,
@@ -88,7 +96,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     updatedAt: now
   };
 
-  if (proposal.status !== "approved") {
+  if (proposal.status !== "approved" && challenge.normalLifecyclePolicyVersion !== 1) {
     await db.collection("winnerProposals").doc(proposalId).set(update, { merge: true });
   }
   const settlement = await createInternalChallengeSettlement(db, {
@@ -97,6 +105,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     adminId: user.uid,
     challenge,
     winners: approvedWinners,
+    ...(challenge.normalLifecyclePolicyVersion === 1 ? { proposalApproval: { update, expectedUpdatedAt: proposal.updatedAt } } : {}),
     approvedAt: proposal.status === "approved" && typeof proposal.reviewedAt === "string" ? proposal.reviewedAt : now
   });
   await writeAuditLog({

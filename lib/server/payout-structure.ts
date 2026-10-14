@@ -197,10 +197,11 @@ export function holdUntilFromApproval(approvedAt: string | Date, holdHours = CAS
 export function validateSponsorFundingWindow(challenge: Record<string, unknown>, now = new Date()) {
   const lifecycle = getChallengeLifecycleState(challenge, now);
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
-  const votingStartsAt = normalizeChallengeDate(challenge.votingStartsAt ?? challenge.votingStartAt, "start");
+  const waitingForEffectiveVoting = challenge.normalLifecyclePolicyVersion === 1 && ["awaiting_submission_deadline", "moderation_pending"].includes(String(challenge.normalVotingGate)) && !challenge.effectiveVotingStartsAt;
+  const votingStartsAt = normalizeChallengeDate(waitingForEffectiveVoting ? null : challenge.effectiveVotingStartsAt ?? challenge.votingStartsAt ?? challenge.votingStartAt, "start");
   const published = Boolean(challenge.publishedAt) || ["published", "scheduled", "registration_not_open", "registration_open", "active", "submission_open", "voting_open"].includes(status);
   const terminal = ["cancelled", "paused", "completed", "winners_announced"].includes(status) || Boolean(challenge.winnersApprovedAt || challenge.adminWinnersApprovedAt);
-  const votingStarted = votingStartsAt ? now.getTime() >= votingStartsAt.getTime() : lifecycle.votingStatus === "voting_open" || lifecycle.votingStatus === "voting_closed";
+  const votingStarted = waitingForEffectiveVoting ? false : votingStartsAt ? now.getTime() >= votingStartsAt.getTime() : lifecycle.votingStatus === "voting_open" || lifecycle.votingStatus === "voting_closed";
   const sponsorReady = Boolean(challenge.sponsorEnabled || challenge.sponsorReady);
   const allowed = sponsorReady && published && !terminal && !votingStarted;
   return {

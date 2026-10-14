@@ -35,4 +35,12 @@ const cutoffChallenge = { status: "active", publishedAt: start.toISOString(), sp
 assert.equal(validateSponsorFundingWindow(cutoffChallenge, new Date("2026-10-10T10:01:59.999Z")).allowed, true, "new reservation one millisecond before cutoff is permitted");
 assert.equal(validateSponsorFundingWindow(cutoffChallenge, new Date("2026-10-10T10:02:00.000Z")).allowed, false, "new reservation exactly at cutoff is rejected");
 assert.equal(validateSponsorFundingWindow(cutoffChallenge, new Date("2026-10-10T10:02:00.001Z")).allowed, false, "new reservation after cutoff is rejected");
-console.log(`PASS Sponsor reservation policy: ${cases.length + 10} deterministic boundary and integrity assertions.`);
+for (const [paymentCompletedAt, expected] of [["2026-10-10T10:01:58.000Z", true], ["2026-10-10T10:01:59.000Z", false], ["2026-10-10T10:02:00.000Z", false], ["2026-10-10T10:08:00.000Z", false]]) {
+  assert.equal(isSponsorPaymentWithinReservation({ ...base, paymentCompletedAt, paymentTimestampPrecisionMs: 1000, requireCompletionBeforeVoting: true }), expected, "Normal funding requires evidence strictly before both cutoff and expiry");
+}
+assert.equal(isSponsorPaymentWithinReservation({ ...base, votingStartsAt: null, paymentCompletedAt: window.createdAt, requireCompletionBeforeVoting: true }), false, "missing authoritative cutoff requires review");
+const delayed = { ...cutoffChallenge, normalLifecyclePolicyVersion: 1, normalVotingGate: "moderation_pending" };
+assert.equal(validateSponsorFundingWindow(delayed, new Date("2026-10-10T10:03:00.000Z")).allowed, true, "delayed Normal voting closes funding at effective activation, not stale schedule");
+assert.equal(validateSponsorFundingWindow({ ...delayed, effectiveVotingStartsAt: "2026-10-10T10:04:00.000Z", normalVotingGate: "ready" }, new Date("2026-10-10T10:04:00.000Z")).allowed, false, "effective voting activation closes new funding exactly at boundary");
+assert.equal(validateSponsorFundingWindow({ ...delayed, status: "cancelled" }, new Date("2026-10-10T10:03:00.000Z")).allowed, false, "moderation delay cannot reopen cancelled funding");
+console.log(`PASS Sponsor reservation policy: ${cases.length + 18} deterministic boundary and integrity assertions.`);

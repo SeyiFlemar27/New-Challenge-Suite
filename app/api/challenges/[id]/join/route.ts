@@ -93,6 +93,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const currentStatus = normalizeParticipantStatus(current.status);
         const entering = requestedAction === "enter_challenge";
         const alreadyEntered = ["entered", "enrolled", "approved", "active", "winner"].includes(currentStatus);
+        if (entering && !alreadyEntered) {
+          // Registration is not an approval override. Recheck capacity in the
+          // transaction that increments it, including previously registered users.
+          if (String(current.status ?? "").toLowerCase() !== "registered") throw new Error("PARTICIPANT_NOT_ADMITTED");
+          if (challengeFull) throw new Error("CHALLENGE_FULL");
+        }
         const nextStatus = entering ? "active" : currentStatus;
         const participant = {
           ...current,
@@ -147,6 +153,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message === "WAITLIST_ACTION_REQUIRED") return fail("This challenge is full. Join the waitlist to continue.", 409, { action: "join_waitlist" }, "WAITLIST_AVAILABLE");
     if (message === "CHALLENGE_FULL") return fail("This challenge has reached its participant capacity.", 409, undefined, "CHALLENGE_FULL");
     if (message === "REGISTRATION_REQUIRED") return fail("Register for this challenge before entering.", 409, { action: "register" }, "REGISTRATION_REQUIRED");
+    if (message === "PARTICIPANT_NOT_ADMITTED") return fail("Your current participation status does not permit entry. Contact the challenge organizer for review.", 403, undefined, "PARTICIPANT_NOT_ADMITTED");
     if (message === "PAID_ENTRY_PAYMENT_REQUIRED") return fail("Entry fee payment is required before submitting to this challenge.", 402, { checkoutUrl: `/api/challenges/${id}/entry-checkout`, challengePath: `/challenges/${id}`, action: "pay_entry_fee" }, "PAID_ENTRY_PAYMENT_REQUIRED");
     return fail(message, message === "Challenge not found." ? 404 : 409, undefined, message === "Challenge not found." ? "NOT_FOUND" : "CHALLENGE_JOIN_REJECTED");
   }

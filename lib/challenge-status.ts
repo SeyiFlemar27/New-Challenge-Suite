@@ -411,12 +411,17 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     && (!timeline.votingOpensAt || now >= timeline.votingOpensAt)
     && (!timeline.votingClosesAt || now <= timeline.votingClosesAt)
   );
-  const votingOpen = Boolean(votingWindowOpen && eligibleSubmissionCount !== null && eligibleSubmissionCount > 0);
+  const normalVotingReady = record.normalLifecyclePolicyVersion !== 1 || record.normalVotingGate === "ready";
+  const votingOpen = Boolean(normalVotingReady && votingWindowOpen && eligibleSubmissionCount !== null && eligibleSubmissionCount > 0);
   if (!submissionOpen && votingWindowOpen && eligibleSubmissionCount !== null && eligibleSubmissionCount <= 0) {
     phase = "voting_pending";
     blocker = "no_eligible_submissions";
   } else if (!submissionOpen && votingOpen) {
     phase = "voting_open";
+  }
+  if (record.normalLifecyclePolicyVersion === 1 && !record.effectiveVotingStartsAt && !normalVotingReady && !terminalStatuses.has(persisted) && submissionOpen === false && timeline.submissionClosesAt && now >= timeline.submissionClosesAt) {
+    phase = "voting_pending";
+    blocker = "moderation_pending";
   }
   const label = registrationOpen && submissionOpen
     ? "Registration & Submission Open"
@@ -623,7 +628,7 @@ export function getChallengeLifecycleState(challenge: Challenge | Record<string,
 
   const noSubmissionRequired = submissionStatus === "no_submission_required";
   const canSubmit = submissionStatus === "submissions_open" && !terminalStatuses.has(persisted) && primaryStatus !== "pending_review" && primaryStatus !== "draft";
-  const canVote = votingStatus === "voting_open" && !terminalStatuses.has(persisted);
+  const canVote = votingStatus === "voting_open" && !terminalStatuses.has(persisted) && (record.normalLifecyclePolicyVersion !== 1 || record.normalVotingGate === "ready");
   const canWatchLive = livestreamStatus === "livestream_live";
   const canEdit = viewerContext.isOwner === true || viewerContext.isAdmin === true ? !["cancelled", "completed"].includes(persisted) : false;
   const canCancel = viewerContext.isOwner === true || viewerContext.isAdmin === true ? !["cancelled", "completed"].includes(persisted) : false;
@@ -702,7 +707,7 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
   const submissionClosesAt = needsDeadlineFallback && submissionOpensAt
     ? new Date(submissionOpensAt.getTime() + 24 * 60 * 60 * 1000)
     : configuredSubmissionClosesAt;
-  const configuredVotingOpensAt = firstDate(record, ["votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start");
+  const configuredVotingOpensAt = firstDate(record, ["effectiveVotingStartsAt", "votingStartAt", "votingOpensAt", "votingStartsAt", "votingOpenAt", "votingStartDate"], "start");
   const votingOpensAt = specializedVotingTimeline ? configuredVotingOpensAt ?? submissionOpensAt : submissionOpensAt ?? configuredVotingOpensAt;
   return {
     timezone: resolveChallengeTimeZone(record),
@@ -713,7 +718,7 @@ function normalizeTimeline(record: Record<string, unknown>): NormalizedTimeline 
     challengeStartsAt: firstDate(record, ["challengeStartsAt", "startsAt", "startDate"], "start"),
     challengeEndsAt: firstDate(record, ["challengeEndsAt", "endsAt", "endDate"], "end"),
     votingOpensAt,
-    votingClosesAt: firstDate(record, ["votingEndAt", "votingClosesAt", "votingDeadline", "votingEndsAt", "votingEndDate"], "end"),
+    votingClosesAt: firstDate(record, ["effectiveVotingEndsAt", "votingEndAt", "votingClosesAt", "votingDeadline", "votingEndsAt", "votingEndDate"], "end"),
     judgingStartsAt: firstDate(record, ["judgingStartsAt", "judgingStartDate"], "start"),
     judgingEndsAt: firstDate(record, ["judgingEndsAt", "judgingEndDate"], "end"),
     winnersAnnouncedAt: firstDate(record, ["winnersAnnouncedAt", "winnerAnnouncementAt", "winnerAnnouncementDate", "endsAt"], "start"),

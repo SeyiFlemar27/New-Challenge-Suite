@@ -28,9 +28,11 @@ assert.match(createRoute, /CREATOR_PRIZE_FUNDING_REQUIRED/);
 assert.match(createRoute, /creatorPrizeFundingConfirmed:\s*false/);
 assert.match(publishRoute, /confirmedCreatorFundingCents\s*>=\s*requiredCreatorFundingCents/);
 assert.match(publishRoute, /confirmedCreatorFundingCents\s*>=\s*configuredPrizeCents/);
-assert.match(settlement, /normalWinnerDistribution\(placementCount\)/);
+assert.match(settlement, /normalQualifiedWinnerDistribution\(Number\(input\.challenge\.numberOfWinners\), placementCount\)/);
+assert.match(settlement, /allocateNormalQualifiedPrizeCents\(totalPool/);
+assert.match(settlement, /NORMAL_SETTLEMENT_FUNDING_CHANGED/);
 assert.match(proposal, /normalizeWinnerProposalWinners\(proposal\.winners, challenge\)/);
-assert.match(payout, /normalizeChallengeDate\(challenge\.votingStartsAt \?\? challenge\.votingStartAt, "start"\)/);
+assert.match(payout, /waitingForEffectiveVoting \? null : challenge\.effectiveVotingStartsAt \?\? challenge\.votingStartsAt \?\? challenge\.votingStartAt/);
 assert.match(payout, /now\.getTime\(\) >= votingStartsAt\.getTime\(\)/);
 
 console.log("PASS Phase 3 deterministic allocation and authoritative contract checks");

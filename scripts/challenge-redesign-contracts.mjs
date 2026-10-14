@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 const foundation = read("lib/challenge-builder-foundation.ts");
+const frontend = read("lib/normal-challenge-frontend.ts");
 const shell = read("components/normal-challenge-builder.tsx");
 const frame = read("components/challenge-builder-frame.tsx");
 const steps = read("components/normal-challenge-builder-steps.tsx");
@@ -26,9 +27,11 @@ const orderedSteps = ["Overview", "Participation", "Monetization & Prize Pool", 
 let previous = -1;
 for (const label of orderedSteps) {
   const index = foundation.indexOf(`navLabel: "${label}"`);
-  assert(index > previous, `${label} must appear in the canonical eight-step order`);
+  assert(index > previous, `${label} must retain its legacy API position`);
   previous = index;
 }
+assert.match(frontend, /NORMAL_FRONTEND_SERVER_STEPS = \[0, 2, 3, 4, 5, 6, 7\]/);
+assert.doesNotMatch(steps, /label="Participation"|Participant capacity|Participant list visibility/);
 assert.match(foundation, /fields: \["maxParticipants", "waitlistEnabled", "hideParticipantList"\]/);
 assert.match(foundation, /fields: \["numberOfWinners", "prizeValue", "entryFeeAmountCents", "sponsorReady", "votingSettings"\]/);
 assert.match(foundation, /fields: \["challengeImages", "challengeVideo"\]/);
@@ -43,7 +46,7 @@ assert.match(frame, /Finish Later/);
 assert.match(steps, /<select/);
 assert.doesNotMatch(steps, />Choice</);
 assert.match(steps, /\[0, 1, 2\]\.map/);
-assert.match(steps, /Image 1 is the public cover/);
+assert.match(steps, /Image 1 is the cover/);
 assert.match(model, /sponsorshipGoal/);
 assert.match(model, /preferredSponsorCategory/);
 assert.match(model, /sponsorNote/);

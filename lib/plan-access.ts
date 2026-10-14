@@ -950,7 +950,8 @@ export function canCreateChallenge(profile: Record<string, unknown>, challengeIn
   const oneVsOne = format.includes("1 vs 1") || format.includes("1v1") || format.includes("head-to-head");
   const liveEvent = format.includes("live event");
   const enterpriseProgram = format.includes("program") || format.includes("campaign");
-  const prize = prizePool > 0 || Boolean(challengeInput.prizePoolEnabled || challengeInput.cashPayoutsEnabled) || (prizeType && !prizeType.includes("bragging"));
+  const optionalNormalBasePrize = challengeInput.builderVersion === "normal_v3" && Number(challengeInput.prizeValue ?? 0) === 0;
+  const prize = prizePool > 0 || Boolean(challengeInput.cashPayoutsEnabled) || (!optionalNormalBasePrize && (Boolean(challengeInput.prizePoolEnabled) || (prizeType && !prizeType.includes("bragging"))));
 
   if (tournament && !capabilities.canCreateTournament) return { allowed: false, code: "CREATOR_REQUIRED", message: "Tournament creation requires Creator or Host access." };
   if (enterpriseProgram && !access.isEnterprise) return { allowed: false, code: "ENTERPRISE_REQUIRED", message: "Program and campaign challenge builders require Enterprise access." };
