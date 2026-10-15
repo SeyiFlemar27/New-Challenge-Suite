@@ -7,6 +7,9 @@ function encryptionKey() {
   if (value.length !== 32) throw new Error("PRIVATE_CREDENTIAL_SERVICE_UNAVAILABLE");
   return value;
 }
+export function privateCredentialServiceReady() {
+  try { encryptionKey(); return true; } catch { return false; }
+}
 
 /** The vault is server-only; public challenge records contain neither plaintext nor ciphertext. */
 export function preparePrivateCredential(db: Firestore, challengeId: string, creatorId: string, method: string, now: string) {

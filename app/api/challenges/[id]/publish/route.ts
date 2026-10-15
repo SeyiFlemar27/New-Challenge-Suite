@@ -26,6 +26,7 @@ import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/se
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
 import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
+import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -281,9 +282,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     mediaVerification = await verifyChallengeMedia(db, id, { ...current, ...body }, user.uid);
   } catch (error) {
-    const code = error instanceof Error ? error.message.split(":")[0] : "MEDIA_VERIFICATION_FAILED";
-    await recordChallengeMediaVerificationFailure(db, id, code).catch(() => undefined);
-    return rejectPublish("Challenge media could not be verified from storage. Replace the media and try again.", 422, undefined, code);
+    const diagnostic = mediaVerificationFailure(error, publishRequestId);
+    await recordChallengeMediaVerificationFailure(db, id, diagnostic.category, diagnostic).catch(() => undefined);
+    return rejectPublish(diagnostic.message, diagnostic.status, { requestId: diagnostic.requestId }, diagnostic.code);
   }
   update.mediaVerification = mediaVerification;
   applyVerifiedChallengeMedia(update, mediaVerification);

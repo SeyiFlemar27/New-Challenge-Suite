@@ -23,6 +23,8 @@ import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 import { ENTERPRISE_WORKSPACE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
 import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
+import { randomUUID } from "node:crypto";
+import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 
 export async function GET() {
   const db = getAdminDb();
@@ -382,9 +384,9 @@ export async function POST(request: Request) {
       challenge.mediaVerification = await verifyChallengeMedia(db, ref.id, challenge, user.uid);
       applyVerifiedChallengeMedia(challenge, challenge.mediaVerification as Record<string, unknown>);
     } catch (error) {
-      const code = error instanceof Error ? error.message.split(":")[0] : "MEDIA_VERIFICATION_FAILED";
-      await recordChallengeMediaVerificationFailure(db, ref.id, code).catch(() => undefined);
-      return fail("Challenge media could not be verified from storage. Replace the media and try again.", 422, undefined, code);
+      const diagnostic = mediaVerificationFailure(error, `PUB-${randomUUID().slice(0, 8).toUpperCase()}`);
+      await recordChallengeMediaVerificationFailure(db, ref.id, diagnostic.category, diagnostic).catch(() => undefined);
+      return fail(diagnostic.message, diagnostic.status, { requestId: diagnostic.requestId }, diagnostic.code);
     }
   }
   let preparedCredential: ReturnType<typeof preparePrivateCredential> | null = null;

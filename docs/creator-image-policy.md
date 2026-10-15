@@ -33,3 +33,25 @@ checking its creator against the draft owner, and applying current challenge
 visibility and viewer authorization. Direct Storage reads remain owner-only;
 unreferenced files, unpublished drafts, hidden private images, and draft videos
 are not made public. No production records or stored files are migrated.
+
+## Publish verification and diagnostics
+
+GCS metadata PATCH merges keys: token revocation explicitly sets
+`firebaseStorageDownloadTokens` to null, then verifies it is absent. Omitting
+the key does not revoke it. See the official [metadata deletion contract](https://docs.cloud.google.com/storage/docs/viewing-editing-metadata).
+Other custom metadata is preserved. Content-addressed copies use create-only
+preconditions; concurrent identical copies are accepted, different bytes are
+never overwritten, and existing verified objects are not re-encoded in place.
+
+Failure responses contain a stable category and request reference. Internal
+stage/category records are preserved independently of later draft saves; raw
+object paths, tokens, and provider errors are not exposed. Configuration,
+permissions, token-revocation, and processing failures preserve saved uploads
+and ask for a retry rather than an unnecessary replacement.
+
+Firebase CLI 15.22.4's Storage emulator retains a separate download-token list
+when the GCS custom metadata key is deleted. The isolated test launcher
+`scripts/run-media-publish-emulators.cjs` corrects only that null-PATCH behavior
+in emulator memory. It changes neither vendor files nor production code. Tests
+must confirm that the old bearer token is rejected, not merely hide metadata.
+This compatibility test is not a live Production publication test.

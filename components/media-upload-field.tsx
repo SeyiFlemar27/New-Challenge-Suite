@@ -316,7 +316,7 @@ export function MediaUploadField({
             <span className="mt-2 text-xs text-slate-500">{disabled ? disabledReason : `${kind === "video" ? "MP4, WebM, or QuickTime" : kind === "document" ? "PDF, Word document, or text file" : kind === "image" ? "JPG, PNG, or WebP" : "JPG, PNG, WebP, MP4, WebM, or QuickTime"} - up to ${limitMb}MB`}</span>
           </button>
         )}
-        <input ref={inputRef} className="hidden" type="file" accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />
+        <input ref={inputRef} className="hidden" type="file" aria-label={`${label} file`} accept={accept} disabled={disabled} onChange={(event) => void handleFile(event.target.files?.[0])} />
         {(uploading || status === "failed" || status === "complete" || value) ? (
           <div className={`mt-4 rounded-[8px] border p-4 ${builderAppearance ? "border-slate-200 bg-slate-50" : "border-white/10 bg-black/25"}`} aria-live="polite">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

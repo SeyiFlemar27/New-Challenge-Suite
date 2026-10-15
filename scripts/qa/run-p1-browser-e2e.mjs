@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +23,9 @@ const nextEnvPath = join(repoRoot, "next-env.d.ts");
 const originalNextEnv = readFileSync(nextEnvPath, "utf8");
 const projectId = process.env.CHALLENGE_SUITE_E2E_PROJECT_ID ?? "demo-challenge-suite";
 if (!projectId.startsWith("demo-")) throw new Error("Browser E2E requires an isolated demo-* Firebase project ID.");
+// Generate the isolated test vault key after emulators:exec starts this process;
+// the Firebase CLI logs its child environment, so never pass this key to the CLI.
+process.env.PRIVATE_INVITE_ENCRYPTION_KEY = randomBytes(32).toString("base64");
 const host = "127.0.0.1";
 function configuredPort(name, fallback) {
   const value = process.env[name] === undefined ? fallback : Number(process.env[name]);
@@ -508,6 +511,86 @@ try {
     context.setDefaultTimeout(interactionTimeout);
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+
+  await test("Media publication and private credential preparation, reveal and copy", async () => {
+    const owner = await seedUser("mediapublisher", { role: "creator" });
+    await Promise.all([db.collection("users").doc(owner.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true }), db.collection("profiles").doc(owner.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true })]);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ["clipboard-read", "clipboard-write"] });
+    const page = await login(context, owner, { rememberMe: true });
+    page.on("response", async (response) => {
+      if (response.status() >= 400 && new URL(response.url()).pathname.startsWith("/api/challenges/drafts/")) {
+        const body = await response.json().catch(() => null);
+        browserDiagnostics.push(`media-draft failure ${response.status()} ${body?.code ?? "UNKNOWN"}`);
+      }
+    });
+    const fixtureSignIn = await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: owner.email, password: owner.password, returnSecureToken: true }) });
+    const fixtureAuth = await fixtureSignIn.json();
+    check(fixtureSignIn.ok && !!fixtureAuth.idToken, "fixture setup uses a verified Auth Emulator ID token");
+    const fixtureHeaders = { authorization: `Bearer ${fixtureAuth.idToken}` };
+    const fixture = JSON.parse(execFileSync(process.execPath, ["--experimental-transform-types", "--experimental-loader", "./scripts/ts-alias-loader.mjs", "--input-type=module", "-e", "import {freshNormalChallengeForm} from './lib/normal-challenge-builder-model.ts';import {normalFrontendPayload} from './lib/normal-challenge-frontend.ts';const f=freshNormalChallengeForm();Object.assign(f,{title:'Browser media publication fixture',description:'An isolated browser fixture for real image upload and review submission.',category:'Fitness',subcategory:'Strength'});console.log(JSON.stringify(normalFrontendPayload(f)));"], { cwd: repoRoot, encoding: "utf8" }));
+    const sharp = require("sharp");
+    const image = await sharp({ create: { width: 31, height: 17, channels: 3, background: "#456" } }).png().withMetadata({ density: 300 }).toBuffer();
+    for (const kind of ["normal", "private"]) {
+      const payload = { ...fixture, ...(kind === "private" ? { challengeType: "private", type: "Private Challenge", visibility: "private", privateAccessPolicyVersion: 2, privateAccessMethod: "invite_link", privateJoiningPolicy: "invite_only", publicPreviewEnabled: false, privateVotingAccess: "access_restricted" } : {}) };
+      const created = await page.request.post(`${baseUrl}/api/challenges/drafts`, { headers: fixtureHeaders, data: payload });
+      const envelope = await created.json();
+      check(created.ok() && envelope.ok, `${kind} authenticated draft creation succeeds (HTTP ${created.status()}, code ${envelope.code ?? "OK"})`);
+      const id = envelope.data.challenge.id, ref = db.collection("challenges").doc(id);
+      // Only the isolated demo fixture starts at Media with earlier fields complete.
+      await ref.update({ builderCurrentStep: 3, maxUnlockedStep: 3, ...(kind === "private" ? { privateBuilderStep: 2 } : {}) });
+      await page.goto(`${baseUrl}/${kind === "private" ? "private" : "challenges"}/create/${id}`, { waitUntil: "domcontentloaded" });
+      const verification = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/creator-media/verify" && r.request().method() === "POST");
+      await page.getByLabel("Image 1 file", { exact: true }).setInputFiles({ name: "browser-cover.png", mimeType: "image/png", buffer: image });
+      check((await verification).status() === 200, `${kind} actual uploaded image is verified by the server`);
+      await expect(page.getByRole("paragraph").filter({ hasText: "Upload complete." })).toBeVisible();
+      for (let n = 0; n < 3; n++) await page.getByRole("button", { name: "Continue", exact: true }).click();
+      if (kind === "private") {
+        await page.getByLabel("Invitation Method", { exact: true }).selectOption("invitation_code");
+        await expect(page.getByText("Invitation Code Prepared", { exact: true })).toBeVisible({ timeout: interactionTimeout });
+        check(true, "Access displays server-confirmed code preparation without exposing the code");
+        const before = (await db.collection("privateCredentialVault").doc(id).get()).data().inviteId;
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(page.getByText("Invitation Code Prepared", { exact: true })).toBeVisible();
+        check((await db.collection("privateCredentialVault").doc(id).get()).data().inviteId === before, "reload preserves the same prepared credential");
+        await page.screenshot({ path: join(artifacts, "private-code-prepared.png"), fullPage: true });
+        await page.getByRole("button", { name: "Continue", exact: true }).click();
+      }
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.getByLabel("I confirm the challenge details are accurate.", { exact: true }).check();
+      await page.getByLabel("I have the rights to publish the content and media.", { exact: true }).check();
+      await page.getByLabel("I understand editing is unavailable while the challenge is under review.", { exact: true }).check();
+      const submitted = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/challenges/${id}/publish` && r.request().method() === "POST");
+      await page.getByRole("button", { name: "Submit for Review", exact: true }).click();
+      check((await submitted).status() === 200, `${kind} browser Submit for Review succeeds`);
+      await expect(page.getByRole("heading", { name: "Challenge Submitted" })).toBeVisible();
+      check((await ref.get()).data().status === "pending_review", `${kind} review status is authoritative`);
+      if (kind === "private") {
+        await expect(page.getByText(/Your challenge is awaiting Admin approval/)).toBeVisible();
+        await page.getByRole("link", { name: "Share & Manage Access", exact: true }).click();
+        await expect(page.getByRole("button", { name: "Copy Code", exact: true })).toBeDisabled();
+        check(true, "sharing is unavailable during Admin review");
+        // Local approved/open-registration fixture; no Production Admin state changes.
+        await ref.update({ status: "registration_open", registrationOpensAt: new Date(Date.now() - 60000).toISOString() });
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.getByRole("button", { name: "Reveal Code", exact: true }).click();
+        const shown = await page.getByLabel("Revealed Invitation Code", { exact: true }).inputValue();
+        check(shown.length === 10, "eligible creator explicitly reveals the server-created code");
+        await page.getByRole("button", { name: "Copy Code", exact: true }).click();
+        await expect(page.getByRole("status")).toContainText("Code copied successfully");
+        check(await page.evaluate(() => navigator.clipboard.readText()) === shown, "Copy Code writes the revealed credential to the clipboard");
+        check(await page.evaluate((secret) => !Object.values(localStorage).some((value) => value.includes(secret)), shown), "credential is never persisted in browser local storage");
+        await page.getByRole("button", { name: "Hide invitation", exact: true }).click();
+      }
+    }
+    const linkDraft = await page.request.post(`${baseUrl}/api/challenges/drafts`, { headers: fixtureHeaders, data: { ...fixture, challengeType: "private", type: "Private Challenge", visibility: "private", privateAccessPolicyVersion: 2, privateAccessMethod: "invite_link" } });
+    const linkId = (await linkDraft.json()).data.challenge.id;
+    await db.collection("challenges").doc(linkId).update({ status: "registration_open", registrationOpensAt: new Date(Date.now() - 60000).toISOString() });
+    await page.goto(`${baseUrl}/challenges/${linkId}/access`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Copy Invite Link", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Invite Link copied successfully");
+    check((await page.evaluate(() => navigator.clipboard.readText())).startsWith(`${baseUrl}/private/invite/`), "Copy Invite Link uses the authorized server credential");
+    await context.close();
+  }, { requiresMedia: true });
 
   await test("Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit", async () => {
     const builderUser = await seedUser("normalbuilder", { role: "creator" });

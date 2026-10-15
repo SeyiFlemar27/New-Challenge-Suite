@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import { randomUUID, randomBytes } from "node:crypto";
+import { initializeApp, deleteApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import sharp from "sharp";
+import { freshNormalChallengeForm } from "../lib/normal-challenge-builder-model.ts";
+import { normalFrontendPayload } from "../lib/normal-challenge-frontend.ts";
+import { privateBuilderPayload, freshPrivateAccess } from "../lib/private-challenge-builder.ts";
+
+assert.ok(process.env.GCLOUD_PROJECT?.startsWith("demo-") && process.env.FIREBASE_STORAGE_EMULATOR_HOST?.startsWith("127.0.0.1:"));
+const projectId = process.env.GCLOUD_PROJECT;
+Object.assign(process.env, { FIREBASE_PROJECT_ID: projectId, NEXT_PUBLIC_FIREBASE_PROJECT_ID: projectId, FIREBASE_STORAGE_BUCKET: `${projectId}.appspot.com`, CHALLENGE_SUITE_USE_FIREBASE_EMULATORS: "true", NORMAL_LIFECYCLE_SCHEDULER_ENABLED: "false", NORMAL_AUTOMATIC_REFUNDS_ENABLED: "false", PRIVATE_INVITE_ENCRYPTION_KEY: randomBytes(32).toString("base64") });
+const app = initializeApp({ projectId, storageBucket: process.env.FIREBASE_STORAGE_BUCKET });
+const db = getFirestore(app), bucket = getStorage(app).bucket();
+const { POST: createDraft } = await import("../app/api/challenges/drafts/route.ts");
+const { POST: publish } = await import("../app/api/challenges/[id]/publish/route.ts");
+const { verifyChallengeMedia } = await import("../lib/server/media-verification.ts");
+const { GET: access } = await import("../app/api/private-challenges/[id]/access/route.ts");
+let count = 0;
+const equal = (a, b, message) => { assert.deepEqual(a, b, message); count++; };
+try {
+  const signedUp = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: `publish-${randomUUID()}@example.test`, password: "TestPassword123!", returnSecureToken: true }) });
+  const user = await signedUp.json();
+  assert.ok(user.localId);
+  await db.collection("users").doc(user.localId).set({ role: "creator", accountStatus: "active", emailVerified: true, planId: "creator", planStatus: "active" });
+  function request(body) { return new Request("http://localhost/api/publish", { method: "POST", headers: { authorization: `Bearer ${user.idToken}`, "content-type": "application/json" }, body: JSON.stringify(body) }); }
+  const bytes = await sharp({ create: { width: 2, height: 1, channels: 3, background: "#456" } }).png().withMetadata({ density: 300 }).toBuffer();
+  for (const kind of ["normal", "private"]) {
+    const path = `challenges/drafts/${user.localId}/banner/${randomUUID()}.png`;
+    await bucket.file(path).save(bytes, { metadata: { contentType: "image/png", metadata: { firebaseStorageDownloadTokens: "local-test-token", preserve: "original" } } });
+    const form = freshNormalChallengeForm();
+    Object.assign(form, { title: `Actual ${kind} publication fixture`, description: "A real handler fixture for secure media verification and review submission.", category: "Fitness", subcategory: "Strength", confirmations: { accurate: true, rights: true, review: true }, images: [{ id: "cover", url: `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`, path, size: bytes.length, contentType: "image/png", fileName: "cover.png", moderationStatus: "pending" }] });
+    const payload = { ...normalFrontendPayload(form), ...(kind === "private" ? privateBuilderPayload({ ...freshPrivateAccess, privateAccessMethod: "invitation_code" }) : {}) };
+    const draftResponse = await createDraft(request(payload));
+    equal(draftResponse.status, 200, `${kind} Overview draft is created without publication`);
+    const draft = (await draftResponse.json()).data.challenge;
+    if (kind === "private") {
+      const url = `http://localhost/api/private-challenges/${draft.id}/access`;
+      const context = { params: Promise.resolve({ id: draft.id }) };
+      const status = await access(new Request(url + "?credentialStatus=true", { headers: { authorization: `Bearer ${user.idToken}` } }), context);
+      const data = (await status.json()).data;
+      equal(data.prepared, true, "code is prepared without revealing its secret");
+      equal(data.credential, undefined, "preparation response contains no secret");
+      equal(status.headers.get("cache-control"), "no-store, private", "credential metadata is not cached");
+      equal((await access(new Request(url + "?share=true", { headers: { authorization: `Bearer ${user.idToken}` } }), context)).status, 409, "draft credential cannot be revealed");
+    }
+    const context = { params: Promise.resolve({ id: draft.id }) };
+    const response = await publish(request(payload), context);
+    const result = await response.json();
+    if (response.status !== 200) console.error("Publication fixture failed", { kind, code: result.code, details: result.details });
+    equal(response.status, 200, `${kind} actual publish handler accepts a legitimate tokenized image`);
+    const saved = (await db.collection("challenges").doc(draft.id).get()).data();
+    equal(saved.status, "pending_review", `${kind} is actually persisted for Admin Review`);
+    const [metadata] = await bucket.file(path).getMetadata();
+    equal(Boolean(metadata.metadata?.firebaseStorageDownloadTokens), false, "bearer token revoked");
+    equal(metadata.metadata?.preserve, "original", "unrelated source metadata preserved");
+    const oldToken = await fetch(`http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=local-test-token`);
+    equal(oldToken.status, 403, "revoked source bearer token cannot read the private stored upload");
+    await oldToken.body?.cancel();
+    const first = await verifyChallengeMedia(db, draft.id, saved, user.localId);
+    const repeated = await verifyChallengeMedia(db, draft.id, saved, user.localId);
+    equal(first.assets[0].path, repeated.assets[0].path, "verified objects are reused");
+    equal(first.assets[0].sha256, repeated.assets[0].sha256, "repeated verification keeps the actual checksum");
+    equal((await publish(request(payload), context)).status, 200, "review submission retry remains idempotent");
+  }
+  const concurrentId = `concurrent_${randomUUID()}`;
+  const concurrentPath = `challenges/drafts/${user.localId}/banner/${randomUUID()}.png`;
+  await bucket.file(concurrentPath).save(bytes, { metadata: { contentType: "image/png", metadata: { firebaseStorageDownloadTokens: "concurrent-test-token" } } });
+  const copies = await Promise.all([verifyChallengeMedia(db, concurrentId, { coverImagePath: concurrentPath }, user.localId), verifyChallengeMedia(db, concurrentId, { coverImagePath: concurrentPath }, user.localId)]);
+  equal(copies[0].assets[0].path, copies[1].assets[0].path, "concurrent verification uses one immutable object identity");
+  equal(copies[0].assets[0].sha256, copies[1].assets[0].sha256, "concurrent verification agrees on actual verified bytes");
+  equal((await bucket.getFiles({ prefix: `verified-challenge-media/${concurrentId}/` }))[0].length, 1, "concurrent verification does not duplicate verified assets");
+  const invalidPath = `challenges/drafts/${user.localId}/banner/${randomUUID()}.png`;
+  await bucket.file(invalidPath).save(Buffer.from("not-an-image"), { metadata: { contentType: "image/png" } });
+  const invalidForm = freshNormalChallengeForm();
+  Object.assign(invalidForm, { title: "Invalid image fixture", description: "A complete fixture that must reject invalid uploaded image bytes.", category: "Fitness", subcategory: "Strength", confirmations: { accurate: true, rights: true, review: true }, images: [{ id: "cover", url: `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/${bucket.name}/o/${encodeURIComponent(invalidPath)}?alt=media`, path: invalidPath, size: 12, contentType: "image/png", fileName: "invalid.png" }] });
+  const invalidPayload = normalFrontendPayload(invalidForm);
+  const invalidDraft = await createDraft(request(invalidPayload));
+  equal(invalidDraft.status, 200, "draft saving does not falsely claim image verification");
+  const invalidId = (await invalidDraft.json()).data.challenge.id;
+  const rejected = await publish(request(invalidPayload), { params: Promise.resolve({ id: invalidId }) });
+  const rejection = await rejected.json();
+  equal(rejected.status, 422, "genuinely invalid image is rejected by actual publication");
+  equal(rejection.code, "MEDIA_FORMAT_INVALID", "invalid media has an actionable stable response code");
+  equal(/^PUB-[A-F0-9]{8}$/.test(rejection.details.requestId), true, "failure includes a support reference");
+  equal(JSON.stringify(rejection).includes(invalidPath), false, "failure response does not expose a private path");
+  const verificationRef = db.collection("challengeMediaVerifications").doc(invalidId);
+  equal((await verificationRef.get()).data().lastFailure.category, "MEDIA_IMAGE_FORMAT_INVALID", "underlying category is recorded server-side");
+  equal((await verificationRef.collection("attempts").doc(rejection.details.requestId).get()).exists, true, "support reference resolves to durable diagnostics");
+  await verificationRef.set({ status: "stale", reason: "draft_media_changed" }, { merge: true });
+  equal((await verificationRef.get()).data().lastFailure.requestId, rejection.details.requestId, "later draft invalidation preserves failure evidence");
+  console.log(`PASS Normal/Private actual publish handlers and tokenized image verification: ${count} assertions`);
+} finally { await db.terminate(); await deleteApp(app); }

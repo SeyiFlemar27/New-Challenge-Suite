@@ -2,16 +2,25 @@ import { requireChallengeManagementAccess } from "@/lib/server/challenge-managem
 import { fail, ok, readJson } from "@/lib/server/responses";
 import { privateEnrollmentOpen } from "@/lib/private-challenge-policy";
 import { isPrivateChallengeRecord } from "@/lib/server/challenge-access";
-import { readPrivateCredential } from "@/lib/server/private-credentials";
+import { readPrivateCredential, privateCredentialServiceReady } from "@/lib/server/private-credentials";
 import { managePrivateAccess, privateParticipantJoined } from "@/lib/server/private-access-management";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function getAccess(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
   if (access.response || !access.db || !access.challenge) return access.response;
   if (!isPrivateChallengeRecord(access.challenge)) return fail("Private challenge not found.", 404);
   const db = access.db;
+  if (new URL(request.url).searchParams.get("credentialStatus") === "true") {
+    const vault = await db.collection("privateCredentialVault").doc(id).get();
+    const data = vault.data();
+    const invite = data?.inviteId ? await db.collection("privateChallengeInvites").doc(String(data.inviteId)).get() : null;
+    const prepared = privateCredentialServiceReady() && access.challenge.privateAccessPolicyVersion === 2 && !!data?.ciphertext && !!data?.iv && !!data?.tag
+      && data?.inviteId === access.challenge.privateCredentialId && data?.method === access.challenge.privateAccessMethod
+      && invite?.data()?.challengeId === id && invite?.data()?.enabled === true;
+    return ok({ prepared, method: String(access.challenge.privateAccessMethod ?? ""), sharingAvailable: prepared && privateEnrollmentOpen(access.challenge) }, "Invitation preparation status loaded.");
+  }
   if (new URL(request.url).searchParams.get("share") === "true") {
     if (!privateEnrollmentOpen(access.challenge)) return fail("Sharing is available only after publication while registration is open.", 409);
     try { const result = ok(await readPrivateCredential(db, id), "Share this credential securely."); result.headers.set("Cache-Control", "no-store, private"); return result; }
@@ -29,10 +38,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const requestDocs = requests.docs.slice(0, 50), participantDocs = participants.docs.slice(0, 50);
   const relatedParticipants = requestDocs.length ? await db.getAll(...requestDocs.map((doc) => db.collection("challengeParticipants").doc(`${id}_${doc.data().userId}`))) : [];
   const joined = new Set(relatedParticipants.filter((doc) => privateParticipantJoined(doc.data())).map((doc) => String(doc.data()?.userId)));
-  return ok({ enrollmentOpen: privateEnrollmentOpen(access.challenge), publicPreviewEnabled: access.challenge.publicPreviewEnabled === true,
+  return ok({ enrollmentOpen: privateEnrollmentOpen(access.challenge), invitationMethod: String(access.challenge.privateAccessMethod ?? ""), publicPreviewEnabled: access.challenge.publicPreviewEnabled === true,
     requests: requestDocs.map((doc) => ({ id: doc.id, userId: doc.data().userId, reason: doc.data().reason ?? "", status: doc.data().status, decisionReason: doc.data().decisionReason ?? "", joined: joined.has(String(doc.data().userId)) })),
     participants: participantDocs.filter((doc) => privateParticipantJoined(doc.data())).map((doc) => ({ id: doc.id, userId: doc.data().userId, status: doc.data().status })),
     nextRequestCursor: requests.size > 50 ? requestDocs.at(-1)?.id : null, nextParticipantCursor: participants.size > 50 ? participantDocs.at(-1)?.id : null }, "Access management loaded.");
+}
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const response = await getAccess(request, context);
+  response?.headers.set("Cache-Control", "no-store, private");
+  return response;
 }
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -4,6 +4,7 @@ import { getAdminStorage } from "@/lib/firebase/admin";
 import { challengeMediaDeliveryUrl } from "@/lib/server/challenge-media-delivery";
 import { inspectImageBytes, inspectVideoBytes, normalizeImageBytes, validateInspectedMedia, type InspectedMedia } from "@/lib/server/media-inspection";
 import { NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
+import { MediaVerificationError } from "@/lib/server/media-verification-errors";
 
 type MediaCandidate = { path: string; expectedType: "image" | "video"; field: string };
 type VerifiedAsset = MediaCandidate & { sourcePath: string; generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
@@ -29,12 +30,11 @@ function candidates(challenge: Record<string, unknown>): MediaCandidate[] {
   });
 }
 
-async function removeDownloadToken(file: StorageFile, field: string) {
+export async function removeDownloadToken(file: StorageFile, field: string) {
   let [metadata] = await file.getMetadata();
-  const objectMetadata = { ...(metadata.metadata ?? {}) } as Record<string, string>;
-  if (!objectMetadata.firebaseStorageDownloadTokens) return metadata;
-  delete objectMetadata.firebaseStorageDownloadTokens;
-  await file.setMetadata({ metadata: objectMetadata });
+  if (!metadata.metadata?.firebaseStorageDownloadTokens) return metadata;
+  // GCS metadata PATCH merges keys. Omission retains a bearer token; null deletes it.
+  await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: null } });
   [metadata] = await file.getMetadata();
   if (metadata.metadata?.firebaseStorageDownloadTokens) throw new Error(`MEDIA_DOWNLOAD_TOKEN_COULD_NOT_BE_REMOVED:${field}`);
   return metadata;
@@ -47,12 +47,16 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
   if (!storage) throw new Error("MEDIA_STORAGE_UNAVAILABLE");
   const bucket = storage.bucket();
   const assets: VerifiedAsset[] = [];
+  let stage = "validation";
+  try {
   for (const candidate of list) {
+    stage = "validation";
     const ownerDraftPath = ["challenges/drafts", "challenges/host-drafts", "challenges/hybrid-drafts", "live-events/drafts", "live-events/hybrid-drafts"].some((prefix) => candidate.path.startsWith(`${prefix}/${creatorId}/`));
     const challengePath = candidate.path.startsWith(`challenges/${challengeId}/`);
     const verifiedChallengePath = candidate.path.startsWith(`verified-challenge-media/${challengeId}/`);
     if ((!ownerDraftPath && !challengePath && !verifiedChallengePath) || candidate.path.includes("..") || candidate.path.startsWith("/")) throw new Error(`MEDIA_PATH_NOT_CHALLENGE_SCOPED:${candidate.field}`);
     const file = bucket.file(candidate.path);
+    stage = "source_metadata";
     const [exists] = await file.exists();
     if (!exists) throw new Error(`MEDIA_OBJECT_MISSING:${candidate.field}`);
     const [metadata] = await file.getMetadata();
@@ -60,18 +64,21 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
     const declaredSize = Number(metadata.size ?? 0);
     const max = candidate.expectedType === "image" ? NORMAL_MEDIA_LIMITS.imageBytes : NORMAL_MEDIA_LIMITS.videoBytes;
     if (!Number.isSafeInteger(declaredSize) || declaredSize <= 0 || (candidate.expectedType === "image" ? declaredSize > max : declaredSize >= max)) throw new Error(`MEDIA_SIZE_INVALID:${candidate.field}`);
+    stage = "source_read";
     const [sourceBytes] = await file.download();
     const [latestMetadata] = await file.getMetadata();
     if (generation && String(latestMetadata.generation ?? "") !== generation) throw new Error(`MEDIA_OBJECT_CHANGED_DURING_VERIFICATION:${candidate.field}`);
     if (sourceBytes.length !== declaredSize) throw new Error(`MEDIA_SIZE_MISMATCH:${candidate.field}`);
     let bytes = sourceBytes;
     let inspected: InspectedMedia;
+    stage = "inspection";
     if (candidate.expectedType === "image") {
       const sourceInspection = await inspectImageBytes(sourceBytes);
       validateInspectedMedia(candidate, sourceInspection, sourceBytes.length);
+      stage = "normalization";
       const normalized = await normalizeImageBytes(sourceBytes);
-      bytes = normalized.bytes;
-      inspected = normalized.inspected;
+      bytes = verifiedChallengePath ? sourceBytes : normalized.bytes;
+      inspected = verifiedChallengePath ? sourceInspection : normalized.inspected;
     } else inspected = inspectVideoBytes(sourceBytes);
     validateInspectedMedia(candidate, inspected, bytes.length);
     const contentType = candidate.expectedType === "image" ? `image/${inspected.format}` : String(metadata.contentType ?? "").toLowerCase();
@@ -81,8 +88,9 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
     let verifiedGeneration = generation || null;
     let verifiedBytes = bytes;
     if (ownerDraftPath) {
+      stage = "verified_copy";
       const extension = inspected.format === "jpeg" ? "jpg" : inspected.format;
-      verifiedPath = `verified-challenge-media/${challengeId}/${candidate.expectedType === "image" ? "images" : "videos"}/${createHash("sha256").update(candidate.path).digest("hex").slice(0, 20)}.${extension}`;
+      verifiedPath = `verified-challenge-media/${challengeId}/${candidate.expectedType === "image" ? "images" : "videos"}/${createHash("sha256").update(candidate.path).update("\0").update(sourceBytes).digest("hex").slice(0, 20)}.${extension}`;
       const verifiedFile = bucket.file(verifiedPath);
       const [verifiedExists] = await verifiedFile.exists();
       if (verifiedExists) {
@@ -90,25 +98,46 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
         if (!existingBytes.equals(bytes)) throw new Error(`MEDIA_VERIFIED_OBJECT_COLLISION:${candidate.field}`);
         verifiedBytes = existingBytes;
       } else {
-        await verifiedFile.save(bytes, { resumable: false, metadata: { contentType, metadata: { normalizedBy: "challenge-media-verification-v1", sourceGeneration: generation || "unknown" } }, preconditionOpts: { ifGenerationMatch: 0 } });
+        try {
+          await verifiedFile.save(bytes, { resumable: false, metadata: { contentType, metadata: { normalizedBy: "challenge-media-verification-v1", sourceGeneration: generation || "unknown" } }, preconditionOpts: { ifGenerationMatch: 0 } });
+        } catch (error) {
+          if (Number((error as { code?: unknown }).code) !== 412) throw error;
+          const [concurrentBytes] = await verifiedFile.download();
+          if (!concurrentBytes.equals(bytes)) throw new Error(`MEDIA_VERIFIED_OBJECT_COLLISION:${candidate.field}`);
+          verifiedBytes = concurrentBytes;
+        }
       }
+      stage = "token_revocation";
       const verifiedMetadata = await removeDownloadToken(verifiedFile, candidate.field);
       verifiedGeneration = String(verifiedMetadata.generation ?? "") || null;
     }
     // Upload SDKs may have attached a bearer download token to the source file.
     // Revoke that capability after verification; readers use the server route.
+    stage = "token_revocation";
     await removeDownloadToken(file, candidate.field);
     // Persist only an application URL. Firebase download-token URLs are bearer
     // capabilities and bypass Storage Rules after they have been shared.
     const verifiedUrl = challengeMediaDeliveryUrl(verifiedPath);
     assets.push({ ...candidate, sourcePath: candidate.path, path: verifiedPath, generation: verifiedGeneration, size: verifiedBytes.length, sha256: createHash("sha256").update(verifiedBytes).digest("hex"), inspected, url: verifiedUrl });
   }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const category = /^MEDIA_[A-Z_]+(?=:|$)/.exec(message)?.[0]
+      ?? (Number((error as { code?: unknown })?.code) === 403 ? "MEDIA_STORAGE_PERMISSION_DENIED"
+        : Number((error as { code?: unknown })?.code) === 404 ? "MEDIA_OBJECT_MISSING"
+          : stage === "inspection" && /unsupported image|corrupt|invalid|input buffer|pixel limit/i.test(message) ? "MEDIA_IMAGE_FORMAT_INVALID" : "MEDIA_VERIFICATION_FAILED");
+    throw new MediaVerificationError(category, stage, error);
+  }
   const verification = { version: 1, status: "verified", verifiedAt: new Date().toISOString(), assets };
   return verification;
 }
 
-export async function recordChallengeMediaVerificationFailure(db: Firestore, challengeId: string, reason: string) {
-  await db.collection("challengeMediaVerifications").doc(challengeId).set({ version: 1, status: "rejected", reason: reason.slice(0, 180), verifiedAt: new Date().toISOString() }, { merge: true });
+export async function recordChallengeMediaVerificationFailure(db: Firestore, challengeId: string, reason: string, diagnostic?: { requestId: string; stage: string }) {
+  const failure = { category: reason, stage: diagnostic?.stage ?? "verification", requestId: diagnostic?.requestId ?? "unreferenced", occurredAt: new Date().toISOString() };
+  const ref = db.collection("challengeMediaVerifications").doc(challengeId);
+  await ref.set({ version: 1, status: "rejected", reason: reason.slice(0, 180), verifiedAt: failure.occurredAt, lastFailure: failure }, { merge: true });
+  if (diagnostic) await ref.collection("attempts").doc(diagnostic.requestId).set(failure);
+  console.warn("[challenge-media-verification]", failure);
 }
 
 export async function persistChallengeMediaVerification(db: Firestore, challengeId: string, verification: Record<string, unknown>) {

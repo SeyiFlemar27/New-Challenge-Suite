@@ -51,6 +51,15 @@ try {
   equal(draft.privateAccessPolicyVersion, 2, "private draft policy persists");
   equal(draft.builderVersion, "normal_v3", "private draft reuses Normal lifecycle version");
   const initialDraftCredential = await readPrivateCredential(db, draft.id);
+  const preparationUrl = `http://localhost/api/private-challenges/${draft.id}/access?credentialStatus=true`;
+  const preparationContext = { params: Promise.resolve({ id: draft.id }) };
+  const preparation = await getAccess(new Request(preparationUrl, { headers: { authorization: `Bearer ${owner.token}` } }), preparationContext);
+  const preparationData = (await preparation.json()).data;
+  equal(preparationData.prepared, true, "owner sees authoritative preparation status");
+  equal(preparationData.credential, undefined, "preparation status never discloses a secret");
+  equal(preparation.headers.get("cache-control"), "no-store, private", "preparation status cannot be cached");
+  equal((await getAccess(new Request(preparationUrl, { headers: { authorization: `Bearer ${other.token}` } }), preparationContext)).status, 403, "other creator cannot inspect credential preparation");
+  equal((await getAccess(new Request(preparationUrl), preparationContext)).status, 401, "signed-out caller cannot inspect credential preparation");
   equal(initialDraftCredential.method, "invite_link", "credential generated at draft creation");
   const patchResponse = await patchDraft(request(owner, { privateAccessPolicyVersion: 2, privateAccessMethod: "invitation_code", privateBuilderStep: 5 }), { params: Promise.resolve({ id: draft.id }) });
   equal(patchResponse.status, 200, "draft invitation method can change before publication");
