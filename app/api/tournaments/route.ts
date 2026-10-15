@@ -7,6 +7,7 @@ import { publicTournamentView } from "@/lib/server/tournament-public-policy";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { verifyCreatorImage } from "@/lib/server/creator-image-verification";
 
 export const dynamic = "force-dynamic";
 
@@ -58,11 +59,17 @@ export async function POST(request: Request) {
   const validation = validateTournamentFoundation(body, { publish: requestedStatus === "pending_review", ownerId: user.uid });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
   const ref = db.collection("tournaments").doc();
+  let creatorMediaVerification = null;
+  if (requestedStatus === "pending_review") {
+    try { creatorMediaVerification = await verifyCreatorImage(String(body.coverImagePath ?? ""), user.uid); }
+    catch { return fail("Upload a valid, owned creator image of 10 MB or smaller before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+  }
   const now = new Date().toISOString();
   const draft = tournamentDraftFromInput({ ...body, enterpriseOrganizationId: officialChallenge ? enterpriseAccess!.organizationId : null }, user.uid, now);
   const readiness = evaluateTournamentReadiness({ id: ref.id, ...draft });
   if (requestedStatus === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const tournament = { id: ref.id, ...draft, status: requestedStatus, submittedAt: requestedStatus === "pending_review" ? now : null, readiness, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false, fakeParticipantsAllowed: false, fakeBracketAllowed: false, fakeWinnersAllowed: false };
+  if (creatorMediaVerification) Object.assign(tournament, { creatorMediaVerification });
   const batch = db.batch();
   batch.set(ref, tournament);
   if (requestedStatus === "pending_review") {

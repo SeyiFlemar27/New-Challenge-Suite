@@ -13,15 +13,17 @@ assert.equal(image.width, 800);
 assert.equal(image.height, 500);
 validateInspectedMedia({ expectedType: "image", field: "cover" }, image, png.length);
 
-const undersizedPng = await sharp({ create: { width: NORMAL_MEDIA_LIMITS.imageMinWidth - 1, height: NORMAL_MEDIA_LIMITS.imageMinHeight, channels: 3, background: "#357" } }).png().toBuffer();
-await assert.rejects(async () => validateInspectedMedia({ expectedType: "image", field: "cover" }, await inspectImageBytes(undersizedPng), undersizedPng.length), /MEDIA_IMAGE_DIMENSIONS_INVALID/);
-const oversizedDimensionsPng = await sharp({ create: { width: NORMAL_MEDIA_LIMITS.imageMaxWidth + 1, height: NORMAL_MEDIA_LIMITS.imageMinHeight, channels: 3, background: "#357" } }).png().toBuffer();
-await assert.rejects(async () => validateInspectedMedia({ expectedType: "image", field: "cover" }, await inspectImageBytes(oversizedDimensionsPng), oversizedDimensionsPng.length), /MEDIA_IMAGE_DIMENSIONS_INVALID/);
+for (const [width, height] of [[1, 1], [5000, 200], [100, 5000]]) {
+  const bytes = await sharp({ create: { width, height, channels: 3, background: "#357" } }).png().toBuffer();
+  validateInspectedMedia({ expectedType: "image", field: "cover" }, await inspectImageBytes(bytes), bytes.length);
+}
+assert.equal(NORMAL_MEDIA_LIMITS.imageBytes, 10 * 1024 * 1024);
+validateInspectedMedia({ expectedType: "image", field: "cover" }, image, NORMAL_MEDIA_LIMITS.imageBytes);
 assert.throws(() => validateInspectedMedia({ expectedType: "image", field: "cover" }, image, NORMAL_MEDIA_LIMITS.imageBytes + 1), /MEDIA_IMAGE_TOO_LARGE/);
 const nonCanonicalDpiPng = await sharp({ create: { width: 800, height: 500, channels: 3, background: "#357" } }).png().withMetadata({ density: 96 }).toBuffer();
 const nonCanonicalDpiImage = await inspectImageBytes(nonCanonicalDpiPng);
 assert.equal(nonCanonicalDpiImage.dpiStatus, "available");
-assert.throws(() => validateInspectedMedia({ expectedType: "image", field: "cover" }, nonCanonicalDpiImage, nonCanonicalDpiPng.length), /MEDIA_IMAGE_DPI_INVALID/);
+validateInspectedMedia({ expectedType: "image", field: "cover" }, nonCanonicalDpiImage, nonCanonicalDpiPng.length);
 
 function mp4Box(type, payload) {
   const header = Buffer.alloc(8);

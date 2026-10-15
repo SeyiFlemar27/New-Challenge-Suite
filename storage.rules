@@ -186,6 +186,12 @@ service firebase.storage {
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
     }
 
+    function isCreatorImage() {
+      return request.resource != null
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
     function isVideo() {
       return request.resource != null
         && request.resource.size < 50 * 1024 * 1024
@@ -204,13 +210,13 @@ service firebase.storage {
     }
 
     function canWriteChallengeDraftMedia(folder) {
-      return (folder in ['banner', 'gallery'] && isImage())
+      return (folder in ['banner', 'gallery'] && isCreatorImage())
         || (folder == 'video' && isVideo())
         || (folder == 'documents' && isDocument());
     }
 
     function canWriteTournamentDraftMedia(folder) {
-      return (folder == 'cover' && isImage())
+      return (folder == 'cover' && isCreatorImage())
         || (folder == 'trailer' && isVideo());
     }
 
@@ -281,7 +287,7 @@ service firebase.storage {
       allow read: if isStoredImage() && isPublicChallengeBanner(challengeId, fileName)
         || isPublicPrivatePreviewBanner(challengeId, fileName)
         || (signedIn() && canReadChallengeMedia(challengeId));
-      allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
+      allow write: if isChallengeManager(challengeId) && ((resource == null && isCreatorImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/trailers/{fileName} {
@@ -291,7 +297,7 @@ service firebase.storage {
 
     match /challenges/{challengeId}/promo-flyer/{fileName} {
       allow read: if signedIn() && canReadChallengeMedia(challengeId);
-      allow write: if isChallengeManager(challengeId) && ((resource == null && isImage()) || request.resource == null);
+      allow write: if isChallengeManager(challengeId) && ((resource == null && isCreatorImage()) || request.resource == null);
     }
 
     match /challenges/{challengeId}/promo-video/{fileName} {
@@ -328,12 +334,12 @@ service firebase.storage {
 
     match /live-events/drafts/{userId}/media/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId) && (isCreatorImage() || isVideo());
     }
 
     match /live-events/hybrid-drafts/{userId}/media/{folder}/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && isMedia();
+      allow write: if isOwner(userId) && (isCreatorImage() || isVideo());
     }
 
     match /live-events/{eventId}/media/{fileName} {

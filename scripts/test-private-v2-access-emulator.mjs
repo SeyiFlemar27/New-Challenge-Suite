@@ -18,7 +18,7 @@ const { GET: preview } = await import("../app/api/private-challenges/[id]/previe
 const { GET: getAccess, POST: manageAccess } = await import("../app/api/private-challenges/[id]/access/route.ts");
 const { POST: privatePost } = await import("../app/api/private-exclusive/route.ts");
 const { POST: join } = await import("../app/api/challenges/[id]/join/route.ts");
-const { POST: createDraft } = await import("../app/api/challenges/route.ts");
+const { POST: createDraft } = await import("../app/api/challenges/drafts/route.ts");
 const { PATCH: patchDraft } = await import("../app/api/challenges/drafts/[id]/route.ts");
 const { POST: castVote } = await import("../app/api/votes/route.ts");
 let count = 0;
@@ -41,11 +41,13 @@ try {
   const owner = await user("owner"), visitor = await user("visitor"), other = await user("other");
   const form = freshNormalChallengeForm();
   Object.assign(form, { title: "Shared private builder fixture", description: "A complete private challenge description for a safe local test.", category: "Fitness", subcategory: "Strength" });
-  const draftPayload = { ...normalFrontendPayload(form), ...privateBuilderPayload(freshPrivateAccess) };
+  const draftPayload = { ...normalFrontendPayload(form), ...privateBuilderPayload(freshPrivateAccess), draftCreationKey: randomUUID() };
   const draftResponse = await createDraft(request(owner, draftPayload));
   if (draftResponse.status !== 200) console.error("Draft creation failed", await draftResponse.clone().json());
   equal(draftResponse.status, 200, "shared builder creates private draft through actual handler");
   const draft = (await draftResponse.json()).data.challenge;
+  const retry = await createDraft(request(owner, draftPayload));
+  equal((await retry.json()).data.challenge.id, draft.id, "lost-response retry returns the same persisted draft");
   equal(draft.privateAccessPolicyVersion, 2, "private draft policy persists");
   equal(draft.builderVersion, "normal_v3", "private draft reuses Normal lifecycle version");
   const initialDraftCredential = await readPrivateCredential(db, draft.id);

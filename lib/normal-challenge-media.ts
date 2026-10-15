@@ -25,8 +25,8 @@ function loadVideo(file: File) {
 export async function validateNormalChallengeImage(file: File): Promise<UploadFileValidation> {
   try {
     const dimensions = await loadImage(file);
-    if (dimensions.width < NORMAL_MEDIA_LIMITS.imageMinWidth || dimensions.height < NORMAL_MEDIA_LIMITS.imageMinHeight) return { ok: false, code: "image_too_small", message: "Image must be at least 712 x 430 pixels." };
-    if (dimensions.width > NORMAL_MEDIA_LIMITS.imageMaxWidth || dimensions.height > NORMAL_MEDIA_LIMITS.imageMaxHeight) return { ok: false, code: "image_too_large", message: "Image must be no larger than 4000 x 2416 pixels." };
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return { ok: false, code: "invalid_image_type", message: "Upload a JPEG, PNG, or WebP image." };
+    if (file.size > NORMAL_MEDIA_LIMITS.imageBytes) return { ok: false, code: "image_too_large", message: "Image must be 10 MB or smaller." };
     return { ok: true, metadata: dimensions };
   } catch { return { ok: false, code: "image_metadata_failed", message: "We couldn't read this image. Choose another JPEG, PNG, or WebP file." }; }
 }

@@ -3,7 +3,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { getAdminStorage } from "@/lib/firebase/admin";
 import { challengeMediaDeliveryUrl } from "@/lib/server/challenge-media-delivery";
 import { inspectImageBytes, inspectVideoBytes, normalizeImageBytes, validateInspectedMedia, type InspectedMedia } from "@/lib/server/media-inspection";
-import { isModernNormalChallenge, NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
+import { NORMAL_MEDIA_LIMITS } from "@/lib/normal-challenge-config";
 
 type MediaCandidate = { path: string; expectedType: "image" | "video"; field: string };
 type VerifiedAsset = MediaCandidate & { sourcePath: string; generation: string | null; size: number; sha256: string; inspected: InspectedMedia; url: string };
@@ -42,18 +42,13 @@ async function removeDownloadToken(file: StorageFile, field: string) {
 
 export async function verifyChallengeMedia(db: Firestore, challengeId: string, challenge: Record<string, unknown>, creatorId: string) {
   const list = candidates(challenge);
-  const modernNormalChallenge = isModernNormalChallenge(challenge);
-  const required = !challenge.usesPlaceholderMedia && (modernNormalChallenge || Boolean(challenge.coverImagePath || challenge.coverImageUrl));
-  if (!list.length) {
-    if (required) throw new Error("MEDIA_REQUIRED");
-    return { version: 1, status: "not_required", assets: [], verifiedAt: new Date().toISOString() };
-  }
+  if (!list.some((item) => item.expectedType === "image")) throw new Error("MEDIA_REQUIRED");
   const storage = getAdminStorage();
   if (!storage) throw new Error("MEDIA_STORAGE_UNAVAILABLE");
   const bucket = storage.bucket();
   const assets: VerifiedAsset[] = [];
   for (const candidate of list) {
-    const ownerDraftPath = candidate.path.startsWith(`challenges/drafts/${creatorId}/`);
+    const ownerDraftPath = ["challenges/drafts", "challenges/host-drafts", "challenges/hybrid-drafts", "live-events/drafts", "live-events/hybrid-drafts"].some((prefix) => candidate.path.startsWith(`${prefix}/${creatorId}/`));
     const challengePath = candidate.path.startsWith(`challenges/${challengeId}/`);
     const verifiedChallengePath = candidate.path.startsWith(`verified-challenge-media/${challengeId}/`);
     if ((!ownerDraftPath && !challengePath && !verifiedChallengePath) || candidate.path.includes("..") || candidate.path.startsWith("/")) throw new Error(`MEDIA_PATH_NOT_CHALLENGE_SCOPED:${candidate.field}`);
@@ -170,5 +165,7 @@ export function applyVerifiedChallengeMedia(challenge: Record<string, unknown>, 
     }
   }
   challenge.publicMediaPaths = [...publicPaths];
+  const primary = assets.find((asset) => asset.expectedType === "image");
+  if (primary) { challenge.coverImagePath = primary.path; challenge.coverImageUrl = primary.url; }
   return challenge;
 }

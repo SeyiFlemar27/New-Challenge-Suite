@@ -414,26 +414,6 @@ function validStoragePath(path: string, prefixes: string[]) {
   return isInternalStoragePath(path, prefixes);
 }
 
-function storageDisabledEnvFlag() {
-  return process.env.NEXT_PUBLIC_DISABLE_MEDIA_UPLOADS === "true";
-}
-
-function storageBucketConfiguredForValidation() {
-  const bucket = (process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "").trim().replace(/^gs:\/\//i, "").replace(/\/+$/g, "");
-  return Boolean(bucket);
-}
-
-function canSkipCoverMedia(challenge: Record<string, unknown>) {
-  const status = text(challenge.mediaUploadStatus);
-  const mediaStatus = text(challenge.mediaStatus);
-  const fallbackType = text(challenge.mediaFallbackType);
-  const requestedSkippedMedia = status === "storage_disabled"
-    && mediaStatus === "skipped_storage_not_configured"
-    && challenge.usesPlaceholderMedia === true
-    && fallbackType === "challenge_suite_placeholder";
-  return requestedSkippedMedia && (storageDisabledEnvFlag() || !storageBucketConfiguredForValidation());
-}
-
 export function validateChallengeForDraft(challenge: ChallengeLike): ChallengeValidationResult {
   const errors: ChallengeValidationIssue[] = [];
   if (text(challenge.title).length > 120) makeIssue(errors, "TITLE_TOO_LONG", "title", "Basics", "Challenge title must be 120 characters or fewer.");
@@ -534,7 +514,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const primaryImage = normalV2 ? (list(challenge.challengeImages)[0] as Record<string, unknown> | undefined) : undefined;
   const coverUrl = text(primaryImage?.url ?? challenge.coverImageUrl);
   const coverPath = text(primaryImage?.path ?? challenge.coverImagePath);
-  const coverMediaSkipped = canSkipCoverMedia(challenge);
+  const coverMediaSkipped = false;
   const allowedDraftPrefixes = ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `challenges/hybrid-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`, `live-events/hybrid-drafts/${ownerId}/media/`] : [];
   const allowedChallengePrefixes = challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/gallery/`, `challenges/${challengeId}/video/`, `challenges/${challengeId}/documents/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [];
   const allowedMediaPrefixes = [...allowedDraftPrefixes, ...allowedChallengePrefixes];

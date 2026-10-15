@@ -50,6 +50,7 @@ export function LiveEventBuilder({ enterpriseOwnership }: { enterpriseOwnership?
   const activeSteps = liveEventSteps;
   const update = <K extends keyof Form>(key: K, value: Form[K]) => { setForm((current) => ({ ...current, [key]: value })); setError(""); };
   const validate = () => {
+    if (step === 7 && (!form.coverImageUrl || !form.coverImagePath)) return "Upload a primary event image before continuing.";
     if (step === 0 && (form.title.trim().length < 3 || form.description.trim().length < 10)) return "Add a title and a description of at least 10 characters.";
     if (liveEvent && step === 1 && (!form.venueName.trim() || !form.eventAddress.trim() || !form.eventCity.trim() || !form.eventCountry.trim() || !form.startsAt || !form.endsAt || new Date(form.startsAt) >= new Date(form.endsAt))) return "Add a complete physical venue and a valid event schedule.";
     if (liveEvent && step === 2 && (!form.registrationOpensAt || !form.registrationClosesAt || new Date(form.registrationOpensAt) >= new Date(form.registrationClosesAt))) return "Add a valid registration window.";
@@ -138,6 +139,7 @@ export function LiveEventBuilder({ enterpriseOwnership }: { enterpriseOwnership?
 
   async function submit(publish: boolean) {
     if (!publish) return void await persistDraft();
+    if (!form.coverImageUrl || !form.coverImagePath) return setError("Upload a primary event image before submitting for review.");
     const problem = validate(); if (problem) return setError(problem);
     setSaving(true);
     if (!draftId) { setSaving(false); return setError("Save the event draft before submitting it for review."); }

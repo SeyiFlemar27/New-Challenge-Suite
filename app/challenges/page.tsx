@@ -11,6 +11,7 @@ import { normalizeChallenge, type ChallengeApiRecord } from "@/lib/api/normalize
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getChallengeDisplayStatus, statusClassName } from "@/lib/challenge-status";
 import { OwnedChallengeActionsMenu } from "@/components/challenge/owned-challenge-actions-menu";
+import { InvitationCodeDialog } from "@/components/invitation-code-dialog";
 
 type ManagementState = "active" | "pending_review" | "requires_changes" | "scheduled" | "draft" | "completed" | "cancelled";
 const tabs: Array<{ id: ManagementState; label: string; empty: string }> = [
@@ -55,7 +56,7 @@ export default function ChallengesPage() {
     <AppShell>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageTitle title="Challenges" subtitle="Create and manage your challenges." icon={<Trophy className="text-[var(--gold)]" />} />
-        {canCreate ? <LinkButton href="/challenges/create" className="w-full sm:w-auto">Create Challenge</LinkButton> : null}
+        <div className="flex flex-wrap gap-3">{user ? <InvitationCodeDialog /> : null}{canCreate ? <LinkButton href="/challenges/create" className="w-full sm:w-auto">Create Challenge</LinkButton> : null}</div>
       </div>
 
       <Card className="mt-7 p-3">

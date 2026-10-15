@@ -8,6 +8,7 @@ import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 import { publicTournamentParticipantIds, publicTournamentParticipantView, publicTournamentView } from "@/lib/server/tournament-public-policy";
 import type { TournamentFoundation, TournamentStatus } from "@/lib/tournament-types";
+import { verifyCreatorImage } from "@/lib/server/creator-image-verification";
 
 export const dynamic = "force-dynamic";
 
@@ -80,8 +81,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (body.status === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const now = new Date().toISOString();
   const transitionToReview = tournament.status !== "pending_review" && body.status === "pending_review";
+  let creatorMediaVerification = null;
+  if (transitionToReview) {
+    try { creatorMediaVerification = await verifyCreatorImage(String((merged as Record<string, unknown>).coverImagePath ?? merged.coverMedia?.path ?? ""), String(tournament.hostId ?? user.uid)); }
+    catch { return fail("Upload a valid, owned creator image of 10 MB or smaller before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+  }
   const update = { ...body, ...(transitionToReview ? { submittedAt: now } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
   const batch = db.batch();
+  if (creatorMediaVerification) Object.assign(update, { creatorMediaVerification });
   batch.set(ref, update, { merge: true });
   if (transitionToReview) {
     batch.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { id: `${id}_initial`, tournamentId: id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });

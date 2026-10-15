@@ -61,11 +61,11 @@ assert.match(model, /winnerPrizeAmountsCents/);
 assert.doesNotMatch(steps, /Physical product|Digital product|Special award/);
 
 assert.match(config, /NORMAL_MEDIA_LIMITS/);
-assert.match(media, /712 x 430/);
-assert.match(media, /4000 x 2416/);
+assert.match(media, /10 MB/);
+assert.doesNotMatch(media, /imageMinWidth|imageMaxWidth|IMAGE_DPI_INVALID/);
 assert.match(media, /1280 x 720/);
 assert.match(media, /75 seconds or shorter/);
-assert.match(steps, /maxSizeMb=\{5\}/);
+assert.match(steps, /maxSizeMb=\{10\}/);
 assert.match(readiness, /IMAGE_NOT_CONFIRMED/);
 assert.match(steps, /Image 1 is the cover/);
 

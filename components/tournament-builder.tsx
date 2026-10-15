@@ -60,14 +60,14 @@ export function TournamentBuilder({ enterpriseOwnership }: { enterpriseOwnership
     if (!form.title.trim()) errors.push("Tournament name is required.");
     if (form.description.trim().length < 20 || form.description.trim().length > 1200) errors.push("Full description must be 20–1,200 characters.");
     if (!form.category.trim()) errors.push("Category is required.");
-    if (!form.coverImageUrl && !mediaDisabled) errors.push("Cover media upload must complete.");
+    if (!form.coverImageUrl || !form.coverImagePath) errors.push("Cover media upload must complete.");
     if (form.participationMode === "team" && (!Number.isInteger(form.minimumTeamSize) || !Number.isInteger(form.maximumTeamSize) || form.minimumTeamSize < 1 || form.minimumTeamSize > form.maximumTeamSize || form.maximumTeamSize > 20)) errors.push("Team size must satisfy 1 <= minimum <= maximum <= 20.");
     if (form.entryType === "paid_entry_setup_required" && form.entryFeeAmountMinor < 100) errors.push("Set a valid paid entry amount.");
     if (form.entryType === "paid_entry_setup_required") warnings.push("Paid entry remains provider-confirmed and setup-gated.");
     if (coverStatus === "uploading" || coverStatus === "preparing") errors.push("Wait for cover upload to finish.");
     if (trailerStatus === "uploading" || trailerStatus === "preparing") errors.push("Wait for trailer upload to finish.");
     return { errors, warnings, ready: errors.length === 0 };
-  }, [coverStatus, form, mediaDisabled, trailerStatus]);
+  }, [coverStatus, form, trailerStatus]);
 
   function update<K extends keyof BuilderForm>(key: K, value: BuilderForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -151,7 +151,7 @@ export function TournamentBuilder({ enterpriseOwnership }: { enterpriseOwnership
     if (step === 0 && (!form.title.trim() || !form.category.trim() || !form.subcategory.trim() || form.description.trim().length < 20 || form.description.trim().length > 1200)) return "Add a title, category, subcategory, and a 20–1,200 character full description before continuing.";
     if (step === 1 && form.participationMode === "team" && (form.minimumTeamSize < 1 || form.minimumTeamSize > form.maximumTeamSize || form.maximumTeamSize > 20)) return "Set valid tournament team sizes before continuing.";
     if (step === 3 && form.entryType === "paid_entry_setup_required" && form.entryFeeAmountMinor < 100) return "Set a valid paid entry amount.";
-    if (step === 4 && !mediaDisabled && !form.coverImageUrl) return "Upload the tournament cover before continuing.";
+    if (step === 4 && (!form.coverImageUrl || !form.coverImagePath)) return "Upload the tournament cover before continuing.";
     return "";
   }
 

@@ -9,6 +9,9 @@ import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { canCreateBuilderType, draftLimitForPlan, isUnfinishedChallengeDraft, normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
+import { createHash } from "node:crypto";
+import { preparePrivateCredential } from "@/lib/server/private-credentials";
+import { serverChallengeCreateSchema, zodFieldErrors } from "@/lib/server/challenge-validation";
 
 export async function GET(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -35,9 +38,14 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Challenge draft creation");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const body = (parsed.body ?? {}) as Record<string, unknown>;
+  const raw = (parsed.body ?? {}) as Record<string, unknown>;
+  const validated = serverChallengeCreateSchema.safeParse({ ...raw, publish: false });
+  if (!validated.success) return fail("Check the draft fields.", 422, { fieldErrors: zodFieldErrors(validated.error) }, "VALIDATION_ERROR");
+  const body = validated.data as Record<string, unknown>;
   const challengeType = normalizeBuilderChallengeType(body.challengeType ?? body.type);
-  if (challengeType !== "normal") return fail("Use the dedicated builder for this challenge type.", 422, { challengeType }, "DEDICATED_BUILDER_REQUIRED");
+  if (!["normal", "private"].includes(challengeType)) return fail("Use the dedicated builder for this challenge type.", 422, { challengeType }, "DEDICATED_BUILDER_REQUIRED");
+  const privateDraft = challengeType === "private";
+  if (privateDraft && !["invite_link", "invitation_code"].includes(String(body.privateAccessMethod))) return fail("Choose Invite Link or Invitation Code.", 422, undefined, "PRIVATE_ACCESS_METHOD_REQUIRED");
   const basics = getNormalChallengeReadiness({ ...body, competitionFormat: "Public Voting", numberOfWinners: body.numberOfWinners ?? 1, winnerSplits: body.winnerSplits ?? [100] });
   const basicsErrors = basics.issues.filter((issue) => issue.step === 0);
   if (basicsErrors.length) return fail(basicsErrors[0].message, 422, { fieldErrors: Object.fromEntries(basicsErrors.map((issue) => [issue.field, issue.message])) }, "BASICS_INCOMPLETE");
@@ -59,7 +67,14 @@ export async function POST(request: Request) {
   if (planAccess.isSponsor) return fail("Sponsor accounts manage campaigns from the sponsor dashboard.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
   if (!canCreateBuilderType(planAccess.normalizedPlanId, challengeType)) return fail("This challenge type isn't included in your plan.", 403, { challengeType }, "CHALLENGE_TYPE_NOT_INCLUDED");
   const now = new Date().toISOString();
-  const ref = db.collection("challenges").doc();
+  const creationKey = String(raw.draftCreationKey ?? "");
+  if (creationKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(creationKey)) return fail("Invalid draft retry reference.", 400);
+  const ref = creationKey ? db.collection("challenges").doc(createHash("sha256").update(`${user.uid}:${creationKey}`).digest("hex").slice(0, 32)) : db.collection("challenges").doc();
+  let credential: ReturnType<typeof preparePrivateCredential> | null = null;
+  if (privateDraft) {
+    try { credential = preparePrivateCredential(db, ref.id, user.uid, String(body.privateAccessMethod), now); }
+    catch { return fail("Secure invitations are unavailable. No draft was created.", 503, undefined, "PRIVATE_CREDENTIAL_SERVICE_UNAVAILABLE"); }
+  }
   const draft = {
     ...body,
     id: ref.id,
@@ -76,8 +91,9 @@ export async function POST(request: Request) {
     enterpriseAssignedUserIds: officialChallenge ? [user.uid] : [],
     status: "draft",
     lifecycleStatus: "draft",
-    visibility: "public",
-    type: "Public Challenge",
+    visibility: privateDraft ? "private" : "public",
+    type: privateDraft ? "Private Challenge" : "Public Challenge",
+    ...(privateDraft ? { privateAccessPolicyVersion: 2, privateBuilderStep: 0, privateCredentialId: credential!.inviteId, privateAccessCode: "", privateDirectInvitees: [], privateAccessCodeMaxUses: null, privateAccessCodeExpiresAt: null } : {}),
     challengeType,
     challengeTypeLocked: true,
         builderVersion: String(body.builderVersion || "normal_v3"),
@@ -95,7 +111,7 @@ export async function POST(request: Request) {
     submissionCount: 0,
     voteCount: 0,
     completionPercentage: 0,
-        nextIncompleteSection: "Participation",
+    nextIncompleteSection: "Monetization & Prize Pool",
     creationStep: 1,
     builderCurrentStep: 1,
     maxUnlockedStep: 1,
@@ -106,14 +122,23 @@ export async function POST(request: Request) {
     lastAutosavedAt: now
   };
   const limit = draftLimitForPlan(planAccess.normalizedPlanId);
+  let saved: Record<string, unknown> = draft;
   try {
-    await db.runTransaction(async (transaction) => {
+    saved = await db.runTransaction(async (transaction) => {
+      const prior = await transaction.get(ref);
+      if (prior.exists) {
+        if (prior.data()?.creatorId !== user.uid || prior.data()?.challengeType !== challengeType) throw new Error("DRAFT_RETRY_CONFLICT");
+        return { id: prior.id, ...prior.data() };
+      }
       const existing = await transaction.get(db.collection("challenges").where("creatorId", "==", user.uid).limit(100));
       const unfinished = existing.docs.filter((doc) => isUnfinishedChallengeDraft(doc.data())).length;
       if (unfinished >= limit) throw new Error("DRAFT_LIMIT_REACHED");
       transaction.create(ref, draft);
+      credential?.apply(transaction);
+      return draft;
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "DRAFT_RETRY_CONFLICT") return fail("This retry reference belongs to a different draft. Refresh and try again.", 409, undefined, "DRAFT_RETRY_CONFLICT");
     if (error instanceof Error && error.message === "DRAFT_LIMIT_REACHED") return fail("You've reached your draft limit. Continue an existing draft, delete a draft you no longer need, or upgrade your plan.", 409, { limit, redirectTo: "/my-challenges" }, "DRAFT_LIMIT_REACHED");
     throw error;
   }
@@ -121,5 +146,5 @@ export async function POST(request: Request) {
     writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge_draft_created", targetType: "challenge", targetId: ref.id, after: { status: "draft", challengeType }, metadata: { source: "api/challenges/drafts" } }, db).catch(() => undefined),
     writeAuditLog({ actorId: user.uid, actorType: "user", action: "challenge_type_locked", targetType: "challenge", targetId: ref.id, after: { challengeType }, metadata: { source: "api/challenges/drafts" } }, db).catch(() => undefined)
   ]);
-  return ok({ challenge: draft }, "Challenge draft created.");
+  return ok({ challenge: saved }, "Challenge draft created.");
 }

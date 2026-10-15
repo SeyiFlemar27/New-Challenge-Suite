@@ -1,5 +1,7 @@
 "use client";
 import { ContentImage } from "@/components/content-image";
+import { isCreatorImageFolder } from "@/lib/creator-media-policy";
+import { apiRequest } from "@/lib/api/client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDownloadURL, ref, uploadBytesResumable, type UploadTask } from "firebase/storage";
@@ -67,7 +69,8 @@ export function MediaUploadField({
   const [removedNotice, setRemovedNotice] = useState("");
 
   const accept = mediaAccept(kind);
-  const limitMb = maxSizeMb ?? defaultMaxSizeMb(kind);
+  const creatorImage = kind === "image" && isCreatorImageFolder(storagePath);
+  const limitMb = creatorImage ? 10 : maxSizeMb ?? defaultMaxSizeMb(kind);
   const isVideo = useMemo(() => Boolean((localPreview || value) && /\.(mp4|webm|mov|quicktime)(\?|$)/i.test(localPreview || value || "")), [localPreview, value]);
   const uploading = status === "preparing" || status === "uploading" || status === "processing";
   const displayUrl = localPreview || value || "";
@@ -177,6 +180,7 @@ export function MediaUploadField({
     lastProgressAtRef.current = uploadStartedAtRef.current;
     lastBytesTransferredRef.current = 0;
     logUploadDebug("started", { uploadPath: path, contentType: file.type, size: file.size });
+    let verificationFailure = "";
     try {
       const uploadTask = uploadBytesResumable(ref(storage, path), file, { contentType: file.type, customMetadata: { originalName: file.name, uploadedBy: auth.user.uid } });
       uploadTaskRef.current = uploadTask;
@@ -226,6 +230,10 @@ export function MediaUploadField({
         });
       });
       const metadata = { path, fileName: file.name, contentType: file.type, size: file.size, ...customValidation.metadata };
+      if (creatorImage) {
+        const verified = await apiRequest<{ status: string }>("/api/creator-media/verify", { method: "POST", body: JSON.stringify({ path }) });
+        if (!verified.ok || verified.data?.status !== "verified") { verificationFailure = verified.message || "Stored image verification failed. Please retry."; throw new Error("processing failed"); }
+      }
       onChange(downloadUrl, metadata);
       setUploadedFile(metadata);
       setLocalPreview("");
@@ -239,7 +247,7 @@ export function MediaUploadField({
     } catch (caught) {
       const classified = classifyStorageError(caught instanceof Error && caught.message === "PROCESSING_FAILED" ? new Error("processing failed") : caught);
       setStatus("failed");
-      setError(classified.message);
+      setError(verificationFailure || classified.message);
       setErrorCode(classified.code);
       uploadTaskRef.current = null;
       if (value) {

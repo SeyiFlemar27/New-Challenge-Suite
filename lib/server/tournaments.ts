@@ -178,7 +178,7 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
   if (!text(tournament.title)) errors.push("Tournament name is required.");
   if (!text(tournament.description)) errors.push("Full description is required.");
   if (!text(tournament.category)) errors.push("Category is required.");
-  if (text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded" && text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "storage_disabled") errors.push("Cover media must be uploaded unless storage-disabled mode is active.");
+  if (!text(tournament.coverImagePath ?? (tournament.coverMedia as Record<string, unknown> | undefined)?.path) || text((tournament.coverMedia as Record<string, unknown> | undefined)?.status) !== "uploaded") errors.push("Upload at least one verified creator image before Admin Review.");
   if (!["single_elimination", "double_elimination"].includes(text(tournament.format))) errors.push("Choose Single Elimination or Double Elimination.");
   if (![4, 8, 16, 32, 64, 128].includes(Number(tournament.participantCapacity))) errors.push("Choose a bracket size of 4, 8, 16, 32, 64, or 128.");
   if (!["individual", "team"].includes(text(tournament.participationMode))) errors.push("Choose Individual or Team tournament participation.");

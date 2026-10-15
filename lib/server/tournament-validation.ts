@@ -93,10 +93,14 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   if (text(input.resultMethod) === "hybrid" && configVersion >= 2) errors.push({ field: "resultMethod", message: "Hybrid scoring is not supported for new Tournament configuration." });
   const roundPlan = Array.isArray(input.roundPlan) ? input.roundPlan : [];
   if (options.validateMedia !== false) {
+    const cover = input.coverMedia && typeof input.coverMedia === "object" ? input.coverMedia as Record<string, unknown> : {};
+    const trailer = input.trailerMedia && typeof input.trailerMedia === "object" ? input.trailerMedia as Record<string, unknown> : {};
+    const coverUrl = text(input.coverImageUrl ?? cover.url), coverPath = text(input.coverImagePath ?? cover.path);
+    if (options.publish && (!coverUrl || !coverPath)) errors.push({ field: "coverImagePath", message: "Upload at least one verified creator image before Admin Review." });
     const mediaPrefixes = options.ownerId ? [`tournaments/drafts/${options.ownerId}/`] : [];
     for (const [field, url, path] of [
-      ["coverImageUrl", text(input.coverImageUrl), text(input.coverImagePath)],
-      ["trailerUrl", text(input.trailerUrl), text(input.trailerPath)]
+      ["coverImageUrl", coverUrl, coverPath],
+      ["trailerUrl", text(input.trailerUrl ?? trailer.url), text(input.trailerPath ?? trailer.path)]
     ] as const) {
       const media = validateOwnedStorageMedia({ url, path, prefixes: mediaPrefixes });
       if (!media.valid) errors.push({ field, message: media.message });

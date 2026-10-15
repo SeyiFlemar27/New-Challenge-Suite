@@ -17,8 +17,7 @@ export function validateInspectedMedia(candidate: { expectedType: "image" | "vid
   if (candidate.expectedType !== inspected.mediaType) throw new Error(`MEDIA_TYPE_MISMATCH:${candidate.field}`);
   if (candidate.expectedType === "image") {
     if (size > NORMAL_MEDIA_LIMITS.imageBytes) throw new Error(`MEDIA_IMAGE_TOO_LARGE:${candidate.field}`);
-    if (inspected.width < NORMAL_MEDIA_LIMITS.imageMinWidth || inspected.height < NORMAL_MEDIA_LIMITS.imageMinHeight || inspected.width > NORMAL_MEDIA_LIMITS.imageMaxWidth || inspected.height > NORMAL_MEDIA_LIMITS.imageMaxHeight) throw new Error(`MEDIA_IMAGE_DIMENSIONS_INVALID:${candidate.field}`);
-    if (inspected.dpiStatus === "available" && ((inspected.dpiX ?? 0) > 0 && Math.abs((inspected.dpiX ?? 0) - 72) > 1 || (inspected.dpiY ?? 0) > 0 && Math.abs((inspected.dpiY ?? 0) - 72) > 1)) throw new Error(`MEDIA_IMAGE_DPI_INVALID:${candidate.field}`);
+    if (!Number.isSafeInteger(inspected.width) || !Number.isSafeInteger(inspected.height) || inspected.width <= 0 || inspected.height <= 0) throw new Error(`MEDIA_IMAGE_FORMAT_INVALID:${candidate.field}`);
   } else {
     if (size >= NORMAL_MEDIA_LIMITS.videoBytes) throw new Error(`MEDIA_VIDEO_TOO_LARGE:${candidate.field}`);
     if (inspected.width < NORMAL_MEDIA_LIMITS.videoMinWidth || inspected.height < NORMAL_MEDIA_LIMITS.videoMinHeight || inspected.width <= inspected.height) throw new Error(`MEDIA_VIDEO_DIMENSIONS_INVALID:${candidate.field}`);

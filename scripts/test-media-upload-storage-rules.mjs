@@ -42,10 +42,10 @@ async function putDocument(collection, id, fields) {
   assert.equal(response.ok, true, `Firestore emulator fixture write failed for ${collection}/${id}: ${response.status} ${await response.text()}`);
 }
 
-async function upload(account, path, contentType, allowed, label) {
+async function upload(account, path, contentType, allowed, label, size = 64) {
   await signIn(account);
   try {
-    await uploadBytes(ref(storage, path), new Blob([`upload-fixture-${randomUUID()}`], { type: contentType }), { contentType });
+    await uploadBytes(ref(storage, path), new Uint8Array(size), { contentType });
     assertions.push(`${label}: allowed`);
     assert.equal(allowed, true, `${label} should be allowed`);
     return true;
@@ -77,6 +77,12 @@ const outsider = await user("outsider");
 // Challenge builder folders preserve their type and owner constraints.
 await upload(owner, `challenges/drafts/${owner.uid}/banner/${randomUUID()}.png`, "image/png", true, "challenge banner upload");
 await upload(owner, `challenges/drafts/${owner.uid}/gallery/${randomUUID()}.png`, "image/png", true, "challenge gallery upload");
+for (const folder of [`challenges/drafts/${owner.uid}/banner`, `challenges/host-drafts/${owner.uid}/gallery`, `challenges/hybrid-drafts/${owner.uid}/gallery`, `tournaments/drafts/${owner.uid}/cover`, `live-events/drafts/${owner.uid}/media/images`, `live-events/hybrid-drafts/${owner.uid}/media/images`]) {
+  await upload(owner, `${folder}/${randomUUID()}.png`, "image/png", true, `10 MB creator image ${folder}`, 10 * 1024 * 1024);
+  await upload(owner, `${folder}/${randomUUID()}.png`, "image/png", false, `over-limit creator image ${folder}`, 10 * 1024 * 1024 + 1);
+}
+await upload(owner, `users/${owner.uid}/profile/avatar/${randomUUID()}.png`, "image/png", false, "avatar remains 5 MB", 5 * 1024 * 1024 + 1);
+await upload(owner, `challenges/test/submissions/${owner.uid}/images/${randomUUID()}.png`, "image/png", false, "participant image remains 5 MB", 5 * 1024 * 1024 + 1);
 await upload(owner, `challenges/drafts/${owner.uid}/video/${randomUUID()}.mp4`, "video/mp4", true, "challenge video upload");
 await upload(owner, `challenges/drafts/${owner.uid}/documents/${randomUUID()}.pdf`, "application/pdf", true, "challenge document upload");
 await upload(outsider, `challenges/drafts/${owner.uid}/banner/${randomUUID()}.png`, "image/png", false, "foreign challenge draft denied");

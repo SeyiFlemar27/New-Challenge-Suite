@@ -62,6 +62,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
   const [attemptedSteps, setAttemptedSteps] = useState<Set<number>>(new Set());
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const hydrated = useRef(false);
+  const creationKey = useRef("");
   const savingDraft = useRef(false);
   const draftSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
   function saveDraft(values: Record<string, unknown>) {
@@ -245,7 +246,12 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
     setSaving(true);
     try {
     if (!id) {
-      const result = await createChallengeDraft(payload);
+      const retrySlot = `challenge-draft:${user?.uid}:${privateMode ? "private" : "normal"}:${enterpriseOwnership ?? "personal"}`;
+      if (!creationKey.current) {
+        creationKey.current = crypto.randomUUID();
+        try { creationKey.current = window.sessionStorage.getItem(retrySlot) || creationKey.current; window.sessionStorage.setItem(retrySlot, creationKey.current); } catch { /* In-memory retries remain safe when browser storage is unavailable. */ }
+      }
+      const result = await createChallengeDraft({ ...payload, draftCreationKey: creationKey.current });
       if (!result.ok || !result.data?.challenge?.id) {
         setSaving(false);
         setDraftLimitReached(["DRAFT_LIMIT_REACHED", "FREE_BASIC_LIMIT_REACHED", "PLAN_LIMIT_REACHED"].includes(result.code ?? ""));
@@ -253,6 +259,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
         return;
       }
       const newId = result.data.challenge.id;
+      try { window.sessionStorage.removeItem(retrySlot); } catch { /* Browser storage may be disabled. */ }
       setId(newId);
       const progress = await updateChallengeDraft(newId, { ...payload, ...draftProgress(payload, 1, 1, result.data.challenge) });
       setAuthoritativeDraft(progress.ok && progress.data?.challenge ? progress.data.challenge : result.data.challenge);
