@@ -27,6 +27,7 @@ function isPublicCoverOrGallery(challenge: Record<string, unknown>, path: string
 
 function isImageAssetPath(path: string) {
   return /^verified-challenge-media\/[^/]+\/images\/[^/]+$/.test(path)
+    || /^challenges\/(drafts|host-drafts|hybrid-drafts)\/[^/]+\/(banner|gallery)\/[^/]+$/.test(path)
     || /^challenges\/[^/]+\/banner\/[^/]+$/.test(path);
 }
 
@@ -50,6 +51,8 @@ async function canReadChallengeAsset(request: Request, db: FirebaseFirestore.Fir
   const challengeSnap = await db.collection("challenges").doc(challengeId).get();
   if (!challengeSnap.exists) return { allowed: false, isPublic: false };
   const challenge = { id: challengeId, ...challengeSnap.data() } as Record<string, unknown>;
+  const draftOwner = /^challenges\/(?:drafts|host-drafts|hybrid-drafts)\/([^/]+)\/(?:banner|gallery)\/[^/]+$/.exec(path)?.[1];
+  if (draftOwner && !userOwnsChallenge(challenge, draftOwner)) return { allowed: false, isPublic: false };
   const referenced = challengeMediaPaths(challenge).has(path);
   if (!referenced) return { allowed: false, isPublic: false };
 
@@ -57,7 +60,7 @@ async function canReadChallengeAsset(request: Request, db: FirebaseFirestore.Fir
   const publicPreview = isImageAssetPath(path) && isPrivatePreviewCover(challenge, path);
   const publicImage = !privateChallenge && isPublicChallenge(challengeId, challenge) && isPublicCoverOrGallery(challenge, path);
   const publiclyReadable = publicPreview || publicImage;
-  if (publiclyReadable && !uid) return { allowed: true, isPublic: true };
+  if (publiclyReadable) return { allowed: true, isPublic: true };
   if (!uid) return { allowed: false, isPublic: false };
 
   const user = await getRequestUser(request);
@@ -105,8 +108,22 @@ function isQaChallenge(id: string, challenge: Record<string, unknown>) {
 async function authorizeMediaRequest(request: Request, db: FirebaseFirestore.Firestore, path: string) {
   const requestUser = await getRequestUser(request);
   const uid = requestUser?.uid ?? null;
-  const draftMatch = /^challenges\/drafts\/([^/]+)\/(banner|gallery|video|documents)\/[^/]+$/.exec(path);
-  if (draftMatch) return { allowed: Boolean(uid && (uid === draftMatch[1] || requestUser?.isAdmin)), isPublic: false };
+  const draftMatch = /^challenges\/(?:drafts|host-drafts|hybrid-drafts)\/([^/]+)\/(banner|gallery|video|documents)\/[^/]+$/.exec(path);
+  if (draftMatch) {
+    if (uid && (uid === draftMatch[1] || requestUser?.isAdmin)) return { allowed: true, isPublic: false };
+    if (!["banner", "gallery"].includes(draftMatch[2])) return { allowed: false, isPublic: false };
+    // Historical published challenges can still reference owned draft objects.
+    // Resolve exact persisted references, never publish an entire draft prefix.
+    const matches = await Promise.all([
+      db.collection("challenges").where("coverImagePath", "==", path).limit(5).get(),
+      db.collection("challenges").where("publicMediaPaths", "array-contains", path).limit(5).get()
+    ]);
+    for (const challengeId of new Set(matches.flatMap((snapshot) => snapshot.docs.map((doc) => doc.id)))) {
+      const access = await canReadChallengeAsset(request, db, uid, challengeId, path);
+      if (access.allowed) return access;
+    }
+    return { allowed: false, isPublic: false };
+  }
   const challengeMatch = /^verified-challenge-media\/([^/]+)\/(images|videos)\/[^/]+$/.exec(path);
   if (challengeMatch) return canReadChallengeAsset(request, db, uid, challengeMatch[1], path);
   const legacyChallengeMatch = /^challenges\/([^/]+)\/(banner|trailers|promo-flyer|promo-video)\/[^/]+$/.exec(path);

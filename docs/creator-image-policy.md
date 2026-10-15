@@ -26,3 +26,10 @@ Private drafts use the authenticated drafts endpoint and server-generated
 credentials. Retry keys are owner-bound and transactional. Invitation-code
 redemption grants access only; joining, payment, capacity, and deadlines remain
 separate server checks. Historical invitation mechanisms are not migrated.
+
+Historical published covers that still reference owner-draft objects are served
+through the application only after resolving an exact persisted reference,
+checking its creator against the draft owner, and applying current challenge
+visibility and viewer authorization. Direct Storage reads remain owner-only;
+unreferenced files, unpublished drafts, hidden private images, and draft videos
+are not made public. No production records or stored files are migrated.

@@ -63,6 +63,30 @@ try {
   const owner = await newUser("owner");
   const outsider = await newUser("outsider");
 
+  for (const namespace of ["drafts", "host-drafts", "hybrid-drafts"]) {
+    const id = `${runId}_${namespace}`;
+    const path = `challenges/${namespace}/${owner.uid}/banner/legacy.png`;
+    const gallery = `challenges/${namespace}/${owner.uid}/gallery/gallery.png`;
+    const unreferenced = `challenges/${namespace}/${owner.uid}/gallery/unreferenced.png`;
+    const trailer = `challenges/${namespace}/${owner.uid}/video/private.mp4`;
+    await Promise.all([object(path), object(gallery), object(unreferenced), object(trailer, "video/mp4")]);
+    const record = db.collection("challenges").doc(id);
+    await record.set({ creatorId: owner.uid, type: "Normal", visibility: "public", status: "published", coverImagePath: path, challengeImages: [{ path: gallery }], publicMediaPaths: [path, gallery], trailerVideoPath: trailer });
+    equal((await read(path)).status, 200, `${namespace} referenced published cover is served while signed out`);
+    equal((await read(gallery)).status, 200, `${namespace} projected public gallery is served`);
+    equal((await read(unreferenced)).status, 404, `${namespace} unreferenced draft stays protected`);
+    equal((await read(trailer)).status, 404, `${namespace} draft trailer stays protected`);
+    await record.update({ status: "draft" });
+    equal((await read(path)).status, 404, `${namespace} unpublished cover stays protected`);
+    await record.update({ status: "registration_open", visibility: "private", type: "Private Challenge", publicPreviewEnabled: false });
+    equal((await read(path)).status, 404, `${namespace} hidden private cover stays protected`);
+    await record.update({ publicPreviewEnabled: true });
+    equal((await read(path)).status, 200, `${namespace} eligible locked preview exposes cover only`);
+    equal((await read(gallery)).status, 404, `${namespace} private gallery stays protected`);
+    await record.update({ creatorId: outsider.uid, visibility: "public", type: "Normal", status: "published" });
+    equal((await read(path)).status, 404, `${namespace} foreign draft reference cannot grant public access`);
+  }
+
   const publicId = `${runId}_public`;
   const publicCover = `verified-challenge-media/${publicId}/images/cover.png`;
   const publicGallery = `verified-challenge-media/${publicId}/images/gallery.png`;
@@ -74,6 +98,7 @@ try {
   });
   const publicCoverResponse = await read(publicCover);
   equal(publicCoverResponse.status, 200, "signed-out visitor can read a referenced public Challenge cover");
+  equal((await read(publicCover, outsider.token)).status, 200, "signed-in visitor can read the same public cover without joining");
   equal(await body(publicCoverResponse), "cover-bytes", "public media endpoint streams the actual stored bytes");
   equal(publicCoverResponse.headers.get("cache-control"), "no-store", "public response avoids stale shared caching after visibility changes");
   const rangeResponse = await read(publicCover, null, { range: "bytes=0-3" });
@@ -92,6 +117,7 @@ try {
     challengeImages: [{ path: privateCover }, { path: privateGallery }], trailerVideoPath: privateTrailer
   });
   equal((await read(privateCover)).status, 200, "signed-out visitor can read an eligible locked-preview cover");
+  equal((await read(privateCover, outsider.token)).status, 200, "signed-in visitor can read an eligible locked-preview cover only");
   equal((await read(privateGallery)).status, 404, "locked preview does not disclose a private gallery asset");
   equal((await read(privateTrailer)).status, 404, "locked preview does not disclose a restricted trailer");
   equal((await read(privateGallery, outsider.token)).status, 404, "unrelated authenticated user cannot read private gallery media");
