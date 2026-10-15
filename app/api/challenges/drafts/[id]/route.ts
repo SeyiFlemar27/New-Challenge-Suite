@@ -14,8 +14,10 @@ import { inferCapacityMode, validateCapacity } from "@/lib/normal-challenge-capa
 import { validateChallengeForDraft } from "@/lib/server/challenge-validation";
 import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize-exposure";
 import { deleteUnpublishedChallengeMedia } from "@/lib/server/media-verification";
+import { preparePrivateCredential } from "@/lib/server/private-credentials";
 
 const allowedDraftFields = new Set([
+  "privateAccessPolicyVersion", "privateBuilderStep", "publicPreviewEnabled",
   "title", "shortDescription", "description", "category", "subcategory", "customCategory", "type", "challengeType", "builderVersion", "coverMediaType", "visibility", "premiumOnly",
   "acceptedSubmissionTypes", "competitionFormat", "bestOf", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline",
   "registrationDeadline", "votingDeadline", "votingStartsAt", "votingEndsAt", "winnerAnnouncementAt", "timeZone", "timezone", "lateRegistrationEnabled",
@@ -93,6 +95,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("CHALLENGE_NOT_FOUND");
     const current = { id: snap.id, ...snap.data() } as Record<string, unknown>;
+    if (patch.privateAccessPolicyVersion !== undefined && patch.privateAccessPolicyVersion !== current.privateAccessPolicyVersion) throw new Error("PRIVATE_POLICY_LOCKED");
+    if (current.privateAccessPolicyVersion === 2 && patch.privateAccessMethod !== undefined && !["invite_link", "invitation_code"].includes(String(patch.privateAccessMethod))) throw new Error("ACCESS_METHOD_MISMATCH");
+    if (current.privateAccessPolicyVersion === 2 && current.publishedAt && patch.privateAccessMethod !== undefined && patch.privateAccessMethod !== current.privateAccessMethod) throw new Error("PRIVATE_METHOD_LOCKED");
     if (!userOwnsChallenge(current, user.uid) && !access.enterpriseAccess && !user.isAdmin) throw new Error("PERMISSION_DENIED");
     const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
     const usesNormalBuilderFoundation = lockedType === "normal" && (
@@ -125,6 +130,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     }
     const merged = { ...current, ...normalizedPatch, updatedAt: now, lastAutosavedAt: now };
+    if (current.privateAccessPolicyVersion === 2) {
+      Object.assign(normalizedPatch, { privateAccessCode: "", accessCode: "", inviteCode: "", privateAccessCodeExpiresAt: null, privateAccessCodeMaxUses: null, privateDirectInvitees: [] });
+      if (normalizedPatch.publicPreviewEnabled === false) Object.assign(normalizedPatch, { privateJoiningPolicy: "invite_only", privateVotingAccess: "access_restricted" });
+    }
     if (Object.keys(normalizedPatch).some((field) => mediaDraftFields.has(field))) {
       const mediaErrors = validateChallengeForDraft(merged).errors.filter((issue) => issue.step === "Media" || issue.step === "Media & Branding");
       if (mediaErrors.length) throw new Error("INVALID_MEDIA_UPLOAD");
@@ -144,12 +153,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const mediaChanged = Object.keys(normalizedPatch).some((field) => mediaDraftFields.has(field));
     const staleMediaVerification = mediaChanged ? { version: 1, status: "stale", reason: "media_replaced", invalidatedAt: now } : undefined;
     const finalPatch = { ...normalizedPatch, ...(staleMediaVerification ? { mediaVerification: staleMediaVerification } : {}), challengeType: lockedType, challengeTypeLocked: true, maxUnlockedStep: safeUnlockedStep, completionPercentage: progress.completionPercentage, nextIncompleteSection: progress.nextIncompleteSection, updatedAt: now, lastAutosavedAt: now, draftAutosaveEnabled: true };
+    if (current.privateAccessPolicyVersion === 2 && normalizedPatch.privateAccessMethod && normalizedPatch.privateAccessMethod !== current.privateAccessMethod) {
+      const credential = preparePrivateCredential(db, id, String(current.creatorId ?? current.hostId), String(normalizedPatch.privateAccessMethod), now);
+      if (current.privateCredentialId) transaction.set(db.collection("privateChallengeInvites").doc(String(current.privateCredentialId)), { enabled: false, status: "revoked", updatedAt: now }, { merge: true });
+      credential.apply(transaction);
+      Object.assign(finalPatch, { privateCredentialId: credential.inviteId });
+    }
     transaction.set(ref, finalPatch, { merge: true });
     if (staleMediaVerification) transaction.set(db.collection("challengeMediaVerifications").doc(id), staleMediaVerification, { merge: true });
     return { ...merged, ...progress, retiredCompetition: false, archived: false };
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
+    if (["PRIVATE_POLICY_LOCKED", "PRIVATE_METHOD_LOCKED", "ACCESS_METHOD_MISMATCH"].includes(code)) return fail("Private access settings are not valid for this draft. The invitation method cannot change after publication.", 422, undefined, code);
+    if (code === "PRIVATE_CREDENTIAL_SERVICE_UNAVAILABLE") return fail("Secure invitations are temporarily unavailable. Your access settings were not changed.", 503, undefined, code);
     if (code === "CHALLENGE_NOT_FOUND") return fail("Challenge draft not found.", 404, undefined, code);
     if (code === "PERMISSION_DENIED") return fail("You can only edit your own challenge drafts.", 403, undefined, code);
     if (code === "CHALLENGE_TYPE_LOCKED") return fail("Challenge type can't be changed after the draft is created.", 409, undefined, code);

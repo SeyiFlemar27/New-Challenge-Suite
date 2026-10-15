@@ -11,6 +11,7 @@ import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
+import { preparePrivateCredential } from "@/lib/server/private-credentials";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { getChallengeMonetizationAccess, validateEntryFee } from "@/lib/server/payout-structure";
 import { calculateChallengeDraftProgress } from "@/lib/server/challenge-drafts";
@@ -200,6 +201,10 @@ export async function POST(request: Request) {
     cashHoldHours: 24
   };
   const challenge: Record<string, unknown> = {
+    ...(body.privateAccessPolicyVersion === 2 && body.visibility === "private" ? {
+      ...Object.fromEntries(["subcategory", "challengeRules", "submissionInstructionsList", "challengeImages", "challengeVideo", "winnerSplits", "winnerPrizeAmountsCents", "prizeCurrency", "joinWindowMode", "registrationOpensAt", "registrationEnabled", "hideVoteTotals", "hideRankings", "capacityMode", "publishConfirmations"].map((key) => [key, (body as Record<string, unknown>)[key]]).filter(([, value]) => value !== undefined)),
+      challengeType: "private", builderVersion: "normal_v3"
+    } : {}),
     id: ref.id,
     creatorId: user.uid,
     createdBy: user.uid,
@@ -218,12 +223,13 @@ export async function POST(request: Request) {
     type: body.type ?? (body.visibility === "private" ? "Private / Exclusive" : "Public Challenge"),
     visibility: body.visibility,
     publicPreviewEnabled: body.visibility === "private" && body.publicPreviewEnabled,
+    ...(body.visibility === "private" && body.privateAccessPolicyVersion === 2 ? { privateAccessPolicyVersion: 2, privateBuilderStep: body.privateBuilderStep ?? 0 } : {}),
     privateAccessMethod: body.visibility === "private" ? privateAccessMethod : "",
     privateJoiningPolicy: body.visibility === "private" ? body.privateJoiningPolicy : "invite_only",
     privateVotingAccess: body.visibility === "private" ? body.privateVotingAccess : "access_restricted",
     privateAccessCode: "",
-    privateAccessCodeExpiresAt: body.visibility === "private" ? body.privateAccessCodeExpiresAt ?? null : null,
-    privateAccessCodeMaxUses: body.visibility === "private" ? body.privateAccessCodeMaxUses ?? 100 : null,
+    privateAccessCodeExpiresAt: body.visibility === "private" && body.privateAccessPolicyVersion !== 2 ? body.privateAccessCodeExpiresAt ?? null : null,
+    privateAccessCodeMaxUses: body.visibility === "private" && body.privateAccessPolicyVersion !== 2 ? body.privateAccessCodeMaxUses ?? 100 : null,
     privateAccessInstructions: body.visibility === "private" ? body.privateAccessInstructions : "",
     privateParticipantQuestions: body.visibility === "private" ? body.privateParticipantQuestions : [],
     privateParticipantAcknowledgements: body.visibility === "private" ? body.privateParticipantAcknowledgements : [],
@@ -357,7 +363,7 @@ export async function POST(request: Request) {
       winnerPublishingEnabled: false,
       exportsEnabled: false
     } : null,
-    votingStartsAt: body.submissionStartAt || body.startsAt,
+    votingStartsAt: body.privateAccessPolicyVersion === 2 ? body.votingStartsAt || body.submissionDeadline : body.submissionStartAt || body.startsAt,
     adminReviewRequired: lifecycleStatus === "pending_review",
     completionPercentage: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).completionPercentage,
     nextIncompleteSection: calculateChallengeDraftProgress(body as unknown as Record<string, unknown>).nextIncompleteSection,
@@ -381,7 +387,12 @@ export async function POST(request: Request) {
       return fail("Challenge media could not be verified from storage. Replace the media and try again.", 422, undefined, code);
     }
   }
-  const privateInvitePromise = body.publish && (challenge.visibility === "private" || challenge.visibility === "exclusive")
+  let preparedCredential: ReturnType<typeof preparePrivateCredential> | null = null;
+  if (body.visibility === "private" && body.privateAccessPolicyVersion === 2) {
+    try { preparedCredential = preparePrivateCredential(db, ref.id, user.uid, privateAccessMethod, now); challenge.privateCredentialId = preparedCredential.inviteId; }
+    catch { return fail("Secure private invitations are temporarily unavailable. Your draft was not created.", 503, undefined, "PRIVATE_CREDENTIAL_SERVICE_UNAVAILABLE"); }
+  }
+  const privateInvitePromise = body.privateAccessPolicyVersion !== 2 && body.publish && (challenge.visibility === "private" || challenge.visibility === "exclusive")
     ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: privateAccessMethod === "invitation_code" ? body.privateAccessCode || undefined : undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100, method: privateAccessMethod as "invite_link" | "invitation_code" | "direct_invitations", allowedEmails: privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [] })
     : Promise.resolve(null);
 
@@ -395,6 +406,7 @@ export async function POST(request: Request) {
         ref.id,
       );
       slot.apply();
+      preparedCredential?.apply(transaction);
       transaction.create(ref, challenge);
     });
   } catch (error) {

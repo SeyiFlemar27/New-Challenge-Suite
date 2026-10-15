@@ -107,6 +107,7 @@ function ExplorePageContent() {
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p>
                 <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Explore Challenges</h1>
+                <LinkButton href="/private/code" variant="ghost" className="mt-2">Enter Invitation Code</LinkButton>
               </div>
               <p className="text-sm font-bold text-slate-400">{loading ? "Loading challenges" : `${challenges.length.toLocaleString()} challenges on this page`}</p>
             </div>
@@ -182,6 +183,7 @@ function ExploreChallengeCard({ challenge }: { challenge: ExploreChallenge }) {
     }
     setSaved(!saved);
   }
+  if (challenge.visibility === "private") return <article className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-[#151515]"><ExploreCardMedia title={String(challenge.title ?? "Private Challenge")} videoUrl="" images={[challenge.coverImageUrl]} /><div className="flex flex-1 flex-col gap-3 p-4"><Badge>Private · Locked</Badge><h2 className="text-lg font-black">{challenge.title}</h2><p className="text-sm text-slate-400">{challenge.shortDescription || challenge.description}</p><p className="text-sm font-bold">{creator.displayName ?? "Challenge creator"}</p><LinkButton href={href} className="mt-auto">View Locked Challenge</LinkButton></div></article>;
   return <article data-mobile-explore-card role="link" tabIndex={0} onClick={openCard} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } }} className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[8px] border border-white/10 bg-[#151515] shadow-lg shadow-black/20 transition hover:border-[var(--gold)]/50 hover:bg-[#1a1a1a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]">
     <div className="relative">
       <ExploreCardMedia title={String(challenge.title ?? "Challenge")} videoUrl={String(challenge.trailerVideoUrl ?? challenge.promoVideoUrl ?? "")} images={[challenge.coverImageUrl, ...(Array.isArray(challenge.challengeImages) ? challenge.challengeImages.map((item: any) => typeof item === "string" ? item : item?.url) : []), challenge.promoImageUrl, challenge.galleryImageUrl]} />

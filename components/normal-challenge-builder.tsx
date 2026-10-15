@@ -17,8 +17,8 @@ import { firebaseClientConfigStatus } from "@/lib/firebase/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { useChallengeBuilderAutosave } from "@/lib/hooks/use-challenge-builder-autosave";
 import { freshNormalChallengeForm, normalChallengeFormFromRecord, type NormalChallengeForm } from "@/lib/normal-challenge-builder-model";
-const NORMAL_CHALLENGE_STEPS = NORMAL_FRONTEND_STEPS.map((step) => step.navLabel);
-const NORMAL_CHALLENGE_MAX_STEP = NORMAL_CHALLENGE_STEPS.length - 1;
+import { freshPrivateAccess, PRIVATE_FRONTEND_STEPS, privateBuilderPayload, privateBuilderReadiness, privateSharedStep, privateVisibleStep, type PrivateBuilderAccess } from "@/lib/private-challenge-builder";
+import { PrivateBuilderAccessStep } from "@/components/private-builder-access";
 
 function builderStatus(record: Record<string, unknown>) {
   const value = String(record.managementState ?? record.status ?? record.lifecycleStatus ?? "draft").toLowerCase();
@@ -26,7 +26,17 @@ function builderStatus(record: Record<string, unknown>) {
 }
 type EnterpriseOwnership = "personal" | "official";
 
-export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draftId?: string; enterpriseOwnership?: EnterpriseOwnership }) {
+export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMode = false }: { draftId?: string; enterpriseOwnership?: EnterpriseOwnership; privateMode?: boolean }) {
+  const definitions = privateMode ? PRIVATE_FRONTEND_STEPS : NORMAL_FRONTEND_STEPS;
+  const NORMAL_CHALLENGE_STEPS = definitions.map((item) => item.navLabel);
+  const NORMAL_CHALLENGE_MAX_STEP = definitions.length - 1;
+  const reviewStep = privateMode ? 6 : normalStepIndex("review");
+  const [privateAccess, setPrivateAccess] = useState<PrivateBuilderAccess>(freshPrivateAccess);
+  const sharedStep = (value: number) => privateMode ? privateSharedStep(value) : value;
+  const visibleStep = (value: number) => privateMode ? privateVisibleStep(value) : value;
+  function draftProgress(values: Record<string, unknown>, position: number, max: number, record: Record<string, unknown> | null) {
+    return { ...normalFrontendDraftProgress(values, sharedStep(position), sharedStep(max), record), ...(privateMode ? { privateBuilderStep: position } : {}) };
+  }
   const router = useRouter();
   const { user, loading } = useCurrentUser();
   const officialContext = enterpriseOwnership === "official";
@@ -62,14 +72,15 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
   const mediaDisabled = firebaseClientConfigStatus.mediaUploadsDisabled;
   const payload = useMemo(() => ({
     ...normalFrontendPayload(form, id),
+    ...(privateMode ? privateBuilderPayload(privateAccess) : {}),
     ...(enterpriseOwnership ? {
       officialChallenge: enterpriseOwnership === "official",
       ownershipType: enterpriseOwnership === "official" ? "challenge_suite_official" : "enterprise_personal"
     } : {})
-  }), [enterpriseOwnership, form, id]);
+  }), [enterpriseOwnership, form, id, privateMode, privateAccess]);
   const funding = useMemo(() => creatorBasePrizeFunding(form.basePrizeAmount, authoritativeDraft), [form.basePrizeAmount, authoritativeDraft]);
-  const readiness = useMemo(() => getNormalFrontendReadiness({ ...authoritativeDraft, ...payload }, funding), [authoritativeDraft, payload, funding]);
-  const stepDefinition = NORMAL_FRONTEND_STEPS[step] ?? NORMAL_FRONTEND_STEPS[0];
+  const readiness = useMemo(() => (privateMode ? privateBuilderReadiness : getNormalFrontendReadiness)({ ...authoritativeDraft, ...payload }, funding), [authoritativeDraft, payload, funding, privateMode]);
+  const stepDefinition = definitions[step] ?? definitions[0];
   const uploadBusy = Object.values(media).some((value) => ["preparing", "uploading", "processing"].includes(value)) ;
   const editable = status === "draft" || status === "requires_changes";
   const firstInvalidStep = readiness.steps.findIndex((item) => !item.complete);
@@ -86,7 +97,12 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
         return;
       }
       const challenge = result.data.challenge;
-      const restoredStep = normalRestoredStep(challenge.builderCurrentStep ?? challenge.creationStep ?? 0);
+      if (!privateMode && (challenge.privateAccessPolicyVersion === 2 || /private|exclusive/i.test(String(challenge.visibility ?? challenge.type ?? "")))) { router.replace(`/private/create/${draftId}`); return; }
+      const restoredStep = privateMode ? Math.max(0, Math.min(7, Number(challenge.privateBuilderStep ?? 0))) : normalRestoredStep(challenge.builderCurrentStep ?? challenge.creationStep ?? 0);
+      if (privateMode) {
+        if (challenge.privateAccessPolicyVersion !== 2) { setDraftLoadFailed(true); setError("This historical Private draft uses the legacy builder. Its settings are preserved and require a compatibility review before migration."); setLoadingDraft(false); return; }
+        setPrivateAccess({ ...freshPrivateAccess, publicPreviewEnabled: challenge.publicPreviewEnabled === true, privateAccessMethod: challenge.privateAccessMethod === "invitation_code" ? "invitation_code" : "invite_link", privateVotingAccess: challenge.privateVotingAccess === "public_voting" ? "public_voting" : "access_restricted" });
+      }
       setAuthoritativeDraft(challenge);
       const loadedStatus = builderStatus(challenge);
       setForm(normalChallengeFormFromRecord(challenge));
@@ -96,7 +112,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
         setError("");
         setAutosaveFailed(false);
       }
-      setUnlocked(Math.max(normalRestoredStep(challenge.maxUnlockedStep ?? challenge.creationStep ?? 0), restoredStep));
+      const sharedUnlocked = normalRestoredStep(challenge.maxUnlockedStep ?? challenge.creationStep ?? 0);
+      setUnlocked(Math.max(privateMode ? privateVisibleStep(sharedUnlocked) : sharedUnlocked, restoredStep));
       setStep(restoredStep);
       setLoadingDraft(false);
     }).catch(() => {
@@ -104,10 +121,10 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
       setDraftLoadFailed(true);
       setLoadingDraft(false);
     });
-  }, [draftId]);
+  }, [draftId, privateMode, router]);
 
   useEffect(() => {
-    if (!user || draftId || plan !== "free") return;
+    if (!user || draftId || privateMode || plan !== "free") return;
     let active = true;
     void fetchChallengeUsage().then((result) => {
       if (!active) return;
@@ -115,7 +132,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
       else setUsageError(result.message || "Challenge allowance could not be checked.");
     }).catch(() => { if (active) setUsageError("Challenge allowance could not be checked. Try again."); });
     return () => { active = false; };
-  }, [draftId, plan, user]);
+  }, [draftId, plan, user, privateMode]);
 
   async function refreshFunding() {
     if (!id || fundingBusy) return;
@@ -148,7 +165,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
     enabled: Boolean(id) && !loadingDraft && !saving && editable,
     revision: payload,
     secondaryRevision: step,
-    save: () => saveDraft({ ...payload, ...normalFrontendDraftProgress(payload, step, unlocked, authoritativeDraft) }),
+    save: () => saveDraft({ ...payload, ...draftProgress(payload, step, unlocked, authoritativeDraft) }),
     onResult: (result) => {
       if (result.ok && result.data?.challenge) setAuthoritativeDraft(result.data.challenge);
       setAutosaveFailed(!result.ok);
@@ -180,7 +197,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
   async function persist(next = step) {
     if (!id || !editable) return false;
     invalidateAutosave();
-    const result = await saveDraft({ ...payload, ...normalFrontendDraftProgress(payload, next, unlocked, authoritativeDraft) });
+    const result = await saveDraft({ ...payload, ...draftProgress(payload, next, unlocked, authoritativeDraft) });
     if (!result.ok) {
       if (result.code === "CHALLENGE_NOT_EDITABLE") {
         const refreshed = await fetchChallengeDraft(id);
@@ -206,8 +223,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
     setAttemptedSteps((current) => new Set(current).add(step));
     setError("");
     setDraftLimitReached(false);
-    if (step === normalStepIndex("review")) {
-      const earlierIssue = readiness.issues.find((item) => item.step < normalStepIndex("review"));
+    if (step === reviewStep) {
+      const earlierIssue = readiness.issues.find((item) => item.step < reviewStep);
       if (earlierIssue) {
         setError(earlierIssue.message);
         setStep(earlierIssue.step);
@@ -237,14 +254,14 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
       }
       const newId = result.data.challenge.id;
       setId(newId);
-      const progress = await updateChallengeDraft(newId, { ...payload, ...normalFrontendDraftProgress(payload, 1, 1, result.data.challenge) });
+      const progress = await updateChallengeDraft(newId, { ...payload, ...draftProgress(payload, 1, 1, result.data.challenge) });
       setAuthoritativeDraft(progress.ok && progress.data?.challenge ? progress.data.challenge : result.data.challenge);
       setStep(progress.ok ? 1 : 0);
       setUnlocked(progress.ok ? 1 : 0);
       setAutosaveFailed(!progress.ok);
       if (!progress.ok) setError("Your draft was created, but its progress could not be saved. Retry without creating another draft.");
       setSaving(false);
-      router.replace(`/challenges/create/${newId}`);
+      router.replace(privateMode ? `/private/create/${newId}` : `/challenges/create/${newId}`);
       return;
     }
     const nextStep = Math.min(NORMAL_CHALLENGE_MAX_STEP, step + 1);
@@ -295,20 +312,20 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
     }
     const freshRecord = refreshed.data.challenge;
     setAuthoritativeDraft(freshRecord);
-    const freshReadiness = getNormalFrontendReadiness({ ...freshRecord, ...payload }, creatorBasePrizeFunding(form.basePrizeAmount, freshRecord));
+    const freshReadiness = (privateMode ? privateBuilderReadiness : getNormalFrontendReadiness)({ ...freshRecord, ...payload }, creatorBasePrizeFunding(form.basePrizeAmount, freshRecord));
     if (!freshReadiness.ready) {
       setSaving(false);
       setError(freshReadiness.issues[0]?.message || "Submission requirements are not satisfied.");
       return;
     }
-    const result = await publishChallengeDraft(id, { ...payload, ...normalFrontendPayload(form, id, freshRecord) });
+    const result = await publishChallengeDraft(id, { ...payload, ...normalFrontendPayload(form, id, freshRecord), ...(privateMode ? privateBuilderPayload(privateAccess) : {}) });
     if (!result.ok) {
       setSaving(false);
       if (["FREE_BASIC_LIMIT_REACHED", "PLAN_LIMIT_REACHED"].includes(result.code ?? "")) setDraftLimitReached(true);
       const issue = normalFrontendSubmitIssue(result.details);
       setError(issue?.message || (result.code === "VALIDATION_ERROR" ? "Some required details need attention." : result.message || "Challenge could not be submitted for review."));
       if (issue?.step !== null && issue?.step !== undefined) {
-        setStep(issue.step);
+        setStep(visibleStep(issue.step));
         window.setTimeout(() => focusField(issue.field), 0);
       }
       return;
@@ -330,16 +347,16 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
   if (!user) return <AppShell><Card className="mx-auto max-w-xl p-8"><h1 className="text-2xl font-black">Sign in to create a challenge</h1><LinkButton href="/auth/login?next=%2Fchallenges%2Fcreate" className="mt-5">Sign In</LinkButton></Card></AppShell>;
   if (draftLimitReached) return <DraftLimit message={error} />;
   if (draftLoadFailed) return <AppShell><ApiErrorPanel title="Draft could not be restored" message={error} onRetry={() => window.location.reload()} /></AppShell>;
-  if (officialContext ? !user.enterprisePermissions?.includes("challenge.create_official") : !capabilities.canCreateNormalChallenge) return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Normal Challenge creation is unavailable in this workspace</h1><LinkButton href="/dashboard" className="mt-5">Return to your workspace</LinkButton></Card></AppShell>;
-  if (!draftId && plan === "free" && (!usage || usage.uid !== user.uid)) return <AppShell><ApiErrorPanel title={usageError ? "Creation entitlement could not be checked" : "Checking your creation entitlement"} message={usageError || "Loading your server-confirmed challenge allowance."} onRetry={usageError ? () => window.location.reload() : undefined} /></AppShell>;
-  if (!draftId && plan === "free" && usage?.remaining === 0) return <DraftLimit message="You have used your Free plan lifetime Normal Challenge allowance. Continue an existing draft or review available plans. Backend publication limits still apply to existing drafts." />;
+  if (officialContext ? !user.enterprisePermissions?.includes("challenge.create_official") : privateMode ? !capabilities.canCreatePrivateChallenge : !capabilities.canCreateNormalChallenge) return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Challenge creation is unavailable in this workspace</h1><LinkButton href="/dashboard" className="mt-5">Return to your workspace</LinkButton></Card></AppShell>;
+  if (!privateMode && !draftId && plan === "free" && (!usage || usage.uid !== user.uid)) return <AppShell><ApiErrorPanel title={usageError ? "Creation entitlement could not be checked" : "Checking your creation entitlement"} message={usageError || "Loading your server-confirmed challenge allowance."} onRetry={usageError ? () => window.location.reload() : undefined} /></AppShell>;
+  if (!privateMode && !draftId && plan === "free" && usage?.remaining === 0) return <DraftLimit message="You have used your Free plan lifetime Normal Challenge allowance. Continue an existing draft or review available plans. Backend publication limits still apply to existing drafts." />;
   if (status === "pending_review" && id) return <SubmittedChallengeState challengeId={id} />;
   if (!editable) return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Editing is unavailable for this challenge</h1><p className="mt-3">The server has recorded its status as {status.replaceAll("_", " ")}.</p><LinkButton className="mt-5" href={`/challenges/${id}`}>View Challenge</LinkButton></Card></AppShell>;
 
   return (
     <AppShell>
       <section className="mx-auto w-full max-w-[1560px] py-7">
-        <PageTitle title="Create Challenge" subtitle="Build your Normal Challenge one step at a time." />
+        <PageTitle title="Create Challenge" subtitle={`Build your ${privateMode ? "Private" : "Normal"} Challenge one step at a time.`} />
 
           <ChallengeBuilderFrame
             steps={NORMAL_CHALLENGE_STEPS}
@@ -357,7 +374,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership }: { draft
               {status === "requires_changes" && reviewReason ? <div className="mb-5 rounded-[8px] border border-amber-200 bg-amber-50 p-4"><p className="font-black text-amber-950">Changes requested</p><p className="mt-1 text-sm leading-6 text-amber-900">{reviewReason}</p></div> : null}
               <BuilderSurface>
                 <BuilderContent>
-                  <NormalChallengeBuilderStep step={step} form={form} update={update} userId={user.uid} mediaDisabled={mediaDisabled} track={(key) => (value) => setMedia((current) => ({ ...current, [key]: value }))} readiness={readiness} edit={setStep} plan={plan} showErrors={attemptedSteps.has(step)} draftId={id} funding={funding} fundBasePrize={() => void openFunding()} refreshFunding={() => void refreshFunding()} fundingBusy={fundingBusy || saving} />
+                  {privateMode && step === 5 ? <PrivateBuilderAccessStep value={privateAccess} onChange={setPrivateAccess} /> : <NormalChallengeBuilderStep step={sharedStep(step)} visibleStep={step} stepCount={definitions.length} form={form} update={update} userId={user.uid} mediaDisabled={mediaDisabled} track={(key) => (value) => setMedia((current) => ({ ...current, [key]: value }))} readiness={privateMode ? { ...readiness, issues: readiness.issues.map((issue) => ({ ...issue, step: privateSharedStep(issue.step) })) } : readiness} edit={(target) => setStep(visibleStep(target))} plan={plan} showErrors={attemptedSteps.has(step)} draftId={id} funding={funding} fundBasePrize={() => void openFunding()} refreshFunding={() => void refreshFunding()} fundingBusy={fundingBusy || saving} />}
+                  {privateMode && step === 6 ? <section className="mt-6 rounded-lg border p-5"><h3 className="font-black">Access</h3><p className="mt-2">{privateAccess.publicPreviewEnabled ? "Visible on Explore; requests permitted" : "Invitation-only; requests unavailable"} · {privateAccess.privateAccessMethod === "invite_link" ? "Invite Link" : "Invitation Code"} · {privateAccess.publicPreviewEnabled && privateAccess.privateVotingAccess === "public_voting" ? "Public voting during voting period" : "Voting requires private access"}</p><button className="mt-3 min-h-11 font-bold underline" onClick={() => setStep(5)}>Edit Access</button></section> : null}
                   {error ? <div className="mt-7"><ApiErrorPanel title="Check this step" message={error} onRetry={autosaveFailed ? () => void persist() : () => setError("")} /></div> : null}
                 </BuilderContent>
                 <BuilderFooter

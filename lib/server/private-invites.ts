@@ -1,8 +1,8 @@
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { createHash, randomBytes } from "node:crypto";
 import { isPrivateChallengeRecord } from "@/lib/server/challenge-access";
-import { isChallengeJoinable } from "@/lib/server/submission-lifecycle";
 import { writeAuditLog } from "@/lib/server/audit";
+import { privateAccessDenied, privateEnrollmentOpen } from "@/lib/private-challenge-policy";
 
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export type PrivateAccessMethod = "invite_link" | "invitation_code" | "direct_invitations";
@@ -183,20 +183,21 @@ export async function admitPrivateChallenge(db: Firestore, input: {
   const accessRef = db.collection("privateChallengeAccess").doc(`${challengeId}_${input.userId}`);
   const participantRef = db.collection("challengeParticipants").doc(`${challengeId}_${input.userId}`);
   return db.runTransaction(async (transaction) => {
-    const [inviteSnap, challengeSnap, accessSnap, participantSnap, accountSnap, profileSnap] = await Promise.all([
+    const [inviteSnap, challengeSnap, accessSnap, participantSnap, accountSnap, profileSnap, requestSnap] = await Promise.all([
       transaction.get(inviteRef),
       transaction.get(db.collection("challenges").doc(challengeId)),
       transaction.get(accessRef),
       transaction.get(participantRef),
       transaction.get(db.collection("users").doc(input.userId)),
-      transaction.get(db.collection("profiles").doc(input.userId))
+      transaction.get(db.collection("profiles").doc(input.userId)),
+      transaction.get(db.collection("privateAccessRequests").doc(`${challengeId}_${input.userId}`))
     ]);
-    if (accessSnap.exists && accessSnap.data()?.status === "approved") return { challengeId, alreadyAdmitted: true, membershipStatus: participantSnap.data()?.status ?? "registered" };
+    if (privateAccessDenied(requestSnap.data(), accessSnap.data())) throw new Error("ACCESS_RESTORATION_REQUIRED");
+    if (accessSnap.exists && accessSnap.data()?.status === "approved") return { challengeId, alreadyAdmitted: true, membershipStatus: participantSnap.data()?.status ?? "not_joined" };
     if (!challengeSnap.exists || !isPrivateChallengeRecord(challengeSnap.data() ?? {})) throw new Error("CHALLENGE_UNAVAILABLE");
     const challenge = { id: challengeId, ...challengeSnap.data() } as Record<string, unknown>;
     if (String(challenge.creatorId ?? challenge.hostId ?? "") === input.userId) throw new Error("SELF_ADMISSION_FORBIDDEN");
-    const joinable = isChallengeJoinable(challenge);
-    if (!joinable.allowed) throw new Error("CHALLENGE_NOT_JOINABLE");
+    if (!privateEnrollmentOpen(challenge, new Date(now))) throw new Error("CHALLENGE_NOT_JOINABLE");
     if (String(challenge.privateAccessMethod ?? "") !== input.method) throw new Error("ACCESS_METHOD_MISMATCH");
     const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
     const eligibilityError = validatePrivateParticipantEligibility(challenge, profile);
@@ -229,39 +230,12 @@ export async function admitPrivateChallenge(db: Firestore, input: {
       requirementAcknowledgements: evidence.requiredIds,
       participantAnswers: evidence.answers,
       requirementsAcceptedAt: now,
-      membershipStatus: participantSnap.exists ? currentParticipant.status ?? "registered" : "registered",
+      membershipStatus: participantSnap.exists ? currentParticipant.status ?? "registered" : "not_joined",
       createdAt: now,
       updatedAt: now
     };
-    const capacity = Math.max(0, Math.trunc(Number(challenge.maxParticipants ?? challenge.participantLimit ?? 0) || 0));
-    const participantCount = Math.max(0, Math.trunc(Number(challenge.participantCount ?? 0) || 0));
-    const waitlisted = !participantSnap.exists && capacity > 0 && participantCount >= capacity;
-    if (waitlisted && challenge.waitlistEnabled !== true) throw new Error("CHALLENGE_FULL");
-    if (!participantSnap.exists) {
-      const membershipStatus = waitlisted ? "waitlisted" : "registered";
-      transaction.create(participantRef, {
-        id: participantRef.id,
-        challengeId,
-        userId: input.userId,
-        status: membershipStatus,
-        registeredAt: now,
-        joinedAt: null,
-        enteredAt: null,
-        privateAccessMethod: input.method,
-        privateInviteId: inviteRef.id,
-        entryAgreementAccepted: false,
-        paidEntryEnabled: false,
-        entryFeeCents: 0,
-        createdAt: now,
-        updatedAt: now
-      });
-      transaction.set(db.collection("challenges").doc(challengeId), {
-        registrationCount: Number(challenge.registrationCount ?? 0) + (waitlisted ? 0 : 1),
-        ...(waitlisted ? { waitlistCount: Number(challenge.waitlistCount ?? 0) + 1 } : {}),
-        updatedAt: now
-      }, { merge: true });
-    }
-    transaction.create(accessRef, { ...receipt, membershipStatus: waitlisted ? "waitlisted" : receipt.membershipStatus });
+    // Access never reserves capacity or creates an unpaid participant record.
+    transaction.set(accessRef, receipt, { merge: true });
     setPrivateChallengeMediaAccessInTransaction(db, transaction, {
       challengeId,
       userId: input.userId,
@@ -277,7 +251,7 @@ export async function admitPrivateChallenge(db: Firestore, input: {
     transaction.create(db.collection("privateInviteAuditEvents").doc(), {
       challengeId, inviteId: inviteRef.id, userId: input.userId, action: `${input.method}_admitted`, createdAt: now
     });
-    return { challengeId, alreadyAdmitted: false, membershipStatus: waitlisted ? "waitlisted" : receipt.membershipStatus };
+    return { challengeId, alreadyAdmitted: false, membershipStatus: receipt.membershipStatus };
   });
 }
 
@@ -289,6 +263,7 @@ export async function revokePrivateChallengeInvite(db: Firestore, input: { chall
     const [inviteSnap, challengeSnap] = await Promise.all([transaction.get(inviteRef), transaction.get(challengeRef)]);
     if (!inviteSnap.exists || String(inviteSnap.data()?.challengeId) !== input.challengeId) throw new Error("INVITE_NOT_FOUND");
     if (!challengeSnap.exists || String(challengeSnap.data()?.creatorId ?? challengeSnap.data()?.hostId ?? "") !== input.actorId) throw new Error("PERMISSION_DENIED");
+    if (inviteSnap.data()?.policyVersion === 2) throw new Error("ROTATION_CONFIRMATION_REQUIRED");
     transaction.set(inviteRef, { status: "revoked", enabled: false, revokedAt: now, revokedBy: input.actorId, updatedAt: now }, { merge: true });
   });
 }

@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { privatePublicVotingOpen } from "@/lib/private-challenge-policy";
 
 export function isPrivateChallengeRecord(challenge: Record<string, unknown>) {
   const visibility = String(challenge.visibility ?? challenge.type ?? "public").toLowerCase();
@@ -13,7 +14,7 @@ export function isPrivateChallengeRecord(challenge: Record<string, unknown>) {
 
 /** Public voting is a narrow exception for approved public submissions. It does not grant private challenge access. */
 export function hasPublicVotingAccess(challenge: Record<string, unknown>) {
-  return isPrivateChallengeRecord(challenge) && challenge.privateVotingAccess === "public_voting";
+  return isPrivateChallengeRecord(challenge) && privatePublicVotingOpen(challenge);
 }
 
 export function userOwnsChallenge(challenge: Record<string, unknown>, userId: string) {

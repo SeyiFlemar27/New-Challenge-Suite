@@ -13,6 +13,7 @@ import {
   Gift,
   Home,
   LayoutGrid,
+  KeyRound,
   Medal,
   Menu,
   Radio,
@@ -77,6 +78,7 @@ function personalSections(capabilities: PersonalCapabilities, context: Workspace
   const hostContext = context === "host" && capabilities.canManageHostOperations;
   const creatorContext = context === "creator" || capabilities.canCreatePrivateChallenge;
   const createChildren = [
+    { href: "/private/code", label: "Enter Invitation Code" },
     capabilities.canCreateNormalChallenge ? { href: hostContext ? "/host/challenges/create" : "/challenges/create", label: "Normal Challenge" } : null,
     capabilities.canCreatePrivateChallenge ? { href: hostContext ? "/host/private/create" : "/private/create", label: "Private" } : null,
     capabilities.canCreateTournament ? { href: hostContext ? "/host/tournaments/create" : "/tournaments/create", label: "Tournament" } : null,
@@ -90,6 +92,7 @@ function personalSections(capabilities: PersonalCapabilities, context: Workspace
     { label: "Main", items: [
       { href: homeHref, label: homeLabel, icon: Home },
       { href: "/explore", label: "Explore", icon: LayoutGrid },
+      { href: "/private/code", label: "Enter Invitation Code", icon: KeyRound },
       { href: "/favorites", label: "Saved", icon: Star }
     ] },
     ...(createChildren.length ? [{ label: "Create", items: [{ label: "Challenge Studio", icon: Swords, children: createChildren }] }] : []),

@@ -6,6 +6,7 @@ import { calculatePaidRevenueSplit, calculateSponsorContributionSplit, MINIMUM_E
 import { calculateEntryEntitlement, consumeEntryEntitlement, type RewardEntitlementType } from "@/lib/server/reward-economy";
 import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
 import { createSponsorReservationWindow, isSponsorPaymentWithinReservation, SPONSOR_FUNDING_RESERVATION_WINDOW_MS } from "@/lib/server/sponsor-reservation-policy";
+import { isPrivateChallengeRecord } from "@/lib/server/challenge-access";
 
 export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding", "sponsor_wallet_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
@@ -189,6 +190,10 @@ export async function createPendingEntryPayment(db: Firestore, input: { userId: 
     if (paymentSnap.exists && ["paid", "confirmed"].includes(String(paymentSnap.data()?.status))) throw new Error("You are already enrolled in this paid challenge.");
     if (legacyPaymentSnap.exists && ["paid", "confirmed"].includes(String(legacyPaymentSnap.data()?.status))) throw new Error("You are already enrolled in this paid challenge.");
     const freshChallenge = freshChallengeSnap.exists ? { id: freshChallengeSnap.id, ...freshChallengeSnap.data() } as Record<string, unknown> : input.challenge;
+    if (isPrivateChallengeRecord(freshChallenge)) {
+      const access = await transaction.get(db.collection("privateChallengeAccess").doc(participantId));
+      if (access.data()?.status !== "approved") throw new Error("PRIVATE_INVITE_REQUIRED");
+    }
     if (freshChallenge.builderVersion === "normal_v3") {
       if (!freshChallengeSnap.exists || !getChallengeLifecycleState(freshChallenge).canJoin) throw new Error("ENTRY_REGISTRATION_CLOSED");
       if (paidEntryAmountCents(freshChallenge) !== amountCents) throw new Error("ENTRY_PAYMENT_AMOUNT_CHANGED");
@@ -279,6 +284,10 @@ export async function confirmRewardEntitledEntry(db: Firestore, paymentId: strin
     const [participantSnap, participantRows] = await Promise.all([transaction.get(participantRef), transaction.get(participantQuery)]);
     if (!challengeSnap.exists) throw new Error("Challenge not found for reward entry confirmation.");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (isPrivateChallengeRecord(challenge)) {
+      const access = await transaction.get(db.collection("privateChallengeAccess").doc(participantId));
+      if (access.data()?.status !== "approved") throw new Error("PRIVATE_INVITE_REQUIRED");
+    }
     const capacity = challengeCapacity(challenge);
     const occupied = activeParticipantCount(participantRows.docs.map((doc) => doc.data() ?? {}));
     const alreadyActive = participantSnap.exists && isActiveParticipantStatus(participantSnap.data()?.status);
@@ -358,16 +367,18 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
     };
     const blockedParticipant = ["rejected", "disqualified", "withdrawn", "waitlisted", "incomplete"].includes(String(participantSnap.data()?.status ?? "")) || (normalEntry && participantSnap.data()?.entryPaymentStatus === "paid" && participantSnap.data()?.entryPaymentId !== id);
     const registrationOpen = getChallengeLifecycleState(challenge).canJoin;
-    const enrollmentAllowed = normalEntry ? registrationOpen && !blockedParticipant && capacityAvailable : reservationValid && capacityAvailable;
+    const privateGrant = isPrivateChallengeRecord(challenge) ? await transaction.get(db.collection("privateChallengeAccess").doc(participantId)) : null;
+    const privateAccessAllowed = !isPrivateChallengeRecord(challenge) || privateGrant?.data()?.status === "approved" || participantAlreadyActive;
+    const enrollmentAllowed = privateAccessAllowed && (normalEntry ? registrationOpen && !blockedParticipant && capacityAvailable : reservationValid && capacityAvailable);
     if (!enrollmentAllowed) {
       const refundCaseId = deterministicId("entry_payment_review", id);
-      const reason = blockedParticipant ? "participant_not_eligible" : !registrationOpen ? "registration_closed_at_confirmation" : "capacity_unavailable_after_confirmation";
+      const reason = !privateAccessAllowed ? "private_access_no_longer_authorized" : blockedParticipant ? "participant_not_eligible" : !registrationOpen ? "registration_closed_at_confirmation" : "capacity_unavailable_after_confirmation";
       transaction.set(paymentRef, {
         ...basePaymentUpdate,
         status: "payment_review_required",
         reservationStatus: "admin_review",
         participantId: null,
-        reviewReason: normalEntry ? reason : !reservationValid ? "reservation_expired_before_webhook_confirmation" : "capacity_unavailable_after_webhook_confirmation",
+        reviewReason: !privateAccessAllowed || normalEntry ? reason : !reservationValid ? "reservation_expired_before_webhook_confirmation" : "capacity_unavailable_after_webhook_confirmation",
         refundCaseId,
         refundStatus: "refund_review",
         refundExecutionEnabled: false

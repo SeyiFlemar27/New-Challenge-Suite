@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
       if (typeFilter && kind !== typeFilter) return [];
       if (sponsorReady && !Boolean(raw.sponsorReady ?? raw.sponsorEnabled ?? (raw.monetization as Record<string, unknown> | undefined)?.sponsorReady)) return [];
       const searchable = (lockedPreview
-        ? [raw.title, raw.shortDescription, raw.category, raw.creatorName, raw.creatorUsername]
+        ? [raw.title, String(raw.publicPreviewDescription ?? raw.shortDescription ?? raw.description ?? "").slice(0, 180), raw.category, raw.creatorName, raw.creatorUsername]
         : [raw.title, raw.shortDescription, raw.description, raw.category, raw.creatorName, raw.creatorUsername, ...(Array.isArray(raw.keywords) ? raw.keywords : []), ...(Array.isArray(raw.tags) ? raw.tags : [])])
         .map((value) => String(value ?? "").toLowerCase()).join(" ");
       if (query && !searchable.includes(query.toLowerCase())) return [];
@@ -226,21 +226,17 @@ export async function GET(request: NextRequest) {
         const item = {
           id: doc.id,
           title: text(raw.title) || "Private Challenge",
-          shortDescription: text(raw.shortDescription ?? raw.summary),
-          category: text(raw.category) || "General",
+          shortDescription: text(raw.publicPreviewDescription ?? raw.shortDescription ?? raw.description).slice(0, 180),
           type: raw.type ?? "Private / Exclusive",
           visibility: "private",
           publicPreviewEnabled: true,
           challengeType: "private",
           typeLabel: typeLabel("private"),
           coverImageUrl: typeof raw.coverImagePath === "string" ? `/api/challenge-media?path=${encodeURIComponent(raw.coverImagePath)}` : null,
-          publishedAt: toIso(raw.publishedAt ?? raw.createdAt),
           creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
-          phaseSummary: phase,
-          completedRecently: completedWithinExploreWindow(raw, phase),
           completedInteractionsDisabled: true,
-          detailHref: `/challenges/${doc.id}`,
-          cta: { label: "View Locked Challenge", href: `/challenges/${doc.id}`, action: "locked_preview" }
+          detailHref: `/private/preview/${doc.id}`,
+          cta: { label: "View Locked Challenge", href: `/private/preview/${doc.id}`, action: "locked_preview" }
         };
         return [{ ...item, _sortDocId: doc.id }];
       }

@@ -92,6 +92,8 @@ export const serverChallengeCreateSchema = z.object({
   privateJoiningPolicy: z.enum(["invite_only", "invite_and_request"]).default("invite_only"),
   privateVotingAccess: z.enum(["access_restricted", "public_voting"]).default("access_restricted"),
   publicPreviewEnabled: z.coerce.boolean().default(false),
+  privateAccessPolicyVersion: z.literal(2).optional(),
+  privateBuilderStep: z.coerce.number().int().min(0).max(7).optional(),
   votingSettings: z.object({
     allowFreeVotes: z.coerce.boolean().default(true),
     allowPaidVotes: z.coerce.boolean().optional(),
@@ -563,7 +565,8 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
     const accessMethod = text(challenge.privateAccessMethod);
     const normalizedMethod = accessMethod === "link_and_code" || accessMethod === "access_code" ? "invitation_code" : accessMethod;
     if (!["invite_link", "invitation_code", "direct_invitations"].includes(normalizedMethod)) makeIssue(errors, "PRIVATE_ACCESS_METHOD_REQUIRED", "privateAccessMethod", "Access", "Choose Invite Link, Invitation Code, or Direct Invitations.");
-    if (normalizedMethod === "invitation_code" && !text(challenge.privateAccessCode)) makeIssue(errors, "PRIVATE_CODE_REQUIRED", "privateAccessCode", "Access", "Generate an invitation code.");
+    if (challenge.privateAccessPolicyVersion === 2 && !["invite_link", "invitation_code"].includes(normalizedMethod)) makeIssue(errors, "PRIVATE_ACCESS_METHOD_REQUIRED", "privateAccessMethod", "Access", "Choose Invite Link or Invitation Code.");
+    if (challenge.privateAccessPolicyVersion !== 2 && normalizedMethod === "invitation_code" && !text(challenge.privateAccessCode)) makeIssue(errors, "PRIVATE_CODE_REQUIRED", "privateAccessCode", "Access", "Generate an invitation code.");
     if (normalizedMethod === "direct_invitations" && !list(challenge.privateDirectInvitees).length) makeIssue(errors, "PRIVATE_DIRECT_INVITE_REQUIRED", "privateDirectInvitees", "Access", "Add at least one direct invitee.");
   }
 

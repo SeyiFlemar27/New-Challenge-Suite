@@ -1,4 +1,5 @@
 "use client";
+import { NormalChallengeBuilder } from "@/components/normal-challenge-builder";
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, LockKeyhole, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -609,7 +610,7 @@ function PrivateEligibilityStep({ form, update }: { form: FormState; update: (fi
 }
 
 export function PrivateChallengeBuilder(props: Omit<React.ComponentProps<typeof ChallengeBuilder>, "mode">) {
-  return <ChallengeBuilder {...props} mode="private" />;
+  return <NormalChallengeBuilder {...props} privateMode />;
 }
 
 function PrivateScheduleStep({ form, update }: { form: FormState; update: (field: keyof FormState, value: FormState[keyof FormState]) => void }) {

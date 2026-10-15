@@ -29,6 +29,7 @@ async function createUser(label, { privateProfile = false, status = "active" } =
   return { uid: body.localId, token: body.idToken, email };
 }
 function request(url, token, method = "GET", body) {
+  if (body?.action === "decide_access_request") body = { ...body, confirmed: true, reason: "Reviewed the request and current eligibility." };
   return new Request(url, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { "content-type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 async function post(user, body) { return privatePost(request("http://localhost/api/private-exclusive", user?.token, "POST", body)); }
@@ -67,7 +68,7 @@ try {
   const ownerQueueData = (await ownerQueue.json()).data;
   equal(ownerQueueData.accessRequests.length, 1, "owner receives pending request");
   equal(ownerQueueData.accessRequests[0].displayName, "requester", "owner receives public requester display identity");
-  equal((await post(requester, { action: "decide_access_request", challengeId, requestId: firstData.requestId, decision: "approve" })).status, 404, "requester cannot approve own request");
+  equal((await post(requester, { action: "decide_access_request", challengeId, requestId: firstData.requestId, decision: "approve" })).status, 403, "requester cannot approve own request");
 
   const decisionUrl = "http://localhost/api/private-exclusive";
   const decisions = await Promise.all([
@@ -97,7 +98,7 @@ try {
     await db.collection("privateChallengeAccess").doc(`${paidChallenge}_${requester.uid}`).set({ id: `${paidChallenge}_${requester.uid}`, challengeId: paidChallenge, userId: requester.uid, status: "approved", source: "owner_approval" });
     equal((await joinChallenge(request("http://localhost", requester.token, "POST", { entryAgreementAccepted: true }), { params: Promise.resolve({ id: paidChallenge }) })).status, 402, "access approval does not bypass paid-entry checkout");
   } else {
-    equal(grant.exists, false, "rejection creates no access grant");
+    equal(grant.data()?.status, "rejected", "rejection persists a denial, never an approved access grant");
     equal((await post(requester, requestBody)).status, 409, "rejected request cannot be resubmitted into approval");
   }
   const privateIdentityRequest = await post(privateRequester, { ...requestBody, challengeId, reason: "I would like to join." });

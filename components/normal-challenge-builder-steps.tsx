@@ -1,4 +1,5 @@
 "use client";
+import { createContext, useContext } from "react";
 
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { MediaUploadField, type MediaUploadStage, type UploadMetadata } from "@/components/media-upload-field";
@@ -13,6 +14,8 @@ import type { NormalChallengeReadiness } from "@/lib/normal-challenge-readiness"
 
 type Props = {
   step: number;
+  visibleStep?: number;
+  stepCount?: number;
   form: NormalChallengeForm;
   update: <K extends keyof NormalChallengeForm>(key: K, value: NormalChallengeForm[K]) => void;
   userId: string;
@@ -29,9 +32,11 @@ type Props = {
   fundingBusy: boolean;
 };
 
+const StepPresentation = createContext<{ visibleStep?: number; stepCount?: number }>({});
 function Heading({ step }: { step: number }) {
+  const presentation = useContext(StepPresentation);
   const definition = NORMAL_FRONTEND_STEPS[step] ?? NORMAL_FRONTEND_STEPS[0];
-  return <div className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Step {step + 1} of {NORMAL_FRONTEND_STEPS.length}</p><h2 data-normal-step-heading tabIndex={-1} className="mt-2 text-3xl font-black tracking-normal text-slate-950 sm:text-4xl">{definition.title}</h2><p className="mt-3 text-base leading-7 text-slate-600">{definition.description}</p></div>;
+  return <div className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Step {(presentation.visibleStep ?? step) + 1} of {presentation.stepCount ?? NORMAL_FRONTEND_STEPS.length}</p><h2 data-normal-step-heading tabIndex={-1} className="mt-2 text-3xl font-black tracking-normal text-slate-950 sm:text-4xl">{definition.title}</h2><p className="mt-3 text-base leading-7 text-slate-600">{definition.description}</p></div>;
 }
 
 function SelectField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; disabled?: boolean }) {
@@ -47,6 +52,9 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
 }
 
 export function NormalChallengeBuilderStep(props: Props) {
+  return <StepPresentation.Provider value={{ visibleStep: props.visibleStep, stepCount: props.stepCount }}><NormalChallengeBuilderStepContent {...props} /></StepPresentation.Provider>;
+}
+function NormalChallengeBuilderStepContent(props: Props) {
   const { step, form, update, userId, mediaDisabled, track, readiness, edit, plan, showErrors = false, draftId = "", funding, fundBasePrize, refreshFunding, fundingBusy } = props;
   const errors = showErrors ? Object.fromEntries(readiness.issues.filter((item) => item.step === step).map((item) => [item.field, item.message])) : {};
   const error = (field: string) => errors[field] ? <p id={`normal-${field}-error`} role="alert" className="mt-2 text-sm font-bold text-red-700">{errors[field]}</p> : null;

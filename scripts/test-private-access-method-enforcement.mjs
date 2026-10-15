@@ -16,10 +16,10 @@ assert.match(invites, /recipientEmail: email/, "direct invitations bind a verifi
 assert.match(invites, /input\.challengeId !== challengeId/, "credentials cannot be replayed against another challenge");
 assert.match(invites, /inviteExpired\(invite\)/, "invitation expiry is enforced during claim");
 assert.match(invites, /input\.verifiedEmail\.trim\(\)\.toLowerCase\(\)/, "direct acceptance is bound to the verified identity email");
-assert.match(invites, /transaction\.create\(accessRef, \{ \.\.\.receipt/, "admission and requirement evidence persist atomically");
+assert.match(invites, /transaction\.set\(accessRef, receipt/, "access and requirement evidence persist atomically");
 assert.match(invites, /transaction\.create\(db\.collection\("privateInviteAuditEvents"\)/, "admission is auditable");
 assert.match(invites, /validatePrivateParticipantEligibility/, "eligibility is validated in the admission service");
-assert.match(invites, /transaction\.create\(participantRef/, "admission creates the participant membership record");
+assert.doesNotMatch(invites, /transaction\.create\(participantRef/, "credential redemption never registers a participant");
 assert.match(invites, /validatePrivateRequirementEvidence/, "configured participant requirements are enforced");
 assert.match(accessRoute, /consumePrivateAdmissionAttempt/, "admission attempts have a durable Firestore rate limit");
 assert.match(accessRoute, /String\(challenge\.privateAccessMethod \?\? ""\) !== String\(invite\.accessMethod \?\? ""\)/, "credential mode must match the challenge's selected mode");
@@ -29,7 +29,7 @@ assert.match(joinRoute, /grant\.source \?\? ""\) !== String\(challenge\.privateA
 assert.match(joinRoute, /validatePrivateRequirementEvidence/, "join rechecks admission requirement evidence");
 assert.match(createRoute, /privateDirectInvitees: \[\]/, "recipient emails are not stored on the challenge document");
 assert.match(publishRoute, /privateAccessCode: ""/, "plaintext access codes are not stored on published challenges");
-assert.match(admissionUi, /Accept Requirements and Join/, "participants explicitly accept requirements before admission");
+assert.match(admissionUi, /Accept Requirements and Unlock Access/, "participants explicitly accept requirements before access");
 assert.match(builder, /Invite Link/);
 assert.match(builder, /Invitation Code/);
 assert.match(builder, /Direct Invitations/);

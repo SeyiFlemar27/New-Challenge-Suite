@@ -4,7 +4,7 @@ import { canSubmissionReceiveVotes, isSponsorProfile } from "@/lib/server/submis
 import { writeAuditLog } from "@/lib/server/audit";
 import { deterministicId } from "@/lib/server/idempotency";
 import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
-import { hasPublicVotingAccess, userOwnsChallenge } from "@/lib/server/challenge-access";
+import { hasPublicVotingAccess, isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { ECONOMY_V1_RULES, getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isPublicSubmission } from "@/lib/server/public-challenge";
 
@@ -172,6 +172,10 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     if (input.requirePublicSubmission && !hasPublicVotingAccess(challenge)) {
       throw voteReject("Public voting is not enabled for this challenge.", "PUBLIC_VOTING_DISABLED");
+    }
+    if (isPrivateChallengeRecord(challenge) && !input.requirePublicSubmission) {
+      const grant = await transaction.get(db.collection("privateChallengeAccess").doc(`${input.challengeId}_${input.userId}`));
+      if (grant.data()?.status !== "approved") throw voteReject("Private challenge access is required.", "PRIVATE_INVITE_REQUIRED");
     }
     if (!canVoteOnChallenge(challenge)) throw voteReject("Voting is closed for this challenge.", "VOTING_CLOSED");
     if (userOwnsChallenge(challenge, input.userId)) {

@@ -49,6 +49,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const current = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (current.privateAccessPolicyVersion === 2) {
+    rawBody.privateAccessPolicyVersion = 2;
+    const vault = await db.collection("privateCredentialVault").doc(id).get();
+    if (!vault.exists || vault.data()?.method !== rawBody.privateAccessMethod || vault.data()?.inviteId !== current.privateCredentialId) return fail("Save and verify the selected private invitation method before submitting.", 409, undefined, "PRIVATE_CREDENTIAL_NOT_READY");
+  } else delete rawBody.privateAccessPolicyVersion;
   const managementAccess = await requireChallengeManagementAccess(request, id, "challenge.edit");
   if (managementAccess.response) return managementAccess.response;
   const currentStatus = String(current.status ?? current.lifecycleStatus ?? "draft").toLowerCase();
@@ -282,7 +287,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   update.mediaVerification = mediaVerification;
   applyVerifiedChallengeMedia(update, mediaVerification);
-  if (body.visibility === "private" || body.visibility === "exclusive") {
+  if (current.privateAccessPolicyVersion !== 2 && (body.visibility === "private" || body.visibility === "exclusive")) {
     try {
       privateAccess = await createPrivateChallengeInvite(db, {
         challengeId: id,

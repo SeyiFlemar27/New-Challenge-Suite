@@ -78,6 +78,10 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     if (input.expectedUpdatedAt !== undefined && latestChallenge.updatedAt !== input.expectedUpdatedAt) {
       throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This draft or its funding changed. Refresh before submitting again.");
     }
+    if (latestChallenge.privateAccessPolicyVersion === 2) {
+      const vault = await transaction.get(db.collection("privateCredentialVault").doc(input.challengeId));
+      if (!vault.exists || vault.data()?.inviteId !== latestChallenge.privateCredentialId || vault.data()?.method !== input.update.privateAccessMethod || input.update.privateAccessPolicyVersion !== 2 || (latestChallenge.publishedAt && latestChallenge.privateAccessMethod !== input.update.privateAccessMethod)) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Private access settings changed. Refresh the draft before submitting.");
+    }
     if (latestChallenge.builderVersion === "normal_v3") {
       if (!enterpriseOwned && (input.update.freeBasicChallenge ?? latestChallenge.freeBasicChallenge) === true) {
         const owned = await transaction.get(db.collection("challenges").where("creatorId", "==", input.userId));

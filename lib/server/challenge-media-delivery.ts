@@ -54,5 +54,5 @@ export function isPublicPrivatePreviewRecord(challenge: Record<string, unknown>)
     && challenge.publicPreviewEnabled === true
     && challenge.publicVisibility !== false
     && challenge.eventVisibility !== "hidden_until_approved"
-    && ["published", "approved", "scheduled", "registration_open", "active"].includes(status);
+    && ["published", "approved", "scheduled", "registration_open", "active", "submission_open", "submission_closed", "voting_open", "voting_closed", "under_review", "winners_announced", "completed"].includes(status);
 }

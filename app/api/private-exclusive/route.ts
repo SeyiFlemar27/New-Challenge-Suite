@@ -14,7 +14,8 @@ import {
   validatePrivateRequirementEvidence
 } from "@/lib/server/private-invites";
 import { isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
-import { isChallengeJoinable } from "@/lib/server/submission-lifecycle";
+import { privateAccessDenied, privateEnrollmentOpen, privateLockedPreview } from "@/lib/private-challenge-policy";
+import { POST as manageAccess } from "@/app/api/private-challenges/[id]/access/route";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ function inviteError(error: unknown) {
     PARTICIPATION_NOT_ELIGIBLE: { status: 403, message: "Your existing participation status does not allow admission." },
     DIRECT_INVITEE_EMAILS_REQUIRED: { status: 422, message: "Add valid recipient email addresses for direct invitations." },
     PERMISSION_DENIED: { status: 403, message: "Only this challenge's owner can revoke its invitations." }
+    ,ACCESS_RESTORATION_REQUIRED: { status: 403, message: "Access was rejected or revoked. Only an authorized creator restoration can change this decision." },
+    ROTATION_CONFIRMATION_REQUIRED: { status: 409, message: "Use Manage Access to confirm credential regeneration and record a reason." }
   };
   const resolved = responses[code];
   return resolved ? fail(resolved.message, resolved.status, undefined, code) : serverError("Private challenge access could not be completed.", code);
@@ -145,13 +148,8 @@ export async function GET(request: Request) {
       const status = String(record.status ?? record.lifecycleStatus ?? "").toLowerCase();
       if (!isPrivateChallengeRecord(record) || ["draft", "deleted", "removed", "cancelled"].includes(status) || record.creatorId === user.uid || record.hostId === user.uid || unlockedIds.has(doc.id)) return [];
       const publicPreview = {
-        id: doc.id,
+        ...privateLockedPreview(record),
         privatePreview: true,
-        title: String(record.title ?? "Private challenge"),
-        description: String(record.description ?? "").slice(0, 1200),
-        category: String(record.category ?? ""),
-        status,
-        startsAt: toIso(record.startsAt),
         privateJoiningPolicy: record.privateJoiningPolicy === "invite_and_request" ? "invite_and_request" : "invite_only",
         accessRequest: requestByChallenge.get(doc.id) ?? null
       };
@@ -175,6 +173,13 @@ export async function POST(request: Request) {
   const action = String(body.action ?? "");
   const now = new Date().toISOString();
 
+  if (["rotate_invites", "decide_access_request", "restore_access_request", "revoke_access_request", "change_visibility"].includes(action)) {
+    const challengeId = String(body.challengeId ?? "").trim();
+    if (!challengeId || challengeId.includes("/")) return validationError({ challengeId: "Select a private challenge." });
+    const mappedAction = action === "rotate_invites" ? "rotate" : action === "restore_access_request" ? "restore" : action === "revoke_access_request" ? "revoke" : action === "change_visibility" ? "visibility" : body.decision;
+    return manageAccess(new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ ...body, action: mappedAction }) }), { params: Promise.resolve({ id: challengeId }) });
+  }
+
   if (action === "preview_invite" || action === "admit_invite" || action === "check_code") {
     const credential = String(body.credential ?? body.inviteCode ?? body.token ?? "").trim();
     if (!credential || credential.length > 300) return validationError({ credential: "A valid invitation credential is required." });
@@ -191,6 +196,8 @@ export async function POST(request: Request) {
       const challenge = { id: challengeId, ...challengeSnap.data() } as Record<string, unknown>;
       if (String(challenge.privateAccessMethod ?? "") !== String(invite.accessMethod ?? "")) throw new Error("ACCESS_METHOD_MISMATCH");
       const accessSnap = await db.collection("privateChallengeAccess").doc(`${challengeId}_${user.uid}`).get();
+      const decisionSnap = await db.collection("privateAccessRequests").doc(`${challengeId}_${user.uid}`).get();
+      if (privateAccessDenied(decisionSnap.data(), accessSnap.data())) throw new Error("ACCESS_RESTORATION_REQUIRED");
       const alreadyAdmitted = accessSnap.exists && accessSnap.data()?.status === "approved";
       const requirements = privateRequirements(challenge);
       if (alreadyAdmitted) {
@@ -198,7 +205,7 @@ export async function POST(request: Request) {
         return ok({ challengeId, alreadyAdmitted: true }, "Private challenge access is already active.");
       }
       if (invite.enabled === false || !["active", "pending"].includes(String(invite.status)) || inviteExpired(invite)) throw new Error("INVITE_INACTIVE");
-      if (!isChallengeJoinable(challenge).allowed) throw new Error("CHALLENGE_NOT_JOINABLE");
+      if (!privateEnrollmentOpen(challenge)) throw new Error("CHALLENGE_NOT_JOINABLE");
       if (String(invite.accessMethod) === "direct_invitations" && String(invite.recipientEmail ?? "").toLowerCase() !== String(user.email ?? "").toLowerCase()) throw new Error("INVITE_RECIPIENT_MISMATCH");
       const [accountSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
       const profile = { ...(profileSnap.exists ? profileSnap.data() ?? {} : {}), ...(accountSnap.exists ? accountSnap.data() ?? {} : {}) };
@@ -269,8 +276,9 @@ export async function POST(request: Request) {
         const challenge = { id: challengeId, ...challengeSnap.data() } as Record<string, unknown>;
         const joiningPolicy = challenge.privateJoiningPolicy === "invite_and_request" ? "invite_and_request" : "invite_only";
         if (joiningPolicy !== "invite_and_request") throw new Error("ACCESS_REQUEST_DISABLED");
-        if (!isPrivateChallengeRecord(challenge) || challenge.publicPreviewEnabled !== true || !["published", "approved", "scheduled", "registration_open", "active"].includes(String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase()) || !isChallengeJoinable(challenge).allowed) throw new Error("CHALLENGE_UNAVAILABLE");
+        if (!isPrivateChallengeRecord(challenge) || challenge.publicPreviewEnabled !== true || !privateEnrollmentOpen(challenge)) throw new Error("CHALLENGE_UNAVAILABLE");
         if (userOwnsChallenge(challenge, user.uid)) throw new Error("OWNER_REQUEST_FORBIDDEN");
+        if (privateAccessDenied(requestSnap.data(), accessSnap.data())) throw new Error("REQUEST_ALREADY_REJECTED");
         if (accessSnap.exists && accessSnap.data()?.status === "approved") return { requestId: ref.id, status: "approved", duplicate: true };
         if (requestSnap.exists && requestSnap.data()?.status === "pending_review") return { requestId: ref.id, status: "pending_review", duplicate: true };
         if (requestSnap.exists && requestSnap.data()?.status === "rejected") throw new Error("REQUEST_ALREADY_REJECTED");
@@ -285,6 +293,9 @@ export async function POST(request: Request) {
           requirementAcknowledgements: evidence.requiredIds, participantAnswers: evidence.answers,
           requirementsAcceptedAt: now, createdAt: now, updatedAt: now, decidedBy: null, decidedAt: null
         });
+        const notification = db.collection("notifications").doc();
+        transaction.create(notification, { id: notification.id, userId: String(challenge.creatorId ?? challenge.hostId), type: "private_access_request", title: "Private challenge access requested", body: "A participant requested access. Review the request in Manage Access.", status: "unread", read: false, targetId: challengeId, actionUrl: `/challenges/${challengeId}/manage`, createdAt: now, updatedAt: now });
+        transaction.create(db.collection("privateInviteAuditEvents").doc(), { challengeId, requestId: ref.id, userId: user.uid, actorId: user.uid, action: "access_requested", createdAt: now });
         return { requestId: ref.id, status: "pending_review", duplicate: false };
       });
       return ok(result, result.status === "approved" ? "Access is already approved." : result.duplicate ? "Your access request is already pending." : "Access request sent to the challenge owner.");

@@ -26,6 +26,14 @@ function discoverable(data: Record<string, unknown>) {
 }
 function ownerId(data: Record<string, unknown>) { return text(data.creatorId ?? data.ownerId ?? data.hostId ?? data.userId); }
 function publicRecord(id: string, data: Record<string, unknown>, kind: string, creatorDisplayName: string, currentUserId: string) {
+  if (kind === "private") return {
+    id, challengeId: id, title: text(data.title ?? data.name, "Private Challenge"),
+    description: text(data.publicPreviewDescription ?? data.shortDescription ?? data.description).slice(0, 180),
+    challengeType: "private", typeLabel: "Private Challenge", accessRequired: true,
+    coverImageUrl: isPublicPrivatePreviewRecord(data) && text(data.coverImagePath) ? challengeMediaDeliveryUrl(text(data.coverImagePath)) : "",
+    creatorDisplayName, creatorId: ownerId(data), isOwned: ownerId(data) === currentUserId,
+    detailHref: `/private/preview/${id}`
+  };
   const privatePreview = kind === "private" && isPublicPrivatePreviewRecord(data);
   const images = kind === "private"
     ? privatePreview && text(data.coverImagePath) ? [challengeMediaDeliveryUrl(text(data.coverImagePath))] : []
