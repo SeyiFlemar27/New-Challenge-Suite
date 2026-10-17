@@ -7,7 +7,8 @@ const root = process.cwd();
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith("@/")) {
-      const target = pathToFileURL(`${root}/${specifier.slice(2)}.ts`).href;
+      const base = `${root}/${specifier.slice(2)}`;
+      const target = pathToFileURL(existsSync(base) ? base : `${base}.ts`).href;
       return { url: target, shortCircuit: true };
     }
     if (specifier.startsWith(".") && context.parentURL?.endsWith(".ts")) {
@@ -154,7 +155,8 @@ assert.equal(failed.state.has(`auditLogs/${submitAudit.id}`), false);
 
 const route = readFileSync("app/api/challenges/[id]/publish/route.ts", "utf8");
 assert.doesNotMatch(route, /allowDoroCoinVotes:\s*undefined/);
-assert.match(route, /buildStoredVotingSettings\(body\.votingSettings\)/);
+assert.match(route, /automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION/);
+assert.match(route, /votingSettings: \{ \.\.\.AUTOMATIC_VOTING_SETTINGS \}/);
 assert.match(route, /commitChallengeReviewSubmission\(db/);
 assert.match(route, /SUBMIT_PAYLOAD_INVALID/);
 assert.match(route, /storedChallengeFields = sanitizeFirestorePayload\(body, "challengeUpdate"\)/);
@@ -171,7 +173,8 @@ assert.doesNotMatch(route.slice(route.indexOf("commitChallengeReviewSubmission(d
 const builder = readFileSync("components/normal-challenge-builder.tsx", "utf8");
 const builderSteps = readFileSync("components/normal-challenge-builder-steps.tsx", "utf8");
 assert.match(builder, /Submit for Review/);
-assert.match(builderSteps, /No fixed capacity\./);
+assert.match(builderSteps, /normalStepIndex\("submission"\)/);
+assert.doesNotMatch(builderSteps, /<Section label="Participation"/);
 assert.doesNotMatch(builder, />Preview</);
 assert.doesNotMatch(builder, />Publish(?: Challenge)?</);
 

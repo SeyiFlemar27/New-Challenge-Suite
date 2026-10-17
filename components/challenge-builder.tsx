@@ -312,7 +312,7 @@ function ChallengeBuilder({ mode, draftId, enterpriseOwnership }: { mode: Mode; 
     const safeSponsorReady = Boolean(monetizationEligible && form.sponsorReady);
     const safePaidEntryRequested = Boolean(monetizationEligible && form.paidEntryEnabled);
     const safePrizePoolRequested = Boolean(monetizationEligible && form.prizePoolEnabled);
-    const safePaidVotesRequested = Boolean(monetizationEligible && form.paidVotesEnabled);
+    const safePaidVotesRequested = false; // New publications use platform-managed DoroCoin voting, not creator monetization setup.
     const registrationCloseAt = challengeDateTimeForStorage(form.registrationDeadline, form.timeZone);
     const challengeSubmissionStartAt = challengeDateTimeForStorage(form.startsAt, form.timeZone);
     const submissionDeadline = challengeDateTimeForStorage(form.submissionDeadline, form.timeZone);
@@ -671,7 +671,7 @@ function MonetizationStep({ form, update, togglePlacement, planAccess, planName,
             {form.confirmedCreatorPrizeFundingCents > 0 ? <><p className="font-black text-emerald-200">Creator funding confirmed</p><p>{formatCents(form.confirmedCreatorPrizeFundingCents)} is reserved for the winner pool.</p></> : <><p className="font-black text-white">Prize funding review</p><p>You can submit the challenge for review now. Prize activation remains unavailable until a funding source is confirmed.</p>{draftId ? <LinkButton className="mt-3" href={"/challenges/" + draftId + "/prize-funding"}>Review Prize Funding</LinkButton> : <p className="mt-2 font-bold text-yellow-100">Save Draft to review funding options.</p>}</>}
           </div> : <p className="rounded-[8px] border border-white/10 bg-black/25 p-4 text-sm text-slate-300">This prize pool grows only from confirmed eligible revenue. Estimates do not create funds.</p>}
         </MonetizationCard>
-        <MonetizationCard title="Enable Paid Votes" enabled={form.paidVotesEnabled} disabled={!monetizationEligible} onChange={(enabled) => update("paidVotesEnabled", enabled)} setupCopy="Paid votes unlock for Creator premium, Host premium, and approved Enterprise accounts, but checkout remains webhook-confirmed before credits are granted." />
+        <Card className="p-4 text-sm">Voting is automatic: eligible voters use their free vote first, then may confirm an additional vote for 5 DoroCoins. Creator plan settings do not enable or disable this new-publication policy.</Card>
       </div>
       <Card className="h-fit p-5">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Monetization Preview</p>

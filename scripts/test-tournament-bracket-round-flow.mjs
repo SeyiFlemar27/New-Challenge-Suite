@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { read } from "./production-flow-test-utils.mjs";
 
 const bracketRoute = read("app/api/tournaments/[id]/bracket/route.ts");
-const resultRoute = read("app/api/tournaments/[id]/results/route.ts");
+const resultRoute = read("lib/server/tournament-result-confirmation.ts");
 const operations = read("lib/server/tournament-operations.ts");
 
 assert(bracketRoute.includes("generateTournamentBracket"));

@@ -1,5 +1,6 @@
 ﻿import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
+import { AUTOMATIC_VOTING_POLICY_VERSION, AUTOMATIC_VOTING_SETTINGS } from "@/lib/automatic-voting-policy";
 import { ok, serverUnavailable, fail, readJson } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
 import { getUserPlanAccess } from "@/lib/plan-access";
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
   }
   const draft = {
     ...body,
+    automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION,
+    votingSettings: { ...AUTOMATIC_VOTING_SETTINGS },
     id: ref.id,
     creatorId: user.uid,
     ownerId: user.uid,

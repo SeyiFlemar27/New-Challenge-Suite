@@ -11,8 +11,8 @@ export function ChallengeTaxonomyFields({ category, subcategory, onCategory, onS
   const legacyCategory = Boolean(category && !selected);
   const legacySubcategory = Boolean(subcategory && !selected?.subcategories.some((item) => item === subcategory));
   return <>
-    <Field label="Category"><select className={inputClass} value={category} onChange={(event) => { onCategory(event.target.value); onSubcategory(""); }}><option value="">Choose category</option>{legacyCategory ? <option value={category} disabled>Legacy value: {category} (choose a replacement)</option> : null}{NORMAL_CHALLENGE_CATEGORIES.map((item) => <option key={item.label} value={item.label}>{item.label}</option>)}</select></Field>
-    <Field label="Subcategory"><select className={inputClass} value={subcategory} disabled={!selected} onChange={(event) => onSubcategory(event.target.value)}><option value="">Choose subcategory</option>{legacySubcategory ? <option value={subcategory} disabled>Legacy value: {subcategory} (choose a replacement)</option> : null}{selected?.subcategories.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
+    <Field label="Category"><select aria-label="Category" className={inputClass} value={category} onChange={(event) => { onCategory(event.target.value); onSubcategory(""); }}><option value="">Choose category</option>{legacyCategory ? <option value={category} disabled>Legacy value: {category} (choose a replacement)</option> : null}{NORMAL_CHALLENGE_CATEGORIES.map((item) => <option key={item.label} value={item.label}>{item.label}</option>)}</select></Field>
+    <Field label="Subcategory"><select aria-label="Subcategory" className={inputClass} value={subcategory} disabled={!selected} onChange={(event) => onSubcategory(event.target.value)}><option value="">Choose subcategory</option>{legacySubcategory ? <option value={subcategory} disabled>Legacy value: {subcategory} (choose a replacement)</option> : null}{selected?.subcategories.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
   </>;
 }
 

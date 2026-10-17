@@ -119,7 +119,7 @@ export function publicChallengeFields(data: Record<string, unknown>, challengeId
     "title", "shortDescription", "description", "category", "subcategory", "type", "visibility", "status", "lifecycleStatus", "builderVersion",
     "computedStatus", "startsAt", "endsAt", "submissionStartAt", "submissionDeadline", "registrationDeadline", "timezone", "timeZone",
     "votingStartsAt", "votingDeadline", "votingEndsAt", "winnerAnnouncementAt", "acceptedSubmissionTypes",
-    "competitionFormat", "bestOf", "votingSettings", "rules", "standardRules",
+    "competitionFormat", "bestOf", "votingSettings", "automaticVotingPolicyVersion", "rules", "standardRules",
     "challengeGuidelines", "submissionInstructionsList", "challengeRules", "prizeType", "prizeTitle", "prizeDescription", "prizeCurrency", "numberOfWinners", "winnerPrizeAmountsCents", "publicPrizeStatus",
     "participantCount", "submissionCount", "voteCount", "weightedVoteCount", "coverImageUrl",
     "challengeImages", "challengeVideo", "promoImageUrl", "trailerVideoUrl", "promoVideoUrl", "mediaUploadStatus", "mediaStatus",

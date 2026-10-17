@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { finalizeTournamentSettlement, tournamentPlacementFingerprint } from "../lib/server/tournament-settlement.ts";
+import { getTournamentFundingSources } from "../lib/server/tournament-funding-sources.ts";
+import { reconcileTournamentTeamEntitlements } from "../lib/server/tournament-team-entitlements.ts";
+assert.match(process.env.GCLOUD_PROJECT ?? "", /^demo-/);
+assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? "", /^127\.0\.0\.1:\d+$/);
+const app = initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+const db = getFirestore(app);
+const prefix = `settle_${randomUUID()}`;
+let assertions = 0;
+const equal = (actual, expected) => { assert.equal(actual, expected); assertions++; };
+async function fixture(suffix, bronze = true) {
+  const id = `${prefix}_${suffix}`;
+  const finalId = `${id}_final`, bronzeId = `${id}_bronze`;
+  const placements = [1, 2, ...(bronze ? [3] : [])].map(placement => ({ id: `${id}_${placement}`, tournamentId: id, participantId: `${id}_p${placement}`, placement, sourceMatchId: placement === 3 ? bronzeId : finalId }));
+  const batch = db.batch();
+  batch.set(db.collection("tournaments").doc(id), { id, hostId: `${id}_host`, configVersion: 3, format: "single_elimination", participationMode: "individual", status: "under_review", creatorPlacementReviewFingerprint: tournamentPlacementFingerprint(placements) });
+  batch.set(db.collection("tournamentMatches").doc(finalId), { tournamentId: id, bracket: "winners", status: "confirmed", participantAId: `${id}_p1`, participantBId: `${id}_p2`, winnerParticipantId: `${id}_p1`, loserParticipantId: `${id}_p2` });
+  batch.set(db.collection("tournamentMatches").doc(bronzeId), { tournamentId: id, bracket: "bronze", status: bronze ? "confirmed" : "double_forfeit_hold", noSubmissionExtensionUsed: true, participantAId: `${id}_p3`, participantBId: `${id}_p4`, winnerParticipantId: `${id}_p3`, loserParticipantId: `${id}_p4` });
+  for (const placement of placements) {
+    batch.set(db.collection("tournamentPlacements").doc(placement.id), placement);
+    batch.set(db.collection("tournamentParticipants").doc(placement.participantId), { tournamentId: id, userId: placement.participantId, status: "active" });
+  }
+  batch.set(db.collection("tournamentEntryPayments").doc(`${id}_entry`), { tournamentId: id, status: "confirmed", amountCents: 10000, currency: "USD", webhookConfirmed: true, providerPaymentIntentId: `${id}_pi` });
+  batch.set(db.collection("creatorPrizeFundingPayments").doc(`${id}_creator`), { tournamentId: id, status: "confirmed", amountCents: 10000, currency: "USD", webhookConfirmed: true });
+  await batch.commit();
+  return id;
+}
+try {
+  const id = await fixture("full");
+  equal((await getTournamentFundingSources(db, id)).confirmedEntryRevenueCents, 10000);
+  const input = { tournamentId: id, adminId: "local_admin", reason: "Verified local competition results" };
+  const results = await Promise.all([finalizeTournamentSettlement(db, input), finalizeTournamentSettlement(db, input)]);
+  equal(results.filter(result => result.settlement.created).length, 1);
+  equal((await db.collection("tournaments").doc(id).get()).data().status, "winners_announced");
+  equal(results[0].settlement.breakdown.creatorHostAmount, 2000);
+  equal(results[0].settlement.breakdown.platformChallengeFeeAmount, 1500);
+  assert.deepEqual(results[0].settlement.breakdown.winnerDistribution.map(row => row.netAmountCents), [9900, 4125, 2475]); assertions++;
+  equal((await db.collection("winnerProposals").doc(results[0].proposalId).get()).data().status, "approved");
+  const held = await fixture("bronze", false);
+  const holdResult = await finalizeTournamentSettlement(db, { ...input, tournamentId: held });
+  equal(holdResult.settlement.breakdown.unawardedThirdPlaceHoldCents, 2475);
+  equal((await db.collection("tournamentSettlementHolds").where("tournamentId", "==", held).get()).size, 1);
+  const restricted = await fixture("restricted");
+  await db.collection("refundCases").doc(`${restricted}_refund`).set({ tournamentId: restricted, status: "pending_review" });
+  await assert.rejects(finalizeTournamentSettlement(db, { ...input, tournamentId: restricted }), /REFUND_RECONCILIATION_REQUIRED/); assertions++;
+  equal((await db.collection("tournaments").doc(restricted).get()).data().status, "under_review");
+  const disputed = await fixture("disputed");
+  await db.collection("tournamentEntryPayments").doc(`${disputed}_entry`).update({ stripeDisputeRestricted: true });
+  await assert.rejects(finalizeTournamentSettlement(db, { ...input, tournamentId: disputed }), /FUNDING_RECONCILIATION_REQUIRED/); assertions++;
+  const sponsor = await fixture("sponsor_cutoff");
+  await db.collection("tournaments").doc(sponsor).update({ firstVotingOpenedAt: "2026-10-10T12:02:00.000Z", tournamentVotingCutoffAt: "2026-10-10T12:02:00.000Z" });
+  await db.collection("tournamentMatches").doc(`${sponsor}_final`).update({ votingOpenedAt: "2026-10-10T12:02:00.000Z" });
+  await db.collection("tournamentAuditEvents").doc(`${sponsor}_final_voting_opened`).set({ tournamentId: sponsor, action: "match_voting_opened", metadata: { votingOpenedAt: "2026-10-10T12:02:00.000Z" } });
+  const sponsorRef = db.collection("sponsorContributions").doc(`${sponsor}_funding`);
+  await sponsorRef.set({ tournamentId: sponsor, status: "confirmed", webhookConfirmed: true, amountCents: 5000, currency: "USD", fundingPurpose: "prize", reservationCreatedAt: "2026-10-10T12:00:00.000Z", reservationExpiresAt: "2026-10-10T12:15:00.000Z", providerCompletionUpperBoundAt: "2026-10-10T12:01:58.000Z", providerTimestampPrecisionMs: 1000, providerCompletionEvidence: "stripe_checkout_session_completed_event_created_paid_card_snapshot_and_captured_automatic_charge" });
+  equal((await getTournamentFundingSources(db, sponsor)).confirmedSponsorPrizeCents, 5000);
+  await sponsorRef.update({ providerCompletionUpperBoundAt: "2026-10-10T12:08:00.000Z" });
+  await assert.rejects(finalizeTournamentSettlement(db, { ...input, tournamentId: sponsor }), /SPONSOR_CUTOFF_RECONCILIATION_REQUIRED/); assertions++;
+  equal((await db.collection("tournaments").doc(sponsor).get()).data().status, "under_review");
+  equal((await sponsorRef.get()).data().amountCents, 5000);
+  await sponsorRef.update({ providerCompletionUpperBoundAt: null });
+  await assert.rejects(getTournamentFundingSources(db, sponsor), /SPONSOR_CUTOFF_RECONCILIATION_REQUIRED/); assertions++;
+  const teamTournament = await fixture("team_correction");
+  await db.collection("tournaments").doc(teamTournament).update({ participationMode: "team" });
+  for (let position = 1; position <= 3; position++) await db.collection("tournamentTeams").doc(`${teamTournament}_p${position}`).set({ tournamentId: teamTournament, status: "active", memberUserIds: [`${teamTournament}_${position}_a`, `${teamTournament}_${position}_b`], rosterLockedAt: "2026-10-10T12:00:00.000Z" });
+  await finalizeTournamentSettlement(db, { ...input, tournamentId: teamTournament });
+  const teamId = `${teamTournament}_p1`, member = `${teamTournament}_1_a`;
+  equal((await db.collection("cashWallets").doc(member).get()).data().pendingBalanceCents, 4950);
+  const correction = { tournamentId: teamTournament, teamId, userId: member, adminId: "local_admin", reason: "Verified permanent ineligibility after finalization", evidenceReference: "supportCase/authoritative-local-decision", decision: "permanently_ineligible", expectedVersion: 0, idempotencyKey: "settlement-correction-once-0001" };
+  await reconcileTournamentTeamEntitlements(db, correction);
+  equal((await db.collection("cashWallets").doc(member).get()).data().pendingBalanceCents, 0);
+  equal((await db.collection("cashWallets").doc(`${teamTournament}_1_b`).get()).data().pendingBalanceCents, 9900);
+  equal((await finalizeTournamentSettlement(db, { ...input, tournamentId: teamTournament })).settlement.idempotent, true);
+  equal((await db.collection("cashWallets").doc(member).get()).data().pendingBalanceCents, 0);
+  equal((await db.collection("cashWallets").doc(`${teamTournament}_1_b`).get()).data().pendingBalanceCents, 9900);
+  console.log(`Tournament settlement: ${assertions} actual Firestore assertions passed; no external payout executed.`);
+} finally {
+  await db.terminate();
+}

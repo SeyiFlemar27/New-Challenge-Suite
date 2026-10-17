@@ -179,7 +179,7 @@ try {
   const expiredCheckoutResponse = await entryHandler.POST(jsonRequest(owner.token, { entryAgreementAccepted: true }, "POST"), { params: Promise.resolve({ id: paidId }) });
   equal(expiredCheckoutResponse.status, 409, "expired original checkout remains fail-closed without another payment");
   const expiredCheckoutEnvelope = await expiredCheckoutResponse.json();
-  equal(expiredCheckoutEnvelope.code, "ENTRY_RESERVATION_EXPIRED", "expired reservation is distinguished from other checkout rejection policies");
+  equal(expiredCheckoutEnvelope.code, "ENTRY_RECONCILIATION_REQUIRED", "an expired reservation without a verifiable provider Session requires reconciliation, never a new charge");
   const expiredCheckoutData = expiredCheckoutEnvelope.details;
   equal(expiredCheckoutData.reconciliationRequired, true, "participant receives an actionable reconciliation state");
   equal(expiredCheckoutData.supportUrl, "/support/new", "reconciliation action targets the existing Support creation route");

@@ -1,9 +1,13 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { reconcileTournamentLifecycleAfterStateChange } from "@/lib/server/tournament-match-lifecycle-jobs";
-import { requireAdminPermission } from "@/lib/server/auth";
+import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { adminTournamentActionFoundation, deriveTournamentCorrectionImpact } from "@/lib/server/tournament-operations";
 import { finalizeTournamentSettlement } from "@/lib/server/tournament-settlement";
+import { reconcileTournamentTeamEntitlements } from "@/lib/server/tournament-team-entitlements";
+import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
+import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
+import { isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +22,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const [participants, rounds, matches, submissions, votes, judges, judgeScores, prizePools, proposals, reports, disputes, entryPaymentDisputes, audits] = await Promise.all([
     db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentRounds").where("tournamentId", "==", id).limit(100).get(),
-    db.collection("tournamentMatches").where("tournamentId", "==", id).limit(200).get(),
-    db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(200).get(),
+    db.collection("tournamentMatches").where("tournamentId", "==", id).limit(260).get(),
+    db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(520).get(),
     db.collection("tournamentVotes").where("tournamentId", "==", id).limit(500).get(),
     db.collection("tournamentJudges").where("tournamentId", "==", id).limit(100).get(),
     db.collection("tournamentJudgeScores").where("tournamentId", "==", id).limit(500).get(),
@@ -35,6 +39,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     ...doc.data()
   } as Record<string, unknown> & { id: string }));
   const matchRows = rows(matches);
+  const teamEvidence = await db.collection("tournamentTeams").where("tournamentId", "==", id).get();
+  // Authorized Admin evidence only; never exposed by the public projection.
+  const adminTournament = { id: tournamentSnap.id, ...tournamentSnap.data(), teamEntitlementEvidence: rows(teamEvidence) };
   const impactMatchId = new URL(request.url).searchParams.get("impactMatchId") ?? "";
   const impact = impactMatchId ? deriveTournamentCorrectionImpact(matchRows as Parameters<typeof deriveTournamentCorrectionImpact>[0], impactMatchId) : null;
   const activity = impact ? {
@@ -43,7 +50,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     judging: rows(judgeScores).filter((item) => impact.affectedMatchIds.includes(String(item.matchId ?? ""))).length,
     settlementSensitive: impact.hasResolvedDownstream || ["results_under_review", "completed"].includes(String(tournamentSnap.data()?.status ?? ""))
   } : null;
-  return ok({ tournament: { id: tournamentSnap.id, ...tournamentSnap.data() }, participants: rows(participants), rounds: rows(rounds), matches: matchRows, submissions: rows(submissions), votes: rows(votes), judges: rows(judges), judgeScores: rows(judgeScores), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), entryPaymentDisputes: rows(entryPaymentDisputes), audits: rows(audits), correctionImpact: impact ? { ...impact, activity, automaticCorrectionAllowed: impact.futureOnly && !activity?.submissions && !activity?.votes && !activity?.judging && !activity?.settlementSensitive } : null }, "Admin tournament detail loaded.");
+  return ok({ tournament: adminTournament, participants: rows(participants), rounds: rows(rounds), matches: matchRows, submissions: rows(submissions), votes: rows(votes), judges: rows(judges), judgeScores: rows(judgeScores), prizePools: rows(prizePools), sponsorProposals: rows(proposals), reports: rows(reports), disputes: rows(disputes), entryPaymentDisputes: rows(entryPaymentDisputes), audits: rows(audits), correctionImpact: impact ? { ...impact, activity, automaticCorrectionAllowed: impact.futureOnly && !activity?.submissions && !activity?.votes && !activity?.judging && !activity?.settlementSensitive } : null }, "Admin tournament detail loaded.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -60,10 +67,59 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const foundation = adminTournamentActionFoundation(action);
   if (!foundation.adminRequired) return fail("Unsupported admin tournament action.", 400, foundation, "ADMIN_TOURNAMENT_ACTION_UNSUPPORTED");
   if (reason.length < 5) return fail("Admin tournament actions require a reason.", 400, foundation, "ADMIN_TOURNAMENT_REASON_REQUIRED");
+  if (body.confirmed !== true) return fail("Confirm this Tournament decision before continuing.", 422, undefined, "TOURNAMENT_CONFIRMATION_REQUIRED");
   const now = new Date().toISOString();
+  if (action === "reconcile_team_entitlements") {
+    const recent = await requireRecentAdminAuthentication(request, "settlements.approve");
+    if (recent.response) return recent.response;
+    try {
+      const decision = String(body.decision);
+      if (!["eligible", "temporary_hold", "permanently_ineligible"].includes(decision)) return fail("Select an authoritative eligibility decision.", 422);
+      const result = await reconcileTournamentTeamEntitlements(db, { tournamentId: id, teamId: String(body.teamId ?? ""), userId: String(body.userId ?? ""), decision: decision as "eligible" | "temporary_hold" | "permanently_ineligible", adminId: user.uid, reason, evidenceReference: String(body.evidenceReference ?? ""), expectedVersion: Number(body.expectedVersion), idempotencyKey: String(body.idempotencyKey ?? "") });
+      const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+      await attemptTournamentNotifications(db, id);
+      return ok(result, result.status === "reconciled_unpaid" ? "Unpaid team entitlements reconciled. No payout was executed." : "Eligibility decision recorded. Review the resulting entitlement hold before any release.");
+    } catch (error) {
+      const code = error instanceof Error && /^TEAM_[A-Z_]+$/.test(error.message) ? error.message : "TEAM_ENTITLEMENT_RECONCILIATION_FAILED";
+      return fail("Team entitlements could not be changed safely. Refresh the evidence and current version before retrying.", 409, undefined, code);
+    }
+  }
+  if (action === "approve" || action === "reject") {
+    if (action === "approve" && process.env.NODE_ENV === "production" && !isTournamentV3SchedulingReady()) return fail("Durable Tournament scheduling is unavailable. Publication remains blocked.", 503, undefined, "TOURNAMENT_SCHEDULING_UNAVAILABLE");
+    try {
+      const result = await db.runTransaction(async transaction => {
+        const ref = db.collection("tournaments").doc(id);
+        const snapshot = await transaction.get(ref);
+        if (!snapshot.exists) throw new Error("TOURNAMENT_NOT_FOUND");
+        const record = { ...snapshot.data(), id };
+        if (snapshot.data()?.status !== "pending_review") throw new Error("TOURNAMENT_REVIEW_STATE_CHANGED");
+        const funding = await getTournamentCreatorFunding(db, id, record, transaction);
+        if (action === "approve") {
+          if (!evaluateTournamentReadiness(record).ready || !snapshot.data()?.creatorMediaVerification) throw new Error("TOURNAMENT_NOT_READY");
+          if (Number(snapshot.data()?.basePrizeAmountMinor ?? 0) > funding.confirmedCreatorCents) throw new Error("BASE_PRIZE_FUNDING_REQUIRED");
+        }
+        const status = action === "approve" ? "registration_open" : "draft";
+        transaction.update(ref, { status, reviewStatus: action === "approve" ? "approved" : "changes_requested", reviewReason: reason, reviewedBy: user.uid, reviewedAt: now, ...(action === "approve" ? { publishedAt: now } : {}), updatedAt: now });
+        transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { status: action === "approve" ? "approved" : "changes_requested", reason, reviewedBy: user.uid, reviewedAt: now, updatedAt: now }, { merge: true });
+        transaction.create(db.collection("tournamentAuditEvents").doc(), { tournamentId: id, actorId: user.uid, action: `tournament_${action}`, reason, createdAt: now, metadata: { previousStatus: "pending_review", resultingStatus: status, paymentActivationChanged: false, externalPayoutExecuted: false } });
+        return { status };
+      });
+      const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+      await attemptTournamentNotifications(db, id);
+      return ok(result, action === "approve" ? "Tournament approved and registration opened. Payment execution settings remain unchanged." : "Changes requested. The creator can update the draft.");
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "TOURNAMENT_REVIEW_FAILED";
+      const messages: Record<string, string> = { TOURNAMENT_NOT_FOUND: "Tournament not found.", TOURNAMENT_REVIEW_STATE_CHANGED: "This Tournament is no longer awaiting review. Refresh before continuing.", TOURNAMENT_NOT_READY: "Required Tournament information or verified media is incomplete.", BASE_PRIZE_FUNDING_REQUIRED: "The creator's Base Prize is not fully confirmed." };
+      return fail(messages[code] ?? "Tournament review could not be completed safely.", code === "TOURNAMENT_NOT_FOUND" ? 404 : 409, undefined, code in messages ? code : "TOURNAMENT_REVIEW_FAILED");
+    }
+  }
   if (action === "approve_payout_foundation") {
+    const recent = await requireRecentAdminAuthentication(request, "settlements.approve");
+    if (recent.response) return recent.response;
     try {
       const result = await finalizeTournamentSettlement(db, { tournamentId: id, adminId: user.uid, reason });
+      const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+      await attemptTournamentNotifications(db, id);
       return ok({ action, ...result, auditRequired: true, payoutProviderCalled: false }, result.settlement.idempotent ? "Official placements were already finalized; the existing internal settlement was returned." : "Official Tournament placements finalized and internal settlement prepared. No external payout was executed.");
     } catch (error) {
       const code = error instanceof Error ? error.message : "TOURNAMENT_SETTLEMENT_FAILED";
@@ -120,6 +176,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { configVersion: _configVersion, ...publicResult } = result;
     return ok({ action, submissionId, ...publicResult }, result.idempotent ? "This Tournament submission already has that review outcome." : `Tournament submission ${result.status}.`);
   }
-  await db.collection("tournamentAuditEvents").doc(`${id}_${action}_${now}`).set({ id: `${id}_${action}_${now}`, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { foundation } });
-  return ok({ action, auditRequired: true, payoutProviderCalled: false, balanceOverwriteAllowed: false, rawVoteTotalEditable: false }, "Admin tournament action was audited. No payout, refund, raw vote edit, or balance overwrite occurred.");
+  return fail("This Tournament action has no authorized execution workflow. No state was changed.", 409, { action, payoutProviderCalled: false }, "ADMIN_TOURNAMENT_ACTION_UNAVAILABLE");
 }

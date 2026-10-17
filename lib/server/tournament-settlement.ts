@@ -1,69 +1,17 @@
+import { getTournamentFundingSources } from "@/lib/server/tournament-funding-sources";
 import type { Firestore } from "firebase-admin/firestore";
 import { createInternalChallengeSettlement, type SettlementWinner } from "@/lib/server/challenge-settlement";
 import { deterministicId } from "@/lib/server/idempotency";
-import { validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
+import { tournamentPlacementFingerprint, validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
+export { tournamentPlacementFingerprint } from "@/lib/server/tournament-settlement-policy";
 
 type Row = Record<string, unknown> & { id: string };
-
-function amount(value: unknown) {
-  return Math.max(0, Math.round(Number(value) || 0));
-}
-
-function confirmed(record: Record<string, unknown>) {
-  return record.webhookConfirmed === true && ["paid", "confirmed"].includes(String(record.status ?? ""));
-}
-
-async function confirmedRows(db: Firestore, collection: string, tournamentId: string) {
-  const snap = await db.collection(collection).where("tournamentId", "==", tournamentId).get();
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Row)).filter(confirmed);
-}
-
-export function tournamentPlacementFingerprint(placements: Row[]) {
-  return deterministicId("tournament_placements", ...placements
-    .slice()
-    .sort((a, b) => Number(a.placement) - Number(b.placement))
-    .map((item) => `${item.placement}:${String(item.userId ?? item.teamId ?? item.participantId)}:${String(item.sourceMatchId ?? "")}`));
-}
-
-async function tournamentConfirmedSources(db: Firestore, tournamentId: string) {
-  const [entries, paidVotes, sponsors, creatorPrize, promotionalPrizeSnap] = await Promise.all([
-    confirmedRows(db, "challengeEntryPayments", tournamentId),
-    confirmedRows(db, "paidVotePurchases", tournamentId),
-    confirmedRows(db, "sponsorContributions", tournamentId),
-    confirmedRows(db, "creatorPrizeFundingPayments", tournamentId),
-    db.collection("enterprisePromotionalPrizeFunding").where("challengeId", "==", tournamentId).get()
-  ]);
-  const promotionalPrize = promotionalPrizeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Row)).filter((item) => item.status === "confirmed");
-  const prizeSponsors = sponsors.filter((item) => ["prize", "prize_funding", "winner_prize"].includes(String(item.fundingPurpose ?? item.sponsorshipPurpose ?? "prize")));
-  const gross = (rows: Row[]) => rows.reduce((sum, item) => sum + amount(item.amountCents ?? item.amount ?? item.grossAmountCents), 0);
-  return {
-    confirmedEntryRevenueCents: gross(entries),
-    confirmedPaidVoteRevenueCents: gross(paidVotes),
-    confirmedSponsorPrizeCents: gross(prizeSponsors),
-    confirmedCreatorPrizeCents: gross(creatorPrize),
-    confirmedPromotionalPrizeCents: gross(promotionalPrize),
-    entryPaymentCount: entries.length,
-    paidVotePaymentCount: paidVotes.length,
-    sponsorPaymentCount: prizeSponsors.length,
-    creatorPrizePaymentCount: creatorPrize.length,
-    sourceBreakdown: {
-      confirmedEntryPaymentIds: entries.map((item) => item.id),
-      confirmedPaidVotePaymentIds: paidVotes.map((item) => item.id),
-      confirmedSponsorPaymentIds: prizeSponsors.map((item) => item.id),
-      confirmedCreatorPrizePaymentIds: creatorPrize.map((item) => item.id),
-      confirmedPromotionalPrizeFundingIds: promotionalPrize.map((item) => item.id),
-      excludedNonPrizeSponsorPaymentIds: sponsors.filter((item) => !prizeSponsors.includes(item)).map((item) => item.id)
-    },
-    confirmedOnly: true as const,
-    pendingFailedCancelledExcluded: true as const
-  };
-}
 
 async function resolveIndividualWinner(db: Firestore, tournamentId: string, placement: Row): Promise<SettlementWinner> {
   const participantId = String(placement.participantId ?? "");
   const participant = await db.collection("tournamentParticipants").doc(participantId).get();
   const userId = String(participant.data()?.userId ?? placement.userId ?? "");
-  if (!participant.exists || !userId || participant.data()?.tournamentId !== tournamentId) throw new Error("TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID");
+  if (!participant.exists || !userId || participant.data()?.tournamentId !== tournamentId || ["disqualified", "withdrawn", "rejected", "refunded"].includes(String(participant.data()?.status))) throw new Error("TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID");
   return { userId, submissionId: null, placement: Number(placement.placement), splitPercent: 0, payoutStatus: "pending_admin_review" };
 }
 
@@ -78,7 +26,7 @@ async function resolveTeamWinners(db: Firestore, tournamentId: string, placement
   const disqualified = new Set(Array.isArray(data.disqualifiedMemberUserIds) ? data.disqualifiedMemberUserIds : []);
   const winners = roster.map((userId, allocationOrder) => {
     const account = accountSnaps[allocationOrder]?.data() ?? {};
-    const payoutHold = account.withdrawalRestricted === true || account.payoutHold === true || account.accountStatus === "suspended";
+    const payoutHold = data.memberEligibilityDecisions?.[userId] === "temporary_hold" || account.withdrawalRestricted === true || account.payoutHold === true || account.accountStatus === "suspended";
     return {
       userId,
       submissionId: null,
@@ -95,6 +43,7 @@ async function resolveTeamWinners(db: Firestore, tournamentId: string, placement
 }
 
 export async function finalizeTournamentSettlement(db: Firestore, input: { tournamentId: string; adminId: string; reason: string }) {
+  if (!input.adminId || input.reason.trim().length < 5) throw new Error("TOURNAMENT_ADMIN_REASON_REQUIRED");
   const tournamentRef = db.collection("tournaments").doc(input.tournamentId);
   const [tournamentSnap, placementsSnap] = await Promise.all([
     tournamentRef.get(),
@@ -110,6 +59,13 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
   if (!placements.some((item) => Number(item.placement) === 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const orderedPositions = placements.map((item) => Number(item.placement)).sort((a, b) => a - b);
   if (new Set(orderedPositions).size !== orderedPositions.length || orderedPositions.some((position, index) => position !== index + 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+  let unawardedThirdPlaceMatchId: string | null = null;
+  if (Number(tournament.configVersion ?? 1) >= 3 && !orderedPositions.includes(3)) {
+    if (tournament.format !== "single_elimination" || !orderedPositions.includes(2)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+    const bronze = await db.collection("tournamentMatches").where("tournamentId", "==", input.tournamentId).where("bracket", "==", "bronze").get();
+    if (bronze.size !== 1 || bronze.docs[0].data().status !== "double_forfeit_hold" || bronze.docs[0].data().noSubmissionExtensionUsed !== true) throw new Error("TOURNAMENT_THIRD_PLACE_UNRESOLVED");
+    unawardedThirdPlaceMatchId = bronze.docs[0].id;
+  }
   const placedCompetitors = placements.map((item) => String(item.participantId ?? ""));
   if (placedCompetitors.some((id) => !id) || new Set(placedCompetitors).size !== placedCompetitors.length) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const evidence = await Promise.all(placements.map(async (placement) => {
@@ -119,7 +75,7 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
     return source.exists && validateTournamentPlacementEvidence(tournament, placement, { id: source.id, ...source.data() });
   }));
   if (evidence.some((valid) => !valid)) throw new Error("TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID");
-  const fingerprint = tournamentPlacementFingerprint(placements);
+  const fingerprint = tournamentPlacementFingerprint(placements, tournament.productPolicyVersion);
   if (tournament.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_CREATOR_REVIEW_REQUIRED");
   if (tournament.settlementPlacementFingerprint && tournament.settlementPlacementFingerprint !== fingerprint) throw new Error("TOURNAMENT_SETTLEMENT_CORRECTION_REQUIRED");
 
@@ -139,12 +95,12 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
     : [];
   const proposalId = deterministicId("tournament_winner_proposal", input.tournamentId, fingerprint);
   const now = new Date().toISOString();
-  const sources = await tournamentConfirmedSources(db, input.tournamentId);
+  const sources = await getTournamentFundingSources(db, input.tournamentId);
   const settlement = await createInternalChallengeSettlement(db, {
     challengeId: input.tournamentId,
     proposalId,
     adminId: input.adminId,
-    challenge: { ...tournament, creatorId: tournament.hostId, ownerId: tournament.hostId },
+    challenge: { ...tournament, ...(unawardedThirdPlaceMatchId ? { thirdPlaceOutcome: "unawarded" } : {}), settlementEntityType: "tournament", creatorId: tournament.hostId, ownerId: tournament.hostId },
     winners,
     approvedAt: now,
     entityCollection: "tournaments",
@@ -168,12 +124,7 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
       updatedAt: now,
       createdAt: now
     },
-    sourceProvenance: { tournamentId: input.tournamentId, placementFingerprint: fingerprint, placementIds: placements.map((item) => item.id), participationMode: tournament.participationMode, lockedRosterAuthority: tournament.participationMode === "team", lockedRosterSnapshots }
+    sourceProvenance: { tournamentId: input.tournamentId, placementFingerprint: fingerprint, placementIds: placements.map((item) => item.id), participationMode: tournament.participationMode, unawardedThirdPlaceMatchId, lockedRosterAuthority: tournament.participationMode === "team", lockedRosterSnapshots }
   });
-  const batch = db.batch();
-  placements.forEach((placement) => batch.set(db.collection("tournamentPlacements").doc(placement.id), { payoutStatus: "pending_admin_review", settlementId: settlement.settlement.id, settlementProposalId: proposalId, settlementPlacementFingerprint: fingerprint, updatedAt: now }, { merge: true }));
-  batch.set(tournamentRef, { status: "winners_announced", officialPlacementsFinalizedAt: now, officialPlacementsFinalizedBy: input.adminId, settlementId: settlement.settlement.id, settlementStatus: settlement.settlement.status, settlementPlacementFingerprint: fingerprint, payoutExecutionEnabled: false, updatedAt: now }, { merge: true });
-  batch.set(db.collection("tournamentAuditEvents").doc(deterministicId("tournament_settlement_finalized", input.tournamentId, fingerprint)), { id: deterministicId("tournament_settlement_finalized", input.tournamentId, fingerprint), tournamentId: input.tournamentId, actorId: input.adminId, action: "official_placements_finalized_and_settlement_prepared", reason: input.reason, createdAt: now, metadata: { proposalId, settlementId: settlement.settlement.id, placementFingerprint: fingerprint, externalPayoutExecuted: false } }, { merge: true });
-  await batch.commit();
   return { settlement, proposalId, placementFingerprint: fingerprint, winnerAllocationCount: winners.length, confirmedSources: sources, payoutProviderCalled: false, externalPayoutExecuted: false };
 }

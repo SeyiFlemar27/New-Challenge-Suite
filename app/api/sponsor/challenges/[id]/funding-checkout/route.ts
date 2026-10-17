@@ -6,6 +6,7 @@ import { deterministicId, getRequestIdempotencyKey } from "@/lib/server/idempote
 import { requireSponsorPermission } from "@/lib/server/sponsor";
 import { hasActiveSponsorSubscription, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorIsApproved } from "@/lib/sponsor-access";
 import { attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, createPendingSponsorContribution, releasePendingSponsorContribution } from "@/lib/server/monetization-payments";
+import { sponsorSubjectType, sponsorSubjectCollection, sponsorSubjectPrefix } from "@/lib/server/sponsor-subject";
 
 const schema = z.object({
   agreementId: z.string().trim().min(1).max(180),
@@ -31,15 +32,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!hasActiveSponsorSubscription(subscriptionStatus)) return fail("An active sponsor plan is required before funding checkout can start.", 403, { subscriptionStatus }, "SPONSOR_PLAN_REQUIRED");
 
   const { id: challengeId } = await params;
-  const challengeSnap = await context.db.collection("challenges").doc(challengeId).get();
+  let subjectType;
+  try { subjectType = sponsorSubjectType(request); } catch { return validationError({ subjectType: "Select a supported opportunity type." }); }
+  const challengeSnap = await context.db.collection(sponsorSubjectCollection(subjectType)).doc(challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (subjectType === "tournament" && challenge.sponsorFundingActivationEnabled !== true) return fail("Tournament sponsor checkout is unavailable until provider and operational verification is approved.", 503, { contributionConfirmed: false }, "TOURNAMENT_SPONSOR_PAYMENT_DISABLED");
   const agreementSnap = await context.db.collection("sponsorChallengeAgreements").doc(body.data.agreementId).get();
   if (!agreementSnap.exists) return fail("An accepted sponsorship agreement is required before funding.", 409, undefined, "SPONSOR_AGREEMENT_REQUIRED");
   const agreement = agreementSnap.data() ?? {};
   const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
-  if (agreement.challengeId !== challengeId || agreement.sponsorOrganizationId !== context.organizationId) return fail("This agreement does not belong to this Sponsor organization and opportunity.", 403, undefined, "SPONSOR_AGREEMENT_SCOPE_MISMATCH");
-  const expectedContributionId = deterministicId("sponsor_funding", challengeId, context.sponsorId, idempotencyKey);
+  if (agreement.challengeId !== challengeId || (agreement.subjectType ?? "challenge") !== subjectType || agreement.sponsorOrganizationId !== context.organizationId) return fail("This agreement does not belong to this Sponsor organization and opportunity.", 403, undefined, "SPONSOR_AGREEMENT_SCOPE_MISMATCH");
+  const expectedContributionId = deterministicId(sponsorSubjectPrefix(subjectType, "sponsor_funding"), challengeId, context.sponsorId, idempotencyKey);
   const retryingSamePendingReservation = agreement.status === "funding_pending"
     && agreement.fundingStatus === "pending"
     && agreement.fundingContributionId === expectedContributionId;
@@ -50,8 +54,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     contribution = await createPendingSponsorContribution(context.db, {
       sponsorId: context.sponsorId,
+      sponsorUserId: context.user.uid,
       sponsorOrganizationId: context.organizationId,
       challengeId,
+      subjectType,
       agreementId: body.data.agreementId,
       idempotencyKey,
       challenge,
@@ -64,7 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     if (error instanceof Error && error.message === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge funding cannot exceed $10,000.", 422, undefined, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
     if (error instanceof Error && error.message === "SPONSOR_RESERVATION_EXPIRED") {
-      const existing = await context.db.collection("sponsorContributions").doc(deterministicId("sponsor_funding", challengeId, context.sponsorId, idempotencyKey)).get();
+      const existing = await context.db.collection("sponsorContributions").doc(expectedContributionId).get();
       const sessionId = String(existing.data()?.stripeCheckoutSessionId ?? "");
       if (sessionId) await stripe.checkout.sessions.expire(sessionId).catch(() => undefined);
       return fail("This funding reservation expired. Start a new agreement checkout before voting begins.", 409, undefined, "SPONSOR_RESERVATION_EXPIRED");
@@ -81,10 +87,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     payment_intent_data: { capture_method: "automatic" },
     expires_at: Math.ceil(Date.now() / 1000) + 31 * 60,
     line_items: [checkoutLineItem({ amountCents: Number(contribution.amountCents), currency: "USD", name: `Sponsor funding - ${String(challenge.title ?? "Challenge")}` })],
-    success_url: `${origin}/sponsor/funding/${encodeURIComponent(challengeId)}/success?sponsorContributionId=${encodeURIComponent(String(contribution.id))}&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/sponsor/funding/${encodeURIComponent(challengeId)}/success?subjectType=${subjectType}&sponsorContributionId=${encodeURIComponent(String(contribution.id))}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel?paymentPurpose=sponsor_funding&challengeId=${encodeURIComponent(challengeId)}`,
     metadata: checkoutMetadataForPurpose("sponsor_funding", contribution)
-  }, { idempotencyKey: `sponsor_challenge_funding_${idempotencyKey}` });
+  }, { idempotencyKey: `${subjectType}_sponsor_funding_${String(contribution.id)}` });
   } catch (error) {
     await releasePendingSponsorContribution(context.db, String(contribution.id)).catch(() => undefined);
     return serverError("Sponsor checkout session could not be created.", error instanceof Error ? error.message : error);

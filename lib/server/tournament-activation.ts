@@ -2,6 +2,8 @@ import type { Firestore } from "firebase-admin/firestore";
 import { generateTournamentBracket, seedParticipants } from "@/lib/server/tournament-operations";
 import { ensureTournamentMatchLifecycleJobs, processTournamentMatchLifecycleJobById } from "@/lib/server/tournament-match-lifecycle-jobs";
 import type { TournamentFoundation, TournamentParticipantFoundation, TournamentTeamFoundation } from "@/lib/tournament-types";
+import { attemptTournamentNotifications as deliverTournamentNotifications } from "@/lib/server/tournament-notifications";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 const ACTIVE_PARTICIPANT_STATES = new Set(["registered", "active"]);
 const ACTIVE_ACCOUNT_BLOCKS = new Set(["disabled", "suspended", "deactivated", "blocked", "deleted", "deletion_requested", "anonymized"]);
@@ -20,7 +22,7 @@ export async function processTournamentActivationJobs(db: Firestore, now = new D
   for (const jobSnapshot of dueJobs.docs) {
     const job = { id: jobSnapshot.id, ...jobSnapshot.data() } as ActivationJob;
     const outcome = await processOneActivationJob(db, job, now);
-    if (outcome.status === "activated") await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now);
+    if (outcome.status === "activated") { await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now); await deliverTournamentNotifications(db, job.tournamentId); }
     outcomes.push({ jobId: job.id, ...outcome });
   }
   return outcomes;
@@ -37,7 +39,7 @@ export async function processTournamentActivationJobById(db: Firestore, jobId: s
     return { status: "skipped" as const, code: "TASK_VERSION_STALE" };
   }
   const outcome = await processOneActivationJob(db, job, now);
-  if (outcome.status === "activated") await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now);
+  if (outcome.status === "activated") { await ensureTournamentMatchLifecycleJobs(db, job.tournamentId, now); await deliverTournamentNotifications(db, job.tournamentId); }
   return outcome;
 }
 
@@ -47,6 +49,10 @@ export async function processTournamentScheduledJobById(db: Firestore, jobId: st
   const type = String(snapshot.data()?.type ?? "");
   if (type === "activate_full_tournament") return processTournamentActivationJobById(db, jobId, expectedVersion, now);
   if (type === "process_tournament_match_lifecycle") return processTournamentMatchLifecycleJobById(db, jobId, expectedVersion, now);
+  if (type === "expire_team_registration") {
+    const { processTournamentTeamExpiryJob } = await import("@/lib/server/tournament-team-entry");
+    return processTournamentTeamExpiryJob(db, jobId, expectedVersion, now);
+  }
   return { status: "skipped" as const, code: "JOB_TYPE_UNSUPPORTED" };
 }
 
@@ -92,19 +98,33 @@ async function processOneActivationJob(db: Firestore, job: ActivationJob, now: D
       ? String(candidate.status) === "ready" && Boolean(candidate.slotReservedAt)
       : ACTIVE_PARTICIPANT_STATES.has(String(candidate.status)));
     if (tournament.entryType !== "free") {
-      const paymentIds = entrants.map((entrant) => String(entrant.entryPaymentId ?? "")).filter(Boolean);
-      if (paymentIds.length !== entrants.length) {
+      const memberPayments = tournament.participationMode === "team" && tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY;
+      const groups = entrants.map(entrant => {
+        const record = entrant as unknown as Record<string, unknown>;
+        const ids = memberPayments ? Array.isArray(record.entryPaymentIds) ? record.entryPaymentIds.map(String) : [] : [String(entrant.entryPaymentId ?? "")].filter(Boolean);
+        const roster = memberPayments && Array.isArray(entrant.memberUserIds) ? entrant.memberUserIds.map(String) : [];
+        return { entrant, ids, roster };
+      });
+      const paymentIds = groups.flatMap(group => group.ids);
+      if (groups.some(group => !group.ids.length || memberPayments && (group.ids.length !== group.roster.length || !group.roster.length)) || new Set(paymentIds).size !== paymentIds.length) {
         transaction.set(tournamentRef, { activationState: "held", activationHoldReason: "PAID_ENTRY_PAYMENT_RECONCILIATION_REQUIRED", updatedAt: now.toISOString() }, { merge: true });
         transaction.set(jobRef, { status: "held", reason: "PAID_ENTRY_PAYMENT_RECONCILIATION_REQUIRED", updatedAt: now.toISOString() }, { merge: true });
         return { status: "held" as const, code: "PAID_ENTRY_PAYMENT_RECONCILIATION_REQUIRED" };
       }
       const paymentRefs = paymentIds.map((paymentId) => db.collection("tournamentEntryPayments").doc(paymentId));
       const payments = paymentRefs.length ? await transaction.getAll(...paymentRefs) : [];
-      const paymentsValid = payments.every((payment, index) => {
-        const record = payment.data() ?? {};
-        const entrant = entrants[index];
-        return payment.exists && record.status === "confirmed" && record.webhookConfirmed === true
-          && record.tournamentId === job.tournamentId && record.entrantId === entrant.id;
+      const byId = new Map(payments.map(payment => [payment.id, payment]));
+      const paymentsValid = groups.every(({ entrant, ids, roster }) => {
+        const payers = new Set<string>();
+        return ids.every(paymentId => {
+          const payment = byId.get(paymentId), record = payment?.data() ?? {};
+          if (memberPayments && (!roster.includes(String(record.userId)) || payers.has(String(record.userId)) || record.teamId !== entrant.id || !record.teamAttemptId)) return false;
+          payers.add(String(record.userId));
+          return payment?.exists && record.status === "confirmed" && record.webhookConfirmed === true
+            && record.tournamentId === job.tournamentId && record.entrantId === entrant.id
+            && !record.financialRestriction && !record.disputeRestricted
+            && (!memberPayments || Number(record.amountCents) === Number(tournament.entryFeeAmountMinor) && String(record.currency).toLowerCase() === "usd");
+        });
       });
       if (!paymentsValid) {
         transaction.set(tournamentRef, { activationState: "held", activationHoldReason: "PAID_ENTRY_PAYMENT_RECONCILIATION_REQUIRED", updatedAt: now.toISOString() }, { merge: true });
@@ -188,6 +208,7 @@ async function processOneActivationJob(db: Firestore, job: ActivationJob, now: D
       voteCountB: 0,
       voteSequence: 0
     }));
+    for (const match of bracket.matches.filter(match => match.roundNumber === 1 && match.participantAId && match.participantBId)) transaction.create(db.collection("tournamentAuditEvents").doc(`${match.id}_assigned`), { tournamentId: job.tournamentId, actorId: "system_tournament_activation", action: "match_assigned", createdAt: now.toISOString(), metadata: { matchId: match.id, submissionDeadlineAt: submissionDeadline } });
     seeded.forEach((entrant) => transaction.set(db.collection(competitorCollection).doc(entrant.id), { seed: entrant.seed, status: "active", ...(tournament.participationMode === "team" ? { rosterLockedAt: entrants.find((item) => item.id === entrant.id)?.rosterLockedAt ?? now.toISOString() } : {}), updatedAt: now.toISOString() }, { merge: true }));
     transaction.set(tournamentRef, { status: "active", activationState: "activated", activationActivatedAt: now.toISOString(), activationWindowEndsAt: null, registrationLockedAt: now.toISOString(), participantCount: tournament.participantCapacity, seedsLockedAt: now.toISOString(), bracketGeneratedAt: now.toISOString(), bracketLockedAt: now.toISOString(), rosterLockedAt: tournament.participationMode === "team" ? now.toISOString() : null, currentRoundId: bracket.rounds.find((round) => round.roundNumber === 1)?.id ?? null, currentRoundNumber: 1, updatedAt: now.toISOString() }, { merge: true });
     transaction.set(jobRef, { status: "completed", completedAt: now.toISOString(), updatedAt: now.toISOString(), expectedMatchCount: bracket.expectedMatchCount }, { merge: true });

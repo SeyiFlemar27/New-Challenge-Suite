@@ -1,0 +1,134 @@
+# Tournament V3 continuation audit — October 17, 2026
+
+## Latest continuation — status supersedes the historical matrix below
+
+The earlier matrix and execution checkpoints are retained as history. They must not be read as the status of the new implementation. Current source remains on `main` at `32434c90fdb96902d9928248ff6381e517688a38`; no commit, push or cloud change is authorized. The continuation started with 155 dirty entries. The existing recovery snapshot predates the changes described here; it is not claimed to capture this continuation.
+
+| Area / specification coverage | Current classification | Evidence and remaining acceptance |
+|---|---|---|
+| Preservation, architecture, single Admin (1–2) | Complete and tested locally | Canonical root/branch/upstream/HEAD verified; existing source and artifacts preserved; no reference worktree changes |
+| Seven-step Builder, Overview, format, registration, monetization, media, timing (3–9) | Implemented but insufficiently tested | Existing builder/policy/handler tests retained; connected scenarios now create real drafts, confirm creator funding, submit and approve; full browser acceptance is still being rerun |
+| Paid registration and team management (6, 10) | Implemented but insufficiently tested | Actual transactional payment/capacity tests; connected DE scenarios use deterministic Stripe checkout/captured-card fixtures; live Stripe is not verified or activated |
+| Brackets, match lifecycle, voting, outcomes (11–13, 17) | Complete and tested locally | Fixed Grand Final reset competitor eligibility and final placement sourceMatchId. Actual persisted-state deadline guards reject paused/cancelled stale work. Four connected scenarios cover bronze, Losers Bracket and reset, fresh submissions/replacement/moderation, no early vote and free/5-DoroCoin votes; unattended cloud dispatch remains blocked |
+| Prize settlement and Team eligibility (14) | Complete and tested locally; live payouts blocked | New transactional `tournament-team-entitlements.ts`, authorized recent-auth Admin action and connected controls. Permanent exclusions redistribute only safe unpaid credits; temporary holds retain shares; completed/reserved/disputed/uncertain funds enter recovery hold. Versioned immutable revisions, stale/idempotency guards and wallet conservation tests |
+| Tournament Details / Match Details (16–17, 19) | Implemented but insufficiently tested | Existing connected interfaces preserved; new browser journey exercises real upload, replacement, moderation, voting and worker-confirmed result; four full competition variants are backend integration scenarios, not four complete browser journeys |
+| Admin and lifecycle communications (18) | Complete and tested locally; live email blocked | Durable audit-driven notices cover registration, payments/review, activation/assignment, submissions/moderation, voting, extensions, results/progression/elimination and prize review. Frozen recipient cursor, preference checks, dedup/read preservation, optional existing-provider email outbox; no email activation or delivery claim |
+| Comprehensive regression (20) | Complete and tested within stated local coverage | Full 68-suite P0 PASS; fresh typecheck/full lint PASS; isolated production build PASS; 13/13 browser journeys, 172 assertions, zero uncaught client errors. These do not verify live providers or every full competition variant in a browser |
+| Production operations and release (21–23) | Blocked | User declined eight live indexes; Tournament queue/authenticated worker/recovery scheduling not configured. See `tournament-v3-production-configuration-plan.md`. No production change, deployment, commit or push |
+| Sponsor addendum | Locally implemented; provider verification blocked | Existing subject-bound agreements/checkout/cutoff/disputes/release retained; payment must be confirmed strictly before first actual voting start, no reservation extension. Provider fixtures do not establish live provider behavior |
+
+New append-only records: `tournamentEntitlementRevisions`; own eligibility recovery records in existing `tournamentSettlementHolds`; version/decision metadata on locked teams and canonical unpaid cash credits. Optional `tournamentEmailOutbox` reuses the existing provider executor with leases/retries; explicit email permission and activation remain required. No migration, index or Rules publication was performed.
+
+No completed external payout is reversed, no negative wallet is created, no unresolved investigation redistributes money, and no unsupported champion/cancellation/replacement-funding policy is introduced. Historical settlement snapshots remain history; current canonical unpaid ledger plus immutable revisions describe corrections. Full live provider, unattended scheduling and end-to-end browser coverage of every competition variant remain separate acceptance requirements.
+
+### Fresh execution evidence for this continuation
+
+- Full P0: **68/68 PASS**, complete results and process exit 0 in `C:\Users\seyia\AppData\Local\Temp\challenge-suite-p0-isolated-AOInsZ`. Includes 424 connected actual-handler/service assertions across individual/team × SE/DE; free SE and fixture-backed paid DE; 27 entitlement assertions; 66 notification assertions; 23 settlement assertions; 12 first-voting/stale-state assertions. No live Stripe or external payout.
+- The first expanded P0 run correctly failed the paid-team activation scenario: activation expected one legacy team payment ID instead of independent locked-roster member payments. Activation now rechecks all member payments, payer uniqueness, team/Tournament binding, amount/currency and financial restrictions. The corrected focused four-scenario run and the complete 68-suite rerun both passed. That failure was not waived.
+- Typecheck and full ESLint: fresh exit 0. New product policy: 41 assertions passed. Team management UI and lifecycle contract checks passed. Script syntax checks passed; repository ESLint excludes scripts, so syntax execution is not represented as ESLint coverage.
+- Final expanded browser run: **13/13 PASS, 172 assertions, zero skipped, zero uncaught client errors**, including the new Match upload/replacement/moderation/free + DoroCoin voting/verified-result journey (18 assertions). Isolated production build PASS. Browser artifacts: `C:\Users\seyia\AppData\Local\Temp\challenge-suite-p1-browser-1d0d6cd0da5e4bc49d76396bac29ea7a`; runner exit-0 evidence: `C:\Users\seyia\AppData\Local\Temp\challenge-suite-p0-isolated-Uxkylr\result.json`.
+- The first expanded browser run completed 12/13 with an ambiguous upload-success text locator. The second completed 12/13 and reached actual replacement/moderation before a repeated exact label lookup failed after controlled-textarea refresh. A blank Chrome reproduction proved that updating a textarea's default text makes Playwright `getByLabel(..., exact: true)` fail while `getByRole('textbox', { name, exact: true })` still matches its correct accessible name. The test now uses that semantic role/name lookup; required reasons and confirmation are preserved. These failures are recorded rather than counted as passes.
+- A focused diagnostic run reproduced the same failure against the real refreshed form: label text was `Decision reason (required)Verified isolated browser submission media`. The control remained connected and correctly named in the accessibility tree. Temporary diagnostics were removed after confirmation; no application authorization or validation was changed. The subsequent full browser run uses the corrected role/name lookup.
+- Earlier Storage ECONNRESET root cause remains unproven because its original process evidence is unavailable. Fresh runners isolate project, every emulator port, hub/log directory, working directory and per-suite result records; both recent full attempts passed Storage regressions, and the final complete run passed all 68 suites without a reset. This establishes current verification, not a fabricated historical crash diagnosis.
+
+### Final browser acceptance inventory
+
+| Journey | Result | Assertions |
+|---|---|---|
+| Media publication and private invitation preparation/reveal/copy | PASS | 17 |
+| Normal Builder, funding states and safe draft exit | PASS | 36 |
+| Creator login, server session and API-backed Explore | PASS | 5 |
+| Private access request | PASS | 4 |
+| Owner approval and durable grant | PASS | 4 |
+| Free Normal registration | PASS | 6 |
+| Sponsor discovery and Enterprise finance interface | PASS | 8 |
+| Tournament seven-step draft, reviewed media, 128-slot bracket | PASS | 20 |
+| Individual Tournament and physical Live Event registration | PASS | 13 |
+| Match media/replacement/Admin moderation/free + DoroCoin voting/worker-confirmed result | PASS | 18 |
+| Admin, wallet and builder navigation | PASS | 17 |
+| Customer Support ticket/Admin confirmation/reply | PASS | 15 |
+| Public/participant mobile layouts | PASS | 8 |
+
+The journey counts total 171; the runner's zero-uncaught-error assertion produces the reported 172. Four complete competitions are connected backend integration scenarios, not four full browser competitions. Refunds/disputes/late payment and financial restriction coverage is in actual-handler/transaction regression fixtures; not every exceptional combination was replayed inside each complete competition or in the browser. Manual assistive-technology evaluation and live provider behavior remain unverified.
+
+Configuration preservation: pre/post browser SHA-256 hashes match exactly for `tsconfig.json`, `next-env.d.ts`, `package.json` and `pnpm-lock.yaml`. Initial 155 dirty entries remain preserved; final working tree has 167 entries, no source deletion, same HEAD/upstream/remote. No commit, push, deployment, live infrastructure change, Rules/index publication or financial execution was performed.
+
+Final post-browser `pnpm.cmd typecheck` exited 0. Fresh full `pnpm.cmd lint` exited 0. `git diff --check` exited 0; Git's existing LF/CRLF conversion notices are warnings, not whitespace failures. The independent V3 policy suite passed 55 assertions and the new-product policy suite passed 41. Existing Team UI/lifecycle contracts and changed script syntax checks passed. The last browser run had zero failed or skipped journeys and zero uncaught client errors.
+
+### Files touched by the entitlement / communications / connected-acceptance continuation
+
+This is a touched-file inventory, not a release staging list. Several files also contain earlier uncommitted work, which remains preserved. The complete dirty tree is larger and must not be blindly committed.
+
+- Finance and authorization: `lib/server/tournament-team-entitlements.ts`, `lib/server/tournament-settlement.ts`, `lib/server/challenge-settlement.ts`, `lib/server/withdrawals.ts`, `lib/server/tournament-operations.ts`, `lib/server/tournament-paid-entry.ts`, `app/api/admin/operations/route.ts`, `app/api/admin/tournaments/[id]/route.ts`, `components/admin/admin-tournament-decisions.tsx`.
+- Competition and communications: `lib/server/tournament-activation.ts`, `lib/server/tournament-result-confirmation.ts`, `lib/server/tournament-lifecycle-scheduler.ts`, `lib/server/tournament-match-lifecycle-jobs.ts`, `lib/server/tournament-notifications.ts`, `lib/server/normal-email.ts`, `app/api/tournaments/route.ts`, `app/api/tournaments/[id]/join/route.ts`, `app/api/tournaments/[id]/submissions/route.ts`.
+- Verification: `scripts/test-tournament-team-entitlements-emulator.mjs`, `scripts/test-tournament-settlement-emulator.mjs`, `scripts/test-tournament-notifications-emulator.mjs`, `scripts/test-tournament-first-voting-cutoff-emulator.mjs`, `scripts/test-tournament-complete-lifecycles-emulator.mjs`, `scripts/qa/run-p1-browser-e2e.mjs`, `scripts/qa/tournament-browser-worker.mjs`, `scripts/run-isolated-p0-emulators.mjs`, `scripts/run-local-verification-suite.mjs`, `scripts/run-p0-emulator-regressions.mjs`, `scripts/ts-alias-loader.mjs`.
+- Documentation: this audit and `docs/tournament-v3-production-configuration-plan.md`.
+
+No dependency upgrade, package-manager change, lockfile rewrite, live index/Rules/IAM publication or provider activation is part of this continuation.
+
+Authority: the complete 1,383-line `Challenge_Suite_Tournament_V3_Full_Prompt_With_Sponsor_Continuation.md`, including its appended cutoff decision. This checklist does not replace or narrow that document. Historical test reports are not current runtime evidence.
+
+## Preservation and baseline
+
+- Canonical repository `C:\Dev\New-Challenge-Suite`, `main` tracking `origin/main`, GitHub `SeyiFlemar27/New-Challenge-Suite`; initial HEAD `32434c90fdb96902d9928248ff6381e517688a38`.
+- 126 status entries initially. No deleted files. Existing local generated files, caches and lint artifacts remain preserved and excluded from publication.
+- Current independently verified recovery: `C:\Dev\Backups\New-Challenge-Suite\20261017T063751Z-tournament-sponsor-continuation`, 2,948 files, two stable source inventories, copied SHA-256 verification, restricted ACL and verified Git bundle. Reference worktrees unchanged.
+- Windows process inspection found Codex/browser-tool and Firebase MCP processes; none was terminated. Stable hashes, not process names, establish capture consistency.
+
+## Complete specification coverage checklist
+
+Classification here is code inspection. No row means runtime verification merely because its component exists. Fresh test results belong in the execution record below.
+
+| Spec | Requirements examined | Current evidence | Classification / remaining acceptance |
+|---|---|---|---|
+| 1–2 | Identity; preservation; dependencies; old/new policy isolation; single Admin; baseline | AGENTS.md; recovery; `tournament-builder-policy.ts`; `tournament-permissions.ts`; existing test runners | Preservation verified; baseline gates executing; main automatic Production means no premature push |
+| 3 | Seven semantic steps; Back/Continue; autosave; Finish Later; resume; responsive labels; no tour | `tournament-builder.tsx`; builder registry; draft adoption route | Implemented, browser acceptance incomplete; legacy active/financial drafts intentionally held rather than silently converted |
+| 4 | Title120; taxonomy; description20–1200; ordered rules; legacy strings | Builder; `tournament-validation.ts`; `tournamentOrderedText` | Code-implemented; fresh focused/browser checks required |
+| 5 | Individual/team; SE/DE; bronze vs Losers Final; reset; capacities4–128; random full seeding; sizes2–5/max20 | `tournaments.ts`; `tournament-operations.ts`; `tournament-activation.ts`; policy tests | Substantial implementation; full lifecycle browser and all-capacity acceptance required |
+| 6 | Public/open; no calendars/check-in; eligibility; invite/request consent; incompatible requests; captain; 30/60/90/120 window; per-member charges; roster lock; all-pay slot; truthful states | teams routes; `tournament-team-entry.ts`; `tournament-team-manager.tsx` | Implemented but payment concurrency/provider and complete team browser journeys insufficiently verified |
+| 7 | USD minimum5; optional Base0/positive5 fully creator-funded; designated contributions100%; generated65/20/15; placements60/25/15; held bronze; one sponsor toggle | Builder; creator funding; funding sources; settlement; shared ledger | Sponsor subject integration missing; reconciliation and team entitlement revision coverage incomplete |
+| 8 | Cover+2 images10MB JPEG/PNG/WebP; optional video49MB MP4/AVI1280x720/75sec; progress/retry/remove/reorder; ownership; separate submissions | Builder uploads; media verification; immutable media delivery; Storage Rules | Implemented; earlier media tests not current proof; deployed Rules/configuration need read-only verification before release |
+| 9 | 12/24/48/72 presets/default48/72; immutable after entrant; full windows/no early vote; image/video; optional ordered instructions; fresh entries; replacements/history; captain-only; one-sided forfeit; one12h extension; moderation/double-forfeit hold | submission route/media verification; lifecycle scheduler/jobs | Implemented; actual-handler boundary tests and complete browser actions still required |
+| 10 | Saved read-only Review/Edit; actionable validation; two confirmations; review audit; no bypass; pending lock; submitted destination | Builder; Tournament PATCH; Admin decisions | Code-implemented; new browser journey not yet passed end-to-end |
+| 11 | Automatic free-first; per-match/local-day free;5DC consent/atomic debit; wallet/limits; purchase-return; no owner/self/team votes; hidden live totals; scalable verification; legacy terms; supported Challenge types only | automatic-voting policy; Normal/Private/Tournament vote handlers; return-path helper; vote verifier | Implemented, regression/browser acceptance pending; explicitly inspect physical Live Event exclusion |
+| 12 | Full verified capacity; provisional random bracket; durable5sec; revalidation/reopen; reservation vs team window; original payer refunds; duplicate/late/partial payments; first actual vote refund cutoff; prior approvals; reversals; no creator post-activation cancel | activation; Cloud Tasks; paid/team entry; refund/dispute handlers | Scheduling-independent logic present; Production Tournament dispatch/recovery configuration absent at last inspection; reverify, do not activate financial execution |
+| 13 | Deadline verified events; sequence/priority/valid0–0; deterministic holds; idempotent advancement/losses/reset/windows; no creator picks; no fake champion/cancellation/appeal policy | result confirmation; sequence pagination; progression helpers; lifecycle jobs | Code-implemented; full SE/DE runtime competition coverage incomplete |
+| 14 | Equal locked roster; no captain premium/contribution scoring; authoritative permanent exclusion; temporary reserve; deterministic rounding; entitlement versions; preserve paid; hold no recipients/KYC/clearance | settlement policy; shared challenge settlement; cash ledger restrictions | Initial allocation present; post-finalization unpaid entitlement revision/reconciliation still partial |
+| 15 | Public permitted detail; authenticated actions; safe captain/public profiles; registration/payment/capacity/activation state; verified results/prizes; no paid fiction | public projection; Details/results; team page; registration controls | Public guard fixed; current public-team tests exist; 150-team query cap and full journey acceptance remain |
+| 16 | Six tabs; Round default; selected round retained; full128 zoom/scroll; SE bronze; DE winners/losers/GF/reset; connected dependencies/holds | `tournament-detail-content.tsx`; round plan | Implemented but bracket connection clarity and desktop/mobile browser acceptance incomplete |
+| 17 | Match identity/competitors/phase/deadlines/instructions/media; captain replacement; automatic voting; verified results; no confidential totals; actionable errors | Match page/actions; submission/vote/result APIs | Implemented; browser lifecycle actions and all failure states not verified |
+| 18 | One Admin; authorization/confirm/reason/audit/stale/idempotence; notifications for full lifecycle; preferences/dedup; retries | Admin decisions; shared auth/audit; lifecycle jobs; notifications | Admin controls present; most lifecycle notifications missing; existing merge-based notification retry can reset read state |
+| 19 | Existing design tokens; restrained responsive/accessibility; labels/focus/states; real connected actions; no fake values | Builder/details/match/Admin components | Needs browser/accessibility acceptance; no blanket design-complete claim |
+| 20 | Every Builder/registration/bracket/vote/finance/security regression and actual journeys | P0 runner; focused Tournament runners; browser harness | Historical passing counts preserved; fresh full results required; prior emulator concurrency and browser failures not waived |
+| 21–23 | Existing project/config; services/Rules/indexes; safe activation; exact source; rollback; verified build/tests; main Git automatic release; live SHA/READY/domains/smoke | AGENTS; Cloud Tasks operations; Vercel Git linkage | Release blocked until implementation, critical tests and operational dependencies are satisfied; no manual promotion substitution |
+| Addendum B–D | Actual immutable first voting cutoff; strict provider confirmation order; no reservation grace; ambiguity hold; transaction rechecks; versioned accepted agreement; subject-bound checkout; duplicates/disputes/refunds; safe Admin release; accurate public/private reporting | `tournament-sponsor-cutoff.ts`; funding sources; existing Sponsor agreement/checkout/disputes | Timing helper/settlement guard present; end-to-end Tournament subject integration missing. Existing Challenge-only paths must be extended coherently, not replaced with a second payment system |
+
+## Current execution record
+
+Baseline typecheck/full lint started after stable preservation. All prior 13 cutoff / 17 settlement / 11 public-team assertions must be rerun, along with full required acceptance. Provider mocks never establish live Stripe evidence. Production remains unchanged until every release gate passes.
+
+### October 17 continuation — superseding progress
+
+The matrix above records the initial audit, not the final implementation status. Subsequent work adds Tournament-aware Sponsor discovery, versioned agreement acceptance, subject-bound checkout and confirmation, canonical first-voting evidence, refund/dispute restrictions, guarded Admin placement/release, canonical public funding, and connected host/Sponsor interfaces. Tournament live funding remains fail-closed unless explicitly activated. No provider credentials or Production configuration were changed.
+
+First actual voting now writes a separate canonical cutoff record, checks persisted Tournament state in the transition transaction, and cannot reopen funding on later matches. Funding confirmation and release inspect actual match history and transition audit evidence. Public team enumeration is cursor-paged beyond the former 150-record cap. Physical Live Events reject public voting. Durable in-app notification delivery respects preferences and preserves read state on retries; outbound email is not activated and complete lifecycle notification coverage remains unfinished.
+
+Fresh focused execution passed: Sponsor Tournament handlers 70 assertions; existing Sponsor handlers 128; existing Sponsor disputes 32; automatic voting 27; automatic results 14; public team projection 12; notifications 13. Expanded Sponsor and first-voting tests require the current full rerun. Typecheck and full ESLint passed after the paused-transition correction. The earlier isolated production build and selected Tournament browser journey passed (20 journey assertions plus one runner assertion); this does not verify all lifecycle journeys.
+
+The first full P0 run stopped at a stale private-discovery expectation: the test expected invitation configuration omitted by the current locked-preview projection. The corrected test asserts the exact safe field whitelist, accessRequired and preview destination; application privacy was not broadened. A fresh full run is in progress. A sandbox emulator restart could not bind the local hub; the isolated rerun uses approved unrestricted local execution. Browser verification uses separate service, hub, logging and websocket ports.
+
+#### Production boundary — explicit user decision
+
+The user answered **Keep live indexes unchanged** for all eight proposed Tournament COLLECTION indexes. None will be published. Read-only inventory found no Tournament indexes in challenge-suite/(default). Production also lacks Tournament queue/worker/reconciler environment configuration and a dedicated recovery job. Existing Normal lifecycle infrastructure was inspected but not modified or repurposed. These are release blockers; do not push main, enable dependent jobs, or substitute a manual deployment/promotion.
+
+Remaining acceptance includes full individual/team single/double-elimination browser lifecycles, post-finalization team-entitlement correction/reconciliation, complete lifecycle communications, provider-backed Stripe verification, and authenticated unattended scheduling. Passing local fixtures does not resolve these dependencies or authorize real money movement.
+
+### Final local verification checkpoint
+
+- Typecheck: PASS, including the fresh check after browser execution. Full ESLint: PASS. Targeted application lint: PASS; repository ESLint intentionally ignores the listed `.mjs` test scripts, so ignored-script warnings are not claimed as lint coverage. Updated browser/discovery scripts also passed `node --check`.
+- Production build: PASS in isolated `.next/e2e/f0e92c693b9b414dbfe8dcf7c93f8e1c`, including the paused-state voting correction. Subsequent application source was unchanged; later changes were tests/documentation.
+- Full existing browser suite: **12/12 PASS, 154 assertions, no uncaught client errors**. Artifacts: `C:\Users\seyia\AppData\Local\Temp\challenge-suite-p1-browser-a3694a77fbaf4613a97b241c0e0a0a4d`. The initial 11/12 result was a stale test using the former native confirmation instead of the mandatory access-decision form. The corrected journey supplies a reason/confirmation, verifies the actual API response, and checks the durable grant.
+- Full focused Tournament runner: **22/22 PASS, exit 0** in fresh `demo-tournament-focused-20261017` Auth/Firestore/Storage emulators. Includes 113 Sponsor handler assertions; 128 existing Sponsor assertions; 32 dispute assertions; 17 settlement assertions; 26 member-payment assertions; 16 submission/media assertions; 27 voting assertions; 13 notification assertions; and 10 actual first-voting assertions, including paused transition rejection and immutable cutoff preservation.
+- Full P0: **NOT PASSED**. First attempt stopped at the corrected private-preview contract. The next run passed that contract and later stopped when local Storage port 19194 returned ECONNRESET during a media upload. Root cause of that emulator termination is not established. Subsequent isolated Tournament submission/media tests passed; this does not substitute for an uninterrupted full P0 pass.
+- A focused run also exposed an outdated public funding assertion; the contract now includes safe `confirmed_sources` status while continuing to exclude internal source identifiers. The corrected 22-suite run passed.
+- No commit, push, cloud mutation, index publication, provider activation or deployment. Main HEAD remains `32434c90fdb96902d9928248ff6381e517688a38`; all source and local artifacts remain uncommitted and preserved. Release remains blocked by explicit index preservation, scheduling configuration, incomplete acceptance and provider verification described above.

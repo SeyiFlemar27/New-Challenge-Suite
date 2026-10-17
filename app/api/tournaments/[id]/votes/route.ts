@@ -7,8 +7,36 @@ import { isTournamentCompetitorVoter, validateTournamentVote } from "@/lib/serve
 import { DOROCOIN_COST_PER_VOTE, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentRoundFoundation } from "@/lib/tournament-types";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { votingAccountRestricted } from "@/lib/voting-account-policy";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Tournament voting status");
+  const { id } = await context.params;
+  const matchId = new URL(request.url).searchParams.get("matchId") ?? "";
+  if (!matchId || matchId.includes("/") || matchId.length > 500) return fail("Choose a valid match.", 422, undefined, "TOURNAMENT_MATCH_REQUIRED");
+  const [tournamentSnap, matchSnap, profile, account, wallet, membership] = await Promise.all([
+    db.collection("tournaments").doc(id).get(), db.collection("tournamentMatches").doc(matchId).get(), db.collection("profiles").doc(user.uid).get(), db.collection("users").doc(user.uid).get(), db.collection("doroCoinWallets").doc(user.uid).get(), db.collection("tournamentTeamMemberships").doc(`${id}_${user.uid}`).get()
+  ]);
+  if (!tournamentSnap.exists || !matchSnap.exists || matchSnap.data()?.tournamentId !== id || tournamentSnap.data()?.privacy !== "public") return fail("Match unavailable.", 404, undefined, "TOURNAMENT_MATCH_NOT_FOUND");
+  const tournament = { ...tournamentSnap.data(), id } as TournamentFoundation;
+  const match = { ...matchSnap.data(), id: matchId } as TournamentMatchFoundation;
+  if (!match.participantAId || !match.participantBId) return fail("Match assignments are not ready.", 409, undefined, "TOURNAMENT_MATCH_NOT_READY");
+  const collection = tournament.participationMode === "team" ? "tournamentTeams" : "tournamentParticipants";
+  const [roundSnap, first, second] = await db.getAll(db.collection("tournamentRounds").doc(match.roundId), db.collection(collection).doc(match.participantAId), db.collection(collection).doc(match.participantBId));
+  const date = voteDateKeyForTimeZone(new Date(), validVotingTimeZone(profile.data()?.timeZone ?? profile.data()?.timezone));
+  const key = createHash("sha256").update(`${id}:${matchId}:${user.uid}:${date}`).digest("hex");
+  const [free, paid] = await db.getAll(db.collection("tournamentFreeVoteDailyGuards").doc(key), db.collection("tournamentPaidVoteDailyGuards").doc(key));
+  const blocked = tournament.hostId === user.uid || isSponsorProfile(account.data() ?? {}) || votingAccountRestricted(account.data() ?? {}) || [first, second].some(side => !side.exists || isTournamentCompetitorVoter({ userId: user.uid, participationMode: tournament.participationMode, competitor: side.data() ?? {}, membership: membership.data() ?? null, teamId: side.id }));
+  const eligible = roundSnap.exists && roundSnap.data()?.tournamentId === id && validateTournamentVote({ tournament, match, round: { ...roundSnap.data(), id: roundSnap.id } as TournamentRoundFoundation }).valid;
+  return ok({ canVote: Boolean(eligible && !blocked), automaticFreeFirst: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY, freeVote: { used: free.exists, available: !free.exists }, balance: Number(wallet.data()?.balance ?? 0), doroCoinCost: DOROCOIN_COST_PER_VOTE, paidVotesUsed: Number(paid.data()?.quantity ?? 0) }, "Current match voting state; vote execution rechecks eligibility.");
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -45,7 +73,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   let idempotentReplay = false;
   try {
     await db.runTransaction(async (transaction) => {
-      const [tournamentSnap, matchSnap, submissionSnap, voteSnap, voterSnap, membershipSnap, voteGuardSnap, walletSnap] = await Promise.all([
+      const [tournamentSnap, matchSnap, submissionSnap, voteSnap, voterSnap, membershipSnap, voteGuardSnap, walletSnap, freeVoteSnap] = await Promise.all([
         transaction.get(tournamentRef),
         transaction.get(matchRef),
         transaction.get(submissionRef),
@@ -53,7 +81,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         transaction.get(db.collection("users").doc(user.uid)),
         transaction.get(db.collection("tournamentTeamMemberships").doc(`${id}_${user.uid}`)),
         transaction.get(requestedVoteType === "free" ? freeGuardRef : paidGuardRef),
-        requestedVoteType === "dorocoin" ? transaction.get(db.collection("doroCoinWallets").doc(user.uid)) : Promise.resolve(null)
+        requestedVoteType === "dorocoin" ? transaction.get(db.collection("doroCoinWallets").doc(user.uid)) : Promise.resolve(null),
+        requestedVoteType === "dorocoin" ? transaction.get(freeGuardRef) : Promise.resolve(null)
       ]);
       if (!tournamentSnap.exists || !matchSnap.exists) throw Object.assign(new Error("Tournament match is required."), { code: "TOURNAMENT_MATCH_NOT_FOUND", status: 404 });
       if (!submissionSnap.exists) throw Object.assign(new Error("Tournament submission is required."), { code: "TOURNAMENT_SUBMISSION_NOT_FOUND", status: 404 });
@@ -73,17 +102,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
       const configVersion = Number(tournament.configVersion ?? 1);
       if (configVersion !== requestConfigVersion) throw Object.assign(new Error("Tournament configuration changed. Retry this vote."), { code: "TOURNAMENT_CONFIG_CHANGED", status: 409 });
+      if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && requestedVoteType === "dorocoin" && !freeVoteSnap?.exists) throw Object.assign(new Error("Use your available free vote before spending DoroCoins in this match today."), { code: "FREE_VOTE_AVAILABLE", status: 409 });
+      if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && requestedVoteType === "dorocoin" && body.confirmedDoroCoinSpend !== true) throw Object.assign(new Error("Confirm the 5 DoroCoin cost before voting."), { code: "DOROCOIN_SPEND_CONFIRMATION_REQUIRED", status: 422 });
       if (configVersion >= 3 && requestedVoteType === "dorocoin" && ((tournament.voting as Record<string, unknown>)?.paidVotesActive !== true || !economyRules?.voting.paidVotingEnabled)) throw Object.assign(new Error("Additional DoroCoin Tournament voting is not enabled."), { code: "PAID_VOTING_DISABLED", status: 403 });
       if (configVersion < 3 && requestedVoteType !== "free") throw Object.assign(new Error("Legacy Tournament voting supports free votes only."), { code: "TOURNAMENT_PAID_VOTING_UNSUPPORTED", status: 400 });
       const voterAccount = voterSnap.data() ?? {};
+      if (isSponsorProfile(voterAccount) || votingAccountRestricted(voterAccount)) throw Object.assign(new Error("This account is not eligible to vote."), { code: "TOURNAMENT_VOTER_RESTRICTED", status: 403 });
       const voterTimeZone = configuredTimeZone;
       if (tournament.hostId === user.uid) throw Object.assign(new Error("Tournament hosts and competitors in this match cannot vote in it."), { code: "TOURNAMENT_SELF_VOTING_BLOCKED", status: 403 });
       const roundRef = db.collection("tournamentRounds").doc(match.roundId);
       const competitorCollection = tournament.participationMode === "team" ? "tournamentTeams" : "tournamentParticipants";
+      if (![match.participantAId, match.participantBId].includes(selectedParticipantId) || !match.participantAId || !match.participantBId) throw Object.assign(new Error("The selected competitor is not assigned to this match."), { code: "TOURNAMENT_MATCH_TARGET_MISMATCH", status: 403 });
       const competitorRef = db.collection(competitorCollection).doc(selectedParticipantId);
-      const [roundSnap, competitorSnap, duplicateSnap] = await Promise.all([
+      const opponentRef = db.collection(competitorCollection).doc(selectedParticipantId === match.participantAId ? match.participantBId : match.participantAId);
+      const [roundSnap, competitorSnap, opponentSnap, duplicateSnap] = await Promise.all([
         transaction.get(roundRef),
         transaction.get(competitorRef),
+        transaction.get(opponentRef),
         configVersion < 3 ? transaction.get(db.collection("tournamentVotes").where("tournamentId", "==", id).where("matchId", "==", matchId).where("voterId", "==", user.uid).limit(1)) : Promise.resolve(null)
       ]);
       if (!roundSnap.exists) throw Object.assign(new Error("The match round does not exist."), { code: "TOURNAMENT_ROUND_NOT_FOUND", status: 404 });
@@ -92,9 +127,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (!validation.valid) throw Object.assign(new Error(validation.message), { code: validation.code, status: 409, details: validation });
       if (!competitorSnap.exists) throw Object.assign(new Error("The selected competitor is not part of this Tournament."), { code: "TOURNAMENT_COMPETITOR_NOT_FOUND", status: 403 });
       const competitor = competitorSnap.data() ?? {};
+      const opponent = opponentSnap.data() ?? {};
+      if (!opponentSnap.exists || opponent.tournamentId !== id) throw Object.assign(new Error("The assigned match competitors require verification."), { code: "TOURNAMENT_COMPETITOR_INELIGIBLE", status: 403 });
       const allowedCompetitorStatuses = tournament.participationMode === "team" ? ["checked_in", "active"] : ["registered", "checked_in", "active"];
       if (competitor.tournamentId !== id || !allowedCompetitorStatuses.includes(String(competitor.status ?? ""))) throw Object.assign(new Error("The selected competitor is not eligible in this Tournament."), { code: "TOURNAMENT_COMPETITOR_INELIGIBLE", status: 403 });
-      if (isTournamentCompetitorVoter({ userId: user.uid, participationMode: tournament.participationMode, competitor, membership: membershipSnap.data() ?? null, teamId: selectedParticipantId })) throw Object.assign(new Error("Tournament competitors cannot vote in their own match."), { code: "TOURNAMENT_SELF_VOTING_BLOCKED", status: 403 });
+      if ([{ record: competitor, id: competitorRef.id }, { record: opponent, id: opponentRef.id }].some(side => isTournamentCompetitorVoter({ userId: user.uid, participationMode: tournament.participationMode, competitor: side.record, membership: membershipSnap.data() ?? null, teamId: side.id }))) throw Object.assign(new Error("Tournament competitors cannot vote for either side of their own match."), { code: "TOURNAMENT_SELF_VOTING_BLOCKED", status: 403 });
       if (![match.participantAId, match.participantBId].includes(selectedParticipantId)) throw Object.assign(new Error("The selected competitor is not assigned to this match."), { code: "TOURNAMENT_MATCH_TARGET_MISMATCH", status: 403 });
       if (submission.tournamentId !== id || submission.matchId !== matchId || submission.roundId !== match.roundId || submission.participantId !== selectedParticipantId) throw Object.assign(new Error("The submission is not assigned to the selected competitor and match."), { code: "TOURNAMENT_SUBMISSION_TARGET_MISMATCH", status: 403 });
       if (!["submitted", "approved", "active"].includes(String(submission.status ?? ""))) throw Object.assign(new Error("This submission is not eligible for Tournament voting."), { code: "TOURNAMENT_SUBMISSION_INELIGIBLE", status: 409 });

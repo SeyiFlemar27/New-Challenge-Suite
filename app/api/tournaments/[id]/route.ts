@@ -8,13 +8,27 @@ import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 import { publicTournamentParticipantIds, publicTournamentParticipantView, publicTournamentView } from "@/lib/server/tournament-public-policy";
 import type { TournamentFoundation, TournamentStatus } from "@/lib/tournament-types";
-import { verifyCreatorImage } from "@/lib/server/creator-image-verification";
+import { freezeTournamentBuilderMedia, verifyTournamentBuilderMedia } from "@/lib/server/tournament-media-verification";
+import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const viewer = await getOptionalRequestUser(request);
+  if (new URL(request.url).searchParams.get("view") === "builder") {
+    if (!viewer) return fail("Sign in to restore your Tournament draft.", 401, undefined, "AUTH_REQUIRED");
+    const db = getAdminDb();
+    if (!db) return serverUnavailable("Tournament draft restoration");
+    const snapshot = await db.collection("tournaments").doc(id).get();
+    if (!snapshot.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
+    const record = { id: snapshot.id, ...snapshot.data() } as Record<string, unknown>;
+    if (!canEditTournament({ ...viewer }, record).allowed) return fail("Tournament manager permission is required.", 403, undefined, "TOURNAMENT_MANAGER_REQUIRED");
+    const fields = ["id", "status", "title", "description", "category", "subcategory", "tournamentRules", "coverMedia", "coverImageUrl", "coverImagePath", "trailerMedia", "trailerUrl", "trailerPath", "galleryMedia", "format", "participationMode", "participantCapacity", "teamConfig", "teamPaymentWindowMinutes", "entryType", "entryFeeAmountMinor", "basePrizeAmountMinor", "confirmedCreatorPrizeFundingCents", "creatorPrizeFundingStatus", "submissionDurationHours", "votingDurationHours", "submissionInstructions", "submissionMediaTypes", "sponsorship", "builderCurrentStep", "builderUnlockedStep", "builderCurrentStepIndex", "builderNavigationVersion", "productPolicyVersion", "updatedAt", "voting", "privacy", "registrationType"];
+    const funding = await getTournamentCreatorFunding(db, id, record);
+    return ok({ tournament: { ...Object.fromEntries(fields.filter(field => field in record).map(field => [field, record[field]])), confirmedCreatorPrizeFundingCents: funding.confirmedCreatorCents, creatorPrizeFundingStatus: funding.reviewCount ? "review_required" : funding.pendingCount ? "pending_confirmation" : funding.confirmedCreatorCents > 0 ? "confirmed" : "not_funded" } }, "Tournament draft restored.");
+  }
   const bundle = await getTournamentBundle(id, viewer);
   if (!bundle.available && bundle.message === "Tournament not found or unavailable.") return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
   if (!bundle.available) return ok({ tournament: bundle.tournament, participants: [], rounds: [], matches: [], announcements: [], sponsors: [] }, bundle.message);
@@ -22,9 +36,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const publicIds = publicTournamentParticipantIds(bundle.participants);
   return ok({
     tournament: publicTournamentView(bundle.tournament),
-    participants: bundle.participants.slice(0, 100).map((item) => publicTournamentParticipantView(item, publicIds.get(item.id) ?? "entrant")),
+    participants: bundle.participants.filter(item => publicIds.has(item.id)).slice(0, 128).map((item) => publicTournamentParticipantView(item, publicIds.get(item.id) ?? "entrant")),
     rounds: bundle.rounds.sort((a, b) => Number(a.roundNumber ?? 0) - Number(b.roundNumber ?? 0)).slice(0, 20).map((round) => Object.fromEntries(Object.entries(round).filter(([key]) => ["id", "roundNumber", "bracket", "status", "startsAt", "endsAt", "votingOpensAt", "votingClosesAt"].includes(key)))),
-    matches: bundle.matches.sort((a, b) => Number(a.roundNumber ?? 0) - Number(b.roundNumber ?? 0) || Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0)).slice(0, 100).map((match) => {
+    matches: bundle.matches.sort((a, b) => Number(a.roundNumber ?? 0) - Number(b.roundNumber ?? 0) || Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0)).slice(0, 260).map((match) => {
       const safe: Record<string, unknown> = Object.fromEntries(Object.entries(match).filter(([key]) => ["id", "roundId", "roundNumber", "matchNumber", "bracket", "status", "resultStatus", "openedAt", "submissionsOpenedAt", "submissionDeadlineAt", "votingOpenedAt", "votingClosesAt", "votingClosedAt", "dependencyHoldReason", "noSubmissionExtensionUsed", "doubleForfeitAt"].includes(key)));
       if (match.status === "confirmed" && match.resultStatus === "confirmed") {
         for (const field of ["verifiedVoteCountA", "verifiedVoteCountB"] as const) {
@@ -39,7 +53,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       return safe;
     }),
     announcements: bundle.announcements.slice(0, 20).map((item) => Object.fromEntries(Object.entries(item).filter(([key]) => ["id", "title", "body", "createdAt"].includes(key)))),
-    sponsors: bundle.sponsors.slice(0, 10).map((item) => Object.fromEntries(Object.entries(item).filter(([key]) => ["id", "brandName", "logoUrl", "displayName"].includes(key))))
+    sponsors: bundle.sponsors.slice(0, 10).map((item, index) => ({ id: `approved-sponsor-${index + 1}`, displayName: String(item.displayName ?? item.brandName ?? "Sponsor") }))
   }, "Tournament loaded.");
 }
 
@@ -55,13 +69,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const tournament = { id: snap.id, ...snap.data() } as TournamentFoundation;
   const permission = canEditTournament({ uid: user.uid, role: user.role, isAdmin: user.isAdmin }, tournament);
   if (!permission.allowed) return fail("Tournament manager permission is required.", 403, permission, "TOURNAMENT_MANAGER_REQUIRED");
+  if (Number(tournament.configVersion ?? 1) >= 3 && tournament.status !== "draft") return fail("Tournament editing is unavailable during review or after publication.", 409, undefined, "TOURNAMENT_NOT_EDITABLE");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
-  const immutableFields = ["id", "hostId", "creatorId", "createdAt", "ownershipType", "officialChallenge", "enterpriseOrganizationId", "configVersion"];
+  const expectedUpdatedAt = body.expectedUpdatedAt;
+  delete body.expectedUpdatedAt;
+  const immutableFields = ["id", "hostId", "creatorId", "createdAt", "ownershipType", "officialChallenge", "enterpriseOrganizationId", "configVersion", "productPolicyVersion"];
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+    const editable = new Set([...immutableFields, "title", "description", "category", "subcategory", "tournamentRules", "submissionInstructions", "submissionMediaTypes", "basePrizeAmountMinor", "galleryMedia", "coverImageUrl", "coverImagePath", "trailerUrl", "trailerPath", "coverMedia", "trailerMedia", "format", "participationMode", "participantCapacity", "minimumTeamSize", "maximumTeamSize", "teamJoiningMode", "teamPaymentWindowMinutes", "privacy", "registrationType", "submissionDurationHours", "votingDurationHours", "paidVotingEnabled", "seedingMethod", "resultMethod", "scoreVisibility", "tieBreaker", "thirdPlaceMethod", "entryType", "entryFeeAmountMinor", "currency", "sponsorReady", "acceptSponsorshipProposals", "sponsorshipGoal", "sponsorCategories", "sponsorNote", "sponsorPlacementPreferences", "sponsorship", "prizeDistribution", "roundPlan", "eligibility", "builderCurrentStep", "builderUnlockedStep", "builderNavigationVersion", "status"]);
+    if (Object.keys(body).some(field => !editable.has(field))) return fail("This field cannot be edited through the Tournament Builder.", 409, undefined, "TOURNAMENT_SERVER_STATE_REQUIRED");
+  }
   if (immutableFields.some((field) => field in body && String(body[field] ?? "") !== String((tournament as unknown as Record<string, unknown>)[field] ?? ""))) return fail("Tournament identity and ownership fields cannot be changed after creation.", 409, undefined, "TOURNAMENT_IDENTITY_LOCKED");
   if (Number(tournament.configVersion ?? 1) >= 3) {
-    const serverOwnedFields = ["participantCount", "timingLockedAt", "activationState", "activationVersion", "activationWindowEndsAt", "activationActivatedAt", "activationHoldReason", "registrationLockedAt", "seedsLockedAt", "bracketGeneratedAt", "bracketLockedAt", "currentRoundId", "currentRoundNumber", "winnerParticipantId", "officialPlacementsFinalizedAt", "officialPlacementsFinalizedBy", "settlementId", "settlementStatus", "settlementPlacementFingerprint", "creatorPlacementReviewFingerprint", "payoutExecutionEnabled", "paymentActivationEnabled", "bracketExecutionEnabled", "firstVotingOpenedAt", "tournamentVotingCutoffAt", "registrationRefundCutoffAt", "prizePool", "confirmedPrizePoolMinor", "winnerIds", "winnerUserIds"];
+    const serverOwnedFields = ["confirmedCreatorPrizeFundingCents", "creatorPrizeFundingStatus", "creatorPrizeGuaranteeLockedAt", "creatorPrizeGuaranteeCents", "monetization", "participantCount", "timingLockedAt", "activationState", "activationVersion", "activationWindowEndsAt", "activationActivatedAt", "activationHoldReason", "registrationLockedAt", "seedsLockedAt", "bracketGeneratedAt", "bracketLockedAt", "currentRoundId", "currentRoundNumber", "winnerParticipantId", "officialPlacementsFinalizedAt", "officialPlacementsFinalizedBy", "settlementId", "settlementStatus", "settlementPlacementFingerprint", "creatorPlacementReviewFingerprint", "payoutExecutionEnabled", "paymentActivationEnabled", "bracketExecutionEnabled", "firstVotingOpenedAt", "tournamentVotingCutoffAt", "registrationRefundCutoffAt", "prizePool", "confirmedPrizePoolMinor", "winnerIds", "winnerUserIds"];
     if (serverOwnedFields.some((field) => field in body)) return fail("Tournament execution and financial state is server-managed.", 409, undefined, "TOURNAMENT_SERVER_STATE_REQUIRED");
     if (body.configVersion !== undefined && Number(body.configVersion) !== Number(tournament.configVersion)) return fail("Tournament configuration version cannot be changed.", 409, undefined, "TOURNAMENT_VERSION_LOCKED");
     if (tournament.timingLockedAt && ((body.submissionDurationHours !== undefined && Number(body.submissionDurationHours) !== Number(tournament.submissionDurationHours)) || (body.votingDurationHours !== undefined && Number(body.votingDurationHours) !== Number(tournament.votingDurationHours)))) return fail("Round timing is locked after the first confirmed entrant.", 409, undefined, "TOURNAMENT_TIMING_LOCKED");
@@ -73,7 +94,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const transition = assertTournamentTransition(String(tournament.status ?? "draft") as TournamentStatus, String(body.status) as TournamentStatus);
     if (!transition.valid) return fail(transition.message, 409, transition, transition.code);
   }
-  const mediaFields = ["coverImageUrl", "coverImagePath", "trailerUrl", "trailerPath"];
+  const mediaFields = ["coverImageUrl", "coverImagePath", "trailerUrl", "trailerPath", "galleryMedia"];
   const validation = validateTournamentFoundation({ ...tournament, ...body }, { publish: body.status === "scheduled" || body.status === "pending_review", ownerId: String(tournament.hostId ?? user.uid), validateMedia: body.status === "pending_review" || mediaFields.some((field) => field in body) });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
   const merged = { ...tournament, ...body };
@@ -83,17 +104,37 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const transitionToReview = tournament.status !== "pending_review" && body.status === "pending_review";
   let creatorMediaVerification = null;
   if (transitionToReview) {
-    try { creatorMediaVerification = await verifyCreatorImage(String((merged as Record<string, unknown>).coverImagePath ?? merged.coverMedia?.path ?? ""), String(tournament.hostId ?? user.uid)); }
-    catch { return fail("Upload a valid, owned creator image of 10 MB or smaller before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+    try { creatorMediaVerification = await freezeTournamentBuilderMedia(id, await verifyTournamentBuilderMedia(merged as unknown as Record<string, unknown>, String(tournament.hostId ?? user.uid))); }
+    catch { return fail("Tournament media must pass image and promotional-video verification before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
   }
   const update = { ...body, ...(transitionToReview ? { submittedAt: now } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
-  const batch = db.batch();
-  if (creatorMediaVerification) Object.assign(update, { creatorMediaVerification });
-  batch.set(ref, update, { merge: true });
-  if (transitionToReview) {
-    batch.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { id: `${id}_initial`, tournamentId: id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });
-    batch.set(db.collection("tournamentAuditEvents").doc(`${id}_submitted_initial`), { id: `${id}_submitted_initial`, tournamentId: id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) Object.assign(update, {
+    sponsorship: { ...tournament.sponsorship, sponsorReady: body.sponsorReady === undefined ? tournament.sponsorship?.sponsorReady === true : body.sponsorReady === true },
+  });
+  if (body.minimumTeamSize !== undefined || body.maximumTeamSize !== undefined || body.teamJoiningMode !== undefined || body.participationMode !== undefined) {
+    Object.assign(update, { teamConfig: merged.participationMode === "team" ? { ...tournament.teamConfig, captainPaysEntryFee: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? false : tournament.teamConfig?.captainPaysEntryFee === true, minimumSize: Number(body.minimumTeamSize ?? tournament.teamConfig?.minimumSize ?? 2), maximumSize: Number(body.maximumTeamSize ?? tournament.teamConfig?.maximumSize ?? 5), joiningMode: body.teamJoiningMode ?? tournament.teamConfig?.joiningMode ?? "invite_and_requests", rosterLocksAtCapacity: true, rosterLocksAtCheckInClose: false } : null });
   }
-  await batch.commit();
+  if (creatorMediaVerification) Object.assign(update, { creatorMediaVerification, coverMedia: { ...merged.coverMedia, url: creatorMediaVerification.cover.url } });
+  try {
+    await db.runTransaction(async transaction => {
+      const current = await transaction.get(ref);
+      if (expectedUpdatedAt !== undefined && current.data()?.updatedAt !== expectedUpdatedAt) throw Object.assign(new Error("The draft changed in another request. Your unsaved edits are preserved here; review the latest draft before saving."), { code: "TOURNAMENT_DRAFT_STALE" });
+      if (!current.exists || (Number(current.data()?.configVersion ?? 1) >= 3 && current.data()?.status !== "draft") || current.data()?.updatedAt !== tournament.updatedAt) throw Object.assign(new Error("The draft changed. Refresh before saving again."), { code: "TOURNAMENT_DRAFT_STALE" });
+      if (!canEditTournament({ ...user }, current.data() ?? {}).allowed) throw Object.assign(new Error("Tournament editing permission changed. Refresh before saving again."), { code: "TOURNAMENT_MANAGER_REQUIRED" });
+      const funding = await getTournamentCreatorFunding(db, id, current.data() ?? {}, transaction);
+      if (body.basePrizeAmountMinor !== undefined && Number(body.basePrizeAmountMinor) !== Number(current.data()?.basePrizeAmountMinor ?? 0)
+        && (funding.recordCount > 0 || funding.pendingCount > 0 || funding.reviewCount > 0 || current.data()?.creatorPrizeGuaranteeLockedAt)) throw Object.assign(new Error("A funded or pending Base Prize cannot be changed. Contact support for reconciliation."), { code: "BASE_PRIZE_COMMITMENT_LOCKED" });
+      const requiredCents = Number(body.basePrizeAmountMinor ?? current.data()?.basePrizeAmountMinor ?? 0);
+      if (transitionToReview && requiredCents > funding.confirmedCreatorCents) throw Object.assign(new Error(`Your Base Prize is $${(requiredCents / 100).toFixed(2)}, but $${(funding.confirmedCreatorCents / 100).toFixed(2)} is confirmed. Fund the remaining $${((requiredCents - funding.confirmedCreatorCents) / 100).toFixed(2)} before Admin Review.`), { code: "BASE_PRIZE_FUNDING_REQUIRED" });
+      transaction.set(ref, update, { merge: true });
+      if (transitionToReview) {
+        transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { id: `${id}_initial`, tournamentId: id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });
+        transaction.set(db.collection("tournamentAuditEvents").doc(`${id}_submitted_initial`), { id: `${id}_submitted_initial`, tournamentId: id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
+      }
+    });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && typeof error.code === "string") return fail(error.message, 409, undefined, error.code);
+    throw error;
+  }
   return ok({ tournament: { ...tournament, ...update } }, transitionToReview ? "Tournament submitted for admin review." : "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
 }

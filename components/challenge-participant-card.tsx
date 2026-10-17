@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRef, useState } from "react";
+import { apiRequest } from "@/lib/api/client";
 import { useMutation } from "@tanstack/react-query";
 import { ExternalLink, Sparkles, Vote } from "lucide-react";
 import { Button, Card, LinkButton } from "@/components/ui";
@@ -13,6 +15,8 @@ export interface PublicVotingAccess {
   canVote: boolean;
   reason: string | null;
   loginPath?: string;
+  automaticFreeFirst?: boolean;
+  freeVote?: { available: boolean; used: boolean };
 }
 
 export interface PublicPredictionAccess {
@@ -56,15 +60,33 @@ export function ChallengeParticipantCard({
   returnPath: string;
   onVoteRecorded?: () => void | Promise<void>;
 }) {
+  const paidAttempt = useRef<string | null>(null);
+  const [needsCoins, setNeedsCoins] = useState(false);
   const voteMutation = useMutation({
     mutationFn: async () => {
+      let voteMode: "free" | "dorocoin" = "free";
+      if (votingAccess.automaticFreeFirst) {
+        const current = await apiRequest<PublicVotingAccess & { balance: number }>(`/api/votes?challengeId=${encodeURIComponent(challengeId)}`);
+        const latest = current.data;
+        if (!current.ok || !latest?.canVote || !latest.freeVote) throw new Error(current.message || "Current vote eligibility could not be verified.");
+        if (latest.freeVote.used) {
+          const balance = latest.balance;
+          if (typeof balance !== "number") throw new Error("Your DoroCoin balance could not be verified. No vote was requested.");
+          if (balance < 5) { setNeedsCoins(true); throw new Error("You need 5 DoroCoins for one additional vote."); }
+          if (!window.confirm(`Your free vote is used. Spend 5 DoroCoins for one additional vote? Current balance: ${balance} DoroCoins.`)) throw new Error("Vote cancelled. No DoroCoins spent.");
+          voteMode = "dorocoin";
+        }
+      }
       const result = await voteForSubmission({
         challengeId,
         submissionId: participant.submissionId,
-        voteMode: "free",
+        voteMode,
+        confirmedDoroCoinSpend: voteMode === "dorocoin",
         quantity: 1,
-        idempotencyKey: crypto.randomUUID()
+        idempotencyKey: voteMode === "dorocoin" ? (paidAttempt.current ??= crypto.randomUUID()) : crypto.randomUUID()
       });
+      if (voteMode === "dorocoin" && (result.ok || result.status && result.status >= 400 && result.status < 500)) paidAttempt.current = null;
+      if (result.code === "INSUFFICIENT_DOROCOINS") setNeedsCoins(true);
       if (!result.ok) throw new Error(result.message);
       return result;
     },
@@ -140,6 +162,7 @@ export function ChallengeParticipantCard({
         {votingAccess.authenticated && !votingAccess.canVote ? <p className="mt-3 text-sm text-slate-400">{blockedVoteMessage(votingAccess.reason)}</p> : null}
         {voteMutation.isSuccess ? <p className="mt-3 text-sm font-bold text-emerald-300">Vote recorded.</p> : null}
         {voteMutation.error ? <p className="mt-3 text-sm text-red-300">{voteMutation.error.message}</p> : null}
+        {needsCoins ? <LinkButton className="mt-3" variant="secondary" href={`/dorocoins?tab=buy&returnTo=${encodeURIComponent(`${returnPath}?submissionId=${encodeURIComponent(participant.submissionId)}`)}`}>Buy DoroCoins and return</LinkButton> : null}
       </div>
     </Card>
   );

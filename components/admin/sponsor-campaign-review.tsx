@@ -39,7 +39,7 @@ export function SponsorCampaignReview() {
     const label = action === "approve_placement" ? "Approve this funded placement and activate campaign visibility?" : "Reject placement and send this funded campaign to refund review? Confirmed prize funding will not be changed.";
     if (!window.confirm(label)) return;
     setBusyId(campaign.id);
-    const result = await apiRequest("/api/admin/sponsor-campaigns", { method: "PATCH", body: JSON.stringify({ id: campaign.id, action, reason }) });
+    const result = await apiRequest("/api/admin/sponsor-campaigns", { method: "PATCH", body: JSON.stringify({ id: campaign.id, action, reason, confirmed: true }) });
     setBusyId("");
     setNotice(result.message);
     if (result.ok) await load();

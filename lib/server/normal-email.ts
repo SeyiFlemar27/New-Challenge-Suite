@@ -7,7 +7,15 @@ const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<",
 type Delivery = { resolveRecipient(userId: string): Promise<string | null>; send(message: EmailMessage): Promise<void> };
 /** Opt-in delivery through the existing provider; no customer email is sent by default. */
 export async function deliverNormalEmailOutbox(db: Firestore, challengeId: string, adapter?: Delivery) {
-  if (!adapter && process.env.NORMAL_EMAIL_DELIVERY_ENABLED !== "true") return { enabled: false, accepted: 0 };
+  return deliverLifecycleEmailOutbox(db, challengeId, "normal", adapter);
+}
+
+export async function deliverTournamentEmailOutbox(db: Firestore, tournamentId: string, adapter?: Delivery) {
+  return deliverLifecycleEmailOutbox(db, tournamentId, "tournament", adapter);
+}
+
+async function deliverLifecycleEmailOutbox(db: Firestore, challengeId: string, kind: "normal" | "tournament", adapter?: Delivery) {
+  if (!adapter && process.env[kind === "normal" ? "NORMAL_EMAIL_DELIVERY_ENABLED" : "TOURNAMENT_EMAIL_DELIVERY_ENABLED"] !== "true") return { enabled: false, accepted: 0 };
   const provider = adapter ?? {
     async resolveRecipient(userId: string) {
       const auth = getAdminAuth();
@@ -17,7 +25,7 @@ export async function deliverNormalEmailOutbox(db: Firestore, challengeId: strin
     },
     send: sendEmail,
   };
-  const messages = await db.collection("normalEmailOutbox").where("challengeId", "==", challengeId).get();
+  const messages = await db.collection(kind === "normal" ? "normalEmailOutbox" : "tournamentEmailOutbox").where(kind === "normal" ? "challengeId" : "tournamentId", "==", challengeId).get();
   let accepted = 0;
   for (const entry of messages.docs.filter(entry => !["accepted", "review_required"].includes(String(entry.data().status))).slice(0, 25)) {
     const token = randomUUID();
@@ -25,6 +33,10 @@ export async function deliverNormalEmailOutbox(db: Firestore, challengeId: strin
     const claim = await db.runTransaction(async transaction => {
       const latest = await transaction.get(entry.ref);
       const value = latest.data() ?? {};
+      if (kind === "tournament") {
+        const preferences = await transaction.get(db.collection("notificationPreferences").doc(String(value.userId)));
+        if (preferences.data()?.email !== true || preferences.data()?.[String(value.category)] === false) { if (latest.exists) transaction.update(entry.ref, { status: "review_required", reason: "EMAIL_PERMISSION_UNAVAILABLE" }); return null; }
+      }
       if (!latest.exists || ["accepted", "review_required"].includes(String(value.status)) || Date.parse(String(value.nextAttemptAt)) > now || (value.status === "sending" && Date.parse(String(value.leaseUntil)) > now)) return null;
       // Provider idempotency retention is finite. Never blindly resend an
       // uncertain old delivery once its original deduplication window elapsed.
@@ -40,7 +52,7 @@ export async function deliverNormalEmailOutbox(db: Firestore, challengeId: strin
       const recipient = await provider.resolveRecipient(String(claim.userId));
       if (!recipient) throw new Error("RECIPIENT_UNAVAILABLE");
       const title = String(claim.title).slice(0, 160), message = String(claim.message).slice(0, 2000);
-      await provider.send({ to: recipient, subject: title, text: message, html: `<h2>${escape(title)}</h2><p>${escape(message)}</p>`, idempotencyKey: `normal-notice-${entry.id}` });
+      await provider.send({ to: recipient, subject: title, text: message, html: `<h2>${escape(title)}</h2><p>${escape(message)}</p>`, idempotencyKey: `${kind}-notice-${entry.id}` });
       await db.runTransaction(async transaction => {
         const latest = await transaction.get(entry.ref);
         if (latest.data()?.token === token) transaction.update(entry.ref, { status: "accepted", providerAcceptedAt: new Date().toISOString(), recipientDeliveryVerified: false, leaseUntil: null, updatedAt: new Date().toISOString() });

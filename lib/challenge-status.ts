@@ -1,5 +1,6 @@
 import type { Challenge } from "./types";
 import { resolveChallengeTimeZone } from "./challenge-date-time";
+import { supportsPublicVoting } from "./automatic-voting-policy";
 
 export type CanonicalChallengeStatus =
   | "draft"
@@ -437,7 +438,7 @@ export function getChallengePhaseSummary(challenge: Challenge | Record<string, u
     votingOpen,
     canJoin: registrationOpen,
     canSubmit: submissionOpen,
-    canVote: votingOpen,
+    canVote: votingOpen && supportsPublicVoting(record),
     timeZone: timeline.timezone,
     registrationEndAt: timeline.registrationClosesAt?.toISOString() ?? null,
     submissionStartAt: timeline.submissionOpensAt?.toISOString() ?? null,
@@ -628,7 +629,7 @@ export function getChallengeLifecycleState(challenge: Challenge | Record<string,
 
   const noSubmissionRequired = submissionStatus === "no_submission_required";
   const canSubmit = submissionStatus === "submissions_open" && !terminalStatuses.has(persisted) && primaryStatus !== "pending_review" && primaryStatus !== "draft";
-  const canVote = votingStatus === "voting_open" && !terminalStatuses.has(persisted) && (record.normalLifecyclePolicyVersion !== 1 || record.normalVotingGate === "ready");
+  const canVote = supportsPublicVoting(record) && votingStatus === "voting_open" && !terminalStatuses.has(persisted) && (record.normalLifecyclePolicyVersion !== 1 || record.normalVotingGate === "ready");
   const canWatchLive = livestreamStatus === "livestream_live";
   const canEdit = viewerContext.isOwner === true || viewerContext.isAdmin === true ? !["cancelled", "completed"].includes(persisted) : false;
   const canCancel = viewerContext.isOwner === true || viewerContext.isAdmin === true ? !["cancelled", "completed"].includes(persisted) : false;

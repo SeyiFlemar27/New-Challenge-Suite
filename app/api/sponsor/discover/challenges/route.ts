@@ -4,22 +4,25 @@ import { requireSponsorContext } from "@/lib/server/sponsor";
 import { resolveSponsorWorkspaceState } from "@/lib/sponsor-access";
 import { fail, ok, serverError } from "@/lib/server/responses";
 import { sponsorPlacementFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
+import { sponsorSubjectType, sponsorSubjectCollection, tournamentSponsorFundingWindow, type SponsorSubjectType } from "@/lib/server/sponsor-subject";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 36;
 const QUERY_PAGE_SIZE = 100;
 const MAX_SCANNED_PER_REQUEST = 500;
 
-function safeChallenge(id: string, data: Record<string, unknown>) {
-  const visibility = String(data.visibility ?? "public").toLowerCase();
+function safeChallenge(id: string, data: Record<string, unknown>, subjectType: SponsorSubjectType) {
+  const visibility = String(subjectType === "tournament" ? data.privacy : data.visibility ?? "public").toLowerCase();
   if (!["public", "published"].includes(visibility) && visibility !== "public challenge") return null;
-  const sponsorReady = data.sponsorEnabled === true || data.sponsorReady === true || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady === true;
+  const sponsorReady = subjectType === "tournament" ? (data.sponsorship as Record<string, unknown> | undefined)?.sponsorReady === true : data.sponsorEnabled === true || data.sponsorReady === true || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady === true;
   if (!sponsorReady) return null;
-  const fundingWindow = validateSponsorFundingWindow(data);
+  const fundingWindow = subjectType === "tournament" ? tournamentSponsorFundingWindow(data) : validateSponsorFundingWindow(data);
+  if (!fundingWindow.published) return null;
   return {
     id,
+    subjectType,
     title: data.title ?? "Untitled challenge",
-    creatorId: data.creatorId ?? null,
+    creatorId: data.creatorId ?? data.hostId ?? null,
     creatorName: data.creatorName ?? "Creator details pending",
     category: data.category ?? null,
     participantCount: Number(data.participantCount ?? 0),
@@ -51,13 +54,14 @@ export async function GET(request: Request) {
   if (!workspace.canDiscover) return fail(workspace.lockedReason || "Sponsor approval is required before discovering challenges.", 403, { sponsorStatus: workspace.status }, "SPONSOR_DISCOVERY_LOCKED");
   try {
     const params = new URL(request.url).searchParams;
+    const subjectType = sponsorSubjectType(request);
     const search = params.get("q")?.trim().toLocaleLowerCase().slice(0, 80) ?? "";
     const page = Math.max(1, Math.floor(Number(params.get("page") ?? 1) || 1));
     const cursorId = params.get("cursor")?.trim() ?? "";
     if (page > 1 && !cursorId) return fail("A cursor is required to continue opportunity discovery.", 400, undefined, "SPONSOR_DISCOVERY_CURSOR_REQUIRED");
     const pageSize = PAGE_SIZE;
-    const challengesRef = context.db.collection("challenges");
-    let query = context.db.collection("challenges")
+    const challengesRef = context.db.collection(sponsorSubjectCollection(subjectType));
+    let query = subjectType === "tournament" ? challengesRef.orderBy(FieldPath.documentId(), "asc") : challengesRef
       .where("visibility", "==", "public")
       .where("status", "in", ["approved", "published", "scheduled", "registration_open", "active", "submission_open", "voting_open"])
       .orderBy("createdAt", "desc")
@@ -78,7 +82,7 @@ export async function GET(request: Request) {
       for (const doc of snap.docs) {
         scanned += 1;
         lastScannedId = doc.id;
-        const challenge = safeChallenge(doc.id, doc.data() as Record<string, unknown>);
+        const challenge = safeChallenge(doc.id, doc.data() as Record<string, unknown>, subjectType);
         if (challenge && matchesSearch(challenge, search)) matches.push({ id: doc.id, challenge });
         if (matches.length >= pageSize + 1) break;
       }

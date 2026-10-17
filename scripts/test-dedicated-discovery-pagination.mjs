@@ -63,7 +63,12 @@ try {
         assert.ok(!found.has(item.id), "alias queries must not duplicate records across pages");
         assert.ok(expected.has(item.id), "hidden and draft challenges stay hidden");
         assert.equal(item.privateAccessCode, undefined);
-        if (kind === "private") assert.equal(item.accessMethod, "direct_invitations");
+        if (kind === "private") {
+          assert.equal(item.accessMethod, undefined, "locked discovery previews do not disclose invitation configuration");
+          assert.equal(item.accessRequired, true);
+          assert.equal(item.detailHref, `/private/preview/${item.id}`);
+          assert.deepEqual(Object.keys(item).sort(), ["id", "challengeId", "title", "description", "challengeType", "typeLabel", "accessRequired", "coverImageUrl", "creatorDisplayName", "creatorId", "isOwned", "detailHref"].sort(), "private discovery remains an explicit safe projection");
+        }
         found.add(item.id);
       }
       assert.ok(!payload.hasMore || payload.nextCursor);

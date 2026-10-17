@@ -64,7 +64,8 @@ export default function BonusVotesPage() {
         voteMode: mode,
         quantity,
         idempotencyKey: crypto.randomUUID(),
-        confirmedLargeSpend: true
+        confirmedLargeSpend: true,
+        confirmedDoroCoinSpend: mode === "dorocoin" && agreed
       });
       if (!result.ok) throw new Error(result.message);
       return { ...result.data, mode };

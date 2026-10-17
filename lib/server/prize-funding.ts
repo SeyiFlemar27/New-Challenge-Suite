@@ -1,4 +1,5 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
 import type Stripe from "stripe";
 import { deterministicId } from "@/lib/server/idempotency";
 import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
@@ -16,6 +17,7 @@ function currency(value: unknown) {
 
 export async function createPendingCreatorPrizeFunding(db: Firestore, input: {
   challengeId: string;
+  subjectType?: "tournament";
   creatorId: string;
   initiatedByUserId?: string;
   organizationOwnerId?: string | null;
@@ -26,9 +28,11 @@ export async function createPendingCreatorPrizeFunding(db: Firestore, input: {
   const amountCents = cents(input.amountCents);
   if (amountCents < 500) throw new Error("Creator prize funding must be at least $5.");
   const now = input.now ?? new Date().toISOString();
-  const id = deterministicId("creator_prize_funding", input.challengeId, input.creatorId);
+  const id = input.subjectType === "tournament"
+    ? deterministicId("tournament_creator_prize_funding", createHash("sha256").update(JSON.stringify([input.challengeId, input.creatorId])).digest("hex"))
+    : deterministicId("creator_prize_funding", input.challengeId, input.creatorId);
   const ref = db.collection("creatorPrizeFundingPayments").doc(id);
-  const challengeRef = db.collection("challenges").doc(input.challengeId);
+  const challengeRef = db.collection(input.subjectType === "tournament" ? "tournaments" : "challenges").doc(input.challengeId);
   const result = await db.runTransaction<Record<string, unknown> & { id: string }>(async (transaction) => {
     const [existing, challengeSnap, pendingPayments] = await Promise.all([
       transaction.get(ref),
@@ -41,6 +45,8 @@ export async function createPendingCreatorPrizeFunding(db: Firestore, input: {
     if (!challengeSnap.exists) throw new Error("Challenge for creator prize funding was not found.");
     const challenge = challengeSnap.data() ?? {};
     if (!editableDraftStatus(challenge)) throw new Error("CHALLENGE_NOT_EDITABLE");
+    if (input.subjectType === "tournament" && (challenge.status !== "draft" || cents(challenge.basePrizeAmountMinor) !== amountCents)) throw new Error("CREATOR_PRIZE_FUNDING_AMOUNT_CONFLICT");
+    if (input.subjectType === "tournament" && !challenge.organizationOwnerId && challenge.hostId !== input.creatorId) throw new Error("CREATOR_PRIZE_FUNDING_OWNER_MISMATCH");
     if (existing.exists && existing.data()?.status === "pending") {
       if (cents(existing.data()?.amountCents) !== amountCents) throw new Error("CREATOR_PRIZE_FUNDING_AMOUNT_CONFLICT");
       return { id: existing.id, ...existing.data(), idempotent: true };
@@ -67,6 +73,7 @@ export async function createPendingCreatorPrizeFunding(db: Firestore, input: {
   const record = {
     id,
     challengeId: input.challengeId,
+    ...(input.subjectType === "tournament" ? { fundingSubjectType: "tournament", tournamentId: input.challengeId } : {}),
     userId: input.creatorId,
     initiatedByUserId: input.initiatedByUserId ?? input.creatorId,
     organizationOwnerId: input.organizationOwnerId ?? null,
@@ -128,6 +135,7 @@ function assertConfirmedSession(session: Stripe.Checkout.Session, record: Record
   if (session.metadata?.challengeId !== record.challengeId || session.metadata?.userId !== record.userId) throw new Error("Creator prize funding ownership metadata mismatch.");
   if (String(session.metadata?.initiatedByUserId ?? "") !== String(record.initiatedByUserId ?? record.userId)) throw new Error("Creator prize funding initiator metadata mismatch.");
   if (String(session.metadata?.organizationOwnerId ?? "") !== String(record.organizationOwnerId ?? "")) throw new Error("Creator prize funding organization metadata mismatch.");
+  if (record.fundingSubjectType === "tournament" && session.metadata?.fundingSubjectType !== "tournament") throw new Error("Creator prize funding subject metadata mismatch.");
   if (cents(session.amount_total) !== cents(record.amountCents)) throw new Error("Creator prize funding amount mismatch.");
   if (currency(session.currency) !== currency(record.currency)) throw new Error("Creator prize funding currency mismatch.");
 }
@@ -147,18 +155,29 @@ export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Ev
     const challengeId = String(payment.challengeId);
     const creatorId = String(payment.userId);
     const amountCents = cents(payment.amountCents);
-    const challengeRef = db.collection("challenges").doc(challengeId);
+    const isTournament = payment.fundingSubjectType === "tournament";
+    const challengeRef = db.collection(isTournament ? "tournaments" : "challenges").doc(challengeId);
     const challengeSnap = await transaction.get(challengeRef);
     if (!challengeSnap.exists) throw new Error("Challenge for creator prize funding was not found.");
     const challenge = challengeSnap.data() ?? {};
     const financialOwnership = resolveEnterpriseFinancialOwnership(challenge);
     const officialEnterprise = financialOwnership.workspaceType === "enterprise";
-    const expectedOwnerId = officialEnterprise ? financialOwnership.organizationOwnerId : String(challenge.creatorId ?? challenge.ownerId ?? "");
+    const expectedOwnerId = officialEnterprise ? financialOwnership.organizationOwnerId : String(isTournament ? challenge.hostId ?? "" : challenge.creatorId ?? challenge.ownerId ?? "");
     if (officialEnterprise && !expectedOwnerId) throw new Error("ENTERPRISE_ORGANIZATION_REQUIRED");
     const paymentOwnerMatches = officialEnterprise
       ? String(payment.organizationOwnerId ?? "") === expectedOwnerId && String(payment.initiatedByUserId ?? payment.userId) === creatorId
       : expectedOwnerId === creatorId && !payment.organizationOwnerId;
     if (!paymentOwnerMatches) throw new Error("Creator prize funding owner no longer matches the challenge.");
+    if (isTournament && payment.status === "review_required") return { handled: true, kind: CREATOR_PRIZE_PAYMENT_PURPOSE, id, duplicate: true, fundingStatus: "review_required", payoutProviderCalled: false };
+    if (isTournament && (challenge.status !== "draft" || cents(challenge.basePrizeAmountMinor) !== amountCents)) {
+      const reviewId = deterministicId("refund_creatorPrizeFundingPayments", id);
+      const reviewRef = db.collection("refundCases").doc(reviewId);
+      const existingReview = await transaction.get(reviewRef);
+      transaction.set(paymentRef, { status: "review_required", webhookConfirmed: true, financialRestriction: "tournament_funding_configuration_changed", providerEventId: event.id, providerPaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null, updatedAt: now }, { merge: true });
+      transaction.set(reviewRef, { id: reviewId, paymentCollection: "creatorPrizeFundingPayments", paymentId: id, challengeId, tournamentId: challengeId, userId: creatorId, amountCents, currency: currency(payment.currency), provider: "stripe", providerPaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null, status: "pending_review", reason: "Tournament funding configuration changed before confirmation; no prize credit applied.", idempotencyKey: reviewId, createdAt: existingReview.data()?.createdAt ?? now, updatedAt: now }, { merge: true });
+      transaction.set(db.collection("auditLogs").doc(`${reviewId}_required`), { actorId: "stripe", actorType: "system", action: "tournament.creator_funding_review_required", targetType: "tournament", targetId: challengeId, reason: "Tournament funding configuration changed before provider confirmation.", metadata: { paymentId: id, refundCaseId: reviewId, providerEventId: event.id }, createdAt: now }, { merge: true });
+      return { handled: true, kind: CREATOR_PRIZE_PAYMENT_PURPOSE, id, duplicate: payment.status === "review_required", fundingStatus: "review_required", payoutProviderCalled: false };
+    }
     if (officialEnterprise) await confirmEnterprisePrizeExposureInTransaction(db, transaction, {
       challengeId,
       challenge,
@@ -190,6 +209,7 @@ export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Ev
     }, { merge: true });
     transaction.set(challengeRef, {
       confirmedCreatorPrizeFundingCents: FieldValue.increment(amountCents),
+      ...(isTournament ? { prizePool: { confirmedPrizePoolMinor: FieldValue.increment(amountCents) }, creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: amountCents } : {}),
       ...(challenge.builderVersion === "normal_v3" ? { creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: challenge.creatorPrizeGuaranteeCents ?? Math.round(Number(challenge.prizeValue ?? 0) * 100) } : {}),
       "monetization.confirmedCreatorPrizeFundingCents": totalConfirmed,
       "monetization.creatorPrizeFundingStatus": fundingStatus,

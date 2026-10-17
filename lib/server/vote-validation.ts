@@ -5,7 +5,8 @@ export const voteRequestSchema = z.object({
   submissionId: z.string().trim().min(1, "Submission ID is required."),
   voteMode: z.enum(["free", "dorocoin"], { message: "Vote mode must be free or DoroCoin." }),
   quantity: z.coerce.number().int("Quantity must be a whole number.").min(1, "Quantity must be at least 1.").max(100, "Vote quantity is too large.").default(1),
-  confirmedLargeSpend: z.boolean().optional().default(false)
+  confirmedLargeSpend: z.boolean().optional().default(false),
+  confirmedDoroCoinSpend: z.boolean().optional().default(false)
 });
 
 export type VoteRequestInput = z.infer<typeof voteRequestSchema>;

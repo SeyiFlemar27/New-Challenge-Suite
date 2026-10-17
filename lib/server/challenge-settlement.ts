@@ -17,6 +17,9 @@ import { getConfirmedCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE } from "
 import { getConfirmedEnterprisePromotionalPrizeFunding, isEnterpriseFinanceResource, organizationOwnerForFinance, reserveEnterpriseSettlementLockInTransaction } from "@/lib/server/enterprise-prize-exposure";
 import { normalQualifiedWinnerDistribution, allocateNormalQualifiedPrizeCents } from "@/lib/normal-challenge-prize-allocation";
 import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { TOURNAMENT_PLACEMENT_SPLITS } from "@/lib/tournament-builder-policy";
+import { getTournamentFundingSources } from "@/lib/server/tournament-funding-sources";
+import { tournamentPlacementFingerprint, validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
 
 export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
@@ -215,21 +218,24 @@ export function buildSettlementBreakdown(input: {
   const sponsorPrizePlatformFeeAmount = Math.floor(grossConfirmedSponsorPrizeAmount * SPONSOR_PRIZE_PLATFORM_FEE_PERCENT / 100);
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
   const placementCount = new Set(input.winners.map((winner) => winner.placement)).size;
+  const fixedTournament = input.challenge.settlementEntityType === "tournament" && Number(input.challenge.configVersion ?? 1) >= 3;
+  if (fixedTournament && (![2, 3].includes(placementCount) || !input.winners.some(winner => winner.placement === 1) || !input.winners.some(winner => winner.placement === 2)
+    || (placementCount === 2 && input.challenge.thirdPlaceOutcome !== "unawarded"))) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const fixedNormalPrizeDistribution = input.challenge.builderVersion === "normal_v3"
     ? normalQualifiedWinnerDistribution(Number(input.challenge.numberOfWinners), placementCount)
     : null;
   if (input.challenge.builderVersion === "normal_v3" && !fixedNormalPrizeDistribution?.length) throw new Error("NORMAL_WINNER_CONFIGURATION_INVALID");
-  const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : defaultPlacementSplit(placementCount);
+  const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : fixedTournament ? TOURNAMENT_PLACEMENT_SPLITS.map(item => ({ position: item.placement, percent: item.percent })) : defaultPlacementSplit(placementCount);
   const generatedPlacementDistribution = fixedNormalPrizeDistribution?.length
     ? allocateNormalQualifiedPrizeCents(generatedSplit.winnerShareCents, Number(input.challenge.numberOfWinners), placementCount)
-    : distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
+    : fixedTournament ? distributeByPercent(generatedSplit.winnerShareCents, prizePlacementDistribution) : distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
   const creatorPlacementDistribution = fixedNormalPrizeDistribution?.length ? allocateNormalQualifiedPrizeCents(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, Number(input.challenge.numberOfWinners), placementCount) : distributeByPercent(grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount, prizePlacementDistribution);
   let challengeDistribution = generatedPlacementDistribution.map((item) => ({ ...item, amountCents: item.amountCents + (creatorPlacementDistribution.find((creator) => creator.position === item.position)?.amountCents ?? 0) }));
   let normalSponsorDistribution: typeof challengeDistribution | null = null;
-  if (fixedNormalPrizeDistribution?.length) {
+  if (fixedNormalPrizeDistribution?.length || fixedTournament) {
     const challengePool = generatedSplit.winnerShareCents + grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount;
     const totalPool = challengePool + grossConfirmedSponsorPrizeAmount;
-    const target = allocateNormalQualifiedPrizeCents(totalPool, Number(input.challenge.numberOfWinners), placementCount);
+    const target = fixedTournament ? distributeByPercent(totalPool, prizePlacementDistribution) : allocateNormalQualifiedPrizeCents(totalPool, Number(input.challenge.numberOfWinners), placementCount);
     challengeDistribution = target.map(item => ({ ...item, amountCents: totalPool ? Number(BigInt(item.amountCents) * BigInt(challengePool) / BigInt(totalPool)) : 0 }));
     let remaining = challengePool - challengeDistribution.reduce((sum, item) => sum + item.amountCents, 0);
     for (let index = target.length - 1; index >= 0 && remaining > 0; index--) {
@@ -240,10 +246,10 @@ export function buildSettlementBreakdown(input: {
     normalSponsorDistribution = target.map((item, index) => ({ ...item, amountCents: item.amountCents - challengeDistribution[index].amountCents }));
   }
   const memberChallengeDistribution = distributePlacementMembers(challengeDistribution, input.winners);
-  const sponsorSplits = fixedNormalPrizeDistribution?.length
+  const sponsorSplits = fixedNormalPrizeDistribution?.length || fixedTournament
     ? prizePlacementDistribution
     : customSponsorSplits(input.challenge, input.winners) ?? defaultPlacementSplit(placementCount);
-  const sponsorGrossDistribution = input.challenge.builderVersion === "normal_v3"
+  const sponsorGrossDistribution = input.challenge.builderVersion === "normal_v3" || fixedTournament
     ? normalSponsorDistribution!
     : customSponsorAmountDistribution(input.challenge, input.winners, grossConfirmedSponsorPrizeAmount) ?? distributeByPercent(grossConfirmedSponsorPrizeAmount, sponsorSplits);
   const sponsorFeeDistribution = distributeByWeights(sponsorPrizePlatformFeeAmount, sponsorGrossDistribution);
@@ -256,6 +262,7 @@ export function buildSettlementBreakdown(input: {
   const memberSponsorNetDistribution = distributePlacementMembers(sponsorNetDistribution, input.winners);
 
   return {
+    unawardedThirdPlaceHoldCents: fixedTournament && placementCount === 2 ? (challengeDistribution.find(item => item.position === 3)?.amountCents ?? 0) + (sponsorNetDistribution.find(item => item.position === 3)?.amountCents ?? 0) : 0,
     currency: DEFAULT_CASH_CURRENCY,
     grossConfirmedChallengeRevenue,
     winnerPoolAmount: generatedSplit.winnerShareCents + grossConfirmedCreatorPrizeAmount + grossConfirmedPromotionalPrizeAmount,
@@ -516,12 +523,55 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       };
     }
     const atomicNormalApproval = input.proposalApproval && challengeSnap.data()?.normalLifecyclePolicyVersion === 1 && entityCollection === "challenges";
-    if (!proposalSnap.exists || (proposalSnap.data()?.status !== "approved" && !atomicNormalApproval)) {
+    const atomicTournamentApproval = entityCollection === "tournaments" && input.proposalMetadata?.id === input.proposalId && input.proposalMetadata?.challengeId === input.challengeId
+      && input.proposalMetadata?.status === "approved" && input.proposalMetadata?.source === "competition_derived_tournament_placements";
+    if ((!proposalSnap.exists || proposalSnap.data()?.status !== "approved") && !atomicNormalApproval && !atomicTournamentApproval) {
       throw new Error("Admin-approved winners are required before settlement.");
     }
     if (atomicNormalApproval && (proposalSnap.data()?.challengeId !== input.challengeId || ["rejected", "cancelled"].includes(String(proposalSnap.data()?.status)) || (input.proposalApproval!.expectedUpdatedAt !== undefined && proposalSnap.data()?.updatedAt !== input.proposalApproval!.expectedUpdatedAt))) throw new Error("WINNER_PROPOSAL_CHANGED");
     if (!challengeSnap.exists) throw new Error("Challenge not found.");
     const latestChallenge = challengeSnap.data() ?? {};
+    if (entityCollection === "tournaments") {
+      if (latestChallenge.financialHold === true || latestChallenge.settlementRestricted === true) throw new Error("TOURNAMENT_FINANCIAL_HOLD");
+      if (proposalSnap.exists && ["rejected", "cancelled"].includes(String(proposalSnap.data()?.status))) throw new Error("TOURNAMENT_PROPOSAL_NOT_APPROVED");
+      const latestSources = await getTournamentFundingSources(db, input.challengeId, transaction);
+      if (JSON.stringify(latestSources) !== JSON.stringify(sources)) throw new Error("TOURNAMENT_SETTLEMENT_FUNDING_CHANGED");
+      const placements = await transaction.get(db.collection("tournamentPlacements").where("tournamentId", "==", input.challengeId));
+      const rows = placements.docs.map(document => ({ ...document.data(), id: document.id })).filter(row => [1, 2, 3].includes(Number((row as Record<string, unknown>).placement)));
+      const fingerprint = tournamentPlacementFingerprint(rows, latestChallenge.productPolicyVersion);
+      if (fingerprint !== input.sourceProvenance?.placementFingerprint || latestChallenge.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_PLACEMENTS_CHANGED");
+      const matchRefs = rows.map(row => db.collection("tournamentMatches").doc(String((row as Record<string, unknown>).sourceMatchId ?? "")));
+      const evidence = matchRefs.length ? await transaction.getAll(...matchRefs) : [];
+      if (rows.some((row, index) => !evidence[index].exists || !validateTournamentPlacementEvidence({ ...latestChallenge, id: input.challengeId }, row, { ...evidence[index].data(), id: evidence[index].id }))) throw new Error("TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID");
+      for (const placement of rows) {
+        const data = placement as Record<string, unknown>;
+        const teamMode = latestChallenge.participationMode === "team";
+        const competitorId = String(data.participantId ?? "");
+        const competitor = await transaction.get(db.collection(teamMode ? "tournamentTeams" : "tournamentParticipants").doc(competitorId));
+        const current = competitor.data();
+        if (!current || current.tournamentId !== input.challengeId || ["disqualified", "withdrawn", "rejected", "refunded"].includes(String(current.status))) throw new Error("TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID");
+        const group = input.winners.filter(winner => winner.placement === Number(data.placement));
+        if (!teamMode) {
+          if (group.length !== 1 || group[0].userId !== current.userId) throw new Error("TOURNAMENT_PLACEMENT_PARTICIPANT_INVALID");
+        } else {
+          const excluded = new Set(Array.isArray(current.disqualifiedMemberUserIds) ? current.disqualifiedMemberUserIds : []);
+          const roster = Array.isArray(current.memberUserIds) ? [...new Set(current.memberUserIds.filter((userId): userId is string => typeof userId === "string" && Boolean(userId)))].filter(userId => !excluded.has(userId)) : [];
+          const ordered = group.slice().sort((a, b) => Number(a.allocationOrder) - Number(b.allocationOrder));
+          if (!current.rosterLockedAt || !roster.length || JSON.stringify(roster) !== JSON.stringify(ordered.map(winner => winner.userId)) || ordered.some(winner => winner.rosterSnapshotReference !== `tournamentTeams/${competitorId}@${String(current.rosterLockedAt)}`)) throw new Error("TOURNAMENT_LOCKED_ROSTER_CHANGED");
+          const accounts = await transaction.getAll(...roster.map(userId => db.collection("users").doc(userId)));
+          if (accounts.some((account, index) => {
+            const profile = account.data() ?? {};
+            const held = current.memberEligibilityDecisions?.[roster[index]] === "temporary_hold" || profile.withdrawalRestricted === true || profile.payoutHold === true || profile.accountStatus === "suspended";
+            return (ordered[index].payoutStatus === "pending_hold") !== held;
+          })) throw new Error("TOURNAMENT_ROSTER_RESTRICTIONS_CHANGED");
+        }
+      }
+      const unawardedMatchId = input.sourceProvenance?.unawardedThirdPlaceMatchId;
+      if (unawardedMatchId) {
+        const bronze = await transaction.get(db.collection("tournamentMatches").doc(String(unawardedMatchId)));
+        if (!bronze.exists || bronze.data()?.tournamentId !== input.challengeId || bronze.data()?.bracket !== "bronze" || bronze.data()?.status !== "double_forfeit_hold" || bronze.data()?.noSubmissionExtensionUsed !== true) throw new Error("TOURNAMENT_THIRD_PLACE_UNRESOLVED");
+      }
+    }
     if (latestChallenge.normalLifecyclePolicyVersion === 1) {
       if (latestChallenge.normalOutcome === "no_winners" || latestChallenge.settlementRestricted === true || latestChallenge.financialResolutionStatus === "held_for_admin_review") throw new Error("NORMAL_SETTLEMENT_RESTRICTED");
       if (latestChallenge.settlementId && latestChallenge.settlementId !== settlementId) throw new Error("CHALLENGE_ALREADY_ALLOCATED");
@@ -804,6 +854,9 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       sourceProvenance: input.sourceProvenance ?? null
     };
     transaction.set(settlementRef, settlement);
+    if (entityCollection === "tournaments" && breakdown.unawardedThirdPlaceHoldCents > 0) {
+      transaction.create(db.collection("tournamentSettlementHolds").doc(`${settlementId}_third_unawarded`), { tournamentId: input.challengeId, settlementId, proposalId: input.proposalId, amountCents: breakdown.unawardedThirdPlaceHoldCents, currency: DEFAULT_CASH_CURRENCY, reason: "THIRD_PLACE_UNAWARDED", status: "pending_admin_review", sourceMatchId: input.sourceProvenance?.unawardedThirdPlaceMatchId ?? null, payoutExecutionEnabled: false, createdAt: now, updatedAt: now });
+    }
     transaction.set(proposalRef, {
       ...(atomicNormalApproval ? input.proposalApproval!.update : {}),
       ...(input.proposalMetadata ?? {}),
@@ -821,6 +874,9 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       updatedAt: now
     }, { merge: true });
     transaction.set(challengeRef, {
+      ...(entityCollection === "tournaments" ? { status: "winners_announced", officialPlacementsFinalizedAt: now, officialPlacementsFinalizedBy: input.adminId, payoutExecutionEnabled: false } : {}),
+      ...(entityCollection === "tournaments" && typeof input.sourceProvenance?.placementFingerprint === "string" ? { settlementPlacementFingerprint: input.sourceProvenance.placementFingerprint } : {}),
+      ...(entityCollection === "tournaments" && input.sourceProvenance?.unawardedThirdPlaceMatchId ? { thirdPlaceOutcome: "unawarded" } : {}),
       winnersApprovedAt: now,
       adminWinnersApprovedAt: now,
       adminWinnerApprovalStatus: "approved",
@@ -831,6 +887,12 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       settlementPrepared: true,
       updatedAt: now
     }, { merge: true });
+    if (entityCollection === "tournaments") {
+      const placementIds = input.sourceProvenance?.placementIds;
+      transaction.create(db.collection("tournamentAuditEvents").doc(`${settlementId}_prepared`), { tournamentId: input.challengeId, actorId: input.adminId, action: "tournament_settlement_prepared", createdAt: now, metadata: { settlementId, proposalId: input.proposalId, externalPayoutExecuted: false } });
+      if (!Array.isArray(placementIds) || placementIds.some(id => typeof id !== "string" || !id)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
+      for (const id of placementIds) transaction.set(db.collection("tournamentPlacements").doc(id), { payoutStatus: "pending_admin_review", settlementId, settlementProposalId: input.proposalId, settlementPlacementFingerprint: input.sourceProvenance?.placementFingerprint, updatedAt: now }, { merge: true });
+    }
     if (entityCollection === "challenges" && challengeSnap.data()?.normalLifecyclePolicyVersion === 1 && holdUntil) wakeNormalLifecycleJob(db, transaction, input.challengeId, holdUntil);
     transaction.set(db.collection("auditLogs").doc(String(settlement.auditLogId)), {
       id: settlement.auditLogId,

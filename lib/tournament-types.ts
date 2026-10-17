@@ -47,6 +47,17 @@ export type TournamentMedia = {
 };
 
 export type TournamentFoundation = {
+  productPolicyVersion?: "tournament_v3_20261015";
+  subcategory?: string;
+  tournamentRules?: string[] | string;
+  submissionInstructions?: string[];
+  submissionMediaTypes?: ("image" | "video")[];
+  basePrizeAmountMinor?: number;
+  galleryMedia?: TournamentMedia[];
+  builderCurrentStep?: string;
+  builderUnlockedStep?: string;
+  builderNavigationVersion?: number;
+  teamPaymentWindowMinutes?: 30 | 60 | 90 | 120;
   id: string;
   hostId: string;
   createdBy?: string;
@@ -90,7 +101,7 @@ export type TournamentFoundation = {
   eligibility: Record<string, unknown>;
   requiresCheckIn: boolean;
   checkInClosesAt: string | null;
-  teamConfig: { minimumSize: number; maximumSize: number; joiningMode: "invite_only" | "invite_and_requests"; captainPaysEntryFee: true; rosterLocksAtCheckInClose: boolean; rosterLocksAtCapacity?: boolean } | null;
+  teamConfig: { minimumSize: number; maximumSize: number; joiningMode: "invite_only" | "invite_and_requests"; captainPaysEntryFee: boolean; rosterLocksAtCheckInClose: boolean; rosterLocksAtCapacity?: boolean } | null;
   seedingMethod: TournamentSeedingMethod;
   resultMethod: TournamentResultMethod;
   advancementMethod: TournamentAdvancementMethod;

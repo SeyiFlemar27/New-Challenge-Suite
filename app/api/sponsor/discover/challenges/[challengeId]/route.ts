@@ -3,6 +3,7 @@ import { requireSponsorContext } from "@/lib/server/sponsor";
 import { fail, ok, serverError } from "@/lib/server/responses";
 import { sponsorPlacementFoundation, sponsorshipDiscussionFoundation, validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { deterministicId } from "@/lib/server/idempotency";
+import { sponsorSubjectType, sponsorSubjectCollection, sponsorSubjectPrefix, tournamentSponsorFundingWindow } from "@/lib/server/sponsor-subject";
 
 export const dynamic = "force-dynamic";
 
@@ -12,21 +13,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
   if (!context) return serverError("Sponsor access could not be verified.");
   try {
     const { challengeId } = await params;
-    const snap = await context.db.collection("challenges").doc(challengeId).get();
+    const subjectType = sponsorSubjectType(request);
+    const snap = await context.db.collection(sponsorSubjectCollection(subjectType)).doc(challengeId).get();
     if (!snap.exists) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
     const data = snap.data() ?? {};
-    if (String(data.visibility ?? "public").toLowerCase() !== "public") return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
-    const sponsorReady = Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
+    if (String(subjectType === "tournament" ? data.privacy : data.visibility ?? "public").toLowerCase() !== "public") return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
+    const sponsorReady = subjectType === "tournament" ? (data.sponsorship as Record<string, unknown> | undefined)?.sponsorReady === true : Boolean(data.sponsorEnabled || data.sponsorReady || (data.monetization as Record<string, unknown> | undefined)?.sponsorReady);
     if (!sponsorReady) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
-    const fundingWindow = validateSponsorFundingWindow(data);
-    const agreementId = deterministicId("sponsor_opportunity", snap.id, context.organizationId);
+    const fundingWindow = subjectType === "tournament" ? tournamentSponsorFundingWindow(data) : validateSponsorFundingWindow(data);
+    if (!fundingWindow.published) return fail("Opportunity was not found.", 404, undefined, "NOT_FOUND");
+    const agreementId = deterministicId(sponsorSubjectPrefix(subjectType, "sponsor_opportunity"), snap.id, context.organizationId);
     const agreementSnap = await context.db.collection("sponsorChallengeAgreements").doc(agreementId).get();
     const placementFoundation = sponsorPlacementFoundation();
     const opportunity = {
       id: snap.id,
+      subjectType,
       title: data.title ?? "Untitled challenge",
       description: data.description ?? "Challenge overview pending.",
-      creatorId: data.creatorId ?? null,
+      creatorId: data.creatorId ?? data.hostId ?? null,
       creatorName: data.creatorName ?? "Creator details pending",
       participantCount: Number(data.participantCount ?? 0),
       category: data.category ?? null,
@@ -40,7 +44,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ chal
       fundingWindow,
       discussionFoundation: sponsorshipDiscussionFoundation(snap.id, context.user.uid),
       agreement: agreementSnap.exists ? { id: agreementSnap.id, ...agreementSnap.data() } : null,
-      fundingSetupCopy: "Sponsor funding checkout creates a pending Stripe session only. Confirmed sponsor contributions are added 100% to the winner prize pool after webhook confirmation.",
+      fundingSetupCopy: subjectType === "tournament" ? "Payment must be provider-confirmed strictly before the first actual match voting start and within its 15-minute reservation. A reservation does not extend the voting cutoff. Late or ambiguous funds require reconciliation." : "Sponsor funding checkout creates a pending Stripe session only. Confirmed sponsor contributions are added 100% to the winner prize pool after webhook confirmation.",
       timeline: { startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, votingDeadline: data.votingDeadline ?? null },
       riskIndicators: { adminReviewRequired: Boolean(data.adminReviewRequired), fundingEnabled: false },
       status: getChallengeDisplayStatus(data as any)

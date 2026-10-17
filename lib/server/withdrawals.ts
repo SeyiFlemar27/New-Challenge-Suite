@@ -92,7 +92,7 @@ export async function createWithdrawalRequest(
   const priorRequests = await transaction.get(db.collection("withdrawalRequests").where("userId", "==", input.userId).limit(1));
   const sourceTotal = sourceSnaps.reduce((sum, snap) => {
     const source = snap.data() ?? {};
-    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit" || source.disputeRestricted === true || !WITHDRAWABLE_CASH_SOURCE_TYPES.has(String(source.sourceType))) {
+    if (!snap.exists || source.userId !== input.userId || source.status !== "available" || source.direction !== "credit" || source.disputeRestricted === true || source.financialRestriction || source.teamEligibilityRestricted === true || !WITHDRAWABLE_CASH_SOURCE_TYPES.has(String(source.sourceType))) {
       throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
     }
     if (String(source.currency ?? "USD").toUpperCase() !== "USD") throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
@@ -101,8 +101,9 @@ export async function createWithdrawalRequest(
     return sum + available;
   }, 0);
   if (!sourceSnaps.length || sourceTotal < input.amountCents) throw new Error("WITHDRAWAL_SOURCE_AMOUNT_MISMATCH");
-  const sourceChallenges = await Promise.all(sourceSnaps.map(source => source.data()?.challengeId ? transaction.get(db.collection("challenges").doc(String(source.data()?.challengeId))) : Promise.resolve(null)));
-  if (sourceChallenges.some(challenge => challenge?.data()?.settlementRestricted === true)) throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
+  const settlements = await Promise.all(sourceSnaps.map(source => source.data()?.settlementId ? transaction.get(db.collection("challengeSettlements").doc(String(source.data()?.settlementId))) : Promise.resolve(null)));
+  const sourceChallenges = await Promise.all(sourceSnaps.map((source, index) => source.data()?.challengeId ? transaction.get(db.collection(settlements[index]?.data()?.settlementEntityType === "tournament" ? "tournaments" : "challenges").doc(String(source.data()?.challengeId))) : Promise.resolve(null)));
+  if (sourceChallenges.some(challenge => challenge?.data()?.settlementRestricted === true || challenge?.data()?.financialHold === true) || settlements.some(settlement => settlement?.data()?.disputeRestricted === true)) throw new Error("WITHDRAWAL_SOURCE_NOT_ELIGIBLE");
   let remaining = input.amountCents;
   const sourceAllocations = sourceSnaps.map(source => {
     const available = Number(source.data()?.availableAmountCents ?? source.data()?.netAmountCents ?? source.data()?.amountCents ?? 0);

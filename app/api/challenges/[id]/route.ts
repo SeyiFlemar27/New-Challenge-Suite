@@ -17,6 +17,7 @@ import { predictionAccessForViewer } from "@/lib/server/predictions";
 import { freeVoteGuardId, nextVoteResetAt, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
 import { getChallengeBoostAccess } from "@/lib/server/boosts";
 import { hasExplicitNoWinnersOutcome } from "@/lib/server/official-winner-records";
+import { usesAutomaticVoting } from "@/lib/automatic-voting-policy";
 
 async function flagMissingOfficialWinners(db: NonNullable<ReturnType<typeof getAdminDb>>, challengeId: string) {
   const ref = db.collection("adminActionTasks").doc(`challenge_results_missing_${challengeId}`);
@@ -250,6 +251,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const approvedSubmissionCount = approvedSubmissionCountSnap.data().count;
   const activeSubmissionCount = activeSubmissionCountSnap.data().count;
   const votingAccess = {
+    automaticFreeFirst: usesAutomaticVoting(challengeData),
     authenticated: Boolean(user),
     canVote: Boolean(user && phaseSummary.votingOpen && eligibleSubmissionCount > 0 && !sponsorAccount && !ownerAccount),
     reason: eligibleSubmissionCount <= 0

@@ -3,13 +3,16 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
+import { readTournamentSponsorVotingEvidence } from "@/lib/server/tournament-sponsor-evidence";
+import { isTournamentSponsorPaymentTimely } from "@/lib/server/tournament-sponsor-cutoff";
 
 export const dynamic = "force-dynamic";
 
 const decisionSchema = z.object({
   id: z.string().trim().min(1).max(180),
   action: z.enum(["approve_placement", "reject_placement"]),
-  reason: z.string().trim().min(8).max(1200)
+  reason: z.string().trim().min(8).max(1200),
+  confirmed: z.boolean().optional().default(false)
 });
 
 export async function GET(request: Request) {
@@ -58,12 +61,18 @@ export async function PATCH(request: Request) {
       const [agreementSnap, contributionSnap, challengeSnap] = await Promise.all([
         transaction.get(agreementRef),
         transaction.get(contributionRef),
-        transaction.get(db.collection("challenges").doc(String(sponsorship.challengeId ?? "")))
+        transaction.get(db.collection(sponsorship.subjectType === "tournament" ? "tournaments" : "challenges").doc(String(sponsorship.challengeId ?? "")))
       ]);
       if (!agreementSnap.exists || !contributionSnap.exists || !challengeSnap.exists) throw new Error("LINKED_RECORD_MISSING");
       const agreement = agreementSnap.data() ?? {};
       const contribution = contributionSnap.data() ?? {};
       const challenge = challengeSnap.data() ?? {};
+      if (sponsorship.subjectType === "tournament") {
+        if (!input.data.confirmed || contribution.subjectType !== "tournament" || agreement.subjectType !== "tournament" || contribution.tournamentId !== challengeSnap.id
+          || contribution.stripeDisputeRestricted === true || contribution.reviewRequired === true || contribution.refundLiabilityStatus === "pending") throw new Error("SPONSORSHIP_LINKAGE_MISMATCH");
+        const evidence = await readTournamentSponsorVotingEvidence(db, transaction, challengeSnap.id, challenge);
+        if (!isTournamentSponsorPaymentTimely({ tournament: evidence, reservationCreatedAt: contribution.reservationCreatedAt, reservationExpiresAt: contribution.reservationExpiresAt, providerCompletionUpperBoundAt: contribution.providerCompletionUpperBoundAt, providerTimestampPrecisionMs: Number(contribution.providerTimestampPrecisionMs), observedAt: new Date() })) throw new Error("SPONSORSHIP_LINKAGE_MISMATCH");
+      }
       const amountCents = Number(sponsorship.amountCents ?? 0);
       if (String(agreement.status) !== "funded_pending_review" || agreement.fundingStatus !== "confirmed"
         || agreement.creatorAcceptedVersion !== agreement.termsVersion || agreement.sponsorAcceptedVersion !== agreement.termsVersion
@@ -78,6 +87,10 @@ export async function PATCH(request: Request) {
       const approved = input.data.action === "approve_placement";
       const status = approved ? "approved" : "placement_rejected_pending_refund";
       const placementStatus = approved ? "approved" : "rejected_pending_refund_review";
+      if (sponsorship.subjectType === "tournament") {
+        transaction.set(sponsorshipRef, { publicDisplayApproved: approved }, { merge: true });
+        transaction.create(db.collection("tournamentAuditEvents").doc(`${sponsorshipRef.id}_placement_decision`), { tournamentId: challengeSnap.id, actorId: user!.uid, action: "sponsor_placement_reviewed", reason: input.data.reason, confirmed: true, before: { status: sponsorship.status, placementStatus: sponsorship.placementStatus ?? null }, after: { approved, placementStatus }, createdAt: now });
+      }
       transaction.set(sponsorshipRef, { status, placementStatus, adminDecision: input.data.action, adminDecisionReason: input.data.reason, adminReviewedBy: user!.uid, adminReviewedAt: now, ...(approved ? { activationAt: now } : {}), updatedAt: now }, { merge: true });
       transaction.set(agreementRef, { status: approved ? "active" : "placement_rejected_pending_refund", placementStatus, adminDecision: input.data.action, adminDecisionReason: input.data.reason, adminReviewedBy: user!.uid, adminReviewedAt: now, ...(approved ? { activatedAt: now } : {}), updatedAt: now }, { merge: true });
       return { agreementId, sponsorshipId: sponsorshipRef.id, status, placementStatus, financialMutation: false, duplicate: false };

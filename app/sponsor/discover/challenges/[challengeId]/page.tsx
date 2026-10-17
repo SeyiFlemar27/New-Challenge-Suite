@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Bookmark, MessageSquare, ShieldAlert, Store, WalletCards } from "lucide-react";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
@@ -12,6 +12,9 @@ type Opportunity = Record<string, any>;
 
 export default function ChallengeOpportunityPage() {
   const params = useParams<{ challengeId: string }>();
+  const query = useSearchParams();
+  const tournament = query.get("subjectType") === "tournament";
+  const subjectQuery = tournament ? "?subjectType=tournament" : "";
   const router = useRouter();
   const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
@@ -29,14 +32,14 @@ export default function ChallengeOpportunityPage() {
   useEffect(() => {
     void Promise.all([
       apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile"),
-      apiRequest<{ opportunity: Opportunity }>(`/api/sponsor/discover/challenges/${params.challengeId}`)
+      apiRequest<{ opportunity: Opportunity }>(`/api/sponsor/discover/challenges/${params.challengeId}${subjectQuery}`)
     ]).then(([profileResult, opportunityResult]) => {
       if (profileResult.ok && profileResult.data) setProfile(profileResult.data.sponsorProfile);
       if (opportunityResult.ok && opportunityResult.data) { setOpportunity(opportunityResult.data.opportunity); setAgreement(opportunityResult.data.opportunity.agreement ?? null); }
       else setError(opportunityResult.message || "Opportunity could not be loaded.");
       setLoading(false);
     });
-  }, [params.challengeId]);
+  }, [params.challengeId, subjectQuery]);
 
   async function save() {
     await apiRequest("/api/sponsor/saved/challenges", { method: "POST", body: JSON.stringify({ challengeId: params.challengeId }) });
@@ -50,7 +53,7 @@ export default function ChallengeOpportunityPage() {
       return;
     }
     setFundingLoading(true);
-    const result = await apiRequest<{ agreement: Opportunity }>(`/api/sponsor/challenges/${params.challengeId}/interest`, {
+    const result = await apiRequest<{ agreement: Opportunity }>(`/api/sponsor/challenges/${params.challengeId}/interest${subjectQuery}`, {
       method: "POST",
       body: JSON.stringify({
         amountCents: Math.round(dollars * 100),
@@ -81,7 +84,7 @@ export default function ChallengeOpportunityPage() {
   async function startFundingCheckout() {
     if (!agreement?.id || agreement.status !== "accepted") return setFundingMessage("Both parties must accept the current agreement before funding.");
     setFundingLoading(true);
-    const result = await apiRequest<{ url?: string }>(`/api/sponsor/challenges/${params.challengeId}/funding-checkout`, {
+    const result = await apiRequest<{ url?: string }>(`/api/sponsor/challenges/${params.challengeId}/funding-checkout${subjectQuery}`, {
       method: "POST",
       body: JSON.stringify({ agreementId: agreement.id, idempotencyKey: crypto.randomUUID() })
     });
@@ -122,13 +125,14 @@ export default function ChallengeOpportunityPage() {
           <p className="mt-3 max-w-3xl leading-7 text-slate-600">{opportunity.description}</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button>
-          <Button variant="secondary" onClick={() => void discussSponsorship()} disabled={discussionLoading || !opportunity.creatorId}><MessageSquare size={16} /> {discussionLoading ? "Opening..." : "Discuss Sponsorship"}</Button>
+          {!tournament ? <Button onClick={() => void save()}><Bookmark size={17} /> Save Challenge</Button> : null}
+          {!tournament ? <Button variant="secondary" onClick={() => void discussSponsorship()} disabled={discussionLoading || !opportunity.creatorId}><MessageSquare size={16} /> {discussionLoading ? "Opening..." : "Discuss Sponsorship"}</Button> : null}
           <LinkButton href="#funding-checkout"><WalletCards size={16} /> Sponsorship terms</LinkButton>
         </div>
       </div>
 
       <Card className="mt-8 border-yellow-500/20 bg-yellow-500/5 p-5">
+        {tournament ? <p className="mb-4 text-sm">{opportunity.fundingSetupCopy}</p> : null}
         <ShieldAlert className="text-[var(--gold)]" />
         <h2 className="mt-3 text-xl font-black">Agree terms before funding</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">Send proposed commercial terms to the challenge owner. Funding opens only after both parties accept the same version. Confirmed contributions remain prize-directed; placements still require review.</p>

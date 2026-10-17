@@ -7,7 +7,7 @@ const draft = readFileSync("lib/server/tournaments.ts", "utf8");
 const registry = readFileSync("lib/challenge-builder-registry.ts", "utf8");
 const frame = readFileSync("components/challenge-builder-frame.tsx", "utf8");
 
-for (const step of ["Overview", "Tournament Format & Bracket", "Eligibility & Registration", "Monetization & Prize Pool", "Media & Branding", "Voting & Advancement", "Round Timing", "Round Submissions", "Review & Publish"]) assert(registry.includes(`"${step}"`));
+for (const step of ["Overview", "Tournament Format & Bracket", "Registration & Teams", "Monetization & Prize Pool", "Media", "Round Timing & Submissions", "Review & Publish"]) assert(registry.includes(`"${step}"`));
 assert.match(frame, /lg:grid-cols-\[270px_minmax\(0,1fr\)\].*xl:grid-cols-\[270px_minmax\(0,760px\)_280px\]/s);
 assert.match(frame, /Builder Guide/);
 assert.match(frame, /Finish Later/);

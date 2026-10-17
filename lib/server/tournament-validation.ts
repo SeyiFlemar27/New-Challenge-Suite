@@ -1,6 +1,7 @@
 import { TOURNAMENT_STATUSES, type TournamentFormat, type TournamentPrivacy, type TournamentRegistrationType, type TournamentThirdPlaceMethod, type TournamentTieBreaker } from "@/lib/tournament-types";
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory } from "@/lib/normal-challenge-config";
 import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 export const TOURNAMENT_CAPACITY_MIN = 4;
 export const TOURNAMENT_CAPACITY_MAX = 128;
@@ -38,16 +39,30 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   const registrationClosesAt = dateValue(input.registrationClosesAt);
   const tournamentStartsAt = dateValue(input.tournamentStartsAt);
   const expectedEndAt = dateValue(input.expectedEndAt);
-  if (!text(input.title)) errors.push({ field: "title", message: "Tournament title is required." });
-  if (!text(input.description)) errors.push({ field: "description", message: "Tournament description is required." });
-  if (configVersion >= 3 && (text(input.description).length < 20 || text(input.description).length > 1200)) errors.push({ field: "description", message: "Tournament description must be 20–1,200 characters." });
+  if (options.publish && !text(input.title)) errors.push({ field: "title", message: "Tournament title is required." });
+  if (text(input.title).length > 120) errors.push({ field: "title", message: "Tournament title must be 120 characters or fewer." });
+  if (input.basePrizeAmountMinor !== undefined) {
+    const basePrize = Number(input.basePrizeAmountMinor);
+    if (!Number.isSafeInteger(basePrize) || basePrize < 0 || (basePrize > 0 && basePrize < 500)) errors.push({ field: "basePrizeAmountMinor", message: "Choose no Base Prize or a Base Prize of at least $5." });
+  }
+  if (input.teamPaymentWindowMinutes !== undefined && ![30, 60, 90, 120].includes(Number(input.teamPaymentWindowMinutes))) errors.push({ field: "teamPaymentWindowMinutes", message: "Choose a 30, 60, 90, or 120 minute team payment window." });
+  if (input.submissionMediaTypes !== undefined && (!Array.isArray(input.submissionMediaTypes) || !input.submissionMediaTypes.length || input.submissionMediaTypes.some(value => value !== "image" && value !== "video"))) errors.push({ field: "submissionMediaTypes", message: "Choose Image, Video, or Image and/or Video." });
+  for (const field of ["tournamentRules", "submissionInstructions"] as const) {
+    if (input[field] !== undefined && typeof input[field] !== "string" && (!Array.isArray(input[field]) || (input[field] as unknown[]).some(value => typeof value !== "string"))) errors.push({ field, message: "Use ordered text items." });
+  }
+  if (options.publish && !text(input.description)) errors.push({ field: "description", message: "Tournament description is required." });
+  if (configVersion >= 3 && ((options.publish && text(input.description).length < 20) || text(input.description).length > 1200)) errors.push({ field: "description", message: "Tournament description must be 20–1,200 characters." });
   const category = text(input.category);
   const subcategory = text(input.subcategory);
-  if (!category) errors.push({ field: "category", message: "Tournament category is required." });
-  else if (!isCanonicalChallengeCategory(category)) errors.push({ field: "category", message: "Choose a category from the available options." });
-  if (!subcategory) errors.push({ field: "subcategory", message: "Tournament subcategory is required." });
-  else if (!isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
+  if (options.publish && !category) errors.push({ field: "category", message: "Tournament category is required." });
+  else if (category && !isCanonicalChallengeCategory(category)) errors.push({ field: "category", message: "Choose a category from the available options." });
+  if (options.publish && !subcategory) errors.push({ field: "subcategory", message: "Tournament subcategory is required." });
+  else if (subcategory && !isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
   if (text(input.currency || "USD") !== "USD") errors.push({ field: "currency", message: "Tournament money values are recorded in USD." });
+  if (input.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+    if (text(input.privacy || "public") !== "public" || text(input.registrationType || "open") !== "open") errors.push({ field: "registration", message: "New Tournaments use public discovery and open eligible registration." });
+    if (input.entryType === "paid_entry_setup_required" && (!Number.isSafeInteger(Number(input.entryFeeAmountMinor)) || Number(input.entryFeeAmountMinor) < 500)) errors.push({ field: "entryFeeAmountMinor", message: "Paid entry must be at least $5 per individual or team member." });
+  }
   const minimumAge = Number(input.ageRestriction ?? 0);
   if (!Number.isInteger(minimumAge) || minimumAge < 0 || minimumAge > 120) errors.push({ field: "ageRestriction", message: "Minimum age must be a whole number from 0 to 120." });
   if (!TOURNAMENT_FORMATS.includes(format)) errors.push({ field: "format", message: "Tournament format is invalid." });
@@ -58,10 +73,11 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   if (!TOURNAMENT_REGISTRATION_TYPES.includes(text(input.registrationType || "open") as TournamentRegistrationType)) errors.push({ field: "registrationType", message: "Tournament registration type is invalid." });
   if (configVersion >= 3 && text(input.registrationType || "open") === "approval_required") errors.push({ field: "registrationType", message: "New Tournament registrations cannot require creator approval." });
   if (participationMode === "team") {
-    const minimum = Number(input.minimumTeamSize ?? 0);
-    const maximum = Number(input.maximumTeamSize ?? 0);
+    const team = input.teamConfig && typeof input.teamConfig === "object" ? input.teamConfig as Record<string, unknown> : {};
+    const minimum = Number(input.minimumTeamSize ?? team.minimumSize ?? 0);
+    const maximum = Number(input.maximumTeamSize ?? team.maximumSize ?? 0);
     if (!Number.isInteger(minimum) || !Number.isInteger(maximum) || minimum < 1 || minimum > maximum || maximum > 20) errors.push({ field: "teamSize", message: "Team size must satisfy 1 <= minimum <= maximum <= 20." });
-    if (!["invite_only", "invite_and_requests"].includes(text(input.teamJoiningMode))) errors.push({ field: "teamJoiningMode", message: "Choose Invite Only or Invite + Join Requests." });
+    if (!["invite_only", "invite_and_requests"].includes(text(input.teamJoiningMode ?? team.joiningMode))) errors.push({ field: "teamJoiningMode", message: "Choose Invite Only or Invite + Join Requests." });
   }
   if (text(input.seedingMethod || "ranking") === "manual" && configVersion >= 2) errors.push({ field: "seedingMethod", message: "New tournaments do not allow manual seeding." });
   if (!TOURNAMENT_TIE_BREAKERS.includes(text(input.tieBreaker || "host_review") as TournamentTieBreaker)) errors.push({ field: "tieBreaker", message: "Tournament tie-breaker is invalid." });
@@ -98,6 +114,13 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
     const coverUrl = text(input.coverImageUrl ?? cover.url), coverPath = text(input.coverImagePath ?? cover.path);
     if (options.publish && (!coverUrl || !coverPath)) errors.push({ field: "coverImagePath", message: "Upload at least one verified creator image before Admin Review." });
     const mediaPrefixes = options.ownerId ? [`tournaments/drafts/${options.ownerId}/`] : [];
+    const gallery = input.galleryMedia === undefined ? [] : input.galleryMedia;
+    if (!Array.isArray(gallery) || gallery.length > 2) errors.push({ field: "galleryMedia", message: "Use at most two additional images." });
+    else gallery.forEach((item, index) => {
+      const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      const media = validateOwnedStorageMedia({ url: text(record.url), path: text(record.path), prefixes: options.ownerId ? [`tournaments/drafts/${options.ownerId}/cover/`] : [] });
+      if (!media.valid || !text(record.path)) errors.push({ field: `galleryMedia.${index}`, message: "Upload an owned additional image." });
+    });
     for (const [field, url, path] of [
       ["coverImageUrl", coverUrl, coverPath],
       ["trailerUrl", text(input.trailerUrl ?? trailer.url), text(input.trailerPath ?? trailer.path)]

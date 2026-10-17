@@ -17,6 +17,6 @@ function Content() {
     primaryLabel: "View Sponsor Dashboard",
     primaryHref: "/sponsor/dashboard",
     secondaryLabel: "View Opportunity",
-    secondaryHref: `/sponsor/discover/challenges/${challengeId}`
+    secondaryHref: `/sponsor/discover/challenges/${challengeId}${params.get("subjectType") === "tournament" ? "?subjectType=tournament" : ""}`
   }} />;
 }

@@ -29,6 +29,7 @@ export async function recordStripeSponsorDispute(
     && Number(contribution.amountCents) === charge.amount
     && String(contribution.currency ?? "").toLowerCase() === String(charge.currency).toLowerCase());
   const challengeId = sourceMatches ? String(contribution.challengeId ?? "") : "";
+  const tournamentId = sourceMatches && contribution.subjectType === "tournament" && contribution.tournamentId === challengeId ? challengeId : null;
   let linked = false;
   let restrictionActive = true;
 
@@ -66,6 +67,7 @@ export async function recordStripeSponsorDispute(
       providerCreatedAt: Number.isSafeInteger(dispute.created) ? new Date(dispute.created * 1000).toISOString() : null,
       providerUpdatedAt: now, amountCents: dispute.amount, currency, chargeId: charge.id, paymentIntentId: paymentIntent.id,
       contributionId: linkStillValid ? contributionDoc!.id : null, challengeId: linkStillValid ? challengeId : null,
+      ...(tournamentId ? { tournamentId, subjectType: "tournament" } : {}),
       sponsorOrganizationId: linkStillValid ? linkedSource.sponsorOrganizationId ?? linkedSource.sponsorId ?? null : null,
       agreementId: linkStillValid ? linkedSource.agreementId ?? null : null,
       settlementIds: linkStillValid ? settlementDocs.map((item) => item.id) : [],
@@ -79,6 +81,7 @@ export async function recordStripeSponsorDispute(
       providerStatus: status, providerOutcome: status === "won" || status === "lost" ? status : null,
       chargeId: charge.id, paymentIntentId: paymentIntent.id, contributionId: linkStillValid ? contributionDoc!.id : null,
       challengeId: linkStillValid ? challengeId : null, agreementId: linkStillValid ? linkedSource.agreementId ?? null : null,
+      ...(tournamentId ? { tournamentId, subjectType: "tournament" } : {}),
       amountCents: dispute.amount, currency, settlementIds: linkStillValid ? settlementDocs.map((item) => item.id) : [],
       linkStatus: linkStillValid ? "verified" : contributionQuery.size > 1 ? "ambiguous_source" : providerObjectMatches ? "unlinked_source" : "provider_reference_mismatch",
       restrictionActive,

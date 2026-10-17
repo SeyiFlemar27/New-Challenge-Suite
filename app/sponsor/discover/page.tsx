@@ -7,6 +7,7 @@ import { Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 
 const tabs = [
+  { label: "Tournaments", href: "/sponsor/discover/tournaments", icon: Store, body: "Review public Tournament sponsorship terms and the strict first-match voting funding cutoff." },
   { label: "Creators", href: "/sponsor/discover/creators", icon: Users, body: "Find real sponsor-ready creator profiles and start a proposal from an eligible opportunity." },
   { label: "Challenges", href: "/sponsor/discover/challenges", icon: Store, body: "Browse published sponsor-ready challenges with real funding-window and host information." },
   { label: "Saved", href: "/sponsor/saved", icon: Bookmark, body: "Return to creators and challenges saved by this sponsor account." }

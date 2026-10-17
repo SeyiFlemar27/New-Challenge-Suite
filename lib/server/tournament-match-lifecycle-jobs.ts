@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { processTournamentLifecycleAction } from "@/lib/server/tournament-lifecycle-scheduler";
 import { createGoogleCloudTasksScheduler, reconcileTournamentActivationOutbox } from "@/lib/server/tournament-cloud-tasks";
+import { confirmScheduledTournamentResult } from "@/lib/server/tournament-result-confirmation";
 
 const REVIEW_RECHECK_MS = 5 * 60_000;
 const TERMINAL_MATCH_STATES = new Set(["confirmed", "forfeit", "bye", "completed", "held", "double_forfeit_hold"]);
@@ -45,7 +46,7 @@ export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tourname
     const status = String(match.status ?? "");
     if (TERMINAL_MATCH_STATES.has(status)) { skipped += 1; continue; }
     const isSubmission = ["submissions_open", "submission_review"].includes(status);
-    const isVoting = status === "voting_open";
+    const isVoting = status === "voting_open" || status === "voting_closed";
     if (!isSubmission && !isVoting) { skipped += 1; continue; }
     const deadlineAt = isoOrNull(isSubmission ? match.submissionDeadlineAt : match.votingClosesAt);
     if (!deadlineAt) { skipped += 1; continue; }
@@ -78,7 +79,7 @@ export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tourname
         tournamentId,
         matchId: match.id,
         type: "process_tournament_match_lifecycle",
-        transition: isSubmission ? "submission_deadline" : "voting_deadline",
+        transition: isSubmission ? "submission_deadline" : status === "voting_closed" ? "result_verification" : "voting_deadline",
         expectedStatus: status,
         expectedDeadlineAt: deadlineAt,
         status: "pending",
@@ -99,7 +100,11 @@ export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tourname
 
 export async function reconcileActiveTournamentMatchLifecycleJobs(db: Firestore, now = new Date(), limit = 100) {
   const boundedLimit = Math.max(1, Math.min(250, limit));
-  const tournaments = await db.collection("tournaments").where("status", "in", ["active", "round_active", "under_review"]).limit(boundedLimit).get();
+  const cursorRef = db.collection("systemJobCursors").doc("tournament_lifecycle_recovery");
+  const cursor = (await cursorRef.get()).data()?.cursor;
+  let query = db.collection("tournaments").where("status", "in", ["draft", "pending_review", "registration_open", "active", "round_active", "under_review", "winners_announced", "paused", "cancelled"]);
+  if (typeof cursor === "string") query = query.startAfter(cursor);
+  const tournaments = await query.limit(boundedLimit).get();
   let scannedMatches = 0;
   let createdJobs = 0;
   let skippedMatches = 0;
@@ -108,14 +113,19 @@ export async function reconcileActiveTournamentMatchLifecycleJobs(db: Firestore,
     if (Number(snapshot.data().configVersion ?? 1) < 3) continue;
     eligibleTournaments += 1;
     const result = await ensureTournamentMatchLifecycleJobs(db, snapshot.id, now);
+    const { attemptTournamentNotifications: deliverTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+    await deliverTournamentNotifications(db, snapshot.id);
     scannedMatches += result.scanned;
     createdJobs += result.created;
     skippedMatches += result.skipped;
   }
+  await cursorRef.set({ cursor: tournaments.size === boundedLimit ? tournaments.docs.at(-1)?.id ?? null : null, updatedAt: now.toISOString() }, { merge: true });
   return { scannedTournaments: tournaments.size, eligibleTournaments, scannedMatches, createdJobs, skippedMatches };
 }
 
 export async function reconcileTournamentLifecycleAfterStateChange(db: Firestore, tournamentId: string, now = new Date(), immediateMatchIds: string[] = []) {
+  const { attemptTournamentNotifications: deliverTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+  await deliverTournamentNotifications(db, tournamentId);
   const lifecycle = await ensureTournamentMatchLifecycleJobs(db, tournamentId, now, 500, immediateMatchIds);
   let scheduler: ReturnType<typeof createGoogleCloudTasksScheduler>;
   try { scheduler = createGoogleCloudTasksScheduler(); }
@@ -137,8 +147,10 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
     const matchRef = db.collection("tournamentMatches").doc(String(job.matchId ?? ""));
     const matchSnapshot = await transaction.get(matchRef);
     const match = matchSnapshot.data() ?? {};
-    const deadlineField = job.transition === "voting_deadline" ? "votingClosesAt" : "submissionDeadlineAt";
-    if (!matchSnapshot.exists || match.tournamentId !== job.tournamentId || match.status !== job.expectedStatus
+    const deadlineField = ["voting_deadline", "result_verification"].includes(String(job.transition)) ? "votingClosesAt" : "submissionDeadlineAt";
+    const retryingClosedVote = job.transition === "voting_deadline" && job.expectedStatus === "voting_open"
+      && match.status === "voting_closed" && Number(job.executionAttempts ?? 0) > 0;
+    if (!matchSnapshot.exists || match.tournamentId !== job.tournamentId || (match.status !== job.expectedStatus && !retryingClosedVote)
         || isoOrNull(match[deadlineField]) !== isoOrNull(job.expectedDeadlineAt)) {
       transaction.set(jobRef, { status: "skipped", reason: "MATCH_LIFECYCLE_STATE_STALE", completedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       return { status: "skipped" as const, code: "MATCH_LIFECYCLE_STATE_STALE" };
@@ -165,13 +177,34 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
       now
     });
     if (!response.ok) throw new Error("TOURNAMENT_LIFECYCLE_PROCESSING_FAILED");
-    const currentMatchSnapshot = await db.collection("tournamentMatches").doc(claim.matchId).get();
+    let currentMatchSnapshot = await db.collection("tournamentMatches").doc(claim.matchId).get();
+    if (currentMatchSnapshot.data()?.status === "voting_closed") {
+      const result = await confirmScheduledTournamentResult(db, claim.tournamentId, claim.matchId, { id: jobId, version: expectedVersion });
+      if (!result.ok) {
+        const latest = await currentMatchSnapshot.ref.get();
+        if (!["confirmed", "forfeit"].includes(String(latest.data()?.status))) {
+          const failure = await result.json() as { code?: string };
+          const code = String(failure.code ?? "TOURNAMENT_RESULT_REVIEW_REQUIRED").slice(0, 100);
+          await db.collection("tournamentExceptions").doc(`${claim.matchId}_result_verification`).set({
+            tournamentId: claim.tournamentId, matchId: claim.matchId, type: "result_verification",
+            status: "open", reason: code, updatedAt: now.toISOString()
+          }, { merge: true });
+          throw new Error(code);
+        }
+      }
+      currentMatchSnapshot = await currentMatchSnapshot.ref.get();
+    }
     const currentMatch = currentMatchSnapshot.data() ?? {};
     await db.runTransaction(async (transaction) => {
-      const currentJobSnapshot = await transaction.get(jobRef);
+      const exceptionRef = db.collection("tournamentExceptions").doc(`${claim.matchId}_result_verification`);
+      const [currentJobSnapshot, freshMatch, exception] = await Promise.all([transaction.get(jobRef), transaction.get(currentMatchSnapshot.ref), transaction.get(exceptionRef)]);
       const currentJob = currentJobSnapshot.data() ?? {};
       if (!currentJobSnapshot.exists || Number(currentJob.version) !== expectedVersion || currentJob.status !== "pending") return;
       transaction.set(jobRef, { status: "completed", completedAt: now.toISOString(), executionLeaseUntilAt: null, updatedAt: now.toISOString() }, { merge: true });
+      if (exception.exists && exception.data()?.status === "open" && ["confirmed", "forfeit"].includes(String(freshMatch.data()?.status))) {
+        transaction.set(exceptionRef, { status: "resolved", resolvedAt: now.toISOString(), resolvedBy: "system_tournament_lifecycle", resolution: "VERIFIED_RESULT_RECOVERED", updatedAt: now.toISOString() }, { merge: true });
+        transaction.set(db.collection("tournamentAuditEvents").doc(createHash("sha256").update(`${jobId}:result_recovery`).digest("hex")), { tournamentId: claim.tournamentId, matchId: claim.matchId, actorId: "system_tournament_lifecycle", action: "result_verification_recovered", createdAt: now.toISOString(), metadata: { jobId, version: expectedVersion, priorReason: exception.data()?.reason ?? null, resultingMatchStatus: freshMatch.data()?.status } });
+      }
       if (currentMatch.status === "submission_review" && Date.parse(String(currentMatch.submissionDeadlineAt ?? "")) <= now.getTime()) {
         const nextCheckAt = isoOrNull(currentMatch.nextLifecycleCheckAt);
         if (!nextCheckAt || Date.parse(nextCheckAt) <= now.getTime()) {
@@ -180,6 +213,8 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
       }
     });
     await ensureTournamentMatchLifecycleJobs(db, claim.tournamentId, now);
+    const { attemptTournamentNotifications: deliverTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+    await deliverTournamentNotifications(db, claim.tournamentId);
     return { status: "completed" as const, code: "MATCH_LIFECYCLE_PROCESSED" };
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 100) : "TOURNAMENT_LIFECYCLE_PROCESSING_FAILED";

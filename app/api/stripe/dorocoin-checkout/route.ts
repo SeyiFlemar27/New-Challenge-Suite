@@ -5,6 +5,7 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { quoteCustomDoroCoinPurchase } from "@/lib/dorocoin-purchase";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { deterministicId } from "@/lib/server/idempotency";
+import { safeVotingReturnPath } from "@/lib/voting-return-path";
 
 function getDoroCoinPriceEnvCandidates(pack: Record<string, unknown>, packageId: string, coins: number) {
   return [
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const packageId = String(parsed.body?.packageId ?? "");
+  const returnTo = safeVotingReturnPath(parsed.body?.returnTo);
   const customCoins = Number(parsed.body?.customCoins ?? 0);
   const customAmountUsd = Number(parsed.body?.customAmountUsd ?? 0);
   const customQuote = customAmountUsd ? quoteCustomDoroCoinPurchase(customAmountUsd) : null;
@@ -71,8 +73,8 @@ export async function POST(request: Request) {
     line_items: customCoins || customQuote
       ? [{ price_data: { currency: "usd", unit_amount: Math.round(amountUsd * 100), product_data: { name: `${coins} DoroCoins` } }, quantity: 1 }]
       : [{ price: priceConfig.priceId!, quantity: 1 }],
-    success_url: `${origin}/checkout/dorocoins/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/checkout/cancel`,
+    success_url: `${origin}/checkout/dorocoins/success?session_id={CHECKOUT_SESSION_ID}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`,
+    cancel_url: returnTo ? `${origin}/dorocoins?tab=buy&cancelled=true&returnTo=${encodeURIComponent(returnTo)}` : `${origin}/checkout/cancel`,
     metadata: { type: "dorocoin_purchase", paymentPurpose: "dorocoin_purchase", packageId, customCoins: customCoins || customQuote ? "true" : "false", userId: user.uid, coins: String(coins), ruleVersion: economyRules.version }
   });
   const purchaseId = deterministicId("dorocoin_purchase", session.id);

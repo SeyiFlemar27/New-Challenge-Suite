@@ -7,6 +7,8 @@ import { VOTER_REWARD_TIERS } from "@/lib/server/revenue-sharing";
 import { hasPublicVotingAccess, isPrivateChallengeRecord, userOwnsChallenge } from "@/lib/server/challenge-access";
 import { ECONOMY_V1_RULES, getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isPublicSubmission } from "@/lib/server/public-challenge";
+import { AUTOMATIC_VOTING_SETTINGS, usesAutomaticVoting } from "@/lib/automatic-voting-policy";
+import { votingAccountRestricted } from "@/lib/voting-account-policy";
 
 export type VoteMode = "free" | "dorocoin";
 export const DOROCOIN_COST_PER_VOTE = 5;
@@ -29,6 +31,7 @@ export interface CastVoteInput {
   requestIdempotencyKey?: string | null;
   timeZone?: string | null;
   confirmedLargeSpend?: boolean;
+  confirmedDoroCoinSpend?: boolean;
   requirePublicSubmission?: boolean;
 }
 
@@ -83,6 +86,7 @@ export function freeVoteGuardId(userId: string, challengeId: string, voteDate: s
 }
 
 function votingSettings(challenge: Record<string, unknown>) {
+  if (usesAutomaticVoting(challenge)) return AUTOMATIC_VOTING_SETTINGS;
   const settings = typeof challenge.votingSettings === "object" && challenge.votingSettings !== null
     ? challenge.votingSettings as Record<string, unknown>
     : {};
@@ -135,19 +139,18 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     const submissionRef = db.collection("submissions").doc(input.submissionId);
     const leaderboardRef = db.collection("leaderboards").doc(input.challengeId);
     const voteRequestRef = voteRequestId ? db.collection("voteRequests").doc(voteRequestId) : null;
-    const freeVoteGuardRef = input.voteMode === "free"
-      ? db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(input.userId, input.challengeId, voteDateKey))
-      : null;
+    const freeVoteGuardRef = db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(input.userId, input.challengeId, voteDateKey));
     const paidVoteGuardRef = input.voteMode === "dorocoin"
       ? db.collection("paidVoteDailyGuards").doc(deterministicId("paid_vote", input.userId, input.challengeId, voteDateKey))
       : null;
-    const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap, paidVoteGuardSnap] = await Promise.all([
+    const [challengeSnap, submissionSnap, leaderboardSnap, voteRequestSnap, freeVoteGuardSnap, paidVoteGuardSnap, voterAccountSnap] = await Promise.all([
       transaction.get(challengeRef),
       transaction.get(submissionRef),
       transaction.get(leaderboardRef),
       voteRequestRef ? transaction.get(voteRequestRef) : Promise.resolve(null),
       freeVoteGuardRef ? transaction.get(freeVoteGuardRef) : Promise.resolve(null),
-      paidVoteGuardRef ? transaction.get(paidVoteGuardRef) : Promise.resolve(null)
+      paidVoteGuardRef ? transaction.get(paidVoteGuardRef) : Promise.resolve(null),
+      transaction.get(db.collection("users").doc(input.userId))
     ]);
 
     if (voteRequestSnap?.exists) {
@@ -170,6 +173,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (votingAccountRestricted(voterAccountSnap.data() ?? profile) || isSponsorProfile(voterAccountSnap.data() ?? profile)) throw voteReject("This account is not eligible to vote.", "VOTER_RESTRICTED");
     if (input.requirePublicSubmission && !hasPublicVotingAccess(challenge)) {
       throw voteReject("Public voting is not enabled for this challenge.", "PUBLIC_VOTING_DISABLED");
     }
@@ -183,6 +187,10 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
     }
 
     const settings = votingSettings(challenge);
+    if (usesAutomaticVoting(challenge) && input.voteMode === "dorocoin") {
+      if (!freeVoteGuardSnap?.exists) throw voteReject("Use your available free vote before spending DoroCoins today.", "FREE_VOTE_AVAILABLE");
+      if (input.confirmedDoroCoinSpend !== true) throw voteReject("Confirm the DoroCoin cost before spending.", "DOROCOIN_SPEND_CONFIRMATION_REQUIRED");
+    }
     if (input.voteMode === "dorocoin" && (!economyRules.voting.paidVotingEnabled || challenge.paidVotingDisabledByAdmin === true)) throw voteReject("Additional DoroCoin voting is disabled.", "PAID_VOTING_DISABLED");
     if (input.voteMode === "free" && !settings.allowFreeVotes) throw voteReject("Free voting is not enabled for this challenge.", "FREE_VOTING_DISABLED");
     if (input.voteMode === "dorocoin" && (!settings.allowPaidVotes || !ECONOMY_V1_RULES.voting.paidVotingEnabled)) throw voteReject("Additional DoroCoin voting is not enabled for this challenge.", "PAID_VOTING_DISABLED");
@@ -288,7 +296,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
       voteRecords.push(vote);
     }
 
-    if (freeVoteGuardRef) {
+    if (input.voteMode === "free" && freeVoteGuardRef) {
       transaction.create(freeVoteGuardRef, {
         id: freeVoteGuardRef.id,
         userId: input.userId,

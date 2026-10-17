@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import { tournamentDraftFromInput, buildTournamentRoundPlan } from "../lib/server/tournaments.ts";
+import { validateTournamentFoundation } from "../lib/server/tournament-validation.ts";
+import { validateTournamentSubmission } from "../lib/server/tournament-operations.ts";
+import { tournamentPlacementFingerprint } from "../lib/server/tournament-settlement-policy.ts";
+import { TOURNAMENT_PRODUCT_POLICY, tournamentBuilderStep } from "../lib/tournament-builder-policy.ts";
+let assertions = 0;
+const equal = (actual, expected) => { assert.equal(actual, expected); assertions++; };
+const draft = tournamentDraftFromInput({}, "owner");
+equal(validateTournamentFoundation(draft).valid, true);
+equal(validateTournamentFoundation(draft, { publish: true }).valid, false);
+equal(draft.productPolicyVersion, TOURNAMENT_PRODUCT_POLICY);
+equal(draft.voting.automaticFreeFirst, true);
+const team = tournamentDraftFromInput({ participationMode: "team" }, "owner");
+equal(team.teamConfig.captainPaysEntryFee, false);
+equal(team.teamConfig.minimumSize, 2);
+equal(team.teamConfig.maximumSize, 5);
+equal(team.teamConfig.joiningMode, "invite_and_requests");
+equal(team.teamPaymentWindowMinutes, 60);
+const deadline = "2026-10-16T12:00:00.000Z";
+const submission = { tournament: { ...draft, submissionMediaTypes: ["image"] }, round: { startsAt: "2026-10-16T11:00:00.000Z", endsAt: deadline }, mediaType: "image", mediaUrl: "https://media.example/image", mediaPath: "owned-image", existingStatus: "approved", now: new Date("2026-10-16T11:59:59.999Z") };
+equal(validateTournamentSubmission(submission).valid, true);
+equal(validateTournamentSubmission({ ...submission, now: new Date(deadline) }).code, "SUBMISSION_DEADLINE_CLOSED");
+equal(validateTournamentSubmission({ ...submission, mediaType: "video" }).code, "MEDIA_TYPE_UNSUPPORTED");
+equal(validateTournamentSubmission({ ...submission, round: { startsAt: null, endsAt: null } }).code, "SUBMISSION_WINDOW_INVALID");
+const placement = { id: "p1", placement: 1, participantId: `${"a".repeat(130)}first`, sourceMatchId: "verified_final" };
+assert.notEqual(tournamentPlacementFingerprint([placement], TOURNAMENT_PRODUCT_POLICY), tournamentPlacementFingerprint([{ ...placement, participantId: `${"a".repeat(130)}other` }], TOURNAMENT_PRODUCT_POLICY)); assertions++;
+equal(tournamentPlacementFingerprint([placement]).startsWith("tournament_placements_v2_"), false);
+equal(tournamentBuilderStep("schedule", 1), "rounds");
+equal(tournamentBuilderStep(8, 1), "review");
+for (const capacity of [4, 8, 16, 32, 64, 128]) {
+  const double = buildTournamentRoundPlan(capacity, "double_elimination");
+  equal(double.length, 3 * Math.log2(capacity));
+  equal(new Set(double.map(round => round.roundNumber)).size, double.length);
+  equal(double.at(-1).advancementRule, "conditional_grand_final_reset");
+  equal(buildTournamentRoundPlan(capacity, "single_elimination").at(-1).title, "Bronze Match");
+}
+console.log(`Tournament new product policy: ${assertions} deterministic assertions passed.`);

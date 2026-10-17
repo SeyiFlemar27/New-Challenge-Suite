@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
+const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 
 // Fail before importing application code or creating any test fixtures.
 const projectId = process.env.GCLOUD_PROJECT;
@@ -74,14 +77,41 @@ const tests = [
   "scripts/test-discovery-analytics-scalability.mjs",
   "scripts/test-dedicated-discovery-pagination.mjs",
   "scripts/test-admin-support-workflows.mjs",
+  "scripts/test-tournament-new-policy.mjs",
+  "scripts/test-tournament-public-route-policy.mjs",
+  "scripts/test-tournament-draft-adoption-emulator.mjs",
+  "scripts/test-tournament-public-team-emulator.mjs",
+  "scripts/test-tournament-vote-pagination.mjs",
+  "scripts/test-tournament-settlement-allocation.mjs",
+  "scripts/test-tournament-vote-pagination-emulator.mjs",
+  "scripts/test-tournament-automatic-results-emulator.mjs",
+  "scripts/test-tournament-creator-funding-emulator.mjs",
+  "scripts/test-tournament-member-payments-emulator.mjs",
+  "scripts/test-tournament-settlement-emulator.mjs",
+  "scripts/test-tournament-submission-media-emulator.mjs",
+  "scripts/test-automatic-voting-emulator.mjs",
+  "scripts/test-tournament-sponsor-cutoff.mjs",
+  "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+  "scripts/test-tournament-notifications-emulator.mjs",
+  "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+  "scripts/test-tournament-team-entitlements-emulator.mjs",
+  "scripts/test-tournament-complete-lifecycles-emulator.mjs",
 ];
 
+const results = [];
+function recordResults(complete) { if (process.env.CHALLENGE_SUITE_TEST_RESULTS_PATH) writeFileSync(process.env.CHALLENGE_SUITE_TEST_RESULTS_PATH, JSON.stringify({ complete, total: tests.length, results }, null, 2)); }
+recordResults(false);
 for (const test of tests) {
   console.log(`\n=== ${test} ===`);
   const testLoaders = test === "scripts/test-tournament-paid-entry-emulator.mjs"
     ? ["--experimental-loader", "./scripts/tournament-paid-entry-stripe-loader.mjs"]
     : [];
-  const result = spawnSync(process.execPath, ["--experimental-transform-types", "--experimental-loader", "./scripts/ts-alias-loader.mjs", ...testLoaders, test], { stdio: "inherit", env: process.env });
+  const startedAt = new Date().toISOString();
+  const result = spawnSync(process.execPath, ["--experimental-transform-types", "--experimental-loader", "./scripts/ts-alias-loader.mjs", ...testLoaders, test], { cwd: repoRoot, stdio: "inherit", env: process.env, timeout: 600_000 });
+  results.push({ test, startedAt, completedAt: new Date().toISOString(), exitCode: result.status, errorCode: result.error?.code ?? null });
+  recordResults(false);
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
+recordResults(true);
+console.log(`Full P0: ${results.length}/${tests.length} suites passed.`);

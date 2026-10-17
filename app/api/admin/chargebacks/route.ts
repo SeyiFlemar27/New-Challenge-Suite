@@ -6,6 +6,8 @@ import { getStripe } from "@/lib/stripe";
 import { createAuditLogRecord, writeAuditLog } from "@/lib/server/audit";
 import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { readTournamentSponsorVotingEvidence } from "@/lib/server/tournament-sponsor-evidence";
+import { isTournamentSponsorPaymentTimely } from "@/lib/server/tournament-sponsor-cutoff";
 
 const schema = z.object({ disputeId: z.string().min(1), chargebackCaseId: z.string().min(1), reason: z.string().trim().min(8).max(1000), evidence: z.object({ customerName: z.string().trim().min(2).max(120), customerEmail: z.string().trim().email(), productDescription: z.string().trim().min(10).max(500), customerCommunication: z.string().trim().min(1).max(10000).optional() }) });
 const reconciliationSchema = z.object({ caseId: z.string().trim().min(1).max(180), action: z.enum(["release_won", "acknowledge_loss"]), reason: z.string().trim().min(10).max(1200), confirmed: z.literal(true) });
@@ -98,6 +100,14 @@ export async function PATCH(request: Request) {
         transaction.set(caseRef, { adminReconciliationStatus: "loss_acknowledged_hold_remains", adminReason: reason, reconciledBy: user!.uid, reconciledAt: now, restrictionActive: true, updatedAt: now }, { merge: true });
         transaction.set(disputeRef, { adminReconciliationStatus: "loss_acknowledged_hold_remains", adminReason: reason, reconciledBy: user!.uid, reconciledAt: now, restrictionActive: true, updatedAt: now }, { merge: true });
       } else {
+        if (contribution.subjectType === "tournament") {
+          const tournamentId = String(contribution.tournamentId ?? "");
+          if (!tournamentId || tournamentId !== contribution.challengeId) throw new Error("DISPUTE_LINK_UNVERIFIED");
+          const tournament = await transaction.get(db.collection("tournaments").doc(tournamentId));
+          if (!tournament.exists) throw new Error("OTHER_FINANCIAL_RESTRICTION");
+          const evidence = await readTournamentSponsorVotingEvidence(db, transaction, tournamentId, tournament.data() ?? {});
+          if (!isTournamentSponsorPaymentTimely({ tournament: evidence, reservationCreatedAt: contribution.reservationCreatedAt, reservationExpiresAt: contribution.reservationExpiresAt, providerCompletionUpperBoundAt: contribution.providerCompletionUpperBoundAt, providerTimestampPrecisionMs: Number(contribution.providerTimestampPrecisionMs), observedAt: new Date() })) throw new Error("OTHER_FINANCIAL_RESTRICTION");
+        }
         const [otherCasesSnap, pendingRefundsSnap, settlementSnap] = await Promise.all([
           transaction.get(db.collection("chargebackCases").where("contributionId", "==", contributionSnap.id).limit(50)),
           transaction.get(db.collection("refundCases").where("paymentCollection", "==", "sponsorContributions").where("paymentId", "==", contributionSnap.id).limit(20)),

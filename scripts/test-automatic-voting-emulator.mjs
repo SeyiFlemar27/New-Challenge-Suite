@@ -1,0 +1,81 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { safeVotingReturnPath } from "../lib/voting-return-path.ts";
+import { TOURNAMENT_PRODUCT_POLICY } from "../lib/tournament-builder-policy.ts";
+assert.match(process.env.GCLOUD_PROJECT ?? "", /^demo-/);
+for (const name of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST"]) assert.match(process.env[name] ?? "", /^127\.0\.0\.1:\d+$/);
+const app = initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+const db = getFirestore(app);
+const { POST: vote, GET: status } = await import("../app/api/votes/route.ts");
+const id = `automatic_vote_${randomUUID()}`;
+const signup = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: `${id}@example.test`, password: "LocalOnly123!", returnSecureToken: true }) });
+const user = await signup.json(); assert.ok(user.idToken);
+const headers = { authorization: `Bearer ${user.idToken}`, "content-type": "application/json" };
+let assertions = 0;
+const equal = (actual, expected) => { assert.equal(actual, expected); assertions++; };
+function request(body) { return new Request("http://localhost/api/votes", { method: "POST", headers, body: JSON.stringify({ challengeId: id, submissionId: `${id}_entry`, quantity: 1, ...body }) }); }
+const future = new Date(Date.now() + 3600000).toISOString(), past = new Date(Date.now() - 3600000).toISOString();
+try {
+  await db.collection("users").doc(user.localId).set({ role: "creator", accountStatus: "active", emailVerified: true, planId: "free" });
+  await db.collection("doroCoinWallets").doc(user.localId).set({ balance: 50 });
+  await db.collection("challenges").doc(id).set({ id, title: "Automatic voting fixture", visibility: "public", creatorId: "other_creator", status: "voting_open", startsAt: past, submissionDeadline: past, votingStartsAt: past, votingDeadline: future, endsAt: future, automaticVotingPolicyVersion: 1, votingSettings: { allowFreeVotes: false, allowPaidVotes: false, weightedVotes: false } });
+  await db.collection("submissions").doc(`${id}_entry`).set({ id: `${id}_entry`, challengeId: id, userId: "other_participant", status: "approved", voteCount: 0 });
+  equal((await vote(request({ voteMode: "dorocoin", idempotencyKey: "before_free", confirmedDoroCoinSpend: true }))).status, 409);
+  equal((await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance, 50);
+  equal((await vote(request({ voteMode: "free", idempotencyKey: "free" }))).status, 200);
+  const state = await status(new Request(`http://localhost/api/votes?challengeId=${id}`, { headers }));
+  equal(state.status, 200);
+  equal((await state.json()).data.freeVote.used, true);
+  const noConsent = await vote(request({ voteMode: "dorocoin", idempotencyKey: "no_consent" }));
+  equal((await noConsent.json()).code, "DOROCOIN_SPEND_CONFIRMATION_REQUIRED");
+  const body = { voteMode: "dorocoin", idempotencyKey: "same_paid_request", confirmedDoroCoinSpend: true };
+  const paid = await Promise.all([vote(request(body)), vote(request(body))]);
+  equal(paid.every(response => response.status === 200), true);
+  equal((await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance, 45);
+  await db.collection("challenges").doc(id).update({ automaticVotingPolicyVersion: FieldValue.delete(), votingSettings: { allowFreeVotes: true, allowPaidVotes: false } });
+  const legacy = await vote(request({ ...body, idempotencyKey: "legacy_disabled" }));
+  equal((await legacy.json()).code, "PAID_VOTING_DISABLED");
+  await db.collection("users").doc(user.localId).update({ accountStatus: "suspended" });
+  equal((await vote(request({ voteMode: "free", idempotencyKey: "restricted" }))).status, 409);
+  equal((await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance, 45);
+  for (const path of ["https://example.test", "//example.test", "/admin", "/tournaments/x?autoVote=true", "/challenges/x?submissionId=entry&token=secret"]) {
+    const expected = path.startsWith("/tournaments/x?") ? "/tournaments/x" : path.startsWith("/challenges/x?") ? "/challenges/x?submissionId=entry" : null;
+    equal(safeVotingReturnPath(path), expected);
+  }
+  await db.collection("users").doc(user.localId).update({ accountStatus: "active" });
+  const { POST: tournamentVote, GET: tournamentStatus } = await import("../app/api/tournaments/[id]/votes/route.ts");
+  const tournamentId = `${id}_tournament`, roundId = `${id}_round`;
+  await db.collection("tournaments").doc(tournamentId).set({ id: tournamentId, hostId: "other_host", productPolicyVersion: TOURNAMENT_PRODUCT_POLICY, configVersion: 3, status: "round_active", privacy: "public", participationMode: "individual", resultMethod: "votes", voting: { paidVotesActive: true } });
+  await db.collection("tournamentRounds").doc(roundId).set({ tournamentId, roundNumber: 1 });
+  for (const entrant of ["a", "b"]) await db.collection("tournamentParticipants").doc(`${id}_${entrant}`).set({ tournamentId, userId: `other_${entrant}`, status: "active" });
+  async function seedMatch(label) {
+    const matchId = `${id}_${label}`, submissionId = `${matchId}_submission`;
+    await db.collection("tournamentMatches").doc(matchId).set({ tournamentId, roundId, roundNumber: 1, matchNumber: 1, status: "voting_open", resultMethod: "votes", participantAId: `${id}_a`, participantBId: `${id}_b`, votingOpenedAt: past, votingClosesAt: future, voteCountA: 0, voteCountB: 0, voteSequence: 0 });
+    await db.collection("tournamentSubmissions").doc(submissionId).set({ tournamentId, matchId, roundId, participantId: `${id}_a`, status: "approved" });
+    return { matchId, submissionId, selectedParticipantId: `${id}_a` };
+  }
+  const target = await seedMatch("match_one"), context = { params: Promise.resolve({ id: tournamentId }) };
+  const tournamentRequest = body => request({ ...target, ...body });
+  equal((await tournamentVote(tournamentRequest({ voteType: "dorocoin", idempotencyKey: "no_free", confirmedDoroCoinSpend: true }), context)).status, 409);
+  equal((await tournamentVote(tournamentRequest({ voteType: "free" }), context)).status, 200);
+  const view = await tournamentStatus(new Request(`http://localhost/votes?matchId=${target.matchId}`, { headers }), context);
+  equal((await view.json()).data.freeVote.used, true);
+  equal((await tournamentVote(tournamentRequest({ voteType: "dorocoin", idempotencyKey: "no_consent" }), context)).status, 422);
+  const tournamentPaid = { voteType: "dorocoin", idempotencyKey: "verified_once", confirmedDoroCoinSpend: true };
+  const confirmations = await Promise.all([tournamentVote(tournamentRequest(tournamentPaid), context), tournamentVote(tournamentRequest(tournamentPaid), context)]);
+  equal(confirmations.every(response => response.status === 200), true);
+  equal((await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance, 40);
+  const otherTarget = await seedMatch("match_two");
+  equal((await tournamentVote(request({ ...otherTarget, voteType: "free" }), context)).status, 200);
+  const ownTarget = await seedMatch("own_match");
+  await db.collection("tournamentParticipants").doc(`${id}_b`).update({ userId: user.localId });
+  equal((await tournamentVote(request({ ...ownTarget, voteType: "free" }), context)).status, 403);
+  await db.collection("challenges").doc(id).update({ isLiveEvent: true, eventMode: "physical" });
+  const balanceBeforePhysical = (await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance;
+  equal((await vote(request({ voteMode: "free", idempotencyKey: "physical_no_free" }))).status, 409);
+  equal((await vote(request({ voteMode: "dorocoin", confirmedDoroCoinSpend: true, idempotencyKey: "physical_no_paid" }))).status, 409);
+  equal((await db.collection("doroCoinWallets").doc(user.localId).get()).data().balance, balanceBeforePhysical);
+  console.log(`Automatic voting: ${assertions} actual-handler and redirect assertions passed. No live checkout or cash operation.`);
+} finally { await db.terminate(); }

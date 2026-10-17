@@ -2,13 +2,27 @@ import { Flag, Swords } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { SubmissionMediaFrame } from "@/components/media-display";
 import { Card, EmptyState, PageTitle } from "@/components/ui";
-import { TournamentMatchActions } from "@/components/tournament-match-actions";
+import { TournamentMatchActions as ClientTournamentMatchActions } from "@/components/tournament-match-actions";
+import type { ComponentProps } from "react";
+import { publicTournamentView } from "@/lib/server/tournament-public-policy";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getServerTournamentViewer, getTournamentBundle } from "@/lib/server/tournament-public";
 import { canPerformTournamentRole } from "@/lib/server/tournament-permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// Keep owner uploads, payment evidence, account IDs and private moderation history out of client props.
+function TournamentMatchActions(props: ComponentProps<typeof ClientTournamentMatchActions>) {
+  const pick = (row: Record<string, unknown>, fields: string[]) => Object.fromEntries(fields.filter(field => field in row).map(field => [field, row[field]]));
+  const tournament = publicTournamentView({ ...props.tournament, id: props.tournamentId });
+  return <ClientTournamentMatchActions {...props}
+    tournament={{ ...tournament, productPolicyVersion: props.tournament.productPolicyVersion, voting: pick((props.tournament.voting as Record<string, unknown> | undefined) ?? {}, ["paidVotesActive", "automaticFreeFirst"]) }}
+    match={pick(props.match, ["id", "participantAId", "participantBId", "status", "resultMethod", "resultStatus", "submissionDeadlineAt", "votingClosesAt"])}
+    round={props.round ? pick(props.round, ["id", "acceptedMedia"]) : null}
+    submissions={props.submissions.map(submission => pick(submission, ["id", "participantId", "status", "mediaUrl", "mediaType", "revision"]))}
+  />;
+}
 
 export default async function TournamentMatchPage({ params }: { params: Promise<{ id: string; matchId: string }> }) {
   const { id, matchId } = await params;

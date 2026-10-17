@@ -542,6 +542,7 @@ export async function PATCH(request: Request) {
         const withdrawalSources = Array.isArray(record.sourceIds) ? record.sourceIds.map((sourceId: unknown) => db.collection("cashLedger").doc(String(sourceId))) : [];
         const withdrawalSourceSnaps = await Promise.all(withdrawalSources.map((sourceRef: FirebaseFirestore.DocumentReference) => transaction.get(sourceRef)));
         if ((["approve", "second_approve", "mark_paid"].includes(action) || (action === "reject" && record.reservationVersion === 2)) && withdrawalSourceSnaps.some((sourceSnap) => sourceSnap.data()?.disputeRestricted === true)) throw new Error("DISPUTE_RESTRICTED_PAYOUT");
+        if ((["approve", "second_approve", "mark_paid"].includes(action) || (action === "reject" && record.reservationVersion === 2)) && withdrawalSourceSnaps.some((sourceSnap: FirebaseFirestore.DocumentSnapshot) => sourceSnap.data()?.financialRestriction || sourceSnap.data()?.teamEligibilityRestricted === true)) throw new Error("ENTITLEMENT_RESTRICTED_PAYOUT");
         previousStatus = String(record.status ?? "pending_review");
         const validTransition = action === "mark_paid"
           ? previousStatus === "approved_for_manual_payout"
@@ -765,6 +766,7 @@ export async function PATCH(request: Request) {
     if (error instanceof Error && error.message === "KYC_REQUIRED") return fail("Identity verification must be verified before approval. KYC processing is not active yet.", 409, undefined, "KYC_REQUIRED");
     if (error instanceof Error && error.message === "SECOND_APPROVER_REQUIRED") return fail("A different authorized administrator must complete the second approval.", 409, undefined, "SECOND_APPROVER_REQUIRED");
     if (error instanceof Error && error.message === "DISPUTE_RESTRICTED_PAYOUT") return fail("This payout is paused while its funding source is under dispute review.", 409, undefined, "DISPUTE_RESTRICTED_PAYOUT");
+    if (error instanceof Error && error.message === "ENTITLEMENT_RESTRICTED_PAYOUT") return fail("This payout is paused for audited entitlement reconciliation. Its reserved or completed financial records have been preserved.", 409, undefined, "ENTITLEMENT_RESTRICTED_PAYOUT");
     return serverError("Admin decision could not be saved.", error instanceof Error ? error.message : error);
   }
 }

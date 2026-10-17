@@ -171,6 +171,8 @@ async function registerVersionThreeEntrant(params: {
     throw error;
   }
   const activationScheduleStatus = activationJobId ? (await dispatchTournamentActivationOutbox(db, activationJobId)).status : null;
+  const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+  await attemptTournamentNotifications(db, id);
   return ok({ participant, outcome: "registered", participantCount: count, activationQueued, activationScheduleStatus }, activationQueued
     ? activationScheduleStatus === "scheduled"
       ? "The final slot is reserved and the server activation task is scheduled after the five-second confirmation window."

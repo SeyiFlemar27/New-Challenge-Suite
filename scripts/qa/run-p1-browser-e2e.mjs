@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID, randomBytes } from "node:crypto";
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -41,7 +41,11 @@ const storageEmulatorPort = configuredPort("CHALLENGE_SUITE_E2E_STORAGE_PORT", 9
 const baseUrl = `http://127.0.0.1:${port}`;
 const runId = randomUUID().replaceAll("-", "");
 const artifacts = join(tmpdir(), `challenge-suite-p1-browser-${runId}`);
-const isolatedNextDistDir = `.next/e2e/${runId}`;
+const reusedNextDistDir = process.env.CHALLENGE_SUITE_E2E_PREBUILT_DIST_DIR;
+if (reusedNextDistDir && (!/^\.next\/e2e\/[a-f0-9]{32}$/.test(reusedNextDistDir) || process.env.CHALLENGE_SUITE_E2E_NEXT_MODE !== "start" || !existsSync(join(repoRoot, reusedNextDistDir, "BUILD_ID")))) {
+  throw new Error("Prebuilt browser verification requires an existing isolated build and explicit start mode; arbitrary paths and unrelated servers are refused.");
+}
+const isolatedNextDistDir = reusedNextDistDir || `.next/e2e/${runId}`;
 mkdirSync(artifacts, { recursive: true });
 
 for (const [name, value] of Object.entries({
@@ -315,7 +319,7 @@ async function login(context, user, { rememberMe = false } = {}) {
 const nextMode = process.env.CHALLENGE_SUITE_E2E_NEXT_MODE === "dev"
   ? "dev"
   : process.env.CHALLENGE_SUITE_E2E_NEXT_MODE === "start" ? "start" : "production";
-const serverEnv = { ...process.env, NODE_ENV: nextMode === "production" ? "production" : "development", NEXT_TELEMETRY_DISABLED: "1" };
+const serverEnv = { ...process.env, NODE_ENV: nextMode === "dev" ? "development" : "production", NEXT_TELEMETRY_DISABLED: "1" };
 const localEnvNames = (() => {
   try { return readFileSync(join(process.cwd(), ".env.local"), "utf8").split(/\r?\n/).map((line) => line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/)?.[1]).filter(Boolean); }
   catch { return []; }
@@ -631,9 +635,9 @@ try {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Timezone", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByLabel("Voting configuration", { exact: true }).waitFor();
+    await page.getByText(/^Voting is automatic:/).waitFor();
     check(await page.getByText("Submission Instructions (optional)", { exact: true }).isVisible(), "instructions are optional");
-    await page.getByLabel("Voting configuration", { exact: true }).selectOption("dorocoin");
+    check(await page.getByLabel("Voting configuration", { exact: true }).count() === 0, "creator voting selector is removed under the automatic policy");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.locator("[data-builder-surface]").getByRole("heading", { name: "Review Your Challenge", exact: true }).waitFor();
     check(!(await page.locator("main").innerText()).includes("Participant visibility"), "Review omits Participation");
@@ -721,11 +725,10 @@ try {
     await legacyPage.waitForURL("**/challenges");
     await db.collection("challenges").doc(legacyId).update({ "votingSettings.allowPaidVotes": true, "monetization.paidVotesRequested": true, builderCurrentStep: 5, maxUnlockedStep: 5 });
     await legacyPage.goto(`${baseUrl}/challenges/create/${legacyId}`, { waitUntil: "domcontentloaded" });
-    await legacyPage.getByRole("button", { name: "Use Free Vote Only", exact: true }).waitFor();
+    await legacyPage.getByText(/^Voting is automatic:/).waitFor();
     check((await legacyPage.locator("[data-normal-step-heading]").innerText()) === "Entry & Submission", "legacy wire position five restores to Entry & Submission");
-    check(await legacyPage.getByLabel("Voting configuration", { exact: true }).isDisabled() && await legacyPage.getByLabel("Voting configuration", { exact: true }).inputValue() === "dorocoin", "Free draft accurately displays its existing DoroCoin setting read-only");
-    await legacyPage.getByRole("button", { name: "Use Free Vote Only", exact: true }).click();
-    check(await legacyPage.getByLabel("Voting configuration", { exact: true }).inputValue() === "free" && await legacyPage.getByLabel("Voting configuration", { exact: true }).locator("option").count() === 1, "explicit Free Vote Only action cannot re-enable paid voting");
+    check(await legacyPage.getByLabel("Voting configuration", { exact: true }).count() === 0, "restored unpublished Free draft uses automatic voting without a creator selector");
+    check((await legacyPage.locator("main").innerText()).includes("5 DoroCoins"), "restored draft explains the real per-vote cost rather than a plan-gated creator option");
     await legacyContext.close();
   }, { requiresMedia: true });
 
@@ -779,9 +782,15 @@ try {
       const response = await page.request.get(`${baseUrl}/api/private-exclusive?challengeId=${privateChallengeId}`);
       throw new Error(`Owner UI did not render the persisted request; API HTTP ${response.status()} body=${(await response.text()).slice(0, 1600)}; page=${(await page.locator("body").innerText()).slice(0, 1000)}`);
     });
-    page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Approve" }).click();
-    await page.getByText("approved", { exact: false }).waitFor({ timeout: 12000 });
+    const confirmation = page.getByRole("region", { name: "Confirm access change" });
+    await confirmation.getByLabel("Decision reason").fill("Approved local test request after reviewing eligibility.");
+    await confirmation.getByLabel("I confirm this access change.").check();
+    const approvalResponse = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/private-challenges/${privateChallengeId}/access` && response.request().method() === "POST");
+    await confirmation.getByRole("button", { name: "Confirm change", exact: true }).click();
+    const approved = await approvalResponse;
+    const approvalEnvelope = await approved.json();
+    check(approved.ok() && approvalEnvelope.ok === true, "Owner confirmation must succeed through the authorized access API.");
     const grant = await db.collection("privateChallengeAccess").doc(`${privateChallengeId}_${participant.uid}`).get();
     check(grant.exists && grant.data()?.status === "approved", "Owner UI approval must create a durable server access grant.");
     check((await db.collection("challengeParticipants").doc(`${privateChallengeId}_${participant.uid}`).get()).exists === false, "Access approval alone must not enroll the requester as a participant.");
@@ -845,11 +854,107 @@ try {
     await enterpriseContext.close();
   });
 
+  await test("Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket", async () => {
+    const owner = await seedUser("tournamentbuilder", { role: "creator" });
+    await Promise.all([db.collection("users").doc(owner.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true }), db.collection("profiles").doc(owner.uid).update({ planId: "creator", planStatus: "active", creatorOnboardingComplete: true })]);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await login(context, owner, { rememberMe: true });
+    await page.goto(`${baseUrl}/tournaments/create`, { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Tournament title", { exact: true }).waitFor();
+    const navigation = page.getByRole("navigation", { name: "Challenge builder steps" });
+    check(await navigation.getByRole("button").count() === 7, "Tournament Builder has exactly seven visible steps");
+    await page.getByLabel("Tournament title", { exact: true }).fill("Verified Tournament browser draft");
+    await page.getByLabel("Category", { exact: true }).selectOption("Gaming");
+    await page.getByLabel("Subcategory", { exact: true }).selectOption("Console");
+    await page.getByLabel("Full description", { exact: true }).fill("A local Tournament fixture covering real draft, media, review and navigation behavior.");
+    await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+    await page.getByLabel("Rule 1", { exact: true }).fill("Respect all competitors.");
+    const creation = page.waitForResponse(response => new URL(response.url()).pathname === "/api/tournaments" && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const created = await creation, envelope = await created.json();
+    check(created.ok() && envelope.ok, `Tournament draft persists through the actual API (HTTP ${created.status()})`);
+    const draftId = envelope.data.tournament.id;
+    await page.locator("[data-builder-surface]").getByRole("button", { name: /^Team\b/ }).click();
+    await page.getByRole("button", { name: /^Double Elimination/ }).click();
+    await page.getByRole("combobox", { name: /^Bracket size/ }).selectOption("128");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    check(await page.getByLabel("Team payment window", { exact: true }).inputValue() === "60", "team payment defaults to the approved 60-minute window");
+    await page.getByLabel("Team payment window", { exact: true }).selectOption("30");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByLabel("Creator-funded Base Prize (USD, optional)", { exact: true }).fill("100");
+    await page.getByLabel("Open this tournament to sponsors", { exact: true }).check();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const { default: sharp } = await import("sharp");
+    const png = await sharp({ create: { width: 32, height: 24, channels: 3, background: "#b58a2a" } }).png().toBuffer();
+    await page.locator('input[type="file"]').first().setInputFiles({ name: "tournament-cover.png", mimeType: "image/png", buffer: png });
+    await page.getByText("Upload complete.", { exact: true }).first().waitFor({ timeout: 30000 });
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    check(await page.getByRole("combobox", { name: /^Submission duration/ }).inputValue() === "48", "submission duration defaults to 48 hours");
+    check(await page.getByRole("combobox", { name: /^Voting duration/ }).inputValue() === "72", "voting duration defaults to 72 hours");
+    await page.getByRole("button", { name: "Add Instruction", exact: true }).click();
+    await page.getByLabel("Instruction 1", { exact: true }).fill("First instruction");
+    await page.getByRole("button", { name: "Add Instruction", exact: true }).click();
+    await page.getByLabel("Instruction 2", { exact: true }).fill("Second instruction");
+    await page.getByRole("button", { name: "Move instruction 2 up", exact: true }).click();
+    check(await page.getByLabel("Instruction 1", { exact: true }).inputValue() === "Second instruction", "Tournament instructions retain their edited order");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator("[data-builder-surface]").getByRole("heading", { name: "Review & Publish", exact: true }).waitFor();
+    check((await page.locator("[data-builder-surface]").innerText()).includes("Outstanding: $100.00"), "Review shows the real unfunded creator obligation");
+    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isDisabled(), "positive unfunded Base Prize cannot be submitted");
+    await page.getByRole("button", { name: "Edit Monetization & Prize Pool", exact: true }).click();
+    await page.getByLabel("Creator-funded Base Prize (USD, optional)", { exact: true }).fill("0");
+    await navigation.getByRole("button", { name: /Review & Publish/ }).click();
+    await page.getByLabel("I confirm the Tournament information is accurate.", { exact: true }).check();
+    await page.getByLabel("I have the rights and permission to use the uploaded media.", { exact: true }).check();
+    const publication = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${draftId}` && response.request().method() === "PATCH" && response.request().postDataJSON()?.status === "pending_review");
+    await page.getByRole("button", { name: "Submit for Review", exact: true }).click();
+    const submitted = await publication, submittedBody = await submitted.json();
+    check(submitted.ok() && submittedBody.ok, `Tournament submits through actual media verification (HTTP ${submitted.status()})`);
+    const saved = (await db.collection("tournaments").doc(draftId).get()).data();
+    check(saved.status === "pending_review" && saved.teamConfig.captainPaysEntryFee === false && saved.teamPaymentWindowMinutes === 30, "reviewed draft preserves the individual-member payment model and chosen window");
+    check(saved.creatorMediaVerification.cover.path.startsWith(`verified-tournament-media/${draftId}/`), "review references immutable verified promotional bytes");
+    const anonymous = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const publicPage = await anonymous.newPage();
+    check((await anonymous.request.get(`${baseUrl}/api/tournaments/${draftId}`)).status() === 404, "unpublished Tournament draft is not public");
+    // Explicit demo data tests rendering at scale; engine progression has separate actual-handler tests.
+    const bracketId = `bracket_${runId}`;
+    await db.collection("tournaments").doc(bracketId).set({ id: bracketId, hostId: owner.uid, title: "128-slot rendering fixture", description: "A public rendering fixture with no live competition or financial activity.", privacy: "public", status: "round_active", configVersion: 3, format: "single_elimination", participationMode: "individual", participantCapacity: 128, participantCount: 128, submissionDurationHours: 48, votingDurationHours: 72, prizeDistribution: [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }], privateReviewNote: "PRIVATE_BROWSER_SENTINEL" });
+    const writer = db.bulkWriter();
+    for (let index = 0; index < 128; index++) writer.set(db.collection("tournamentParticipants").doc(`${bracketId}_${index}`), { tournamentId: bracketId, status: "active", seed: index + 1, displayName: `Entrant ${index + 1}`, publicDisplayName: true });
+    for (let round = 1; round <= 7; round++) for (let match = 1; match <= 128 / (2 ** round); match++) writer.set(db.collection("tournamentMatches").doc(`${bracketId}_${round}_${match}`), { tournamentId: bracketId, roundNumber: round, matchNumber: match, bracket: "winners", status: round === 1 ? "submissions_open" : "pending", participantAId: round === 1 ? `${bracketId}_${(match - 1) * 2}` : null, participantBId: round === 1 ? `${bracketId}_${(match - 1) * 2 + 1}` : null });
+    writer.set(db.collection("tournamentMatches").doc(`${bracketId}_bronze`), { tournamentId: bracketId, roundNumber: 8, matchNumber: 1, bracket: "bronze", status: "pending", participantAId: null, participantBId: null });
+    await writer.close();
+    const completeBracketResponse = await anonymous.request.get(`${baseUrl}/api/tournaments/${bracketId}`);
+    const completeBracket = await completeBracketResponse.json();
+    check(completeBracketResponse.ok() && completeBracket.ok && completeBracket.data.participants.length === 128 && completeBracket.data.matches.length === 128, "public API returns every entrant and match in the 128-slot fixture");
+    await publicPage.goto(`${baseUrl}/tournaments/${bracketId}`, { waitUntil: "domcontentloaded" });
+    const tablist = publicPage.getByRole("tablist", { name: "Tournament information" });
+    await tablist.waitFor({ state: "visible" });
+    check(await tablist.getByRole("tab").allTextContents().then(labels => labels.join("|") === "Overview|Bracket|Matches|Participants|Prizes|Rules"), "Details exposes exactly the six required tabs");
+    await tablist.getByRole("tab", { name: "Overview", exact: true }).focus();
+    await publicPage.keyboard.press("ArrowRight");
+    await publicPage.getByRole("button", { name: "Round View", exact: true }).waitFor();
+    check(await publicPage.getByRole("button", { name: "Round View", exact: true }).getAttribute("aria-pressed") === "true", "keyboard tab navigation opens default Round View");
+    await publicPage.getByRole("button", { name: "Full Bracket", exact: true }).click();
+    const bracket = publicPage.getByRole("region", { name: /^Full Tournament bracket/ });
+    await bracket.waitFor({ state: "visible" });
+    check(await bracket.getByRole("link").count() === 128, "all 128 generated match cards are available without truncation");
+    await publicPage.getByRole("button", { name: "Zoom bracket in", exact: true }).click();
+    await expect(publicPage.getByText("125%", { exact: true })).toBeVisible();
+    check(await publicPage.getByText("125%", { exact: true }).isVisible(), "Full Bracket has a working zoom control");
+    check(!(await publicPage.content()).includes("PRIVATE_BROWSER_SENTINEL"), "private review fields are absent from public client payloads");
+    await publicPage.screenshot({ path: join(artifacts, "tournament-bracket-desktop.png"), fullPage: true });
+    await publicPage.setViewportSize({ width: 390, height: 844 });
+    check(await bracket.evaluate(element => element.scrollWidth > element.clientWidth), "mobile Full Bracket supports horizontal exploration without compressing match cards");
+    await publicPage.screenshot({ path: join(artifacts, "tournament-bracket-mobile.png"), fullPage: true });
+    await anonymous.close(); await context.close();
+  }, { requiresMedia: true });
+
   await test("Individual Tournament registration and physical Live Event registration persist from browser forms", async () => {
     const tournamentContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const tournamentPage = await login(tournamentContext, participant, { rememberMe: true });
     await tournamentPage.goto(`${baseUrl}/tournaments/${tournamentId}`, { waitUntil: "domcontentloaded" });
-    const tournamentJoinLink = tournamentPage.getByRole("link", { name: "Join / Apply" });
+    const tournamentJoinLink = tournamentPage.getByRole("link", { name: "Join Tournament", exact: true });
     const tournamentJoinHref = await tournamentJoinLink.getAttribute("href");
     const tournamentJoinPath = `/tournaments/${tournamentId}/join`;
     const tournamentJoinNavigation = tournamentPage.waitForURL((url) => url.pathname === tournamentJoinPath, { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
@@ -928,6 +1033,72 @@ try {
     await eventPage.screenshot({ path: join(artifacts, "live-event-registration-mobile.png"), fullPage: true });
     await eventContext.close();
   });
+
+  await test("Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result", async () => {
+    const opponent = await seedUser("matchopponent", { role: "creator" });
+    const voter = await seedUser("matchvoter", { role: "creator" });
+    const id = `e2e_match_${runId}`, matchId = `${id}_final`, roundId = `${id}_round`;
+    const a = `${id}_${participant.uid}`, b = `${id}_${opponent.uid}`;
+    const { TOURNAMENT_PRODUCT_POLICY } = await import("../../lib/tournament-builder-policy.ts");
+    await db.collection("tournaments").doc(id).set({ id, title: "Browser verified match", hostId: creator.uid, productPolicyVersion: TOURNAMENT_PRODUCT_POLICY, configVersion: 3, privacy: "public", status: "active", participationMode: "individual", resultMethod: "votes", submissionMediaTypes: ["image"], submissionDurationHours: 12, votingDurationHours: 12, format: "single_elimination", voting: { paidVotesActive: true } });
+    await db.collection("tournamentRounds").doc(roundId).set({ tournamentId: id, status: "active", roundNumber: 1 });
+    await db.collection("tournamentMatches").doc(matchId).set({ tournamentId: id, roundId, roundNumber: 1, matchNumber: 1, bracket: "winners", status: "submissions_open", resultMethod: "votes", participantAId: a, participantBId: b, submissionsOpenedAt: new Date(Date.now() - 1000).toISOString(), submissionDeadlineAt: new Date(Date.now() + 12 * 3600_000).toISOString(), voteCountA: 0, voteCountB: 0, voteSequence: 0, tiePrioritySlot: "A" });
+    for (const [entryId, person] of [[a, participant], [b, opponent]]) await db.collection("tournamentParticipants").doc(entryId).set({ tournamentId: id, userId: person.uid, status: "active", lossCount: 0 });
+    await db.collection("doroCoinWallets").doc(voter.uid).set({ balance: 10 });
+    const { default: sharp } = await import("sharp");
+    const contexts = [];
+    async function upload(person, color, replacement = false) {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 800 } }); contexts.push(context);
+      const page = await login(context, person, { rememberMe: true });
+      await page.goto(`${baseUrl}/tournaments/${id}/matches/${matchId}`, { waitUntil: "domcontentloaded" });
+      await page.getByRole("heading", { name: "Your fresh match submission", exact: true }).waitFor();
+      await page.locator('input[type="file"]').first().setInputFiles({ name: `match-${color}.png`, mimeType: "image/png", buffer: await sharp({ create: { width: 24, height: 24, channels: 3, background: color } }).png().toBuffer() });
+        await expect(page.getByRole("paragraph").filter({ hasText: "Upload complete." })).toBeVisible();
+      const response = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${id}/submissions` && response.request().method() === "POST");
+      await page.getByRole("button", { name: replacement ? "Submit replacement" : "Submit match entry", exact: true }).click();
+      check((await response).ok(), "Match UI saves verified media through the actual authorized endpoint");
+      return page;
+    }
+    await upload(participant, "red");
+    await upload(participant, "purple", true);
+    check((await db.collection("tournamentSubmissions").doc(`${id}_${matchId}_${a}`).get()).data()?.revision === 2, "Browser replacement preserves optimistic revision checks");
+    await upload(opponent, "blue");
+    const adminContext = await browser.newContext(); contexts.push(adminContext);
+    const adminPage = await login(adminContext, admin, { rememberMe: true });
+    await adminPage.goto(`${baseUrl}/admin/tournaments/${id}`, { waitUntil: "domcontentloaded" });
+    for (let index = 0; index < 2; index++) {
+        await adminPage.getByRole("textbox", { name: "Decision reason (required)", exact: true }).fill("Verified isolated browser submission media");
+      await adminPage.getByLabel("I have reviewed the relevant evidence and confirm this decision.").check();
+      const response = adminPage.waitForResponse(response => new URL(response.url()).pathname === `/api/admin/tournaments/${id}` && response.request().method() === "POST");
+      await adminPage.getByRole("button", { name: "Approve submission", exact: true }).first().click();
+      check((await response).ok(), "Admin moderation UI persists the authorized decision");
+      await expect(adminPage.getByRole("button", { name: "Approve submission", exact: true })).toHaveCount(1 - index);
+    }
+    const worker = phase => execFileSync(process.execPath, ["--experimental-transform-types", "--experimental-loader", "./scripts/ts-alias-loader.mjs", "scripts/qa/tournament-browser-worker.mjs", id, phase], { cwd: repoRoot, env: process.env, stdio: "pipe", timeout: 120000 });
+    await db.collection("tournamentMatches").doc(matchId).update({ submissionDeadlineAt: new Date(Date.now() - 1).toISOString() });
+    worker("open");
+    check((await db.collection("tournamentMatches").doc(matchId).get()).data()?.status === "voting_open", "Real lifecycle processing opens voting only after the fixture deadline and approvals");
+    const voterContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); contexts.push(voterContext);
+    const page = await login(voterContext, voter, { rememberMe: true });
+    await page.goto(`${baseUrl}/tournaments/${id}/matches/${matchId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Vote", exact: true }).first().waitFor();
+    check(await page.getByLabel("Verified final vote tally").count() === 0, "Live totals remain hidden before verification");
+    for (let index = 0; index < 2; index++) {
+      if (index) page.once("dialog", dialog => dialog.accept());
+      const response = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${id}/votes` && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Vote", exact: true }).first().click();
+      check((await response).ok(), index ? "Confirmed additional browser vote uses DoroCoins" : "First browser vote is free");
+    }
+    check((await db.collection("doroCoinWallets").doc(voter.uid).get()).data()?.balance === 5, "Exactly five DoroCoins are debited once");
+    await db.collection("tournamentMatches").doc(matchId).update({ votingClosesAt: new Date(Date.now() - 1).toISOString() });
+    worker("result");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByLabel("Verified final vote tally").waitFor();
+    check((await db.collection("tournamentMatches").doc(matchId).get()).data()?.status === "confirmed", "Leased worker verifies the browser votes and final result");
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Verified Match Details remains usable on mobile");
+    await page.screenshot({ path: join(artifacts, "tournament-match-verified-mobile.png"), fullPage: true });
+    for (const context of contexts) await context.close();
+  }, { requiresMedia: true });
 
   await test("Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions", async () => {
     const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });

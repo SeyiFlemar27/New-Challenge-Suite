@@ -5,7 +5,7 @@ import type { Firestore } from "firebase-admin/firestore";
 
 const MAX_RECONCILE_SCAN = 500;
 const DISPATCH_LEASE_MS = 60_000;
-const SCHEDULABLE_TOURNAMENT_JOB_TYPES = ["activate_full_tournament", "process_tournament_match_lifecycle"] as const;
+const SCHEDULABLE_TOURNAMENT_JOB_TYPES = ["activate_full_tournament", "process_tournament_match_lifecycle", "expire_team_registration"] as const;
 
 export type TournamentActivationTask = { jobId: string; version: number; runAt: string };
 export type TournamentTaskScheduler = { scheduleActivation(task: TournamentActivationTask): Promise<{ taskName: string }>; verifyDispatchAccess?(): Promise<boolean> };

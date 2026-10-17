@@ -18,8 +18,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const settings = challenge.votingSettings && typeof challenge.votingSettings === "object" ? challenge.votingSettings as Record<string, unknown> : {};
   const economy = submissions ? await getActiveEconomyRules(db) : null;
   const result = ok({ challenge: { ...preview, coverImage: challenge.coverImagePath ? challengeMediaDeliveryUrl(String(challenge.coverImagePath)) : "" },
-    voting: { free: Boolean(submissions && settings.allowFreeVotes !== false), dorocoin: Boolean(submissions && economy?.voting.paidVotingEnabled && challenge.paidVotingDisabledByAdmin !== true && (settings.allowPaidVotes === undefined ? settings.allowDoroCoinVotes !== false : settings.allowPaidVotes !== false)), doroCoinCost: DOROCOIN_COST_PER_VOTE },
+    voting: { automaticFreeFirst: usesAutomaticVoting(challenge), free: Boolean(submissions && (usesAutomaticVoting(challenge) || settings.allowFreeVotes !== false)), dorocoin: Boolean(submissions && economy?.voting.paidVotingEnabled && challenge.paidVotingDisabledByAdmin !== true && (usesAutomaticVoting(challenge) || (settings.allowPaidVotes === undefined ? settings.allowDoroCoinVotes !== false : settings.allowPaidVotes !== false))), doroCoinCost: DOROCOIN_COST_PER_VOTE },
     submissions: submissions?.docs.filter((doc) => canSubmissionReceiveVotes(doc.data().status) && doc.data().visibility === "public" && doc.data().leaderboardEligible === true).map((doc) => ({ id: doc.id, title: String(doc.data().title ?? "Submission"), mediaUrl: doc.data().mediaPath ? challengeMediaDeliveryUrl(String(doc.data().mediaPath)) : "", mediaType: String(doc.data().mediaType ?? "") })) ?? [] }, "Locked preview loaded.");
   result.headers.set("Cache-Control", "no-store, private");
   return result;
 }
+import { usesAutomaticVoting } from "@/lib/automatic-voting-policy";

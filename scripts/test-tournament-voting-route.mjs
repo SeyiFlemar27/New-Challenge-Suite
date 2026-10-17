@@ -163,6 +163,13 @@ try {
   await db.collection("tournamentSubmissions").doc(teamSubmission).set({ tournamentId: teamTournamentId, matchId: teamMatchId, roundId: `${teamMatchId}_round`, participantId: teamA, teamId: teamA, status: "submitted" }, { merge: true });
   const ownTeamVote = await vote({ voter: voters[4], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
   equal(ownTeamVote.status, 403, "a Team member cannot vote in their own Team's match");
+  const opponentTeamVote = await vote({ voter: voters[5], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
+  equal(opponentTeamVote.status, 403, "a Team member cannot vote for the opposing Team in their own match");
+  const selfMatch = `${runId}_opponent_self_match`;
+  await seedMatch({ matchId: selfMatch, participantAId: `${selfMatch}_a`, participantBId: `${selfMatch}_b`, submissionAId: `${selfMatch}_submission` });
+  await db.collection("tournamentParticipants").doc(`${selfMatch}_b`).update({ userId: voters[3].uid });
+  const opponentIndividualVote = await vote({ voter: voters[3], matchId: selfMatch, submissionId: `${selfMatch}_submission`, participantId: `${selfMatch}_a` });
+  equal(opponentIndividualVote.status, 403, "an Individual competitor cannot vote for their opponent");
   const validTeamVote = await vote({ voter: voters[0], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamA, tournament: teamTournamentId });
   equal(validTeamVote.status, 200, "an unrelated eligible voter can vote for a valid Team-owned submission");
   const forgedTeamVote = await vote({ voter: voters[2], matchId: teamMatchId, submissionId: teamSubmission, participantId: teamB, tournament: teamTournamentId });

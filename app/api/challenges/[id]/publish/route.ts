@@ -21,7 +21,7 @@ import { awardDoroCoinEngagement } from "@/lib/server/economy-dorocoin";
 import { getChallengePublishBlocker } from "@/lib/challenge-publish-readiness";
 import { normalizeBuilderChallengeType } from "@/lib/challenge-builder-foundation";
 import { getNormalChallengeReadiness } from "@/lib/normal-challenge-readiness";
-import { buildStoredVotingSettings } from "@/lib/server/challenge-publish-payload";
+import { AUTOMATIC_VOTING_POLICY_VERSION, AUTOMATIC_VOTING_SETTINGS } from "@/lib/automatic-voting-policy";
 import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
@@ -106,6 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
   if (!validation.success) return rejectPublish("Some required details are missing.", 400, { fieldErrors: zodFieldErrors(validation.error) }, "VALIDATION_ERROR");
   const body = validation.data;
+  body.monetization.paidVotesRequested = false;
   const privateAccessMethod = body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod;
   let privateAccess: Record<string, unknown> | null = null;
   const judgeAccountIds = body.hostOperations?.judgeAccountIds ?? [];
@@ -246,7 +247,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status: lifecycleStatus,
     lifecycleStatus,
     economyRuleVersion: current.economyRuleVersion ?? economyRules.version,
-    votingSettings: buildStoredVotingSettings(body.votingSettings),
+    automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION,
+    votingSettings: { ...AUTOMATIC_VOTING_SETTINGS },
     monetization: safeMonetization,
     sponsorEnabled,
     participantApprovalMode: "automatic",

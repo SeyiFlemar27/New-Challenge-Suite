@@ -1,3 +1,5 @@
+import { createTournamentVoteSequenceVerifier } from "@/lib/server/tournament-vote-sequence";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 import type {
   TournamentFoundation,
   TournamentInvitationStatus,
@@ -228,6 +230,12 @@ export function validateTournamentSubmission(params: { tournament: TournamentFou
   if (deadline && now >= new Date(deadline)) return { valid: false, code: "SUBMISSION_DEADLINE_CLOSED", message: "Submission deadline has passed." };
   if (!params.mediaUrl || !params.mediaPath) return { valid: false, code: "UPLOADED_MEDIA_REQUIRED", message: "Tournament submissions require uploaded media URL and storage path." };
   if (!["image", "video"].includes(String(params.mediaType))) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "Tournament submissions support image or video media." };
+  if (params.tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+    if (!opensAt || !deadline || !Number.isFinite(Date.parse(String(opensAt))) || !Number.isFinite(Date.parse(String(deadline)))) return { valid: false, code: "SUBMISSION_WINDOW_INVALID", message: "The authoritative submission window is unavailable." };
+    if (!params.tournament.submissionMediaTypes?.includes(params.mediaType as "image" | "video")) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "This Tournament does not accept that media type." };
+    if (params.existingStatus && !["submitted", "pending_moderation", "under_review", "approved", "rejected"].includes(params.existingStatus)) return { valid: false, code: "SUBMISSION_ALREADY_RECORDED", message: "This submission requires exceptional review." };
+    return { valid: true, code: "SUBMISSION_VALID", message: "Submission can be recorded and reviewed." };
+  }
   if (params.existingStatus === "submitted" && !params.replacementAllowed) return { valid: false, code: "REPLACEMENT_NOT_ALLOWED", message: "Submission replacement is not allowed by tournament rules." };
   if (params.existingStatus && params.existingStatus !== "submitted") return { valid: false, code: "SUBMISSION_ALREADY_RECORDED", message: "An official submission has already been recorded for this match." };
   return { valid: true, code: "SUBMISSION_VALID", message: "Submission can be recorded." };
@@ -241,7 +249,8 @@ export function validateTournamentVote(params: {
 }) {
   const now = params.now ?? new Date();
   const voting = (params.tournament.voting ?? {}) as Record<string, unknown>;
-  if (params.tournament.status !== "active" && params.tournament.status !== "round_active") return { valid: false, code: "TOURNAMENT_NOT_VOTING", message: "This tournament is not accepting votes." };
+  const pendingBronze = Number(params.tournament.configVersion ?? 1) >= 3 && params.tournament.status === "under_review" && params.match.bracket === "bronze" && !(params.tournament as unknown as Record<string, unknown>).settlementId;
+  if (params.tournament.status !== "active" && params.tournament.status !== "round_active" && !pendingBronze) return { valid: false, code: "TOURNAMENT_NOT_VOTING", message: "This tournament is not accepting votes." };
   if (params.tournament.resultMethod !== "votes" || params.match.resultMethod !== "votes") return { valid: false, code: "PUBLIC_VOTING_DISABLED", message: "Public voting is not the configured decision method for this match." };
   const versionThree = Number(params.tournament.configVersion ?? 1) >= 3;
   if (params.match.resultStatus === "confirmed" || (versionThree
@@ -280,42 +289,12 @@ export function tournamentMatchVoteOutcome(match: TournamentMatchFoundation) {
 export function resolveTournamentVoteEventSequence(params: {
   match: TournamentMatchFoundation;
   votes: Array<Record<string, unknown>>;
-  maximumEvents?: number;
 }) {
   const { match, votes } = params;
-  const maximumEvents = params.maximumEvents ?? 5000;
-  if (votes.length > maximumEvents) return { valid: false, code: "VOTE_EVENT_LIMIT_EXCEEDED", votesA: 0, votesB: 0, winnerParticipantId: null, tied: false, totalVotes: votes.length, resolution: "held" as const };
   const ordered = [...votes].sort((a, b) => Number(a.voteSequence) - Number(b.voteSequence));
-  const seen = new Set<number>();
-  let votesA = 0;
-  let votesB = 0;
-  const sequencesA: number[] = [];
-  const sequencesB: number[] = [];
-  for (const [index, event] of ordered.entries()) {
-    const sequence = Number(event.voteSequence);
-    const participantId = String(event.selectedParticipantId ?? event.participantId ?? "");
-    if (!Number.isSafeInteger(sequence) || sequence !== index + 1 || seen.has(sequence) || ![match.participantAId, match.participantBId].includes(participantId) || event.status !== "recorded") {
-      return { valid: false, code: "VOTE_EVENT_INTEGRITY_FAILED", votesA, votesB, winnerParticipantId: null, tied: false, totalVotes: ordered.length, resolution: "held" as const };
-    }
-    seen.add(sequence);
-    if (participantId === match.participantAId) { votesA += 1; sequencesA.push(sequence); }
-    else { votesB += 1; sequencesB.push(sequence); }
-  }
-  if (ordered.length !== Number(match.voteSequence ?? 0) || seen.size !== Number(match.voteSequence ?? 0)) {
-    return { valid: false, code: "VOTE_EVENT_SEQUENCE_MISMATCH", votesA, votesB, winnerParticipantId: null, tied: votesA === votesB, totalVotes: ordered.length, resolution: "held" as const };
-  }
-  if (votesA !== Number(match.voteCountA ?? 0) || votesB !== Number(match.voteCountB ?? 0)) {
-    return { valid: false, code: "VOTE_TALLY_MISMATCH", votesA, votesB, winnerParticipantId: null, tied: votesA === votesB, totalVotes: ordered.length, resolution: "held" as const };
-  }
-  if (votesA !== votesB) return { valid: true, code: "VOTE_SEQUENCE_WINNER", votesA, votesB, winnerParticipantId: votesA > votesB ? match.participantAId : match.participantBId, tied: false, totalVotes: ordered.length, resolution: "vote_total" as const };
-  if (votesA > 0) {
-    const sequenceA = sequencesA[votesA - 1];
-    const sequenceB = sequencesB[votesB - 1];
-    if (sequenceA !== sequenceB) return { valid: true, code: "TIE_RESOLVED_BY_FINAL_TALLY_SEQUENCE", votesA, votesB, winnerParticipantId: sequenceA < sequenceB ? match.participantAId : match.participantBId, tied: true, totalVotes: ordered.length, resolution: "final_tally_sequence" as const };
-  }
-  const priority = match.tiePrioritySlot === "A" ? match.participantAId : match.tiePrioritySlot === "B" ? match.participantBId : null;
-  if (!priority) return { valid: false, code: "TIE_PRIORITY_MISSING", votesA, votesB, winnerParticipantId: null, tied: true, totalVotes: ordered.length, resolution: "held" as const };
-  return { valid: true, code: "TIE_RESOLVED_BY_PRE_RECORDED_PRIORITY", votesA, votesB, winnerParticipantId: priority, tied: true, totalVotes: ordered.length, resolution: "pre_recorded_priority" as const };
+  const verifier = createTournamentVoteSequenceVerifier(match);
+  ordered.forEach((event) => verifier.accept(event));
+  return verifier.finish();
 }
 
 export function validateJudgeRubric(criteria: Array<{ name: string; weight: number }>) {
@@ -442,7 +421,7 @@ export function auditEvent(params: { id: string; tournamentId: string; actorId: 
 export const TOURNAMENT_MANAGEMENT_ROLES = ["host", "manager", "participant_manager", "submission_reviewer", "moderator", "judge_coordinator", "finance_viewer"] as const;
 
 export function adminTournamentActionFoundation(action: string) {
-  const sensitive = ["approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation", "submission_approved", "submission_rejected"];
+  const sensitive = ["reconcile_team_entitlements", "approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation", "submission_approved", "submission_rejected"];
   return { action, adminRequired: sensitive.includes(action), auditRequired: sensitive.includes(action), payoutProviderCalled: false, rawVoteTotalEditable: false, balanceOverwriteAllowed: false };
 }
 

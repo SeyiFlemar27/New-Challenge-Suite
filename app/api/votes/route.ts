@@ -1,7 +1,12 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
-import { castVote } from "@/lib/server/voting";
+import { castVote, freeVoteGuardId, validVotingTimeZone, voteDateKeyForTimeZone } from "@/lib/server/voting";
+import { usesAutomaticVoting } from "@/lib/automatic-voting-policy";
+import { canVoteOnChallenge } from "@/lib/challenge-status";
+import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { userOwnsChallenge } from "@/lib/server/challenge-access";
+import { votingAccountRestricted } from "@/lib/voting-account-policy";
 import { canAccessChallenge, getUserPlanAccess } from "@/lib/plan-access";
 import { voteRequestSchema, zodFieldErrors } from "@/lib/server/vote-validation";
 import { suspiciousVoteSignals, voteSignalHashes } from "@/lib/server/fraud-signals";
@@ -9,6 +14,29 @@ import { getRequestIdempotencyKey } from "@/lib/server/idempotency";
 import { challengeForPlanAccess, hasPublicVotingAccess } from "@/lib/server/challenge-access";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { grantRewardPointsForEvent } from "@/lib/server/reward-economy";
+
+export async function GET(request: Request) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Voting status");
+  const challengeId = new URL(request.url).searchParams.get("challengeId") ?? "";
+  if (!challengeId || challengeId.length > 200 || challengeId.includes("/")) return validationError({ challengeId: "A valid Challenge ID is required." });
+  const [challengeSnap, accountSnap, profileSnap, wallet] = await Promise.all([db.collection("challenges").doc(challengeId).get(), db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get(), db.collection("doroCoinWallets").doc(user.uid).get()]);
+  if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+  const challenge = { ...challengeSnap.data(), id: challengeId };
+  const profile = { ...profileSnap.data(), ...accountSnap.data() };
+  const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
+  const publicVotingOnly = accessContext.privateOnly && !accessContext.hasAccessGrant && hasPublicVotingAccess(challenge);
+  if (accessContext.privateOnly && !accessContext.hasAccessGrant && !publicVotingOnly) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
+  const access = canAccessChallenge(profile, publicVotingOnly ? { ...challenge, visibility: "public" } : accessContext.challenge);
+  if (!access.allowed) return fail("Voting access is unavailable.", 403, undefined, "CHALLENGE_ACCESS_DENIED");
+  const zone = validVotingTimeZone(profile.timeZone ?? profile.timezone);
+  const date = voteDateKeyForTimeZone(new Date(), zone);
+  const guard = await db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(user.uid, challengeId, date)).get();
+  const canVote = canVoteOnChallenge(challenge) && !userOwnsChallenge(challenge, user.uid) && !isSponsorProfile(profile) && !votingAccountRestricted(profile);
+  return ok({ automaticFreeFirst: usesAutomaticVoting(challenge), canVote, freeVote: { used: guard.exists, available: !guard.exists }, doroCoinCost: 5, balance: Number(wallet.data()?.balance ?? 0) }, "Current voting state. Eligibility is rechecked when a vote is requested.");
+}
 
 export async function POST(request: Request) {
   const { user, response } = await requireRequestUser(request);
@@ -60,6 +88,7 @@ export async function POST(request: Request) {
       challengeId: body.challengeId,
       submissionId: body.submissionId,
       voteMode: body.voteMode,
+      confirmedDoroCoinSpend: body.confirmedDoroCoinSpend,
       quantity: body.quantity,
       planId: planAccess.normalizedPlanId,
       dailyFreeVoteLimit: planAccess.dailyFreeVoteLimit,

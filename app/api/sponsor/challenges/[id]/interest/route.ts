@@ -3,6 +3,7 @@ import { requireSponsorContext, requireSponsorPermission } from "@/lib/server/sp
 import { fail, ok, readJson, serverError, validationError } from "@/lib/server/responses";
 import { validateSponsorFundingWindow } from "@/lib/server/payout-structure";
 import { deterministicId } from "@/lib/server/idempotency";
+import { sponsorSubjectType, sponsorSubjectCollection, sponsorSubjectPrefix, sponsorTermsFingerprint, tournamentSponsorFundingWindow } from "@/lib/server/sponsor-subject";
 
 export const dynamic = "force-dynamic";
 
@@ -28,17 +29,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = schema.safeParse(parsed.body ?? {});
   if (!body.success) return validationError(Object.fromEntries(body.error.issues.map((issue) => [String(issue.path[0] ?? "terms"), issue.message])));
   const { id: challengeId } = await params;
+  let subjectType;
+  try { subjectType = sponsorSubjectType(request); } catch { return validationError({ subjectType: "Select a supported opportunity type." }); }
   const now = new Date().toISOString();
-  const agreementId = deterministicId("sponsor_opportunity", challengeId, context.organizationId);
+  const agreementId = deterministicId(sponsorSubjectPrefix(subjectType, "sponsor_opportunity"), challengeId, context.organizationId);
   const agreementRef = context.db.collection("sponsorChallengeAgreements").doc(agreementId);
   try {
     const result = await context.db.runTransaction(async (transaction) => {
-      const challengeRef = context.db.collection("challenges").doc(challengeId);
+      const challengeRef = context.db.collection(sponsorSubjectCollection(subjectType)).doc(challengeId);
       const [challengeSnap, agreementSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(agreementRef)]);
       if (!challengeSnap.exists) throw new Error("OPPORTUNITY_NOT_FOUND");
       const challenge = challengeSnap.data() ?? {};
-      const available = validateSponsorFundingWindow(challenge);
-      if (!available.allowed || !["public", "published", "public challenge"].includes(String(challenge.visibility ?? "public").toLowerCase()) || !(challenge.sponsorEnabled === true || challenge.sponsorReady === true || (challenge.monetization as Record<string, unknown> | undefined)?.sponsorReady === true)) throw new Error("OPPORTUNITY_UNAVAILABLE");
+      const available = subjectType === "tournament" ? tournamentSponsorFundingWindow(challenge) : validateSponsorFundingWindow(challenge);
+      if (!available.allowed || (subjectType !== "tournament" && (!["public", "published", "public challenge"].includes(String(challenge.visibility ?? "public").toLowerCase()) || !(challenge.sponsorEnabled === true || challenge.sponsorReady === true || (challenge.monetization as Record<string, unknown> | undefined)?.sponsorReady === true)))) throw new Error("OPPORTUNITY_UNAVAILABLE");
       const sponsorOrganizationId = String(context.organizationId);
       const creatorId = String(challenge.creatorId ?? challenge.hostId ?? "");
       if (!creatorId) throw new Error("OPPORTUNITY_OWNER_MISSING");
@@ -55,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const agreement = {
         id: agreementId,
         challengeId,
+        ...(subjectType === "tournament" ? { subjectType, tournamentId: challengeId } : {}),
         challengeTitle: String(challenge.title ?? "Challenge").slice(0, 180),
         creatorId,
         sponsorId: sponsorOrganizationId,
@@ -80,8 +84,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         createdAt: now,
         updatedAt: now
       };
-      transaction.create(agreementRef, agreement);
-      return { agreement, duplicate: false };
+      const storedAgreement = subjectType === "tournament" ? { ...agreement, termsFingerprint: sponsorTermsFingerprint(agreement.terms) } : agreement;
+      transaction.create(agreementRef, storedAgreement);
+      return { agreement: storedAgreement, duplicate: false };
     });
     return ok(result, result.duplicate ? "Your interest is already recorded for this opportunity." : "Sponsorship interest and proposed terms sent to the challenge owner.");
   } catch (error) {

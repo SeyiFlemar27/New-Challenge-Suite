@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const operations = readFileSync("lib/server/tournament-operations.ts", "utf8");
-const results = readFileSync("app/api/tournaments/[id]/results/route.ts", "utf8");
+const results = readFileSync("lib/server/tournament-result-confirmation.ts", "utf8");
 const management = readFileSync("app/api/tournaments/[id]/manage/actions/route.ts", "utf8");
 
 assert.match(operations, /_bronze_match/);

@@ -1,4 +1,5 @@
 import type { TournamentFoundation, TournamentPrizeDistribution, TournamentResultMethod, TournamentRoundPlanItem } from "@/lib/tournament-types";
+import { tournamentOrderedText, TOURNAMENT_PLACEMENT_SPLITS, TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -83,8 +84,23 @@ export function buildRoundRobinPlan(capacity: number, resultMethod: TournamentRe
   }));
 }
 
+/** Builder preview follows the engine's bracket groups; it does not schedule calendar dates. */
+export function buildTournamentRoundPlan(capacity: number, format: "single_elimination" | "double_elimination"): TournamentRoundPlanItem[] {
+  if (format === "single_elimination") return buildRoundPlan(capacity, "votes", "third_place_match");
+  const winners = buildRoundPlan(capacity).map(round => ({ ...round, title: `Winners ${round.title}` }));
+  const rounds = winners.length;
+  if (!rounds) return [];
+  const template = winners[0];
+  return [
+    ...winners,
+    ...Array.from({ length: 2 * (rounds - 1) }, (_, index) => ({ ...template, roundNumber: rounds + index + 1, title: `Losers Round ${index + 1}`, brief: "A second loss eliminates a competitor.", advancementRule: "validated_losers_bracket_advancement" })),
+    { ...template, roundNumber: rounds * 3, title: "Grand Final", brief: "Winners and Losers bracket finalists compete.", advancementRule: "validated_grand_final_result" },
+    { ...template, roundNumber: rounds * 3 + 1, title: "Grand Final Reset (if required)", brief: "Played only when the previously undefeated finalist receives their first loss in the Grand Final.", advancementRule: "conditional_grand_final_reset" }
+  ];
+}
+
 export function defaultPrizeDistribution(): TournamentPrizeDistribution[] {
-  return [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }];
+  return TOURNAMENT_PLACEMENT_SPLITS.map(item => ({ ...item }));
 }
 
 export function tournamentDraftFromInput(input: Record<string, unknown>, hostId: string, now = new Date().toISOString()): Omit<TournamentFoundation, "id"> {
@@ -92,6 +108,7 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
   const storageDisabled = (input.coverMedia as Record<string, unknown> | undefined)?.status === "storage_disabled" || input.mediaUploadStatus === "storage_disabled";
   return {
     hostId,
+    productPolicyVersion: TOURNAMENT_PRODUCT_POLICY,
     createdBy: hostId,
     officialChallenge,
     ownershipType: officialChallenge ? "challenge_suite_official" : input.ownershipType === "enterprise_personal" ? "enterprise_personal" : "creator_personal",
@@ -104,17 +121,27 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     shortDescription: text(input.shortDescription),
     description: text(input.description),
     category: text(input.category),
+    subcategory: text(input.subcategory),
+    tournamentRules: tournamentOrderedText(input.tournamentRules),
+    submissionInstructions: tournamentOrderedText(input.submissionInstructions),
+    submissionMediaTypes: (Array.isArray(input.submissionMediaTypes) ? input.submissionMediaTypes.filter((value): value is "image" | "video" => value === "image" || value === "video") : ["image", "video"]),
+    basePrizeAmountMinor: Math.max(0, Math.round(Number(input.basePrizeAmountMinor ?? 0))),
+    galleryMedia: Array.isArray(input.galleryMedia) ? input.galleryMedia.slice(0, 2) as TournamentFoundation["galleryMedia"] : [],
+    builderCurrentStep: text(input.builderCurrentStep, "overview"),
+    builderUnlockedStep: text(input.builderUnlockedStep, "overview"),
+    builderNavigationVersion: 2,
+    teamPaymentWindowMinutes: ([30, 60, 90, 120].includes(Number(input.teamPaymentWindowMinutes)) ? Number(input.teamPaymentWindowMinutes) : 60) as 30 | 60 | 90 | 120,
     coverMedia: { url: text(input.coverImageUrl) || null, path: text(input.coverImagePath) || null, status: text(input.coverImageUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
     trailerMedia: { url: text(input.trailerUrl) || null, path: text(input.trailerPath) || null, status: text(input.trailerUrl) ? "uploaded" : storageDisabled ? "storage_disabled" : "missing" },
     status: "draft",
-    configVersion: Math.max(3, positiveInteger(input.configVersion, 3)),
+    configVersion: 3,
     format: text(input.format, "single_elimination") as TournamentFoundation["format"],
     participationMode: text(input.participationMode, "individual") === "team" ? "team" : "individual",
     participantCapacity: positiveInteger(input.participantCapacity, 8),
     participantCount: 0,
-    privacy: text(input.privacy, "public") as TournamentFoundation["privacy"],
-    registrationType: text(input.registrationType, "open") === "invite_only" ? "invite_only" : "open",
-    roundPlan: buildRoundPlan(positiveInteger(input.participantCapacity, 8), "votes", text(input.format) === "single_elimination" ? "third_place_match" : "none"),
+    privacy: "public",
+    registrationType: "open",
+    roundPlan: buildTournamentRoundPlan(positiveInteger(input.participantCapacity, 8), input.format === "double_elimination" ? "double_elimination" : "single_elimination"),
     registrationOpensAt: null,
     registrationClosesAt: null,
     tournamentStartsAt: null,
@@ -127,14 +154,14 @@ export function tournamentDraftFromInput(input: Record<string, unknown>, hostId:
     eligibility: input.eligibility && typeof input.eligibility === "object" ? input.eligibility as Record<string, unknown> : {},
     requiresCheckIn: false,
     checkInClosesAt: null,
-    teamConfig: text(input.participationMode) === "team" ? { minimumSize: positiveInteger(input.minimumTeamSize, 2), maximumSize: Math.min(20, positiveInteger(input.maximumTeamSize, 5)), joiningMode: text(input.teamJoiningMode) === "invite_and_requests" ? "invite_and_requests" : "invite_only", captainPaysEntryFee: true, rosterLocksAtCapacity: true, rosterLocksAtCheckInClose: false } : null,
+    teamConfig: text(input.participationMode) === "team" ? { minimumSize: positiveInteger(input.minimumTeamSize, 2), maximumSize: Math.min(20, positiveInteger(input.maximumTeamSize, 5)), joiningMode: text(input.teamJoiningMode) === "invite_only" ? "invite_only" : "invite_and_requests", captainPaysEntryFee: false, rosterLocksAtCapacity: true, rosterLocksAtCheckInClose: false } : null,
     seedingMethod: "random",
     resultMethod: "votes",
     advancementMethod: "bracket",
-    voting: { paidVotesActive: (input.voting as Record<string, unknown> | undefined)?.paidVotesActive === true, webhookConfirmationRequired: true, freeVotePolicy: "one_per_match_per_local_day" },
+    voting: { paidVotesActive: true, automaticFreeFirst: true, webhookConfirmationRequired: true, freeVotePolicy: "one_per_match_per_local_day" },
     judging: { setupRequired: false, disabledForConfigVersion: 3 },
     tieBreaker: "pre_recorded_priority",
-    thirdPlaceMethod: text(input.format) === "single_elimination" ? "third_place_match" : "none",
+    thirdPlaceMethod: text(input.format, "single_elimination") === "single_elimination" ? "third_place_match" : "none",
     scoreVisibility: "final_only",
     prizeDistribution: Array.isArray(input.prizeDistribution) ? input.prizeDistribution as TournamentPrizeDistribution[] : defaultPrizeDistribution(),
     readiness: { readyToLaunch: false, lastCheckedAt: now, blockingErrors: [], warnings: [] },

@@ -101,6 +101,8 @@ assert.equal(validateTournamentSubmission(submissionBase).valid, true, "official
 assert.equal(validateTournamentSubmission({ ...submissionBase, now: new Date(deadline) }).code, "SUBMISSION_DEADLINE_CLOSED", "official content is rejected exactly at its deadline");
 assert.equal(validateTournamentSubmission({ ...submissionBase, existingStatus: "submitted", replacementAllowed: false }).code, "REPLACEMENT_NOT_ALLOWED", "replacement remains disabled unless the Tournament explicitly permits it");
 assert.equal(validateTournamentSubmission({ ...submissionBase, existingStatus: "approved", replacementAllowed: true }).code, "SUBMISSION_ALREADY_RECORDED", "approved submissions cannot be overwritten by an ordinary retry");
+assert.equal(validateTournamentVote({ tournament: { ...v3VotingConfig, status: "under_review" }, match: { ...v3Match, bracket: "bronze" }, round: v3Round, now: new Date("2026-01-01T00:30:00.000Z") }).valid, true, "the pending bronze match remains eligible while championship placements await review");
+assert.equal(validateTournamentVote({ tournament: { ...v3VotingConfig, status: "under_review", settlementId: "already_finalized" }, match: { ...v3Match, bracket: "bronze" }, round: v3Round, now: new Date("2026-01-01T00:30:00.000Z") }).valid, false, "a settled Tournament cannot reopen bronze voting");
 
 const singleTournament = { id: "settlement-se", format: "single_elimination" };
 const finalEvidence = { tournamentId: "settlement-se", status: "confirmed", bracket: "winners", nextMatchId: null, participantAId: "p1", participantBId: "p2", winnerParticipantId: "p1", loserParticipantId: "p2" };
@@ -118,7 +120,7 @@ const publicView = publicTournamentView({ id: "public-tournament", title: "Publi
 assert.equal(publicView.title, "Public");
 assert.equal("hostId" in publicView, false, "public projection omits owner identity");
 assert.equal("financeLedger" in publicView, false, "public projection omits financial internals");
-assert.deepEqual(publicView.prizePool, { confirmedPrizePoolMinor: 5000 }, "public projection exposes only confirmed prize total");
+assert.deepEqual(publicView.prizePool, { confirmedPrizePoolMinor: 5000, status: "confirmed_sources" }, "public projection exposes confirmed total and safe reconciliation status without source identifiers");
 assert.deepEqual(publicView.coverMedia, { url: "https://media.example/cover.jpg" }, "public projection omits private Storage path");
 const participantsForView = [{ id: "t_opaque-user-a", seed: 2 }, { id: "t_opaque-user-b", seed: 1 }];
 const publicIds = publicTournamentParticipantIds(participantsForView);
@@ -126,4 +128,4 @@ assert.notEqual(publicIds.get("t_opaque-user-a"), "t_opaque-user-a", "public ent
 const participantView = publicTournamentParticipantView({ id: "t_user-private", userId: "user-private", inviteId: "invite-private", status: "active", seed: 1 }, "entrant-1");
 assert.deepEqual(participantView, { id: "entrant-1", status: "active", seed: 1 }, "public participant projection omits user and invitation identifiers");
 
-console.log("Tournament V3 policy tests passed (53 assertions).");
+console.log("Tournament V3 policy tests passed (55 assertions).");

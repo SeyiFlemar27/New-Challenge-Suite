@@ -5,6 +5,9 @@ import { fail, ok } from "@/lib/server/responses";
 import type { TournamentFoundation, TournamentMatchFoundation } from "@/lib/tournament-types";
 
 const dateMs = (value: unknown) => { const result = new Date(String(value ?? "")).getTime(); return Number.isFinite(result) ? result : 0; };
+function permitsDeadlineTransition(tournament: Record<string, unknown> | undefined, match: Record<string, unknown> | undefined) {
+  return Boolean(tournament && (["active", "round_active"].includes(String(tournament.status)) || tournament.status === "under_review" && match?.bracket === "bronze" && !tournament.settlementId));
+}
 
 export async function processTournamentLifecycleAction(args: {
   db: Firestore;
@@ -54,7 +57,9 @@ export async function processTournamentLifecycleAction(args: {
         if (decision.action === "waiting" || decision.action === "hold") continue;
         if (decision.action === "review") {
           await db.runTransaction(async (transaction) => {
+            const tournamentState = await transaction.get(tournamentRef);
             const current = await transaction.get(matchRef);
+            if (!permitsDeadlineTransition(tournamentState.data(), current.data())) return;
             if (!current.exists || !["submissions_open", "submission_review"].includes(String(current.data()?.status ?? ""))) return;
             if (current.data()?.status !== "submission_review") transaction.set(matchRef, { status: "submission_review", moderationHoldReason: "platform_moderation_pending", updatedAt: nowIso }, { merge: true });
           });
@@ -66,10 +71,15 @@ export async function processTournamentLifecycleAction(args: {
           const roundRef = db.collection("tournamentRounds").doc(match.roundId);
           const submissionRefs = [match.participantAId, match.participantBId].map((participantId) => db.collection("tournamentSubmissions").doc(`${id}_${match.id}_${participantId}`));
           const opened = await db.runTransaction(async (transaction) => {
+            const fundingCutoffRef = db.collection("tournamentFundingCutoffs").doc(id);
+            const fundingCutoff = await transaction.get(fundingCutoffRef);
             const [currentTournament, currentMatch, currentRound, submissionA, submissionB] = await Promise.all([
               transaction.get(tournamentRef), transaction.get(matchRef), transaction.get(roundRef), transaction.get(submissionRefs[0]), transaction.get(submissionRefs[1])
             ]);
             if (!currentTournament.exists || !currentMatch.exists || !currentRound.exists || currentRound.data()?.tournamentId !== id) return false;
+            // Recheck persisted state inside the transition transaction: a queued
+            // request must not open voting after an intervening pause/cancellation.
+            if (!permitsDeadlineTransition(currentTournament.data(), currentMatch.data())) return false;
             const current = currentMatch.data() ?? {};
             const currentSubmissionDecision = resolveTournamentSubmissionDeadline({ participantAStatus: submissionA.data()?.status ?? null, participantBStatus: submissionB.data()?.status ?? null, extensionAlreadyUsed: current.noSubmissionExtensionUsed === true, submissionDeadlineAt: String(current.submissionDeadlineAt ?? ""), now });
             if (!["submissions_open", "submission_review"].includes(String(current.status ?? "")) || currentSubmissionDecision.action !== "open_voting") return false;
@@ -77,7 +87,15 @@ export async function processTournamentLifecycleAction(args: {
             transaction.set(matchRef, { status: "voting_open", votingOpenedAt: nowIso, votingClosesAt, moderationHoldReason: null, nextLifecycleCheckAt: null, updatedAt: nowIso }, { merge: true });
             transaction.set(roundRef, { status: "active", startsAt: currentRound.data()?.startsAt ?? nowIso, updatedAt: nowIso }, { merge: true });
             const tournament = currentTournament.data() ?? {};
-            if (!tournament.firstVotingOpenedAt) transaction.set(tournamentRef, { firstVotingOpenedAt: nowIso, tournamentVotingCutoffAt: nowIso, registrationRefundCutoffAt: nowIso, updatedAt: nowIso }, { merge: true });
+            if (!fundingCutoff.exists) {
+              // Old voting history must never be replaced by a later transition.
+              const firstVotingOpenedAt = tournament.firstVotingOpenedAt ?? nowIso;
+              transaction.create(fundingCutoffRef, { tournamentId: id, firstVotingOpenedAt, sourceMatchId: tournament.firstVotingOpenedAt ? null : match.id, createdAt: nowIso, policy: "provider_confirmation_strictly_before_first_voting" });
+            }
+            if (!tournament.firstVotingOpenedAt) {
+              const firstVotingOpenedAt = fundingCutoff.data()?.firstVotingOpenedAt ?? nowIso;
+              transaction.set(tournamentRef, { firstVotingOpenedAt, tournamentVotingCutoffAt: firstVotingOpenedAt, registrationRefundCutoffAt: firstVotingOpenedAt, updatedAt: nowIso }, { merge: true });
+            }
             const auditRef = db.collection("tournamentAuditEvents").doc(`${match.id}_voting_opened`);
             transaction.set(auditRef, { id: auditRef.id, tournamentId: id, actorId: "system_tournament_lifecycle", action: "match_voting_opened", createdAt: nowIso, metadata: { matchId: match.id, votingOpenedAt: nowIso, votingClosesAt } }, { merge: true });
             return true;
@@ -90,17 +108,15 @@ export async function processTournamentLifecycleAction(args: {
           if (!originalDeadline) continue;
           const extendedDeadline = new Date(originalDeadline + 12 * 60 * 60 * 1000).toISOString();
           const extended = await db.runTransaction(async (transaction) => {
+            const tournamentState = await transaction.get(tournamentRef);
             const current = await transaction.get(matchRef);
+            if (!permitsDeadlineTransition(tournamentState.data(), current.data())) return false;
             if (!current.exists || current.data()?.noSubmissionExtensionUsed === true || !["submissions_open", "submission_review"].includes(String(current.data()?.status ?? ""))) return false;
             transaction.set(matchRef, { noSubmissionExtensionUsed: true, originalSubmissionDeadlineAt: current.data()?.originalSubmissionDeadlineAt ?? current.data()?.submissionDeadlineAt, submissionExtensionAt: nowIso, submissionDeadlineAt: extendedDeadline, status: "submissions_open", moderationHoldReason: null, nextLifecycleCheckAt: null, updatedAt: nowIso }, { merge: true });
             const auditRef = db.collection("tournamentAuditEvents").doc(`${match.id}_no_submission_extension`);
             transaction.set(auditRef, { id: auditRef.id, tournamentId: id, actorId: "system_tournament_lifecycle", action: "no_submission_extension", createdAt: nowIso, metadata: { matchId: match.id, extensionHours: 12, submissionDeadlineAt: extendedDeadline } }, { merge: true });
             return true;
           });
-          if (extended) {
-            const recipientIds = [...new Set([match.participantAId, match.participantBId].flatMap((competitorId) => competitorRecipients.get(String(competitorId ?? "")) ?? []))];
-            await Promise.allSettled(recipientIds.map((recipientId) => createNotification(db, { userId: recipientId, type: "tournament_submission_extension", title: "Tournament submission extended", body: "Both competitors received one 12-hour submission extension.", entityType: "tournament_match", entityId: match.id, actionUrl: `/tournaments/${id}/matches/${match.id}`, idempotencyKey: `${match.id}_no_submission_extension_${recipientId}` })));
-          }
           outcomes.push({ matchId: match.id, action: extended ? "extension" : "transition_rechecked" });
           continue;
         }
@@ -112,7 +128,9 @@ export async function processTournamentLifecycleAction(args: {
           const submissionBRef = db.collection("tournamentSubmissions").doc(`${id}_${match.id}_${match.participantBId}`);
           const dependentRefs = [match.nextMatchId, match.loserNextMatchId].filter(Boolean).map((matchId) => db.collection("tournamentMatches").doc(String(matchId)));
           const held = await db.runTransaction(async (transaction) => {
+            const tournamentState = await transaction.get(tournamentRef);
             const [current, participantA, participantB, submissionA, submissionB, ...dependents] = await Promise.all([transaction.get(matchRef), transaction.get(participantARef), transaction.get(participantBRef), transaction.get(submissionARef), transaction.get(submissionBRef), ...dependentRefs.map((ref) => transaction.get(ref))]);
+            if (!permitsDeadlineTransition(tournamentState.data(), current.data())) return false;
             if (!current.exists || !participantA.exists || !participantB.exists || current.data()?.noSubmissionExtensionUsed !== true || !["submissions_open", "submission_review"].includes(String(current.data()?.status ?? ""))) return false;
             const currentData = current.data() ?? {};
             const stillDoubleForfeit = resolveTournamentSubmissionDeadline({ participantAStatus: submissionA.data()?.status ?? null, participantBStatus: submissionB.data()?.status ?? null, extensionAlreadyUsed: currentData.noSubmissionExtensionUsed === true, submissionDeadlineAt: String(currentData.submissionDeadlineAt ?? ""), now });
@@ -152,7 +170,7 @@ export async function processTournamentLifecycleAction(args: {
               resetRef ? transaction.get(resetRef) : Promise.resolve(null)
             ]);
             if (!currentTournament.exists || !current.exists || !winner.exists || !loser.exists) return false;
-            if (!["active", "round_active"].includes(String(currentTournament.data()?.status ?? ""))) return false;
+            if (!permitsDeadlineTransition(currentTournament.data(), current.data())) return false;
             const currentData = current.data() ?? {};
             if (currentData.tournamentId !== id || currentData.participantAId !== match.participantAId || currentData.participantBId !== match.participantBId || !["submissions_open", "submission_review"].includes(String(currentData.status ?? ""))) return false;
             const rechecked = resolveTournamentSubmissionDeadline({ participantAStatus: submissionA.data()?.status ?? null, participantBStatus: submissionB.data()?.status ?? null, extensionAlreadyUsed: true, submissionDeadlineAt: String(currentData.submissionDeadlineAt ?? ""), now });
@@ -191,7 +209,7 @@ export async function processTournamentLifecycleAction(args: {
             const roundSnapshots = await Promise.all(roundIds.map((roundId) => transaction.get(db.collection("tournamentRounds").doc(roundId))));
             transaction.set(matchRef, { status: "forfeit", resultStatus: "confirmed", winnerParticipantId: winnerId, loserParticipantId: loserId, forfeitReason: "submission_deadline_missed", forfeitedAt: nowIso, confirmedAt: nowIso, confirmedBy: "system_tournament_lifecycle", updatedAt: nowIso }, { merge: true });
             transaction.set(winnerRef, { status: "active", updatedAt: nowIso }, { merge: true });
-            transaction.set(loserRef, { lossCount: nextLosses, status: loserContinues ? "active" : "eliminated", updatedAt: nowIso }, { merge: true });
+            transaction.set(loserRef, { lossCount: nextLosses, status: loserContinues || resetRequired ? "active" : "eliminated", updatedAt: nowIso }, { merge: true });
             if (nextToPersist) transaction.set(db.collection("tournamentMatches").doc(nextToPersist.id), nextToPersist, { merge: true });
             if (loserMatch) transaction.set(db.collection("tournamentMatches").doc(loserMatch.id), loserMatch, { merge: true });
             if (resetMatch) transaction.set(db.collection("tournamentMatches").doc(resetMatch.id), resetMatch, { merge: true });
@@ -199,11 +217,13 @@ export async function processTournamentLifecycleAction(args: {
             finalPlacementRows.forEach((placement) => transaction.set(db.collection("tournamentPlacements").doc(`${id}_${placement.placement}`), { ...placement, id: `${id}_${placement.placement}`, tournamentId: id, userId: tournament.participationMode === "team" ? null : placement.participantId, teamId: tournament.participationMode === "team" ? placement.participantId : null, sourceMatchId: match.id, lockedAt: nowIso, payoutStatus: "pending_admin_review" }, { merge: true }));
             if (finalPlacementRows.length) transaction.set(tournamentRef, { status: "under_review", resultsUnderReviewAt: nowIso, updatedAt: nowIso }, { merge: true });
             transaction.create(db.collection("tournamentAuditEvents").doc(`${match.id}_submission_forfeit`), { id: `${match.id}_submission_forfeit`, tournamentId: id, actorId: "system_tournament_lifecycle", action: "submission_forfeit", createdAt: nowIso, metadata: { matchId: match.id, winnerId, loserId, nextLossCount: nextLosses } });
+            for (const [competitorId, action] of [[winnerId, "competitor_advanced"], [loserId, loserContinues || resetRequired ? "competitor_advanced" : "competitor_eliminated"]]) transaction.create(db.collection("tournamentAuditEvents").doc(`${match.id}_${competitorId}_progression`), { tournamentId: id, actorId: "system_tournament_lifecycle", action, createdAt: nowIso, metadata: { matchId: match.id, targetCompetitorIds: [competitorId] } });
+            for (const next of [nextToPersist, loserMatch, resetMatch]) if (next?.status === "submissions_open") transaction.set(db.collection("tournamentAuditEvents").doc(`${next.id}_assigned`), { tournamentId: id, actorId: "system_tournament_lifecycle", action: "match_assigned", createdAt: nowIso, metadata: { matchId: next.id, submissionDeadlineAt: next.submissionDeadlineAt } });
             if (resetRequired && !resetMatch) {
               transaction.set(tournamentRef, { status: "under_review", resultsUnderReviewAt: nowIso, updatedAt: nowIso }, { merge: true });
               transaction.set(db.collection("tournamentExceptions").doc(`${match.id}_missing_reset_match`), { id: `${match.id}_missing_reset_match`, tournamentId: id, matchId: match.id, type: "missing_required_reset_match", status: "open", reason: "The double-elimination final requires a reset match, but its configured record is missing. No champion was announced.", createdAt: nowIso, updatedAt: nowIso }, { merge: true });
             }
-            if (!loserContinues && format === "double_elimination" && nextLosses < 2) transaction.set(db.collection("tournamentExceptions").doc(`${match.id}_missing_loser_path`), { id: `${match.id}_missing_loser_path`, tournamentId: id, matchId: match.id, type: "missing_loser_bracket_path", status: "open", reason: "The competitor remains eligible after one loss, but the configured loser-bracket match is unavailable. The match result is recorded and advancement requires review.", createdAt: nowIso, updatedAt: nowIso }, { merge: true });
+            if (!loserContinues && !resetRequired && format === "double_elimination" && nextLosses < 2) transaction.set(db.collection("tournamentExceptions").doc(`${match.id}_missing_loser_path`), { id: `${match.id}_missing_loser_path`, tournamentId: id, matchId: match.id, type: "missing_loser_bracket_path", status: "open", reason: "The competitor remains eligible after one loss, but the configured loser-bracket match is unavailable. The match result is recorded and advancement requires review.", createdAt: nowIso, updatedAt: nowIso }, { merge: true });
             return true;
           });
           outcomes.push({ matchId: match.id, action: finalized ? "forfeit" : "transition_rechecked" });
@@ -257,7 +277,9 @@ export async function processTournamentLifecycleAction(args: {
         if (match.status !== "voting_open" || votingClosesAt <= 0 || votingClosesAt > now.getTime()) continue;
         const matchRef = db.collection("tournamentMatches").doc(match.id);
         const closed = await db.runTransaction(async (transaction) => {
+          const tournamentState = await transaction.get(tournamentRef);
           const current = await transaction.get(matchRef);
+          if (!permitsDeadlineTransition(tournamentState.data(), current.data())) return false;
           if (!current.exists || current.data()?.tournamentId !== id || current.data()?.status !== "voting_open" || dateMs(current.data()?.votingClosesAt) > now.getTime()) return false;
           transaction.set(matchRef, { status: "voting_closed", votingClosedAt: nowIso, updatedAt: nowIso }, { merge: true });
           const auditRef = db.collection("tournamentAuditEvents").doc(`${match.id}_voting_closed`);

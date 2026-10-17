@@ -3,11 +3,12 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateTournament } from "@/lib/server/tournament-permissions";
 import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
-import { publicTournamentView } from "@/lib/server/tournament-public-policy";
+import { isPublishedTournament, publicTournamentView } from "@/lib/server/tournament-public-policy";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
-import { verifyCreatorImage } from "@/lib/server/creator-image-verification";
+import { freezeTournamentBuilderMedia, verifyTournamentBuilderMedia } from "@/lib/server/tournament-media-verification";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const tournaments = (snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, unknown> & { id: string })
       .filter((item) => item.privacy === "public")
+      .filter(isPublishedTournament)
       .filter((item) => !status || item.status === status)
       .filter((item) => !category || item.category === category)
       .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
@@ -45,7 +47,9 @@ export async function POST(request: Request) {
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
+  body.productPolicyVersion = TOURNAMENT_PRODUCT_POLICY;
   const requestedStatus = body.status === "pending_review" ? "pending_review" : "draft";
+  if (requestedStatus === "pending_review" && Number(body.basePrizeAmountMinor ?? 0) > 0) return fail("Save this Tournament as a draft and confirm its creator-funded Base Prize before Admin Review.", 409, undefined, "BASE_PRIZE_FUNDING_REQUIRED");
   if (body.status && body.status !== "draft" && body.status !== "pending_review") return fail("Tournament status is not valid for this action.", 422, undefined, "TOURNAMENT_STATUS_INVALID");
   const [userSnap, profileSnap] = await Promise.all([db.collection("users").doc(user.uid).get(), db.collection("profiles").doc(user.uid).get()]);
   const profile = { ...(profileSnap.data() ?? {}), ...(userSnap.data() ?? {}), uid: user.uid, role: user.role, isAdmin: user.isAdmin };
@@ -61,15 +65,15 @@ export async function POST(request: Request) {
   const ref = db.collection("tournaments").doc();
   let creatorMediaVerification = null;
   if (requestedStatus === "pending_review") {
-    try { creatorMediaVerification = await verifyCreatorImage(String(body.coverImagePath ?? ""), user.uid); }
-    catch { return fail("Upload a valid, owned creator image of 10 MB or smaller before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+    try { creatorMediaVerification = await freezeTournamentBuilderMedia(ref.id, await verifyTournamentBuilderMedia(body, user.uid)); }
+    catch { return fail("Tournament media must pass image and promotional-video verification before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
   }
   const now = new Date().toISOString();
   const draft = tournamentDraftFromInput({ ...body, enterpriseOrganizationId: officialChallenge ? enterpriseAccess!.organizationId : null }, user.uid, now);
   const readiness = evaluateTournamentReadiness({ id: ref.id, ...draft });
   if (requestedStatus === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const tournament = { id: ref.id, ...draft, status: requestedStatus, submittedAt: requestedStatus === "pending_review" ? now : null, readiness, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false, fakeParticipantsAllowed: false, fakeBracketAllowed: false, fakeWinnersAllowed: false };
-  if (creatorMediaVerification) Object.assign(tournament, { creatorMediaVerification });
+  if (creatorMediaVerification) Object.assign(tournament, { creatorMediaVerification, coverMedia: { ...draft.coverMedia, url: creatorMediaVerification.cover.url } });
   const batch = db.batch();
   batch.set(ref, tournament);
   if (requestedStatus === "pending_review") {
@@ -77,5 +81,7 @@ export async function POST(request: Request) {
     batch.set(db.collection("tournamentAuditEvents").doc(`${ref.id}_submitted_initial`), { id: `${ref.id}_submitted_initial`, tournamentId: ref.id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
   }
   await batch.commit();
+  const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+  await attemptTournamentNotifications(db, ref.id);
   return ok({ tournament }, requestedStatus === "pending_review" ? "Tournament submitted for admin review." : "Tournament draft created. No bracket, participants, payments, prize pool, winners, or payouts were created.");
 }

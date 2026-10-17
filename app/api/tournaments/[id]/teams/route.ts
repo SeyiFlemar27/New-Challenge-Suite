@@ -7,6 +7,7 @@ import type { TournamentFoundation, TournamentTeamFoundation } from "@/lib/tourn
 import { getStripe } from "@/lib/stripe";
 import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
 import { dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 export const dynamic = "force-dynamic";
 const normalizedName = (value: unknown) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -28,6 +29,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const db = getAdminDb();
   if (!db) return serverUnavailable("Tournament teams");
   const { id } = await context.params;
+  const tournamentSnapshot = await db.collection("tournaments").doc(id).get();
+  if (!tournamentSnapshot.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
+  const tournament = tournamentSnapshot.data()!;
   const url = new URL(request.url);
   const search = String(url.searchParams.get("q") ?? "").trim().toLowerCase().slice(0, 60);
   const searchTeamId = String(url.searchParams.get("teamId") ?? "");
@@ -138,7 +142,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return [profileId, { id: profileId, displayName, username }];
   }));
   const teams = records.map((team) => ({ id: team.id, tournamentId: team.tournamentId, name: team.name, status: team.status, paymentStatus: team.paymentStatus, seed: team.seed, rankingScore: team.rankingScore, rosterLockedAt: team.rosterLockedAt, memberCount: team.memberUserIds.length, canManage: team.captainUserId === user.uid, isViewerTeam: team.id === viewerTeamId }));
-  return ok({ teams, viewerTeam, viewerCanManage: viewerTeam?.captainUserId === user.uid, invitations: visibleInvitations, requests: visibleRequests, captainTransfers: visibleTransfers, identities }, "Tournament teams loaded.");
+  return ok({ teams, viewerTeam, viewerCanManage: viewerTeam?.captainUserId === user.uid, invitations: visibleInvitations, requests: visibleRequests, captainTransfers: visibleTransfers, identities, memberPaymentModel: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY }, "Tournament teams loaded.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -417,7 +421,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         try {
           const checkout = await createTournamentEntryCheckout(db, stripe, { tournamentId: id, target: { mode: "team", teamId: targetTeamId, userId: user.uid }, rulesAccepted: body.rulesAccepted === true, appUrl });
           if (!checkout.checkoutUrl) return conflict("This entry reservation is being connected to checkout. Refresh in a moment.");
-          return ok({ teamId: targetTeamId, paymentStatus: "pending", reservationId: checkout.reservationId, reservationExpiresAt: checkout.expiresAt, checkoutUrl: checkout.checkoutUrl }, "A ten-minute Tournament team slot is reserved. Captain payment must be confirmed before the team is registered.");
+          return ok({ teamId: targetTeamId, paymentStatus: "pending", reservationId: checkout.reservationId, reservationExpiresAt: checkout.expiresAt, checkoutUrl: checkout.checkoutUrl }, checkout.teamAttemptId ? "Your own entry checkout is ready. The team registers only after every member's payment is verified within the team payment window." : "A ten-minute Tournament team slot is reserved. Captain payment must be confirmed before the team is registered.");
         } catch (error) {
           const failure = error as Error & { code?: string; status?: number };
           if (failure.code) return fail(failure.message, failure.status ?? 409, undefined, failure.code);

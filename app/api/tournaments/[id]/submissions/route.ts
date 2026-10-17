@@ -5,6 +5,8 @@ import { validateTournamentSubmission } from "@/lib/server/tournament-operations
 import { tournamentSubmissionMediaPath } from "@/lib/media-upload-paths";
 import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { createHash } from "node:crypto";
+import { verifyTournamentSubmissionMedia } from "@/lib/server/tournament-submission-media";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentParticipantFoundation, TournamentRoundFoundation, TournamentSubmissionStatus } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +60,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     : { id: roundSnap.id, ...roundData };
   const validation = validateTournamentSubmission({ tournament, round: validationRound as TournamentRoundFoundation, mediaUrl: String(body.mediaUrl ?? ""), mediaPath: String(body.mediaPath ?? ""), mediaType: String(body.mediaType ?? ""), replacementAllowed: Boolean((tournament.voting as Record<string, unknown>)?.submissionReplacementAllowed), existingStatus: existingSnap.exists ? String(existingSnap.data()?.status ?? "") as TournamentSubmissionStatus : null });
   if (!validation.valid) return fail(validation.message, 400, validation, validation.code);
+  let verifiedMedia: Awaited<ReturnType<typeof verifyTournamentSubmissionMedia>> | null = null;
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+    try { verifiedMedia = await verifyTournamentSubmissionMedia({ tournamentId: id, submissionId: ref.id, path: String(body.mediaPath), mediaType: mediaType as "image" | "video" }); }
+    catch { return fail("The uploaded match media could not be verified. Upload an accepted file and retry.", 422, undefined, "SUBMISSION_MEDIA_VERIFICATION_FAILED"); }
+  }
   const contentFingerprint = createHash("sha256").update(JSON.stringify({ mediaUrl: String(body.mediaUrl), mediaPath: String(body.mediaPath), mediaType, caption: String(body.caption ?? "").slice(0, 400) })).digest("hex");
   let savedSubmission: Record<string, unknown> | null = null;
   let idempotentReplay = false;
@@ -84,7 +91,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       } else if (!currentParticipant || currentParticipant.tournamentId !== id || !["registered", "checked_in", "active"].includes(currentParticipant.status)) {
         throw Object.assign(new Error("TOURNAMENT_PARTICIPANT_NOT_ACTIVE"), { code: "TOURNAMENT_PARTICIPANT_NOT_ACTIVE" });
       }
-      if (Number(currentTournament.configVersion ?? 1) >= 3 && (currentMatch.status !== "submissions_open" || !["active", "round_active"].includes(currentTournament.status))) throw Object.assign(new Error("TOURNAMENT_SUBMISSIONS_NOT_OPEN"), { code: "TOURNAMENT_SUBMISSIONS_NOT_OPEN" });
+      const pendingBronze = Number(currentTournament.configVersion ?? 1) >= 3 && currentTournament.status === "under_review" && currentMatch.bracket === "bronze" && !currentTournamentSnap.data()?.settlementId;
+      if (Number(currentTournament.configVersion ?? 1) >= 3 && (currentMatch.status !== "submissions_open" || (!pendingBronze && !["active", "round_active"].includes(currentTournament.status)))) throw Object.assign(new Error("TOURNAMENT_SUBMISSIONS_NOT_OPEN"), { code: "TOURNAMENT_SUBMISSIONS_NOT_OPEN" });
       const prior = currentSubmissionSnap.exists ? currentSubmissionSnap.data() ?? {} : null;
       const currentRoundData = currentRoundSnap.data() ?? {};
       const currentValidationRound = Number(currentTournament.configVersion ?? 1) >= 3
@@ -97,6 +105,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         idempotentReplay = true;
         return;
       }
+      if (currentTournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+        if (!verifiedMedia) throw Object.assign(new Error("SUBMISSION_MEDIA_VERIFICATION_FAILED"), { code: "SUBMISSION_MEDIA_VERIFICATION_FAILED" });
+        const expectedRevision = Number(body.expectedRevision ?? 0);
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== Number(prior?.revision ?? 0)) throw Object.assign(new Error("SUBMISSION_REVISION_STALE"), { code: "SUBMISSION_REVISION_STALE" });
+        const history = await transaction.get(db.collection("tournamentSubmissions").where("tournamentId", "==", id).where("participantId", "==", currentParticipantId));
+        if (history.docs.some(document => document.id !== ref.id && document.data().mediaVerification?.sha256 === verifiedMedia?.sha256)) throw Object.assign(new Error("FRESH_MATCH_MEDIA_REQUIRED"), { code: "FRESH_MATCH_MEDIA_REQUIRED" });
+      }
       const now = new Date().toISOString();
       const revision = Number(prior?.revision ?? 0) + 1;
       if (prior) {
@@ -104,6 +119,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         transaction.create(revisionRef, { id: revisionRef.id, tournamentId: id, submissionId: ref.id, revision: revision - 1, snapshot: prior, preservedAt: now, preservedBy: user.uid });
       }
       const submission = { id: ref.id, tournamentId: id, roundId: currentRoundSnap.id, matchId, participantId: currentParticipantId, teamId: currentTournament.participationMode === "team" ? currentParticipantId : null, userId: user.uid, submittedByCaptain: currentTournament.participationMode === "team", status: "submitted", revision, contentFingerprint, mediaUrl: String(body.mediaUrl), mediaPath: String(body.mediaPath), mediaType, caption: String(body.caption ?? "").slice(0, 400), submittedAt: now, updatedAt: now };
+      if (verifiedMedia) Object.assign(submission, { mediaVerification: verifiedMedia, mediaUrl: `/api/tournaments/${encodeURIComponent(id)}/submissions/${encodeURIComponent(ref.id)}/media?revision=${revision}` });
       transaction.set(ref, submission);
       const auditRef = db.collection("tournamentAuditEvents").doc(`${ref.id}_submitted_v${revision}`);
       transaction.set(auditRef, { id: auditRef.id, tournamentId: id, actorId: user.uid, action: prior ? "submission_replaced" : "submission_submitted", createdAt: now, metadata: { roundId: currentRoundSnap.id, matchId, participantId: currentParticipantId, revision } });
@@ -112,8 +128,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch (error) {
     const code = error instanceof Error && "code" in error ? String((error as Error & { code?: string }).code) : "TOURNAMENT_SUBMISSION_FAILED";
     const status = ["TOURNAMENT_MATCH_NOT_FOUND"].includes(code) ? 404 : ["TEAM_CAPTAIN_SUBMISSION_REQUIRED", "TOURNAMENT_PARTICIPANT_NOT_ACTIVE", "TOURNAMENT_MATCH_ASSIGNMENT_REQUIRED"].includes(code) ? 403 : 409;
-    const messages: Record<string, string> = { SUBMISSION_NOT_OPEN: "Submissions are not open yet.", SUBMISSION_DEADLINE_CLOSED: "The submission deadline has passed.", SUBMISSION_ALREADY_RECORDED: "An official submission has already been recorded for this match.", REPLACEMENT_NOT_ALLOWED: "Submission replacement is not allowed by Tournament rules.", TOURNAMENT_SUBMISSIONS_NOT_OPEN: "This match is not accepting submissions in its current phase." };
+    const messages: Record<string, string> = { SUBMISSION_REVISION_STALE: "Your submission changed. Refresh before replacing it again.", FRESH_MATCH_MEDIA_REQUIRED: "Each match requires fresh media. Do not reuse an earlier match entry.", SUBMISSION_MEDIA_VERIFICATION_FAILED: "The media must be verified before this submission can be saved.", SUBMISSION_NOT_OPEN: "Submissions are not open yet.", SUBMISSION_DEADLINE_CLOSED: "The submission deadline has passed.", SUBMISSION_ALREADY_RECORDED: "An official submission has already been recorded for this match.", REPLACEMENT_NOT_ALLOWED: "Submission replacement is not allowed by Tournament rules.", TOURNAMENT_SUBMISSIONS_NOT_OPEN: "This match is not accepting submissions in its current phase." };
     return fail(messages[code] ?? "The Tournament submission could not be saved in its current state.", status, undefined, code);
   }
+  const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
+  await attemptTournamentNotifications(db, id);
   return ok({ submission: savedSubmission, idempotentReplay }, idempotentReplay ? "The existing Tournament submission was returned safely." : "Tournament submission saved after uploaded media and deadline validation.");
 }

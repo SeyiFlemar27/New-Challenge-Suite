@@ -1,7 +1,11 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { cookies } from "next/headers";
 import { getRequestUser, SESSION_COOKIE_NAME, type RequestUser } from "@/lib/server/auth";
-import { publicTournamentView } from "@/lib/server/tournament-public-policy";
+import { isPublishedTournament, publicTournamentView } from "@/lib/server/tournament-public-policy";
+import { canEditTournament } from "@/lib/server/tournament-permissions";
+import { loadTournamentTeamDirectory } from "@/lib/server/tournament-team-directory";
+import { getPublicTournamentFunding } from "@/lib/server/tournament-public-funding";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 type TournamentRow = Record<string, unknown> & { id: string };
 
@@ -29,7 +33,7 @@ export async function listPublicTournaments(limit = 50): Promise<{ available: bo
   if (!db) return { available: false, tournaments: [], message: "Tournament data requires Firebase Admin configuration." };
   try {
     const snap = await db.collection("tournaments").where("privacy", "==", "public").limit(limit).get();
-    const tournaments = sortByIsoDesc(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentRow[], "createdAt").map(publicTournamentView);
+    const tournaments = sortByIsoDesc(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter(isPublishedTournament) as TournamentRow[], "createdAt").map(publicTournamentView);
     return { available: true, tournaments, message: snap.empty ? "No public tournaments are available yet." : "" };
   } catch (error) {
     logMissingIndex("listPublicTournaments", error);
@@ -48,8 +52,10 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
   if (!db) return { available: false, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament data requires Firebase Admin configuration." };
   const tournamentSnap = await db.collection("tournaments").doc(id).get();
   if (!tournamentSnap.exists) return { available: true, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found." };
-  const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentRow[];
+  const rows = (snap: Pick<FirebaseFirestore.QuerySnapshot, "docs">) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentRow[];
   const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as TournamentRow;
+  const canManage = Boolean(viewer && canEditTournament({ ...viewer }, tournament).allowed);
+  if (!isPublishedTournament(tournament) && !canManage) return { available: false, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found or unavailable." };
   if (tournament.privacy !== "public") {
     if (!viewer?.emailVerified) return { available: false, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found or unavailable." };
     const [participant, teamMembership, invitation, teamInvitationQuery] = await Promise.all([
@@ -74,17 +80,21 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
     if (!allowed) return { available: false, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found or unavailable." };
   }
   try {
+    const viewerMembership = viewer && tournament.participationMode === "team" ? await db.collection("tournamentTeamMemberships").doc(`${id}_${viewer.uid}`).get() : null;
+    const viewerTeamId = viewerMembership?.data()?.status === "active" ? String(viewerMembership.data()?.teamId ?? "") : "";
     const [participants, teams, rounds, matches, submissions, announcements, sponsors, placements, audits] = await Promise.all([
       db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(500).get(),
-      db.collection("tournamentTeams").where("tournamentId", "==", id).limit(150).get(),
+      loadTournamentTeamDirectory(db, id),
       db.collection("tournamentRounds").where("tournamentId", "==", id).limit(100).get(),
-      db.collection("tournamentMatches").where("tournamentId", "==", id).limit(200).get(),
-      db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(200).get(),
+      db.collection("tournamentMatches").where("tournamentId", "==", id).limit(260).get(),
+      db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(520).get(),
       db.collection("tournamentAnnouncements").where("tournamentId", "==", id).limit(50).get(),
-      db.collection("tournamentSponsorProposals").where("tournamentId", "==", id).limit(20).get(),
+      db.collection(tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? "sponsorships" : "tournamentSponsorProposals").where("tournamentId", "==", id).get(),
       db.collection("tournamentPlacements").where("tournamentId", "==", id).limit(20).get(),
       db.collection("tournamentAuditEvents").where("tournamentId", "==", id).limit(100).get()
     ]);
+    const publicFunding = tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? await getPublicTournamentFunding(db, id) : null;
+    if (publicFunding) tournament.prizePool = publicFunding.prizePool;
     return {
       available: true,
       tournament,
@@ -105,11 +115,13 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
         }
         return safeMatch;
       }),
-      submissions: rows(submissions),
+      submissions: rows(submissions).filter(submission => canManage || (viewer && submission.userId === viewer.uid)
+        || (viewerTeamId && submission.teamId === viewerTeamId)
+        || ["approved", "active", "eliminated", "winner"].includes(String(submission.status))),
       announcements: rows(announcements).filter((item) => item.status === "published"),
-      sponsors: rows(sponsors).filter((item) => item.publicDisplayApproved === true),
+      sponsors: rows(sponsors).filter((item) => item.publicDisplayApproved === true && (!publicFunding || (item.status === "approved" && publicFunding.eligibleSponsorIds.includes(String(item.sponsorContributionId))))),
       placements: rows(placements),
-      audits: rows(audits),
+      audits: canManage ? rows(audits) : [],
       message: ""
     };
   } catch (error) {

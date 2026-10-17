@@ -402,20 +402,20 @@ export function fetchLeaderboards(board = "global", options: { type?: "global" |
   return apiRequest<{ board: string; type?: string; entries: unknown[]; source: string; updatedAt: string | null; status?: string; competitionMode?: string; visibilityMode?: string; visible?: boolean; message?: string | null; pagination?: { page: number; pageSize: number; total: number; totalPages: number }; currentUserPosition?: unknown | null }>(`/api/leaderboards?${params.toString()}`);
 }
 
-export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean }) {
+export function voteForSubmission(payload: { challengeId: string; submissionId: string; voteMode: "free" | "dorocoin"; quantity?: number; idempotencyKey?: string; confirmedLargeSpend?: boolean; confirmedDoroCoinSpend?: boolean }) {
   return apiRequest<{ vote: unknown; votes?: unknown[]; quantity?: number; coinCost?: number; creditCost?: number; walletTransactionId?: string | null; voteDate?: string; timeZone?: string; freeVoteResetAt?: string }>("/api/votes", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export function purchaseDoroCoins(packageId: string) {
-  return apiRequest<CheckoutResponse>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ packageId }) });
+export function purchaseDoroCoins(packageId: string, returnTo?: string | null) {
+  return apiRequest<CheckoutResponse>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ packageId, returnTo }) });
 }
 
 export function purchaseCustomDoroCoins(coins: number) {
   return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customCoins: coins }) });
 }
 
-export function purchaseCustomDoroCoinsByUsd(customAmountUsd: number) {
-  return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customAmountUsd }) });
+export function purchaseCustomDoroCoinsByUsd(customAmountUsd: number, returnTo?: string | null) {
+  return apiRequest<CheckoutResponse & { purchaseRequest?: unknown; paymentPending?: boolean }>("/api/stripe/dorocoin-checkout", { method: "POST", body: JSON.stringify({ customAmountUsd, returnTo }) });
 }
 
 export function recordDoroCoinTransaction(payload: unknown) {

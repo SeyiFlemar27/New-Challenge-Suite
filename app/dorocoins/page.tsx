@@ -9,6 +9,8 @@ import { Button, Card, EmptyState, Field, PageTitle, inputClass } from "@/compon
 import { apiRequest } from "@/lib/api/client";
 import { fetchDoroCoinPackages, fetchWallet, purchaseCustomDoroCoinsByUsd, purchaseDoroCoins } from "@/lib/api/services";
 import { quoteCustomDoroCoinPurchase } from "@/lib/dorocoin-purchase";
+import { safeVotingReturnPath } from "@/lib/voting-return-path";
+import Link from "next/link";
 
 const tabs = ["overview", "earn", "buy", "transfer", "history"] as const;
 type Tab = typeof tabs[number];
@@ -31,6 +33,7 @@ const earningRules = [
 
 export default function DoroCoinsPage() {
   const searchParams = useSearchParams();
+  const returnTo = safeVotingReturnPath(searchParams.get("returnTo"));
   const initialTab = searchParams.get("tab") as Tab | null;
   const [activeTab, setActiveTab] = useState<Tab>(initialTab && tabs.includes(initialTab) ? initialTab : "overview");
   const [balance, setBalance] = useState(0);
@@ -97,8 +100,8 @@ export default function DoroCoinsPage() {
   }, [recipientSearch, selectedRecipient]);
 
   function openCheckout(url?: string | null) { if (url) window.location.assign(url); else setMessage("Secure checkout could not be started."); }
-  async function buyCustom() { if (!quote) return; setBusy("custom"); setMessage(""); const result = await purchaseCustomDoroCoinsByUsd(quote.amountUsd); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
-  async function buyPackage(packageId: string) { setBusy(packageId); setMessage(""); const result = await purchaseDoroCoins(packageId); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
+  async function buyCustom() { if (!quote) return; setBusy("custom"); setMessage(""); const result = await purchaseCustomDoroCoinsByUsd(quote.amountUsd, returnTo); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
+  async function buyPackage(packageId: string) { setBusy(packageId); setMessage(""); const result = await purchaseDoroCoins(packageId, returnTo); setBusy(null); if (!result.ok) return setMessage(result.message); openCheckout(result.data?.url); }
   async function dailyLogin() { setBusy("daily"); const result = await apiRequest("/api/dorocoin/daily-login", { method: "POST" }); setBusy(null); setMessage(result.message); if (result.ok) { setLoading(true); applyLoadResults(await load()); } }
   async function transfer() {
     if (!selectedRecipient) return;
@@ -118,6 +121,7 @@ export default function DoroCoinsPage() {
   return <AppShell>
     <div className="mx-auto w-full max-w-7xl">
       <PageTitle title="DoroCoins" subtitle="Earn, buy, transfer, and use DoroCoins across eligible Challenge Suite community features." />
+      {returnTo ? <p className="mt-4 text-sm"><Link href={returnTo} className="font-bold underline">Return to voting</Link>. Buying coins never casts a vote automatically. Your balance is updated only after provider confirmation.</p> : null}
       <section className="mt-7 overflow-hidden rounded-[8px] border border-yellow-300 bg-gradient-to-br from-white to-yellow-50 p-6 text-slate-950 shadow-sm sm:p-8">
         <div className="grid gap-7 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="text-sm font-bold text-yellow-800">Available Balance</p>{loading ? <div className="mt-3 h-14 w-64 animate-pulse rounded-[8px] bg-yellow-100" aria-label="Loading DoroCoin balance" /> : <p className="mt-2 text-5xl font-black tracking-normal text-yellow-800 sm:text-6xl">{balance.toLocaleString()} DoroCoins</p>}<p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600">DoroCoins are a virtual platform currency. They are not cash, are not legal tender, and cannot currently be withdrawn or converted to cash.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]"><Button onClick={() => chooseTab("earn")}>Earn DoroCoins</Button><Button variant="secondary" onClick={() => chooseTab("buy")}>Buy DoroCoins</Button><Button variant="secondary" onClick={() => chooseTab("transfer")}>Transfer</Button><Button variant="secondary" onClick={() => chooseTab("history")}>View History</Button></div></div>
       </section>

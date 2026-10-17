@@ -18,7 +18,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const payment = paymentDocument.data();
   if (payment.tournamentId !== tournamentId) return fail("Tournament payment is not available.", 404, undefined, "TOURNAMENT_PAYMENT_NOT_FOUND");
   let authorized = payment.userId === user.uid;
-  if (!authorized && payment.entrantType === "team" && payment.teamId) {
+  if (!authorized && !payment.teamAttemptId && payment.entrantType === "team" && payment.teamId) {
     const team = await db.collection("tournamentTeams").doc(String(payment.teamId)).get();
     authorized = team.exists && team.data()?.captainUserId === user.uid;
   }

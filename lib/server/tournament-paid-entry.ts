@@ -1,8 +1,12 @@
+import { assertPaidEntryProviderEvidence, type ProviderEvidence } from "@/lib/server/tournament-entry-provider";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import type { TournamentFoundation, TournamentParticipantFoundation, TournamentTeamFoundation } from "@/lib/tournament-types";
 import { deterministicId } from "@/lib/server/idempotency";
 import { dispatchTournamentActivationOutbox } from "@/lib/server/tournament-cloud-tasks";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { confirmTournamentTeamMemberPayment, expireTournamentTeamAttempt, reserveTournamentTeamMemberEntry } from "@/lib/server/tournament-team-entry";
+import { deliverTournamentNotifications } from "@/lib/server/tournament-notifications";
 
 export const TOURNAMENT_ENTRY_RESERVATION_MS = 10 * 60 * 1000;
 const ACTIVE_PARTICIPANT_STATUSES = new Set(["registered", "checked_in", "active"]);
@@ -10,7 +14,7 @@ const ACTIVE_TEAM_STATUSES = new Set(["ready", "checked_in", "active"]);
 const BLOCKED_ACCOUNT_STATUSES = new Set(["disabled", "suspended", "deactivated", "blocked", "deleted", "deletion_requested", "anonymized"]);
 
 type PaidEntryTarget = { mode: "individual"; participantId: string; userId: string } | { mode: "team"; teamId: string; userId: string };
-type ReservationResult = { reservationId: string; paymentId: string; expiresAt: string; amountCents: number; currency: string; checkoutSessionId: string | null; checkoutUrl: string | null; existing: boolean };
+type ReservationResult = { reservationId: string; paymentId: string; teamAttemptId?: string; expiresAt: string; amountCents: number; currency: string; checkoutSessionId: string | null; checkoutUrl: string | null; existing: boolean };
 type CodedError = Error & { code: string; status: number };
 
 function coded(message: string, code: string, status = 409): CodedError { return Object.assign(new Error(message), { code, status }); }
@@ -34,6 +38,10 @@ function activeCount(records: Array<Record<string, unknown>>, mode: PaidEntryTar
 export async function reserveTournamentPaidEntry(db: Firestore, input: {
   tournamentId: string; target: PaidEntryTarget; rulesAccepted: boolean; invitationId?: string | null; now?: Date;
 }): Promise<ReservationResult> {
+  if (input.target.mode === "team") {
+    const tournament = await db.collection("tournaments").doc(input.tournamentId).get();
+    if (tournament.data()?.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) return reserveTournamentTeamMemberEntry(db, { tournamentId: input.tournamentId, teamId: input.target.teamId, userId: input.target.userId, rulesAccepted: input.rulesAccepted, now: input.now });
+  }
   const now = input.now ?? new Date();
   const nowIso = now.toISOString();
   const nowMs = now.getTime();
@@ -64,6 +72,7 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     if (!tournamentSnap.exists) throw coded("Tournament not found.", "TOURNAMENT_NOT_FOUND", 404);
     const tournament = { id: input.tournamentId, ...tournamentSnap.data() } as TournamentFoundation & Record<string, unknown>;
     if (Number(tournament.configVersion ?? 1) < 3) throw coded("Paid entry checkout is available only for Tournament V3.", "TOURNAMENT_VERSION_UNSUPPORTED");
+    if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && input.target.mode === "team") throw coded("This Tournament requires individual member payments; captain-paid checkout is unavailable.", "TEAM_MEMBER_PAYMENTS_REQUIRED");
     if (tournament.entryType === "free") throw coded("This Tournament does not require an entry payment.", "PAYMENT_NOT_REQUIRED", 409);
     if (tournament.paymentActivationEnabled !== true) throw coded("Paid entry is not enabled for this Tournament yet.", "TOURNAMENT_PAYMENT_DISABLED", 409);
     if (tournament.status !== "registration_open") throw coded("Tournament registration is closed.", "REGISTRATION_NOT_OPEN");
@@ -172,13 +181,14 @@ export async function createTournamentEntryCheckout(db: Firestore, stripe: Strip
     payment_method_types: ["card"],
     // Stripe Checkout requires at least a 30-minute provider session. The
     // separate ten-minute Firestore reservation remains the product deadline.
-    expires_at: Math.floor(Date.now() / 1000) + 35 * 60,
+    expires_at: reservation.teamAttemptId ? Math.max(Math.floor(Date.now() / 1000) + 35 * 60, Math.floor(Date.parse(reservation.expiresAt) / 1000)) : Math.floor(Date.now() / 1000) + 35 * 60,
     client_reference_id: reservation.paymentId,
     metadata: {
       paymentPurpose: "tournament_entry", tournamentId: input.tournamentId,
       reservationId: reservation.reservationId, paymentId: reservation.paymentId,
       entrantType: input.target.mode, entrantId: input.target.mode === "individual" ? input.target.participantId : input.target.teamId,
-      userId: input.target.userId
+      userId: input.target.userId,
+      ...(reservation.teamAttemptId ? { teamAttemptId: reservation.teamAttemptId } : {})
     },
     line_items: [{ quantity: 1, price_data: { currency: reservation.currency, unit_amount: reservation.amountCents, product_data: { name: "Tournament entry", description: "Tournament bracket slot entry fee" } } }],
     success_url: `${input.appUrl}/tournaments/${encodeURIComponent(input.tournamentId)}/${input.target.mode === "team" ? "me" : "join"}?payment=processing&session_id={CHECKOUT_SESSION_ID}`,
@@ -202,6 +212,11 @@ export async function createTournamentEntryCheckout(db: Firestore, stripe: Strip
 export async function expireTournamentEntryReservation(db: Firestore, session: Stripe.Checkout.Session, now = new Date()) {
   const reservationId = String(session.metadata?.reservationId ?? "");
   if (!reservationId) throw new Error("Tournament Checkout Session is missing its reservation reference.");
+  const memberPayment = await db.collection("tournamentEntryPayments").doc(reservationId).get();
+  if (memberPayment.data()?.teamAttemptId) {
+    if (memberPayment.data()?.providerSessionId !== session.id) throw new Error("Tournament member session does not match its payment.");
+    return expireTournamentTeamAttempt(db, String(memberPayment.data()?.teamAttemptId), now);
+  }
   const reservationRef = db.collection("tournamentEntryReservations").doc(reservationId);
   const paymentRef = db.collection("tournamentEntryPayments").doc(reservationId);
   const teamRef = session.metadata?.entrantType === "team" && session.metadata?.entrantId
@@ -221,20 +236,14 @@ export async function expireTournamentEntryReservation(db: Firestore, session: S
   });
 }
 
-type ProviderEvidence = { paymentIntent: Stripe.PaymentIntent; charge: Stripe.Charge };
-function assertPaidEntryProviderEvidence(session: Stripe.Checkout.Session, evidence: ProviderEvidence) {
-  if (session.mode !== "payment" || session.payment_status !== "paid" || session.metadata?.paymentPurpose !== "tournament_entry") throw new Error("Tournament Checkout Session is not a paid one-time entry payment.");
-  if (evidence.paymentIntent.status !== "succeeded" || !["automatic", "automatic_async"].includes(String(evidence.paymentIntent.capture_method))) throw new Error("Tournament entry PaymentIntent is not a successfully captured automatic card payment.");
-  if (!evidence.charge.paid || !evidence.charge.captured || evidence.charge.status !== "succeeded" || evidence.charge.payment_method_details?.type !== "card") throw new Error("Tournament entry Charge is not a captured card payment.");
-  if (!session.payment_method_types?.length || session.payment_method_types.some((method) => method !== "card")) throw new Error("Tournament Checkout Session used an unsupported payment method.");
-  if (typeof session.amount_total !== "number" || evidence.paymentIntent.amount_received !== session.amount_total || evidence.charge.amount_captured !== session.amount_total) throw new Error("Tournament provider amount evidence is inconsistent.");
-  if (String(session.currency).toLowerCase() !== String(evidence.paymentIntent.currency).toLowerCase() || String(session.currency).toLowerCase() !== String(evidence.charge.currency).toLowerCase()) throw new Error("Tournament provider currency evidence is inconsistent.");
-  if (String(evidence.paymentIntent.id) !== String(typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id)) throw new Error("Tournament Checkout Session and PaymentIntent references do not match.");
-}
-
 /** Confirms the paid entry atomically. A late success gets a fresh capacity/eligibility check; otherwise it becomes a required, idempotent refund case. */
 export async function confirmTournamentEntryPayment(db: Firestore, session: Stripe.Checkout.Session, evidence: ProviderEvidence, now = new Date()) {
   assertPaidEntryProviderEvidence(session, evidence);
+  const memberPaymentId = String(session.metadata?.paymentId ?? "");
+  if (memberPaymentId) {
+    const memberPayment = await db.collection("tournamentEntryPayments").doc(memberPaymentId).get();
+    if (memberPayment.data()?.teamAttemptId) return confirmTournamentTeamMemberPayment(db, session, evidence, now);
+  }
   const metadata = session.metadata ?? {};
   const reservationId = String(metadata.reservationId ?? "");
   const paymentId = String(metadata.paymentId ?? "");
@@ -327,6 +336,7 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
       transaction.set(paymentRef, { status: "refund_required", refundStatus: "required", refundType: "mandatory_tournament_entry_reversal", refundReason: reason, providerPaymentIntentId: evidence.paymentIntent.id, providerChargeId: evidence.charge.id, providerPaidStateVerifiedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       transaction.set(db.collection("refundCases").doc(refundCaseId), { id: refundCaseId, paymentCollection: "tournamentEntryPayments", paymentId, tournamentId, userId, provider: "stripe", providerPaymentIntentId: evidence.paymentIntent.id, amountCents: session.amount_total, currency: session.currency, status: "required", refundType: "mandatory_tournament_entry_reversal", reason, createdAt: now.toISOString(), updatedAt: now.toISOString(), idempotencyKey: refundCaseId }, { merge: true });
       result = { handled: true, kind: "tournament_entry", status: "refund_required", reason, refundCaseId };
+      transaction.set(db.collection("tournamentAuditEvents").doc(`${paymentId}_registration_review`), { tournamentId, actorId: "stripe", action: "tournament_entry_payment_review_required", createdAt: now.toISOString(), metadata: { paymentId, payerUserId: userId, refundCaseId, reason } });
       return;
     }
     const competitors = competitorRows.docs.map((doc) => doc.data() ?? {}) as Array<Record<string, unknown>>;
@@ -341,6 +351,7 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
       transaction.set(paymentRef, { status: "refund_required", refundStatus: "required", refundType: "mandatory_tournament_entry_reversal", refundReason: reason, providerPaymentIntentId: evidence.paymentIntent.id, providerChargeId: evidence.charge.id, providerPaidStateVerifiedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       transaction.set(db.collection("refundCases").doc(refundCaseId), { id: refundCaseId, paymentCollection: "tournamentEntryPayments", paymentId, tournamentId, userId, provider: "stripe", providerPaymentIntentId: evidence.paymentIntent.id, amountCents: session.amount_total, currency: session.currency, status: "required", refundType: "mandatory_tournament_entry_reversal", reason, createdAt: now.toISOString(), updatedAt: now.toISOString(), idempotencyKey: refundCaseId }, { merge: true });
       result = { handled: true, kind: "tournament_entry", status: "refund_required", reason, refundCaseId };
+      transaction.set(db.collection("tournamentAuditEvents").doc(`${paymentId}_registration_review`), { tournamentId, actorId: "stripe", action: "tournament_entry_payment_review_required", createdAt: now.toISOString(), metadata: { paymentId, payerUserId: userId, refundCaseId, reason } });
       return;
     }
     if (entrantType === "individual") {
@@ -365,7 +376,7 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
     transaction.set(reservationRef, { status: "confirmed", confirmedAt: now.toISOString(), lateConfirmation: !reservationStillValid, updatedAt: now.toISOString() }, { merge: true });
     transaction.set(lockRef, { activeReservationId: null, updatedAt: now.toISOString() }, { merge: true });
     transaction.create(db.collection("tournamentFinancialLedger").doc(`entry_${paymentId}`), { id: `entry_${paymentId}`, tournamentId, paymentId, participantId: entrantType === "individual" ? entrantId : null, teamId: entrantType === "team" ? entrantId : null, payerUserId: userId, amountCents: session.amount_total, currency: session.currency, status: "confirmed_entry_fee", provider: "stripe", providerSessionId: session.id, providerPaymentIntentId: evidence.paymentIntent.id, providerChargeId: evidence.charge.id, createdAt: now.toISOString(), idempotencyKey: paymentId });
-    transaction.create(db.collection("tournamentAuditEvents").doc(`${paymentId}_confirmed`), { id: `${paymentId}_confirmed`, tournamentId, actorId: "stripe", action: "paid_tournament_entry_confirmed", createdAt: now.toISOString(), metadata: { entrantType, entrantId, lateConfirmation: !reservationStillValid, amountCents: session.amount_total, currency: session.currency } });
+    transaction.create(db.collection("tournamentAuditEvents").doc(`${paymentId}_confirmed`), { id: `${paymentId}_confirmed`, tournamentId, actorId: "stripe", action: "paid_tournament_entry_confirmed", createdAt: now.toISOString(), metadata: { entrantType, entrantId, payerUserId: userId, lateConfirmation: !reservationStillValid, amountCents: session.amount_total, currency: session.currency } });
     if (activationQueued) {
       const jobId = `${tournamentId}_activation_v${activationVersion}`;
       activationJobId = jobId;
@@ -377,6 +388,7 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
     const dispatch = await dispatchTournamentActivationOutbox(db, activationJobId);
     result.schedulerDispatchStatus = dispatch.status;
   }
+  await deliverTournamentNotifications(db, tournamentId).catch(() => console.warn("[tournament-notification] Registration event delivery deferred."));
   return result;
 }
 
@@ -567,7 +579,7 @@ export async function reconcileTournamentEntryRefund(db: Firestore, input: {
       return { idempotent: false, tournamentId, entrantId, entrantType, wasConfirmed: Boolean(payment.confirmedAt), reviewRequired: true };
     }
     const status = input.status;
-    const previouslyConfirmed = payment.status === "confirmed" || payment.refundPreviousPaymentStatus === "confirmed" || Boolean(payment.confirmedAt);
+    const previouslyConfirmed = payment.teamAttemptId ? Boolean(payment.teamRegistrationConfirmedAt) : payment.status === "confirmed" || payment.refundPreviousPaymentStatus === "confirmed" || Boolean(payment.confirmedAt);
     transaction.set(refundRef, { status, providerRefundId: input.providerRefundId, providerStatus: input.providerStatus, providerCallCompletedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
     if (status !== "succeeded") {
       const restoredStatus = status === "processing" ? "refund_pending" : payment.refundPreviousPaymentStatus === "confirmed" || payment.confirmedAt ? "confirmed" : String(payment.refundPreviousPaymentStatus ?? "refund_required");
@@ -590,11 +602,18 @@ export async function reconcileTournamentEntryRefund(db: Firestore, input: {
       transaction.set(competitorRef, entrantType === "team"
         ? { status: "withdrawn", paymentStatus: "refunded", withdrawnAt: now.toISOString(), withdrawalReason: "ENTRY_PAYMENT_REFUNDED", updatedAt: now.toISOString() }
         : { status: "withdrawn", withdrawnAt: now.toISOString(), withdrawalReason: "ENTRY_PAYMENT_REFUNDED", updatedAt: now.toISOString() }, { merge: true });
-      transaction.set(tournamentRef, { participantCount: Math.max(0, currentCount - 1), financialHold: true, financialHoldReason: "TOURNAMENT_ENTRY_PAYMENT_REVERSED", financialHoldAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
+      transaction.set(tournamentRef, { participantCount: Math.max(0, currentCount - (competitorSnap.data()?.status === "withdrawn" ? 0 : 1)), financialHold: true, financialHoldReason: "TOURNAMENT_ENTRY_PAYMENT_REVERSED", financialHoldAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       transaction.set(db.collection("tournamentSettlementHolds").doc(`${tournamentId}_${paymentId}`), { id: `${tournamentId}_${paymentId}`, tournamentId, paymentId, entrantId, entrantType, affectedMatchIds: matchIds, reason: "TOURNAMENT_ENTRY_PAYMENT_REVERSED", status: "pending_admin_review", createdAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       transaction.set(db.collection("tournamentAuditEvents").doc(`${paymentId}_refunded`), { id: `${paymentId}_refunded`, tournamentId, actorId: "stripe", action: "tournament_entry_refunded_and_held", createdAt: now.toISOString(), metadata: { refundCaseId: input.refundCaseId, providerRefundId: input.providerRefundId, entrantId, entrantType, affectedMatchIds: matchIds } }, { merge: true });
     }
     return { idempotent: false, tournamentId, entrantId, entrantType, wasConfirmed: previouslyConfirmed };
   });
+  const reconciledCase = await db.collection("refundCases").doc(input.refundCaseId).get();
+  if (reconciledCase.data()?.paymentId) {
+    const reconciledPayment = await db.collection("tournamentEntryPayments").doc(String(reconciledCase.data()?.paymentId)).get();
+    if (reconciledPayment.data()?.teamAttemptId && reconciledPayment.data()?.status === "refunded" && !reconciledPayment.data()?.teamRegistrationConfirmedAt) {
+      await expireTournamentTeamAttempt(db, String(reconciledPayment.data()?.teamAttemptId), now, "TEAM_MEMBER_PAYMENT_REVERSED");
+    }
+  }
   return result;
 }

@@ -1,3 +1,13 @@
+import { deterministicId } from "@/lib/server/idempotency";
+import { createHash } from "node:crypto";
+import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+
+export function tournamentPlacementFingerprint(placements: Array<Record<string, unknown> & { id: string }>, productPolicyVersion?: unknown) {
+  if (productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) return `tournament_placements_v2_${createHash("sha256").update(JSON.stringify(placements.slice().sort((a, b) => Number(a.placement) - Number(b.placement)).map(item => [item.placement, item.participantId ?? null, item.userId ?? null, item.teamId ?? null, item.sourceMatchId ?? null]))).digest("hex")}`;
+  return deterministicId("tournament_placements", ...placements.slice().sort((a, b) => Number(a.placement) - Number(b.placement))
+    .map(item => `${item.placement}:${String(item.userId ?? item.teamId ?? item.participantId)}:${String(item.sourceMatchId ?? "")}`));
+}
+
 export function validateTournamentPlacementEvidence(tournament: Record<string, unknown>, placement: Record<string, unknown>, match: Record<string, unknown>) {
   const position = Number(placement.placement);
   const participantId = String(placement.participantId ?? "");

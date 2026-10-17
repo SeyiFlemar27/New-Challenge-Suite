@@ -188,6 +188,7 @@ try {
     privateAccessMethod: "invite_link",
     privateJoiningPolicy: "invite_only",
     privateVotingAccess: "public_voting",
+    publicPreviewEnabled: true,
     visibility: "private",
     type: "Private / Exclusive",
     creatorId: `${prefix}_owner`,
@@ -213,6 +214,9 @@ try {
 
   const privateDetails = await detailGet(request(`http://localhost/api/challenges/${privateId}`), routeParams(privateId));
   equal(privateDetails.status, 403, "public voting configuration does not grant full private Challenge details");
+  await db.collection("challenges").doc(privateId).update({ publicPreviewEnabled: false });
+  equal((await participantsGet(request(`http://localhost/api/challenges/${privateId}/participants`), routeParams(privateId))).status, 403, "non-discoverable Private Challenges do not expose public-voting participants");
+  await db.collection("challenges").doc(privateId).update({ publicPreviewEnabled: true });
   const privateComments = await commentsGet(request(`http://localhost/api/challenges/${privateId}/comments`), routeParams(privateId));
   equal(privateComments.status, 404, "public voting configuration does not grant private comments");
 

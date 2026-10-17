@@ -3,7 +3,7 @@ import { read } from "./production-flow-test-utils.mjs";
 
 const settlement = read("lib/server/challenge-settlement.ts");
 const approval = read("app/api/admin/challenges/[id]/winner-proposals/[proposalId]/approve/route.ts");
-const tournamentResults = read("app/api/tournaments/[id]/results/route.ts");
+const tournamentResults = read("lib/server/tournament-result-confirmation.ts");
 const liveRegistration = read("app/api/events/[id]/registrations/route.ts");
 
 assert(settlement.includes("Admin-approved winners are required before settlement."));

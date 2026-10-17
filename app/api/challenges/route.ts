@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { AUTOMATIC_VOTING_POLICY_VERSION, AUTOMATIC_VOTING_SETTINGS } from "@/lib/automatic-voting-policy";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
 import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
   const validation = serverChallengeCreateSchema.safeParse(normalizedInput);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
   const body = validation.data;
+  body.monetization.paidVotesRequested = false;
   const privateAccessMethod = body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod;
   if (body.publish && body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return fail("Challenge media uploads are not available yet. Add a storage-confirmed challenge image before publishing.", 503, { provider: "firebase_storage", setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   if (isRetiredHybridCompetition(body as unknown as Record<string, unknown>)) {
@@ -258,10 +260,8 @@ export async function POST(request: Request) {
     bestOf: body.bestOf,
     numberOfWinners: body.numberOfWinners,
     winnerSelection: body.winnerSelection,
-    votingSettings: Object.fromEntries(Object.entries({
-      ...body.votingSettings,
-      allowPaidVotes: body.votingSettings.allowPaidVotes ?? body.votingSettings.allowDoroCoinVotes
-    }).filter(([key, value]) => key !== "allowDoroCoinVotes" && value !== undefined)),
+    automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION,
+    votingSettings: { ...AUTOMATIC_VOTING_SETTINGS },
     rules: body.standardRules
       ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
       : [],
