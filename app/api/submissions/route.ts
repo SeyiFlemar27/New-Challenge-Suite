@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   const challengeSnap = await db.collection("challenges").doc(body.challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, { fieldErrors: { challengeId: "Challenge does not exist." } }, "NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (challenge.isLiveEvent && (challenge.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) return fail("This event takes place in person and does not accept online submissions.", 409, undefined, "PHYSICAL_EVENT_ONLY");
   if (userOwnsChallenge(challenge, user.uid)) return fail("Creators and hosts cannot submit entries to their own challenge.", 403, undefined, "SELF_ENTRY_NOT_ALLOWED");
   const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
   if (accessContext.privateOnly && !accessContext.hasAccessGrant) {

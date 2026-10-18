@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const frame = readFileSync("components/challenge-builder-frame.tsx", "utf8");
 const normalBuilder = readFileSync("components/normal-challenge-builder.tsx", "utf8");
 const privateBuilder = readFileSync("components/challenge-builder.tsx", "utf8");
-const liveBuilder = readFileSync("components/host/host-competition-wizard.tsx", "utf8");
+const liveBuilder = readFileSync("components/host/live-event-builder-v2.tsx", "utf8");
 const tournamentBuilder = readFileSync("components/tournament-builder.tsx", "utf8");
 
 for (const source of [normalBuilder, privateBuilder, liveBuilder, tournamentBuilder]) {

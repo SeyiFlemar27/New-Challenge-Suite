@@ -30,7 +30,13 @@ import { confirmCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE, expireCreato
 import { claimEnterpriseRefundLock, finalizeEnterprisePaidVoteRefund, finalizeEnterprisePrizeFundingRefund, releaseEnterpriseRefundLock } from "@/lib/server/enterprise-prize-exposure";
 import { fail, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { recordStripeSponsorDispute } from "@/lib/server/stripe-sponsor-disputes";
+import {recordLiveEventBookingDispute} from "@/lib/server/live-event-disputes";
 import { confirmTournamentEntryPayment, expireTournamentEntryReservation, initiateTournamentEntryRefund, reconcileTournamentEntryRefund, recordTournamentEntryDispute } from "@/lib/server/tournament-paid-entry";
+import { confirmLiveEventPayment } from "@/lib/server/live-event-payments";
+import { expireLiveEventCheckout } from "@/lib/server/live-event-checkout";
+import { reconcileLiveEventRefund } from "@/lib/server/live-event-refunds";
+import {reconcileLiveEventUnfulfilledRefund} from "@/lib/server/live-event-unfulfilled-refunds";
+import {isLiveEventV2} from "@/lib/server/live-event-sponsor-cutoff";
 
 const handledEventTypes = new Set<Stripe.Event.Type>([
   "checkout.session.completed",
@@ -247,6 +253,7 @@ async function processSponsorDispute(stripe: Stripe, db: FirebaseFirestore.Fires
   if (tournamentPayment.size > 0) {
     return recordTournamentEntryDispute(db, { dispute, charge, paymentIntent, eventId: event.id, eventType: event.type });
   }
+  if(paymentIntent.metadata?.paymentPurpose==="live_event_booking")return recordLiveEventBookingDispute(db,{dispute,charge,paymentIntent,eventId:event.id,eventType:event.type});
   return recordStripeSponsorDispute(db, { dispute, charge, paymentIntent, eventId: event.id, eventType: event.type });
 }
 
@@ -336,7 +343,13 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
-        if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") {
+        if (paymentPurpose === "live_event_booking") {
+          const retrieved = await stripe.checkout.sessions.retrieve(session.id);
+          const intentId = objectId(retrieved.payment_intent);
+          if (!intentId || retrieved.id !== session.id || retrieved.metadata?.bookingId !== session.metadata?.bookingId) throw new Error("Live Event provider references could not be verified.");
+          const intent = await stripe.paymentIntents.retrieve(intentId, { expand: ["latest_charge"] });
+          outcome = await confirmLiveEventPayment(db, event, retrieved, intent);
+        } else if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") {
           outcome = await confirmChallengeEntryPayment(db, event, session);
         } else if (paymentPurpose === "paid_vote") {
           outcome = await confirmPaidVotePurchase(db, event, session);
@@ -349,7 +362,11 @@ export async function POST(request: Request) {
         } else if (paymentPurpose === PREDICTION_PAYMENT_PURPOSE) {
           outcome = await confirmPredictionPayment(db, event, session);
         } else if (paymentPurpose === CREATOR_PRIZE_PAYMENT_PURPOSE) {
-          outcome = await confirmCreatorPrizeFunding(db, event, session);
+          const source=await db.collection("challenges").doc(String(session.metadata?.challengeId??"missing")).get();
+          if(isLiveEventV2(source.data()??{})){
+            const retrieved=await stripe.checkout.sessions.retrieve(session.id),intentId=objectId(retrieved.payment_intent);
+            outcome=await confirmCreatorPrizeFunding(db,event,retrieved,intentId?await stripe.paymentIntents.retrieve(intentId,{expand:["latest_charge"]}):undefined);
+          }else outcome = await confirmCreatorPrizeFunding(db, event, session);
         } else if (session.metadata?.type === "dorocoin_purchase") {
           assertPaidPaymentSession(session);
           const purchaseId = deterministicId("dorocoin_purchase", session.id);
@@ -403,7 +420,9 @@ export async function POST(request: Request) {
       case "checkout.session.expired": {
         const session = event.data.object;
         const paymentPurpose = session.metadata?.paymentPurpose;
-        if (paymentPurpose === "tournament_entry") {
+        if (paymentPurpose === "live_event_booking") {
+          outcome = await expireLiveEventCheckout(db, stripe, String(session.metadata?.bookingId ?? ""));
+        } else if (paymentPurpose === "tournament_entry") {
           const currentSession = await stripe.checkout.sessions.retrieve(session.id);
           outcome = await expireTournamentEntryReservation(db, currentSession);
         } else if (paymentPurpose === "challenge_entry_fee" || paymentPurpose === "challenge_entry") outcome = await expireChallengeEntryPayment(db, session);
@@ -421,7 +440,12 @@ export async function POST(request: Request) {
       }
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object;
-        if (session.metadata?.paymentPurpose === "sponsor_funding") {
+        if (session.metadata?.paymentPurpose === "live_event_booking") {
+          const retrieved = await stripe.checkout.sessions.retrieve(session.id);
+          const intentId = objectId(retrieved.payment_intent);
+          if (!intentId || retrieved.metadata?.bookingId !== session.metadata?.bookingId) throw new Error("Live Event provider references could not be verified.");
+          outcome = await confirmLiveEventPayment(db, event, retrieved, await stripe.paymentIntents.retrieve(intentId, { expand: ["latest_charge"] }));
+        } else if (session.metadata?.paymentPurpose === "sponsor_funding") {
           outcome = await confirmSponsorFundingFromProviderState(stripe, db, event, session);
         } else if (session.metadata?.paymentPurpose === "tournament_entry") {
           outcome = await confirmTournamentEntryFromProviderState(stripe, db, session);
@@ -454,6 +478,11 @@ export async function POST(request: Request) {
         if (!refundCase.exists) throw new Error("Stripe refund event has no matching refund case.");
         const refundRecord = refundCase.data() ?? {};
         const status = refund.status === "succeeded" ? "succeeded" : refund.status === "failed" || refund.status === "canceled" ? "failed" : "processing";
+        if (["live_event_ticket_refund","live_event_booking_reconciliation"].includes(String(refundRecord.type))) {
+          if (status === "succeeded") outcome = await (refundRecord.type==="live_event_ticket_refund"?reconcileLiveEventRefund:reconcileLiveEventUnfulfilledRefund)(db, { caseId: refundCaseId, providerRefundId: refund.id, paymentIntentId: objectId(refund.payment_intent) ?? "", amountCents: refund.amount, currency: refund.currency, status });
+          else outcome=await db.runTransaction(async transaction=>{const latest=await transaction.get(refundRef),record=latest.data()??{};if(record.providerPaymentIntentId!==objectId(refund.payment_intent)||record.amountCents!==refund.amount||record.currency!==refund.currency||record.providerRefundId&&record.providerRefundId!==refund.id)throw new Error("Live Event refund references could not be verified.");if(record.status==="refunded")return {handled:true,duplicate:true};transaction.update(refundRef,{status:status==="failed"?"financial_hold":"processing",providerStatus:refund.status,providerRefundId:refund.id,updatedAt:new Date().toISOString()});return {handled:true,status};});
+          break;
+        }
         if (refundRecord.normalLifecyclePolicyVersion === 1 && status === "succeeded") {
           outcome = await reconcileNormalRefund(db, { refundCaseId, providerRefundId: refund.id, paymentIntentId: typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id ?? "", amountCents: refund.amount, currency: refund.currency, providerStatus: status });
           break;

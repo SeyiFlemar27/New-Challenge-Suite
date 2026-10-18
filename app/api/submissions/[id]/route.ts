@@ -42,6 +42,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   ]);
   if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (challenge.isLiveEvent && (challenge.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) return fail("This event takes place in person and does not accept online submissions.", 409, undefined, "PHYSICAL_EVENT_ONLY");
   const profile = { ...(profileSnap.data() ?? {}), ...(accountSnap.data() ?? {}) } as Record<string, unknown>;
   if (isSponsorProfile(profile) || userOwnsChallenge(challenge, auth.user.uid)) return fail("This account cannot edit this submission.", 403, undefined, "SUBMISSION_EDIT_FORBIDDEN");
   const accessContext = await challengeForPlanAccess(db, challenge, auth.user.uid);

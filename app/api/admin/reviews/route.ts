@@ -5,6 +5,7 @@ import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/se
 import { writeAuditLog } from "@/lib/server/audit";
 import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
 import { prepareEnterpriseActiveChallengeRelease } from "@/lib/server/enterprise-active-challenge-limit";
+import { seedLiveEventJobs } from "@/lib/server/live-event-job-outbox";
 
 const reviewTypes = new Set(["sponsor", "challenge", "sponsorship"]);
 const reviewActions = new Set(["approve", "reject"]);
@@ -84,34 +85,32 @@ export async function PATCH(request: Request) {
         : { apply: () => undefined };
       transaction.set(ref, {
         ...reviewUpdate,
+        ...(approved && latestChallenge.isLiveEvent && latestChallenge.hostOperations?.schemaVersion === 2 && !latestChallenge.sponsorFundingCutoffAt ? {sponsorFundingCutoffAt:latestChallenge.startsAt} : {}),
         prizeApprovalStatus: approved ? "approved" : "rejected",
         eventApprovalStatus: challenge.isLiveEvent ? approved ? "approved" : "rejected" : challenge.eventApprovalStatus ?? "not_required",
         eventSyncStatus: challenge.isLiveEvent ? approved ? "synced" : "rejected" : challenge.eventSyncStatus ?? "not_applicable",
         eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable"
       }, { merge: true });
+      if (latestChallenge.isLiveEvent) {
+        if (approved && latestChallenge.hostOperations?.schemaVersion === 2 && latestChallenge.eventApprovalStatus !== "approved") seedLiveEventJobs(db,transaction,id,latestChallenge);
+        transaction.set(db.collection("liveEvents").doc(id), {
+          id, challengeId: id, title: latestChallenge.title ?? "", description: latestChallenge.description ?? "",
+          hostName: latestChallenge.creatorName ?? "", creatorId: latestChallenge.creatorId ?? null,
+          organizationOwnerId: latestChallenge.organizationOwnerId ?? null, officialChallenge: latestChallenge.officialChallenge === true,
+          ownershipType: latestChallenge.ownershipType ?? "creator_personal",
+          imageUrl: latestChallenge.coverImageUrl ?? null,
+          location: [latestChallenge.venueName, latestChallenge.eventCity, latestChallenge.eventCountry].filter(Boolean).join(", "),
+          venueName: latestChallenge.venueName ?? "", eventAddress: latestChallenge.eventAddress ?? "",
+          eventCity: latestChallenge.eventCity ?? "", eventState: latestChallenge.eventState ?? "", eventCountry: latestChallenge.eventCountry ?? "",
+          startsAt: latestChallenge.startsAt, endsAt: latestChallenge.endsAt, time: latestChallenge.startsAt,
+          hostOperations: latestChallenge.hostOperations ?? {}, capacity: latestChallenge.eventCapacity ?? latestChallenge.maxParticipants ?? 0,
+          status: approved ? "scheduled" : "rejected", visibility: approved ? "public" : "private",
+          eventApprovalStatus: approved ? "approved" : "rejected", source: "challenge_sync", moneyMovementEnabled: false,
+          updatedAt: now, createdAt: latestChallenge.createdAt ?? now,
+        }, { merge: true });
+      }
       release.apply();
     });
-    if (approved && challenge.isLiveEvent) {
-      await db.collection("liveEvents").doc(id).set({
-        id,
-        challengeId: id,
-        title: challenge.title ?? "",
-        description: challenge.description ?? "",
-        hostName: challenge.creatorName ?? "Challenge Host",
-        creatorId: challenge.creatorId ?? null,
-        imageUrl: challenge.coverImageUrl ?? challenge.promoImageUrl ?? null,
-        location: [challenge.venueName, challenge.eventCity, challenge.eventCountry].filter(Boolean).join(", "),
-        startsAt: challenge.startsAt,
-        time: challenge.startsAt,
-        capacity: challenge.eventCapacity ?? challenge.maxParticipants ?? 0,
-        status: "scheduled",
-        visibility: "public",
-        source: "challenge_sync",
-        moneyMovementEnabled: false,
-        updatedAt: now,
-        createdAt: challenge.createdAt ?? now
-      }, { merge: true });
-    }
   }
 
   if (type === "sponsorship") {

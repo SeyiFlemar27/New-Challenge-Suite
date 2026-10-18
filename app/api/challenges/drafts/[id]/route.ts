@@ -15,6 +15,7 @@ import { validateChallengeForDraft } from "@/lib/server/challenge-validation";
 import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize-exposure";
 import { deleteUnpublishedChallengeMedia } from "@/lib/server/media-verification";
 import { preparePrivateCredential } from "@/lib/server/private-credentials";
+import { liveEventFinancialConfigurationLocked } from "@/lib/live-event-policy";
 
 const allowedDraftFields = new Set([
   "privateAccessPolicyVersion", "privateBuilderStep", "publicPreviewEnabled",
@@ -47,7 +48,12 @@ function sanitizeDraftPatch(body: Record<string, unknown>) {
   if (patch.maxParticipants !== undefined || patch.capacityMode !== undefined) {
     const capacityMode = patch.capacityMode === "limited" || patch.capacityMode === "unlimited" ? patch.capacityMode : inferCapacityMode(patch.maxParticipants);
     patch.capacityMode = capacityMode;
-    patch.maxParticipants = validateCapacity(capacityMode, patch.maxParticipants as string | number | null | undefined);
+    const physicalEvent = patch.isLiveEvent === true && patch.type === "Live Event" && (patch.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2;
+    if (physicalEvent && capacityMode === "limited") {
+      const capacity = Number(patch.maxParticipants);
+      if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error("Enter a positive whole-number venue capacity.");
+      patch.maxParticipants = capacity;
+    } else patch.maxParticipants = validateCapacity(capacityMode, patch.maxParticipants as string | number | null | undefined);
   }
   if (patch.challengeType === "normal" || patch.builderVersion === "normal_v2") {
     patch.participationMode = "open";
@@ -111,6 +117,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return { ...current, ...calculateChallengeDraftProgress(current), retiredCompetition: true, archived: true };
     }
     if (!editableDraftStatus(current)) throw new Error("CHALLENGE_NOT_EDITABLE");
+    if (liveEventFinancialConfigurationLocked(current, patch)) throw new Error("FUNDED_EVENT_CONFIGURATION_LOCKED");
     if (usesNormalBuilderFoundation && patch.prizeValue !== undefined) {
       const monetization = current.monetization as Record<string, unknown> | undefined;
       const confirmed = Number(current.confirmedCreatorPrizeFundingCents ?? monetization?.confirmedCreatorPrizeFundingCents ?? 0);
@@ -174,6 +181,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (code === "FUTURE_STEP_LOCKED" || code === "CURRENT_STEP_INCOMPLETE") return fail("Complete this step before continuing.", 422, { nextRequiredStep: inferLegacyMaxUnlockedStep(body) }, code);
     if (code === "CHALLENGE_NOT_EDITABLE") return fail("This challenge can no longer be edited.", 409, undefined, code);
     if (code === "FUNDED_BASE_PRIZE_LOCKED") return fail("Confirmed Base Prize commitments require an authorized financial review before they can change.", 409, undefined, code);
+    if (code === "FUNDED_EVENT_CONFIGURATION_LOCKED") return fail("This event already has confirmed prize commitments. Contact support before changing its competition type or prizes.", 409, undefined, code);
     if (code === "INVALID_MEDIA_UPLOAD") return fail("Uploaded media must come from your confirmed Challenge Suite storage path.", 422, undefined, code);
     if (code === "ENTERPRISE_PRIZE_LIMIT_EXCEEDED") return fail("Enterprise challenge prize and funding commitments cannot exceed $10,000.", 422, undefined, code);
     if (code === "ENTERPRISE_ORGANIZATION_REQUIRED" || code === "ENTERPRISE_FINANCE_OWNER_MISMATCH") return fail("Enterprise financial ownership could not be verified.", 409, undefined, code);

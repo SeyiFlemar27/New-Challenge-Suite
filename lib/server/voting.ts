@@ -173,6 +173,7 @@ export async function castVote(db: Firestore, input: CastVoteInput) {
 
     if (!challengeSnap.exists) throw voteReject("Challenge not found.", "NOT_FOUND");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (challenge.isLiveEvent && (challenge.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) throw voteReject("This event uses physical judging, not online voting.", "PHYSICAL_EVENT_ONLY");
     if (votingAccountRestricted(voterAccountSnap.data() ?? profile) || isSponsorProfile(voterAccountSnap.data() ?? profile)) throw voteReject("This account is not eligible to vote.", "VOTER_RESTRICTED");
     if (input.requirePublicSubmission && !hasPublicVotingAccess(challenge)) {
       throw voteReject("Public voting is not enabled for this challenge.", "PUBLIC_VOTING_DISABLED");

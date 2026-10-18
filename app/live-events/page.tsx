@@ -12,6 +12,7 @@ import { getEffectiveTier } from "@/lib/plan-access";
 
 interface LiveEventRecord {
   id: string;
+  detailPath?:string;
   title: string;
   host: string;
   image: string;
@@ -52,6 +53,7 @@ function LiveEventsContent() {
       const record = event as Partial<LiveEventRecord>;
       return {
         id: String(record.id ?? ""), title: String(record.title ?? ""), host: String(record.host ?? ""), image: String(record.image ?? ""),
+        detailPath:record.detailPath===`/live-events/${encodeURIComponent(String(record.id))}/register`?record.detailPath:`/live-events/${encodeURIComponent(String(record.id))}`,
         location: String(record.location ?? ""), date: String(record.date ?? ""), time: String(record.time ?? ""), attending: Number(record.attending ?? 0),
         registrationStatus: String(record.registrationStatus ?? "available"), planRequired: Boolean(record.planRequired), canRegister: Boolean(record.canRegister),
         checkInCount: Number(record.checkInCount ?? 0), status: String(record.status ?? "scheduled"), isOwned: Boolean(record.isOwned),
@@ -116,7 +118,7 @@ function LiveEventsContent() {
                   ) : !event.canRegister ? (
                     <Button variant="ghost" disabled>Registration Closed</Button>
                   ) : (
-                    <LinkButton href={`/live-events/${event.id}/register`}>Register to Attend</LinkButton>
+                    <LinkButton href={event.detailPath??`/live-events/${encodeURIComponent(event.id)}`}>View Event</LinkButton>
                   )}
                   </> : null}
                 </div>

@@ -110,7 +110,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const privateAccessMethod = body.privateAccessMethod === "link_and_code" || body.privateAccessMethod === "access_code" ? "invitation_code" : body.privateAccessMethod;
   let privateAccess: Record<string, unknown> | null = null;
   const judgeAccountIds = body.hostOperations?.judgeAccountIds ?? [];
-  if (body.isLiveEvent && body.hostOperations?.winnerSelection === "judge_selection") {
+  if (body.isLiveEvent && body.hostOperations?.schemaVersion !== 2 && body.hostOperations?.winnerSelection === "judge_selection") {
     if (!judgeAccountIds.length) return rejectPublish("Assign at least one registered judge before submitting this event.", 422, { fieldErrors: { judgeAccountIds: "Assign at least one registered judge." } }, "REGISTERED_JUDGE_REQUIRED");
     const judgeSnaps = await db.getAll(...judgeAccountIds.map((judgeId) => db.collection("users").doc(judgeId)));
     if (judgeSnaps.some((snap) => !snap.exists || String(snap.data()?.accountStatus ?? "active") !== "active")) return rejectPublish("One or more assigned judges are no longer available. Choose registered accounts and try again.", 422, { fieldErrors: { judgeAccountIds: "Choose active registered accounts." } }, "REGISTERED_JUDGE_INVALID");
@@ -248,7 +248,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     lifecycleStatus,
     economyRuleVersion: current.economyRuleVersion ?? economyRules.version,
     automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION,
-    votingSettings: { ...AUTOMATIC_VOTING_SETTINGS },
+    votingSettings: body.isLiveEvent && body.hostOperations?.schemaVersion === 2 ? { allowFreeVotes: false, allowPaidVotes: false, weightedVotes: false } : { ...AUTOMATIC_VOTING_SETTINGS },
     monetization: safeMonetization,
     sponsorEnabled,
     participantApprovalMode: "automatic",

@@ -1,6 +1,7 @@
 import { getChallengeLifecycleState, normalizeChallengeDate } from "@/lib/challenge-status";
 import { getUserPlanAccess } from "@/lib/plan-access";
 import { WITHDRAWAL_ARCHITECTURE_CONFIG, type CashWalletBucket } from "@/lib/server/wallet-architecture";
+import { isLiveEventV2, liveEventSponsorFundingWindow } from "@/lib/server/live-event-sponsor-cutoff";
 
 export const DEFAULT_CASH_CURRENCY = "USD";
 export const MINIMUM_ENTRY_FEE_CENTS = 500;
@@ -195,6 +196,7 @@ export function holdUntilFromApproval(approvedAt: string | Date, holdHours = CAS
 }
 
 export function validateSponsorFundingWindow(challenge: Record<string, unknown>, now = new Date()) {
+  if (isLiveEventV2(challenge)) return liveEventSponsorFundingWindow(challenge, now);
   const lifecycle = getChallengeLifecycleState(challenge, now);
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
   const waitingForEffectiveVoting = challenge.normalLifecyclePolicyVersion === 1 && ["awaiting_submission_deadline", "moderation_pending"].includes(String(challenge.normalVotingGate)) && !challenge.effectiveVotingStartsAt;

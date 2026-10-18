@@ -94,13 +94,15 @@ run("private_requirements", () => {
 });
 
 run("live_steps", () => {
-  const wizard = read("components/host/host-competition-wizard.tsx");
+  const wizard = read("components/host/live-event-builder-v2.tsx");
   const steps = registrySteps("live_event");
-  assert.equal((steps.match(/\["[^"]+", "[^"]+"\]/g) ?? []).length, 10);
-  assert.match(wizard, /canonicalBuilderSteps\("live_event"\)/);
-  assert.match(wizard, /manualCheckInEnabled: true/);
-  assert.match(wizard, /qrCheckInRequiresServerToken: true/);
-  assert.match(wizard, /judgeAccountIds/);
+  assert.equal((steps.match(/\["[^"]+", "[^"]+"\]/g) ?? []).length, 6);
+  assert.match(wizard, /liveEventBuilderSteps\(competition\?"physical_competition":"attendance_only"\)/);
+  assert.match(read("lib/challenge-builder-registry.ts"), /kind === "physical_competition" \|\| step.key !== "prizes"/);
+  assert.match(read("lib/server/live-event-admission.ts"), /assertCheckInManager/);
+  assert.match(read("lib/server/live-event-admission.ts"), /credentialHash/);
+  assert.doesNotMatch(wizard, /judgeAccountIds|RegisteredAccountPicker/);
+  assert.match(wizard, /physicalJudgeCount/);
   assert.match(wizard, /ChallengeBuilderFrame/);
   assert.match(wizard, /useChallengeBuilderAutosave/);
   assert.match(read("lib/hooks/use-challenge-builder-autosave.ts"), /window\.setTimeout/);

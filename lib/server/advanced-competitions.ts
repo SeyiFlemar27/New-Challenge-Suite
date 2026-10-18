@@ -28,6 +28,6 @@ export function advancedCompetitionDetailRoute(record: Record<string, unknown>) 
   const id = text(record.id);
   const type = text(record.type ?? record.competitionType).toLowerCase();
   if (type.includes("tournament")) return `/tournaments/${id}`;
-  if (record.isLiveEvent === true || type.includes("live event")) return record.challengeId ? `/challenges/${text(record.challengeId)}` : `/live-events/${id}/register`;
+  if (record.isLiveEvent === true || type.includes("live event")) return `/live-events/${id}`;
   return `/challenges/${id}`;
 }

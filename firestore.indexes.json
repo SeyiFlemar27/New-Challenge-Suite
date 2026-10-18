@@ -1,6 +1,50 @@
 {
   "indexes": [
     {
+      "collectionGroup": "liveEventUpdates", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventUpdates", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "refundCases", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventJobs", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"runAt","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventBookings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"userId","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventBookings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"reservationExpiresAt","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventEmailOutbox", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventAnnouncements", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "refundCases", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amountCents","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "cashLedger", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"direction","order":"ASCENDING"},{"fieldPath":"shareType","order":"ASCENDING"},{"fieldPath":"netAmountCents","order":"ASCENDING"}]
+    },
+    {
+      "collectionGroup": "liveEventBookings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"eventId","order":"ASCENDING"},{"fieldPath":"paymentConfirmed","order":"ASCENDING"},{"fieldPath":"admissionCents","order":"ASCENDING"},{"fieldPath":"competitionEntryCents","order":"ASCENDING"},{"fieldPath":"providerRefundedCents","order":"ASCENDING"}]
+    },
+    {
       "collectionGroup": "normalLifecycleJobs",
       "queryScope": "COLLECTION",
       "fields": [

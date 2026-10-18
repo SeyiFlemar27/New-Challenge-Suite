@@ -14,6 +14,7 @@ import {
 import { createNotification } from "@/lib/server/notifications";
 import { calculateGrowthWalletAllocation, calculatePaidEntrySplit, ECONOMY_V1_RULES, ECONOMY_V1_RULE_VERSION } from "@/lib/server/economy-rules";
 import { getConfirmedCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE } from "@/lib/server/prize-funding";
+import {isLiveEventV2} from "@/lib/server/live-event-sponsor-cutoff";
 import { getConfirmedEnterprisePromotionalPrizeFunding, isEnterpriseFinanceResource, organizationOwnerForFinance, reserveEnterpriseSettlementLockInTransaction } from "@/lib/server/enterprise-prize-exposure";
 import { normalQualifiedWinnerDistribution, allocateNormalQualifiedPrizeCents } from "@/lib/normal-challenge-prize-allocation";
 import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
@@ -207,6 +208,7 @@ export function buildSettlementBreakdown(input: {
   confirmedCreatorPrizeCents?: number;
   confirmedPromotionalPrizeCents?: number;
 }) {
+  if(isLiveEventV2(input.challenge))throw new Error("LIVE_EVENT_SETTLEMENT_INTEGRATION_REQUIRED");
   const economyV1 = input.challenge.economyRuleVersion === ECONOMY_V1_RULE_VERSION;
   const grossConfirmedChallengeRevenue = cents(input.confirmedEntryRevenueCents) + cents(input.confirmedPaidVoteRevenueCents);
   const legacySplit = calculatePaidRevenueSplit(grossConfirmedChallengeRevenue);
@@ -501,6 +503,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       transaction.get(disputedSponsorContributionQuery)
     ]);
     const confirmedMoneyNow = breakdown.grossConfirmedChallengeRevenue + breakdown.grossConfirmedSponsorPrizeAmount + breakdown.grossConfirmedCreatorPrizeAmount > 0;
+    if(isLiveEventV2(challengeSnap.data()??{}))throw new Error("LIVE_EVENT_SETTLEMENT_INTEGRATION_REQUIRED");
     const existingSettlement = settlementSnap.exists ? settlementSnap.data() ?? {} : null;
     if (!pendingSponsorReservationSnap.empty) {
       throw new Error("Settlement is paused while Sponsor funding reservations or payment reviews are unresolved.");

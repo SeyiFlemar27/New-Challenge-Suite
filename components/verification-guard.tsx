@@ -5,6 +5,7 @@ import { Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 import { isPublicTournamentRoute } from "@/lib/tournament-public-route-policy";
+import { isPublicLiveEventRoute } from "@/lib/live-event-public-route-policy";
 
 const publicPrefixes = ["/auth", "/categories", "/mobile-preview"];
 const publicRoutes = new Set([
@@ -25,6 +26,7 @@ const publicRoutes = new Set([
 ]);
 
 function isPublicRoute(pathname: string) {
+  if (isPublicLiveEventRoute(pathname)) return true;
   if (isPublicTournamentRoute(pathname)) return true;
   if (publicRoutes.has(pathname)) return true;
   if (publicPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;

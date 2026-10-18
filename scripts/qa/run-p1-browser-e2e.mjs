@@ -488,7 +488,7 @@ try {
     db.collection("enterpriseChallenges").doc(`${runId}_official`).set({ organizationId: enterpriseOrg, status: "active", title: "Enterprise operations fixture", createdAt: now })
     ,db.collection("liveEvents").doc(liveEventId).set({
       id: liveEventId, title: "In-Person Art Gathering", hostId: creator.uid, hostName: "Journey creator",
-      description: "A physical event registration fixture.", status: "scheduled", startsAt: future,
+      description: "A physical event registration fixture.", status: "scheduled",eventApprovalStatus:"approved",visibility:"public", startsAt: future,
       date: future, time: "10:00", location: "Lagos", venueName: "Community Arts Hall", eventAddress: "1 Test Lane",
       price: 0, ticketType: "General attendee access", capacity: 25, attending: 0, registrationCount: 0,
       createdAt: now, updatedAt: now
@@ -1183,6 +1183,367 @@ try {
     await context.close();
   });
 
+  await test("Live Event Attendance Only creator earnings approval, clearance and owner visibility", async () => {
+    const owner=await seedUser("liveearningsowner",{role:"creator"}),id=`creator_earnings_browser_${runId}`,bookingId=`${id}_booking`,sourceId=`live_event_${bookingId}_admission_creator`;
+    const ended=new Date(Date.now()-3600000).toISOString(),event={id,title:`Creator earnings ${runId}`,creatorId:owner.uid,isLiveEvent:true,eventApprovalStatus:"approved",visibility:"public",status:"completed",startsAt:past,endsAt:ended,completedAt:ended,capacity:20,hostOperations:{schemaVersion:2,eventFormat:"attendance_only",timezone:"UTC",competitorCapacity:0}};
+    await Promise.all([db.collection("challenges").doc(id).set(event),db.collection("liveEvents").doc(id).set(event),db.collection("liveEventBookings").doc(bookingId).set({eventId:id,userId:"seeded_buyer",status:"confirmed",paymentConfirmed:true,providerPaymentIntentId:`pi_${bookingId}`,amountCents:10000,admissionCents:10000,competitionEntryCents:0,currency:"usd",refundReservedCents:0}),db.collection("cashLedger").doc(sourceId).set({id:sourceId,eventId:id,challengeId:id,userId:owner.uid,sourceId:bookingId,sourceType:"host_event_revenue",direction:"credit",revenueType:"admission",shareType:"creator_host_share",amountCents:8500,netAmountCents:8500,currency:"USD",providerReference:`pi_${bookingId}`,status:"held",settlementRestricted:true,createdAt:now})]);
+    await db.collection("cashLedger").doc(`live_event_${bookingId}_admission_platform`).set({eventId:id,challengeId:id,userId:"platform",sourceId:bookingId,sourceType:"host_event_revenue",direction:"credit",revenueType:"admission",shareType:"platform_share",amountCents:1500,netAmountCents:1500,currency:"USD",status:"held",providerReference:`pi_${bookingId}`,createdAt:now});
+    const context=await browser.newContext(),page=await login(context,admin,{rememberMe:true});
+    await page.goto(`${baseUrl}/admin/finance`,{waitUntil:"domcontentloaded"});
+    await page.getByRole("heading",{name:"Live Event original-payment returns",exact:true}).waitFor();
+    check(await page.getByText("Live Event provider return execution is disabled or unavailable. The original payment and its review case remain preserved.",{exact:true}).isVisible(),"Admin original-payment return UI accurately preserves the disabled provider boundary");
+    const card=page.getByRole("heading",{name:"Live Event creator earnings approval",exact:true}).locator("..");
+    await card.getByLabel("Creator earnings event ID",{exact:true}).fill(id);
+    await card.getByRole("button",{name:"Review original creator earnings",exact:true}).click();
+    await card.getByText("Admission earnings: $85.00",{exact:true}).waitFor();
+    check(await card.getByText("Awaiting Admin approval",{exact:true}).isVisible(),"Attendance Only earnings can be reviewed without winner records");
+    async function confirmDecision(){await card.getByLabel("Creator earnings decision reason",{exact:true}).fill("Verified completion, original booking shares and all outstanding financial obligations");await card.getByRole("checkbox",{name:"I verified completion, original payment sources, refunds, disputes and the requested creator earnings decision.",exact:true}).check();}
+    await confirmDecision();
+    const approved=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-creator-earnings"&&response.request().method()==="POST");
+    await card.getByRole("button",{name:"Approve eligible creator earnings for clearance",exact:true}).click();
+    check((await approved).ok(),"existing single Admin approves original earnings through the actual financial endpoint");
+    await card.getByText("Original creator earnings approved for 72-hour clearance. They are not available yet.",{exact:true}).waitFor();
+    const source=(await db.collection("cashLedger").doc(sourceId).get()).data();
+    check(Date.parse(source.holdUntil)-Date.parse(source.creatorEarningsApprovedAt)===72*3600000,"the existing clearance begins at this approval");
+    check((await db.collection("cashWallets").doc(owner.uid).get()).data().lockedBalanceCents===8500,"approved earnings remain locked, rather than immediately withdrawable");
+    check((await db.collection("cashLedger").where("eventId","==",id).get()).size===2,"approval preserves the two original creator/platform records without a duplicate revenue allocation");
+    await card.getByRole("button",{name:"Review original creator earnings",exact:true}).click();
+    await card.getByText("Clearing after Admin approval",{exact:true}).waitFor();await confirmDecision();
+    const early=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-creator-earnings"&&response.request().method()==="POST");
+    await card.getByRole("button",{name:"Recheck creator earnings clearance",exact:true}).click();
+    check((await early).status()===409,"actual financial handler refuses early clearance");
+    // Deterministic local fixture aging, not a claim that real provider funds cleared.
+    await db.collection("cashLedger").doc(sourceId).update({creatorEarningsApprovedAt:new Date(Date.now()-73*3600000).toISOString(),holdUntil:new Date(Date.now()-3600000).toISOString()});
+    await card.getByRole("button",{name:"Review original creator earnings",exact:true}).click();
+    await card.getByText("Clearing after Admin approval",{exact:true}).waitFor();await confirmDecision();
+    const cleared=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-creator-earnings"&&response.request().method()==="POST");
+    await card.getByRole("button",{name:"Recheck creator earnings clearance",exact:true}).click();
+    check((await cleared).ok(),"reconciled aged fixture clears through the actual authorization path");
+    check((await db.collection("cashWallets").doc(owner.uid).get()).data().availableBalanceCents===8500,"original creator earnings become internally available exactly once");
+    const ownerContext=await browser.newContext(),ownerPage=await login(ownerContext,owner,{rememberMe:true});
+    await ownerPage.goto(`${baseUrl}/live-events/${id}/manage`,{waitUntil:"domcontentloaded"});await ownerPage.getByRole("button",{name:"Tickets & Earnings",exact:true}).click();
+    await ownerPage.getByText("Available internally, subject to withdrawal checks",{exact:true}).waitFor();
+    check(await ownerPage.getByText("Available internally, subject to withdrawal checks",{exact:true}).locator("..").getByText("$85.00",{exact:true}).isVisible(),"creator dashboard reports only the cleared original amount");
+    check(await ownerPage.getByText("External withdrawals are not available until an approved payout provider is connected and verified.",{exact:true}).isVisible(),"internal clearance never claims a live payout integration is available");
+    await ownerPage.screenshot({path:join(artifacts,"live-event-creator-earnings-clearance.png"),fullPage:true});
+    await ownerContext.close();await context.close();
+  });
+
+  await test("Live Event physical competition registration, arrival, judging and public results", async () => {
+    const id=`physical_journey_${runId}`,first=await seedUser("livewinner"),second=await seedUser("liveopponent");
+    // Model a public identity without a contact field; real Auth remains on the demo emulator.
+    await db.collection("profiles").doc(first.uid).update({email:"",publicProfile:true});
+    const start=new Date(Date.now()-60000).toISOString(),end=new Date(Date.now()+7200000).toISOString();
+    const record={id,title:`Physical judging ${runId}`,creatorId:creator.uid,isLiveEvent:true,eventApprovalStatus:"approved",visibility:"public",status:"in_progress",description:"Physical competition journey using verified local accounts and real event operations.",startsAt:start,endsAt:end,venueName:"Local test venue",capacity:4,hostOperations:{schemaVersion:2,eventFormat:"physical_competition",timezone:"UTC",competitorCapacity:2,winnerCount:1,physicalJudgeCount:2,ticketPrice:0,competitionEntryFee:0,registrationOpensAt:past,registrationClosesAt:end,checkInStartAt:start,checkInEndAt:end,eventRules:["Respect the physical judges."],competitionInstructions:["Present your own Participant Pass."]}};
+    await Promise.all([db.collection("challenges").doc(id).set(record),db.collection("liveEvents").doc(id).set(record)]);
+    const registrations=[];
+    for(const [user,name] of [[first,"First competitor"],[second,"Second competitor"]]){
+      const context=await browser.newContext(),page=await login(context,user,{rememberMe:true});
+      await page.goto(`${baseUrl}/live-events/${id}`,{waitUntil:"domcontentloaded"});
+      let admission;
+      if(user.uid===first.uid){
+        await page.getByLabel("Guest 1 name",{exact:true}).fill("My personal audience ticket");
+        const booked=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/bookings`&&response.request().method()==="POST");await page.getByRole("button",{name:"Get tickets",exact:true}).click();check((await booked).ok(),"signed-in purchaser first obtains their own audience ticket");
+        await page.getByRole("heading",{name:"My Tickets",exact:true}).waitFor();
+        admission=(await db.collection("liveEventTickets").where("eventId","==",id).where("userId","==",user.uid).get()).docs[0].data();
+        await page.getByLabel("Choose your competition admission",{exact:true}).selectOption(admission.id);
+        await page.getByRole("checkbox",{name:"This ticket is for my personal admission. After successful conversion its old QR code will stop working, including for anyone I previously shared it with.",exact:true}).check();
+      }
+      await page.getByLabel("Competitor name",{exact:true}).fill(name);
+      const registered=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/bookings`&&response.request().method()==="POST");
+      await page.getByRole("button",{name:admission?"Convert ticket and join":"Join competition",exact:true}).click();
+      check((await registered).ok(),"competitor registers through the actual authenticated booking endpoint");
+      await page.getByText("Participant Pass — only valid for the registered competitor",{exact:true}).waitFor();
+      const row=(await db.collection("liveEventRegistrations").doc(`${id}_${user.uid}`).get()).data();
+      check(row.eligible&&row.status==="confirmed","registration persists eligibility without fabricating attendance");
+      if(admission){check((await db.collection("liveEventTickets").doc(admission.id).get()).data().status==="converted","free upgrade permanently converts only the explicitly selected owned ticket");check((await page.request.post(`${baseUrl}/api/live-events/${id}/presentation`,{headers:{origin:baseUrl},data:{ticketId:admission.id,credential:admission.credential}})).status()===404,"a previously shared original QR cannot retrieve a valid ticket after conversion");}
+      registrations.push({user,name,ticketId:row.ticketId});await context.close();
+    }
+    const ownerContext=await browser.newContext(),page=await login(ownerContext,creator,{rememberMe:true});
+    await page.goto(`${baseUrl}/live-events/${id}/manage`,{waitUntil:"domcontentloaded"});
+    await page.getByRole("button",{name:"Check-In",exact:true}).click();
+    for(const person of registrations){
+      await page.getByLabel("Ticket identification",{exact:true}).fill(person.ticketId);
+      await page.getByRole("button",{name:"Verify ticket",exact:true}).click();
+      await page.getByRole("button",{name:"Confirm Arrival",exact:true}).waitFor();page.once("dialog",dialog=>dialog.accept());
+      const arrived=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/check-in`&&response.request().postDataJSON()?.confirm===true);
+      await page.getByRole("button",{name:"Confirm Arrival",exact:true}).click();
+      check((await arrived).ok(),"organizer confirms physical identity and arrival through the real check-in endpoint");
+      await page.getByRole("button",{name:"Confirm Arrival",exact:true}).waitFor({state:"hidden"});
+    }
+    await page.getByRole("button",{name:"Results",exact:true}).click();
+    async function score(name,value){await page.getByLabel("Reason for this results action",{exact:true}).fill("The physical judges verified these scores at the venue");await page.getByLabel(`Physical judge scores for ${name}`,{exact:true}).fill(value);const saved=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/management`&&response.request().postDataJSON()?.action==="scores");await page.getByRole("heading",{name,exact:true}).locator("..").getByRole("button",{name:"Save confirmed scores",exact:true}).click();check((await saved).ok(),"all physical judges' scores are persisted through the actual authorized handler");await expect(page.getByLabel("Reason for this results action",{exact:true})).toHaveValue("");}
+    for(const person of registrations)await score(person.name,"8, 8");
+    async function announce(){await page.getByLabel("Reason for this results action",{exact:true}).fill("Reviewed the final physical judging evidence and confirmed the results");page.once("dialog",dialog=>dialog.accept());const response=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/management`&&response.request().postDataJSON()?.action==="announce");await page.getByRole("button",{name:"Review and Announce Results",exact:true}).click();return response;}
+    check((await announce()).status()===409,"unresolved tied winning positions cannot be announced");
+    check(!(await db.collection("liveEvents").doc(id).get()).data().resultsPublishedAt,"a tie hold creates no fictitious official winner");
+    await score(registrations[0].name,"9, 9");
+    check((await announce()).ok(),"verified physical reassessment allows the calculated winner to be announced");
+    const official=(await db.collection("liveEvents").doc(id).get()).data();
+    check(official.publishedPhysicalResults[0].userId===first.uid,"the highest verified score determines the winner");
+    check((await db.collection("cashLedger").where("eventId","==",id).get()).empty,"sporting publication does not create wallet credits or payouts");
+    check((await db.collection("notifications").doc(`live_result_${id}_${first.uid}`).get()).exists,"the official winner receives an in-app notification");
+    const publicContext=await browser.newContext(),publicPage=await publicContext.newPage();
+    await publicPage.goto(`${baseUrl}/live-events/${id}`,{waitUntil:"domcontentloaded"});
+    await publicPage.getByRole("tab",{name:"Results",exact:true}).click();
+    check(await publicPage.getByText("Place 1 · Journey livewinner",{exact:true}).isVisible(),"signed-out results show the winner's public profile name and official position");
+    check(await publicPage.getByText("Judges’ score: 18",{exact:true}).isVisible(),"the public sporting score combines the persisted physical judges' scores");
+    await publicPage.screenshot({path:join(artifacts,"live-event-physical-results.png"),fullPage:true});
+    await publicContext.close();await ownerContext.close();
+  });
+
+  await test("Live Event grouped venue and check-in reschedule requires actual Admin approval", async () => {
+    const id=`reviewed_live_${runId}`,oldStart=new Date(Date.now()+86400000).toISOString(),oldEnd=new Date(Date.now()+86400000+4*3600000).toISOString(),closing=new Date(Date.now()+7200000).toISOString();
+    const record={id,title:`Reviewed reschedule ${runId}`,creatorId:creator.uid,isLiveEvent:true,eventApprovalStatus:"approved",visibility:"public",status:"scheduled",startsAt:oldStart,endsAt:oldEnd,venueName:"Original venue",eventAddress:"Original address",eventCity:"Test city",eventCountry:"Nigeria",capacity:20,sponsorFundingCutoffAt:oldStart,hostOperations:{schemaVersion:2,eventFormat:"attendance_only",timezone:"UTC",registrationOpensAt:past,registrationClosesAt:closing,checkInStartAt:new Date(Date.parse(oldStart)-3600000).toISOString(),checkInEndAt:oldEnd,competitorCapacity:0}};
+    await Promise.all([db.collection("challenges").doc(id).set(record),db.collection("liveEvents").doc(id).set(record)]);
+    const ownerContext=await browser.newContext({timezoneId:"UTC"}),ownerPage=await login(ownerContext,creator,{rememberMe:true});
+    await ownerPage.goto(`${baseUrl}/live-events/${id}/manage`,{waitUntil:"domcontentloaded"});
+    await ownerPage.getByRole("button",{name:"Event Details",exact:true}).click();
+    const start=new Date(Math.floor((Date.now()+2*86400000)/60000)*60000),end=new Date(start.getTime()+3*3600000),arrival=new Date(start.getTime()-3600000);
+    await ownerPage.getByLabel("Venue name",{exact:true}).fill("Reviewed replacement venue");
+    for(const [label,date] of [["Event start",start],["Event end",end],["Check-in opens",arrival],["Check-in closes",end]])await ownerPage.getByLabel(label,{exact:true}).fill(date.toISOString().slice(0,16));
+    await ownerPage.getByLabel("Required reason",{exact:true}).fill("The venue approved this replacement date and arrival window");
+    ownerPage.once("dialog",dialog=>dialog.accept());
+    const proposed=ownerPage.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/changes`&&response.request().method()==="POST");
+    await ownerPage.getByRole("button",{name:"Request Admin review",exact:true}).click();
+    check((await proposed).ok(),"organizer submits all related venue and arrival changes through the real endpoint");
+    check((await db.collection("challenges").doc(id).get()).data().startsAt===oldStart,"a proposal cannot change published details before Admin approval");
+    const request=(await db.collection("liveEventChangeRequests").where("eventId","==",id).get()).docs[0];
+    check(request.data().proposed.checkInStartAt===arrival.toISOString(),"the request preserves explicit check-in timing for review");
+    const adminContext=await browser.newContext({timezoneId:"UTC"}),adminPage=await login(adminContext,admin,{rememberMe:true});
+    await adminPage.goto(`${baseUrl}/admin`,{waitUntil:"domcontentloaded"});
+    const review=adminPage.getByRole("heading",{name:"Published Live Event changes",exact:true}).locator("..");
+    await review.getByLabel("Decision reason",{exact:true}).fill("Verified the venue, schedule and existing booking protections");
+    await review.getByRole("checkbox",{name:"I reviewed the existing and proposed values and confirm this decision.",exact:true}).check();
+    const decided=adminPage.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-changes"&&response.request().method()==="POST");
+    await review.getByRole("heading",{name:id,exact:true}).locator("..").getByRole("button",{name:"Approve",exact:true}).click();
+    check((await decided).ok(),"the existing single-Admin review controls apply the authorized grouped request");
+    const changed=(await db.collection("challenges").doc(id).get()).data();
+    check(changed.startsAt===start.toISOString()&&changed.hostOperations.checkInStartAt===arrival.toISOString(),"event and check-in changes commit together");
+    check(changed.hostOperations.registrationClosesAt===closing,"rescheduling does not extend registration eligibility or old booking deadlines");
+    check((await db.collection("liveEventUpdates").doc(request.id).get()).exists,"approved material changes retain a durable registrant notice and refund-rights record");
+    await ownerPage.reload({waitUntil:"domcontentloaded"});
+    await ownerPage.getByRole("button",{name:"Event Details",exact:true}).click();
+    await ownerPage.getByText("Current published venue and schedule",{exact:true}).click();
+    check(await ownerPage.getByText(start.toISOString(),{exact:true}).isVisible(),"the organizer sees current server-persisted schedule values");
+    await ownerPage.screenshot({path:join(artifacts,"live-event-reviewed-reschedule.png"),fullPage:true});
+    const rosterBatch=db.batch();
+    for(let index=0;index<205;index++){const suffix=String(index).padStart(4,"0");rosterBatch.set(db.collection("liveEventTickets").doc(`${id}_${suffix}`),{eventId:id,guestName:`Roster guest ${suffix}`,kind:"audience",status:"confirmed",checkedInAt:null});}
+    await rosterBatch.commit();
+    await ownerPage.reload({waitUntil:"domcontentloaded"});
+    await ownerPage.getByRole("button",{name:"Guests & Competitors",exact:true}).click();
+    check(await ownerPage.getByText("Roster guest 0000",{exact:true}).isVisible(),"management renders the first authorized roster page");
+    check(await ownerPage.getByText("Roster guest 0204",{exact:true}).count()===0,"later guests are not falsely included before their page loads");
+    for(let index=0;index<2;index++){const loaded=ownerPage.waitForResponse(response=>new URL(response.url()).pathname===`/api/live-events/${id}/management`&&new URL(response.url()).searchParams.has("ticketsAfter"));await ownerPage.getByRole("button",{name:"Load more guests and competitors",exact:true}).click();check((await loaded).ok(),"load-more uses the real authorized management endpoint");}
+    await ownerPage.getByText("Roster guest 0204",{exact:true}).waitFor();
+    check(await ownerPage.getByRole("button",{name:"Load more guests and competitors",exact:true}).count()===0,"pagination ends when the server has no further roster records");
+    await ownerPage.getByLabel("Find a guest or competitor",{exact:true}).fill("0204");
+    check(await ownerPage.getByText("Roster guest 0204",{exact:true}).isVisible(),"roster search includes guests loaded from later pages");
+    check(await ownerPage.getByText("Roster guest 0000",{exact:true}).count()===0,"local roster search filters loaded pages consistently");
+    await ownerPage.screenshot({path:join(artifacts,"live-event-paginated-roster.png"),fullPage:true});
+    await ownerContext.close();await adminContext.close();
+  });
+
+  await test("Live Event financial Admin evidence, approval and held-credit safeguards", async () => {
+    const id=`financial_live_${runId}`,winner=await seedUser("livefinancialwinner");
+    const event={id,title:`Financial review ${runId}`,creatorId:creator.uid,isLiveEvent:true,eventApprovalStatus:"approved",visibility:"public",status:"completed",startsAt:past,endsAt:now,resultsPublishedAt:now,physicalResultsVersion:2,physicalJudgeCountLocked:1,publishedPhysicalResults:[{userId:winner.uid,placement:1,score:900}],eventPrizeSettlementStatus:"awaiting_financial_verification",hostOperations:{schemaVersion:2,eventFormat:"physical_competition",winnerCount:1,physicalJudgeCount:1}};
+    await Promise.all([
+      db.collection("challenges").doc(id).set(event),db.collection("liveEvents").doc(id).set(event),
+      db.collection("liveEventRegistrations").doc(`${id}_winner`).set({eventId:id,userId:winner.uid,kind:"competitor",eligible:true,status:"checked_in",checkedInAt:past}),
+      db.collection("liveEventPhysicalScores").doc(`${id}_score`).set({eventId:id,userId:winner.uid,scores:[9],attendanceCheckedInAt:past}),
+      db.collection("creatorPrizeFundingPayments").doc(`${id}_fixture`).set({challengeId:id,status:"confirmed",webhookConfirmed:true,paymentPurpose:"prize_pool_funding",currency:"USD",amountCents:1000}),
+    ]);
+    const context=await browser.newContext({viewport:{width:1365,height:900}}),page=await login(context,admin,{rememberMe:true});
+    await page.goto(`${baseUrl}/admin/finance`,{waitUntil:"domcontentloaded"});
+    await page.getByRole("heading",{name:"Live Event prize approval",exact:true}).waitFor();
+    await page.getByLabel("Event ID",{exact:true}).fill(id);
+    const preview=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-settlements"&&new URL(response.url()).searchParams.get("eventId")===id);
+    await page.getByRole("button",{name:"Review authoritative evidence",exact:true}).click();
+    check((await preview).ok(),"Admin browser retrieves authoritative financial and judging evidence");
+    await page.getByText("Confirmed winner pool: $10.00",{exact:true}).waitFor();
+    check((await db.collection("cashLedger").where("eventId","==",id).get()).empty,"Financial preview does not create money");
+    const approve=page.getByRole("button",{name:"Approve held winner credits",exact:true});
+    check(await approve.isDisabled(),"Approval is disabled before reason and confirmation");
+    await page.getByLabel("Approval reason",{exact:true}).fill("Verified original funding and published physical judges' records");
+    await page.getByRole("checkbox",{name:/I verified the official results/}).check();
+    const decision=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-settlements"&&response.request().method()==="POST");
+    await approve.click();check((await decision).ok(),"Admin approval connects to the actual authorized endpoint");
+    await page.getByText(/Approved\. Winner credits are held pending clearance/).waitFor();
+    const credits=await db.collection("cashLedger").where("eventId","==",id).get();
+    check(credits.size===1&&credits.docs[0].data().status==="pending_hold","Exactly one held winner credit exists");
+    check((await db.collection("cashWallets").doc(winner.uid).get()).data()?.lockedBalanceCents===1000,"Real internal wallet balance is locked, not spendable");
+    check(credits.docs[0].data().externalPayoutExecuted===false,"Financial approval never executes an external payout");
+    await page.getByText("Clear previously approved winner credits",{exact:true}).click();
+    await page.getByLabel("Clearance reason",{exact:true}).fill("Recheck the approved allocation and clearance period");
+    await page.getByRole("checkbox",{name:"I confirm the clearance review for the event ID above.",exact:true}).check();
+    const clearance=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/admin/live-event-settlements"&&response.request().method()==="PATCH");
+    await page.getByRole("button",{name:"Recheck and clear eligible credits",exact:true}).click();
+    check((await clearance).status()===409,"Browser cannot bypass the 72-hour clearance period");
+    await page.getByText(/The clearance period or financial reconciliation is incomplete/).waitFor();
+    await page.screenshot({path:join(artifacts,"live-event-admin-financial-review.png"),fullPage:true});
+    await context.close();
+  });
+
+  for(const builderFormat of ["attendance_only","physical_competition"]){
+  await test(`Live Event V2 ${builderFormat} builder draft, media, publication and Admin approval`, async () => {
+    const owner=await seedUser(`live-builder-owner-${builderFormat}`,{role:"host"});
+    await Promise.all([db.collection("users").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true})]);
+    const context=await browser.newContext({viewport:{width:1440,height:1000}});
+    const page=await login(context,owner,{rememberMe:true});
+    await page.goto(`${baseUrl}/live/create`,{waitUntil:"domcontentloaded"});
+    await page.getByLabel("Event title",{exact:true}).waitFor();
+    const nav=page.getByRole("navigation",{name:"Challenge builder steps"});
+    check(await nav.getByRole("button").count()===5,"attendance builder exposes exactly five approved steps");
+    await page.getByLabel("Event title",{exact:true}).fill("Live Event draft browser verification");
+    await page.getByLabel("Category",{exact:true}).selectOption("Fitness");
+    await page.getByLabel("Subcategory",{exact:true}).selectOption("Strength");
+    await page.getByLabel("Event description",{exact:true}).fill("An isolated local event draft with actual authorized persistence.");
+    await page.getByRole("button",{name:"Add Rule",exact:true}).click();
+    await page.getByLabel("Rule 1",{exact:true}).fill("Respect everyone attending.");
+    const creation=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/challenges"&&response.request().method()==="POST");
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    const created=await creation,envelope=await created.json();
+    check(created.ok()&&envelope.ok,`Host Overview saves through the real draft handler (${created.status()})`);
+    const draftId=envelope.data.challenge.id;
+    check((await db.collection("challenges").doc(draftId).get()).data().hostOperations.schemaVersion===2,"saved draft uses the Live Event V2 schema");
+    await page.getByLabel("Venue name",{exact:true}).waitFor();
+    await page.reload({waitUntil:"domcontentloaded"});
+    await nav.getByRole("button",{name:/Overview/}).click();
+    await page.getByLabel("Event title",{exact:true}).waitFor();
+    check(await page.getByLabel("Event title",{exact:true}).inputValue()==="Live Event draft browser verification","restoring the saved Overview preserves entered content");
+    check(await page.getByLabel("Rule 1",{exact:true}).inputValue()==="Respect everyone attending.","restoring preserves ordered event rules");
+    await page.screenshot({path:join(artifacts,`live-event-v2-builder-${builderFormat}-draft.png`),fullPage:true});
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    const localInput=offset=>new Date(Date.now()+offset).toISOString().slice(0,16),day=86400000;
+    for(const [label,value] of [["Venue name","Verified local event venue"],["Full address","10 Test Street"],["City","Lagos"],["State or region","Lagos"],["Event timezone","UTC"],["Event start",localInput(5*day)],["Event end",localInput(5*day+3*3600000)],["Registration opens",localInput(-60000)],["Registration closes",localInput(4*day)],["Check-in opens",localInput(5*day-3600000)],["Check-in closes",localInput(5*day+3600000)],["Total venue capacity","20"]])await page.getByLabel(label,{exact:true}).fill(value);
+    await page.getByLabel("Country",{exact:true}).selectOption("NG");
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    await page.getByLabel("Event type",{exact:true}).waitFor();
+    if(builderFormat==="physical_competition"){
+      await page.getByLabel("Event type",{exact:true}).selectOption("physical_competition");
+      await page.getByLabel("Maximum competitors",{exact:true}).fill("2");
+      await page.getByLabel("Number of physical judges",{exact:true}).fill("2");
+      await page.getByRole("button",{name:"Add Instruction",exact:true}).click();
+      await page.getByLabel("Instruction 1",{exact:true}).fill("Bring your identity-bound Participant Pass to the physical judges.");
+      check(await nav.getByRole("button").count()===6,"switching to physical competition adds only the approved prize step");
+    }
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    if(builderFormat==="physical_competition"){
+      await page.getByLabel("Winner positions",{exact:true}).selectOption("2");
+      await page.getByLabel("Prize description",{exact:true}).fill("Recognition for the two highest-scoring competitors.");
+      await page.getByRole("button",{name:"Continue",exact:true}).click();
+    }
+    const eventCover=await require("sharp")({create:{width:800,height:500,channels:3,background:"#c8a755"}}).png().toBuffer();
+    await page.getByLabel("Event cover file",{exact:true}).setInputFiles({name:"live-event-cover.png",mimeType:"image/png",buffer:eventCover});
+    await page.getByRole("paragraph").filter({hasText:"Upload complete."}).waitFor();
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    const summary=page.getByRole("region",{name:"Event review summary",exact:true});
+    await summary.waitFor();check(await summary.getByText("Audience admission",{exact:true}).locator("..").getByText("Free",{exact:true}).isVisible(),"review shows actual free admission without promised funding");
+    if(builderFormat==="physical_competition")check(await summary.getByText("70% / 30%",{exact:true}).isVisible(),"physical review uses the approved two-winner allocation without inventing cash");
+    check(await summary.getByText("Full refund until 48 hours before",{exact:true}).isVisible(),"review discloses the actual saved refund policy");
+    await page.getByLabel("The event details are accurate.",{exact:true}).check();
+    await page.getByLabel("I have permission to use the uploaded content.",{exact:true}).check();
+    const reviewResponse=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/challenges/${draftId}/publish`&&response.request().method()==="POST");
+    await page.getByRole("button",{name:"Submit for Review",exact:true}).click();
+    const submittedResponse=await reviewResponse,submittedEnvelope=await submittedResponse.json();
+    check(submittedResponse.ok()&&submittedEnvelope.ok,`Live Event submits through actual upload verification and publication handler (${submittedResponse.status()}): ${JSON.stringify(submittedEnvelope).slice(0,3000)}`);
+    await page.getByRole("heading",{name:"Event submitted for review",exact:true}).waitFor();
+    check((await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`)).status()===404,"pending event remains unavailable to public booking");
+    const adminLogin=await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:admin.email,password:admin.password,returnSecureToken:true})});
+    const adminToken=await adminLogin.json();
+    const approvalResponse=await context.request.patch(`${baseUrl}/api/admin/reviews`,{headers:{authorization:`Bearer ${adminToken.idToken}`},data:{type:"challenge",id:draftId,action:"approve"}});
+    check(approvalResponse.ok(),"existing authenticated Admin review API approves the actual submitted event");
+    const published=await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`);
+    check(published.ok(),"approved event is now publicly discoverable through the real Live Event API");
+    const finalEvent=(await db.collection("liveEvents").doc(draftId).get()).data();
+    check(finalEvent.eventApprovalStatus==="approved"&&finalEvent.hostOperations.eventFormat===builderFormat,"Admin approval synchronizes the correct Live Event type atomically");
+    await context.close();
+  },{requiresMedia:true});
+  }
+
+  await test("Live Event V2 signed-out details and verified guest multiple-ticket booking", async () => {
+    const eventId = `live_v2_browser_${runId}`, attendeeEvent = `${eventId}_attendance`;
+    const start = Date.now() + 2 * 86400000;
+    const fixture = { id:eventId,creatorId:users.creator.uid,title:"Physical event browser verification",description:"A real description with paragraphs.\n\nPhysical event details for local browser verification.",capacity:4,visibility:"public",status:"scheduled",eventApprovalStatus:"approved",startsAt:new Date(start).toISOString(),endsAt:new Date(start+7200000).toISOString(),venueName:"Local demo venue",eventAddress:"Test address",eventCity:"Lagos",eventCountry:"NG",hostOperations:{schemaVersion:2,eventFormat:"physical_competition",timezone:"Africa/Lagos",competitorCapacity:2,physicalJudgeCount:2,winnerCount:2,admissionRefundPolicy:"standard",registrationOpensAt:new Date(Date.now()-10000).toISOString(),registrationClosesAt:new Date(start).toISOString(),checkInStartAt:new Date(start-3600000).toISOString(),checkInEndAt:new Date(start+7200000).toISOString(),eventRules:["Respect guests"],competitionInstructions:["Arrive ready to compete"]} };
+    await db.collection("liveEvents").doc(eventId).set(fixture);
+    await db.collection("liveEvents").doc(attendeeEvent).set({...fixture,id:attendeeEvent,title:"Attendance browser verification",hostOperations:{...fixture.hostOperations,eventFormat:"attendance_only",competitorCapacity:0}});
+    const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();
+    page.on("pageerror",error=>pageErrors.push(error.message));
+    const response=await page.goto(`${baseUrl}/live-events/${eventId}`,{waitUntil:"domcontentloaded"});
+    check(response.status()===200,"public event page returns HTTP 200");
+    await page.getByRole("heading",{name:fixture.title,exact:true}).waitFor();
+    check(await page.getByRole("tab").count()===4,"physical event exposes four initial information tabs");
+    check(await page.getByRole("heading",{name:"Get Ticket",exact:true}).isVisible(),"audience booking is visible");
+    check(await page.getByRole("heading",{name:"Join Entry",exact:true}).isVisible(),"competition booking is visible");
+    await page.getByRole("tab",{name:"Instructions",exact:true}).click();
+    await page.getByRole("heading",{name:"Before You Compete",exact:true}).waitFor();
+    check(await page.getByText("Arrive ready to compete",{exact:true}).isVisible(),"published physical instructions are displayed");
+    const {beginGuestVerification}=await import("../../lib/server/live-event-guests.ts");
+    let verificationCode;
+    // Only external mail delivery is deterministic. Verification, session cookies,
+    // booking, capacity updates and ticket retrieval use actual application routes.
+    await page.route(`**/api/live-events/${eventId}/guest-verification`,async route=>{
+      const payload=route.request().postDataJSON();
+      if(payload.action!=="send")return route.continue();
+      const sent=await beginGuestVerification(db,eventId,payload.email,async email=>{verificationCode=email.text.match(/\b\d{6}\b/)[0];});
+      await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({ok:true,data:sent,message:"Check your email for your verification code."})});
+    });
+    await page.getByLabel("Your email",{exact:true}).fill(`guest_${runId}@example.test`);
+    const verificationSent=page.waitForResponse(reply=>new URL(reply.url()).pathname===`/api/live-events/${eventId}/guest-verification`&&reply.request().postDataJSON()?.action==="send");
+    await page.getByRole("button",{name:"Send verification code",exact:true}).click();
+    check((await verificationSent).status()===200,"deterministic email boundary creates a real single-use verification record");
+    await page.getByLabel("Email verification code",{exact:true}).waitFor();
+    await page.getByLabel("Email verification code",{exact:true}).fill(verificationCode);
+    await page.getByRole("button",{name:"Verify email",exact:true}).click();
+    await page.getByLabel("Guest 1 name",{exact:true}).fill("Browser guest one");
+    await page.getByRole("button",{name:"Add guest",exact:true}).click();
+    await page.getByLabel("Guest 2 name",{exact:true}).fill("Browser guest two");
+    const booked=page.waitForResponse(reply=>new URL(reply.url()).pathname===`/api/live-events/${eventId}/bookings`&&reply.request().method()==="POST");
+    await page.getByRole("button",{name:"Get tickets",exact:true}).click();
+    check((await booked).status()===200,"verified guest books through actual server endpoint without an account");
+    await page.getByRole("heading",{name:"My Tickets",exact:true}).waitFor();
+    const guestPreference=page.getByRole("checkbox",{name:"Receive optional organizer announcement emails for this event",exact:true});
+    await guestPreference.waitFor();
+    const preferenceSaved=page.waitForResponse(reply=>new URL(reply.url()).pathname===`/api/live-events/${eventId}/email-preferences`&&reply.request().method()==="PATCH");
+    await guestPreference.check();
+    check((await preferenceSaved).ok(),"verified guest can opt into optional organizer announcements through the actual preference endpoint");
+    const preferenceRemoved=page.waitForResponse(reply=>new URL(reply.url()).pathname===`/api/live-events/${eventId}/email-preferences`&&reply.request().method()==="PATCH");
+    await expect(guestPreference).toBeChecked();
+    await guestPreference.uncheck();
+    check((await preferenceRemoved).ok(),"verified guest can withdraw announcement consent without creating an account");
+    await expect(guestPreference).not.toBeChecked();
+    await page.getByAltText("Admission QR code — present this at the event entrance",{exact:true}).first().waitFor();
+    await page.addScriptTag({path:join(repoRoot,"node_modules/@zxing/browser/umd/zxing-browser.min.js")});
+    const rawQr=await page.evaluate(async()=>{
+      const reader=new window.ZXingBrowser.BrowserQRCodeReader();
+      const image=document.querySelector('img[alt="Admission QR code — present this at the event entrance"]');await image.decode();
+      const result=await reader.decodeFromImageElement(image);
+      return result.getText();
+    });
+    const {readLiveEventTicketCode}=await import("../../lib/live-event-ticket-code.ts");
+    const qrPayload=readLiveEventTicketCode(rawQr,eventId);
+    check((await db.collection("liveEventTickets").doc(qrPayload.ticketId).get()).data()?.eventId===eventId,"actual rendered QR decodes into the correct event and individual ticket");
+    const sharedContext=await browser.newContext();
+    const sharedPage=await sharedContext.newPage();
+    sharedPage.on("pageerror",error=>pageErrors.push(error.message));
+    await sharedPage.goto(`${baseUrl}/live-events/${eventId}/ticket#${qrPayload.ticketId}.${qrPayload.credential}`,{waitUntil:"domcontentloaded"});
+    await sharedPage.getByText("Ready to present at the entrance",{exact:true}).waitFor();
+    check(await sharedPage.getByText("General Admission — valid for one person presenting this unused ticket",{exact:true}).isVisible(),"shared audience ticket works without purchaser authentication");
+    check((await sharedPage.request.get(`${baseUrl}/api/live-events/${eventId}/tickets`)).status()===401,"a shared ticket never grants access to the purchaser's other tickets");
+    check((await sharedPage.request.get(`${baseUrl}/api/live-events/${eventId}/email-preferences`)).status()===401,"a shared admission credential cannot change purchaser email preferences");
+    await sharedContext.close();
+    check((await db.collection("liveEventTickets").where("eventId","==",eventId).get()).size===2,"one admission credential is issued for each named guest");
+    check((await db.collection("liveEvents").doc(eventId).get()).data().audienceCount===2,"capacity counts two tickets rather than one checkout");
+    await page.screenshot({path:join(artifacts,"live-event-v2-desktop.png"),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"physical event fits a mobile viewport");
+    await page.screenshot({path:join(artifacts,"live-event-v2-mobile.png"),fullPage:true});
+    await page.goto(`${baseUrl}/live-events/${attendeeEvent}`,{waitUntil:"domcontentloaded"});
+    await page.getByRole("heading",{name:"Attendance browser verification",exact:true}).waitFor();
+    check(await page.getByRole("tab").count()===3,"attendance event has three information tabs");
+    check(await page.getByRole("heading",{name:"Join Entry",exact:true}).count()===0,"attendance event never presents competition entry");
+    await context.close();
+  });
   check(pageErrors.length === 0, `Browser encountered uncaught client errors: ${pageErrors.join(" | ")}`);
 } finally {
   if (browser) await browser.close().catch(() => undefined);

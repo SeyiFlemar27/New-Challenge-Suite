@@ -1,17 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-
-const wizard = readFileSync("components/host/host-competition-wizard.tsx", "utf8");
-
-assert(wizard.includes("data-live-event-canonical-builder"));
-assert(wizard.includes("ChallengeBuilderFrame"));
-assert(wizard.includes("BuilderSurface"));
-assert(wizard.includes("BuilderFooter"));
-assert(wizard.includes("LivePublishChecklist"));
-assert(wizard.includes("finishLater"));
-assert(wizard.includes("persistDraft(true)"));
-
-assert(!wizard.includes("overflow-x-auto"), "Live Event must not use the horizontal tab strip.");
-assert(!wizard.includes("HostCompetitionWizard"), "The obsolete generic builder export must remain removed.");
-
-console.log("Live Event vertical builder layout checks passed.");
+import {readFileSync} from "node:fs";
+const wizard=readFileSync("components/host/live-event-builder-v2.tsx","utf8");
+for(const token of ["ChallengeBuilderFrame","BuilderSurface","BuilderFooter","finishLater","save().then","liveEventBuilderSteps"])assert(wizard.includes(token),token);
+assert(!wizard.includes("HostVerticalStepper")&&!wizard.includes("function WizardStep"));
+assert(wizard.includes("uploading")&&wizard.includes("onStatusChange"),"Leaving and saving must respect active uploads");
+console.log("Live Event vertical layout and safe-exit contracts passed.");

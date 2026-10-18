@@ -5,6 +5,7 @@ import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-ch
 import { calculateNormalWinnerAmountsCents, isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS, normalWinnerPercentages } from "@/lib/normal-challenge-config";
 import { isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
+import { eventCapacities, eventTime } from "@/lib/live-event-policy";
 
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -213,6 +214,16 @@ export const serverChallengeCreateSchema = z.object({
   roundDuration: z.coerce.number().int().min(0).max(86400).default(0),
   judgeScoringEnabled: z.coerce.boolean().default(false),
   hostOperations: z.object({
+    schemaVersion: z.literal(2).optional(),
+    currentStep: z.enum(["overview", "registration", "participation", "prizes", "media", "review"]).default("overview"),
+    competitorCapacity: z.coerce.number().int().min(0).max(100000).default(0),
+    competitionEntryFee: z.coerce.number().min(0).max(1000000).default(0),
+    competitionInstructions: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+    physicalJudgeCount: z.coerce.number().int().min(1).max(20).default(1),
+    winnerCount: z.coerce.number().int().min(1).max(3).default(1),
+    detailsConfirmed: z.boolean().default(false),
+    mediaRightsConfirmed: z.boolean().default(false),
+    admissionRefundPolicy: z.enum(["flexible", "standard", "strict", "non_refundable"]).default("standard"),
     visibilityMode: z.enum(["public", "invite_only", "access_code", "approved_list", "hidden", "public_preview"]).default("public"),
     accessCode: z.string().trim().max(80).default(""),
     format: z.enum(["single_round", "multi_round", "knockout", "leaderboard", "judge_reviewed", "submission_voting", "registration_only"]).default("single_round"),
@@ -272,7 +283,10 @@ export const serverChallengeCreateSchema = z.object({
     : String(value.type ?? "").toLowerCase() === "public challenge";
   const tournamentChallenge = explicitChallengeType === "tournament" || value.tournamentType !== "none" || /tournament|bracket|knockout/.test(`${value.type} ${value.competitionFormat}`.toLowerCase());
   const capacityMode = tournamentChallenge ? "limited" : value.capacityMode ?? inferCapacityMode(value.maxParticipants);
-  const capacityError = normalChallengeCapacityError(value.maxParticipants, capacityMode);
+  const physicalEvent = value.isLiveEvent && value.hostOperations?.schemaVersion === 2;
+  const capacityError = physicalEvent
+    ? capacityMode === "limited" && (!Number.isSafeInteger(value.maxParticipants) || Number(value.maxParticipants) < 1) ? "Enter a positive whole-number venue capacity." : null
+    : normalChallengeCapacityError(value.maxParticipants, capacityMode);
   if (capacityError) ctx.addIssue({ code: "custom", path: ["maxParticipants"], message: capacityError });
   if (normalChallenge) {
     if (isModernNormalChallenge(value) && (value.participationMode !== "open" || value.requiresParticipantApproval || value.participantApprovalMode !== "automatic")) {
@@ -288,7 +302,7 @@ export const serverChallengeCreateSchema = z.object({
   }
   if (value.isLiveEvent) {
     const countryCodes = new Set(NORMAL_ELIGIBLE_COUNTRIES.map(([code]) => code));
-    if (!countryCodes.has(value.eventCountry as typeof NORMAL_ELIGIBLE_COUNTRIES[number][0])) ctx.addIssue({ code: "custom", path: ["eventCountry"], message: "Choose an event country from the available options." });
+    if ((value.publish || !physicalEvent || value.eventCountry) && !countryCodes.has(value.eventCountry as typeof NORMAL_ELIGIBLE_COUNTRIES[number][0])) ctx.addIssue({ code: "custom", path: ["eventCountry"], message: "Choose an event country from the available options." });
     const location = value.hostOperations?.locationRestriction ?? "";
     if (location && !countryCodes.has(location as typeof NORMAL_ELIGIBLE_COUNTRIES[number][0])) ctx.addIssue({ code: "custom", path: ["hostOperations", "locationRestriction"], message: "Choose Worldwide or one of the available countries." });
   }
@@ -296,7 +310,7 @@ export const serverChallengeCreateSchema = z.object({
     ctx.addIssue({ code: "custom", path: ["timerDuration"], message: "Timer duration must be greater than zero." });
   }
   const hasAnySchedule = Boolean(value.startsAt || value.endsAt || value.submissionDeadline || value.votingDeadline);
-  if (!value.publish && hasAnySchedule) {
+  if (!value.publish && hasAnySchedule && !(value.isLiveEvent && value.hostOperations?.schemaVersion === 2)) {
     const dateResult = validateChallengeDates(value);
     for (const [field, message] of Object.entries(dateResult.fieldErrors)) {
       if (value.publish || value[field as keyof typeof value]) ctx.addIssue({ code: "custom", path: [field], message });
@@ -467,6 +481,27 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const normalV2 = isModernNormalChallenge(challenge);
   const legacyNormalV2 = isNormalChallengeV2(challenge);
   const hostOps = typeof challenge.hostOperations === "object" && challenge.hostOperations ? challenge.hostOperations as Record<string, unknown> : null;
+  if (kind.isLive && hostOps?.schemaVersion === 2) {
+    requireText(errors, challenge, "title", "Overview", "Add an event title.", 3);
+    requireText(errors, challenge, "description", "Overview", "Add an event description.", 20);
+    requireText(errors, challenge, "category", "Overview", "Choose an event category.");
+    for (const field of ["venueName", "eventAddress", "eventCity", "eventCountry"]) requireText(errors, challenge, field, "Registration & Tickets", "Add the full event location.");
+    const start = eventTime(challenge.startsAt), end = eventTime(challenge.endsAt);
+    const opening = eventTime(hostOps.registrationOpensAt), closing = eventTime(hostOps.registrationClosesAt);
+    const checkInStart = eventTime(hostOps.checkInStartAt), checkInEnd = eventTime(hostOps.checkInEndAt);
+    if (![start, end, opening, closing, checkInStart, checkInEnd].every(Number.isFinite) || start <= now.getTime() || end <= start || opening >= closing || closing > end || checkInStart >= checkInEnd || checkInEnd > end) makeIssue(errors, "LIVE_TIMELINE_INVALID", "startsAt", "Registration & Tickets", "Check the event, registration and arrival times.");
+    try { new Intl.DateTimeFormat("en", { timeZone: String(hostOps.timezone) }).format(); } catch { makeIssue(errors, "LIVE_TIMEZONE_INVALID", "timezone", "Registration & Tickets", "Choose a valid event timezone."); }
+    try { eventCapacities(challenge); } catch { makeIssue(errors, "LIVE_CAPACITY_INVALID", "eventCapacity", "Registration & Tickets", "Set the venue capacity and separate competitor spaces."); }
+    if (!["attendance_only", "physical_competition"].includes(String(hostOps.eventFormat))) makeIssue(errors, "LIVE_FORMAT_INVALID", "eventFormat", "Participation & Competition", "Choose Attendance Only or Physical Competition.");
+    if (hostOps.eventFormat === "attendance_only" && (Number(hostOps.competitorCapacity) > 0 || Number(hostOps.competitionEntryFee) > 0 || challenge.prizeType === "money" || Number(challenge.prizeValue) > 0)) makeIssue(errors, "ATTENDANCE_COMPETITION_CONFLICT", "eventFormat", "Participation & Competition", "Attendance Only events cannot include competition fees or prizes.");
+    if (Number(hostOps.ticketPrice) > 0 || Number(hostOps.competitionEntryFee) > 0) makeIssue(errors, "LIVE_PAID_BOOKING_NOT_READY", "ticketPrice", "Registration & Tickets", "Paid event bookings require verified payment and refund configuration before review.");
+    if (Number(challenge.prizeValue) > 0 && Number(challenge.confirmedCreatorPrizeFundingCents??0)<Math.round(Number(challenge.prizeValue)*100)) makeIssue(errors, "LIVE_PRIZE_FUNDING_NOT_READY", "prizeValue", "Prizes & Earnings", "The positive creator-funded cash prize must be fully confirmed before review. Sponsor or entry revenue does not replace it.");
+    if (!hostOps.detailsConfirmed || !hostOps.mediaRightsConfirmed) makeIssue(errors, "LIVE_CONFIRMATIONS_REQUIRED", "hostOperations", "Review & Submit", "Confirm the event details and your permission to use the media.");
+    const draft = validateChallengeForDraft(challenge);
+    errors.push(...draft.errors);
+    if (!text(challenge.coverImageUrl) || !text(challenge.coverImagePath)) makeIssue(errors, "REQUIRED_BANNER", "coverImageUrl", "Photos & Videos", "Upload an event cover.");
+    return validationResult(errors);
+  }
 
   requireText(errors, challenge, "title", "Basics", "Add a challenge title.", 3);
   requireText(errors, challenge, "description", normalV2 ? "Overview" : "Basics", "Add a complete description.", 20);

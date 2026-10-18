@@ -1,7 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
-import { requireRequestUser } from "@/lib/server/auth";
+import { getRequestUser } from "@/lib/server/auth";
 import { ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
+import {isPublicApprovedLiveEvent} from "@/lib/live-event-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,8 @@ function eventDateValue(data: FirebaseFirestore.DocumentData) {
 }
 
 export async function GET(request: Request) {
-  const { user, response } = await requireRequestUser(request);
-  if (response) return response;
+  const authenticated = await getRequestUser(request);
+  const user = authenticated ?? { uid: "", email: "" };
 
   const db = getAdminDb();
   if (!db) return serverUnavailable("Live events");
@@ -32,15 +33,15 @@ export async function GET(request: Request) {
 
   try {
     const [userSnap, profileSnap, eventsSnap, challengeEventsSnap, registrationsSnap] = await Promise.all([
-      db.collection("users").doc(user.uid).get(),
-      db.collection("profiles").doc(user.uid).get(),
+      user.uid ? db.collection("users").doc(user.uid).get() : Promise.resolve(null),
+      user.uid ? db.collection("profiles").doc(user.uid).get() : Promise.resolve(null),
       db.collection("liveEvents").orderBy("startsAt", "asc").limit(limit).get(),
       db.collection("challenges").where("isLiveEvent", "==", true).limit(limit).get(),
-      db.collection("eventRegistrations").where("userId", "==", user.uid).limit(200).get()
+      user.uid ? db.collection("liveEventRegistrations").where("userId", "==", user.uid).limit(200).get() : Promise.resolve({ docs: [] })
     ]);
 
-    const account = userSnap.exists ? userSnap.data() ?? {} : {};
-    const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
+    const account = userSnap?.exists ? userSnap.data() ?? {} : {};
+    const profile = profileSnap?.exists ? profileSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });
     const registeredEventIds = new Set(registrationsSnap.docs.map((doc) => String(doc.data().eventId ?? "")));
 
@@ -50,7 +51,9 @@ export async function GET(request: Request) {
         .filter((doc) => doc.data().eventApprovalStatus === "approved" && doc.data().eventVisibility !== "hidden")
         .map((doc) => ({ id: doc.id, data: doc.data(), source: "challenge" }))
     ];
-    const events = liveEventRecords
+    const records = [...new Map(liveEventRecords.map(record => [record.id, record])).values()];
+    const events = records
+      .filter(record => isPublicApprovedLiveEvent(record.data))
       .map((doc) => {
         const data = doc.data;
         const requiredPlanId = typeof data.requiredPlanId === "string" ? data.requiredPlanId : null;
@@ -60,9 +63,10 @@ export async function GET(request: Request) {
         const attending = Number(data.attending ?? data.attendeeCount ?? data.registrationCount ?? 0);
         return {
           id: doc.id,
+          detailPath:(data.hostOperations as Record<string,unknown>|undefined)?.schemaVersion===2?`/live-events/${encodeURIComponent(doc.id)}`:`/live-events/${encodeURIComponent(doc.id)}/register`,
           title: data.title ?? "",
           host: data.hostName ?? data.host ?? data.creatorName ?? "",
-          image: data.imageUrl ?? data.image ?? data.mediaUrl ?? "",
+          image: data.coverImageUrl ?? data.imageUrl ?? data.image ?? data.mediaUrl ?? "",
           location: data.location ?? "",
           venueName: data.venueName ?? data.location ?? "",
           venueAddress: data.eventAddress ?? data.address ?? "",

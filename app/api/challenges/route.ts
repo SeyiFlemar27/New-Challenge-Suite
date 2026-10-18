@@ -261,7 +261,7 @@ export async function POST(request: Request) {
     numberOfWinners: body.numberOfWinners,
     winnerSelection: body.winnerSelection,
     automaticVotingPolicyVersion: AUTOMATIC_VOTING_POLICY_VERSION,
-    votingSettings: { ...AUTOMATIC_VOTING_SETTINGS },
+    votingSettings: body.isLiveEvent && body.hostOperations?.schemaVersion === 2 ? { allowFreeVotes: false, allowPaidVotes: false, weightedVotes: false } : { ...AUTOMATIC_VOTING_SETTINGS },
     rules: body.standardRules
       ? body.standardRules.split("\n").map((rule, index) => ({ id: `rule_${index + 1}`, editableText: rule.trim() })).filter((rule) => rule.editableText)
       : [],

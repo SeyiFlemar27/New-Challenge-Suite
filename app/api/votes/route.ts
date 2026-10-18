@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   if (accessContext.privateOnly && !accessContext.hasAccessGrant && !publicVotingOnly) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   const access = canAccessChallenge(profile, publicVotingOnly ? { ...challenge, visibility: "public" } : accessContext.challenge);
   if (!access.allowed) return fail("Voting access is unavailable.", 403, undefined, "CHALLENGE_ACCESS_DENIED");
+  if (challengeSnap.data()?.isLiveEvent && challengeSnap.data()?.hostOperations?.schemaVersion === 2) return ok({ automaticFreeFirst: false, canVote: false, freeVote: { used: false, available: false }, doroCoinCost: null, balance: Number(wallet.data()?.balance ?? 0) }, "This event uses physical judging, not online voting.");
   const zone = validVotingTimeZone(profile.timeZone ?? profile.timezone);
   const date = voteDateKeyForTimeZone(new Date(), zone);
   const guard = await db.collection("freeVoteDailyGuards").doc(freeVoteGuardId(user.uid, challengeId, date)).get();
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
     if (!challengeSnap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
 
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+    if (challenge.isLiveEvent && (challenge.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) return fail("This event uses physical judging, not online voting.", 409, undefined, "PHYSICAL_EVENT_ONLY");
     const accessContext = await challengeForPlanAccess(db, challenge, user.uid);
     const publicVotingOnly = accessContext.privateOnly && !accessContext.hasAccessGrant && hasPublicVotingAccess(challenge);
     if (accessContext.privateOnly && !accessContext.hasAccessGrant && !publicVotingOnly) {

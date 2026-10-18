@@ -109,7 +109,7 @@ export async function GET(request: Request) {
       warnings,
       financialSummary: {
         status: "review_only",
-        pendingEarningsCents: cashEarnings.filter((item) => item.status === "pending_review" || item.status === "pending_hold").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0),
+        pendingEarningsCents: cashEarnings.filter((item) => item.status === "pending_review" || item.status === "pending_hold" || item.sourceType === "host_event_revenue" && item.status === "held").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0),
         sponsorEarningsCents: cashEarnings.filter((item) => item.sourceType === "sponsor_prize").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0),
         prizeWinningsCents: cashEarnings.filter((item) => item.sourceType === "challenge_winner_prize").reduce((sum, item) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0)
           || (winnerClaimsSnap?.docs.reduce((sum, doc) => sum + Number(doc.data().prizeAmountCents ?? 0), 0) ?? 0),

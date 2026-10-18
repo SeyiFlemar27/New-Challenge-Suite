@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
 import { WalletCards } from "lucide-react";
 import { apiRequest } from "@/lib/api/client";
+import {LiveEventFinancialReview} from "@/components/live-event-financial-review";
+import {LiveEventCreatorEarningsReview} from "@/components/live-event-creator-earnings-review";
 
 export default function AdminFinancePage() {
   const { data, isLoading } = useQuery({
@@ -15,6 +17,8 @@ export default function AdminFinancePage() {
   const settlements = payload?.settlements ?? [];
   return <>
     <PageTitle title="Finance Review" subtitle="Review settlements, withdrawals, holds, refunds, sponsor funds, and ledger activity before any manual payout step." icon={<WalletCards />} />
+    <LiveEventFinancialReview />
+    <LiveEventCreatorEarningsReview />
     {isLoading ? <div className="mt-8 grid gap-5 md:grid-cols-2">{[0, 1].map((item) => <Card key={item} className="h-44 animate-pulse" />)}</div> : settlements.length ? <div className="mt-8 space-y-5">
       {settlements.map((settlement) => {
         const platformEntries = (payload?.platformLedger ?? []).filter((entry) => entry.settlementId === settlement.id);
@@ -24,7 +28,10 @@ export default function AdminFinancePage() {
             <div><p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--gold)]">Internal Settlement</p><h2 className="mt-2 break-all text-lg font-black">{settlement.challengeId}</h2></div>
             <span className="rounded-[8px] border border-white/10 px-3 py-2 text-xs font-black capitalize">{String(settlement.status ?? "pending_review").replaceAll("_", " ")}</span>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {settlement.type==="live_event_winner_settlement"?<div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Amount label="Confirmed Live Event Winner Pool" value={settlement.totalCents} />
+            <Amount label="Winner Credits Only — Creator / Platform Shares Already Recorded" value={credits.reduce((sum: number,item:any)=>sum+Number(item.netAmountCents??0),0)} />
+          </div>:<div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Amount label="Confirmed Challenge Revenue" value={settlement.grossConfirmedChallengeRevenue} />
             <Amount label="Winner Pool (65%)" value={settlement.winnerPoolAmount} />
             <Amount label="Creator / Host (20%)" value={settlement.creatorHostAmount} />
@@ -33,7 +40,7 @@ export default function AdminFinancePage() {
             <Amount label="Sponsor Prize Platform Fee" value={settlement.sponsorPrizePlatformFeeAmount} />
             <Amount label="Net Sponsor Prize" value={settlement.netSponsorPrizeAmount} />
             <Amount label="Internal Credits" value={credits.reduce((sum: number, item: any) => sum + Number(item.netAmountCents ?? item.amountCents ?? 0), 0)} />
-          </div>
+          </div>}
           <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-400"><span>{credits.length} wallet credits</span><span>{platformEntries.length} platform ledger entries</span><span>No external payout</span></div>
         </Card>;
       })}

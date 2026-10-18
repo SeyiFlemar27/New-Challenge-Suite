@@ -184,6 +184,7 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
     <>
       <PageTitle title={meta.title} subtitle={meta.description} icon={<ShieldCheck />} />
       {normalizedSection === "overview" ? <NormalMaterialAdminReview /> : null}
+      {normalizedSection === "overview" ? <NormalMaterialAdminReview kind="live_event" /> : null}
       {notice ? <Card className="mt-6 border-yellow-500/20 p-4 text-sm text-slate-200">{notice}</Card> : null}
       {loading ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : null}
       {!loading && data && normalizedSection === "overview" ? <Overview data={data} /> : null}

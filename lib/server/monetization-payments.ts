@@ -10,6 +10,7 @@ import { isPrivateChallengeRecord } from "@/lib/server/challenge-access";
 import { sponsorSubjectCollection, sponsorSubjectPrefix, sponsorTermsFingerprint, tournamentSponsorFundingWindow, type SponsorSubjectType } from "@/lib/server/sponsor-subject";
 import { isTournamentSponsorPaymentTimely } from "@/lib/server/tournament-sponsor-cutoff";
 import { readTournamentSponsorVotingEvidence } from "@/lib/server/tournament-sponsor-evidence";
+import { isLiveEventV2, liveEventSponsorReservation, isLiveEventSponsorPaymentTimely } from "@/lib/server/live-event-sponsor-cutoff";
 
 export const PAYMENT_PURPOSES = ["challenge_entry_fee", "challenge_entry", "paid_vote", "sponsor_funding", "sponsor_wallet_funding"] as const;
 export type MonetizationPaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
@@ -684,6 +685,7 @@ export async function expirePaidVotePurchase(db: Firestore, session: Stripe.Chec
 
 export async function createPendingSponsorContribution(db: Firestore, input: { sponsorId: string; sponsorUserId?: string; sponsorOrganizationId?: string; challengeId: string; subjectType?: SponsorSubjectType; challenge: Record<string, unknown>; sponsorProfile: Record<string, unknown>; amountCents: number; idempotencyKey: string; ctaText?: string; ctaUrl?: string; placementNotes?: string; placements?: string[]; agreementId?: string; now?: string }) {
   const subjectType = input.subjectType ?? "challenge";
+  if (isLiveEventV2(input.challenge) && !input.agreementId) throw new Error("SPONSOR_AGREEMENT_REQUIRED");
   if (subjectType === "tournament" && !input.agreementId) throw new Error("SPONSOR_AGREEMENT_REQUIRED");
   const fundingWindow = subjectType === "tournament" ? tournamentSponsorFundingWindow(input.challenge) : validateSponsorFundingWindow(input.challenge);
   if (!fundingWindow.allowed) throw new Error("This challenge is not eligible for sponsor funding right now.");
@@ -693,7 +695,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
   if (!requestKey) throw new Error("A sponsor funding idempotency key is required.");
   const id = deterministicId(sponsorSubjectPrefix(subjectType, "sponsor_funding"), input.challengeId, input.sponsorId, requestKey);
   const now = input.now ?? new Date().toISOString();
-  const reservationWindow = createSponsorReservationWindow(new Date(now));
+  const reservationWindow = isLiveEventV2(input.challenge) ? liveEventSponsorReservation(input.challenge,new Date(now)) : createSponsorReservationWindow(new Date(now));
   const split = calculateSponsorContributionSplit(amountCents);
   const record: Record<string, unknown> = {
     id,
@@ -728,6 +730,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
     reservationExpiresAt: reservationWindow.expiresAt,
     reservationDurationMs: SPONSOR_FUNDING_RESERVATION_WINDOW_MS,
     reservationStatus: "reserved",
+    ...("fundingCutoffAt" in reservationWindow ? { liveEventFundingCutoffAt: reservationWindow.fundingCutoffAt } : {}),
     metadata: { checkoutSuccessConfirmsContribution: false, webhookConfirmationRequired: true, sponsorContributionGoesFullyToWinners: true, sponsorBrandingAutoApproved: false, prizeReleaseCreated: false, payoutExecutionCreated: false },
     createdAt: now,
     updatedAt: now
@@ -757,6 +760,12 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
     if (!latestChallenge.exists) throw new Error("Challenge opportunity was not found.");
     const storedChallenge = latestChallenge.data() ?? {};
     const challenge = subjectType === "tournament" ? await readTournamentSponsorVotingEvidence(db, transaction, input.challengeId, storedChallenge) : storedChallenge;
+    if (isLiveEventV2(challenge)) {
+      const currentWindow=liveEventSponsorReservation(challenge,new Date(now));
+      record.reservationExpiresAt=currentWindow.expiresAt;
+      record.liveEventFundingCutoffAt=currentWindow.fundingCutoffAt;
+      if(!agreementRef)throw new Error("SPONSOR_AGREEMENT_REQUIRED");
+    }
     if (agreementRef) {
       if (!agreementSnap?.exists) throw new Error("SPONSOR_AGREEMENT_NOT_FOUND");
       const agreement = agreementSnap.data() ?? {};
@@ -770,6 +779,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
       if (!["not_started", "failed", "expired"].includes(String(agreement.fundingStatus ?? "not_started"))) throw new Error("SPONSOR_AGREEMENT_ALREADY_FUNDED_OR_PENDING");
       record.agreementId = agreementRef.id;
       record.agreementVersion = agreement.termsVersion;
+      if(isLiveEventV2(challenge)){record.agreementTermsFingerprint=sponsorTermsFingerprint(terms);record.agreementTermsSnapshot=terms;}
       if (subjectType === "tournament") {
         const fingerprint = sponsorTermsFingerprint(terms);
         if (agreement.termsFingerprint !== fingerprint || agreement.creatorAcceptedFingerprint !== fingerprint || agreement.sponsorAcceptedFingerprint !== fingerprint) throw new Error("SPONSOR_AGREEMENT_TERMS_MISMATCH");
@@ -909,7 +919,8 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
     const agreementSnap = agreementRef ? await transaction.get(agreementRef) : null;
     const agreement = agreementSnap?.data() ?? {};
     const terms = typeof agreement.terms === "object" && agreement.terms !== null ? agreement.terms as Record<string, unknown> : {};
-    const agreementMatches = !agreementRef || Boolean(agreementSnap?.exists
+    const liveAgreementValid = !isLiveEventV2(challenge) || Boolean(agreementRef && Number(charge?.amount_refunded ?? 0) === 0 && agreement.creatorAcceptedVersion === contribution.agreementVersion && agreement.sponsorAcceptedVersion === contribution.agreementVersion && sponsorTermsFingerprint(terms) === contribution.agreementTermsFingerprint);
+    const agreementMatches = liveAgreementValid && (!agreementRef || Boolean(agreementSnap?.exists
       && agreement.challengeId === challengeId
       && (agreement.subjectType ?? "challenge") === subjectType
       && agreement.sponsorOrganizationId === (contribution.sponsorOrganizationId ?? contribution.sponsorId)
@@ -921,10 +932,10 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
         && agreement.termsFingerprint === contribution.agreementTermsFingerprint
         && agreement.creatorAcceptedFingerprint === contribution.agreementTermsFingerprint
         && agreement.sponsorAcceptedFingerprint === contribution.agreementTermsFingerprint
-        && sponsorTermsFingerprint(terms) === contribution.agreementTermsFingerprint)));
+        && sponsorTermsFingerprint(terms) === contribution.agreementTermsFingerprint))));
     const challengeStatus = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
-    const challengeStillEligible = !["cancelled", "canceled", "paused", "completed", "winners_announced"].includes(challengeStatus)
-      && !challenge.winnersApprovedAt && !challenge.adminWinnersApprovedAt;
+    const challengeStillEligible = !(isLiveEventV2(challenge) ? ["cancelled", "canceled", "paused", "rejected", "deleted"] : ["cancelled", "canceled", "paused", "completed", "winners_announced"]).includes(challengeStatus)
+      && !challenge.winnersApprovedAt && !challenge.adminWinnersApprovedAt && !(isLiveEventV2(challenge) && challenge.settlementId);
     const reservationStillPending = contribution.status === "pending" && contribution.reservationStatus === "reserved";
     const originalCreatedAt = Date.parse(String(contribution.createdAt ?? ""));
     const reservationCreatedAt = Date.parse(String(contribution.reservationCreatedAt ?? ""));
@@ -945,7 +956,7 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
         providerCompletionUpperBoundAt,
         providerTimestampPrecisionMs: 1000,
         observedAt: new Date(),
-      })) : isSponsorPaymentWithinReservation({
+      })) : isLiveEventV2(challenge) ? isLiveEventSponsorPaymentTimely({event:challenge,reservationCreatedAt:contribution.reservationCreatedAt,reservationExpiresAt:contribution.reservationExpiresAt,reservedCutoffAt:contribution.liveEventFundingCutoffAt,providerCompletionUpperBoundAt,precisionMs:1000}) : isSponsorPaymentWithinReservation({
         reservationCreatedAt: contribution.reservationCreatedAt,
         reservationExpiresAt: contribution.reservationExpiresAt,
         paymentCompletedAt: providerCompletionUpperBoundAt,
@@ -974,6 +985,7 @@ export async function confirmSponsorContribution(db: Firestore, event: Stripe.Ev
         financialCreditStatus: "never_credited",
         refundSourceState: "successful_provider_payment_not_accepted_as_prize_funding",
         challengeId,
+        ...(isLiveEventV2(challenge)?{eventId:challengeId,liveEventFinancialPolicyVersion:1}:{}),
         ...(subjectType === "tournament" ? { subjectType, tournamentId: challengeId } : {}),
         amountCents: cents(session.amount_total),
         sourceAmountCents: expectedAmountCents,

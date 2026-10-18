@@ -1,18 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-
-const wizard = readFileSync("components/host/host-competition-wizard.tsx", "utf8");
-const liveRoute = readFileSync("app/host/live/create/page.tsx", "utf8");
-
-assert(liveRoute.includes("LiveEventBuilder"));
-assert(!liveRoute.includes("HostCompetitionWizard"));
-assert(wizard.includes('"paid_setup_required"'));
-assert(wizard.includes("ticketCheckoutActive: false"));
-assert(wizard.includes("ticketPaymentConfirmationRequired: true"));
-assert(!wizard.includes("createTicketCheckout"));
-assert(!wizard.includes("ticketPaymentStatus"));
-assert(!wizard.includes("mockTicket"));
-assert(!wizard.includes("fake ticket"));
-assert(!wizard.includes("paymentSucceeded: true"));
-
-console.log("Live Event no-fake-ticket-payment checks passed.");
+import {readFileSync} from "node:fs";
+const builder=readFileSync("components/host/live-event-builder-v2.tsx","utf8");
+const checkout=readFileSync("app/api/live-events/[id]/checkout/route.ts","utf8");
+const payments=readFileSync("lib/server/live-event-payments.ts","utf8");
+assert(builder.includes('"paid_setup_required"'));
+assert(checkout.includes('LIVE_EVENT_PAID_CHECKOUT_ENABLED !== "true"'));
+assert(payments.includes("verifyLiveEventPaymentEvidence")&&payments.includes('status: "held"'));
+assert(payments.includes('status: "payment_review_required"'));
+assert(!builder.includes("paymentSucceeded: true")&&!builder.includes("mockTicket"));
+console.log("Live Event provider-gated, no-fabricated-payment contracts passed.");

@@ -4,6 +4,8 @@ import { createNotification } from "@/lib/server/notifications";
 import { conflict, fail, forbidden, ok, serverUnavailable, readJson, validationError } from "@/lib/server/responses";
 import { logEmailDeliveryError, sendEmail } from "@/lib/server/email";
 import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
+import { bookFreeLiveEvent } from "@/lib/server/live-event-admission";
+import { isPublicApprovedLiveEvent,LiveEventPolicyError } from "@/lib/live-event-policy";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,6 +23,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (existingRegistrationSnap.exists) return conflict("You are already registered for this event.");
 
   const event = eventSnap.data() ?? {};
+  if(!isPublicApprovedLiveEvent(event))return fail("Live event not found.",404,undefined,"NOT_FOUND");
+  if ((event.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) {
+    const parsed = await readJson(request);
+    if (parsed.response) return parsed.response;
+    if (parsed.body?.acceptedAgreement !== true || typeof parsed.body?.fullName !== "string") return validationError({ fullName: "Add your name and accept the event agreement." });
+    try {
+      const booked = await bookFreeLiveEvent(db, { eventId: id, actor: user, kind: "audience", names: [parsed.body.fullName], requestKey: "legacy_admission" });
+      return ok({ registration: { id: booked.bookingId, status: "confirmed", ticketIds: booked.ticketIds } }, "You're on the guest list!");
+    } catch (error) {
+      return fail("Your ticket couldn't be confirmed. Check event availability and try again.", error instanceof LiveEventPolicyError ? error.status : 500);
+    }
+  }
   const status = String(event.status ?? "scheduled").toLowerCase();
   if (["draft", "deleted", "cancelled", "closed", "completed"].includes(status)) {
     return conflict("This event is not open for registration.");
@@ -64,6 +78,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!currentEventSnap.exists) throw new Error("Live event not found.");
       if (currentRegistrationSnap.exists) throw new Error("You are already registered for this event.");
       const currentEvent = currentEventSnap.data() ?? {};
+      if(!isPublicApprovedLiveEvent(currentEvent)||["cancelled","completed","closed"].includes(String(currentEvent.status)))throw new Error("This event is not open for registration.");
       const currentCapacity = Number(currentEvent.capacity ?? currentEvent.maxAttendees ?? 0);
       const currentAttending = Number(currentEvent.attending ?? currentEvent.attendeeCount ?? currentEvent.registrationCount ?? 0);
       if (currentCapacity && currentAttending >= currentCapacity) throw new Error("This event is full.");

@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import { liveEventSponsorFundingWindow, liveEventSponsorReservation, isLiveEventSponsorPaymentTimely, liveEventSponsorCutoff } from '../lib/server/live-event-sponsor-cutoff.ts';
+import { isPublicApprovedLiveEvent,allocateLiveEventRevenue, liveEventWinnerShares, eventCapacities, assertAvailableSpaces, assertEventBookingOpen, assertEventCheckInOpen, rankPhysicalResults, liveEventRefundEligibility, liveEventReservationWindow, liveEventPaymentTiming } from '../lib/live-event-policy.ts';
+let assertions = 0;
+const eq = (a,b) => { assert.deepEqual(a,b); assertions++; };
+const rejects = (fn, code) => { assert.throws(fn, error => error.code === code); assertions++; };
+const now = Date.UTC(2026,10,1,12);
+const event = { capacity: 10, status: 'scheduled', eventApprovalStatus: 'approved', visibility: 'public', startsAt: new Date(now+10000).toISOString(), endsAt: new Date(now+86400000).toISOString(), audienceCount: 3, competitorCount: 1, hostOperations: { eventFormat:'physical_competition', competitorCapacity:4, registrationOpensAt:new Date(now-1000).toISOString(), registrationClosesAt:new Date(now+1000).toISOString(), checkInStartAt:new Date(now).toISOString(), checkInEndAt:new Date(now+1000).toISOString() } };
+eq(eventCapacities(event), {total:10,audience:6,competitors:4});
+assertAvailableSpaces(event,'audience',3); assertions++;
+rejects(()=>assertAvailableSpaces(event,'audience',4),'AUDIENCE_FULL');
+rejects(()=>assertAvailableSpaces(event,'competitor',2),'BOOKING_QUANTITY_INVALID');
+rejects(()=>assertAvailableSpaces({...event,competitorCount:4},'competitor',1),'COMPETITION_FULL');
+assertEventBookingOpen(event,now); assertions++;
+eq(isPublicApprovedLiveEvent(event),true);
+for(const patch of [{eventApprovalStatus:undefined},{eventApprovalStatus:'pending_admin_review'},{visibility:undefined},{visibility:'private'},{eventVisibility:'hidden'},{eventVisibility:'hidden_until_approved'},{status:'draft'}]){
+  eq(isPublicApprovedLiveEvent({...event,...patch}),false,'unknown approval and restricted visibility never grant public access');
+  rejects(()=>assertEventBookingOpen({...event,...patch},now),'REGISTRATION_CLOSED');
+}
+rejects(()=>assertEventBookingOpen(event,now+1000),'REGISTRATION_CLOSED');
+rejects(()=>assertEventBookingOpen({...event,eventApprovalStatus:'pending_admin_review'},now),'REGISTRATION_CLOSED');
+assertEventCheckInOpen(event,now); assertions++;
+rejects(()=>assertEventCheckInOpen(event,now+1000),'CHECK_IN_CLOSED');
+rejects(()=>assertEventCheckInOpen({...event,status:'cancelled'},now),'CHECK_IN_CLOSED');
+eq(allocateLiveEventRevenue(10000,10000), {admission:{platform:1500,creator:8500},competition:{winners:6500,creator:2000,platform:1500}});
+for (let cents=0;cents<100;cents++) {
+  const split=allocateLiveEventRevenue(cents,cents);
+  eq(split.admission.platform+split.admission.creator,cents);
+  eq(Object.values(split.competition).reduce((a,b)=>a+b,0),cents);
+  for(const count of [1,2,3]) eq(liveEventWinnerShares(cents,count).reduce((a,b)=>a+b,0),cents);
+}
+eq(liveEventWinnerShares(10000,2),[7000,3000]);
+eq(liveEventWinnerShares(10000,3),[6000,2500,1500]);
+const rows=[{userId:'a',eligible:true,checkedIn:true,scores:[9,8]},{userId:'b',eligible:true,checkedIn:true,scores:[8,7]}];
+eq(rankPhysicalResults(rows,2,1).map(row=>row.userId),['a','b']);
+rejects(()=>rankPhysicalResults([{...rows[0],checkedIn:false}],2,1),'COMPLETE_PHYSICAL_SCORES_REQUIRED');
+rejects(()=>rankPhysicalResults([{...rows[0],scores:[9]}],2,1),'COMPLETE_PHYSICAL_SCORES_REQUIRED');
+rejects(()=>rankPhysicalResults([rows[0],{...rows[1],scores:[8,9]}],2,1),'PHYSICAL_TIE_ASSESSMENT_REQUIRED');
+rejects(()=>rankPhysicalResults([rows[0],rows[0]],2,1),'DUPLICATE_COMPETITOR');
+for(const [policy,hours] of [['flexible',24],['standard',48],['strict',168]]){
+  const refund={policy,startsAt:new Date(now+hours*3600000).toISOString(),now:now-1,used:false,organizerCancelled:false,admissionCents:1000,competitionEntryCents:500};
+  eq(liveEventRefundEligibility(refund).admissionCents,1000);
+  eq(liveEventRefundEligibility(refund).competitionEntryCents,0);
+  eq(liveEventRefundEligibility({...refund,now}).eligible,false);
+  eq(liveEventRefundEligibility({...refund,used:true}).eligible,false);
+  eq(liveEventRefundEligibility({...refund,used:true,organizerCancelled:true}).competitionEntryCents,500);
+}
+eq(liveEventRefundEligibility({policy:'non_refundable',startsAt:new Date(now+100000000).toISOString(),now,used:false,organizerCancelled:false,admissionCents:1000,competitionEntryCents:500}).eligible,false);
+eq(liveEventRefundEligibility({policy:'non_refundable',startsAt:new Date(now).toISOString(),revisedStartsAt:new Date(now+86400000).toISOString(),materialChangeNotifiedAt:new Date(now-1000).toISOString(),now,used:false,organizerCancelled:false,admissionCents:1000,competitionEntryCents:500}).competitionEntryCents,500);
+const reservation = liveEventReservationWindow(event,now);
+eq(reservation.expiresAt,now+1000,'registration closing caps the product reservation');
+eq(reservation.stripeExpiresAtSeconds,(now+1800000)/1000,'provider lifetime does not extend product eligibility');
+rejects(()=>liveEventReservationWindow(event,now+1000),'REGISTRATION_CLOSED');
+const timing={reservationCreatedAt:new Date(now).toISOString(),reservationExpiresAt:new Date(now+1800000).toISOString(),registrationClosesAt:new Date(now+3600000).toISOString(),verifiedCompletionUpperBoundSeconds:now/1000+1798};
+eq(liveEventPaymentTiming(timing).eligible,true);
+eq(liveEventPaymentTiming({...timing,verifiedCompletionUpperBoundSeconds:now/1000+1800}).eligible,false,'exact expiry cannot be automatically fulfilled');
+eq(liveEventPaymentTiming({...timing,verifiedCompletionUpperBoundSeconds:null}).reason,'completion_evidence_unavailable');
+eq(liveEventPaymentTiming({...timing,reservationExpiresAt:new Date(now+1800001).toISOString()}).reason,'reservation_invalid','retry cannot extend reservation');
+eq(liveEventPaymentTiming({...timing,verifiedCompletionUpperBoundSeconds:now/1000+1801}).reason,'completion_requires_review','late snapshot alone does not prove when payment completed');
+const sponsorEvent={...event,isLiveEvent:true,sponsorEnabled:true,sponsorFundingCutoffAt:new Date(now+600000).toISOString(),startsAt:new Date(now+600000).toISOString(),hostOperations:{...event.hostOperations,schemaVersion:2}};
+const sponsorReservation=liveEventSponsorReservation(sponsorEvent,new Date(now));
+eq(sponsorReservation.expiresAt,sponsorEvent.startsAt,'15-minute sponsor reservation is capped at event start');
+eq(liveEventSponsorFundingWindow(sponsorEvent,new Date(now+600000)).allowed,false,'new sponsor reservations stop exactly at event start');
+const sponsorTiming={event:sponsorEvent,reservationCreatedAt:sponsorReservation.createdAt,reservationExpiresAt:sponsorReservation.expiresAt,reservedCutoffAt:sponsorReservation.fundingCutoffAt,providerCompletionUpperBoundAt:new Date(now+598000).toISOString(),precisionMs:1000};
+eq(isLiveEventSponsorPaymentTimely(sponsorTiming),true,'on-time provider evidence is independent of webhook receipt');
+eq(isLiveEventSponsorPaymentTimely({...sponsorTiming,providerCompletionUpperBoundAt:sponsorEvent.startsAt}),false,'confirmation at start is ineligible');
+eq(isLiveEventSponsorPaymentTimely({...sponsorTiming,providerCompletionUpperBoundAt:new Date(now+601000).toISOString()}),false,'earlier reservation never extends sponsorship past event start');
+eq(isLiveEventSponsorPaymentTimely({...sponsorTiming,providerCompletionUpperBoundAt:null}),false,'ambiguous provider timing requires review');
+eq(liveEventSponsorCutoff({...sponsorEvent,startsAt:new Date(now+3600000).toISOString()}),now+600000,'manual event delay cannot extend persisted funding deadline');
+eq(liveEventSponsorCutoff({...sponsorEvent,liveEventStartedAt:new Date(now+300000).toISOString()}),now+300000,'verified early event start closes funding earlier');
+eq(liveEventSponsorFundingWindow({...sponsorEvent,sponsorFundingClosedAt:new Date(now).toISOString(),startsAt:new Date(now+7200000).toISOString()},new Date(now)).allowed,false,'an occurred cutoff never reopens');
+eq(liveEventSponsorFundingWindow({...sponsorEvent,status:'cancelled'},new Date(now)).allowed,false);
+eq(liveEventSponsorFundingWindow({...sponsorEvent,hostOperations:{...sponsorEvent.hostOperations,eventFormat:'attendance_only'}},new Date(now)).allowed,false,'only physical prize competitions accept prize sponsorship');
+eq(isLiveEventSponsorPaymentTimely({...sponsorTiming,reservationExpiresAt:new Date(now+900000).toISOString()}),false,'uncapped reservation cannot bypass approved cutoff');
+console.log(`Live Event policy: ${assertions} assertions passed.`);

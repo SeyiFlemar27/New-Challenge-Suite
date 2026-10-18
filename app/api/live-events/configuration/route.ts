@@ -1,0 +1,2 @@
+import {ok} from "@/lib/server/responses";
+export async function GET(){return ok({creatorFundingAvailable:process.env.LIVE_EVENT_CREATOR_FUNDING_ENABLED==="true"&&Boolean(process.env.STRIPE_SECRET_KEY)&&Boolean(process.env.STRIPE_WEBHOOK_SECRET),paidCheckoutAvailable:process.env.LIVE_EVENT_PAID_CHECKOUT_ENABLED==="true",sponsorFundingAvailable:process.env.LIVE_EVENT_SPONSOR_FUNDING_ENABLED==="true",externalPayoutExecutionAvailable:false});}

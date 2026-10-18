@@ -25,13 +25,16 @@ export const CHALLENGE_BUILDER_REGISTRY: Record<CanonicalBuilderType, readonly C
     ["rounds", "Round Timing & Submissions"], ["review", "Review & Publish"]
   ].map(([key, label]) => ({ key, label, guide: { title: label, description: "Configure a tournament using bracket-safe operational rules.", points: ["Bracket size is the tournament capacity.", "Round results control advancement.", "Competition state is locked when live play begins."] } })),
   live_event: [
-    ["basics", "Basics"], ["venue", "Venue & Schedule"], ["registration", "Registration & Tickets"],
-    ["participants", "Participants"], ["format", "Format"], ["judging", "Voting & Judging"],
-    ["prize", "Prize Setup"], ["media", "Media & Branding"], ["sponsors", "Sponsors"],
+    ["overview", "Overview"], ["registration", "Registration & Tickets"],
+    ["participation", "Participation & Competition"], ["prizes", "Prizes & Earnings"], ["media", "Photos & Videos"],
     ["review", "Review & Submit"]
   ].map(([key, label]) => ({ key, label, guide: { title: label, description: "Prepare a physical event with clear registration and event-day operations.", points: ["Registration is automatic when eligibility, capacity, and payment pass.", "Check-in is verified server-side.", "Only relevant competition controls are shown."] } }))
 };
 
 export function canonicalBuilderSteps(type: CanonicalBuilderType) {
   return CHALLENGE_BUILDER_REGISTRY[type].map((step) => step.label);
+}
+
+export function liveEventBuilderSteps(kind: "attendance_only" | "physical_competition") {
+  return CHALLENGE_BUILDER_REGISTRY.live_event.filter(step => kind === "physical_competition" || step.key !== "prizes");
 }

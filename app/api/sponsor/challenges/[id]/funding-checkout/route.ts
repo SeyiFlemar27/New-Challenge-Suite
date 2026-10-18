@@ -7,6 +7,7 @@ import { requireSponsorPermission } from "@/lib/server/sponsor";
 import { hasActiveSponsorSubscription, normalizeSponsorReviewStatus, normalizeSponsorSubscriptionStatus, sponsorIsApproved } from "@/lib/sponsor-access";
 import { attachCheckoutSession, checkoutLineItem, checkoutMetadataForPurpose, createPendingSponsorContribution, releasePendingSponsorContribution } from "@/lib/server/monetization-payments";
 import { sponsorSubjectType, sponsorSubjectCollection, sponsorSubjectPrefix } from "@/lib/server/sponsor-subject";
+import { isLiveEventV2, liveEventSponsorFundingWindow } from "@/lib/server/live-event-sponsor-cutoff";
 
 const schema = z.object({
   agreementId: z.string().trim().min(1).max(180),
@@ -37,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const challengeSnap = await context.db.collection(sponsorSubjectCollection(subjectType)).doc(challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge opportunity was not found.", 404, undefined, "NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if (isLiveEventV2(challenge) && process.env.LIVE_EVENT_SPONSOR_FUNDING_ENABLED !== "true") return fail("Event sponsor checkout is unavailable until payment and operational verification is approved.",503,undefined,"LIVE_EVENT_SPONSOR_PAYMENT_DISABLED");
   if (subjectType === "tournament" && challenge.sponsorFundingActivationEnabled !== true) return fail("Tournament sponsor checkout is unavailable until provider and operational verification is approved.", 503, { contributionConfirmed: false }, "TOURNAMENT_SPONSOR_PAYMENT_DISABLED");
   const agreementSnap = await context.db.collection("sponsorChallengeAgreements").doc(body.data.agreementId).get();
   if (!agreementSnap.exists) return fail("An accepted sponsorship agreement is required before funding.", 409, undefined, "SPONSOR_AGREEMENT_REQUIRED");
@@ -79,6 +81,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   if (contribution.status === "confirmed") return ok({ sponsorContributionId: contribution.id, status: "confirmed", contributionConfirmed: true }, "This funding request is already confirmed.");
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  if(isLiveEventV2(challenge)){
+    const latest=await context.db.collection("challenges").doc(challengeId).get();
+    if(!latest.exists||!liveEventSponsorFundingWindow(latest.data()??{}).allowed)return fail("Sponsor funding has closed for this event.",409,undefined,"LIVE_EVENT_SPONSOR_WINDOW_CLOSED");
+  }
   let session;
   try {
   session = await stripe.checkout.sessions.create({

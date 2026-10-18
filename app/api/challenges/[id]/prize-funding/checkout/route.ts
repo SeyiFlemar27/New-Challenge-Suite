@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type Stripe from "stripe";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
@@ -8,6 +9,7 @@ import { editableDraftStatus } from "@/lib/server/challenge-drafts";
 import { getChallengeMonetizationAccess } from "@/lib/server/payout-structure";
 import { attachCreatorPrizeCheckoutSession, createPendingCreatorPrizeFunding, CREATOR_PRIZE_PAYMENT_PURPOSE, releasePendingCreatorPrizeFunding } from "@/lib/server/prize-funding";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
+import { isLiveEventV2 } from "@/lib/server/live-event-sponsor-cutoff";
 
 const schema = z.object({ amountCents: z.coerce.number().int().min(500).max(100000000) });
 
@@ -26,6 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const challengeSnap = await db.collection("challenges").doc(challengeId).get();
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  if(isLiveEventV2(challenge)&&process.env.LIVE_EVENT_CREATOR_FUNDING_ENABLED!=="true")return fail("Event prize funding is unavailable until provider verification is approved.",503,undefined,"LIVE_EVENT_CREATOR_FUNDING_DISABLED");
   if (!editableDraftStatus(challenge)) return fail("Creator prize funding must be completed before the challenge is published.", 409, undefined, "CHALLENGE_NOT_EDITABLE");
   const [profileSnap, accountSnap] = managementAccess.enterpriseAccess ? [null, null] : await Promise.all([
     db.collection("profiles").doc(user.uid).get(),
@@ -40,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (confirmedCents > 0) return fail("This challenge already has confirmed creator prize funding. Contact support before changing a funded guarantee.", 409, { confirmedCents }, "PRIZE_FUNDING_ALREADY_CONFIRMED");
 
   const amountCents = body.data.amountCents;
-  if (challenge.builderVersion === "normal_v3" && amountCents !== Math.round(Number(challenge.prizeValue ?? 0) * 100)) return fail("Fund the exact Base Prize saved on this draft. Save any unfunded amount change before checkout.", 409, undefined, "BASE_PRIZE_FUNDING_AMOUNT_MISMATCH");
+  if ((challenge.builderVersion === "normal_v3"||isLiveEventV2(challenge)) && amountCents !== Math.round(Number(challenge.prizeValue ?? 0) * 100)) return fail("Fund the exact Base Prize saved on this draft. Save any unfunded amount change before checkout.", 409, undefined, "BASE_PRIZE_FUNDING_AMOUNT_MISMATCH");
   const officialEnterprise = challenge.officialChallenge === true || challenge.ownershipType === "challenge_suite_official" || Boolean(challenge.organizationOwnerId);
   if (officialEnterprise && confirmedCents + amountCents > ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents) return fail("Enterprise challenge prize funding cannot exceed $10,000.", 422, { maximumPrizeAmountCents: ENTERPRISE_WORKSPACE_LIMITS.maximumPrizeAmountCents }, "ENTERPRISE_PRIZE_LIMIT_EXCEEDED");
 
@@ -63,9 +66,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
   session = await stripe.checkout.sessions.create({
     mode: "payment",
+    ...(isLiveEventV2(challenge)?{payment_method_types:["card"] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],payment_intent_data:{capture_method:"automatic" as const}}:{}),
     line_items: [{ price_data: { currency: "usd", unit_amount: amountCents, product_data: { name: `Guaranteed prize funding - ${String(challenge.title ?? "Challenge").slice(0, 80)}` } }, quantity: 1 }],
-    success_url: `${origin}/challenges/${encodeURIComponent(challengeId)}/prize-funding/success?prizeFundingId=${encodeURIComponent(String(payment.id))}&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/checkout/cancel?paymentPurpose=${CREATOR_PRIZE_PAYMENT_PURPOSE}&challengeId=${encodeURIComponent(challengeId)}`,
+    success_url: isLiveEventV2(challenge)?`${origin}/live/create?draftId=${encodeURIComponent(challengeId)}&prizeFundingId=${encodeURIComponent(String(payment.id))}`:`${origin}/challenges/${encodeURIComponent(challengeId)}/prize-funding/success?prizeFundingId=${encodeURIComponent(String(payment.id))}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: isLiveEventV2(challenge) ? `${origin}/live/create?draftId=${encodeURIComponent(challengeId)}&fundingCancelled=true` : `${origin}/checkout/cancel?paymentPurpose=${CREATOR_PRIZE_PAYMENT_PURPOSE}&challengeId=${encodeURIComponent(challengeId)}`,
     metadata: {
       paymentPurpose: CREATOR_PRIZE_PAYMENT_PURPOSE,
       transactionPurpose: "prize_pool_funding",
@@ -76,7 +80,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       challengeId,
       amount: String(amountCents),
       currency: "USD",
-      returnRoute: `/challenges/create/${challengeId}`,
+      returnRoute: isLiveEventV2(challenge)?`/live/create?draftId=${encodeURIComponent(challengeId)}`:`/challenges/create/${challengeId}`,
       idempotencyKey: String(payment.id),
       environment: process.env.NODE_ENV,
       createdAt: new Date().toISOString()

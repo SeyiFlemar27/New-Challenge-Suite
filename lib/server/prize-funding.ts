@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { deterministicId } from "@/lib/server/idempotency";
 import { confirmEnterprisePrizeExposureInTransaction, reserveEnterprisePrizeExposureInTransaction, resolveEnterpriseFinancialOwnership } from "@/lib/server/enterprise-prize-exposure";
 import { editableDraftStatus } from "@/lib/server/challenge-drafts";
+import { isLiveEventV2 } from "@/lib/server/live-event-sponsor-cutoff";
 
 export const CREATOR_PRIZE_PAYMENT_PURPOSE = "prize_pool_funding" as const;
 
@@ -140,7 +141,7 @@ function assertConfirmedSession(session: Stripe.Checkout.Session, record: Record
   if (currency(session.currency) !== currency(record.currency)) throw new Error("Creator prize funding currency mismatch.");
 }
 
-export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session) {
+export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Event, session: Stripe.Checkout.Session, paymentIntent?:Stripe.PaymentIntent) {
   const id = String(session.metadata?.creatorPrizeFundingId ?? "");
   if (!id) throw new Error("Creator prize funding reference is missing.");
   const paymentRef = db.collection("creatorPrizeFundingPayments").doc(id);
@@ -160,6 +161,20 @@ export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Ev
     const challengeSnap = await transaction.get(challengeRef);
     if (!challengeSnap.exists) throw new Error("Challenge for creator prize funding was not found.");
     const challenge = challengeSnap.data() ?? {};
+    if(isLiveEventV2(challenge)){
+      if(payment.status==="review_required")return{handled:true,kind:CREATOR_PRIZE_PAYMENT_PURPOSE,id,duplicate:true,fundingStatus:"review_required",payoutProviderCalled:false};
+      const charge=paymentIntent?.latest_charge&&typeof paymentIntent.latest_charge==="object"?paymentIntent.latest_charge:null;
+      const intentId=typeof session.payment_intent==="string"?session.payment_intent:session.payment_intent?.id;
+      const ownership=resolveEnterpriseFinancialOwnership(challenge);
+      const ownerMatches=ownership.workspaceType==="enterprise"?Boolean(ownership.organizationOwnerId&&String(payment.organizationOwnerId??"")===ownership.organizationOwnerId&&String(payment.initiatedByUserId??payment.userId)===creatorId):String(challenge.creatorId??challenge.ownerId??"")===creatorId&&!payment.organizationOwnerId;
+      if(!ownerMatches||payment.providerSessionId!==session.id||!editableDraftStatus(challenge)||Math.round(Number(challenge.prizeValue??0)*100)!==amountCents||paymentIntent?.id!==intentId||paymentIntent?.status!=="succeeded"||paymentIntent.capture_method!=="automatic"||paymentIntent.amount_received!==amountCents||currency(paymentIntent.currency)!==currency(payment.currency)||session.payment_method_types?.length!==1||session.payment_method_types[0]!=="card"||!charge?.paid||!charge.captured||charge.status!=="succeeded"||charge.disputed||charge.refunded||Number(charge.amount_refunded??0)>0||charge.outcome?.type==="blocked"||charge.fraud_details?.user_report==="fraudulent"||charge.review||charge.amount_captured!==amountCents||currency(charge.currency)!==currency(payment.currency)||charge.payment_method_details?.type!=="card"||(typeof charge.payment_intent==="string"?charge.payment_intent:charge.payment_intent?.id)!==intentId){
+        const caseId=deterministicId("refund_creatorPrizeFundingPayments",id),reviewRef=db.collection("refundCases").doc(caseId),previous=await transaction.get(reviewRef);
+        transaction.set(paymentRef,{status:"review_required",webhookConfirmed:true,providerPaymentIntentId:intentId??null,providerEventId:event.id,financialRestriction:"live_event_funding_evidence_requires_review",updatedAt:now},{merge:true});
+        if(!previous.exists)transaction.create(reviewRef,{id:caseId,type:"live_event_creator_funding_review",eventId:challengeId,challengeId,paymentCollection:"creatorPrizeFundingPayments",paymentId:id,userId:creatorId,provider:"stripe",providerPaymentIntentId:intentId??null,amountCents,currency:currency(payment.currency),status:"financial_hold",financialCreditStatus:"never_credited",reason:"Live Event creator payment requires authoritative capture, ownership or saved-configuration reconciliation.",createdAt:now,updatedAt:now});
+        transaction.create(db.collection("auditLogs").doc(),{actorId:"stripe_verified_webhook",action:"live_event.creator_funding_review_required",eventId:challengeId,targetId:caseId,providerEventId:event.id,createdAt:now});
+        return{handled:true,kind:CREATOR_PRIZE_PAYMENT_PURPOSE,id,reviewRequired:true,fundingStatus:"review_required",payoutProviderCalled:false};
+      }
+    }
     const financialOwnership = resolveEnterpriseFinancialOwnership(challenge);
     const officialEnterprise = financialOwnership.workspaceType === "enterprise";
     const expectedOwnerId = officialEnterprise ? financialOwnership.organizationOwnerId : String(isTournament ? challenge.hostId ?? "" : challenge.creatorId ?? challenge.ownerId ?? "");
@@ -210,7 +225,7 @@ export async function confirmCreatorPrizeFunding(db: Firestore, event: Stripe.Ev
     transaction.set(challengeRef, {
       confirmedCreatorPrizeFundingCents: FieldValue.increment(amountCents),
       ...(isTournament ? { prizePool: { confirmedPrizePoolMinor: FieldValue.increment(amountCents) }, creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: amountCents } : {}),
-      ...(challenge.builderVersion === "normal_v3" ? { creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: challenge.creatorPrizeGuaranteeCents ?? Math.round(Number(challenge.prizeValue ?? 0) * 100) } : {}),
+      ...(challenge.builderVersion === "normal_v3"||isLiveEventV2(challenge) ? { creatorPrizeGuaranteeLockedAt: challenge.creatorPrizeGuaranteeLockedAt ?? now, creatorPrizeGuaranteeCents: challenge.creatorPrizeGuaranteeCents ?? Math.round(Number(challenge.prizeValue ?? 0) * 100) } : {}),
       "monetization.confirmedCreatorPrizeFundingCents": totalConfirmed,
       "monetization.creatorPrizeFundingStatus": fundingStatus,
       "monetization.prizePoolFundingSource": "creator_funded",

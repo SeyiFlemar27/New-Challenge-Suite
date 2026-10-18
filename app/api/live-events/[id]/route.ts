@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, forbidden, ok, serverError, serverUnavailable } from "@/lib/server/responses";
 import { getPlanRank, getUserPlanAccess } from "@/lib/plan-access";
+import {isPublicApprovedLiveEvent} from "@/lib/live-event-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const data = eventSnap.data() ?? {};
+    if(!isPublicApprovedLiveEvent(data))return fail("Live event not found.",404,undefined,"NOT_FOUND");
     const account = userSnap.exists ? userSnap.data() ?? {} : {};
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
     const plan = getUserPlanAccess({ ...profile, ...account });

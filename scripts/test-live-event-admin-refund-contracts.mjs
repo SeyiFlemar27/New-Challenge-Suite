@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const route=readFileSync('app/api/admin/refunds/route.ts','utf8');
+assert(route.includes('if(liveEventRefundCase(record))return handleLiveEventRefund('),'Live Event refunds must be intercepted before the generic full-charge executor');
+assert(route.includes('record.paymentCollection==="liveEventBookings"')&&route.includes('record.liveEventFinancialPolicyVersion===1'),'booking and prize-funding review cases must be scoped');
+assert(route.indexOf('if(liveEventRefundCase(record))')<route.indexOf('stripe.refunds.create'),'no Live Event case can fall through to a full-payment refund');
+assert(route.includes('record.automaticPolicyEligible!==true')&&route.includes('record.type!=="live_event_ticket_refund"'),'unresolved provider/review cases cannot be approved by a generic status change');
+assert(route.includes('LIVE_EVENT_AUTOMATIC_REFUNDS_ENABLED!=="true"'),'live execution must remain opt-in');
+assert(route.includes('executeLiveEventRefund(db,stripe,input.refundCaseId)'),'eligible partial ticket refunds use the booking-aware executor');
+assert(route.includes('returnLiveEventUnfulfilledPayment')&&route.includes('input.confirmed!==true'),'unfulfilled original-payment returns require their dedicated verifier and explicit confirmation');
+assert(route.includes('requireRecentAdminAuthentication(request,"refunds.execute")')&&route.includes('live_event.refund_execution_requested'),'Admin execution retains step-up verification and reason/audit logging');
+console.log('Live Event Admin refund source contracts passed; these are not authenticated-handler or live-provider verification.');
