@@ -1,4 +1,6 @@
+import { challengeReviewBuilderDestination } from "@/lib/notification-navigation";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { createHash } from "node:crypto";
 import { reconcileTournamentLifecycleAfterStateChange } from "@/lib/server/tournament-match-lifecycle-jobs";
 import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
@@ -84,29 +86,40 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return fail("Team entitlements could not be changed safely. Refresh the evidence and current version before retrying.", 409, undefined, code);
     }
   }
-  if (action === "approve" || action === "reject") {
-    if (action === "approve" && process.env.NODE_ENV === "production" && !isTournamentV3SchedulingReady()) return fail("Durable Tournament scheduling is unavailable. Publication remains blocked.", 503, undefined, "TOURNAMENT_SCHEDULING_UNAVAILABLE");
+  if (action === "approve" || action === "reject" || action === "request_changes") {
+    const registrationReady = process.env.NODE_ENV !== "production" || isTournamentV3SchedulingReady();
+    const openRegistration = action === "approve" && body.openRegistration === true;
+    if (openRegistration && !registrationReady) return fail("Editorial approval is preserved. Registration remains held until durable scheduling is ready.", 503, undefined, "TOURNAMENT_SCHEDULING_UNAVAILABLE");
     try {
       const result = await db.runTransaction(async transaction => {
         const ref = db.collection("tournaments").doc(id);
         const snapshot = await transaction.get(ref);
         if (!snapshot.exists) throw new Error("TOURNAMENT_NOT_FOUND");
         const record = { ...snapshot.data(), id };
-        if (snapshot.data()?.status !== "pending_review") throw new Error("TOURNAMENT_REVIEW_STATE_CHANGED");
+        if ([snapshot.data()?.hostId, snapshot.data()?.creatorId].includes(user.uid)) throw new Error("TOURNAMENT_SELF_REVIEW_PROHIBITED");
+        const decisionId = createHash("sha256").update(`${id}:${snapshot.data()?.submittedAt ?? "initial"}:${openRegistration ? "open_registration" : action}`).digest("hex");
+        const decisionRef = db.collection("tournamentAuditEvents").doc(decisionId), previous = await transaction.get(decisionRef);
+        if (previous.exists && snapshot.data()?.lastReviewDecisionId === decisionId) return { status: snapshot.data()?.status, publicationHeld: Boolean(snapshot.data()?.publicationHoldReason), idempotent: true };
+        if (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== snapshot.data()?.updatedAt) throw new Error("TOURNAMENT_REVIEW_STATE_CHANGED");
+        if (openRegistration ? !(snapshot.data()?.status === "scheduled" && snapshot.data()?.reviewStatus === "approved" && snapshot.data()?.publicationHoldReason === "scheduler_unavailable") : snapshot.data()?.status !== "pending_review") throw new Error("TOURNAMENT_REVIEW_STATE_CHANGED");
         const funding = await getTournamentCreatorFunding(db, id, record, transaction);
         if (action === "approve") {
           if (!evaluateTournamentReadiness(record).ready || !snapshot.data()?.creatorMediaVerification) throw new Error("TOURNAMENT_NOT_READY");
           if (Number(snapshot.data()?.basePrizeAmountMinor ?? 0) > funding.confirmedCreatorCents) throw new Error("BASE_PRIZE_FUNDING_REQUIRED");
         }
-        const status = action === "approve" ? "registration_open" : "draft";
-        transaction.update(ref, { status, reviewStatus: action === "approve" ? "approved" : "changes_requested", reviewReason: reason, reviewedBy: user.uid, reviewedAt: now, ...(action === "approve" ? { publishedAt: now } : {}), updatedAt: now });
-        transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { status: action === "approve" ? "approved" : "changes_requested", reason, reviewedBy: user.uid, reviewedAt: now, updatedAt: now }, { merge: true });
-        transaction.create(db.collection("tournamentAuditEvents").doc(), { tournamentId: id, actorId: user.uid, action: `tournament_${action}`, reason, createdAt: now, metadata: { previousStatus: "pending_review", resultingStatus: status, paymentActivationChanged: false, externalPayoutExecuted: false } });
-        return { status };
+        const publicationHeld = action === "approve" && !registrationReady;
+        const status = action === "approve" ? publicationHeld ? "scheduled" : "registration_open" : "draft";
+        const reviewStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : "changes_requested";
+        transaction.update(ref, { status, reviewStatus, publicationHoldReason: publicationHeld ? "scheduler_unavailable" : null, lastReviewDecisionId: decisionId, reviewReason: reason, reviewedBy: user.uid, reviewedAt: now, ...(action === "approve" ? { publishedAt: publicationHeld ? null : now } : {}), updatedAt: now });
+        transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { status: reviewStatus, reason, reviewedBy: user.uid, reviewedAt: now, updatedAt: now }, { merge: true });
+        transaction.create(decisionRef, { tournamentId: id, actorId: user.uid, action: openRegistration ? "tournament_registration_opened" : `tournament_${action}`, reason, createdAt: now, metadata: { previousStatus: snapshot.data()?.status, resultingStatus: status, publicationHeld, paymentActivationChanged: false, externalPayoutExecuted: false } });
+        if (snapshot.data()?.hostId) transaction.set(db.collection("notifications").doc(`review_${decisionId}`), { userId: snapshot.data()!.hostId, type: `tournament_${action}`, title: action === "approve" ? "Tournament approved" : action === "reject" ? "Tournament not approved" : "Tournament changes requested", body: publicationHeld ? `${reason} Editorial approval is complete; registration and public discovery are held until scheduling is ready.` : reason, targetId: id, actionUrl: action === "approve" && !publicationHeld ? `/tournaments/${encodeURIComponent(id)}` : challengeReviewBuilderDestination(record, id, "tournaments"), read: false, delivery: { inApp: true, email: false }, createdAt: now });
+        if (snapshot.data()?.hostId) transaction.set(db.collection("tournamentEmailOutbox").doc(`review_${decisionId}`), { tournamentId: id, userId: snapshot.data()!.hostId, category: "challengeReminders", title: "Tournament review decision", message: reason, status: "pending", createdAt: now });
+        return { status, publicationHeld };
       });
       const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
       await attemptTournamentNotifications(db, id);
-      return ok(result, action === "approve" ? "Tournament approved and registration opened. Payment execution settings remain unchanged." : "Changes requested. The creator can update the draft.");
+      return ok(result, action === "approve" ? result.publicationHeld ? "Tournament approved for content. Registration and public discovery remain on hold until durable scheduling is ready." : "Tournament approved and registration opened. Payment execution settings remain unchanged." : action === "reject" ? "Tournament rejected with feedback. The creator can edit and resubmit." : "Changes requested. The creator can update the draft.");
     } catch (error) {
       const code = error instanceof Error ? error.message : "TOURNAMENT_REVIEW_FAILED";
       const messages: Record<string, string> = { TOURNAMENT_NOT_FOUND: "Tournament not found.", TOURNAMENT_REVIEW_STATE_CHANGED: "This Tournament is no longer awaiting review. Refresh before continuing.", TOURNAMENT_NOT_READY: "Required Tournament information or verified media is incomplete.", BASE_PRIZE_FUNDING_REQUIRED: "The creator's Base Prize is not fully confirmed." };

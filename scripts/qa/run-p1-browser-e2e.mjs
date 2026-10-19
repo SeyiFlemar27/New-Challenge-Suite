@@ -358,6 +358,13 @@ async function waitForServer() {
         if (response.status === 200) {
           const loginMarker = /Sign In|Loading sign-in|We couldn't open your workspace/i.test(html);
           if (contentType.includes("text/html") && loginMarker) return;
+          if(nextMode==="dev"&&contentType.includes("text/html")){
+            // Development renders the root shell before client hydration. Require
+            // the real accessible login control in a browser, not merely HTTP 200.
+            const probe=await chromium.launch({headless:true,channel:"chrome"});
+            try{const page=await probe.newPage();await page.goto(`${baseUrl}/auth/login`,{waitUntil:"domcontentloaded",timeout:navigationTimeout});await page.getByRole("button",{name:"Sign In",exact:true}).waitFor({state:"visible",timeout:interactionTimeout});return;}
+            finally{await probe.close();}
+          }
           throw new Error(`Runner-owned Next.js returned HTTP 200 for /auth/login but failed route readiness (contentType=${contentType || "missing"}, loginMarker=${loginMarker}, bodyLength=${html.length}). ${logs.slice(-1800)}`);
         }
         if (response.status === 404) throw new Error(`The runner-owned Next.js server returned HTTP 404 for /auth/login. ${logs.slice(-5000)}`);
@@ -515,6 +522,65 @@ try {
     context.setDefaultTimeout(interactionTimeout);
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+
+  for(const kind of ["normal","private","tournament","attendance_only","physical_competition"]) await test(`Unified publishing review: ${kind}, Admin feedback, resubmission and approval`, async () => {
+    const owner = await seedUser(`reviewpublisher-${kind}`, { role: "creator" });
+    await Promise.all([db.collection("users").doc(owner.uid).update({planId:"host",planStatus:"active",creatorOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"host",planStatus:"active",creatorOnboardingComplete:true})]);
+    const signedIn=await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:owner.email,password:owner.password,returnSecureToken:true})});
+    const signed=await signedIn.json(),headers={authorization:`Bearer ${signed.idToken}`};
+    check(signedIn.ok&&Boolean(signed.idToken),"publisher uses the isolated Auth Emulator");
+    const {getStorage}=await import("firebase-admin/storage"),bucket=getStorage(firebaseApp).bucket();
+    const image=await require("sharp")({create:{width:32,height:24,channels:3,background:"gold"}}).png().toBuffer();
+    const {freshNormalChallengeForm}=await import("../../lib/normal-challenge-builder-model.ts");
+    const {normalFrontendPayload}=await import("../../lib/normal-challenge-frontend.ts");
+    const adminContext=await browser.newContext({viewport:{width:1440,height:1000}}),page=await login(adminContext,admin,{rememberMe:true});
+    {
+      const tournament=kind==="tournament",live=kind.endsWith("_only")||kind==="physical_competition";
+      const path=tournament?`tournaments/drafts/${owner.uid}/cover/${randomUUID()}.png`:`challenges/drafts/${owner.uid}/banner/${randomUUID()}.png`;
+      // Real emulator object bytes; browser file-picker replacement/upload is covered by the dedicated builder journeys.
+      await bucket.file(path).save(image,{metadata:{contentType:"image/png"}});
+      const asset={id:randomUUID(),path,url:`http://${host}:${storageEmulatorPort}/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`,size:image.length,contentType:"image/png",fileName:"review.png"};
+      const form=freshNormalChallengeForm();Object.assign(form,{title:`Review browser ${kind}`,description:"A complete isolated publishing and Admin review browser fixture.",category:"Fitness",subcategory:"Strength",images:[asset],confirmations:{accurate:true,rights:true,review:true}});
+      let payload=normalFrontendPayload(form);
+      if(kind==="private")Object.assign(payload,{challengeType:"private",type:"Private Challenge",visibility:"private",privateAccessPolicyVersion:2,privateAccessMethod:"invite_link",privateJoiningPolicy:"invite_only",privateVotingAccess:"access_restricted",publicPreviewEnabled:true});
+      if(live){const at=hours=>new Date(Date.now()+hours*3600000).toISOString();Object.assign(payload,{type:"Live Event",challengeType:"live_event",builderVersion:"live_event_v2",isLiveEvent:true,competitionFormat:"physical_event",acceptedSubmissionTypes:[],startsAt:at(48),endsAt:at(52),submissionDeadline:"",votingDeadline:"",venueName:"Demo review hall",eventAddress:"Demo road",eventCity:"Lagos",eventCountry:"NG",eventCapacity:20,maxParticipants:20,capacityMode:"limited",coverImageUrl:asset.url,coverImagePath:asset.path,challengeImages:[asset],prizeType:"bragging_rights",prizeValue:0,hostOperations:{schemaVersion:2,eventFormat:kind,timezone:"Africa/Lagos",registrationOpensAt:at(1),registrationClosesAt:at(47),checkInStartAt:at(47),checkInEndAt:at(50),ticketPrice:0,competitionEntryFee:0,competitorCapacity:kind==="physical_competition"?4:0,physicalJudgeCount:1,winnerCount:1,eventRules:["Respect everyone"],admissionRefundPolicy:"standard",detailsConfirmed:true,mediaRightsConfirmed:true}});}
+      if(tournament)payload={configVersion:3,title:"Review browser Tournament",description:"A complete isolated Tournament publishing and Admin review fixture.",category:"Gaming",subcategory:"Console",tournamentRules:["Respect competitors"],participantCapacity:4,participationMode:"individual",format:"single_elimination",entryType:"free",basePrizeAmountMinor:0,submissionDurationHours:12,votingDurationHours:12,coverImageUrl:asset.url,coverImagePath:asset.path,status:"draft"};
+      const created=await page.request.post(`${baseUrl}${tournament?"/api/tournaments":live?"/api/challenges":"/api/challenges/drafts"}`,{headers,data:payload}),createdJson=await created.json();
+      check(created.ok()&&createdJson.ok,`${kind} actual draft creation (${created.status()})`);
+      const id=(tournament?createdJson.data.tournament:createdJson.data.challenge).id;
+      const submit=async()=>{const r=tournament?await page.request.patch(`${baseUrl}/api/tournaments/${id}`,{headers,data:{status:"pending_review"}}):await page.request.post(`${baseUrl}/api/challenges/${id}/publish`,{headers,data:payload});const body=await r.json();check(r.ok()&&body.ok,`${kind} real submission HTTP ${r.status()} ${body.code??""}`);};
+      await submit();
+      for(const action of ["request_changes","reject","approve"]){
+        await page.goto(`${baseUrl}/admin/challenges`,{waitUntil:"domcontentloaded"});
+        await page.getByRole("heading",{name:"Challenge review",exact:true}).waitFor();
+        await page.getByLabel("Search title, creator or ID",{exact:true}).fill(id);
+        const [searched]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname==="/api/admin/challenge-reviews"&&new URL(r.url()).searchParams.get("q")===id),page.getByRole("button",{name:"Search submissions",exact:true}).click()]);check(searched.ok(),`${kind} unified queue search succeeds`);
+        await page.getByRole("button",{name:"Review details",exact:true}).click();
+        await page.getByRole("heading",{name:/Review browser/}).last().waitFor();
+        const submittedMedia=page.getByRole("region",{name:"Submitted media"});
+        await expect(submittedMedia).toBeVisible();
+        await expect.poll(()=>submittedMedia.getByRole("img").first().evaluate(image=>image.complete&&image.naturalWidth>0),{timeout:interactionTimeout}).toBe(true);
+        check(true,`${kind} review displays the actual decoded submitted image`);
+        await page.getByLabel("Decision reason",{exact:true}).fill(`Browser verified ${kind} ${action}`);
+        await page.getByLabel("I reviewed this submission and confirm the decision.",{exact:true}).check();
+        const decided=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/admin/challenge-reviews"&&r.request().method()==="PATCH");
+        await page.getByRole("button",{name:action==="request_changes"?"Request Changes":action==="reject"?"Reject":"Approve",exact:true}).click();
+        const response=await decided,body=await response.json();check(response.ok()&&body.ok,`${kind} browser ${action} HTTP ${response.status()} ${body.code??""}`);
+        const stored=(await db.collection(tournament?"tournaments":"challenges").doc(id).get()).data();check(stored.reviewStatus===(action==="approve"?"approved":action==="reject"?"rejected":"changes_requested"),`${kind} decision is durably persisted`);
+        if(action!=="approve")await submit();
+      }
+      const finalRecord=(await db.collection(tournament?"tournaments":"challenges").doc(id).get()).data();
+      if(tournament&&finalRecord.publicationHoldReason){
+        check(finalRecord.status==="scheduled"&&finalRecord.reviewStatus==="approved","editorial approval does not open unready registration");
+        // Native fetch has no Admin browser cookies: this asserts public access,
+        // while authorized managers retain their existing inspection rights.
+        check((await fetch(`${baseUrl}/api/tournaments/${id}`)).status===404,"held approved Tournament stays outside public detail/discovery");
+      }
+      const detailResponse=await page.request.get(`${baseUrl}${tournament?`/api/tournaments/${id}${finalRecord.publicationHoldReason?"?view=builder":""}`:live?`/api/live-events/${id}/public`:`/api/challenges/${id}`}`,{headers});
+      check(detailResponse.ok(),`${kind} approved detail route HTTP ${detailResponse.status()}: ${(await detailResponse.text()).slice(0,500)}`);
+    }
+    await adminContext.close();
+  },{requiresMedia:true});
 
   await test("Media publication and private credential preparation, reveal and copy", async () => {
     const owner = await seedUser("mediapublisher", { role: "creator" });
@@ -1451,7 +1517,7 @@ try {
     check((await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`)).status()===404,"pending event remains unavailable to public booking");
     const adminLogin=await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:admin.email,password:admin.password,returnSecureToken:true})});
     const adminToken=await adminLogin.json();
-    const approvalResponse=await context.request.patch(`${baseUrl}/api/admin/reviews`,{headers:{authorization:`Bearer ${adminToken.idToken}`},data:{type:"challenge",id:draftId,action:"approve"}});
+    const approvalResponse=await context.request.patch(`${baseUrl}/api/admin/reviews`,{headers:{authorization:`Bearer ${adminToken.idToken}`},data:{type:"challenge",id:draftId,action:"approve",confirmed:true,reason:"Inspected verified Live Event browser submission"}});
     check(approvalResponse.ok(),"existing authenticated Admin review API approves the actual submitted event");
     const published=await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`);
     check(published.ok(),"approved event is now publicly discoverable through the real Live Event API");

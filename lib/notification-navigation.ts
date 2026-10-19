@@ -21,6 +21,14 @@ export function safeNotificationActionUrl(value: unknown) {
   return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") ? path.slice(0, 500) : null;
 }
 
+/** Existing authenticated edit routes; publication still requires server approval. */
+export function challengeReviewBuilderDestination(record: Record<string, unknown>, id: string, source = "challenges") {
+  const encoded = encodeURIComponent(id), official = record.officialChallenge === true || record.ownershipType === "challenge_suite_official";
+  if (source === "tournaments") return `${official ? "/enterprise/challenges/create/official/tournament" : "/host/tournaments/create"}?draft=${encoded}`;
+  if (record.isLiveEvent) return `${official ? "/enterprise/challenges/create/official/live" : "/host/live/create"}?draftId=${encoded}`;
+  return `${["private", "exclusive"].includes(String(record.visibility)) ? "/private/create" : "/challenges/create"}/${encoded}`;
+}
+
 export function notificationDestination(input: NotificationNavigationInput) {
   const explicit = safeNotificationActionUrl(input.actionUrl);
   if (explicit) return explicit;

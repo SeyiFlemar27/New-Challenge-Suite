@@ -49,6 +49,7 @@ export function publicChallengeImagePaths(challenge: Record<string, unknown>) {
 }
 
 export function isPublicPrivatePreviewRecord(challenge: Record<string, unknown>) {
+  if (challenge.adminReviewRequired === true || ["pending_review", "changes_requested", "rejected"].includes(String(challenge.adminApprovalStatus ?? challenge.reviewStatus ?? ""))) return false;
   const status = String(challenge.status ?? challenge.lifecycleStatus ?? "").toLowerCase();
   return String(challenge.visibility ?? "").toLowerCase() === "private"
     && challenge.publicPreviewEnabled === true

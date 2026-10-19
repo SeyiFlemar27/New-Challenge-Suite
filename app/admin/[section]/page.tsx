@@ -1,4 +1,5 @@
 import { AdminControlCenter } from "@/components/admin/admin-control-center";
+import { ChallengeReviewCenter } from "@/components/admin/challenge-review-center";
 
 const sections = new Set([
   "action-centre", "sponsors", "hosts", "challenges", "submissions", "participants", "winners", "withdrawals", "disputes",
@@ -8,7 +9,9 @@ const sections = new Set([
   , "predictions", "rewards", "prize-wheel", "kyc", "settlements", "refunds", "appeals", "sponsor-campaigns", "system-status"
 ]);
 
-export default async function AdminSectionPage({ params }: { params: Promise<{ section: string }> }) {
+export default async function AdminSectionPage({ params, searchParams }: { params: Promise<{ section: string }>; searchParams?: Promise<{ view?: string }> }) {
   const { section } = await params;
+  const view = (await searchParams)?.view;
+  if ((section === "challenges" || section === "tournaments") && view !== "operations") return <ChallengeReviewCenter initialKind={section === "tournaments" ? "tournament" : "all"} />;
   return <AdminControlCenter section={sections.has(section) ? section : "overview"} />;
 }

@@ -51,6 +51,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const creatorId = String(challengeData.creatorId ?? challengeData.ownerId ?? challengeData.hostId ?? challengeData.userId ?? "");
   const publiclyVisible = isPublicChallenge(challengeSnap.id, challengeData);
   const user = await getOptionalRequestUser(request);
+  if ((challengeData.adminReviewRequired === true || ["pending_review", "changes_requested", "rejected"].includes(String(challengeData.adminApprovalStatus ?? challengeData.reviewStatus ?? "")))
+    && user?.uid !== creatorId && user?.role !== "admin" && !user?.isAdmin) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   let requestProfile: Record<string, unknown> = {};
   let hasPrivateAccess = false;
   if (!user && !publiclyVisible) {

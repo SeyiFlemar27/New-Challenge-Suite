@@ -1,5 +1,7 @@
 type TournamentRow = Record<string, unknown> & { id: string };
 export function isPublishedTournament(tournament: Record<string, unknown>) {
+  if (tournament.publicationHoldReason) return false;
+  if (["pending_review", "rejected", "changes_requested"].includes(String(tournament.reviewStatus ?? ""))) return false;
   return ["scheduled", "registration_open", "registration_closed", "seeding", "ready", "active", "round_active", "round_review", "final", "under_review", "winners_announced", "completed", "paused", "cancelled"].includes(String(tournament.status));
 }
 

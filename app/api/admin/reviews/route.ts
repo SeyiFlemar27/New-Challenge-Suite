@@ -3,12 +3,10 @@ import { requireAdminPermission, requireAdminUser } from "@/lib/server/auth";
 import { hasAdminPermission, type AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { writeAuditLog } from "@/lib/server/audit";
-import { buildChallengeApprovalUpdate, buildChallengeRejectionUpdate } from "@/lib/server/challenge-lifecycle";
-import { prepareEnterpriseActiveChallengeRelease } from "@/lib/server/enterprise-active-challenge-limit";
-import { seedLiveEventJobs } from "@/lib/server/live-event-job-outbox";
+import { PATCH as unifiedChallengeReview } from "@/app/api/admin/challenge-reviews/route";
 
-const reviewTypes = new Set(["sponsor", "challenge", "sponsorship"]);
-const reviewActions = new Set(["approve", "reject"]);
+const reviewTypes = new Set(["sponsor", "challenge", "tournament", "sponsorship"]);
+const reviewActions = new Set(["approve", "reject", "request_changes"]);
 
 export async function GET(request: Request) {
   const { user, response } = await requireAdminUser(request);
@@ -16,15 +14,19 @@ export async function GET(request: Request) {
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin reviews");
   const empty = { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
-  const [sponsors, challenges, sponsorships, prizePools] = await Promise.all([
+  const [sponsors, challenges, sponsorships, prizePools, tournaments] = await Promise.all([
     hasAdminPermission(user?.adminPermissions, "sponsors.review") ? db.collection("sponsorProfiles").where("sponsorVerificationStatus", "==", "pending_review").limit(100).get() : Promise.resolve(empty),
     hasAdminPermission(user?.adminPermissions, "challenges.review") ? db.collection("challenges").where("adminReviewRequired", "==", true).limit(100).get() : Promise.resolve(empty),
     hasAdminPermission(user?.adminPermissions, "sponsorCampaigns.review") ? db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get() : Promise.resolve(empty),
-    hasAdminPermission(user?.adminPermissions, "finance.view") ? db.collection("prizePools").limit(100).get() : Promise.resolve(empty)
+    hasAdminPermission(user?.adminPermissions, "finance.view") ? db.collection("prizePools").limit(100).get() : Promise.resolve(empty),
+    hasAdminPermission(user?.adminPermissions, "challenges.review") ? db.collection("tournaments").where("status", "==", "pending_review").limit(100).get() : Promise.resolve(empty)
   ]);
   return ok({
     sponsors: sponsors.docs.map((doc) => ({ id: doc.id, brandName: doc.data().brandName ?? "", status: doc.data().sponsorVerificationStatus })),
     challenges: challenges.docs.map((doc) => ({ id: doc.id, title: doc.data().title ?? "", status: doc.data().status, prizeType: doc.data().prizeType, isLiveEvent: Boolean(doc.data().isLiveEvent), platformFeePercent: doc.data().platformFeePercent ?? 15 })),
+    tournaments: tournaments.docs.map(doc => ({ id: doc.id, source: "tournaments", title: doc.data().title ?? "", status: doc.data().status })),
+    unifiedQueueUrl: "/api/admin/challenge-reviews",
+    legacyQueueTruncated: challenges.docs.length === 100 || tournaments.docs.length === 100,
     sponsorships: sponsorships.docs.map((doc) => ({ id: doc.id, challengeId: doc.data().challengeId, brandName: doc.data().brandName ?? "", status: doc.data().status, sponsorApprovedAt: doc.data().sponsorApprovedAt ?? null, creatorApprovedAt: doc.data().creatorApprovedAt ?? null })),
     prizePools: prizePools.docs.map((doc) => ({
       id: doc.id,
@@ -49,7 +51,9 @@ export async function PATCH(request: Request) {
   const action = String(parsed.body?.action ?? "");
   if (!reviewTypes.has(type)) return validationError({ type: "Select a valid review type." });
   if (!reviewActions.has(action)) return validationError({ action: "Select approve or reject." });
+  if (action === "request_changes" && !["challenge", "tournament"].includes(type)) return validationError({ action: "Select approve or reject for this review type." });
   if (!id) return validationError({ id: "Review record ID is required." });
+  if (type === "challenge" || type === "tournament") return unifiedChallengeReview(new Request(request.url, { method: "PATCH", headers: request.headers, body: JSON.stringify({ ...parsed.body, source: type === "tournament" || parsed.body?.source === "tournaments" ? "tournaments" : "challenges" }) }));
   const permissionByType: Record<string, AdminPermission> = { sponsor: "sponsors.approve", challenge: "challenges.review", sponsorship: "sponsorCampaigns.review" };
   const { user, response } = await requireAdminPermission(request, permissionByType[type]);
   if (response) return response;
@@ -67,50 +71,6 @@ export async function PATCH(request: Request) {
       db.collection("users").doc(id).set({ sponsorVerificationStatus: status, updatedAt: now }, { merge: true }),
       db.collection("profiles").doc(id).set({ sponsorVerificationStatus: status, updatedAt: now }, { merge: true })
     ]);
-  }
-
-  if (type === "challenge") {
-    const ref = db.collection("challenges").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
-    const challenge = snap.data() ?? {};
-    const approved = action === "approve";
-    const reviewUpdate = approved ? buildChallengeApprovalUpdate(challenge, user.uid, now) : buildChallengeRejectionUpdate(user.uid, now);
-    await db.runTransaction(async (transaction) => {
-      const latest = await transaction.get(ref);
-      if (!latest.exists) throw new Error("Challenge not found.");
-      const latestChallenge = latest.data() ?? {};
-      const release = !approved
-        ? await prepareEnterpriseActiveChallengeRelease(db, transaction, String(latestChallenge.organizationOwnerId ?? "") || null, id)
-        : { apply: () => undefined };
-      transaction.set(ref, {
-        ...reviewUpdate,
-        ...(approved && latestChallenge.isLiveEvent && latestChallenge.hostOperations?.schemaVersion === 2 && !latestChallenge.sponsorFundingCutoffAt ? {sponsorFundingCutoffAt:latestChallenge.startsAt} : {}),
-        prizeApprovalStatus: approved ? "approved" : "rejected",
-        eventApprovalStatus: challenge.isLiveEvent ? approved ? "approved" : "rejected" : challenge.eventApprovalStatus ?? "not_required",
-        eventSyncStatus: challenge.isLiveEvent ? approved ? "synced" : "rejected" : challenge.eventSyncStatus ?? "not_applicable",
-        eventVisibility: challenge.isLiveEvent ? approved ? "public" : "hidden" : challenge.eventVisibility ?? "not_applicable"
-      }, { merge: true });
-      if (latestChallenge.isLiveEvent) {
-        if (approved && latestChallenge.hostOperations?.schemaVersion === 2 && latestChallenge.eventApprovalStatus !== "approved") seedLiveEventJobs(db,transaction,id,latestChallenge);
-        transaction.set(db.collection("liveEvents").doc(id), {
-          id, challengeId: id, title: latestChallenge.title ?? "", description: latestChallenge.description ?? "",
-          hostName: latestChallenge.creatorName ?? "", creatorId: latestChallenge.creatorId ?? null,
-          organizationOwnerId: latestChallenge.organizationOwnerId ?? null, officialChallenge: latestChallenge.officialChallenge === true,
-          ownershipType: latestChallenge.ownershipType ?? "creator_personal",
-          imageUrl: latestChallenge.coverImageUrl ?? null,
-          location: [latestChallenge.venueName, latestChallenge.eventCity, latestChallenge.eventCountry].filter(Boolean).join(", "),
-          venueName: latestChallenge.venueName ?? "", eventAddress: latestChallenge.eventAddress ?? "",
-          eventCity: latestChallenge.eventCity ?? "", eventState: latestChallenge.eventState ?? "", eventCountry: latestChallenge.eventCountry ?? "",
-          startsAt: latestChallenge.startsAt, endsAt: latestChallenge.endsAt, time: latestChallenge.startsAt,
-          hostOperations: latestChallenge.hostOperations ?? {}, capacity: latestChallenge.eventCapacity ?? latestChallenge.maxParticipants ?? 0,
-          status: approved ? "scheduled" : "rejected", visibility: approved ? "public" : "private",
-          eventApprovalStatus: approved ? "approved" : "rejected", source: "challenge_sync", moneyMovementEnabled: false,
-          updatedAt: now, createdAt: latestChallenge.createdAt ?? now,
-        }, { merge: true });
-      }
-      release.apply();
-    });
   }
 
   if (type === "sponsorship") {

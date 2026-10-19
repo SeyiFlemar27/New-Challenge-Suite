@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { serverChallengeCreateSchema, validateChallengeForDraft } from '../lib/server/challenge-validation.ts';
+import { validateOwnedStorageMedia } from '../lib/server/media-storage-validation.ts';
+const id='roundtrip-challenge', owner='roundtrip-owner';
+const path=`verified-challenge-media/${id}/images/abc.png`;
+const url=`/api/challenge-media?path=${encodeURIComponent(path)}`;
+const media={id:'cover',path,url,size:100,contentType:'image/png'};
+const record={id,creatorId:owner,title:'Restored challenge',challengeImages:[media],coverImageUrl:url,coverImagePath:path};
+assert.equal(serverChallengeCreateSchema.safeParse(record).success,true,'saved application media URLs survive the request schema');
+assert.equal(validateChallengeForDraft(record).valid,true,'verified media remains scoped to its own challenge on restore');
+assert.equal(validateOwnedStorageMedia({url,path,prefixes:[`verified-challenge-media/${id}/`]}).valid,true);
+assert.equal(validateOwnedStorageMedia({url:url.replace('abc.png','other.png'),path,prefixes:[`verified-challenge-media/${id}/`]}).valid,false,'URL and object must match');
+assert.equal(validateChallengeForDraft({...record,id:'another-challenge'}).valid,false,'verified objects cannot be reused across challenges');
+assert.equal(serverChallengeCreateSchema.safeParse({...record,coverImageUrl:'/api/admin/private'}).success,false,'arbitrary relative endpoints are not media');
+console.log('Publishing media round trip: 6 assertions passed.');

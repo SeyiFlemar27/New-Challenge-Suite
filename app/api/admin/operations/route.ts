@@ -264,7 +264,7 @@ export async function GET(request: Request) {
       overview: {
         pendingSponsorReviews: pending(sponsors, ["pending_review", "submitted"]),
         pendingHostVerifications: hosts.filter((item) => ["pending_review", "submitted"].includes(String(item.hostVerificationStatus))).length,
-        pendingChallengeReviews: pending(challenges, ["pending_review", "flagged"]),
+        pendingChallengeReviews: pending(challenges, ["pending_review", "flagged"]) + pending(tournaments, ["pending_review"]),
         pendingEnterpriseApplications: pending(enterpriseApplications, ["pending", "in_review"]),
         pendingSubmissions: pending(submissions, ["pending_review"]),
         flaggedSubmissions: pending(submissions, ["flagged"]),
@@ -406,6 +406,11 @@ function nextStatus(type: string, action: string) {
 }
 
 export async function PATCH(request: Request) {
+  const reviewBody = await request.clone().json().catch(() => null);
+  if (reviewBody?.type === "challenge" && ["approve", "reject", "request_changes"].includes(reviewBody.action)) {
+    const { PATCH: review } = await import("@/app/api/admin/challenge-reviews/route");
+    return review(new Request(request.url, { method: "PATCH", headers: request.headers, body: JSON.stringify({ ...reviewBody, source: "challenges" }) }));
+  }
   const db = getAdminDb();
   if (!db) return serverUnavailable("Admin operations");
   const parsed = await readJson(request);

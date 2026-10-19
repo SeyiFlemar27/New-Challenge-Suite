@@ -54,6 +54,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   const [coverStatus, setCoverStatus] = useState<MediaUploadStage>("idle");
   const [trailerStatus, setTrailerStatus] = useState<MediaUploadStage>("idle");
   const [galleryStatus, setGalleryStatus] = useState<Record<number, MediaUploadStage>>({});
+  const mediaBusy = [coverStatus, trailerStatus, ...Object.values(galleryStatus)].some(status => ["preparing", "uploading", "processing"].includes(status));
   const [notice, setNotice] = useState("");
   const [createdId, setCreatedId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -70,6 +71,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   const [fundingStatus, setFundingStatus] = useState("not_funded");
   const [fundingBusy, setFundingBusy] = useState(false);
   const serverUpdatedAt = useRef<string | undefined>(undefined);
+  const creationKey = useRef("");
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const mainRef = useRef<HTMLElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
       setStep(TOURNAMENT_BUILDER_STEP_KEYS.indexOf(restoredKey));
       setUnlocked(Math.max(TOURNAMENT_BUILDER_STEP_KEYS.indexOf(restoredKey), TOURNAMENT_BUILDER_STEP_KEYS.indexOf(unlockedKey)));
       setCreatedId(draftId);
+      if (["rejected", "changes_requested"].includes(String(saved.reviewStatus)) && saved.reviewReason) setNotice(`Review feedback: ${String(saved.reviewReason)}`);
       if (saved.status !== "draft") { setSubmittedStatus(String(saved.status)); setSubmitted(true); }
     }).catch(() => { if (!cancelled) { setRestoreFailed(true); setNotice("Your draft could not be restored. Reload to retry."); } }).finally(() => { if (!cancelled) setRestoring(false); });
     return () => { cancelled = true; };
@@ -126,8 +129,8 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
     if (!funding.valid) errors.push("Choose no Base Prize or a Base Prize of at least $5.");
     else if (!funding.fullyFunded) errors.push(`Your Base Prize is $${(form.basePrizeAmountMinor / 100).toFixed(2)}, but only $${(confirmedCreatorCents / 100).toFixed(2)} is confirmed. Fund the remaining $${(funding.outstandingCents / 100).toFixed(2)} before Admin Review.`);
     if (form.entryType === "paid_entry_setup_required") warnings.push("Paid entry remains provider-confirmed and setup-gated.");
-    if (coverStatus === "uploading" || coverStatus === "preparing") errors.push("Wait for cover upload to finish.");
-    if (trailerStatus === "uploading" || trailerStatus === "preparing") errors.push("Wait for trailer upload to finish.");
+    if (["uploading", "preparing", "processing"].includes(coverStatus)) errors.push("Wait for cover upload to finish.");
+    if (["uploading", "preparing", "processing"].includes(trailerStatus)) errors.push("Wait for trailer upload to finish.");
     if (Object.values(galleryStatus).some(status => ["uploading", "preparing", "processing"].includes(status))) errors.push("Wait for additional image uploads to finish.");
     return { errors, warnings, ready: errors.length === 0 };
   }, [coverStatus, form, trailerStatus, confirmedCreatorCents, galleryStatus]);
@@ -166,7 +169,8 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
 
   function persistDraft(payload: ReturnType<typeof draftPayload>) {
     const pending = saveQueue.current.then(async () => {
-      const result = await apiRequest<{ tournament: { id: string; updatedAt?: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", body: JSON.stringify({ ...payload, ...(createdId && serverUpdatedAt.current ? { expectedUpdatedAt: serverUpdatedAt.current } : {}) }) });
+      if (!creationKey.current) creationKey.current = crypto.randomUUID();
+      const result = await apiRequest<{ tournament: { id: string; updatedAt?: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", ...(!createdId ? { headers: { "x-challenge-creation-key": creationKey.current } } : {}), body: JSON.stringify({ ...payload, ...(createdId && serverUpdatedAt.current ? { expectedUpdatedAt: serverUpdatedAt.current } : {}) }) });
       if (result.ok && result.data?.tournament.updatedAt) serverUpdatedAt.current = result.data.tournament.updatedAt;
       return result;
     });
@@ -190,6 +194,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   });
 
   async function saveDraft(status: "draft" | "pending_review" = "draft", quiet = false, background = false) {
+    if (mediaBusy) { setNotice("Wait for your media upload to finish before saving or submitting."); return false; }
     invalidateAutosave();
     if (!background) setSaving(true);
     if (!quiet) setNotice("");
@@ -215,7 +220,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
       setSubmitted(true);
       setNotice("");
     }
-    if (!quiet) setNotice(status === "pending_review" ? "Tournament submitted for readiness review." : "Tournament draft saved.");
+    if (!quiet) setNotice(status === "pending_review" ? "Your challenge has been submitted for review." : "Tournament draft saved.");
     return result.data.tournament.id;
   }
 
@@ -293,7 +298,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
     <AppShell>
       <main ref={mainRef} className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8">
         <PageTitle title="Create Tournament Challenge" subtitle="Configure a first-class Tournament Challenge using the reviewed publishing workflow." icon={<Trophy />} />
-        <ChallengeBuilderFrame steps={steps} currentStep={step} unlockedStep={unlocked} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={setStep}>
+        <ChallengeBuilderFrame steps={steps} currentStep={step} unlockedStep={unlocked} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={value => { if (mediaBusy) { setNotice("Wait for your media upload to finish before leaving this step."); return; } setStep(value); }}>
             <BuilderSurface>
              <BuilderContent>
              {step === 0 ? <OverviewStep form={form} update={update} /> : null}
@@ -306,7 +311,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
              {notice ? <div ref={noticeRef} tabIndex={-1} role={autosaveFailed ? "alert" : "status"} className="mt-5 rounded-[8px] border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-950">{notice}{autosaveFailed ? <Button className="mt-3" variant="secondary" disabled={saving} onClick={() => void saveDraft("draft")}>Retry save</Button> : null}</div> : null}
             {createdId ? <LinkButton href={`/tournaments/${createdId}`} className="mt-5" variant="secondary">View tournament draft</LinkButton> : null}
              </BuilderContent>
-             <BuilderFooter backDisabled={step === 0} busy={saving} finishLater={() => void finishLater()} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={step < steps.length - 1 ? () => void next() : () => void saveDraft("pending_review")} final={step === steps.length - 1} finalDisabled={autosaveFailed || (step === steps.length - 1 && (!readiness.ready || !reviewConfirmed || !rightsConfirmed))} />
+             <BuilderFooter backDisabled={step === 0} busy={saving || mediaBusy} finishLater={() => void finishLater()} onBack={() => setStep((value) => Math.max(0, value - 1))} onContinue={step < steps.length - 1 ? () => void next() : () => void saveDraft("pending_review")} final={step === steps.length - 1} finalDisabled={autosaveFailed || (step === steps.length - 1 && (!readiness.ready || !reviewConfirmed || !rightsConfirmed))} />
             </BuilderSurface>
         </ChallengeBuilderFrame>
       </main>

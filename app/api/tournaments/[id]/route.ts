@@ -1,3 +1,4 @@
+import { challengeReviewBuilderDestination } from "@/lib/notification-navigation";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getOptionalRequestUser, requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
@@ -8,7 +9,8 @@ import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
 import { getTournamentBundle } from "@/lib/server/tournament-public";
 import { publicTournamentParticipantIds, publicTournamentParticipantView, publicTournamentView } from "@/lib/server/tournament-public-policy";
 import type { TournamentFoundation, TournamentStatus } from "@/lib/tournament-types";
-import { freezeTournamentBuilderMedia, verifyTournamentBuilderMedia } from "@/lib/server/tournament-media-verification";
+import { freezeTournamentBuilderMedia, normalizeTournamentReviewMedia, verifyTournamentBuilderMedia } from "@/lib/server/tournament-media-verification";
+import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
@@ -23,9 +25,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!db) return serverUnavailable("Tournament draft restoration");
     const snapshot = await db.collection("tournaments").doc(id).get();
     if (!snapshot.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-    const record = { id: snapshot.id, ...snapshot.data() } as Record<string, unknown>;
+    const record = normalizeTournamentReviewMedia({ id: snapshot.id, ...snapshot.data() });
     if (!canEditTournament({ ...viewer }, record).allowed) return fail("Tournament manager permission is required.", 403, undefined, "TOURNAMENT_MANAGER_REQUIRED");
     const fields = ["id", "status", "title", "description", "category", "subcategory", "tournamentRules", "coverMedia", "coverImageUrl", "coverImagePath", "trailerMedia", "trailerUrl", "trailerPath", "galleryMedia", "format", "participationMode", "participantCapacity", "teamConfig", "teamPaymentWindowMinutes", "entryType", "entryFeeAmountMinor", "basePrizeAmountMinor", "confirmedCreatorPrizeFundingCents", "creatorPrizeFundingStatus", "submissionDurationHours", "votingDurationHours", "submissionInstructions", "submissionMediaTypes", "sponsorship", "builderCurrentStep", "builderUnlockedStep", "builderCurrentStepIndex", "builderNavigationVersion", "productPolicyVersion", "updatedAt", "voting", "privacy", "registrationType"];
+    fields.push("reviewStatus", "reviewReason", "reviewedAt");
     const funding = await getTournamentCreatorFunding(db, id, record);
     return ok({ tournament: { ...Object.fromEntries(fields.filter(field => field in record).map(field => [field, record[field]])), confirmedCreatorPrizeFundingCents: funding.confirmedCreatorCents, creatorPrizeFundingStatus: funding.reviewCount ? "review_required" : funding.pendingCount ? "pending_confirmation" : funding.confirmedCreatorCents > 0 ? "confirmed" : "not_funded" } }, "Tournament draft restored.");
   }
@@ -66,13 +69,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const ref = db.collection("tournaments").doc(id);
   const snap = await ref.get();
   if (!snap.exists) return fail("Tournament not found.", 404, undefined, "TOURNAMENT_NOT_FOUND");
-  const tournament = { id: snap.id, ...snap.data() } as TournamentFoundation;
+  const tournament = normalizeTournamentReviewMedia({ id: snap.id, ...snap.data() }) as TournamentFoundation;
   const permission = canEditTournament({ uid: user.uid, role: user.role, isAdmin: user.isAdmin }, tournament);
   if (!permission.allowed) return fail("Tournament manager permission is required.", 403, permission, "TOURNAMENT_MANAGER_REQUIRED");
-  if (Number(tournament.configVersion ?? 1) >= 3 && tournament.status !== "draft") return fail("Tournament editing is unavailable during review or after publication.", 409, undefined, "TOURNAMENT_NOT_EDITABLE");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
+  if (Number(tournament.configVersion ?? 1) >= 3 && tournament.status !== "draft") {
+    if (tournament.status === "pending_review" && body.status === "pending_review" && Object.keys(body).every(key => ["status", "expectedUpdatedAt"].includes(key))) return ok({ tournament }, "Your challenge has been submitted for review.");
+    return fail("Tournament editing is unavailable during review or after publication.", 409, undefined, "TOURNAMENT_NOT_EDITABLE");
+  }
   const expectedUpdatedAt = body.expectedUpdatedAt;
   delete body.expectedUpdatedAt;
   const immutableFields = ["id", "hostId", "creatorId", "createdAt", "ownershipType", "officialChallenge", "enterpriseOrganizationId", "configVersion", "productPolicyVersion"];
@@ -102,19 +108,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (body.status === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const now = new Date().toISOString();
   const transitionToReview = tournament.status !== "pending_review" && body.status === "pending_review";
+  const reviewRevision = Math.max(0, Number((tournament as unknown as Record<string, unknown>).reviewRevision ?? 0)) + 1;
   let creatorMediaVerification = null;
   if (transitionToReview) {
     try { creatorMediaVerification = await freezeTournamentBuilderMedia(id, await verifyTournamentBuilderMedia(merged as unknown as Record<string, unknown>, String(tournament.hostId ?? user.uid))); }
-    catch { return fail("Tournament media must pass image and promotional-video verification before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+    catch (error) { const diagnostic = mediaVerificationFailure(error, `TPUB-${crypto.randomUUID().slice(0,8)}`); console.warn("[tournament-media-verification]", {category:diagnostic.category,stage:diagnostic.stage,requestId:diagnostic.requestId}); return fail(diagnostic.message, diagnostic.status, {requestId:diagnostic.requestId}, diagnostic.code); }
   }
-  const update = { ...body, ...(transitionToReview ? { submittedAt: now } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
+  const update = { ...body, ...(transitionToReview ? { submittedAt: now, reviewRevision, reviewStatus: "pending_review" } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
   if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) Object.assign(update, {
     sponsorship: { ...tournament.sponsorship, sponsorReady: body.sponsorReady === undefined ? tournament.sponsorship?.sponsorReady === true : body.sponsorReady === true },
   });
   if (body.minimumTeamSize !== undefined || body.maximumTeamSize !== undefined || body.teamJoiningMode !== undefined || body.participationMode !== undefined) {
     Object.assign(update, { teamConfig: merged.participationMode === "team" ? { ...tournament.teamConfig, captainPaysEntryFee: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? false : tournament.teamConfig?.captainPaysEntryFee === true, minimumSize: Number(body.minimumTeamSize ?? tournament.teamConfig?.minimumSize ?? 2), maximumSize: Number(body.maximumTeamSize ?? tournament.teamConfig?.maximumSize ?? 5), joiningMode: body.teamJoiningMode ?? tournament.teamConfig?.joiningMode ?? "invite_and_requests", rosterLocksAtCapacity: true, rosterLocksAtCheckInClose: false } : null });
   }
-  if (creatorMediaVerification) Object.assign(update, { creatorMediaVerification, coverMedia: { ...merged.coverMedia, url: creatorMediaVerification.cover.url } });
+  if (creatorMediaVerification) Object.assign(update, { creatorMediaVerification, coverMedia: { ...merged.coverMedia, path: creatorMediaVerification.cover.path, url: creatorMediaVerification.cover.url } });
   try {
     await db.runTransaction(async transaction => {
       const current = await transaction.get(ref);
@@ -129,12 +136,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       transaction.set(ref, update, { merge: true });
       if (transitionToReview) {
         transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_initial`), { id: `${id}_initial`, tournamentId: id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });
-        transaction.set(db.collection("tournamentAuditEvents").doc(`${id}_submitted_initial`), { id: `${id}_submitted_initial`, tournamentId: id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
+        transaction.set(db.collection("tournamentReviewRequests").doc(`${id}_revision_${reviewRevision}`), { tournamentId: id, hostId: user.uid, status: "pending_review", revision: reviewRevision, createdAt: now });
+        transaction.create(db.collection("tournamentAuditEvents").doc(`${id}_submitted_${reviewRevision}`), { tournamentId: id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review", revision: reviewRevision } });
+        transaction.set(db.collection("notifications").doc(`${id}_submitted_${reviewRevision}`), { userId: user.uid, type: "tournament_submitted", title: "Tournament submitted for review", body: "Your challenge has been submitted for review.", targetId: id, actionUrl: challengeReviewBuilderDestination(tournament as unknown as Record<string, unknown>, id, "tournaments"), read: false, delivery: { inApp: true, email: false }, createdAt: now });
+        transaction.set(db.collection("tournamentEmailOutbox").doc(`${id}_submitted_${reviewRevision}`), { tournamentId: id, userId: user.uid, category: "challengeReminders", title: "Tournament submitted for review", message: "Your challenge has been submitted for review.", status: "pending", createdAt: now });
       }
     });
   } catch (error) {
     if (error instanceof Error && "code" in error && typeof error.code === "string") return fail(error.message, 409, undefined, error.code);
     throw error;
   }
-  return ok({ tournament: { ...tournament, ...update } }, transitionToReview ? "Tournament submitted for admin review." : "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
+  return ok({ tournament: { ...tournament, ...update } }, transitionToReview ? "Your challenge has been submitted for review." : "Tournament foundation updated. No bracket, participants, payments, winners, or payouts were created.");
 }

@@ -17,7 +17,7 @@ const media = read("components/media-display.tsx") + read("components/challenge-
 const explore = read("app/explore/page.tsx") + read("components/challenge-media-carousel.tsx");
 const verification = read("components/verification-guard.tsx");
 const tournament = read("components/tournament-builder.tsx");
-const hostBuilder = read("components/host/host-competition-wizard.tsx");
+const hostBuilder = read("components/host/live-event-builder-v2.tsx");
 
 assert(builder.includes("getNormalFrontendReadiness") && read("lib/normal-challenge-frontend.ts").includes("getNormalChallengeReadiness") && publishRoute.includes("getNormalChallengeReadiness"), "frontend adapter retains authoritative server checks and reports policy differences");
 assert(!publishRoute.includes('"PRIZE_FUNDING_REQUIRED"') && !createRoute.includes('"PRIZE_FUNDING_REQUIRED"'), "operational prize review must not block base challenge submission");
@@ -43,7 +43,7 @@ assert(!publishRoute.includes("KYC_REQUIRED") && !builder.includes("KYC_REQUIRED
 
 assert(privateBuilder.includes("canCreatePrivateChallenges"), "Private builder entitlement must remain intact");
 assert(tournament.includes("readiness.ready") && tournament.includes('saveDraft("pending_review")'), "tournament readiness gating must remain intact");
-assert(hostBuilder.includes("const problem = validate()") && hostBuilder.includes("persistDraft") && hostBuilder.includes("publishChallengeDraft"), "host builders must retain validation, draft persistence, and server review submission");
+assert(hostBuilder.includes('active==="overview"') && hostBuilder.includes("form.description.trim().length<20") && hostBuilder.includes("updateChallengeDraft") && hostBuilder.includes("createChallenge") && hostBuilder.includes("publishChallengeDraft") && hostBuilder.includes("if(result.ok)setSubmitted(true)"), "current Live Event builder retains validation, authenticated draft persistence and API-confirmed review submission");
 assert(media.indexOf("...(videoUrl ?") < media.indexOf("...cleanImages.map"), "public challenge media must remain video-first");
 assert(explore.includes("<Play") && explore.includes("playsInline"), "Explore video behavior must remain intact");
 assert(!verification.includes("Restoring your session") && !verification.includes("Checking session"), "technical session loading copy must remain removed");

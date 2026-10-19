@@ -1,3 +1,4 @@
+import { challengeReviewBuilderDestination } from "@/lib/notification-navigation";
 import type { Firestore } from "firebase-admin/firestore";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { assertNoUndefinedFirestoreValues } from "@/lib/server/firestore-payload";
@@ -25,6 +26,7 @@ type ReviewSubmissionInput = {
   update: Record<string, unknown>;
   revision: Record<string, unknown> & { id: string };
   revenue: Record<string, unknown>;
+  mediaVerification?: Record<string, unknown>;
   submitAudit: Record<string, unknown> & { id: string };
   revisionAudit: Record<string, unknown> & { id: string };
   prizePool: {
@@ -126,6 +128,9 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     assertNoUndefinedFirestoreValues(prizePool, "prizePool");
     const reviewUpdate = { ...input.update, ...(latestChallenge.builderVersion === "normal_v3" && !enterpriseOwned && input.update.freeBasicChallenge === true ? { reviewCreatorPlanId: "free" } : {}) };
     transaction.set(challengeRef, reviewUpdate, { merge: true });
+    if (input.mediaVerification) transaction.set(db.collection("challengeMediaVerifications").doc(input.challengeId), input.mediaVerification);
+    transaction.set(db.collection("notifications").doc(`review_submitted_${input.revision.id}`), { userId: input.userId, type: "challenge_submitted", title: "Challenge submitted for review", body: "Your challenge has been submitted for review.", targetId: input.challengeId, actionUrl: challengeReviewBuilderDestination(latestChallenge, input.challengeId), read: false, delivery: { inApp: true, email: false }, createdAt: input.update.updatedAt ?? new Date().toISOString() });
+    transaction.set(db.collection("normalEmailOutbox").doc(`review_submitted_${input.revision.id}`), { challengeId: input.challengeId, userId: input.userId, sourceEventId: input.revision.id, title: "Challenge submitted for review", message: "Your challenge has been submitted for review.", status: "pending", createdAt: input.update.updatedAt ?? new Date().toISOString() });
     enterpriseSlot.apply();
     transaction.set(revisionRef, input.revision, { merge: true });
     const ownership = resolveEnterpriseFinancialOwnership(latestChallenge);

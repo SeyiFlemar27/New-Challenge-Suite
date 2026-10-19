@@ -1,14 +1,14 @@
+import { challengeReviewBuilderDestination } from "@/lib/notification-navigation";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { AUTOMATIC_VOTING_POLICY_VERSION, AUTOMATIC_VOTING_SETTINGS } from "@/lib/automatic-voting-policy";
 import { requireRequestUser, requireRole } from "@/lib/server/auth";
-import { createNotification } from "@/lib/server/notifications";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { getChallengeDisplayStatus } from "@/lib/challenge-status";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
 import { normalizeMoneyLockedChallengeFields, resolveInitialChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForDraft, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { writeAuditLog } from "@/lib/server/audit";
-import { writeChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
+import { createChallengePrizePoolFoundation } from "@/lib/server/prize-pools";
 import { isPublicChallenge, publicChallengeFields } from "@/lib/server/public-challenge";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
@@ -22,9 +22,9 @@ import { isRetiredHybridCompetition } from "@/lib/server/retired-competitions";
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import { isKycRequiredForAction } from "@/lib/server/kyc-policy";
 import { ENTERPRISE_WORKSPACE_LIMITS, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
-import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
+import { applyVerifiedChallengeMedia, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
 import { prepareEnterpriseActiveChallengeSlot } from "@/lib/server/enterprise-active-challenge-limit";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 
 export async function GET() {
@@ -49,6 +49,13 @@ export async function POST(request: Request) {
 
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
+  const creationKey = request.headers.get("x-challenge-creation-key") ?? "";
+  if (creationKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(creationKey)) return fail("Invalid draft retry reference.", 422);
+  const ref = creationKey ? db.collection("challenges").doc(createHash("sha256").update(`challenge:${user.uid}:${creationKey}`).digest("hex").slice(0, 32)) : db.collection("challenges").doc();
+  if (creationKey) {
+    const existing = await ref.get();
+    if (existing.exists) return ok({ challenge: { ...existing.data(), id: ref.id }, idempotent: true }, "Your saved challenge was recovered. No duplicate was created.");
+  }
   const normalizedInput = normalizeChallengeTimelineForStorage((parsed.body ?? {}) as Record<string, unknown>);
   const validation = serverChallengeCreateSchema.safeParse(normalizedInput);
   if (!validation.success) return validationError(zodFieldErrors(validation.error));
@@ -178,7 +185,6 @@ export async function POST(request: Request) {
     return fail(creationAccess.message, creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { plan: planAccess, activeChallengeCount }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
   }
 
-  const ref = db.collection("challenges").doc();
   const economyRules = await getActiveEconomyRules(db);
   const sponsorEnabled = Boolean(body.sponsorEnabled && planAccess.canCreateSponsoredChallenges);
   const safeMonetization = {
@@ -398,9 +404,8 @@ export async function POST(request: Request) {
     ? createPrivateChallengeInvite(db, { challengeId: ref.id, creatorId: user.uid, now, code: privateAccessMethod === "invitation_code" ? body.privateAccessCode || undefined : undefined, expiresAt: body.privateAccessCodeExpiresAt ?? null, maxUses: body.privateAccessCodeMaxUses ?? 100, method: privateAccessMethod as "invite_link" | "invitation_code" | "direct_invitations", allowedEmails: privateAccessMethod === "direct_invitations" ? body.privateDirectInvitees : [] })
     : Promise.resolve(null);
 
-  let challengeWrite: void;
   try {
-    challengeWrite = await db.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction) => {
       const slot = await prepareEnterpriseActiveChallengeSlot(
         db,
         transaction,
@@ -410,29 +415,28 @@ export async function POST(request: Request) {
       slot.apply();
       preparedCredential?.apply(transaction);
       transaction.create(ref, challenge);
+      transaction.create(db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`), revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, challenge, sponsorEnabled, now }));
+      transaction.create(db.collection("prizePools").doc(ref.id), createChallengePrizePoolFoundation({ challengeId: ref.id, prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now }));
+      if (body.publish && challenge.mediaVerification && typeof challenge.mediaVerification === "object") {
+        transaction.set(db.collection("challengeMediaVerifications").doc(ref.id), challenge.mediaVerification as Record<string, unknown>, { merge: true });
+      }
+      if (body.publish) {
+        transaction.create(db.collection("notifications").doc(`review_submitted_${ref.id}_initial`), { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted for review", body: "Your challenge has been submitted for review.", targetId: ref.id, actionUrl: challengeReviewBuilderDestination(challenge, ref.id), read: false, delivery: { inApp: true, email: false }, createdAt: now });
+        transaction.create(db.collection("normalEmailOutbox").doc(`review_submitted_${ref.id}_initial`), { challengeId: ref.id, userId: user.uid, sourceEventId: `${ref.id}_initial`, title: "Challenge submitted for review", message: "Your challenge has been submitted for review.", status: "pending", createdAt: now });
+      }
     });
   } catch (error) {
+    if (creationKey && [6, "already-exists"].includes((error as {code?: number|string})?.code ?? "")) {
+      const existing = await ref.get();
+      if (existing.exists) return ok({ challenge: { ...existing.data(), id: ref.id }, idempotent: true }, "Your saved challenge was recovered. No duplicate was created.");
+    }
     if (error instanceof Error && error.name === "EnterpriseActiveChallengeLimitError") {
       return fail(error.message, 409, { activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
     }
     throw error;
   }
 
-  const [, , privateAccess] = await Promise.all([
-    Promise.resolve(challengeWrite),
-    db.collection("revenueShareLedgers").doc(`revenue_share_${ref.id}`).set(revenueShareFoundation({ challengeId: ref.id, creatorId: user.uid, challenge, sponsorEnabled, now }), { merge: true }),
-    privateInvitePromise,
-    writeChallengePrizePoolFoundation(db, {
-      challengeId: ref.id,
-      prizeType: body.prizeType,
-      prizeValueCents: Math.round(body.prizeValue * 100),
-      sponsorEnabled,
-      paidEntryEnabled: safeMonetization.paidEntryRequested,
-      now
-    })
-  ]);
-  if (body.publish && challenge.mediaVerification && typeof challenge.mediaVerification === "object") await persistChallengeMediaVerification(db, ref.id, challenge.mediaVerification as Record<string, unknown>);
-  if (body.publish) await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: ref.id }).catch(() => undefined);
+  const privateAccess = await privateInvitePromise;
   await writeAuditLog({
     actorId: user.uid,
     actorType: user.role === "creator" ? "creator" : "user",
@@ -444,6 +448,6 @@ export async function POST(request: Request) {
     metadata: { source: "api/challenges", lifecycleStatus, moneyLocked: true }
   }, db).catch((error) => console.warn("[audit] challenge create log failed", error instanceof Error ? error.message : String(error)));
 
-  const publishMessage = lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.";
+  const publishMessage = lifecycleStatus === "pending_review" ? "Your challenge has been submitted for review." : "Challenge scheduled.";
   return ok({ challenge, privateAccess }, body.publish ? publishMessage : "Challenge draft saved.");
 }

@@ -6,7 +6,6 @@ import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/
 import { normalizeMoneyLockedChallengeFields, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { createAuditLogRecord, writeAuditLog } from "@/lib/server/audit";
-import { createNotification } from "@/lib/server/notifications";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
 import { FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicRemaining, freeBasicUsage } from "@/lib/server/free-challenge-limits";
 import { createPrivateChallengeInvite } from "@/lib/server/private-invites";
@@ -25,7 +24,7 @@ import { AUTOMATIC_VOTING_POLICY_VERSION, AUTOMATIC_VOTING_SETTINGS } from "@/li
 import { InvalidFirestorePayloadError, sanitizeFirestorePayload } from "@/lib/server/firestore-payload";
 import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from "@/lib/server/challenge-review-submission";
 import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
-import { applyVerifiedChallengeMedia, persistChallengeMediaVerification, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
+import { applyVerifiedChallengeMedia, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
 import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -118,7 +117,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (body.usesPlaceholderMedia && process.env.NODE_ENV === "production" && !imageLessChallengePublishingAllowed()) return rejectPublish("Please add challenge media before publishing.", 503, { setupRequired: true }, "CHALLENGE_MEDIA_UNAVAILABLE");
   if (planAccess.isSponsor) return rejectPublish("You can't publish this challenge.", 403, { redirectTo: "/sponsor/dashboard" }, "SPONSOR_NOT_ALLOWED");
 
-  const publishValidation = validateChallengeForPublish({ ...body, creatorId: user.uid }, { mode: "publish", userId: user.uid });
+  const mediaOwnerId = String(current.creatorId ?? current.hostId ?? user.uid);
+  const publishValidation = validateChallengeForPublish({ ...body, id, creatorId: mediaOwnerId }, { mode: "publish", userId: user.uid });
   const normalReadiness = usesNormalBuilderFoundation ? getNormalChallengeReadiness({ ...current, ...rawBody, ...body, creatorId: user.uid }) : null;
   if (normalReadiness && !normalReadiness.ready) return rejectPublish(normalReadiness.issues[0]?.message ?? "Some required details are missing.", 422, { readiness: normalReadiness, fieldErrors: Object.fromEntries(normalReadiness.issues.map((issue) => [issue.field, issue.message])) }, "NORMAL_CHALLENGE_NOT_READY");
 
@@ -214,9 +214,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const economyRules = await getActiveEconomyRules(db);
   const normalV2 = body.builderVersion === "normal_v2" || body.builderVersion === "normal_v3";
   const simpleVotingStartAt = !body.isLiveEvent && body.tournamentType === "none" && !normalV2 ? body.submissionStartAt || body.startsAt : body.votingStartsAt || body.submissionStartAt || body.startsAt;
-  const reviewRevisionNumber = currentStatus === "changes_requested" || currentStatus === "requires_changes"
-    ? Math.max(1, Number(current.reviewRevisionNumber ?? 1)) + 1
-    : 1;
+  const reviewRevisionNumber = Math.max(0, Number(current.reviewRevisionNumber ?? 0)) + 1;
   const revisionSuffix = reviewRevisionNumber === 1 ? "initial" : `revision_${reviewRevisionNumber}`;
   const storedChallengeFields = sanitizeFirestorePayload(body, "challengeUpdate");
   const update: Record<string, unknown> = {
@@ -282,7 +280,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   let mediaVerification: Record<string, unknown>;
   try {
-    mediaVerification = await verifyChallengeMedia(db, id, { ...current, ...body }, user.uid);
+    mediaVerification = await verifyChallengeMedia(db, id, { ...current, ...body }, mediaOwnerId);
   } catch (error) {
     const diagnostic = mediaVerificationFailure(error, publishRequestId);
     await recordChallengeMediaVerificationFailure(db, id, diagnostic.category, diagnostic).catch(() => undefined);
@@ -315,6 +313,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       expectedStatus: currentStatus,
       expectedUpdatedAt: current.updatedAt,
       update,
+      mediaVerification,
       revision,
       revenue,
       submitAudit: { ...submitAudit },
@@ -345,12 +344,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return serverError("Challenge could not be submitted for review.", error instanceof Error ? error.message : error);
   }
   if (transition.idempotent) return ok({ challenge: transition.challenge, idempotent: true }, "Challenge is already submitted for review.");
-  await persistChallengeMediaVerification(db, id, mediaVerification);
-  await createNotification(db, { userId: user.uid, type: "challenge_submitted", title: "Challenge submitted", body: "Your challenge is awaiting review.", targetId: id }).catch(() => undefined);
   if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
     await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {
       await db.collection("adminActionTasks").doc(`doro_create_${id}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "create_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
     });
   }
-  return ok({ challenge: update, privateAccess }, lifecycleStatus === "pending_review" ? "Challenge submitted for review." : "Challenge scheduled.");
+  return ok({ challenge: update, privateAccess }, "Your challenge has been submitted for review.");
 }

@@ -421,7 +421,7 @@ export function auditEvent(params: { id: string; tournamentId: string; actorId: 
 export const TOURNAMENT_MANAGEMENT_ROLES = ["host", "manager", "participant_manager", "submission_reviewer", "moderator", "judge_coordinator", "finance_viewer"] as const;
 
 export function adminTournamentActionFoundation(action: string) {
-  const sensitive = ["reconcile_team_entitlements", "approve", "reject", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation", "submission_approved", "submission_rejected"];
+  const sensitive = ["reconcile_team_entitlements", "approve", "reject", "request_changes", "pause", "resume", "cancel", "lock_voting", "reopen_review", "resolve_dispute", "disqualify", "confirm_result", "approve_payout_foundation", "trigger_refund_foundation", "submission_approved", "submission_rejected"];
   return { action, adminRequired: sensitive.includes(action), auditRequired: sensitive.includes(action), payoutProviderCalled: false, rawVoteTotalEditable: false, balanceOverwriteAllowed: false };
 }
 

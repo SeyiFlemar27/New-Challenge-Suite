@@ -79,6 +79,7 @@ export function isQaDemoOrPlaceholderProfile(id: string, data: Record<string, un
 }
 
 export function isPublicChallenge(id: string, data: Record<string, unknown>) {
+  if (data.adminReviewRequired === true || ["pending_review", "changes_requested", "rejected"].includes(String(data.adminApprovalStatus ?? data.reviewStatus ?? ""))) return false;
   if (isQaOrDemoRecord(id, data)) return false;
   if (isRetiredHybridCompetition(data)) return false;
   const status = String(data.status ?? data.lifecycleStatus ?? "").toLowerCase();

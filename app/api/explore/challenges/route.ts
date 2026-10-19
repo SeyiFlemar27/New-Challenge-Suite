@@ -66,6 +66,7 @@ function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseS
 }
 
 function isLockedPublicPreview(id: string, challenge: Record<string, unknown>) {
+  if (challenge.adminReviewRequired === true || ["pending_review", "changes_requested", "rejected"].includes(String(challenge.adminApprovalStatus ?? challenge.reviewStatus ?? ""))) return false;
   const visibility = text(challenge.visibility).toLowerCase();
   const type = text(challenge.type ?? challenge.competitionType).toLowerCase();
   const status = text(challenge.status ?? challenge.lifecycleStatus).toLowerCase();

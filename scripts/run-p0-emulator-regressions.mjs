@@ -97,6 +97,8 @@ const tests = [
   "scripts/test-tournament-team-entitlements-emulator.mjs",
   "scripts/test-tournament-complete-lifecycles-emulator.mjs",
   "scripts/test-live-event-admission-emulator.mjs",
+  "scripts/test-media-publish-handlers-emulator.mjs",
+  "scripts/test-publishing-review-emulator.mjs",
 ];
 
 const results = [];

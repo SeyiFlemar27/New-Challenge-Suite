@@ -343,8 +343,8 @@ export function fetchDoroCoinPackages() {
   return apiRequest<{ packages: unknown[]; coinsPerUsd?: number }>("/api/dorocoin/packages");
 }
 
-export function createChallenge(payload: unknown) {
-  return apiRequest<{ challenge: unknown; privateAccess?: Record<string, unknown> | null }>("/api/challenges", { method: "POST", body: JSON.stringify(payload) });
+export function createChallenge(payload: unknown, creationKey?: string) {
+  return apiRequest<{ challenge: unknown; privateAccess?: Record<string, unknown> | null }>("/api/challenges", { method: "POST", ...(creationKey ? { headers: { "x-challenge-creation-key": creationKey } } : {}), body: JSON.stringify(payload) });
 }
 
 export function createChallengeDraft(payload: unknown) {

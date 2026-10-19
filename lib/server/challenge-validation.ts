@@ -3,13 +3,14 @@ import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
 import { calculateNormalWinnerAmountsCents, isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS, normalWinnerPercentages } from "@/lib/normal-challenge-config";
-import { isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
+import { isApplicationMediaUrl, isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
 import { eventCapacities, eventTime } from "@/lib/live-event-policy";
 
+const mediaUrlSchema = z.string().trim().refine(value => isApplicationMediaUrl(value) || z.string().url().safeParse(value).success, "Use a completed Challenge Suite upload.");
 const normalMediaSchema = z.object({
   id: z.string().trim().min(1).max(120),
-  url: z.string().trim().url(),
+  url: mediaUrlSchema,
   path: z.string().trim().min(1).max(500),
   fileName: z.string().trim().max(240).default(""),
   contentType: z.string().trim().max(120).default(""),
@@ -53,17 +54,17 @@ export const serverChallengeCreateSchema = z.object({
   policyTerms: z.string().trim().max(6000).default(""),
   challengeGuidelines: z.string().trim().max(6000).default(""),
   submissionInstructionsList: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
-  coverImageUrl: z.string().trim().url("Cover image URL must be valid.").optional().or(z.literal("")),
+  coverImageUrl: mediaUrlSchema.optional().or(z.literal("")),
   coverImagePath: z.string().trim().max(500).default(""),
   mediaUploadStatus: z.enum(["required", "uploaded", "storage_disabled"]).default("required"),
   mediaStatus: z.enum(["required", "uploaded", "skipped_storage_not_configured"]).default("required"),
   usesPlaceholderMedia: z.coerce.boolean().default(false),
   mediaFallbackType: z.string().trim().max(80).default(""),
-  promoImageUrl: z.string().trim().url("Promo image URL must be valid.").optional().or(z.literal("")),
+  promoImageUrl: mediaUrlSchema.optional().or(z.literal("")),
   promoImagePath: z.string().trim().max(500).default(""),
-  trailerVideoUrl: z.string().trim().url("Trailer video URL must be valid.").optional().or(z.literal("")),
+  trailerVideoUrl: mediaUrlSchema.optional().or(z.literal("")),
   trailerVideoPath: z.string().trim().max(500).default(""),
-  promoVideoUrl: z.string().trim().url("Promo video URL must be valid.").optional().or(z.literal("")),
+  promoVideoUrl: mediaUrlSchema.optional().or(z.literal("")),
   promoVideoPath: z.string().trim().max(500).default(""),
   documentUrls: z.array(z.string().trim().url("Document URL must be valid.")).max(2).default([]),
   documentPaths: z.array(z.string().trim().max(500)).max(2).default([]),
@@ -442,6 +443,8 @@ export function validateChallengeForDraft(challenge: ChallengeLike): ChallengeVa
   const ownerId = text(challenge.creatorId);
   const challengeId = text(challenge.id);
   const prefixes = [
+    ...(ownerId ? [`challenges/hybrid-drafts/${ownerId}/`, `live-events/hybrid-drafts/${ownerId}/media/`] : []),
+    ...(challengeId ? [`verified-challenge-media/${challengeId}/`] : []),
     ...(ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`] : []),
     ...(challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/gallery/`, `challenges/${challengeId}/video/`, `challenges/${challengeId}/documents/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [])
   ];
@@ -552,7 +555,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   const coverMediaSkipped = false;
   const allowedDraftPrefixes = ownerId ? [`challenges/drafts/${ownerId}/`, `challenges/host-drafts/${ownerId}/`, `challenges/hybrid-drafts/${ownerId}/`, `live-events/drafts/${ownerId}/media/`, `live-events/hybrid-drafts/${ownerId}/media/`] : [];
   const allowedChallengePrefixes = challengeId ? [`challenges/${challengeId}/banner/`, `challenges/${challengeId}/gallery/`, `challenges/${challengeId}/video/`, `challenges/${challengeId}/documents/`, `challenges/${challengeId}/trailers/`, `challenges/${challengeId}/promo-flyer/`, `challenges/${challengeId}/promo-video/`] : [];
-  const allowedMediaPrefixes = [...allowedDraftPrefixes, ...allowedChallengePrefixes];
+  const allowedMediaPrefixes = [...allowedDraftPrefixes, ...allowedChallengePrefixes, ...(challengeId ? [`verified-challenge-media/${challengeId}/`] : [])];
   if ((!coverUrl || !coverPath) && !coverMediaSkipped) makeIssue(errors, "REQUIRED_BANNER", "coverImageUrl", "Media", "Upload a challenge banner.");
   else if (!coverMediaSkipped && !validStoragePath(coverPath, allowedMediaPrefixes)) makeIssue(errors, "INVALID_BANNER_STORAGE_PATH", "coverImagePath", "Media", "Challenge banner storage path must belong to this challenge or owner draft path.");
   if (normalV2) {

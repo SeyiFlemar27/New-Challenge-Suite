@@ -113,12 +113,13 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
     const trailer = input.trailerMedia && typeof input.trailerMedia === "object" ? input.trailerMedia as Record<string, unknown> : {};
     const coverUrl = text(input.coverImageUrl ?? cover.url), coverPath = text(input.coverImagePath ?? cover.path);
     if (options.publish && (!coverUrl || !coverPath)) errors.push({ field: "coverImagePath", message: "Upload at least one verified creator image before Admin Review." });
-    const mediaPrefixes = options.ownerId ? [`tournaments/drafts/${options.ownerId}/`] : [];
+    const frozenPrefixes = text(input.id) ? [`verified-tournament-media/${text(input.id)}/`] : [];
+    const mediaPrefixes = [...(options.ownerId ? [`tournaments/drafts/${options.ownerId}/`] : []), ...frozenPrefixes];
     const gallery = input.galleryMedia === undefined ? [] : input.galleryMedia;
     if (!Array.isArray(gallery) || gallery.length > 2) errors.push({ field: "galleryMedia", message: "Use at most two additional images." });
     else gallery.forEach((item, index) => {
       const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
-      const media = validateOwnedStorageMedia({ url: text(record.url), path: text(record.path), prefixes: options.ownerId ? [`tournaments/drafts/${options.ownerId}/cover/`] : [] });
+      const media = validateOwnedStorageMedia({ url: text(record.url), path: text(record.path), prefixes: [...(options.ownerId ? [`tournaments/drafts/${options.ownerId}/cover/`] : []), ...frozenPrefixes] });
       if (!media.valid || !text(record.path)) errors.push({ field: `galleryMedia.${index}`, message: "Upload an owned additional image." });
     });
     for (const [field, url, path] of [

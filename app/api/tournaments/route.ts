@@ -1,4 +1,6 @@
+import { challengeReviewBuilderDestination } from "@/lib/notification-navigation";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { createHash } from "node:crypto";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateTournament } from "@/lib/server/tournament-permissions";
@@ -8,6 +10,7 @@ import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdom
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 import { freezeTournamentBuilderMedia, verifyTournamentBuilderMedia } from "@/lib/server/tournament-media-verification";
+import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +36,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (isFirestoreMissingIndexError(error)) {
       console.warn("[tournament-firestore-index]", { scope: "api:tournaments:list", message: "Firestore index required for this query." });
-      return ok({ tournaments: [], foundation: tournamentSubdomainFoundation(), emptyState: "Tournament data is not available yet. Please try again shortly." }, "Tournament listing unavailable.");
+      return fail("Tournament discovery is temporarily unavailable. Please retry; the listing could not be loaded.", 503, undefined, "TOURNAMENT_INDEX_REQUIRED");
     }
     throw error;
   }
@@ -46,6 +49,13 @@ export async function POST(request: Request) {
   if (!db) return serverUnavailable("Tournament creation");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
+  const creationKey = request.headers.get("x-challenge-creation-key") ?? "";
+  if (creationKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(creationKey)) return fail("Invalid draft retry reference.", 422);
+  const ref = creationKey ? db.collection("tournaments").doc(createHash("sha256").update(`tournament:${user.uid}:${creationKey}`).digest("hex").slice(0, 32)) : db.collection("tournaments").doc();
+  if (creationKey) {
+    const existing = await ref.get();
+    if (existing.exists) return ok({ tournament: { ...existing.data(), id: ref.id }, idempotent: true }, "Your saved Tournament was recovered. No duplicate was created.");
+  }
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
   body.productPolicyVersion = TOURNAMENT_PRODUCT_POLICY;
   const requestedStatus = body.status === "pending_review" ? "pending_review" : "draft";
@@ -62,26 +72,34 @@ export async function POST(request: Request) {
   if (!permission.allowed) return fail("Tournament hosting requires Host, approved Enterprise, or allowed premium Creator access.", 403, permission, "TOURNAMENT_HOSTING_LOCKED");
   const validation = validateTournamentFoundation(body, { publish: requestedStatus === "pending_review", ownerId: user.uid });
   if (!validation.valid) return validationError(Object.fromEntries(validation.errors.map((issue) => [issue.field, issue.message])));
-  const ref = db.collection("tournaments").doc();
   let creatorMediaVerification = null;
   if (requestedStatus === "pending_review") {
     try { creatorMediaVerification = await freezeTournamentBuilderMedia(ref.id, await verifyTournamentBuilderMedia(body, user.uid)); }
-    catch { return fail("Tournament media must pass image and promotional-video verification before Admin Review.", 422, undefined, "MEDIA_VERIFICATION_FAILED"); }
+    catch (error) { const diagnostic = mediaVerificationFailure(error, `TPUB-${crypto.randomUUID().slice(0,8)}`); console.warn("[tournament-media-verification]", {category:diagnostic.category,stage:diagnostic.stage,requestId:diagnostic.requestId}); return fail(diagnostic.message, diagnostic.status, {requestId:diagnostic.requestId}, diagnostic.code); }
   }
   const now = new Date().toISOString();
   const draft = tournamentDraftFromInput({ ...body, enterpriseOrganizationId: officialChallenge ? enterpriseAccess!.organizationId : null }, user.uid, now);
   const readiness = evaluateTournamentReadiness({ id: ref.id, ...draft });
   if (requestedStatus === "pending_review" && !readiness.ready) return fail("Tournament details need attention before review.", 422, { fieldErrors: readiness.errors }, "TOURNAMENT_NOT_READY");
   const tournament = { id: ref.id, ...draft, status: requestedStatus, submittedAt: requestedStatus === "pending_review" ? now : null, readiness, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false, fakeParticipantsAllowed: false, fakeBracketAllowed: false, fakeWinnersAllowed: false };
-  if (creatorMediaVerification) Object.assign(tournament, { creatorMediaVerification, coverMedia: { ...draft.coverMedia, url: creatorMediaVerification.cover.url } });
+  if (creatorMediaVerification) Object.assign(tournament, { creatorMediaVerification, coverMedia: { ...draft.coverMedia, path: creatorMediaVerification.cover.path, url: creatorMediaVerification.cover.url } });
   const batch = db.batch();
-  batch.set(ref, tournament);
+  batch.create(ref, tournament);
   if (requestedStatus === "pending_review") {
     batch.set(db.collection("tournamentReviewRequests").doc(`${ref.id}_initial`), { id: `${ref.id}_initial`, tournamentId: ref.id, hostId: user.uid, status: "pending_review", revision: 1, createdAt: now, updatedAt: now });
     batch.set(db.collection("tournamentAuditEvents").doc(`${ref.id}_submitted_initial`), { id: `${ref.id}_submitted_initial`, tournamentId: ref.id, actorId: user.uid, action: "submitted_for_review", createdAt: now, metadata: { status: "pending_review" } });
+    batch.set(db.collection("notifications").doc(`${ref.id}_submitted_initial`), { userId: user.uid, type: "tournament_submitted", title: "Tournament submitted for review", body: "Your challenge has been submitted for review.", targetId: ref.id, actionUrl: challengeReviewBuilderDestination(tournament, ref.id, "tournaments"), read: false, delivery: { inApp: true, email: false }, createdAt: now });
+    batch.set(db.collection("tournamentEmailOutbox").doc(`${ref.id}_submitted_initial`), { tournamentId: ref.id, userId: user.uid, category: "challengeReminders", title: "Tournament submitted for review", message: "Your challenge has been submitted for review.", status: "pending", createdAt: now });
   }
-  await batch.commit();
+  try { await batch.commit(); }
+  catch (error) {
+    if (creationKey && [6, "already-exists"].includes((error as {code?: number|string})?.code ?? "")) {
+      const existing = await ref.get();
+      if (existing.exists) return ok({ tournament: { ...existing.data(), id: ref.id }, idempotent: true }, "Your saved Tournament was recovered. No duplicate was created.");
+    }
+    throw error;
+  }
   const { attemptTournamentNotifications } = await import("@/lib/server/tournament-notifications");
   await attemptTournamentNotifications(db, ref.id);
-  return ok({ tournament }, requestedStatus === "pending_review" ? "Tournament submitted for admin review." : "Tournament draft created. No bracket, participants, payments, prize pool, winners, or payouts were created.");
+  return ok({ tournament }, requestedStatus === "pending_review" ? "Your challenge has been submitted for review." : "Tournament draft created. No bracket, participants, payments, prize pool, winners, or payouts were created.");
 }

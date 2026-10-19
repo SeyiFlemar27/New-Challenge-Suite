@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminPermission } from "@/lib/server/auth";
-import { ok, serverUnavailable } from "@/lib/server/responses";
+import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (isFirestoreMissingIndexError(error)) {
       console.warn("[tournament-firestore-index]", { scope: "api:admin:tournaments:list", message: "Firestore index required for this query." });
-      return ok({ tournaments: [], emptyState: "Firestore index required for this query." }, "Admin tournament queue requires setup.");
+      return fail("The Tournament queue requires a database index. It could not be loaded.", 503, undefined, "TOURNAMENT_INDEX_REQUIRED");
     }
     throw error;
   }
