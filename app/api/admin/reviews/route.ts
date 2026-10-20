@@ -16,10 +16,10 @@ export async function GET(request: Request) {
   const empty = { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
   const [sponsors, challenges, sponsorships, prizePools, tournaments] = await Promise.all([
     hasAdminPermission(user?.adminPermissions, "sponsors.review") ? db.collection("sponsorProfiles").where("sponsorVerificationStatus", "==", "pending_review").limit(100).get() : Promise.resolve(empty),
-    hasAdminPermission(user?.adminPermissions, "challenges.review") ? db.collection("challenges").where("adminReviewRequired", "==", true).limit(100).get() : Promise.resolve(empty),
+    Promise.resolve(empty),
     hasAdminPermission(user?.adminPermissions, "sponsorCampaigns.review") ? db.collection("sponsorships").where("status", "==", "pending_admin_review").limit(100).get() : Promise.resolve(empty),
     hasAdminPermission(user?.adminPermissions, "finance.view") ? db.collection("prizePools").limit(100).get() : Promise.resolve(empty),
-    hasAdminPermission(user?.adminPermissions, "challenges.review") ? db.collection("tournaments").where("status", "==", "pending_review").limit(100).get() : Promise.resolve(empty)
+    Promise.resolve(empty)
   ]);
   return ok({
     sponsors: sponsors.docs.map((doc) => ({ id: doc.id, brandName: doc.data().brandName ?? "", status: doc.data().sponsorVerificationStatus })),

@@ -12,5 +12,5 @@ for (const issues of [getNormalChallengeReadiness(challenge).issues, validateCha
   assert.equal(issues.some(issue => ["submissionInstructionsList", "winnerPrizeAmountsCents", "prizeValue"].includes(issue.field)), false); count++;
 }
 assert.ok(getNormalChallengeReadiness({ ...challenge, prizeValue: 4.99 }).issues.some(issue => issue.code === "BASE_PRIZE_INVALID")); count++;
-assert.ok(getNormalChallengeReadiness({ ...challenge, builderVersion: "normal_v2" }).issues.some(issue => issue.code === "PRIZE_AMOUNTS_INVALID")); count++;
+assert.equal(getNormalChallengeReadiness({ ...challenge, builderVersion: "normal_v2" }).issues.some(issue => issue.code === "PRIZE_AMOUNTS_INVALID"), false); count++;
 console.log(`Normal Base Prize policy: ${count} assertions passed.`);

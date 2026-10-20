@@ -144,6 +144,10 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
     if (job.type !== "process_tournament_match_lifecycle" || Number(job.version) !== expectedVersion) return { status: "skipped" as const, code: "TASK_VERSION_STALE" };
     if (job.status !== "pending") return { status: "skipped" as const, code: "JOB_ALREADY_PROCESSED" };
     if (Date.parse(String(job.runAt ?? "")) > now.getTime()) return { status: "not_due" as const, code: "TASK_NOT_DUE" };
+    // Another worker may already have advanced the match but not completed its
+    // job write. A duplicate must respect that lease before declaring it stale.
+    const leaseUntil = isoOrNull(job.executionLeaseUntilAt);
+    if (leaseUntil && Date.parse(leaseUntil) > now.getTime()) return { status: "running" as const, code: "TASK_ALREADY_RUNNING" };
     const matchRef = db.collection("tournamentMatches").doc(String(job.matchId ?? ""));
     const matchSnapshot = await transaction.get(matchRef);
     const match = matchSnapshot.data() ?? {};
@@ -155,8 +159,6 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
       transaction.set(jobRef, { status: "skipped", reason: "MATCH_LIFECYCLE_STATE_STALE", completedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
       return { status: "skipped" as const, code: "MATCH_LIFECYCLE_STATE_STALE" };
     }
-    const leaseUntil = isoOrNull(job.executionLeaseUntilAt);
-    if (leaseUntil && Date.parse(leaseUntil) > now.getTime()) return { status: "running" as const, code: "TASK_ALREADY_RUNNING" };
     transaction.set(jobRef, { executionLeaseUntilAt: new Date(now.getTime() + 2 * 60_000).toISOString(), executionStartedAt: now.toISOString(), executionAttempts: Number(job.executionAttempts ?? 0) + 1, updatedAt: now.toISOString() }, { merge: true });
     return { status: "claimed" as const, tournamentId: String(job.tournamentId), matchId: String(job.matchId) };
   });

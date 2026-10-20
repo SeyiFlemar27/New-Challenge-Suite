@@ -1,0 +1,46 @@
+{
+  "project": "challenge-suite",
+  "location": "us-central1",
+  "actions": [
+    {
+      "operation": "created_with_future_schedule",
+      "name": "projects/challenge-suite/locations/us-central1/jobs/tournament-lifecycle-recovery",
+      "schedule": "0 0 1 1 *",
+      "nextOccurrence": "2027-01-01T00:00:00Z"
+    },
+    {
+      "operation": "independent_pause_verified",
+      "state": "PAUSED"
+    },
+    {
+      "operation": "final_verified",
+      "name": "projects/challenge-suite/locations/us-central1/jobs/tournament-lifecycle-recovery",
+      "schedule": "* * * * *",
+      "timeZone": "Etc/UTC",
+      "state": "PAUSED",
+      "target": {
+        "uri": "https://www.challengesuite.com/api/internal/tournament-scheduler",
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Google-Cloud-Scheduler"
+        },
+        "body": "e30=",
+        "oidcToken": {
+          "serviceAccountEmail": "tournament-lifecycle-invoker@challenge-suite.iam.gserviceaccount.com",
+          "audience": "https://www.challengesuite.com/api/internal/tournament-scheduler"
+        }
+      },
+      "retryConfig": {
+        "retryCount": 3,
+        "maxRetryDuration": "0s",
+        "minBackoffDuration": "10s",
+        "maxBackoffDuration": "60s",
+        "maxDoublings": 3
+      },
+      "noExecutionObserved": true
+    }
+  ],
+  "runOrResumeCalled": false,
+  "updatedAt": "2026-10-20T12:08:05.337Z"
+}

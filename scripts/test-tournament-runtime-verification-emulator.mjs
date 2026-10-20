@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import { initializeApp, deleteApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { createTournamentVerification, dispatchTournamentVerification, processTournamentVerification, readTournamentVerification, cleanupTournamentVerification, isTournamentVerificationJob, recoverTournamentVerification } from '../lib/server/tournament-runtime-verification.ts';
+import { POST as adminPost } from '../app/api/admin/tournament-runtime-verification/route.ts';
+import { POST as workerPost, GET as workerGet } from '../app/api/internal/tournament-activation/route.ts';
+const project=process.env.FIREBASE_PROJECT_ID;
+assert.ok(project?.startsWith('demo-') && /^127\.0\.0\.1:\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST||''));
+const app=initializeApp({projectId:project}),raw=getFirestore(app);
+let checks=0,accesses=0;const check=(condition,message)=>{assert.ok(condition,message);checks++;};
+// Capability boundary: fail immediately if the implementation attempts any
+// collection/query or document access beyond the single synthetic namespace.
+const safeRef=ref=>assert.match(ref.path,/^tournamentRuntimeVerification\/release-probe_[0-9a-f-]+$/);
+const db={collection(name){assert.equal(name,'tournamentRuntimeVerification');accesses++;return raw.collection(name);},runTransaction(fn){return raw.runTransaction(tx=>fn({get(ref){safeRef(ref);return tx.get(ref);},update(ref,data){safeRef(ref);return tx.update(ref,data);},delete(ref){safeRef(ref);return tx.delete(ref);}}));}};
+let id;
+try {
+ check((await adminPost(new Request('http://localhost/api/admin/tournament-runtime-verification',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'create',reason:'Isolated acceptance verification'})}))).status===401,'Admin diagnostic rejects anonymous requests');
+ check((await workerPost(new Request('http://localhost/api/internal/tournament-activation',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}))).status===401,'worker rejects anonymous requests');
+ const oldSecret=process.env.CRON_SECRET;process.env.CRON_SECRET='isolated-disabled-worker';
+ check((await workerGet(new Request('http://localhost/api/internal/tournament-activation',{headers:{authorization:'Bearer isolated-disabled-worker'}}))).status===503,'authorized cron cannot execute ordinary jobs while flags are disabled');
+ if(oldSecret===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=oldSecret;
+ const email='probe-'+Date.now()+'@example.invalid',password='Isolated-test-only-123!';
+ const signup=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});
+ const identity=await signup.json();assert.ok(identity.localId);await getAuth(app).updateUser(identity.localId,{emailVerified:true});
+ const signIn=async()=>{const r=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const data=await r.json();assert.ok(data.idToken);return data.idToken;};
+ const adminRequest=async(token,body)=>adminPost(new Request('http://localhost/api/admin/tournament-runtime-verification',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({...body,reason:'Isolated emulator transport verification'})}));
+ try {
+  check((await adminRequest(await signIn(),{action:'create'})).status===403,'ordinary authenticated creator cannot create runtime probes');
+  await getAuth(app).setCustomUserClaims(identity.localId,{admin:true});const token=await signIn();
+  const response=await adminRequest(token,{action:'create'});check(response.status===200,'recent authenticated Admin can create synthetic probe');
+  const routeId=(await response.json()).data.id;
+  check((await readTournamentVerification(db,routeId)).actorId===identity.localId,'actual route records requesting Admin');
+  check((await adminRequest(token,{action:'cleanup',id:routeId})).status===200,'actual Admin route cleans only its synthetic record');
+  check(await readTournamentVerification(db,routeId)===null,'actual route cleanup confirmed');
+ } finally {await getAuth(app).deleteUser(identity.localId);}
+ await assert.rejects(()=>createTournamentVerification(db,'admin','short'));checks++;
+ ({id}=await createTournamentVerification(db,'synthetic-admin','Bounded isolated transport acceptance'));
+ check(isTournamentVerificationJob(id),'reserved ID recognized');
+ const record=await readTournamentVerification(db,id);
+ check((await processTournamentVerification(db,id,1,record.runAt-1)).code==='VERIFICATION_NOT_DUE','early delivery retries without transition');
+ check(record.transitions===0,'early delivery has zero transitions');
+ check((await processTournamentVerification(db,id,2,record.runAt)).code==='VERIFICATION_STALE','stale version harmless');
+ let enqueues=0;
+ const scheduler={scheduleActivation:async task=>{check(task.jobId===id&&task.version===1,'enqueue stays in exact synthetic scope');enqueues++;return {taskName:'synthetic-task'};}};
+ await assert.rejects(()=>dispatchTournamentVerification(db,id,{scheduleActivation:async()=>{throw Error('bounded transport failure');}}));checks++;
+ await dispatchTournamentVerification(db,id,scheduler);
+ check(enqueues===1,'failed dispatch can be recovered by exact-ID retry');
+ check((await recoverTournamentVerification(db,id,999,scheduler)).code==='VERIFICATION_STALE_OR_MISSING','stale recovery cannot dispatch');
+ await recoverTournamentVerification(db,id,1,scheduler);
+ check(enqueues===2,'exact synthetic recovery redispatches without global query');
+ const outcomes=await Promise.all(Array.from({length:5},()=>processTournamentVerification(db,id,1,record.runAt+1000)));
+ check(outcomes.filter(o=>o.code==='VERIFICATION_COMPLETED').length===1,'one concurrent transition');
+ check(outcomes.filter(o=>o.code==='VERIFICATION_DUPLICATE').length===4,'duplicate delivery harmless');
+ const final=await readTournamentVerification(db,id);
+ check(final.transitions===1&&final.attempts===1,'single persisted state transition');
+ check((await recoverTournamentVerification(db,id,1,scheduler)).code==='VERIFICATION_ALREADY_COMPLETED','completed synthetic recovery does not dispatch');
+ check((await processTournamentVerification(db,'release-probe_../../tournaments',1)).code==='VERIFICATION_INVALID','malformed reserved ID cannot escape');
+ await assert.rejects(()=>readTournamentVerification(db,'ordinary-user-tournament'));checks++;
+ await assert.rejects(()=>cleanupTournamentVerification(db,'ordinary-user-tournament'));checks++;
+ await cleanupTournamentVerification(db,id);
+ check(await readTournamentVerification(db,id)===null,'synthetic cleanup confirmed');
+ check((await processTournamentVerification(db,id,1)).code==='VERIFICATION_EXPIRED_OR_MISSING','post-cleanup task cannot recreate records');
+ ({id}=await createTournamentVerification(db,'synthetic-admin','Bounded retry verification fixture',true));
+ const retryRecord=await readTournamentVerification(db,id);
+ check((await processTournamentVerification(db,id,1,retryRecord.runAt)).code==='VERIFICATION_RETRY_ONCE','one synthetic failure requests retry');
+ check((await processTournamentVerification(db,id,1,retryRecord.runAt+1000)).code==='VERIFICATION_COMPLETED','bounded synthetic retry completes');
+ const retryFinal=await readTournamentVerification(db,id);
+ check(retryFinal.attempts===2&&retryFinal.transitions===1,'retry records two attempts and one transition');
+ await cleanupTournamentVerification(db,id);
+ check(accesses>0,'actual scoped Firestore operations executed');
+ console.log(`Tournament runtime isolation: ${checks} assertions passed; exact synthetic document only; no competition/financial/health collection access.`);
+} finally {if(id)await cleanupTournamentVerification(db,id);await deleteApp(app);}

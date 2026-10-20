@@ -16,6 +16,7 @@ import { prepareEnterprisePrizeValueUpdate } from "@/lib/server/enterprise-prize
 import { deleteUnpublishedChallengeMedia } from "@/lib/server/media-verification";
 import { preparePrivateCredential } from "@/lib/server/private-credentials";
 import { liveEventFinancialConfigurationLocked } from "@/lib/live-event-policy";
+import { requireConfirmedPublicationFunding } from "@/lib/server/publication-guards";
 
 const allowedDraftFields = new Set([
   "privateAccessPolicyVersion", "privateBuilderStep", "publicPreviewEnabled",
@@ -73,7 +74,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const access = await requireChallengeManagementAccess(request, id, "challenge.edit");
   if (access.response || !access.challenge) return access.response;
-  const challenge = access.challenge;
+  const challenge = { ...access.challenge };
+  if (challenge.prizeType === "money" && access.db) {
+    try {
+      const funding = await access.db.runTransaction(tx => requireConfirmedPublicationFunding(access.db!, tx, id, challenge, challenge, true));
+      challenge.confirmedCreatorPrizeFundingCents = funding.confirmed;
+      challenge.monetization = { ...(challenge.monetization as Record<string, unknown> ?? {}), creatorPrizeFundingRequiredCents: funding.required, confirmedCreatorPrizeFundingCents: funding.confirmed };
+    } catch { return fail("Prize funding could not be loaded. Retry before publishing.", 503, undefined, "PRIZE_FUNDING_UNAVAILABLE"); }
+  }
   const progress = calculateChallengeDraftProgress(challenge);
   return ok({ challenge: { ...challenge, ...(retiredHybridCompetitionState(challenge) ?? {}), managementState: resolveChallengeManagementState(challenge), completionPercentage: Number(challenge.completionPercentage ?? progress.completionPercentage), nextIncompleteSection: challenge.nextIncompleteSection ?? progress.nextIncompleteSection } }, "Challenge draft loaded.");
 }

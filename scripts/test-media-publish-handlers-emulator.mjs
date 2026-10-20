@@ -51,7 +51,7 @@ try {
     if (response.status !== 200) console.error("Publication fixture failed", { kind, code: result.code, details: result.details });
     equal(response.status, 200, `${kind} actual publish handler accepts a legitimate tokenized image`);
     const saved = (await db.collection("challenges").doc(draft.id).get()).data();
-    equal(saved.status, "pending_review", `${kind} is actually persisted for Admin Review`);
+    equal(saved.status, "scheduled", `${kind} is persisted as published without Admin review`);
     const [metadata] = await bucket.file(path).getMetadata();
     equal(Boolean(metadata.metadata?.firebaseStorageDownloadTokens), false, "bearer token revoked");
     equal(metadata.metadata?.preserve, "original", "unrelated source metadata preserved");

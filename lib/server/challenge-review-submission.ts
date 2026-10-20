@@ -8,6 +8,11 @@ import { isEnterpriseFinanceResource, prepareEnterprisePrizeValueUpdate, resolve
 import { enterpriseChallengeInScope, hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
 import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
 import { freeBasicUsage, FREE_BASIC_CHALLENGE_LIFETIME_LIMIT, freeBasicLimitMessage } from "@/lib/server/free-challenge-limits";
+import { readPublicationSafety, recordPublicationHold, requireConfirmedPublicationFunding } from "@/lib/server/publication-guards";
+import { seedLiveEventJobs } from "@/lib/server/live-event-job-outbox";
+import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
+import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
+import { resolveApprovedChallengeStatus } from "@/lib/server/challenge-lifecycle";
 
 export class ChallengeReviewTransitionError extends Error {
   readonly code: "CHALLENGE_NOT_FOUND" | "PERMISSION_DENIED" | "CHALLENGE_STATE_CHANGED";
@@ -39,12 +44,15 @@ type ReviewSubmissionInput = {
 };
 
 export async function commitChallengeReviewSubmission(db: Firestore, input: ReviewSubmissionInput) {
+  const at = String(input.update.updatedAt ?? new Date().toISOString());
+  const status = input.update.isLiveEvent ? "scheduled" : resolveApprovedChallengeStatus({ startsAt: String(input.update.startsAt ?? ""), submissionDeadline: String(input.update.submissionDeadline ?? ""), votingDeadline: String(input.update.votingDeadline ?? "") }, new Date(at));
+  input = { ...input, update: { ...input.update, status, lifecycleStatus: status, adminReviewRequired: false, reviewStatus: "not_required", adminApprovalStatus: "approved", publicationPolicyVersion: 1, publicationOutcome: "published", publishedAt: at } };
   for (const [name, payload] of Object.entries({ update: input.update, revision: input.revision, revenue: input.revenue, submitAudit: input.submitAudit, revisionAudit: input.revisionAudit })) {
     assertNoUndefinedFirestoreValues(payload, name);
   }
 
   const challengeRef = db.collection("challenges").doc(input.challengeId);
-  const revisionRef = db.collection("challengeReviewRevisions").doc(input.revision.id);
+  const revisionRef = db.collection("challengePublicationEvents").doc(input.revision.id);
   const revenueRef = db.collection("revenueShareLedgers").doc(`revenue_share_${input.challengeId}`);
   const prizePoolRef = db.collection("prizePools").doc(input.challengeId);
   const submitAuditRef = db.collection("auditLogs").doc(input.submitAudit.id);
@@ -75,10 +83,30 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
       throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "You can only submit your own challenge for review.");
     }
     const latestStatus = String(latestChallenge.status ?? latestChallenge.lifecycleStatus ?? "draft").toLowerCase();
-    if (latestStatus === "pending_review") return { idempotent: true, challenge: latestChallenge };
+    if (latestChallenge.publicationPolicyVersion === 1 && latestChallenge.publishedAt) return { idempotent: true, challenge: latestChallenge };
     if (latestStatus !== input.expectedStatus) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This challenge changed while it was being submitted. Please refresh and try again.");
     if (input.expectedUpdatedAt !== undefined && latestChallenge.updatedAt !== input.expectedUpdatedAt) {
       throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "This draft or its funding changed. Refresh before submitting again.");
+    }
+    const safety = await readPublicationSafety(db, transaction, input.userId, latestChallenge);
+    if (safety) return { idempotent: false, challenge: { ...latestChallenge, ...recordPublicationHold(db, transaction, input.challengeId, "challenges", input.userId, safety, String(input.update.updatedAt)) } };
+    const fundingEvidence = await requireConfirmedPublicationFunding(db, transaction, input.challengeId, latestChallenge, input.update);
+    if (!enterpriseOwned) {
+      const [account, profile, owned] = await Promise.all([
+        transaction.get(db.collection("users").doc(input.userId)),
+        transaction.get(db.collection("profiles").doc(input.userId)),
+        transaction.get(db.collection("challenges").where("creatorId", "==", input.userId)),
+      ]);
+      const latestProfile = { ...profile.data(), ...account.data() }, plan = getUserPlanAccess(latestProfile), limits = getPlanExperience(latestProfile);
+      const entitlement = canCreateChallenge(latestProfile, { ...input.update, creatorPrizeFundingConfirmed: fundingEvidence.confirmed >= fundingEvidence.required }, 0);
+      if (!entitlement.allowed) throw new ChallengeReviewTransitionError("PERMISSION_DENIED", entitlement.message);
+      const others = owned.docs.filter(document => document.id !== input.challengeId);
+      if (plan.normalizedPlanId === "free" && freeBasicUsage(others) >= FREE_BASIC_CHALLENGE_LIFETIME_LIMIT) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", freeBasicLimitMessage(freeBasicUsage(others)));
+      const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+      const monthly = others.filter(document => { const data = document.data(); return !["draft", "cancelled"].includes(String(data.status)) && Date.parse(String(data.createdAt)) >= monthStart.getTime(); }).length;
+      if (plan.normalizedPlanId !== "free" && limits.monthlyChallengeLimit !== null && monthly >= limits.monthlyChallengeLimit) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Your monthly challenge publication allowance is fully used.");
+      const privateMonthly = others.filter(document => { const data = document.data(); return data.visibility === "private" && !["draft", "cancelled"].includes(String(data.status)) && Date.parse(String(data.createdAt)) >= monthStart.getTime(); }).length;
+      if (input.update.visibility === "private" && limits.monthlyPrivateChallengeLimit !== null && privateMonthly >= limits.monthlyPrivateChallengeLimit) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Your monthly Private Challenge publication allowance is fully used.");
     }
     if (latestChallenge.privateAccessPolicyVersion === 2) {
       const vault = await transaction.get(db.collection("privateCredentialVault").doc(input.challengeId));
@@ -106,7 +134,7 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
       if ((confirmed > 0 || latestChallenge.creatorPrizeGuaranteeLockedAt) && Number(input.update.prizeValue ?? latestChallenge.prizeValue) !== Number(latestChallenge.prizeValue)) {
         throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "A confirmed Base Prize cannot be changed through publication.");
       }
-      if (confirmed < required) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Confirm the full creator-funded Base Prize before submitting for review.");
+      if (confirmed < required) throw new ChallengeReviewTransitionError("CHALLENGE_STATE_CHANGED", "Confirm the full creator-funded Base Prize before publishing.");
     }
 
     const enterpriseSlot = await prepareEnterpriseActiveChallengeSlot(
@@ -129,8 +157,7 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     const reviewUpdate = { ...input.update, ...(latestChallenge.builderVersion === "normal_v3" && !enterpriseOwned && input.update.freeBasicChallenge === true ? { reviewCreatorPlanId: "free" } : {}) };
     transaction.set(challengeRef, reviewUpdate, { merge: true });
     if (input.mediaVerification) transaction.set(db.collection("challengeMediaVerifications").doc(input.challengeId), input.mediaVerification);
-    transaction.set(db.collection("notifications").doc(`review_submitted_${input.revision.id}`), { userId: input.userId, type: "challenge_submitted", title: "Challenge submitted for review", body: "Your challenge has been submitted for review.", targetId: input.challengeId, actionUrl: challengeReviewBuilderDestination(latestChallenge, input.challengeId), read: false, delivery: { inApp: true, email: false }, createdAt: input.update.updatedAt ?? new Date().toISOString() });
-    transaction.set(db.collection("normalEmailOutbox").doc(`review_submitted_${input.revision.id}`), { challengeId: input.challengeId, userId: input.userId, sourceEventId: input.revision.id, title: "Challenge submitted for review", message: "Your challenge has been submitted for review.", status: "pending", createdAt: input.update.updatedAt ?? new Date().toISOString() });
+    transaction.set(db.collection("notifications").doc(`published_${input.revision.id}`), { userId: input.userId, type: "challenge_published", title: "Challenge published", body: "Your challenge is published. Operational availability is shown on its public page.", targetId: input.challengeId, actionUrl: `${latestChallenge.isLiveEvent ? "/live-events" : "/challenges"}/${encodeURIComponent(input.challengeId)}`, read: false, delivery: { inApp: true, email: false }, createdAt: input.update.updatedAt ?? new Date().toISOString() });
     enterpriseSlot.apply();
     transaction.set(revisionRef, input.revision, { merge: true });
     const ownership = resolveEnterpriseFinancialOwnership(latestChallenge);
@@ -144,6 +171,11 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     transaction.set(prizePoolRef, prizePool, { merge: true });
     transaction.set(submitAuditRef, input.submitAudit, { merge: true });
     transaction.set(revisionAuditRef, input.revisionAudit, { merge: true });
+    if (input.update.isLiveEvent) {
+      transaction.set(db.collection("liveEvents").doc(input.challengeId), { ...latestChallenge, ...reviewUpdate, id: input.challengeId, challengeId: input.challengeId }, { merge: true });
+      if ((input.update.hostOperations as Record<string, unknown> | undefined)?.schemaVersion === 2) seedLiveEventJobs(db, transaction, input.challengeId, reviewUpdate);
+    }
+    if (input.update.normalLifecyclePolicyVersion === 1) wakeNormalLifecycleJob(db, transaction, input.challengeId, String(input.update.updatedAt));
     return { idempotent: false, challenge: reviewUpdate };
   });
 }

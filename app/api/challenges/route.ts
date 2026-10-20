@@ -39,7 +39,7 @@ export async function GET() {
   return ok({ challenges }, "Challenges loaded.");
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
@@ -49,6 +49,15 @@ export async function POST(request: Request) {
 
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
+  if ((parsed.body as Record<string, unknown> | undefined)?.publish === true) {
+    const saved = await POST(new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ ...parsed.body, publish: false }) }));
+    if (!saved.ok) return saved;
+    const result = await saved.json();
+    const challenge = result.data?.challenge;
+    if (!challenge?.id) return serverUnavailable("Saved challenge recovery");
+    const { POST: publish } = await import("@/app/api/challenges/[id]/publish/route");
+    return publish(new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ ...parsed.body, publish: true }) }), { params: Promise.resolve({ id: challenge.id }) });
+  }
   const creationKey = request.headers.get("x-challenge-creation-key") ?? "";
   if (creationKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(creationKey)) return fail("Invalid draft retry reference.", 422);
   const ref = creationKey ? db.collection("challenges").doc(createHash("sha256").update(`challenge:${user.uid}:${creationKey}`).digest("hex").slice(0, 32)) : db.collection("challenges").doc();
@@ -110,7 +119,7 @@ export async function POST(request: Request) {
   const freeCreatorPrizeRequested = freePlan
     && monetizationIntent.prizePoolRequested
     && body.prizeType === "money"
-    && Number(body.prizeValue ?? 0) > 0;
+    && Number(body.prizeValue ?? 0) >= 0;
   const freeBasicChallengeCount = freeBasicUsage(ownedChallengesSnap.docs);
 
   if (planAccess.isSponsor) {

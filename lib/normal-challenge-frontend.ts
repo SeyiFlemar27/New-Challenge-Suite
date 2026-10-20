@@ -10,12 +10,12 @@ export const NORMAL_FRONTEND_STEPS = NORMAL_FRONTEND_SERVER_STEPS.map((position)
     ...definition,
     fields: definition.key === "monetization" ? definition.fields.filter((field) => field !== "votingSettings")
       : definition.key === "submission" ? [...definition.fields, "votingSettings"] : definition.fields,
-    description: definition.key === "publish" ? "Check the requirements below before submitting for Admin review."
+    description: definition.key === "publish" ? "Check the essential requirements, then publish."
       : definition.key === "monetization" ? "Choose an optional Base Prize and plan-eligible monetization." : definition.description,
     guide: definition.key === "review"
-      ? ["Review every section before submitting.", "A positive Base Prize must be fully creator-funded before review.", "Unconfirmed sponsor interest and projected revenue are not prize funds."]
+      ? ["Review every section before publishing.", "A positive Base Prize must be fully creator-funded before publishing.", "Unconfirmed sponsor interest and projected revenue are not prize funds."]
       : definition.key === "monetization"
-        ? ["Base Prize funding is optional; a positive guarantee must be fully confirmed before review.", "Only confirmed creator or authorized owner funding satisfies your Base Prize.", "Sponsor prize funds remain separate and do not replace your obligation."]
+        ? ["Base Prize funding is optional; a positive guarantee must be fully confirmed before publishing.", "Only confirmed creator or authorized owner funding satisfies your Base Prize.", "Sponsor prize funds remain separate and do not replace your obligation."]
       : definition.key === "submission"
         ? ["Instructions are optional in this form.", "Choose the submission format and supported voting configuration.", "Publish explains any remaining server-policy requirements."]
         : definition.guide
@@ -98,8 +98,8 @@ export function getNormalFrontendReadiness(payload: Record<string, unknown>, fun
   if (payload.builderVersion === "normal_v3" && (locationMode !== "worldwide" || Boolean(payload.eligibleCountry) || Array.isArray(payload.eligibleCountries) && payload.eligibleCountries.length > 0 || payload.ageRestrictionMode === "minimum" || Number(payload.minimumAge ?? 0) > 0)) issues.push({ code: "LEGACY_ELIGIBILITY_POLICY", field: "legacyParticipation", step: publishStep, message: "Stored age/location restrictions are preserved. The current server rejects these restrictions for normal_v3; backend compatibility review is required rather than silently removing them." });
   if (!Number.isFinite(Number(payload.prizeValue)) || Number(payload.prizeValue) < 0) issues.push({ code: "BASE_PRIZE_INVALID", field: "prizeValue", step: normalStepIndex("monetization"), message: "Enter zero or a valid positive Base Prize amount." });
   if (!funding.satisfied) issues.push({ code: "CREATOR_BASE_PRIZE_UNFUNDED", field: "creatorFunding", step: publishStep, message: funding.confirmedCents === null
-    ? `Your Base Prize is ${usd(funding.requiredCents)}. Refresh the confirmed creator funding record before submitting for review.`
-    : `Your Base Prize is ${usd(funding.requiredCents)}, but only ${usd(funding.confirmedCents)} has been confirmed. Fund the remaining ${usd(funding.outstandingCents)} before submitting for review.` });
+    ? `Your Base Prize is ${usd(funding.requiredCents)}. Refresh the confirmed creator funding record before publishing.`
+    : `Your Base Prize is ${usd(funding.requiredCents)}, but only ${usd(funding.confirmedCents)} has been confirmed. Fund the remaining ${usd(funding.outstandingCents)} before publishing.` });
   if (funding.requiredCents > 0 && funding.requiredCents < 500 && !funding.satisfied) issues.push({ code: "FUNDING_SERVICE_MINIMUM", field: "creatorFunding", step: publishStep, message: "The existing creator funding checkout requires at least $5. This smaller Base Prize cannot be funded through the current service; backend policy alignment is required." });
   const steps = NORMAL_FRONTEND_STEPS.map((definition, position) => ({ label: definition.navLabel, issues: issues.filter((item) => item.step === position), complete: definition.key === "review" ? !issues.some((item) => item.step < position) : !issues.some((item) => item.step === position) }));
   const firstIncomplete = steps.findIndex((step) => !step.complete);

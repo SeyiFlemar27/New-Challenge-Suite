@@ -1,0 +1,139 @@
+{
+  "source": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-Usl0DP/runtime-temp/challenge-suite-p1-browser-5ef0600d452046bc96ed8124372032de/results.json",
+  "environment": "isolated demo Firebase",
+  "mode": "production build",
+  "singleRun": true,
+  "passed": 25,
+  "failed": 0,
+  "skipped": 0,
+  "assertions": 327,
+  "clientErrorCount": 0,
+  "cases": [
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 12
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 10
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "PASS",
+      "assertions": 16
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "PASS",
+      "assertions": 36
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "PASS",
+      "assertions": 4
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "PASS",
+      "assertions": 6
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "PASS",
+      "assertions": 18
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "PASS",
+      "assertions": 23
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "PASS",
+      "assertions": 18
+    }
+  ],
+  "productionProviderVerification": false
+}

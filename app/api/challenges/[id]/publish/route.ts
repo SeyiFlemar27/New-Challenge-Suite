@@ -1,9 +1,9 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { randomUUID } from "node:crypto";
 import { requireRequestUser } from "@/lib/server/auth";
-import { fail, ok, readJson, serverError, serverUnavailable } from "@/lib/server/responses";
+import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { canCreateChallenge, getPlanExperience, getUserPlanAccess } from "@/lib/plan-access";
-import { normalizeMoneyLockedChallengeFields, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
+import { normalizeMoneyLockedChallengeFields, resolveApprovedChallengeStatus, shouldCountAgainstActiveChallengeLimit } from "@/lib/server/challenge-lifecycle";
 import { serverChallengeCreateSchema, validateChallengeForPublish, zodFieldErrors } from "@/lib/server/challenge-validation";
 import { createAuditLogRecord, writeAuditLog } from "@/lib/server/audit";
 import { revenueShareFoundation } from "@/lib/server/revenue-sharing";
@@ -26,6 +26,8 @@ import { ChallengeReviewTransitionError, commitChallengeReviewSubmission } from 
 import { ENTERPRISE_WORKSPACE_LIMITS } from "@/lib/enterprise-access";
 import { applyVerifiedChallengeMedia, recordChallengeMediaVerificationFailure, verifyChallengeMedia } from "@/lib/server/media-verification";
 import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
+import { withPublishingDefaults } from "@/lib/publishing-policy";
+import { PublicationGuardError, requireConfirmedPublicationFunding } from "@/lib/server/publication-guards";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -36,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!db) return serverUnavailable("Challenge publishing");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
-  const rawBody = normalizeChallengeTimelineForStorage({ ...((parsed.body ?? {}) as Record<string, unknown>), publish: true }) as Record<string, unknown>;
+  let rawBody = normalizeChallengeTimelineForStorage({ ...((parsed.body ?? {}) as Record<string, unknown>), publish: true }) as Record<string, unknown>;
   const { id } = await params;
   const now = new Date().toISOString();
   const publishRequestId = `PUB-${randomUUID().slice(0, 8).toUpperCase()}`;
@@ -49,15 +51,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!challengeSnap.exists) return fail("Challenge draft not found.", 404, undefined, "CHALLENGE_NOT_FOUND");
   const current = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
+  const managementAccess = await requireChallengeManagementAccess(request, id, "challenge.edit");
+  if (managementAccess.response) return managementAccess.response;
+  rawBody = withPublishingDefaults({ ...current, ...rawBody });
+  if (current.publicationPolicyVersion === 1 && current.publishedAt) {
+    const held = ["held", "suspended", "removed"].includes(String(current.moderationStatus));
+    return ok({ challenge: current, outcome: held ? "held_for_moderation" : "published", idempotent: true }, held ? "Held for moderation. The existing restriction remains in place." : "Challenge is published.");
+  }
   if (current.privateAccessPolicyVersion === 2) {
     rawBody.privateAccessPolicyVersion = 2;
     const vault = await db.collection("privateCredentialVault").doc(id).get();
     if (!vault.exists || vault.data()?.method !== rawBody.privateAccessMethod || vault.data()?.inviteId !== current.privateCredentialId) return fail("Save and verify the selected private invitation method before submitting.", 409, undefined, "PRIVATE_CREDENTIAL_NOT_READY");
   } else delete rawBody.privateAccessPolicyVersion;
-  const managementAccess = await requireChallengeManagementAccess(request, id, "challenge.edit");
-  if (managementAccess.response) return managementAccess.response;
   const currentStatus = String(current.status ?? current.lifecycleStatus ?? "draft").toLowerCase();
-  if (currentStatus === "pending_review") return ok({ challenge: current, idempotent: true }, "Challenge is already submitted for review.");
+  if (currentStatus === "pending_review") return fail("This historical submission needs revalidation through the remediation process. It has not been published.", 409, { outcome: "needs_attention" }, "HISTORICAL_PUBLICATION_REVALIDATION_REQUIRED");
   const lockedType = normalizeBuilderChallengeType(current.challengeType ?? current.type);
   const usesNormalBuilderFoundation = lockedType === "normal" && (
     String(current.builderVersion ?? "") === "normal_v1" || String(current.challengeType ?? "") === "normal"
@@ -82,7 +89,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       targetType: "challenge",
       targetId: id,
       before: { status: String(current.status ?? current.lifecycleStatus ?? "unknown") },
-      after: { attemptedStatus: "pending_review" },
+      after: { attemptedStatus: "published" },
       reason: message,
       metadata: {
         action: "publish_challenge",
@@ -99,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
       createdAt: now
     }, db).catch(() => undefined);
-    return fail(message, status, details, code);
+    return fail(message, status, { ...(details && typeof details === "object" ? details : {}), outcome: "needs_attention" }, code);
   }
 
   const validation = serverChallengeCreateSchema.safeParse(rawBody);
@@ -145,14 +152,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const requestedMonetization = Boolean(monetizationIntent.paidEntryRequested || monetizationIntent.sponsorReady || monetizationIntent.prizePoolRequested || monetizationIntent.paidVotesRequested);
   const paidEntryValidation = validateEntryFee(monetizationIntent.entryFeeAmountCents);
   const currentMonetization = current.monetization && typeof current.monetization === "object" ? current.monetization as Record<string, unknown> : {};
-  const requiredCreatorFundingCents = Math.max(0, Number(currentMonetization.creatorPrizeFundingRequiredCents ?? 0));
-  const confirmedCreatorFundingCents = Math.max(0, Number(current.confirmedCreatorPrizeFundingCents ?? currentMonetization.confirmedCreatorPrizeFundingCents ?? 0));
+  let publicationFunding;
+  try { publicationFunding = await db.runTransaction(tx => requireConfirmedPublicationFunding(db, tx, id, current, body)); }
+  catch (error) { return rejectPublish(error instanceof Error ? error.message : "Prize funding could not be verified.", 409, undefined, error instanceof PublicationGuardError ? error.code : "PRIZE_FUNDING_UNAVAILABLE"); }
+  const requiredCreatorFundingCents = publicationFunding.required;
+  const confirmedCreatorFundingCents = publicationFunding.confirmed;
   const configuredPrizeCents = Math.max(0, Math.round(Number(body.prizeValue ?? 0) * 100));
-  const creatorPrizeFundingConfirmed = requiredCreatorFundingCents > 0
+  const creatorPrizeFundingConfirmed = configuredPrizeCents === 0 || requiredCreatorFundingCents > 0
     && confirmedCreatorFundingCents >= requiredCreatorFundingCents
     && confirmedCreatorFundingCents >= configuredPrizeCents;
-  if (((body.builderVersion === "normal_v3" && configuredPrizeCents > 0) || (freePlan && body.builderVersion !== "normal_v3" && monetizationIntent.prizePoolRequested)) && !creatorPrizeFundingConfirmed) {
-    return rejectPublish("Confirm the full creator-funded Base Prize before submitting for review.", 409, {
+  if (body.prizeType === "money" && configuredPrizeCents > 0 && !creatorPrizeFundingConfirmed) {
+    return rejectPublish("Confirm the full creator-funded Base Prize before publishing.", 409, {
       requiredCreatorFundingCents,
       confirmedCreatorFundingCents,
       configuredPrizeCents
@@ -180,7 +190,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return rejectPublish(sharedBlocker.message, status, { publishValidation, fieldErrors: Object.fromEntries(publishValidation.errors.map((issue) => [issue.field, issue.message])) }, sharedBlocker.code);
   }
 
-  const lifecycleStatus = "pending_review";
+  const lifecycleStatus = body.isLiveEvent ? "scheduled" : resolveApprovedChallengeStatus(body, new Date(now));
   const moneyLocks = normalizeMoneyLockedChallengeFields();
   const creationAccess = canCreateChallenge(planProfile, { ...body, ...moneyLocks, creatorPrizeFundingConfirmed, paidEntryEnabled: monetizationIntent.paidEntryRequested, entryFee: paidEntryValidation.entryFeeCents / 100, prizePoolEnabled: monetizationIntent.prizePoolRequested, status: lifecycleStatus }, ownedChallengesSnap.docs.filter((doc) => shouldCountAgainstActiveChallengeLimit(doc.data().status) && doc.id !== id).length);
   if (!creationAccess.allowed) return rejectPublish("This feature isn't included in your plan.", creationAccess.code === "PLAN_LIMIT_REACHED" ? 409 : 403, { planId: planAccess.normalizedPlanId }, creationAccess.code ?? "PLAN_ACCESS_DENIED");
@@ -240,8 +250,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     timezone: body.timeZone,
     ...moneyLocks,
     id,
-    creatorId: user.uid,
-    ownerId: user.uid,
+    creatorId: current.creatorId ?? user.uid,
+    ownerId: current.ownerId ?? current.creatorId ?? user.uid,
     status: lifecycleStatus,
     lifecycleStatus,
     economyRuleVersion: current.economyRuleVersion ?? economyRules.version,
@@ -251,10 +261,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     sponsorEnabled,
     participantApprovalMode: "automatic",
     requiresParticipantApproval: false,
-    reviewStatus: lifecycleStatus === "pending_review" ? "pending_review" : "approved",
-    adminReviewRequired: lifecycleStatus === "pending_review",
-    submittedForReviewAt: lifecycleStatus === "pending_review" ? now : current.submittedForReviewAt ?? null,
-    publishedAt: lifecycleStatus !== "pending_review" ? current.publishedAt ?? now : current.publishedAt ?? null,
+    reviewStatus: "not_required",
+    adminApprovalStatus: "approved",
+    adminReviewRequired: false,
+    submittedForReviewAt: null,
+    publishedAt: current.publishedAt ?? now,
+    publicationPolicyVersion: 1,
+    publicationOutcome: "published",
+    publicVisibility: body.visibility === "public" || body.publicPreviewEnabled === true,
+    ...(body.isLiveEvent ? { eventApprovalStatus: "approved", eventVisibility: "public", eventSyncStatus: "synced", sponsorFundingCutoffAt: body.startsAt, bookingAvailability: Number(body.hostOperations?.ticketPrice ?? 0) > 0 || Number(body.hostOperations?.competitionEntryFee ?? 0) > 0 ? "temporarily_unavailable" : "free_registration", bookingUnavailableReason: Number(body.hostOperations?.ticketPrice ?? 0) > 0 || Number(body.hostOperations?.competitionEntryFee ?? 0) > 0 ? "Paid booking is unavailable. Event publication does not enable checkout." : null } : {}),
     entitlementConsumed: true,
     freeBasicChallenge: freePlan,
     freeBasicChallengeLimit: freePlan ? FREE_BASIC_CHALLENGE_LIFETIME_LIMIT : null,
@@ -273,10 +288,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const revisionId = `challenge_review_${id}_${revisionSuffix}`;
   const submitAuditRef = db.collection("auditLogs").doc(`challenge_submit_${id}_${revisionSuffix}`);
   const revisionAuditRef = db.collection("auditLogs").doc(`challenge_revision_${id}_${revisionSuffix}`);
-  const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "pending_review", revision: reviewRevisionNumber, submittedAt: now, createdAt: now, updatedAt: now };
+  const revision = { id: revisionId, challengeId: id, creatorId: user.uid, status: "published", policyVersion: 1, revision: reviewRevisionNumber, publishedAt: now, createdAt: now, updatedAt: now };
   const revenue = revenueShareFoundation({ challengeId: id, creatorId: user.uid, challenge: current, sponsorEnabled, now });
-  const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_submitted_for_review", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Challenge submitted for review.", metadata: { source: "api/challenges/[id]/publish", idempotentDraftPublish: true }, createdAt: now }, submitAuditRef.id, now);
-  const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge_review_revision_created", targetType: "challenge", targetId: id, after: { revisionId, revision: reviewRevisionNumber }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
+  const submitAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge.published", targetType: "challenge", targetId: id, before: { status: currentStatus }, after: { status: lifecycleStatus, title: body.title }, reason: "Essential publication checks passed.", metadata: { source: "api/challenges/[id]/publish", policyVersion: 1 }, createdAt: now }, submitAuditRef.id, now);
+  const revisionAudit = createAuditLogRecord({ actorId: user.uid, actorType: "user", action: "challenge.publication_event_created", targetType: "challenge", targetId: id, after: { revisionId, revision: reviewRevisionNumber }, metadata: { source: "api/challenges/[id]/publish" }, createdAt: now }, revisionAuditRef.id, now);
 
   let mediaVerification: Record<string, unknown>;
   try {
@@ -321,6 +336,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       prizePool: { prizeType: body.prizeType, prizeValueCents: Math.round(body.prizeValue * 100), sponsorEnabled, paidEntryEnabled: safeMonetization.paidEntryRequested, now }
     });
   } catch (error) {
+    if (error instanceof PublicationGuardError) return rejectPublish(error.message, 409, undefined, error.code);
     if (error instanceof Error && error.name === "EnterpriseActiveChallengeLimitError") {
       return rejectPublish(error.message, 409, { activeChallengeLimit: ENTERPRISE_WORKSPACE_LIMITS.activeChallengeLimit }, "ENTERPRISE_ACTIVE_CHALLENGE_LIMIT_REACHED");
     }
@@ -341,13 +357,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return rejectPublish(error.message, status, undefined, error.code);
     }
     await writeAuditLog({ actorId: user.uid, actorType: "creator", action: "challenge.publish_failed", targetType: "challenge", targetId: id, before: { status: String(current.status ?? current.lifecycleStatus ?? "unknown") }, after: { attemptedStatus: lifecycleStatus }, reason: "Challenge submission write failed.", metadata: { action: "publish_challenge", causeCode: "PUBLISH_WRITE_FAILED", planId: planAccess.normalizedPlanId, accountType: planAccess.accountType, media: mediaSummary, paidEntry: { requested: monetizationIntent.paidEntryRequested }, sponsorReady: { requested: monetizationIntent.sponsorReady }, prizePool: { requested: monetizationIntent.prizePoolRequested }, occurredAt: now }, createdAt: now }, db).catch(() => undefined);
-    return serverError("Challenge could not be submitted for review.", error instanceof Error ? error.message : error);
+    return rejectPublish("Publication could not be saved. Please retry; your draft is preserved.", 503, undefined, "PUBLISH_WRITE_FAILED");
   }
-  if (transition.idempotent) return ok({ challenge: transition.challenge, idempotent: true }, "Challenge is already submitted for review.");
-  if (lifecycleStatus !== "pending_review" && !safeMonetization.paidEntryRequested) {
+  if (transition.challenge.publicationOutcome === "held_for_moderation") return ok({ challenge: transition.challenge, outcome: "held_for_moderation" }, "Held for moderation. An existing account or content restriction requires investigation.");
+  if (transition.idempotent) return ok({ challenge: transition.challenge, outcome: "published", idempotent: true }, "Challenge is published.");
+  if (!safeMonetization.paidEntryRequested) {
     await awardDoroCoinEngagement(db, { userId: user.uid, sourceType: "create_free_challenge", actionId: id, challengeId: id }).catch(async (error) => {
       await db.collection("adminActionTasks").doc(`doro_create_${id}`).set({ type: "dorocoin_reward_delivery_failure", sourceType: "create_free_challenge", challengeId: id, userId: user.uid, status: "open", message: error instanceof Error ? error.message : "Reward delivery failed.", createdAt: now }, { merge: true });
     });
   }
-  return ok({ challenge: update, privateAccess }, "Your challenge has been submitted for review.");
+  return ok({ challenge: update, privateAccess, outcome: "published" }, "Your challenge is published.");
 }

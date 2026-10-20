@@ -8,8 +8,10 @@ import { processTournamentActivationJobById } from "../lib/server/tournament-act
 import { processTournamentLifecycleAction } from "../lib/server/tournament-lifecycle-scheduler.ts";
 import { createPendingCreatorPrizeFunding, confirmCreatorPrizeFunding } from "../lib/server/prize-funding.ts";
 import { createTournamentEntryCheckout, confirmTournamentEntryPayment } from "../lib/server/tournament-paid-entry.ts";
+import { setTournamentRegistrationReadinessForTests } from "../lib/server/tournament-publication.ts";
 assert.match(process.env.GCLOUD_PROJECT ?? "", /^demo-/);
 for (const name of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"]) assert.match(process.env[name] ?? "", /^127\.0\.0\.1:\d+$/);
+setTournamentRegistrationReadinessForTests(true);
 process.env.FIREBASE_STORAGE_BUCKET = `${process.env.GCLOUD_PROJECT}.appspot.com`;
 const app = initializeApp({ projectId: process.env.GCLOUD_PROJECT, storageBucket: process.env.FIREBASE_STORAGE_BUCKET }), db = getFirestore(app), bucket = getStorage(app).bucket();
 const { POST: create } = await import("../app/api/tournaments/route.ts");
@@ -70,7 +72,7 @@ try {
     const payment = await createPendingCreatorPrizeFunding(db, { challengeId: id, subjectType: "tournament", creatorId: host.uid, amountCents: 10000 });
     await confirmCreatorPrizeFunding(db, { id: `${id}_creator_fixture` }, { id: `${id}_session`, mode: "payment", payment_status: "paid", amount_total: 10000, currency: "usd", payment_intent: `${id}_intent`, metadata: { paymentPurpose: "prize_pool_funding", creatorPrizeFundingId: payment.id, fundingSubjectType: "tournament", challengeId: id, userId: host.uid, initiatedByUserId: host.uid, organizationOwnerId: "" } });
     await call(edit, host, { status: "pending_review", expectedUpdatedAt: (await db.collection("tournaments").doc(id).get()).data().updatedAt }, id, "PATCH");
-    await call(adminAction, admin, { action: "approve", confirmed: true, reason: "Verified isolated acceptance specification" }, id);
+    eq((await db.collection("tournaments").doc(id).get()).data().status, "registration_open", "automatic publication opens registration with deterministic scheduler readiness; no editorial approval");
     if (paidEntry) await db.collection("tournaments").doc(id).update({ paymentActivationEnabled: true }); // Isolated provider-fixture environment only.
     if (mode === "individual") {
       for (const player of players) { if (paidEntry) await pay(id, player, { mode: "individual", participantId: `${id}_${player.uid}` }); else await call(join, player, { rulesAccepted: true }, id); owners.set(`${id}_${player.uid}`, player); }

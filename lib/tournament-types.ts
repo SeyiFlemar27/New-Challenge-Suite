@@ -47,6 +47,12 @@ export type TournamentMedia = {
 };
 
 export type TournamentFoundation = {
+  publicationPolicyVersion?: number;
+  publicationOutcome?: "published" | "held_for_moderation" | "needs_attention";
+  publicVisibility?: boolean;
+  moderationStatus?: string;
+  registrationAvailability?: "open" | "temporarily_unavailable";
+  registrationHoldReason?: string | null;
   productPolicyVersion?: "tournament_v3_20261015";
   subcategory?: string;
   tournamentRules?: string[] | string;

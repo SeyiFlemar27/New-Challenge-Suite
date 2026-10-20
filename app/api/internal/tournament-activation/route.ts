@@ -3,12 +3,15 @@ import { processTournamentActivationJobs, processTournamentScheduledJobById } fr
 import { processTournamentMatchLifecycleJobs, reconcileActiveTournamentMatchLifecycleJobs } from "@/lib/server/tournament-match-lifecycle-jobs";
 import { createGoogleCloudTasksScheduler, reconcileTournamentActivationOutbox, verifyTournamentCloudTaskRequest } from "@/lib/server/tournament-cloud-tasks";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
+import { isTournamentVerificationJob, processTournamentVerification } from "@/lib/server/tournament-runtime-verification";
+import { isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return fail("Scheduled operation is not authorized.", 401, undefined, "CRON_UNAUTHORIZED");
+  if (!isTournamentV3SchedulingReady()) return serverUnavailable("Tournament scheduling is disabled");
   const db = getAdminDb();
   if (!db) return serverUnavailable("Tournament activation scheduler");
   const now = new Date();
@@ -31,6 +34,11 @@ export async function POST(request: Request) {
   const jobId = typeof body.jobId === "string" ? body.jobId : "";
   const version = Number(body.version);
   if (!jobId || !Number.isSafeInteger(version) || version < 1) return fail("Scheduled task payload is invalid.", 400, undefined, "TASK_PAYLOAD_INVALID");
+  if (isTournamentVerificationJob(jobId)) {
+    const result = await processTournamentVerification(db, jobId, version);
+    return result.retry ? fail("Synthetic verification requests a bounded retry.", 503, undefined, result.code) : ok(result, "Synthetic delivery verified.");
+  }
+  if (!isTournamentV3SchedulingReady()) return serverUnavailable("Tournament scheduling is disabled");
   const outcome = await processTournamentScheduledJobById(db, jobId, version);
   if (outcome.code === "ACTIVATION_WINDOW_OPEN" || outcome.code === "TASK_NOT_DUE") {
     return new Response(JSON.stringify({ ok: false, code: "TASK_NOT_DUE" }), { status: 503, headers: { "content-type": "application/json", "retry-after": "2" } });

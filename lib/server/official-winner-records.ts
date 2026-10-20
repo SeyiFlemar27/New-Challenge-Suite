@@ -9,7 +9,7 @@ export type OfficialWinnerRecord = Record<string, unknown> & {
 export function authoritativeWinnerCount(challenge: Record<string, unknown>) {
   const configured = Number(challenge.numberOfWinners);
   const approved = Array.isArray(challenge.approvedWinnerIds) ? challenge.approvedWinnerIds : [];
-  if (challenge.normalLifecyclePolicyVersion === 1 && [1, 3].includes(configured) && approved.length > 0 && approved.length <= configured && approved.every(id => typeof id === "string" && id.length > 0) && new Set(approved).size === approved.length) return approved.length;
+  if (challenge.normalLifecyclePolicyVersion === 1 && [1, 2, 3].includes(configured) && approved.length > 0 && approved.length <= configured && approved.every(id => typeof id === "string" && id.length > 0) && new Set(approved).size === approved.length) return approved.length;
   return configured || undefined;
 }
 

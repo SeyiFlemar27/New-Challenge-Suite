@@ -1,0 +1,20 @@
+{
+  "readOnly": true,
+  "productionMutations": 0,
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "team": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "completedAt": "2026-10-20T13:44:29.054Z",
+  "destinationsOrSecretsPrinted": false,
+  "results": [
+    {
+      "label": "drains",
+      "verified": true,
+      "items": []
+    },
+    {
+      "label": "integrations",
+      "verified": true,
+      "items": []
+    }
+  ]
+}

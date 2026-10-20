@@ -1,10 +1,11 @@
-const NORMAL_WINNER_PERCENTAGES: Record<1 | 3, readonly number[]> = {
+const NORMAL_WINNER_PERCENTAGES: Record<1 | 2 | 3, readonly number[]> = {
   1: [100],
+  2: [70, 30],
   3: [60, 25, 15]
 };
 
 export function calculateNormalWinnerAmountsCents(totalCents: number, winnerCount: number) {
-  if (!Number.isSafeInteger(totalCents) || totalCents < 0 || (winnerCount !== 1 && winnerCount !== 3)) return [];
+  if (!Number.isSafeInteger(totalCents) || totalCents < 0 || (winnerCount !== 1 && winnerCount !== 2 && winnerCount !== 3)) return [];
   const percentages = NORMAL_WINNER_PERCENTAGES[winnerCount];
   let allocated = 0;
   return percentages.map((percent, index) => {
@@ -15,7 +16,7 @@ export function calculateNormalWinnerAmountsCents(totalCents: number, winnerCoun
 }
 
 export function normalWinnerPercentages(winnerCount: number) {
-  return winnerCount === 1 || winnerCount === 3 ? [...NORMAL_WINNER_PERCENTAGES[winnerCount]] : [];
+  return winnerCount === 1 || winnerCount === 2 || winnerCount === 3 ? [...NORMAL_WINNER_PERCENTAGES[winnerCount]] : [];
 }
 
 export function normalWinnerDistribution(winnerCount: number) {
@@ -23,7 +24,7 @@ export function normalWinnerDistribution(winnerCount: number) {
 }
 
 export function normalQualifiedWinnerDistribution(configuredCount: number, qualifiedCount: number) {
-  if (![1, 3].includes(configuredCount) || !Number.isInteger(qualifiedCount) || qualifiedCount < 1 || qualifiedCount > configuredCount) return [];
+  if (![1, 2, 3].includes(configuredCount) || !Number.isInteger(qualifiedCount) || qualifiedCount < 1 || qualifiedCount > configuredCount) return [];
   const weights = normalWinnerPercentages(configuredCount).slice(0, qualifiedCount);
   const denominator = weights.reduce((sum, value) => sum + value, 0);
   let allocatedPercent = 0;

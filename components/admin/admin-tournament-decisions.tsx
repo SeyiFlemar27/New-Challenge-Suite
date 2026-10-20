@@ -50,7 +50,7 @@ export function AdminTournamentDecisions({ id }: { id: string }) {
     {!bundle ? <p aria-busy={!message}>Loading authorized evidence…</p> : <>
       <Field label="Decision reason (required)"><textarea className={textareaClass} value={reason} onChange={event => setReason(event.target.value)} minLength={5} maxLength={500} required /></Field>
       <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} className="mt-1" />I have reviewed the relevant evidence and confirm this decision.</label>
-      {bundle.tournament.status === "pending_review" ? <div className="flex flex-wrap gap-3"><Button disabled={disabled} onClick={() => void decide("approve")}>Approve and open registration</Button><Button variant="secondary" disabled={disabled} onClick={() => void decide("reject")}>Request changes</Button></div> : null}
+      {bundle.tournament.status === "pending_review" ? <p className="text-sm">This historical publication requires revalidation. Routine editorial approval has been retired.</p> : null}
       {["under_review", "final"].includes(String(bundle.tournament.status)) ? <Button disabled={disabled} onClick={() => void decide("approve_payout_foundation")}>Approve verified placements and prepare settlement</Button> : null}
       {bundle.tournament.participationMode === "team" ? <section className="space-y-3 rounded-xl border p-4" aria-label="Team prize entitlement reconciliation">
         <h3 className="font-bold">Team prize entitlement reconciliation</h3>

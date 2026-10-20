@@ -127,6 +127,7 @@ export async function GET(request: Request) {
       riskFlags: item.riskFlags ?? [],
       submissionCount: Number(item.submissionCount ?? 0),
       voteCount: Number(item.voteCount ?? item.totalVotes ?? 0),
+      moderationStatus: item.moderationStatus ?? "clear",
       adminNote: notes.get(`challenge_${item.id}`)?.note ?? null
     }));
     const submissions = records(submissionSnap).map((item) => ({
@@ -205,7 +206,7 @@ export async function GET(request: Request) {
     };
     const cashLedger = records(cashLedgerSnap).map((item) => ({ id: item.id, userId: item.userId ?? null, type: item.type ?? "unknown", sourceType: item.sourceType ?? "", sourceId: item.sourceId ?? "", amountCents: Number(item.amountCents ?? 0), currency: item.currency ?? "USD", direction: item.direction ?? "", status: item.status ?? "recorded", createdAt: item.createdAt ?? null, transferEnabled: false }));
     const events = records(liveEventSnap).map((item) => ({ id: item.id, title: item.title ?? "Live event", hostId: item.hostId ?? item.creatorId ?? null, startsAt: item.startsAt ?? null, status: item.status ?? "draft", registrationCount: Number(item.registrationCount ?? 0), riskFlags: item.riskFlags ?? [] }));
-    const tournaments = records(tournamentSnap).map((item) => ({ id: item.id, title: item.title ?? "Tournament", hostId: item.hostId ?? null, format: item.format ?? "not_configured", participantCount: Number(item.participantCount ?? 0), status: item.status ?? "draft", bracketExecutionEnabled: false }));
+    const tournaments = records(tournamentSnap).map((item) => ({ id: item.id, title: item.title ?? "Tournament", hostId: item.hostId ?? null, format: item.format ?? "not_configured", participantCount: Number(item.participantCount ?? 0), status: item.status ?? "draft", moderationStatus: item.moderationStatus ?? "clear", bracketExecutionEnabled: false }));
     const adminNotifications = records(notificationSnap).filter((item) => item.audience === "admin" || item.adminOnly === true || ["sponsor_application", "host_verification", "flagged_submission", "withdrawal_request", "winner_review", "support_ticket"].includes(String(item.type)));
     const support = records(supportSnap).map((item) => ({ id: item.id, category: item.category ?? "other", subject: item.subject ?? "Support request", userId: item.userId ?? null, status: item.status ?? "open", createdAt: item.createdAt ?? null }));
     const announcements = records(announcementSnap).map((item) => ({ id: item.id, type: item.type ?? "platform_announcement", title: item.title ?? "Announcement", status: item.status ?? "draft", createdAt: item.createdAt ?? null, deliveryActive: false }));
@@ -264,7 +265,7 @@ export async function GET(request: Request) {
       overview: {
         pendingSponsorReviews: pending(sponsors, ["pending_review", "submitted"]),
         pendingHostVerifications: hosts.filter((item) => ["pending_review", "submitted"].includes(String(item.hostVerificationStatus))).length,
-        pendingChallengeReviews: pending(challenges, ["pending_review", "flagged"]) + pending(tournaments, ["pending_review"]),
+        pendingChallengeReviews: [...challenges, ...tournaments].filter(item => ["held", "suspended", "removed"].includes(String(item.moderationStatus))).length,
         pendingEnterpriseApplications: pending(enterpriseApplications, ["pending", "in_review"]),
         pendingSubmissions: pending(submissions, ["pending_review"]),
         flaggedSubmissions: pending(submissions, ["flagged"]),
@@ -614,6 +615,23 @@ export async function PATCH(request: Request) {
         transaction.create(db.collection("auditLogs").doc(`${id}_${action}_${status}`), { actorId: user.uid, actorType: "admin", action: `withdrawal.${action}`, targetId: id, reason: reason || note || "Withdrawal reviewed.", before: { status: previousStatus }, after: { status, payoutExecuted: false }, createdAt: now });
       });
     } else if (type === "challenge") {
+      if (["flag", "suspend", "archive"].includes(action)) {
+        if (reason.length < 8) return fail("Explain this moderation action in at least eight characters.", 422, undefined, "MODERATION_REASON_REQUIRED");
+        const result = await db.runTransaction(async transaction => {
+          const ref = db.collection("challenges").doc(id), caseRef = db.collection("challengeModerationCases").doc(`admin_challenges_${id}`);
+          const [snapshot, previousCase] = await Promise.all([transaction.get(ref), transaction.get(caseRef)]);
+          if (!snapshot.exists) throw new Error("CHALLENGE_NOT_FOUND");
+          const current = snapshot.data()!;
+          const update = { moderationStatus: action === "archive" ? "removed" : "held", moderationReason: reason, publicVisibility: false, preModerationPublicVisibility: current.preModerationPublicVisibility ?? current.publicVisibility ?? true, updatedAt: now };
+          const version = Number(previousCase.data()?.version ?? 0) + 1;
+          transaction.update(ref, update);
+          if (current.isLiveEvent) transaction.set(db.collection("liveEvents").doc(id), update, { merge: true });
+          transaction.set(caseRef, { targetId: id, source: "challenges", sourceType: "admin_evidence", status: "investigating", reason, reviewedBy: user.uid, version, updatedAt: now });
+          transaction.create(db.collection("auditLogs").doc(`admin_moderation_${id}_${version}`), { targetId: id, actorId: user.uid, action: `challenge.moderation.${action}`, reason, createdAt: now });
+          return update;
+        });
+        return ok(result, "Moderation restriction recorded with an investigation case.");
+      }
       const ref = db.collection("challenges").doc(id);
       const snap = await ref.get();
       if (!snap.exists) return fail("Challenge record not found.", 404, undefined, "NOT_FOUND");

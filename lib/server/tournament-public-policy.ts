@@ -1,6 +1,11 @@
 type TournamentRow = Record<string, unknown> & { id: string };
+export function withTournamentRegistrationAvailability<T extends Record<string, unknown>>(record: T, schedulingReady: boolean): T {
+  if (record.publicationPolicyVersion === 1 && record.status === "registration_open" && !schedulingReady) return { ...record, registrationAvailability: "temporarily_unavailable", registrationHoldReason: "scheduler_unavailable" };
+  return record;
+}
 export function isPublishedTournament(tournament: Record<string, unknown>) {
-  if (tournament.publicationHoldReason) return false;
+  if (tournament.publicationHoldReason && tournament.publicationPolicyVersion !== 1) return false;
+  if (tournament.publicVisibility === false || ["held", "suspended", "removed", "confirmed_abuse"].includes(String(tournament.moderationStatus))) return false;
   if (["pending_review", "rejected", "changes_requested"].includes(String(tournament.reviewStatus ?? ""))) return false;
   return ["scheduled", "registration_open", "registration_closed", "seeding", "ready", "active", "round_active", "round_review", "final", "under_review", "winners_announced", "completed", "paused", "cancelled"].includes(String(tournament.status));
 }
@@ -10,6 +15,7 @@ const PUBLIC_TOURNAMENT_FIELDS = [
   "privacy", "registrationType", "status", "createdAt", "updatedAt", "registrationOpensAt", "registrationClosesAt",
   "tournamentStartsAt", "expectedEndAt", "submissionDurationHours", "votingDurationHours", "entryType", "entryFeeAmountMinor",
   "currency", "coverMedia", "teamConfig", "prizeDistribution", "scoreVisibility", "currentRoundNumber", "bracketGeneratedAt", "basePrizeAmountMinor"
+  , "registrationAvailability", "registrationHoldReason", "publishedAt"
 ] as const;
 
 export function publicTournamentView(tournament: TournamentRow): TournamentRow {

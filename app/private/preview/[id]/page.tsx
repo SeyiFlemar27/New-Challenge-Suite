@@ -1,4 +1,5 @@
 "use client";
+import { ChallengeSafetyAction } from "@/components/challenge-safety-action";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ export default function Page() {
     catch { setMessage("The request could not be confirmed. Retry safely."); }
     finally { setBusy(false); }
   }
-  return <AppShell><Card className="mx-auto max-w-3xl space-y-5 p-6">{query.isLoading ? <p aria-busy="true">Loading locked preview…</p> : !data ? <><h1 className="text-2xl font-black">Private Challenge</h1><p>{query.data?.message || "This challenge is restricted."}</p></> : <><h1 className="text-3xl font-black">{data.challenge.title}</h1>{data.challenge.coverImage ? <ContentImage src={data.challenge.coverImage} alt={data.challenge.title} className="aspect-video w-full rounded-lg object-cover" /> : null}<p>{data.challenge.creatorName}</p><p className="whitespace-pre-wrap">{data.challenge.description}</p><p className="font-bold">Locked · Access does not join or reserve a place.</p>
+  return <AppShell><Card className="mx-auto max-w-3xl space-y-5 p-6">{query.isLoading ? <p aria-busy="true">Loading locked preview…</p> : !data ? <><h1 className="text-2xl font-black">Private Challenge</h1><p>{query.data?.message || "This challenge is restricted."}</p></> : <><h1 className="text-3xl font-black">{data.challenge.title}</h1>{data.challenge.coverImage ? <ContentImage src={data.challenge.coverImage} alt={data.challenge.title} className="aspect-video w-full rounded-lg object-cover" /> : null}<p>{data.challenge.creatorName}</p><p className="whitespace-pre-wrap">{data.challenge.description}</p><p className="font-bold">Locked · Access does not join or reserve a place.</p><ChallengeSafetyAction challengeId={id} />
     {!user ? <LinkButton href={`/auth/login?next=${encodeURIComponent(`/private/preview/${id}`)}`}>Sign in to request access or vote</LinkButton> : data.challenge.canRequestAccess ? <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void act("/api/private-exclusive", { action: "request_access", challengeId: id, reason }); }}><Field label="Why would you like access?"><textarea className={textareaClass} required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></Field><Button type="submit" disabled={busy || !reason.trim()}>Request Access</Button></form> : <p>Access requests are closed.</p>}
     {data.challenge.publicVotingAvailable ? <PrivatePublicVoting challengeId={id} data={data} signedIn={Boolean(user)} /> : null}</>}
     <p role="status" aria-live="polite">{message}</p><LinkButton variant="secondary" href="/private/code">Enter Invitation Code</LinkButton><LinkButton variant="ghost" href={`/challenges/${id}`}>Open challenge with existing access</LinkButton></Card></AppShell>;

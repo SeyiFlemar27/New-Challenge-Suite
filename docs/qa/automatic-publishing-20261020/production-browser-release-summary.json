@@ -1,0 +1,183 @@
+{
+  "aggregateAcrossRuns": true,
+  "notSingleFullPass": true,
+  "verifiedCases": 25,
+  "perCaseAssertions": 326,
+  "cases": [
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 11,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 12,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 10,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "PASS",
+      "assertions": 16,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "PASS",
+      "assertions": 36,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "PASS",
+      "assertions": 5,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "PASS",
+      "assertions": 6,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "PASS",
+      "assertions": 8,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "PASS",
+      "assertions": 20,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "PASS",
+      "assertions": 13,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "PASS",
+      "assertions": 18,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "PASS",
+      "assertions": 17,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "PASS",
+      "assertions": 15,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "PASS",
+      "assertions": 8,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "PASS",
+      "assertions": 13,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "PASS",
+      "assertions": 23,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "PASS",
+      "assertions": 17,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "PASS",
+      "assertions": 9,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 11,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 13,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "PASS",
+      "assertions": 18,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-v3Sm1N/runtime-temp/challenge-suite-p1-browser-639e9507365940be95197e17ea05c858/results.json"
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "PASS",
+      "assertions": 5,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-bYIOzb/runtime-temp/challenge-suite-p1-browser-c94bad798e23436a9d1f7169e767ae83/results.json"
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "PASS",
+      "assertions": 4,
+      "mode": "production",
+      "sourceResults": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-bYIOzb/runtime-temp/challenge-suite-p1-browser-c94bad798e23436a9d1f7169e767ae83/results.json"
+    }
+  ]
+}

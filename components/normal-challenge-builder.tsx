@@ -19,6 +19,7 @@ import { useChallengeBuilderAutosave } from "@/lib/hooks/use-challenge-builder-a
 import { freshNormalChallengeForm, normalChallengeFormFromRecord, type NormalChallengeForm } from "@/lib/normal-challenge-builder-model";
 import { freshPrivateAccess, PRIVATE_FRONTEND_STEPS, privateBuilderPayload, privateBuilderReadiness, privateSharedStep, privateVisibleStep, type PrivateBuilderAccess } from "@/lib/private-challenge-builder";
 import { PrivateBuilderAccessStep } from "@/components/private-builder-access";
+import { ChallengeSafetyAction } from "@/components/challenge-safety-action";
 
 function builderStatus(record: Record<string, unknown>) {
   const value = String(record.managementState ?? record.status ?? record.lifecycleStatus ?? "draft").toLowerCase();
@@ -331,7 +332,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
       if (["FREE_BASIC_LIMIT_REACHED", "PLAN_LIMIT_REACHED"].includes(result.code ?? "")) setDraftLimitReached(true);
       const issue = normalFrontendSubmitIssue(result.details);
       const reference = result.details && typeof result.details === "object" ? String((result.details as Record<string, unknown>).requestId ?? "") : "";
-      const message = issue?.message || (result.code === "VALIDATION_ERROR" ? "Some required details need attention." : result.message || "Challenge could not be submitted for review.");
+      const message = issue?.message || (result.code === "VALIDATION_ERROR" ? "Some required details need attention." : result.message || "Publication could not be confirmed.");
       setError(message + (/^PUB-[A-F0-9]{8}$/.test(reference) ? ` Reference: ${reference}` : ""));
       if (issue?.step !== null && issue?.step !== undefined) {
         setStep(visibleStep(issue.step));
@@ -342,7 +343,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
     invalidateAutosave();
     setAutosaveFailed(false);
     setError("");
-    setStatus(builderStatus(result.data?.challenge ?? {}) || "pending_review");
+    setAuthoritativeDraft(result.data?.challenge ?? null);
+    setStatus(result.data?.challenge?.publicationOutcome === "held_for_moderation" ? "held_for_moderation" : builderStatus(result.data?.challenge ?? {}) || "scheduled");
     setSaving(false);
     } catch {
       setAutosaveFailed(true);
@@ -359,7 +361,8 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
   if (officialContext ? !user.enterprisePermissions?.includes("challenge.create_official") : privateMode ? !capabilities.canCreatePrivateChallenge : !capabilities.canCreateNormalChallenge) return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Challenge creation is unavailable in this workspace</h1><LinkButton href="/dashboard" className="mt-5">Return to your workspace</LinkButton></Card></AppShell>;
   if (!privateMode && !draftId && plan === "free" && (!usage || usage.uid !== user.uid)) return <AppShell><ApiErrorPanel title={usageError ? "Creation entitlement could not be checked" : "Checking your creation entitlement"} message={usageError || "Loading your server-confirmed challenge allowance."} onRetry={usageError ? () => window.location.reload() : undefined} /></AppShell>;
   if (!privateMode && !draftId && plan === "free" && usage?.remaining === 0) return <DraftLimit message="You have used your Free plan lifetime Normal Challenge allowance. Continue an existing draft or review available plans. Backend publication limits still apply to existing drafts." />;
-  if (status === "pending_review" && id) return <SubmittedChallengeState challengeId={id} privateMode={privateMode} />;
+  if (id && ["scheduled", "active", "submission_open", "registration_open", "voting_open"].includes(status)) return <SubmittedChallengeState challengeId={id} privateMode={privateMode} />;
+  if (status === "held_for_moderation") return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Held for moderation</h1><p>An existing account or content restriction requires investigation. Your saved challenge is preserved.</p><ChallengeSafetyAction challengeId={id} appeal /><LinkButton href="/support/new">Contact Support</LinkButton></Card></AppShell>;
   if (!editable) return <AppShell><Card className="p-8"><h1 className="text-2xl font-black">Editing is unavailable for this challenge</h1><p className="mt-3">The server has recorded its status as {status.replaceAll("_", " ")}.</p><LinkButton className="mt-5" href={`/challenges/${id}`}>View Challenge</LinkButton></Card></AppShell>;
 
   return (
@@ -395,7 +398,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
                   onContinue={step === NORMAL_CHALLENGE_MAX_STEP ? submit : next}
                   final={step === NORMAL_CHALLENGE_MAX_STEP}
                   finalDisabled={autosaveFailed || (step === NORMAL_CHALLENGE_MAX_STEP ? !readiness.ready : uploadBusy)}
-                  submitLabel={status === "requires_changes" ? "Resubmit for Review" : "Submit for Review"}
+                  submitLabel="Publish"
                 />
               </BuilderSurface>
           </ChallengeBuilderFrame>
@@ -406,7 +409,7 @@ export function NormalChallengeBuilder({ draftId, enterpriseOwnership, privateMo
 }
 
 function SubmittedChallengeState({ challengeId, privateMode }: { challengeId: string; privateMode: boolean }) {
-  return <AppShell><section className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Card className="p-6 sm:p-8"><div className="grid size-12 place-items-center rounded-full bg-emerald-100 text-emerald-800"><Check size={24} /></div><h1 className="mt-5 text-2xl font-black">Challenge Submitted</h1><p role="status" className="mt-3 text-sm font-bold text-emerald-900">Your challenge has been sent for review.</p><p className="mt-3 text-sm leading-6 text-slate-600">Status: Under Review. Editing is unavailable until an admin requests changes.</p>{privateMode ? <p className="mt-4 text-sm">Your challenge is awaiting Admin approval. Invitation sharing becomes available once the challenge is approved and registration opens.</p> : null}<div className="mt-6 flex flex-wrap gap-3">{privateMode ? <LinkButton variant="secondary" href={`/challenges/${challengeId}/access`}>Share &amp; Manage Access</LinkButton> : null}<LinkButton href={`/challenges/${challengeId}`}>View Challenge</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/contact" variant="ghost">Contact Support</LinkButton></div></Card></section></AppShell>;
+  return <AppShell><section className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Card className="p-6 sm:p-8"><div className="grid size-12 place-items-center rounded-full bg-emerald-100 text-emerald-800"><Check size={24} /></div><h1 className="mt-5 text-2xl font-black">Challenge Published</h1><p role="status" className="mt-3 text-sm font-bold text-emerald-900">Your challenge is published.</p><p className="mt-3 text-sm leading-6 text-slate-600">Publication succeeded. You can update descriptive and promotional details from Manage Challenge.</p>{privateMode ? <p className="mt-4 text-sm">Your selected invitation method protects access. Only the locked preview is discoverable when enabled.</p> : null}<div className="mt-6 flex flex-wrap gap-3">{privateMode ? <LinkButton variant="secondary" href={`/challenges/${challengeId}/access`}>Share &amp; Manage Access</LinkButton> : null}<LinkButton href={`/challenges/${challengeId}`}>View Challenge</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/contact" variant="ghost">Contact Support</LinkButton></div></Card></section></AppShell>;
 }
 
 function DraftLimit({ message }: { message: string }) {

@@ -60,7 +60,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }, "Tournament loaded.");
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
@@ -75,6 +75,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const body = parsed.body && typeof parsed.body === "object" ? parsed.body as Record<string, unknown> : {};
+  if (body.status === "pending_review" || body.status === "publish") {
+    const saved = await PATCH(new Request(request.url, { method: "PATCH", headers: request.headers, body: JSON.stringify({ ...body, status: "draft" }) }), context);
+    if (!saved.ok) return saved;
+    const { POST: publish } = await import("@/app/api/tournaments/[id]/publish/route");
+    return publish(request, context);
+  }
   if (Number(tournament.configVersion ?? 1) >= 3 && tournament.status !== "draft") {
     if (tournament.status === "pending_review" && body.status === "pending_review" && Object.keys(body).every(key => ["status", "expectedUpdatedAt"].includes(key))) return ok({ tournament }, "Your challenge has been submitted for review.");
     return fail("Tournament editing is unavailable during review or after publication.", 409, undefined, "TOURNAMENT_NOT_EDITABLE");

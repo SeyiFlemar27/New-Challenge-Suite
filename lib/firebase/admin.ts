@@ -2,6 +2,9 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { Storage } from "@google-cloud/storage";
+
+let productionStorage: Pick<ReturnType<typeof getStorage>, "bucket"> | undefined;
 
 export function getFirebaseAdminConfigStatus() {
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -75,5 +78,21 @@ export function getAdminStorage() {
     getAdminDb();
   }
   if (!getApps().length) return null;
-  return getStorage();
+  // Preserve the Firebase emulator adapter. Production authentication uses
+  // Node's standards-based transport: the legacy node-fetch implementation
+  // closes the OAuth response prematurely in the verified Node 24 runtime.
+  if (getFirebaseAdminConfigStatus().emulator) return getStorage();
+  if (!productionStorage) {
+    const config = getFirebaseAdminConfigStatus();
+    const client = new Storage({
+      projectId: config.projectId,
+      credentials: {
+        client_email: process.env.FIREBASE_CLIENT_EMAIL,
+        private_key: process.env.FIREBASE_PRIVATE_KEY?.trim().replace(/\\n/g, "\n")
+      },
+      clientOptions: { transporterOptions: { fetchImplementation: fetch } }
+    });
+    productionStorage = { bucket: (name?: string) => client.bucket(name ?? config.storageBucket!) };
+  }
+  return productionStorage;
 }

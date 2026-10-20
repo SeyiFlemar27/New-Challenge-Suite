@@ -1,0 +1,16 @@
+{
+  "source": "C:/Users/seyia/AppData/Local/Temp/challenge-suite-p0-isolated-iltJRG/runtime-temp/challenge-suite-p1-browser-f077bc2af99d48fe880b21773a472a1e/results.json",
+  "mode": "production build",
+  "environment": "isolated demo Firebase",
+  "passed": 1,
+  "failed": 0,
+  "assertions": 9,
+  "cases": [
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "PASS",
+      "assertions": 8
+    }
+  ],
+  "productionProviderVerification": false
+}

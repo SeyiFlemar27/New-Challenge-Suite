@@ -22,7 +22,7 @@ function kindOf(data: Record<string, unknown>) {
 }
 function discoverable(data: Record<string, unknown>) {
   const status = text(data.status ?? data.lifecycleStatus).toLowerCase();
-  return DISCOVERABLE.has(status) && data.deleted !== true && data.publicVisibility !== false;
+  return DISCOVERABLE.has(status) && data.deleted !== true && data.publicVisibility !== false && !["held", "suspended", "removed", "confirmed_abuse"].includes(String(data.moderationStatus));
 }
 function ownerId(data: Record<string, unknown>) { return text(data.creatorId ?? data.ownerId ?? data.hostId ?? data.userId); }
 function publicRecord(id: string, data: Record<string, unknown>, kind: string, creatorDisplayName: string, currentUserId: string) {

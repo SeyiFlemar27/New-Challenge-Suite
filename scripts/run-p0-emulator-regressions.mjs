@@ -61,6 +61,7 @@ const tests = [
   "scripts/test-payment-return-routes.mjs",
   "scripts/test-tournament-paid-entry-emulator.mjs",
   "scripts/test-tournament-cloud-tasks.mjs",
+  "scripts/test-tournament-runtime-verification-emulator.mjs",
   "scripts/test-stripe-sponsor-disputes-emulator.mjs",
   "scripts/test-stripe-webhook-route-paid-vote.mjs",
   "scripts/test-enterprise-finance-route.mjs",
@@ -113,8 +114,10 @@ for (const test of tests) {
   const result = spawnSync(process.execPath, ["--experimental-transform-types", "--experimental-loader", "./scripts/ts-alias-loader.mjs", ...testLoaders, test], { cwd: repoRoot, stdio: "inherit", env: process.env, timeout: 600_000 });
   results.push({ test, startedAt, completedAt: new Date().toISOString(), exitCode: result.status, errorCode: result.error?.code ?? null });
   recordResults(false);
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.error && process.env.CHALLENGE_SUITE_CONTINUE_REGRESSIONS !== "true") throw result.error;
+  if (result.status !== 0 && process.env.CHALLENGE_SUITE_CONTINUE_REGRESSIONS !== "true") process.exit(result.status ?? 1);
 }
 recordResults(true);
-console.log(`Full P0: ${results.length}/${tests.length} suites passed.`);
+const failures = results.filter(result => result.exitCode !== 0 || result.errorCode);
+console.log(`Full P0: ${results.length - failures.length}/${tests.length} suites passed; ${failures.length} failed.`);
+if (failures.length) { console.error(JSON.stringify(failures)); process.exitCode = 1; }

@@ -6,6 +6,7 @@ import { conflict, fail, ok, readJson, serverUnavailable, validationError } from
 import type { TournamentFoundation, TournamentTeamFoundation } from "@/lib/tournament-types";
 import { getStripe } from "@/lib/stripe";
 import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
@@ -409,6 +410,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (action === "ready") {
+    if (tournament.publicationPolicyVersion === 1 && (!await tournamentRegistrationReady(db) || tournament.publicVisibility === false)) return fail("Tournament registration is temporarily unavailable.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");
     const minimum = Number(tournament.teamConfig?.minimumSize ?? 1);
     if (team.memberUserIds.length < minimum) return fail(`Add at least ${minimum} team members before marking the team ready.`, 422, undefined, "TEAM_MINIMUM_NOT_MET");
     if (Number(tournament.configVersion ?? 1) >= 3) {

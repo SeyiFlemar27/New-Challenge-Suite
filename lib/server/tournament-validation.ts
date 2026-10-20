@@ -51,13 +51,12 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
     if (input[field] !== undefined && typeof input[field] !== "string" && (!Array.isArray(input[field]) || (input[field] as unknown[]).some(value => typeof value !== "string"))) errors.push({ field, message: "Use ordered text items." });
   }
   if (options.publish && !text(input.description)) errors.push({ field: "description", message: "Tournament description is required." });
-  if (configVersion >= 3 && ((options.publish && text(input.description).length < 20) || text(input.description).length > 1200)) errors.push({ field: "description", message: "Tournament description must be 20–1,200 characters." });
+  if (configVersion >= 3 && text(input.description).length > 1200) errors.push({ field: "description", message: "Tournament description must be 1,200 characters or fewer." });
   const category = text(input.category);
   const subcategory = text(input.subcategory);
   if (options.publish && !category) errors.push({ field: "category", message: "Tournament category is required." });
   else if (category && !isCanonicalChallengeCategory(category)) errors.push({ field: "category", message: "Choose a category from the available options." });
-  if (options.publish && !subcategory) errors.push({ field: "subcategory", message: "Tournament subcategory is required." });
-  else if (subcategory && !isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
+  if (subcategory && !isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
   if (text(input.currency || "USD") !== "USD") errors.push({ field: "currency", message: "Tournament money values are recorded in USD." });
   if (input.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
     if (text(input.privacy || "public") !== "public" || text(input.registrationType || "open") !== "open") errors.push({ field: "registration", message: "New Tournaments use public discovery and open eligible registration." });

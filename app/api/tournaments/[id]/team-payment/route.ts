@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/stripe";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
 
@@ -12,6 +13,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const db = getAdminDb();
   if (!db) return serverUnavailable("Team payment status");
   const { id } = await context.params;
+  const publication = await db.collection("tournaments").doc(id).get();
+  if (publication.data()?.publicationPolicyVersion === 1 && (!await tournamentRegistrationReady(db) || publication.data()?.publicVisibility === false)) return fail("Tournament registration is temporarily unavailable.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");
   const membership = await db.collection("tournamentTeamMemberships").doc(`${id}_${user.uid}`).get();
   if (membership.data()?.status !== "active") return fail("Active team membership is required.", 403, undefined, "TEAM_MEMBERSHIP_REQUIRED");
   const team = await db.collection("tournamentTeams").doc(String(membership.data()?.teamId)).get();
@@ -36,6 +39,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
   const { id } = await context.params;
+  const publication = await db.collection("tournaments").doc(id).get();
+  if (publication.data()?.publicationPolicyVersion === 1 && (!await tournamentRegistrationReady(db) || publication.data()?.publicVisibility === false)) return fail("Tournament registration is temporarily unavailable.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");
   const tournament = await db.collection("tournaments").doc(id).get();
   if (tournament.data()?.productPolicyVersion !== TOURNAMENT_PRODUCT_POLICY) return fail("This Tournament does not use individual team-member payments.", 409, undefined, "TEAM_PAYMENT_MODEL_MISMATCH");
   if (process.env.TOURNAMENT_ENTRY_PAYMENTS_ENABLED !== "true" || (process.env.NODE_ENV === "production" && !isTournamentV3SchedulingReady())) return fail("Tournament payments are not enabled or scheduling is unavailable.", 503, undefined, "TOURNAMENT_PAYMENT_DISABLED");

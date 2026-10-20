@@ -1,0 +1,104 @@
+{
+  "readOnly": true,
+  "productionMutations": 0,
+  "project": "challenge-suite",
+  "completedAt": "2026-10-20T13:27:50.345Z",
+  "results": [
+    {
+      "label": "invokerKeys",
+      "userManagedKeyCount": 0
+    },
+    {
+      "label": "enqueuerKeys",
+      "userManagedKeyCount": 0
+    },
+    {
+      "label": "notificationChannels",
+      "channels": [],
+      "hasMore": false
+    },
+    {
+      "label": "dedicatedQueueEmpty",
+      "empty": true,
+      "hasMore": false
+    },
+    {
+      "label": "queuePolicy",
+      "bindings": [
+        {
+          "role": "roles/cloudtasks.enqueuer",
+          "members": [
+            "serviceAccount:tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "invokerPolicy",
+      "bindings": [
+        {
+          "role": "roles/iam.serviceAccountUser",
+          "members": [
+            "serviceAccount:tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "indexes",
+      "required": [
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgLiT6IEK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgLiIjZIK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgNirtJAK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiIjZIJ",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiI64sK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgOi39IkK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiI_5oK",
+          "state": "READY"
+        },
+        {
+          "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentVotes/indexes/CICAgPig2YMK",
+          "state": "READY"
+        }
+      ],
+      "hasMore": false
+    },
+    {
+      "label": "enqueuerPolicy",
+      "bindings": [
+        {
+          "role": "roles/iam.workloadIdentityUser",
+          "members": [
+            "principal://iam.googleapis.com/projects/599920137316/locations/global/workloadIdentityPools/challenge-suite-vercel-prod/subject/owner:seyiflemar27s-projects:project:challenge-suite:environment:production"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "servingFirestoreRules",
+      "release": "projects/challenge-suite/releases/cloud.firestore",
+      "ruleset": "projects/challenge-suite/rulesets/09a2f92c-d0b4-4b85-830e-c5482b851f91",
+      "approvedCandidateMatches": true,
+      "sha256": "6145640e68cfe507e82fa0f0c2aef30bf7f35aa2861fcdbf527c4bcbc4eae457"
+    }
+  ]
+}

@@ -26,6 +26,7 @@ const publicRoutes = new Set([
 ]);
 
 function isPublicRoute(pathname: string) {
+  if (/^\/private\/preview\/[^/]+$/.test(pathname)) return true;
   if (isPublicLiveEventRoute(pathname)) return true;
   if (isPublicTournamentRoute(pathname)) return true;
   if (publicRoutes.has(pathname)) return true;

@@ -1,0 +1,534 @@
+{
+  "readOnly": true,
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "team": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "verifiedAt": "2026-10-20T13:28:51.117Z",
+  "tournamentRecords": [
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_QUEUE",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_WORKER_URL",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_OIDC_AUDIENCE",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_RECONCILER_AUDIENCE",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true
+    },
+    {
+      "name": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true,
+      "flagFalse": true
+    },
+    {
+      "name": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "count": 1,
+      "scope": [
+        "production"
+      ],
+      "serverOnly": true,
+      "flagFalse": true
+    }
+  ],
+  "environmentMetadata": [
+    {
+      "key": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_RECONCILER_AUDIENCE",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_OIDC_AUDIENCE",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_WORKER_URL",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "TOURNAMENT_CLOUD_TASKS_QUEUE",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "PRIVATE_INVITE_ENCRYPTION_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_EMAIL_DELIVERY_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_AUTOMATIC_REFUNDS_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_LIFECYCLE_SCHEDULER_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_CLOUD_TASKS_OIDC_AUDIENCE",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_CLOUD_TASKS_WORKER_URL",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NORMAL_CLOUD_TASKS_QUEUE",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "GOOGLE_WORKLOAD_IDENTITY_POOL_PROVIDER_ID",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "GOOGLE_WORKLOAD_IDENTITY_POOL_ID",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "CLOUD_TASKS_LOCATION",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "GOOGLE_CLOUD_PROJECT_NUMBER",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "GOOGLE_CLOUD_PROJECT",
+      "target": [
+        "production"
+      ],
+      "type": "plain",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_APP_ID",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_DOROCOIN_500",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_DOROCOIN_100",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_DOROCOIN_50",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "FIREBASE_STORAGE_BUCKET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_SUMSUB_ENABLED",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_ENVIRONMENT",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_BASE_URL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_WEBHOOK_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_LEVEL_NAME",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_SECRET_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "SUMSUB_APP_TOKEN",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_HOST",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_PRO",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_PRICE_CREATOR",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "NEXT_PUBLIC_APP_URL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "EMAIL_FROM",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "EMAIL_PROVIDER",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "OTP_HASH_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "FIREBASE_PRIVATE_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "FIREBASE_CLIENT_EMAIL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    },
+    {
+      "key": "FIREBASE_PROJECT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive",
+      "gitBranch": null
+    }
+  ],
+  "servingDeployment": {
+    "id": "dpl_DyD6caF8diEezVDYUZdxz8cVffo5",
+    "state": "READY",
+    "target": "production",
+    "sha": "4e0c5cee1c012361f492fd37a50518194fd909d6",
+    "branch": "main",
+    "url": "challenge-suite-h6p98hg17-seyiflemar27s-projects.vercel.app",
+    "aliases": [
+      "www.challengesuite.com",
+      "challenge-suite.vercel.app",
+      "challengesuite.com",
+      "challenge-suite-seyiflemar27s-projects.vercel.app",
+      "challenge-suite-git-main-seyiflemar27s-projects.vercel.app"
+    ]
+  },
+  "gitIntegration": {
+    "type": "github",
+    "repo": "New-Challenge-Suite",
+    "org": "SeyiFlemar27",
+    "productionBranch": "main"
+  },
+  "productionMutations": 0
+}

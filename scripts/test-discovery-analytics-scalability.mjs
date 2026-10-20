@@ -275,7 +275,7 @@ try {
   assert.deepEqual((await stableExplorePage.json()).data.challenges.map((challenge) => challenge.id), firstExploreIds, "Explore first-page ordering is stable across repeated requests");
   assertions += 1;
   check(exploreIds.has(`${runId}_explore_041`), "matching Explore challenge beyond the first 36 records is discoverable");
-  check(!exploreIds.has(lockedId), "default Explore excludes locked Private Challenges unless the Private filter is selected");
+  check(exploreIds.has(lockedId), "default Explore includes only the authorized locked Private preview when enabled");
   check(exploreIds.has(recentCompletedId), "challenge remains visible inside the five-minute winner window");
   check(!exploreIds.has(canceledId), "cancelled Challenge is not public");
   check(!exploreIds.has(expiredId) && !exploreIds.has(oldCompletedId), "completed challenges disappear after the five-minute winner window even with filters");

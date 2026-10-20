@@ -1,0 +1,61 @@
+{
+  "capturedAt": "2026-10-20T12:50:19.045Z",
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "team": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "records": [
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_QUEUE",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_WORKER_URL",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_OIDC_AUDIENCE",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_RECONCILER_AUDIENCE",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "scope": "production",
+      "status": "created_verified"
+    },
+    {
+      "name": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "scope": "production",
+      "status": "created_verified"
+    }
+  ],
+  "applicationDeploymentPerformed": false,
+  "existingRecordsUnchanged": true,
+  "bothSchedulerFlagsLiteralFalse": true,
+  "productionDeploymentUnchanged": true,
+  "productionDeploymentId": "dpl_DyD6caF8diEezVDYUZdxz8cVffo5",
+  "success": true,
+  "localCleanup": {
+    "requestFileDeleted": true,
+    "emptyTemporaryDirectoryRetained": true,
+    "error": "EBUSY",
+    "configurationVerificationCompleted": true
+  },
+  "noNewDeploymentObserved": true,
+  "deploymentInventoryVerifiedAt": "2026-10-20T12:54:08.627Z"
+}

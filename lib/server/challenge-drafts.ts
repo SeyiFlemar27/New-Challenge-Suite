@@ -45,7 +45,7 @@ export function calculateChallengeDraftProgress(challenge: Record<string, unknow
   const mediaOptional = bool(challenge.usesPlaceholderMedia) || text(challenge.mediaUploadStatus) === "storage_disabled";
   const checks: Array<{ section: string; complete: boolean }> = [
     { section: "Basics", complete: Boolean(text(challenge.title) && text(challenge.category)) },
-    { section: "Description", complete: text(challenge.description).length >= 20 },
+    { section: "Description", complete: Boolean(text(challenge.description)) },
     { section: "Eligibility", complete: Boolean(text(challenge.standardRules ?? challenge.rules) && text(challenge.policyTerms)) },
     { section: "Schedule", complete: Boolean(text(challenge.startsAt) && text(challenge.registrationDeadline ?? challenge.submissionDeadline) && text(challenge.submissionDeadline) && text(challenge.votingDeadline ?? challenge.votingEndsAt) && text(challenge.endsAt)) },
     { section: "Submission Settings", complete: list(challenge.acceptedSubmissionTypes).length > 0 && Boolean(text(challenge.challengeGuidelines)) },

@@ -4,6 +4,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { createGoogleCloudTasksScheduler, dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady, reconcileTournamentActivationOutbox, verifyTournamentCloudTaskRequest } from "../lib/server/tournament-cloud-tasks.ts";
 import { ensureTournamentMatchLifecycleJobs, processTournamentMatchLifecycleJobById } from "../lib/server/tournament-match-lifecycle-jobs.ts";
+import { recordTournamentSchedulerReadiness } from "../lib/server/tournament-publication.ts";
 
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "FIRESTORE_EMULATOR_HOST is required");
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "demo-challenge-suite";
@@ -14,6 +15,17 @@ const runId = "cloud_tasks_" + randomUUID().replaceAll("-", "");
 let assertions = 0;
 const check = (value, message) => { assert.ok(value, message); assertions += 1; };
 const equal = (actual, expected, message) => { assert.equal(actual, expected, message); assertions += 1; };
+
+const emptyDispatch = { configured: true, pending: 0 };
+equal(await recordTournamentSchedulerReadiness(db, { scheduleActivation: async () => ({ taskName: "unused" }) }, emptyDispatch), false, "empty outbox cannot establish enqueue access");
+equal((await db.collection("operationalReadiness").doc("tournament_scheduler").get()).data().status, "unavailable", "missing access evidence persists unavailable health");
+const readyScheduler = { scheduleActivation: async () => ({ taskName: "unused" }), verifyDispatchAccess: async () => true };
+equal(await recordTournamentSchedulerReadiness(db, readyScheduler, emptyDispatch), true, "authenticated dispatch access and clean reconciliation establish health");
+equal((await db.collection("operationalReadiness").doc("tournament_scheduler").get()).data().status, "verified", "verified health is persisted");
+equal(await recordTournamentSchedulerReadiness(db, { ...readyScheduler, verifyDispatchAccess: async () => false }, emptyDispatch), false, "lost dispatch permission fails closed");
+equal((await db.collection("operationalReadiness").doc("tournament_scheduler").get()).data().status, "unavailable", "lost access invalidates previously fresh health immediately");
+equal(await recordTournamentSchedulerReadiness(db, { ...readyScheduler, verifyDispatchAccess: async () => { throw Error("fixture transport failure"); } }, emptyDispatch), false, "permission transport errors do not establish readiness");
+equal(await recordTournamentSchedulerReadiness(db, readyScheduler, { configured: true, pending: 1 }), false, "unresolved outbox failures keep registration unavailable");
 
 const env = {
   GOOGLE_CLOUD_PROJECT: "challenge-suite-test",
@@ -167,6 +179,10 @@ check(lifecycleOutcomes.some((outcome) => outcome.code === "MATCH_LIFECYCLE_PROC
 check(lifecycleOutcomes.every((outcome) => ["MATCH_LIFECYCLE_PROCESSED", "TASK_ALREADY_RUNNING", "JOB_ALREADY_PROCESSED"].includes(outcome.code)), "concurrent delivery is leased or treated as an idempotent duplicate");
 equal((await db.collection("tournamentMatches").doc(dueMatchId).get()).data()?.status, "voting_open", "approved submissions open voting only after the server deadline check");
 equal((await db.collection("tournamentJobs").doc(dueJobId).get()).data()?.status, "completed", "processed lifecycle job is durably completed");
+const leasedJobId = lifecycleTournamentId + "_advanced_but_leased";
+await db.collection("tournamentJobs").doc(leasedJobId).set({ id: leasedJobId, tournamentId: lifecycleTournamentId, matchId: dueMatchId, type: "process_tournament_match_lifecycle", transition: "submission_deadline", expectedStatus: "submissions_open", expectedDeadlineAt: dueDeadline, status: "pending", version: 1, runAt: dueDeadline, executionLeaseUntilAt: new Date(lifecycleNow.getTime() + 120_000).toISOString() });
+equal((await processTournamentMatchLifecycleJobById(db, leasedJobId, 1, lifecycleNow)).code, "TASK_ALREADY_RUNNING", "advanced match does not let a duplicate invalidate an active worker lease");
+equal((await db.collection("tournamentJobs").doc(leasedJobId).get()).data()?.status, "pending", "duplicate delivery preserves the active worker's pending job");
 const votingDeadlineJob = (await db.collection("tournamentJobs").where("tournamentId", "==", lifecycleTournamentId).get()).docs.map((doc) => doc.data()).find((job) => job.matchId === dueMatchId && job.transition === "voting_deadline");
 check(votingDeadlineJob?.expectedStatus === "voting_open", "opening voting is followed by a durable voting-close job");
 equal((await processTournamentMatchLifecycleJobById(db, dueJobId, 1, lifecycleNow)).code, "JOB_ALREADY_PROCESSED", "duplicate task delivery cannot process the same transition twice");

@@ -130,7 +130,10 @@ function check(condition, message) {
 }
 
 async function test(name, fn, { requiresMedia = false } = {}) {
-  if (journeyFilter && !name.toLowerCase().includes(journeyFilter)) {
+  const publishingGroup = /^(Automatic publication:|Media publication|Normal Builder|Tournament V3|Live Event V2 .* builder draft)/.test(name);
+  const followUpGroup = /^(Media publication|Live Event V2 .* builder draft)/.test(name);
+  const privateAccessGroup = /^(Private requester|Challenge owner approves access request)/.test(name);
+  if (journeyFilter && !(journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
     results.push({ name, status: "SKIP", assertions: 0, message: "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY." });
     return;
   }
@@ -523,64 +526,79 @@ try {
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 
-  for(const kind of ["normal","private","tournament","attendance_only","physical_competition"]) await test(`Unified publishing review: ${kind}, Admin feedback, resubmission and approval`, async () => {
-    const owner = await seedUser(`reviewpublisher-${kind}`, { role: "creator" });
-    await Promise.all([db.collection("users").doc(owner.uid).update({planId:"host",planStatus:"active",creatorOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"host",planStatus:"active",creatorOnboardingComplete:true})]);
-    const signedIn=await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:owner.email,password:owner.password,returnSecureToken:true})});
-    const signed=await signedIn.json(),headers={authorization:`Bearer ${signed.idToken}`};
-    check(signedIn.ok&&Boolean(signed.idToken),"publisher uses the isolated Auth Emulator");
-    const {getStorage}=await import("firebase-admin/storage"),bucket=getStorage(firebaseApp).bucket();
-    const image=await require("sharp")({create:{width:32,height:24,channels:3,background:"gold"}}).png().toBuffer();
-    const {freshNormalChallengeForm}=await import("../../lib/normal-challenge-builder-model.ts");
-    const {normalFrontendPayload}=await import("../../lib/normal-challenge-frontend.ts");
-    const adminContext=await browser.newContext({viewport:{width:1440,height:1000}}),page=await login(adminContext,admin,{rememberMe:true});
-    {
-      const tournament=kind==="tournament",live=kind.endsWith("_only")||kind==="physical_competition";
-      const path=tournament?`tournaments/drafts/${owner.uid}/cover/${randomUUID()}.png`:`challenges/drafts/${owner.uid}/banner/${randomUUID()}.png`;
-      // Real emulator object bytes; browser file-picker replacement/upload is covered by the dedicated builder journeys.
-      await bucket.file(path).save(image,{metadata:{contentType:"image/png"}});
-      const asset={id:randomUUID(),path,url:`http://${host}:${storageEmulatorPort}/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`,size:image.length,contentType:"image/png",fileName:"review.png"};
-      const form=freshNormalChallengeForm();Object.assign(form,{title:`Review browser ${kind}`,description:"A complete isolated publishing and Admin review browser fixture.",category:"Fitness",subcategory:"Strength",images:[asset],confirmations:{accurate:true,rights:true,review:true}});
-      let payload=normalFrontendPayload(form);
-      if(kind==="private")Object.assign(payload,{challengeType:"private",type:"Private Challenge",visibility:"private",privateAccessPolicyVersion:2,privateAccessMethod:"invite_link",privateJoiningPolicy:"invite_only",privateVotingAccess:"access_restricted",publicPreviewEnabled:true});
-      if(live){const at=hours=>new Date(Date.now()+hours*3600000).toISOString();Object.assign(payload,{type:"Live Event",challengeType:"live_event",builderVersion:"live_event_v2",isLiveEvent:true,competitionFormat:"physical_event",acceptedSubmissionTypes:[],startsAt:at(48),endsAt:at(52),submissionDeadline:"",votingDeadline:"",venueName:"Demo review hall",eventAddress:"Demo road",eventCity:"Lagos",eventCountry:"NG",eventCapacity:20,maxParticipants:20,capacityMode:"limited",coverImageUrl:asset.url,coverImagePath:asset.path,challengeImages:[asset],prizeType:"bragging_rights",prizeValue:0,hostOperations:{schemaVersion:2,eventFormat:kind,timezone:"Africa/Lagos",registrationOpensAt:at(1),registrationClosesAt:at(47),checkInStartAt:at(47),checkInEndAt:at(50),ticketPrice:0,competitionEntryFee:0,competitorCapacity:kind==="physical_competition"?4:0,physicalJudgeCount:1,winnerCount:1,eventRules:["Respect everyone"],admissionRefundPolicy:"standard",detailsConfirmed:true,mediaRightsConfirmed:true}});}
-      if(tournament)payload={configVersion:3,title:"Review browser Tournament",description:"A complete isolated Tournament publishing and Admin review fixture.",category:"Gaming",subcategory:"Console",tournamentRules:["Respect competitors"],participantCapacity:4,participationMode:"individual",format:"single_elimination",entryType:"free",basePrizeAmountMinor:0,submissionDurationHours:12,votingDurationHours:12,coverImageUrl:asset.url,coverImagePath:asset.path,status:"draft"};
-      const created=await page.request.post(`${baseUrl}${tournament?"/api/tournaments":live?"/api/challenges":"/api/challenges/drafts"}`,{headers,data:payload}),createdJson=await created.json();
-      check(created.ok()&&createdJson.ok,`${kind} actual draft creation (${created.status()})`);
-      const id=(tournament?createdJson.data.tournament:createdJson.data.challenge).id;
-      const submit=async()=>{const r=tournament?await page.request.patch(`${baseUrl}/api/tournaments/${id}`,{headers,data:{status:"pending_review"}}):await page.request.post(`${baseUrl}/api/challenges/${id}/publish`,{headers,data:payload});const body=await r.json();check(r.ok()&&body.ok,`${kind} real submission HTTP ${r.status()} ${body.code??""}`);};
-      await submit();
-      for(const action of ["request_changes","reject","approve"]){
-        await page.goto(`${baseUrl}/admin/challenges`,{waitUntil:"domcontentloaded"});
-        await page.getByRole("heading",{name:"Challenge review",exact:true}).waitFor();
-        await page.getByLabel("Search title, creator or ID",{exact:true}).fill(id);
-        const [searched]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname==="/api/admin/challenge-reviews"&&new URL(r.url()).searchParams.get("q")===id),page.getByRole("button",{name:"Search submissions",exact:true}).click()]);check(searched.ok(),`${kind} unified queue search succeeds`);
-        await page.getByRole("button",{name:"Review details",exact:true}).click();
-        await page.getByRole("heading",{name:/Review browser/}).last().waitFor();
-        const submittedMedia=page.getByRole("region",{name:"Submitted media"});
-        await expect(submittedMedia).toBeVisible();
-        await expect.poll(()=>submittedMedia.getByRole("img").first().evaluate(image=>image.complete&&image.naturalWidth>0),{timeout:interactionTimeout}).toBe(true);
-        check(true,`${kind} review displays the actual decoded submitted image`);
-        await page.getByLabel("Decision reason",{exact:true}).fill(`Browser verified ${kind} ${action}`);
-        await page.getByLabel("I reviewed this submission and confirm the decision.",{exact:true}).check();
-        const decided=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/admin/challenge-reviews"&&r.request().method()==="PATCH");
-        await page.getByRole("button",{name:action==="request_changes"?"Request Changes":action==="reject"?"Reject":"Approve",exact:true}).click();
-        const response=await decided,body=await response.json();check(response.ok()&&body.ok,`${kind} browser ${action} HTTP ${response.status()} ${body.code??""}`);
-        const stored=(await db.collection(tournament?"tournaments":"challenges").doc(id).get()).data();check(stored.reviewStatus===(action==="approve"?"approved":action==="reject"?"rejected":"changes_requested"),`${kind} decision is durably persisted`);
-        if(action!=="approve")await submit();
-      }
-      const finalRecord=(await db.collection(tournament?"tournaments":"challenges").doc(id).get()).data();
-      if(tournament&&finalRecord.publicationHoldReason){
-        check(finalRecord.status==="scheduled"&&finalRecord.reviewStatus==="approved","editorial approval does not open unready registration");
-        // Native fetch has no Admin browser cookies: this asserts public access,
-        // while authorized managers retain their existing inspection rights.
-        check((await fetch(`${baseUrl}/api/tournaments/${id}`)).status===404,"held approved Tournament stays outside public detail/discovery");
-      }
-      const detailResponse=await page.request.get(`${baseUrl}${tournament?`/api/tournaments/${id}${finalRecord.publicationHoldReason?"?view=builder":""}`:live?`/api/live-events/${id}/public`:`/api/challenges/${id}`}`,{headers});
-      check(detailResponse.ok(),`${kind} approved detail route HTTP ${detailResponse.status()}: ${(await detailResponse.text()).slice(0,500)}`);
+  for (const kind of ["normal", "private", "tournament", "attendance_only", "physical_competition"]) await test(`Automatic publication: ${kind} upload, save, restore, Publish and public refresh`, async () => {
+    const owner = await seedUser(`automatic-${kind}`, { role: "creator" });
+    await Promise.all([db.collection("users").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true }), db.collection("profiles").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true })]);
+    const context = await browser.newContext({ viewport: { width: kind === "private" ? 390 : 1440, height: 1000 } });
+    const page = await login(context, owner, { rememberMe: true });
+    const signedIn = await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: owner.email, password: owner.password, returnSecureToken: true }) });
+    const signed = await signedIn.json(), headers = { authorization: `Bearer ${signed.idToken}` };
+    const { freshNormalChallengeForm } = await import("../../lib/normal-challenge-builder-model.ts");
+    const { normalFrontendPayload } = await import("../../lib/normal-challenge-frontend.ts");
+    const form = freshNormalChallengeForm();
+    Object.assign(form, { title: `Creator publication ${kind}`, description: "A complete ordinary creator competition with optional media left blank.", category: "Fitness", subcategory: "", images: [], numberOfWinners: 2, confirmations: { accurate: false, rights: false, review: false } });
+    let payload = normalFrontendPayload(form);
+    const tournament = kind === "tournament", live = kind === "attendance_only" || kind === "physical_competition";
+    if (kind === "private") Object.assign(payload, { challengeType: "private", type: "Private Challenge", visibility: "private", privateAccessPolicyVersion: 2, privateAccessMethod: "invitation_code", privateJoiningPolicy: "invite_only", privateVotingAccess: "access_restricted", publicPreviewEnabled: true });
+    if (live) { const at = hours => new Date(Date.now() + hours * 3600000).toISOString(); payload = { title: form.title, description: form.description, category: "Fitness", type: "Live Event", challengeType: "live_event", builderVersion: "live_event_v2", isLiveEvent: true, visibility: "public", competitionFormat: "physical_event", acceptedSubmissionTypes: [], startsAt: at(48), endsAt: at(52), timeZone: "Africa/Lagos", venueName: "Community hall", eventAddress: "Community road", eventCity: "Lagos", eventCountry: "NG", eventCapacity: 20, maxParticipants: 20, capacityMode: "limited", prizeType: "bragging_rights", prizeValue: 0, hostOperations: { schemaVersion: 2, currentStep: "media", eventFormat: kind, timezone: "Africa/Lagos", registrationOpensAt: at(1), registrationClosesAt: at(47), checkInStartAt: at(47), checkInEndAt: at(50), ticketPrice: kind === "attendance_only" ? 10 : 0, competitionEntryFee: 0, competitorCapacity: kind === "physical_competition" ? 4 : 0, physicalJudgeCount: 1, winnerCount: 1, eventRules: ["Respect others"], admissionRefundPolicy: "standard", detailsConfirmed: false, mediaRightsConfirmed: false } }; }
+    if (tournament) payload = { title: form.title, description: form.description, category: "Gaming", participantCapacity: 4, participationMode: "individual", format: "single_elimination", entryType: "free", basePrizeAmountMinor: 0, submissionDurationHours: 12, votingDurationHours: 12, status: "draft" };
+    const created = await page.request.post(baseUrl + (tournament ? "/api/tournaments" : live ? "/api/challenges" : "/api/challenges/drafts"), { headers, data: payload }), createdBody = await created.json();
+    check(created.ok() && createdBody.ok, `real draft creation ${kind}: ${created.status()} ${JSON.stringify(createdBody)}`);
+    const id = (tournament ? createdBody.data.tournament : createdBody.data.challenge).id, ref = db.collection(tournament ? "tournaments" : "challenges").doc(id);
+    await ref.update(tournament ? { builderCurrentStep: "media", builderUnlockedStep: "media", builderNavigationVersion: 2 } : live ? { "hostOperations.currentStep": "media" } : { builderCurrentStep: 3, maxUnlockedStep: 3, ...(kind === "private" ? { privateBuilderStep: 2 } : {}) });
+    const builderUrl = tournament ? `/tournaments/create?draft=${id}` : live ? `/host/live/create?draftId=${id}` : `/${kind === "private" ? "private" : "challenges"}/create/${id}`;
+    await page.goto(baseUrl + builderUrl, { waitUntil: "domcontentloaded" });
+    const image = await require("sharp")({ create: { width: 137, height: 91, channels: 3, background: "gold" } }).png().toBuffer();
+    const fileInput = live ? page.locator('input[type="file"]').first() : page.getByLabel(tournament ? "Cover image file" : "Image 1 file", { exact: true });
+    const verified = page.waitForResponse(response => new URL(response.url()).pathname === "/api/creator-media/verify" && response.request().method() === "POST");
+    await fileInput.setInputFiles({ name: "creator-cover.png", mimeType: "image/png", buffer: image });
+    check((await verified).status() === 200, "real creator upload and decoding succeeded");
+    await expect(page.getByText("Upload complete.", { exact: true }).first()).toBeVisible();
+    const savePath = tournament ? `/api/tournaments/${id}` : `/api/challenges/drafts/${id}`;
+    const saved = page.waitForResponse(response => new URL(response.url()).pathname === savePath && response.request().method() === "PATCH" && response.ok());
+    await page.getByRole("button", { name: "Continue", exact: true }).click(); await saved;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    check(Boolean(tournament ? (await ref.get()).data().coverMedia?.path : live ? (await ref.get()).data().coverImagePath : (await ref.get()).data().challengeImages?.[0]?.path), "media survives saved draft restoration");
+    for (let step = 0; step < 8; step++) {
+      const action = page.getByRole("button", { name: /^(Continue|Publish)$/ }).last();
+      await expect(action).toBeVisible();
+      if ((await action.innerText()).trim() === "Publish") break;
+      const continued = page.waitForResponse(response => new URL(response.url()).pathname === savePath && response.request().method() === "PATCH");
+      await action.click();
+      check((await continued).ok(), "builder step saved");
     }
-    await adminContext.close();
-  },{requiresMedia:true});
+    if (live) {
+      await page.getByLabel("The event details are accurate.", { exact: true }).check();
+      await page.getByLabel("I have permission to use the uploaded content.", { exact: true }).check();
+      if (kind === "attendance_only") await expect(page.getByText(/Event information can be published/)).toBeVisible();
+    } else if (tournament) {
+      await page.getByLabel("I confirm the Tournament information is accurate.", { exact: true }).check();
+      await page.getByLabel("I have the rights and permission to use the uploaded media.", { exact: true }).check();
+    } else {
+      await page.getByLabel("I confirm the challenge details are accurate.", { exact: true }).check();
+      await page.getByLabel("I have the rights to publish the content and media.", { exact: true }).check();
+    }
+    const publishedResponse = page.waitForResponse(response => new URL(response.url()).pathname === (tournament ? `/api/tournaments/${id}` : `/api/challenges/${id}/publish`) && response.request().method() === (tournament ? "PATCH" : "POST"));
+    await page.getByRole("button", { name: "Publish", exact: true }).last().click();
+    const response = await publishedResponse, envelope = await response.json();
+    check(response.ok() && envelope.ok, `Publish click succeeded ${kind}: ${response.status()} ${JSON.stringify(envelope)}`);
+    await expect(page.getByRole("heading", { name: tournament ? "Tournament Published" : live ? "Event published" : "Challenge Published", exact: true })).toBeVisible();
+    const record = (await ref.get()).data();
+    check(record.publicationOutcome === "published" && record.publishedAt && record.status !== "pending_review" && record.adminReviewRequired !== true, "automatic publication persisted");
+    check(!record.trailerVideoPath && !record.trailerPath, "optional video stayed blank");
+    const publicUrl = tournament ? `/tournaments/${id}` : live ? `/live-events/${id}` : kind === "private" ? `/private/preview/${id}` : `/challenges/${id}`;
+    const publicContext = await browser.newContext({ viewport: { width: kind === "private" ? 390 : 1440, height: 1000 } }), publicPage = await publicContext.newPage();
+    await publicPage.goto(baseUrl + publicUrl, { waitUntil: "domcontentloaded" });
+    await expect(publicPage.getByRole("heading", { name: record.title, exact: true }).first()).toBeVisible();
+    await publicPage.reload({ waitUntil: "domcontentloaded" });
+    await expect(publicPage.getByRole("heading", { name: record.title, exact: true }).first()).toBeVisible();
+    const discovery = await publicPage.request.get(baseUrl + "/api/explore/challenges?type=" + (kind === "private" ? "private" : tournament ? "tournament" : live ? "live_event" : "normal") + "&q=" + encodeURIComponent(record.title));
+    const discovered = await discovery.json(); check(discovery.ok() && discovered.data.challenges.some(row => row.id === id), "Explore type filter and search find the published record");
+    if (tournament) await expect(publicPage.getByText(/Registration Temporarily Unavailable/).first()).toBeVisible();
+    if (kind === "attendance_only") await expect(publicPage.getByText(/Paid booking unavailable|Paid checkout unavailable|Paid entry unavailable/).first()).toBeVisible();
+    await publicPage.screenshot({ path: join(artifacts, `automatic-${kind}-public.png`), fullPage: true });
+    await publicContext.close(); await context.close();
+  }, { requiresMedia: true });
 
   await test("Media publication and private credential preparation, reveal and copy", async () => {
     const owner = await seedUser("mediapublisher", { role: "creator" });
@@ -628,18 +646,15 @@ try {
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       await page.getByLabel("I confirm the challenge details are accurate.", { exact: true }).check();
       await page.getByLabel("I have the rights to publish the content and media.", { exact: true }).check();
-      await page.getByLabel("I understand editing is unavailable while the challenge is under review.", { exact: true }).check();
       const submitted = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/challenges/${id}/publish` && r.request().method() === "POST");
-      await page.getByRole("button", { name: "Submit for Review", exact: true }).click();
-      check((await submitted).status() === 200, `${kind} browser Submit for Review succeeds`);
-      await expect(page.getByRole("heading", { name: "Challenge Submitted" })).toBeVisible();
-      check((await ref.get()).data().status === "pending_review", `${kind} review status is authoritative`);
+      await page.getByRole("button", { name: "Publish", exact: true }).last().click();
+      check((await submitted).status() === 200, `${kind} browser Publish succeeds`);
+      await expect(page.getByRole("heading", { name: "Challenge Published" })).toBeVisible();
+      check((await ref.get()).data().publicationOutcome === "published", `${kind} published status is authoritative`);
       if (kind === "private") {
-        await expect(page.getByText(/Your challenge is awaiting Admin approval/)).toBeVisible();
         await page.getByRole("link", { name: "Share & Manage Access", exact: true }).click();
-        await expect(page.getByRole("button", { name: "Copy Code", exact: true })).toBeDisabled();
-        check(true, "sharing is unavailable during Admin review");
-        // Local approved/open-registration fixture; no Production Admin state changes.
+        await page.waitForURL(`${baseUrl}/challenges/${id}/access`);
+        // Local registration-window fixture; no Admin editorial action.
         await ref.update({ status: "registration_open", registrationOpensAt: new Date(Date.now() - 60000).toISOString() });
         await page.reload({ waitUntil: "domcontentloaded" });
         await page.getByRole("button", { name: "Reveal Code", exact: true }).click();
@@ -710,15 +725,17 @@ try {
     check((await page.locator("[data-builder-surface]").innerText()).includes("An isolated local fixture for the approved Normal Builder frontend.") && (await page.locator("[data-builder-surface]").innerText()).includes("Respect every participant."), "Review renders the actual description and creator rules");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.locator("[data-builder-surface]").getByRole("heading", { name: "Ready to Submit?", exact: true }).waitFor();
-    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isDisabled(), "unfunded and server-incompatible draft cannot submit");
+    check(await page.getByRole("button", { name: "Publish", exact: true }).last().isDisabled(), "unfunded and server-incompatible draft cannot submit");
     check((await page.locator("main").innerText()).includes("Fund the remaining $100.00"), "accurate outstanding amount");
     await navigation.getByRole("button", { name: "Monetization & Prize Pool", exact: true }).click();
     // These are explicit demo-server fixtures, not simulated live Stripe confirmation.
-    await draftRef.update({ confirmedCreatorPrizeFundingCents: 6000 });
+    const creatorFundingRef=db.collection("creatorPrizeFundingPayments").doc(`${draftId}_browser_funding`);
+    await creatorFundingRef.set({challengeId:draftId,userId:builderUser.uid,amountCents:6000,currency:"USD",paymentPurpose:"prize_pool_funding",status:"confirmed",webhookConfirmed:true});
     await page.getByRole("button", { name: "Refresh funding status", exact: true }).click();
     await page.getByText("Partially funded", { exact: true }).waitFor();
     check((await page.locator("main").innerText()).includes("Outstanding: $40.00"), "partial creator funding never counts as fully funded");
     await draftRef.update({ confirmedCreatorPrizeFundingCents: 10000, "monetization.status": "active_foundation", "monetization.paymentActive": true, "monetization.checkoutActive": true });
+    await creatorFundingRef.update({amountCents:10000});
     await page.getByRole("button", { name: "Refresh funding status", exact: true }).click();
     await page.getByText("Fully creator-funded", { exact: true }).waitFor();
     check(await page.getByLabel("Base prize (USD)", { exact: true }).isDisabled(), "confirmed monetary commitment is protected from accidental editing");
@@ -735,8 +752,7 @@ try {
     await navigation.getByRole("button", { name: /Publish$/ }).click();
     await page.getByLabel("I confirm the challenge details are accurate.", { exact: true }).check();
     await page.getByLabel("I have the rights to publish the content and media.", { exact: true }).check();
-    await page.getByLabel("I understand editing is unavailable while the challenge is under review.", { exact: true }).check();
-    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isEnabled(), "full authoritative creator funding satisfies the frontend checkpoint when all other requirements are valid");
+    check(await page.getByRole("button", { name: "Publish", exact: true }).last().isEnabled(), "full authoritative creator funding satisfies the frontend checkpoint when all other requirements are valid");
     // Never invoke publication or a payment: verify gating only using demo funding records.
     await navigation.getByRole("button", { name: "Entry & Submission", exact: true }).click();
     await page.getByRole("button", { name: "Remove instruction 2", exact: true }).click();
@@ -823,7 +839,8 @@ try {
       const storage = await page.evaluate(async () => ({ localStorageKeys: Object.keys(localStorage), sessionStorageKeys: Object.keys(sessionStorage), databases: (await indexedDB.databases()).map((database) => database.name) }));
       throw new Error(`Private UI did not render the public locked preview; API HTTP ${response.status()} body=${body.slice(0, 1600)}; page=${(await page.locator("body").innerText()).slice(0, 1000)}; storage=${JSON.stringify(storage)}`);
     });
-    await page.getByRole("button", { name: "Request Access" }).first().click();
+    const opportunity = page.getByRole("heading", { name: "Locked Art Opportunity", exact: true }).locator("..");
+    await opportunity.getByRole("button", { name: "Request Access", exact: true }).click();
     await page.getByLabel("Reason for access").fill("I would like to join this art challenge.");
     const accessRequestResponse = page.waitForResponse((response) => {
       return new URL(response.url()).pathname === "/api/private-exclusive" && response.request().method() === "POST";
@@ -832,6 +849,7 @@ try {
     const requestResponse = await accessRequestResponse;
     const requestEnvelope = await requestResponse.json().catch(() => null);
     check(requestResponse.ok() && requestEnvelope?.ok === true, `Private access request API should accept the submitted form (HTTP ${requestResponse.status()}, code=${String(requestEnvelope?.code ?? "unknown")}).`);
+    check(requestEnvelope.data?.requestId === `${privateChallengeId}_${participant.uid}`, "request targets the intended challenge and authenticated participant");
     await page.getByText(/Request: pending review/i).waitFor({ timeout: 15000 });
     const stored = await db.collection("privateAccessRequests").doc(`${privateChallengeId}_${participant.uid}`).get();
     check(stored.exists && stored.data()?.status === "pending_review", "UI request must persist a pending Firestore access request.");
@@ -966,22 +984,22 @@ try {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.locator("[data-builder-surface]").getByRole("heading", { name: "Review & Publish", exact: true }).waitFor();
     check((await page.locator("[data-builder-surface]").innerText()).includes("Outstanding: $100.00"), "Review shows the real unfunded creator obligation");
-    check(await page.getByRole("button", { name: "Submit for Review", exact: true }).isDisabled(), "positive unfunded Base Prize cannot be submitted");
+    check(await page.getByRole("button", { name: "Publish", exact: true }).last().isDisabled(), "positive unfunded Base Prize cannot be submitted");
     await page.getByRole("button", { name: "Edit Monetization & Prize Pool", exact: true }).click();
     await page.getByLabel("Creator-funded Base Prize (USD, optional)", { exact: true }).fill("0");
     await navigation.getByRole("button", { name: /Review & Publish/ }).click();
     await page.getByLabel("I confirm the Tournament information is accurate.", { exact: true }).check();
     await page.getByLabel("I have the rights and permission to use the uploaded media.", { exact: true }).check();
     const publication = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${draftId}` && response.request().method() === "PATCH" && response.request().postDataJSON()?.status === "pending_review");
-    await page.getByRole("button", { name: "Submit for Review", exact: true }).click();
+    await page.getByRole("button", { name: "Publish", exact: true }).last().click();
     const submitted = await publication, submittedBody = await submitted.json();
     check(submitted.ok() && submittedBody.ok, `Tournament submits through actual media verification (HTTP ${submitted.status()})`);
     const saved = (await db.collection("tournaments").doc(draftId).get()).data();
-    check(saved.status === "pending_review" && saved.teamConfig.captainPaysEntryFee === false && saved.teamPaymentWindowMinutes === 30, "reviewed draft preserves the individual-member payment model and chosen window");
+    check(saved.publicationOutcome === "published" && saved.teamConfig.captainPaysEntryFee === false && saved.teamPaymentWindowMinutes === 30, "published Tournament preserves the individual-member payment model and chosen window");
     check(saved.creatorMediaVerification.cover.path.startsWith(`verified-tournament-media/${draftId}/`), "review references immutable verified promotional bytes");
     const anonymous = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const publicPage = await anonymous.newPage();
-    check((await anonymous.request.get(`${baseUrl}/api/tournaments/${draftId}`)).status() === 404, "unpublished Tournament draft is not public");
+    check((await anonymous.request.get(`${baseUrl}/api/tournaments/${draftId}`)).status() === 200, "published Tournament is public without Admin approval");
     // Explicit demo data tests rendering at scale; engine progression has separate actual-handler tests.
     const bracketId = `bracket_${runId}`;
     await db.collection("tournaments").doc(bracketId).set({ id: bracketId, hostId: owner.uid, title: "128-slot rendering fixture", description: "A public rendering fixture with no live competition or financial activity.", privacy: "public", status: "round_active", configVersion: 3, format: "single_elimination", participationMode: "individual", participantCapacity: 128, participantCount: 128, submissionDurationHours: 48, votingDurationHours: 72, prizeDistribution: [{ placement: 1, percent: 60 }, { placement: 2, percent: 25 }, { placement: 3, percent: 15 }], privateReviewNote: "PRIVATE_BROWSER_SENTINEL" });
@@ -1178,6 +1196,31 @@ try {
     }
     await page.screenshot({ path: join(artifacts, "admin-mobile.png"), fullPage: true });
     await context.close();
+  });
+
+  await test("Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run", async () => {
+    const context = await browser.newContext(), page = await login(context, admin, { rememberMe: true });
+    await page.goto(baseUrl + "/admin/tournament-runtime-verification");
+    await expect(page.getByRole("heading", { name: "Isolated Tournament runtime verification", exact: true })).toBeVisible();
+    check(await page.getByRole("button", { name: "Create synthetic run", exact: true }).isDisabled(), "reason required before synthetic operation");
+    await page.getByLabel("Verification reason", { exact: true }).fill("Isolated emulator Admin runtime verification");
+    const created = page.waitForResponse(r => new URL(r.url()).pathname === "/api/admin/tournament-runtime-verification" && r.request().method() === "POST");
+    await page.getByRole("button", { name: "Create synthetic run", exact: true }).click();
+    const response = await created, envelope = await response.json();
+    check(response.ok() && /^release-probe_[a-f0-9-]+$/.test(envelope.data?.id), "actual authenticated Admin UI creates only reserved synthetic ID");
+    const ref = db.collection("tournamentRuntimeVerification").doc(envelope.data.id);
+    try {
+      check((await ref.get()).data()?.synthetic === true, "created exact synthetic document");
+      const status = page.waitForResponse(r => new URL(r.url()).pathname === "/api/admin/tournament-runtime-verification" && r.request().method() === "POST");
+      await page.getByRole("button", { name: "Refresh test status", exact: true }).click();
+      check((await status).ok(), "authenticated status request succeeds");
+      await expect(page.getByLabel("Synthetic verification result")).toContainText('"transitions": 0');
+      const cleanup = page.waitForResponse(r => new URL(r.url()).pathname === "/api/admin/tournament-runtime-verification" && r.request().method() === "POST");
+      await page.getByRole("button", { name: "Delete synthetic run", exact: true }).click();
+      check((await cleanup).ok(), "actual UI cleanup succeeds");
+      check(!(await ref.get()).exists, "synthetic document absent after cleanup");
+      check(await page.getByRole("button", { name: "Dispatch test task", exact: true }).isDisabled(), "no dispatch without selected run");
+    } finally { if ((await ref.get()).exists) await ref.delete(); await context.close(); }
   });
 
   await test("Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls", async () => {
@@ -1451,7 +1494,7 @@ try {
   });
 
   for(const builderFormat of ["attendance_only","physical_competition"]){
-  await test(`Live Event V2 ${builderFormat} builder draft, media, publication and Admin approval`, async () => {
+  await test(`Live Event V2 ${builderFormat} builder draft, media and automatic publication`, async () => {
     const owner=await seedUser(`live-builder-owner-${builderFormat}`,{role:"host"});
     await Promise.all([db.collection("users").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true})]);
     const context=await browser.newContext({viewport:{width:1440,height:1000}});
@@ -1481,7 +1524,7 @@ try {
     await page.screenshot({path:join(artifacts,`live-event-v2-builder-${builderFormat}-draft.png`),fullPage:true});
     await page.getByRole("button",{name:"Continue",exact:true}).click();
     const localInput=offset=>new Date(Date.now()+offset).toISOString().slice(0,16),day=86400000;
-    for(const [label,value] of [["Venue name","Verified local event venue"],["Full address","10 Test Street"],["City","Lagos"],["State or region","Lagos"],["Event timezone","UTC"],["Event start",localInput(5*day)],["Event end",localInput(5*day+3*3600000)],["Registration opens",localInput(-60000)],["Registration closes",localInput(4*day)],["Check-in opens",localInput(5*day-3600000)],["Check-in closes",localInput(5*day+3600000)],["Total venue capacity","20"]])await page.getByLabel(label,{exact:true}).fill(value);
+for(const [label,value] of [["Venue name","Verified local event venue"],["Full address","10 Test Street"],["City","Lagos"],["State or region","Lagos"],["Event timezone","UTC"],["Event start",localInput(5*day)],["Event end",localInput(5*day+3*3600000)],["Registration opens (optional; defaults to publication)",localInput(-60000)],["Registration closes (optional; defaults to event start)",localInput(4*day)],["Check-in opens (optional; defaults to event start)",localInput(5*day-3600000)],["Check-in closes (optional; defaults to event end)",localInput(5*day+3600000)],["Total venue capacity","20"]])await page.getByLabel(label,{exact:true}).fill(value);
     await page.getByLabel("Country",{exact:true}).selectOption("NG");
     await page.getByRole("button",{name:"Continue",exact:true}).click();
     await page.getByLabel("Event type",{exact:true}).waitFor();
@@ -1510,19 +1553,14 @@ try {
     await page.getByLabel("The event details are accurate.",{exact:true}).check();
     await page.getByLabel("I have permission to use the uploaded content.",{exact:true}).check();
     const reviewResponse=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/challenges/${draftId}/publish`&&response.request().method()==="POST");
-    await page.getByRole("button",{name:"Submit for Review",exact:true}).click();
+    await page.getByRole("button",{name:"Publish",exact:true}).last().click();
     const submittedResponse=await reviewResponse,submittedEnvelope=await submittedResponse.json();
     check(submittedResponse.ok()&&submittedEnvelope.ok,`Live Event submits through actual upload verification and publication handler (${submittedResponse.status()}): ${JSON.stringify(submittedEnvelope).slice(0,3000)}`);
-    await page.getByRole("heading",{name:"Event submitted for review",exact:true}).waitFor();
-    check((await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`)).status()===404,"pending event remains unavailable to public booking");
-    const adminLogin=await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:admin.email,password:admin.password,returnSecureToken:true})});
-    const adminToken=await adminLogin.json();
-    const approvalResponse=await context.request.patch(`${baseUrl}/api/admin/reviews`,{headers:{authorization:`Bearer ${adminToken.idToken}`},data:{type:"challenge",id:draftId,action:"approve",confirmed:true,reason:"Inspected verified Live Event browser submission"}});
-    check(approvalResponse.ok(),"existing authenticated Admin review API approves the actual submitted event");
+    await page.getByRole("heading",{name:"Event published",exact:true}).waitFor();
     const published=await context.request.get(`${baseUrl}/api/live-events/${draftId}/public`);
-    check(published.ok(),"approved event is now publicly discoverable through the real Live Event API");
+    check(published.ok(),"event is publicly discoverable through the real Live Event API without editorial approval");
     const finalEvent=(await db.collection("liveEvents").doc(draftId).get()).data();
-    check(finalEvent.eventApprovalStatus==="approved"&&finalEvent.hostOperations.eventFormat===builderFormat,"Admin approval synchronizes the correct Live Event type atomically");
+    check(finalEvent.eventApprovalStatus==="approved"&&finalEvent.hostOperations.eventFormat===builderFormat,"automatic publication synchronizes the correct Live Event type atomically");
     await context.close();
   },{requiresMedia:true});
   }

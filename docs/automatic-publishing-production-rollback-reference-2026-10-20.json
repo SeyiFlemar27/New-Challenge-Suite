@@ -1,0 +1,23 @@
+{
+  "id": "dpl_DyD6caF8diEezVDYUZdxz8cVffo5",
+  "projectId": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "url": "challenge-suite-h6p98hg17-seyiflemar27s-projects.vercel.app",
+  "readyState": "READY",
+  "target": "production",
+  "aliases": [
+    "www.challengesuite.com",
+    "challenge-suite.vercel.app",
+    "challengesuite.com",
+    "challenge-suite-seyiflemar27s-projects.vercel.app",
+    "challenge-suite-git-main-seyiflemar27s-projects.vercel.app"
+  ],
+  "source": {
+    "sha": "4e0c5cee1c012361f492fd37a50518194fd909d6",
+    "branch": "main",
+    "organization": "SeyiFlemar27",
+    "repository": "New-Challenge-Suite"
+  },
+  "inspectionOnly": true,
+  "applicationDeploymentPerformed": false,
+  "capturedAt": "2026-10-20T12:36:07.360Z"
+}

@@ -3,6 +3,7 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { conflict, fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { evaluateTournamentJoinEligibility, nextWaitlistPosition, participantRecord } from "@/lib/server/tournament-operations";
 import type { TournamentFoundation, TournamentParticipantFoundation } from "@/lib/tournament-types";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { getStripe } from "@/lib/stripe";
 import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
 import { dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
@@ -19,6 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = parsed.body && typeof parsed.body === "object" ? bodyAsRecord(parsed.body) : {};
   const { id } = await context.params;
   const preliminaryTournament = await db.collection("tournaments").doc(id).get();
+  if (preliminaryTournament.data()?.publicationPolicyVersion === 1 && (!await tournamentRegistrationReady(db) || preliminaryTournament.data()?.publicVisibility === false)) return fail("Tournament registration is temporarily unavailable.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");
   if (preliminaryTournament.exists && Number(preliminaryTournament.data()?.configVersion ?? 1) >= 3) {
     if (String(preliminaryTournament.data()?.participationMode ?? "individual") === "team") return fail("Create or join a complete Tournament team to reserve a bracket slot.", 409, undefined, "TEAM_REGISTRATION_REQUIRED");
     if (process.env.NODE_ENV === "production" && !isTournamentV3SchedulingReady()) return fail("Tournament registration is temporarily unavailable while its background scheduler is not configured.", 503, undefined, "TOURNAMENT_SCHEDULER_UNAVAILABLE");

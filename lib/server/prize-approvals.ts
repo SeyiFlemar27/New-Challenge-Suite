@@ -96,7 +96,7 @@ export function validateWinnerProposalWinners(winners: NormalizedProposalWinner[
   if (!winners.length) errors.winners = "At least one proposed winner is required.";
   if (challenge?.builderVersion === "normal_v3") {
     const expectedCount = Number(challenge.numberOfWinners);
-    if (![1, 3].includes(expectedCount) || winners.length < 1 || winners.length > expectedCount) errors.winnerCount = "Winner selection cannot exceed the configured winner count.";
+    if (![1, 2, 3].includes(expectedCount) || winners.length < 1 || winners.length > expectedCount) errors.winnerCount = "Winner selection cannot exceed the configured winner count.";
     const expectedPlacements = new Set(Array.from({ length: winners.length }, (_, index) => index + 1));
     if (winners.some((winner) => !expectedPlacements.has(winner.placement))) errors.winnerPlacement = "Winner placements must match the configured prize positions.";
   }

@@ -132,5 +132,5 @@ export function rankPhysicalResults(entries: Array<{ userId: string; checkedIn: 
 }
 /** Missing legacy approval or visibility is not permission to publish a record. */
 export function isPublicApprovedLiveEvent(event:Record<string,unknown>){
-  return event.eventApprovalStatus==="approved"&&event.visibility==="public"&&!["hidden","hidden_until_approved"].includes(String(event.eventVisibility))&&!["draft","pending_review","pending_admin_review","rejected","deleted","requires_changes","changes_requested"].includes(String(event.status));
+  return event.publicVisibility!==false&&!["held","suspended","removed","confirmed_abuse"].includes(String(event.moderationStatus))&&event.eventApprovalStatus==="approved"&&event.visibility==="public"&&!["hidden","hidden_until_approved"].includes(String(event.eventVisibility))&&!["draft","pending_review","pending_admin_review","rejected","deleted","requires_changes","changes_requested"].includes(String(event.status));
 }

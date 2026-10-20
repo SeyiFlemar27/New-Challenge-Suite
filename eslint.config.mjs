@@ -6,6 +6,7 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     "node_modules/**",
+    ".pnpm-store/**",
     "reference-screenshots/**",
     "docs/**",
     "scripts/**",

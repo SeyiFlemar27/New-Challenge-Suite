@@ -1,7 +1,8 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { cookies } from "next/headers";
 import { getRequestUser, SESSION_COOKIE_NAME, type RequestUser } from "@/lib/server/auth";
-import { isPublishedTournament, publicTournamentView } from "@/lib/server/tournament-public-policy";
+import { isPublishedTournament, publicTournamentView, withTournamentRegistrationAvailability } from "@/lib/server/tournament-public-policy";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { canEditTournament } from "@/lib/server/tournament-permissions";
 import { loadTournamentTeamDirectory } from "@/lib/server/tournament-team-directory";
 import { getPublicTournamentFunding } from "@/lib/server/tournament-public-funding";
@@ -53,7 +54,8 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
   const tournamentSnap = await db.collection("tournaments").doc(id).get();
   if (!tournamentSnap.exists) return { available: true, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found." };
   const rows = (snap: Pick<FirebaseFirestore.QuerySnapshot, "docs">) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as TournamentRow[];
-  const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as TournamentRow;
+  const savedTournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as TournamentRow;
+  const tournament = withTournamentRegistrationAvailability(savedTournament, savedTournament.publicationPolicyVersion === 1 ? await tournamentRegistrationReady(db) : false);
   const canManage = Boolean(viewer && canEditTournament({ ...viewer }, tournament).allowed);
   if (!isPublishedTournament(tournament) && !canManage) return { available: false, tournament: null, participants: [], rounds: [], matches: [], submissions: [], announcements: [], sponsors: [], placements: [], audits: [], message: "Tournament not found or unavailable." };
   if (tournament.privacy !== "public") {

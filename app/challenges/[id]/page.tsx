@@ -15,6 +15,7 @@ import { normalizeChallenge, normalizeSubmission, type ChallengeApiRecord, type 
 import { getChallengeLifecycleState, getChallengeTimelineDisplay } from "@/lib/challenge-status";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { ChallengeShare } from "@/components/challenge-share";
+import { ChallengeSafetyAction } from "@/components/challenge-safety-action";
 import { ChallengeMediaGallery } from "@/components/media-display";
 import { DEFAULT_CHALLENGE_TIME_ZONE, formatChallengeDateTime } from "@/lib/challenge-date-time";
 import type { PublicChallengeParticipant } from "@/lib/server/challenge-participants";
@@ -425,6 +426,7 @@ export default function ChallengeDetailPage() {
           {ownerAccount ? <Card className="mt-6 p-5"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Owner Controls</p><div className="mt-4 grid gap-3 sm:flex sm:flex-wrap"><LinkButton href={`/challenges/${challenge.id}/manage`} className="w-full sm:w-auto">Manage Challenge</LinkButton><LinkButton href={`/challenges/${challenge.id}/participants`} className="w-full sm:w-auto" variant="secondary">Manage Participants</LinkButton></div></Card> : null}
           <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
             <ChallengeShare className="w-full sm:w-auto" title={challenge.title} description={challenge.description} path={`/challenges/${challenge.id}`} />
+            <ChallengeSafetyAction challengeId={String(challenge.id)} />
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => void updateEngagement("save_challenge", !saved)}><Bookmark size={17} /> {saved ? "Saved" : "Save Challenge"}</Button>
           </div>
           {engagementMessage ? <p className="mt-3 text-sm text-slate-700">{engagementMessage}</p> : null}

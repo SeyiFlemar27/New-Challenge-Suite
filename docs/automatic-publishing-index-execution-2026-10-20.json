@@ -1,0 +1,212 @@
+{
+  "project": "challenge-suite",
+  "database": "(default)",
+  "additiveOnly": true,
+  "updatedAt": "2026-10-20T12:06:59.643Z",
+  "results": [
+    {
+      "definition": {
+        "dependentQuery": "Tournament Explore createdAt desc",
+        "collectionGroup": "tournaments",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "privacy",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          },
+          {
+            "fieldPath": "__name__",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgLiT6IEK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Tournament Explore createdAt asc",
+        "collectionGroup": "tournaments",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "privacy",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "__name__",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgLiIjZIK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Tournament Explore participantCount desc",
+        "collectionGroup": "tournaments",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "privacy",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "participantCount",
+            "order": "DESCENDING"
+          },
+          {
+            "fieldPath": "__name__",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournaments/indexes/CICAgNirtJAK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Due activation and lifecycle",
+        "collectionGroup": "tournamentJobs",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "type",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "runAt",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiIjZIJ",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Stale lifecycle dispatch",
+        "collectionGroup": "tournamentJobs",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "type",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "schedulerDispatchState",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "runAt",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiI64sK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Pending dispatch",
+        "collectionGroup": "tournamentJobs",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "type",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "schedulerDispatchState",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgOi39IkK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Expired dispatch lease",
+        "collectionGroup": "tournamentJobs",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "type",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "schedulerDispatchState",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "schedulerDispatchLeaseUntilAt",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentJobs/indexes/CICAgLiI_5oK",
+      "state": "READY"
+    },
+    {
+      "definition": {
+        "dependentQuery": "Verified vote pages",
+        "collectionGroup": "tournamentVotes",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "tournamentId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "matchId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "voteSequence",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      "action": "skipped_equivalent_after_conflict",
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/tournamentVotes/indexes/CICAgPig2YMK",
+      "state": "READY"
+    }
+  ]
+}

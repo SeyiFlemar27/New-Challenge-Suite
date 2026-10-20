@@ -74,7 +74,7 @@ export function BuilderFooter({
   onContinue,
   final,
   finalDisabled,
-  submitLabel = "Submit for Review"
+  submitLabel = "Publish"
 }: {
   backDisabled: boolean;
   busy: boolean;
@@ -89,7 +89,7 @@ export function BuilderFooter({
     <Button variant="secondary" disabled={backDisabled || busy} onClick={onBack}>Back</Button>
     <div className="flex flex-wrap justify-end gap-2">
       {finishLater ? <Button variant="ghost" disabled={busy} onClick={finishLater}>Finish Later</Button> : null}
-      <Button disabled={busy || Boolean(finalDisabled)} onClick={onContinue}>{busy ? final ? "Submitting..." : "Saving..." : final ? submitLabel : "Continue"}</Button>
+      <Button disabled={busy || Boolean(finalDisabled)} onClick={onContinue}>{busy ? final ? "Publishing..." : "Saving..." : final ? submitLabel : "Continue"}</Button>
     </div>
   </div>;
 }

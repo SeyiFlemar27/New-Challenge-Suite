@@ -78,7 +78,7 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
 const queueActions: Record<string, Array<{ action: string; label: string; dangerous?: boolean }>> = {
   sponsors: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
   hosts: [{ action: "verify", label: "Verify" }, { action: "request_changes", label: "Request changes" }, { action: "reject", label: "Reject", dangerous: true }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
-  challenges: [{ action: "approve", label: "Publish" }, { action: "request_changes", label: "Request changes" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "archive", label: "Archive" }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
+  challenges: [{ action: "flag", label: "Flag for investigation" }, { action: "archive", label: "Archive" }, { action: "suspend", label: "Suspend", dangerous: true }, { action: "add_note", label: "Add note" }],
   submissions: [{ action: "approve", label: "Approve" }, { action: "request_changes", label: "Request resubmission" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "add_note", label: "Add note" }],
   participants: [{ action: "approve", label: "Approve" }, { action: "reinstate", label: "Reinstate" }, { action: "flag", label: "Flag" }, { action: "reject", label: "Reject", dangerous: true }, { action: "disqualify", label: "Disqualify", dangerous: true }, { action: "add_note", label: "Add note" }],
   winners: [{ action: "approve", label: "Approve announcement" }, { action: "hold", label: "Hold" }, { action: "request_review", label: "Request review" }, { action: "flag", label: "Flag" }, { action: "add_note", label: "Add note" }],
@@ -205,7 +205,7 @@ function Overview({ data }: { data: AdminData }) {
   const cards = [
     ["Pending sponsor reviews", data.overview.pendingSponsorReviews, "/admin/sponsors?status=pending_review", ShieldCheck],
     ["Pending host verifications", data.overview.pendingHostVerifications, "/admin/hosts?status=pending_review", UserCog],
-    ["Pending challenge reviews", data.overview.pendingChallengeReviews, "/admin/challenges?status=pending_review", Trophy],
+    ["Challenge moderation", data.overview.pendingChallengeReviews, "/admin/challenges", Trophy],
     ["Pending submissions", data.overview.pendingSubmissions, "/admin/submissions?status=pending_review", ClipboardCheck],
     ["Flagged submissions", data.overview.flaggedSubmissions, "/admin/submissions?status=flagged", ShieldAlert],
     ["Participant approvals", data.overview.participantApprovals, "/admin/participants?status=pending", UsersRound],
@@ -234,7 +234,7 @@ function Overview({ data }: { data: AdminData }) {
 function ActionCentre({ data, onSelect }: { data: AdminData; onSelect: (record: AdminRecord) => void }) {
   const taskGroups = [
     ["Sponsor applications", data.sponsors.filter((item) => ["pending", "pending_review", "needs_changes"].includes(recordStatus(item))), "/admin/sponsors"],
-    ["Challenge reviews", data.challenges.filter((item) => ["pending", "pending_review", "flagged"].includes(recordStatus(item))), "/admin/challenges"],
+    ["Challenge moderation", data.challenges.filter((item) => ["held", "suspended", "removed"].includes(String(item.moderationStatus))), "/admin/challenges"],
     ["Submission reviews", data.submissions.filter((item) => ["pending", "pending_review", "flagged"].includes(recordStatus(item))), "/admin/submissions"],
     ["Winner reviews", data.winners.filter((item) => ["pending", "pending_admin_review", "held"].includes(recordStatus(item))), "/admin/winners"],
     ["Withdrawal reviews", data.withdrawals.filter((item) => ["pending", "pending_review", "needs_kyc"].includes(recordStatus(item))), "/admin/withdrawals"],

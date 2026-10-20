@@ -5,7 +5,8 @@ import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverUnavailable, validationError } from "@/lib/server/responses";
 import { canCreateTournament } from "@/lib/server/tournament-permissions";
 import { isFirestoreMissingIndexError } from "@/lib/server/tournament-public";
-import { isPublishedTournament, publicTournamentView } from "@/lib/server/tournament-public-policy";
+import { isPublishedTournament, publicTournamentView, withTournamentRegistrationAvailability } from "@/lib/server/tournament-public-policy";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { evaluateTournamentReadiness, tournamentDraftFromInput, tournamentSubdomainFoundation } from "@/lib/server/tournaments";
 import { validateTournamentFoundation } from "@/lib/server/tournament-validation";
 import { hasEnterprisePermission, normalizeEnterpriseAccess } from "@/lib/enterprise-access";
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
   const category = url.searchParams.get("category");
   try {
     const snap = await db.collection("tournaments").where("privacy", "==", "public").limit(100).get();
+    const schedulingReady = await tournamentRegistrationReady(db);
     const tournaments = (snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, unknown> & { id: string })
       .filter((item) => item.privacy === "public")
@@ -31,7 +33,7 @@ export async function GET(request: Request) {
       .filter((item) => !category || item.category === category)
       .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
       .slice(0, 50)
-      .map((item) => publicTournamentView(item)));
+      .map((item) => publicTournamentView(withTournamentRegistrationAvailability(item, schedulingReady))));
     return ok({ tournaments, foundation: tournamentSubdomainFoundation(), emptyState: tournaments.length ? null : "No tournaments found from backend state." }, "Tournament records loaded.");
   } catch (error) {
     if (isFirestoreMissingIndexError(error)) {
@@ -42,13 +44,20 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   const { user, response } = await requireRequestUser(request);
   if (response) return response;
   const db = getAdminDb();
   if (!db) return serverUnavailable("Tournament creation");
   const parsed = await readJson(request);
   if (parsed.response) return parsed.response;
+  if (["pending_review", "publish"].includes(String((parsed.body as Record<string, unknown> | undefined)?.status))) {
+    const saved = await POST(new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ ...parsed.body, status: "draft" }) }));
+    if (!saved.ok) return saved;
+    const result = await saved.json();
+    const { POST: publish } = await import("@/app/api/tournaments/[id]/publish/route");
+    return publish(request, { params: Promise.resolve({ id: result.data.tournament.id }) });
+  }
   const creationKey = request.headers.get("x-challenge-creation-key") ?? "";
   if (creationKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(creationKey)) return fail("Invalid draft retry reference.", 422);
   const ref = creationKey ? db.collection("tournaments").doc(createHash("sha256").update(`tournament:${user.uid}:${creationKey}`).digest("hex").slice(0, 32)) : db.collection("tournaments").doc();

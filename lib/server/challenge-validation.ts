@@ -2,10 +2,11 @@
 import { validateChallengeDates } from "@/lib/server/challenge-lifecycle";
 import { DEFAULT_CHALLENGE_TIME_ZONE } from "@/lib/challenge-date-time";
 import { inferCapacityMode, normalChallengeCapacityError } from "@/lib/normal-challenge-capacity";
-import { calculateNormalWinnerAmountsCents, isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isModernNormalChallenge, isNormalChallengeV2, isNormalChallengeV3, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS, normalWinnerPercentages } from "@/lib/normal-challenge-config";
+import { calculateNormalWinnerAmountsCents, isCanonicalChallengeCategory, isCanonicalChallengeSubcategory, isModernNormalChallenge, isNormalChallengeV3, NORMAL_ELIGIBLE_COUNTRIES, NORMAL_RESUBMIT_WINDOWS, normalWinnerPercentages } from "@/lib/normal-challenge-config";
 import { isApplicationMediaUrl, isInternalStoragePath, validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { normalBasePrizeCents } from "@/lib/normal-base-prize-policy";
 import { eventCapacities, eventTime } from "@/lib/live-event-policy";
+import { withPublishingDefaults } from "@/lib/publishing-policy";
 
 const mediaUrlSchema = z.string().trim().refine(value => isApplicationMediaUrl(value) || z.string().url().safeParse(value).success, "Use a completed Challenge Suite upload.");
 const normalMediaSchema = z.object({
@@ -478,15 +479,15 @@ export function validateChallengeForDraft(challenge: ChallengeLike): ChallengeVa
 }
 
 export function validateChallengeForPublish(challenge: ChallengeLike, context: ChallengeValidationContext = {}): ChallengeValidationResult {
+  challenge = withPublishingDefaults(challenge);
   const errors: ChallengeValidationIssue[] = [];
   const now = context.now ?? new Date();
   const kind = challengeKind(challenge);
   const normalV2 = isModernNormalChallenge(challenge);
-  const legacyNormalV2 = isNormalChallengeV2(challenge);
   const hostOps = typeof challenge.hostOperations === "object" && challenge.hostOperations ? challenge.hostOperations as Record<string, unknown> : null;
   if (kind.isLive && hostOps?.schemaVersion === 2) {
-    requireText(errors, challenge, "title", "Overview", "Add an event title.", 3);
-    requireText(errors, challenge, "description", "Overview", "Add an event description.", 20);
+    requireText(errors, challenge, "title", "Overview", "Add an event title.");
+    requireText(errors, challenge, "description", "Overview", "Add an event description.");
     requireText(errors, challenge, "category", "Overview", "Choose an event category.");
     for (const field of ["venueName", "eventAddress", "eventCity", "eventCountry"]) requireText(errors, challenge, field, "Registration & Tickets", "Add the full event location.");
     const start = eventTime(challenge.startsAt), end = eventTime(challenge.endsAt);
@@ -496,9 +497,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
     try { new Intl.DateTimeFormat("en", { timeZone: String(hostOps.timezone) }).format(); } catch { makeIssue(errors, "LIVE_TIMEZONE_INVALID", "timezone", "Registration & Tickets", "Choose a valid event timezone."); }
     try { eventCapacities(challenge); } catch { makeIssue(errors, "LIVE_CAPACITY_INVALID", "eventCapacity", "Registration & Tickets", "Set the venue capacity and separate competitor spaces."); }
     if (!["attendance_only", "physical_competition"].includes(String(hostOps.eventFormat))) makeIssue(errors, "LIVE_FORMAT_INVALID", "eventFormat", "Participation & Competition", "Choose Attendance Only or Physical Competition.");
-    if (hostOps.eventFormat === "attendance_only" && (Number(hostOps.competitorCapacity) > 0 || Number(hostOps.competitionEntryFee) > 0 || challenge.prizeType === "money" || Number(challenge.prizeValue) > 0)) makeIssue(errors, "ATTENDANCE_COMPETITION_CONFLICT", "eventFormat", "Participation & Competition", "Attendance Only events cannot include competition fees or prizes.");
-    if (Number(hostOps.ticketPrice) > 0 || Number(hostOps.competitionEntryFee) > 0) makeIssue(errors, "LIVE_PAID_BOOKING_NOT_READY", "ticketPrice", "Registration & Tickets", "Paid event bookings require verified payment and refund configuration before review.");
-    if (Number(challenge.prizeValue) > 0 && Number(challenge.confirmedCreatorPrizeFundingCents??0)<Math.round(Number(challenge.prizeValue)*100)) makeIssue(errors, "LIVE_PRIZE_FUNDING_NOT_READY", "prizeValue", "Prizes & Earnings", "The positive creator-funded cash prize must be fully confirmed before review. Sponsor or entry revenue does not replace it.");
+    if (hostOps.eventFormat === "attendance_only" && (Number(hostOps.competitorCapacity) > 0 || Number(hostOps.competitionEntryFee) > 0 || Number(challenge.prizeValue) > 0)) makeIssue(errors, "ATTENDANCE_COMPETITION_CONFLICT", "eventFormat", "Participation & Competition", "Attendance Only events cannot include competition fees or prizes.");
     if (!hostOps.detailsConfirmed || !hostOps.mediaRightsConfirmed) makeIssue(errors, "LIVE_CONFIRMATIONS_REQUIRED", "hostOperations", "Review & Submit", "Confirm the event details and your permission to use the media.");
     const draft = validateChallengeForDraft(challenge);
     errors.push(...draft.errors);
@@ -506,21 +505,12 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
     return validationResult(errors);
   }
 
-  requireText(errors, challenge, "title", "Basics", "Add a challenge title.", 3);
-  requireText(errors, challenge, "description", normalV2 ? "Overview" : "Basics", "Add a complete description.", 20);
+  requireText(errors, challenge, "title", "Basics", "Add a challenge title.");
+  requireText(errors, challenge, "description", normalV2 ? "Overview" : "Basics", "Describe the challenge.");
   requireText(errors, challenge, "category", normalV2 ? "Overview" : "Basics", "Select a category.");
-  if (normalV2) {
-    if (legacyNormalV2) requireText(errors, challenge, "shortDescription", "Overview", "Add a short description.", 10);
-    requireText(errors, challenge, "subcategory", "Overview", "Select a subcategory.");
-  }
   requireText(errors, challenge, "type", "Basics", "Select a challenge type.");
   requireText(errors, challenge, "competitionFormat", "Format & Rules", "Select a competition format.");
   if (!list(challenge.acceptedSubmissionTypes).length) makeIssue(errors, "REQUIRED_ACCEPTED_MEDIA_TYPE", "acceptedSubmissionTypes", "Format & Rules", "Select at least one accepted media type.");
-  if (!normalV2) requireText(errors, challenge, "standardRules", "Format & Rules", "Add at least one competition rule.", 10);
-  if (!isNormalChallengeV3(challenge)) {
-    requireText(errors, challenge, "challengeGuidelines", "Format & Rules", "Add submission requirements or challenge guidelines.", 10);
-  }
-  if (!normalV2) requireText(errors, challenge, "policyTerms", "Format & Rules", "Add eligibility or participation terms.", 10);
 
   requireDate(errors, challenge, "startsAt", "Schedule", "Add a challenge start date.");
   requireDate(errors, challenge, "endsAt", "Schedule", "Add a challenge end date.");
@@ -597,7 +587,7 @@ export function validateChallengeForPublish(challenge: ChallengeLike, context: C
   if (normalV2) {
     const winnerCount = numberValue(challenge.numberOfWinners);
     const amounts = list(challenge.winnerPrizeAmountsCents).map(numberValue);
-    if (winnerCount < 1 || winnerCount > 3 || amounts.length !== winnerCount || amounts.some((amount) => !Number.isSafeInteger(amount) || (isNormalChallengeV3(challenge) ? amount < 0 : amount <= 0))) {
+    if (winnerCount < 1 || winnerCount > 3 || amounts.length !== winnerCount || amounts.some((amount) => !Number.isSafeInteger(amount) || amount < 0)) {
       makeIssue(errors, "INVALID_CASH_PLACEMENTS", "winnerPrizeAmountsCents", "Monetization & Prize Pool", "Add a valid cash amount for every winner placement.");
     }
     if (isNormalChallengeV3(challenge)) {

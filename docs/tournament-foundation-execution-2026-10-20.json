@@ -1,0 +1,75 @@
+{
+  "project": "challenge-suite",
+  "location": "us-central1",
+  "updatedAt": "2026-10-20T12:07:06.514Z",
+  "activationPerformed": false,
+  "actions": [
+    {
+      "operation": "keyless_identity_verified",
+      "email": "tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "service_account_created",
+      "email": "tournament-lifecycle-invoker@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "keyless_identity_verified",
+      "email": "tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "keyless_identity_verified",
+      "email": "tournament-lifecycle-invoker@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "keyless_identity_verified",
+      "email": "tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "keyless_identity_verified",
+      "email": "tournament-lifecycle-invoker@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "queue_created",
+      "resource": "projects/challenge-suite/locations/us-central1/queues/tournament-lifecycle"
+    },
+    {
+      "operation": "queue_configuration_and_empty_state_verified",
+      "resource": "projects/challenge-suite/locations/us-central1/queues/tournament-lifecycle",
+      "state": "RUNNING",
+      "rateLimits": {
+        "maxDispatchesPerSecond": 5,
+        "maxBurstSize": 10,
+        "maxConcurrentDispatches": 10
+      },
+      "retryConfig": {
+        "maxAttempts": 10,
+        "maxRetryDuration": "86400s",
+        "minBackoff": "10s",
+        "maxBackoff": "300s",
+        "maxDoublings": 5
+      }
+    },
+    {
+      "operation": "binding_added_and_verified",
+      "resource": "https://cloudtasks.googleapis.com/v2/projects/challenge-suite/locations/us-central1/queues/tournament-lifecycle",
+      "role": "roles/cloudtasks.enqueuer",
+      "member": "serviceAccount:tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "binding_added_and_verified",
+      "resource": "https://iam.googleapis.com/v1/projects/challenge-suite/serviceAccounts/tournament-lifecycle-invoker@challenge-suite.iam.gserviceaccount.com",
+      "role": "roles/iam.serviceAccountUser",
+      "member": "serviceAccount:tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com"
+    },
+    {
+      "operation": "binding_added_and_verified",
+      "resource": "https://iam.googleapis.com/v1/projects/challenge-suite/serviceAccounts/tournament-lifecycle-enqueuer@challenge-suite.iam.gserviceaccount.com",
+      "role": "roles/iam.workloadIdentityUser",
+      "member": "principal://iam.googleapis.com/projects/599920137316/locations/global/workloadIdentityPools/challenge-suite-vercel-prod/subject/owner:seyiflemar27s-projects:project:challenge-suite:environment:production"
+    },
+    {
+      "operation": "normal_configuration_unchanged",
+      "verified": true
+    }
+  ]
+}

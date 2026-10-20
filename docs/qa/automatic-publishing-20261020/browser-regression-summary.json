@@ -1,0 +1,98 @@
+{
+  "scope": "Latest successful result for each of ten relevant publishing journeys across the recorded runs",
+  "singleRun": false,
+  "passed": 10,
+  "failed": 0,
+  "caseAssertions": 147,
+  "productionCases": 7,
+  "developmentCases": 3,
+  "otherBrowserJourneysNotExecuted": 15,
+  "runs": [
+    {
+      "mode": "production",
+      "artifactDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595",
+      "passed": 7,
+      "failed": 3,
+      "pageErrorCount": 0
+    },
+    {
+      "mode": "development",
+      "artifactDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-W3igUe\\runtime-temp\\challenge-suite-p1-browser-de34b8d370c04f5fae9d592e9be9e5ee",
+      "passed": 3,
+      "failed": 0,
+      "pageErrorCount": 0
+    }
+  ],
+  "results": [
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 11,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 12,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 10,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "PASS",
+      "assertions": 16,
+      "mode": "development",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-W3igUe\\runtime-temp\\challenge-suite-p1-browser-de34b8d370c04f5fae9d592e9be9e5ee"
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "PASS",
+      "assertions": 36,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "PASS",
+      "assertions": 20,
+      "mode": "production",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-j8pZka\\runtime-temp\\challenge-suite-p1-browser-8b6b5641be8842119367167eed929595"
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 11,
+      "mode": "development",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-W3igUe\\runtime-temp\\challenge-suite-p1-browser-de34b8d370c04f5fae9d592e9be9e5ee"
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 13,
+      "mode": "development",
+      "evidenceDirectory": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-W3igUe\\runtime-temp\\challenge-suite-p1-browser-de34b8d370c04f5fae9d592e9be9e5ee"
+    }
+  ]
+}

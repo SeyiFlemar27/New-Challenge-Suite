@@ -74,6 +74,7 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
     stage = "inspection";
     if (candidate.expectedType === "image") {
       const sourceInspection = await inspectImageBytes(sourceBytes);
+      if (String(metadata.contentType ?? "").toLowerCase() !== `image/${sourceInspection.format}`) throw new Error(`MEDIA_CONTENT_TYPE_INVALID:${candidate.field}`);
       validateInspectedMedia(candidate, sourceInspection, sourceBytes.length);
       stage = "normalization";
       const normalized = await normalizeImageBytes(sourceBytes);
@@ -84,6 +85,7 @@ export async function verifyChallengeMedia(db: Firestore, challengeId: string, c
     const contentType = candidate.expectedType === "image" ? `image/${inspected.format}` : String(metadata.contentType ?? "").toLowerCase();
     const allowedTypes = candidate.expectedType === "image" ? ["image/jpeg", "image/png", "image/webp"] : inspected.format === "mp4" ? ["video/mp4"] : ["video/avi", "video/x-msvideo"];
     if (!allowedTypes.includes(contentType)) throw new Error(`MEDIA_CONTENT_TYPE_INVALID:${candidate.field}`);
+    if (!allowedTypes.includes(String(metadata.contentType ?? "").toLowerCase())) throw new Error(`MEDIA_CONTENT_TYPE_INVALID:${candidate.field}`);
     let verifiedPath = candidate.path;
     let verifiedGeneration = generation || null;
     let verifiedBytes = bytes;

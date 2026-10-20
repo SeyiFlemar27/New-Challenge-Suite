@@ -1,0 +1,29 @@
+{
+  "project": "challenge-suite",
+  "approvedCollections": [
+    "challenges",
+    "submissions",
+    "votes"
+  ],
+  "applicationDeployed": false,
+  "dataWrites": false,
+  "indexChanges": false,
+  "storageRuleChanges": false,
+  "previousRelease": {
+    "name": "projects/challenge-suite/releases/cloud.firestore",
+    "rulesetName": "projects/challenge-suite/rulesets/96281880-3d0e-4319-abe6-c31f6ca2f057",
+    "createTime": "2026-06-18T15:28:42.568961Z",
+    "updateTime": "2026-07-05T09:13:35.347146Z"
+  },
+  "baselineSha256": "7dc8ed2ee373ea43a2d4a9f9996fdad98c72edd8aac465477097da6179a4be4e",
+  "candidateRulesetName": "projects/challenge-suite/rulesets/09a2f92c-d0b4-4b85-830e-c5482b851f91",
+  "servingRelease": {
+    "name": "projects/challenge-suite/releases/cloud.firestore",
+    "rulesetName": "projects/challenge-suite/rulesets/09a2f92c-d0b4-4b85-830e-c5482b851f91",
+    "createTime": "2026-06-18T15:28:42.568961Z",
+    "updateTime": "2026-10-20T12:23:57.133375Z"
+  },
+  "servingSha256": "6145640e68cfe507e82fa0f0c2aef30bf7f35aa2861fcdbf527c4bcbc4eae457",
+  "verified": true,
+  "completedAt": "2026-10-20T12:23:59.376Z"
+}

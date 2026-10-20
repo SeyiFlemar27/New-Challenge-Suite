@@ -1,0 +1,636 @@
+{
+  "capturedAt": "2026-10-20T14:03:00.307Z",
+  "base": "4e0c5cee1c012361f492fd37a50518194fd909d6",
+  "sourceBranch": "codex/automatic-publishing-exception-moderation",
+  "files": [
+    {
+      "path": "app/admin/tournament-runtime-verification/page.tsx",
+      "bytes": 3608,
+      "sha256": "9859b90311db268063eb7f970ff3771a51465929cb9fed81c1dd98710d8be374"
+    },
+    {
+      "path": "app/api/admin/challenge-reviews/route.ts",
+      "bytes": 2758,
+      "sha256": "5304971aa8b7a451a53579e0edb970c8b4c2f086861d9b519a70fc7a1a3db6ed"
+    },
+    {
+      "path": "app/api/admin/operations/route.ts",
+      "bytes": 66152,
+      "sha256": "a7ebec0e3ef738154d3fa53a1fdb71028a47e3105ea2a2db52a7d810a7a62630"
+    },
+    {
+      "path": "app/api/admin/reviews/route.ts",
+      "bytes": 6722,
+      "sha256": "efa574866b2867146fb0482d71ef5ea40dcce482caf7aec44a1de3ced83bd992"
+    },
+    {
+      "path": "app/api/admin/tournament-runtime-verification/route.ts",
+      "bytes": 4042,
+      "sha256": "76ffe561dbace1a131ec26c0bc9d5d7b9f58984ec5a902faf013b0827524858e"
+    },
+    {
+      "path": "app/api/admin/tournaments/[id]/route.ts",
+      "bytes": 14854,
+      "sha256": "77ac5e98c2e0bbeb1ad9434aaf38ffd088693cb58054585704740cb0dbdfb7ca"
+    },
+    {
+      "path": "app/api/challenge-discovery/route.ts",
+      "bytes": 10103,
+      "sha256": "33d0b2d5dd4fbc329c8d24712f948571a51e34edbc82f5b0913b5c6385628b77"
+    },
+    {
+      "path": "app/api/challenges/[id]/moderation-appeal/route.ts",
+      "bytes": 2278,
+      "sha256": "423e2b9c632701524953cc15258173ed71d8556ce1ed32be8a15a8d0a8610421"
+    },
+    {
+      "path": "app/api/challenges/[id]/publish/route.ts",
+      "bytes": 30312,
+      "sha256": "61269632ba0abd9e09ce563c84a5bb0f5d5594cc33b6add30053c3c428766392"
+    },
+    {
+      "path": "app/api/challenges/[id]/published-details/route.ts",
+      "bytes": 4669,
+      "sha256": "bc9aef0aac95aaafef0037906eb77df7b9239c83c3202296aea38f4a3a0ab5c4"
+    },
+    {
+      "path": "app/api/challenges/[id]/report/route.ts",
+      "bytes": 2230,
+      "sha256": "21b48fa0d869714c07209f9676e5bb4f8d0b75dc95c689c4e6455b9af708606e"
+    },
+    {
+      "path": "app/api/challenges/[id]/route.ts",
+      "bytes": 26472,
+      "sha256": "8db7583bcf15360272f56fc74584d507ab2d7db9183984fec1d225dcda068489"
+    },
+    {
+      "path": "app/api/challenges/drafts/[id]/route.ts",
+      "bytes": 22457,
+      "sha256": "a05031d530d43272bd1424f515619b59cd367ccf1f6459a856cb925ffad5f5cc"
+    },
+    {
+      "path": "app/api/challenges/route.ts",
+      "bytes": 33494,
+      "sha256": "24d92741319197e019392dbb4a19fa7c6762ee7cf48d31056b96621e7cb3c050"
+    },
+    {
+      "path": "app/api/explore/challenges/route.ts",
+      "bytes": 23943,
+      "sha256": "0de999ea98eb48d65fab5e3c269ee20e01677990ff320b5b89ac64f82f1aacec"
+    },
+    {
+      "path": "app/api/internal/tournament-activation/route.ts",
+      "bytes": 4215,
+      "sha256": "4bbd36a058133e7f88a5c28a4c3390ec64b63517026fb8dd6c4f74cce535436b"
+    },
+    {
+      "path": "app/api/internal/tournament-scheduler/route.ts",
+      "bytes": 2862,
+      "sha256": "2c12f16a4f83660eb6260536dbeec9b24ec2dce74706dc159a9ba9e10e88ab74"
+    },
+    {
+      "path": "app/api/live-events/[id]/management/route.ts",
+      "bytes": 5719,
+      "sha256": "fe71b8152675ced70131d1717c14ed5acc51807efe0387b3406b2c8b44091a35"
+    },
+    {
+      "path": "app/api/live-events/[id]/public/route.ts",
+      "bytes": 5676,
+      "sha256": "d77c5c45061bbdb5b18297af1fd1eef0c8f4d2fc01ac5772d7031b03980ee4c5"
+    },
+    {
+      "path": "app/api/tournaments/[id]/join/route.ts",
+      "bytes": 14441,
+      "sha256": "a5d668283fbf81eff69b47eeb221dfbc375b6208207d4726f29136a51388157b"
+    },
+    {
+      "path": "app/api/tournaments/[id]/publish/route.ts",
+      "bytes": 7913,
+      "sha256": "8a27230afb93bd56c1dd3233e36ff18202fae00908387859f60057e7afde4f81"
+    },
+    {
+      "path": "app/api/tournaments/[id]/published-details/route.ts",
+      "bytes": 3748,
+      "sha256": "f088c36178e65d014e8a64f1087589ed779825416d9d291464bfd32a74beaa35"
+    },
+    {
+      "path": "app/api/tournaments/[id]/route.ts",
+      "bytes": 20029,
+      "sha256": "2786a43508b6f9a642c4a51fcbb5db3f60f9c738293d908fa505a5df0ae1921a"
+    },
+    {
+      "path": "app/api/tournaments/[id]/team-payment/route.ts",
+      "bytes": 6047,
+      "sha256": "12342986ee29b2608112da650cf471349def162b9e659bb0a3c8937bde8ec776"
+    },
+    {
+      "path": "app/api/tournaments/[id]/teams/route.ts",
+      "bytes": 42565,
+      "sha256": "eefb8d2c55027d4fe6b5cc4bf461855ddb07279eb7ddcda435d6261fb61c6689"
+    },
+    {
+      "path": "app/api/tournaments/route.ts",
+      "bytes": 10505,
+      "sha256": "67f766caaddd7a86a2b173a9a3ac58612ecb3d8ae693e49a8217155ad59fc1f0"
+    },
+    {
+      "path": "app/challenges/[id]/manage/page.tsx",
+      "bytes": 27387,
+      "sha256": "1c7993ccb53730dc13c4fbf149518dcebd9a895d16f286839b3e00b26ba6a07f"
+    },
+    {
+      "path": "app/challenges/[id]/page.tsx",
+      "bytes": 59494,
+      "sha256": "a3940902557a4077c68c54a2145b75e7b1369d9359fa54cfc28a2606090d7636"
+    },
+    {
+      "path": "app/live-events/[id]/manage/page.tsx",
+      "bytes": 10596,
+      "sha256": "d2e23407cb76edd536d65cb023afaaa7512981fbce3cb40f9bea39ebdb9bc259"
+    },
+    {
+      "path": "app/live-events/[id]/page.tsx",
+      "bytes": 29308,
+      "sha256": "9933a3233f82f9d8f6e664bb5b35d8d2e802261c5993a5943145cb3cf2e09ad0"
+    },
+    {
+      "path": "app/private/preview/[id]/page.tsx",
+      "bytes": 3419,
+      "sha256": "ae0e30da2ca44b10f61a0852d803d7f9d429294adcaa85c60b01632c5154fd88"
+    },
+    {
+      "path": "app/tournaments/[id]/manage/page.tsx",
+      "bytes": 3418,
+      "sha256": "42f46887739d981fd4415619665695486193e42e8d7212da92acc89d494173c7"
+    },
+    {
+      "path": "app/tournaments/[id]/page.tsx",
+      "bytes": 5066,
+      "sha256": "12042099b5ba24b940111d717c2d851d743fda8ff67c9915b827d92c63273b04"
+    },
+    {
+      "path": "components/admin/admin-control-center.tsx",
+      "bytes": 50912,
+      "sha256": "9126a3b50779ea09e7d72db885d52fbe42798cbdfee0212ad4b1204aace87354"
+    },
+    {
+      "path": "components/admin/admin-tournament-decisions.tsx",
+      "bytes": 6998,
+      "sha256": "df3dc969e493099b6bbc16450b0f8cdbb5859b05d0ab35c7ccabc1fa1ed559e7"
+    },
+    {
+      "path": "components/admin/challenge-review-center.tsx",
+      "bytes": 4518,
+      "sha256": "497af1436ccdef4bfcb09412d10c11b85aa9ebe18bc9d77fec37d4ddd6404f4a"
+    },
+    {
+      "path": "components/challenge-builder-frame.tsx",
+      "bytes": 9205,
+      "sha256": "1db42d451971e5d0ef2d71cd29c83457f9ddaa8f035c3d78d0293b10a3ff608f"
+    },
+    {
+      "path": "components/challenge-safety-action.tsx",
+      "bytes": 1969,
+      "sha256": "8e5c9526d9d80af4a039ffd318147e5b5c1a1bf567ef1d2586cf16c0a544a719"
+    },
+    {
+      "path": "components/host/live-event-builder-v2.tsx",
+      "bytes": 28318,
+      "sha256": "50201c545548cf8c2eef2954904d61b4b3ca3ca06732e0fb99a4381317228468"
+    },
+    {
+      "path": "components/normal-challenge-builder-steps.tsx",
+      "bytes": 31515,
+      "sha256": "08f1bf8a221fc1d6839e494f9eb0e468fd4b4e1c61d674b057e3af4c14e935e4"
+    },
+    {
+      "path": "components/normal-challenge-builder.tsx",
+      "bytes": 28162,
+      "sha256": "1dfb53136f9cad167a1825ba2a4f44431437380ad3a700a5ca7a0ce5f68ff949"
+    },
+    {
+      "path": "components/normal-published-details-editor.tsx",
+      "bytes": 3933,
+      "sha256": "04539de56dcb4ea7b824c6cd8cb6eb3824dafb6f89040d2f026b5103a63f41dc"
+    },
+    {
+      "path": "components/tournament-builder.tsx",
+      "bytes": 48562,
+      "sha256": "3bf26e20d14484fc6e8d4973407938f8a778dd71c576aa8de9792d4e7862b5c1"
+    },
+    {
+      "path": "components/verification-guard.tsx",
+      "bytes": 2611,
+      "sha256": "644382326d148c69c4d06fcd9994c99be782e394526325723410dc17b37f850f"
+    },
+    {
+      "path": "docs/automatic-publishing-audit-2026-10-20.md",
+      "bytes": 32765,
+      "sha256": "60c860fa0cf3f044add7dabf209863a11c48b310383b65b38e850e250aceef55"
+    },
+    {
+      "path": "docs/automatic-publishing-consolidated-readiness-2026-10-20.md",
+      "bytes": 12926,
+      "sha256": "b8c1c1ee1812eb25e5d6b87c2c313f57d27d87b94b657142381ef044a4be5e2d"
+    },
+    {
+      "path": "docs/automatic-publishing-final-infrastructure-verification-2026-10-20.json",
+      "bytes": 3191,
+      "sha256": "5b0bb929c5dc371f8d3bf2b3f04bb0de70146d80e325d46e0c0c4957f637bee1"
+    },
+    {
+      "path": "docs/automatic-publishing-final-vercel-inspection-2026-10-20.json",
+      "bytes": 10651,
+      "sha256": "ff77c7ee6f1b8c895467863e7f33b40541fdc77a5b4500ed51fa176b49b0c074"
+    },
+    {
+      "path": "docs/automatic-publishing-index-execution-2026-10-20.json",
+      "bytes": 5948,
+      "sha256": "a0b19a4b63713a3b98b24732961cb4c96d84149cbad0b32465ee90d785d20820"
+    },
+    {
+      "path": "docs/automatic-publishing-production-read-only-smoke-2026-10-20.json",
+      "bytes": 1830,
+      "sha256": "7a14aa4f2c00fb44db985ace3e049664819e47a007d8c522def8b9e87bb367dd"
+    },
+    {
+      "path": "docs/automatic-publishing-production-rollback-reference-2026-10-20.json",
+      "bytes": 738,
+      "sha256": "edb12f6be7a8e8ac61fd4f5da0bab2bc9d7ad7819371bcc8db56d83c08a4bc16"
+    },
+    {
+      "path": "docs/automatic-publishing-release-gates-2026-10-20.md",
+      "bytes": 6649,
+      "sha256": "7aa7b29d5594e2a0413b4a77dece842e8406490ae07443798d39994a4ebdaed5"
+    },
+    {
+      "path": "docs/automatic-publishing-required-index-additions-2026-10-20.json",
+      "bytes": 3878,
+      "sha256": "4ac5bee995e8b432e274dcf6582011bf3125c2d11b8a82686d8d4e9bccd65490"
+    },
+    {
+      "path": "docs/firestore-private-content-rule-change-request-2026-10-20.md",
+      "bytes": 2877,
+      "sha256": "55ee56c5701e3fe66b301ba3b210a990813d7ea469ddd3900ee224ddc552f52b"
+    },
+    {
+      "path": "docs/firestore-private-content-rule-execution-2026-10-20.json",
+      "bytes": 1132,
+      "sha256": "65742f416f594ed158a9ea2daf23587731d4fcd525ca5df51aa368c3f0573c16"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/automatic-attendance_only-public.png",
+      "bytes": 171909,
+      "sha256": "d273b88c80b6386b3f9e632781ad1bb8a4e82a8dddd746b52bafd268924d7b1c"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/automatic-normal-public.png",
+      "bytes": 218868,
+      "sha256": "d1c6accb38c1bfcad9a8e07a5a206831f0bdbf0f28c7d2a74b142e91a5b1db8c"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/automatic-physical_competition-public.png",
+      "bytes": 182179,
+      "sha256": "1630ac83190a2a8ecb1ba2bd479ea04254163078bc6fadf2dd7d4ba63d6c53bc"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/automatic-private-public.png",
+      "bytes": 69687,
+      "sha256": "a6580707efc7b701258c5ffc62cfafbb3e7bdc308bce30b345e6809b6187df2b"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/automatic-tournament-public.png",
+      "bytes": 112325,
+      "sha256": "8339455b6aaac20a97104030b73ccb2b231a8f1993397d27f2487b997d94c274"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/browser-regression-summary.json",
+      "bytes": 4569,
+      "sha256": "9ab86a6225a4ef8c428bdb36424da5c3cb330cab8a8fae73159a283539484dec"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/deployed-firestore-release-before-20261020.json",
+      "bytes": 5381,
+      "sha256": "1fd714c967521b2205830cc121d365f4acad20638da1c681f81496463197eee4"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/deployed-firestore-rules-before-20261020.rules",
+      "bytes": 4548,
+      "sha256": "d885a2fd027abb5eb519dca06c6ac07785890db36c9f7a9b09ff0dd8cfe3b417"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/final-runtime-browser-summary.json",
+      "bytes": 535,
+      "sha256": "35962eca2e50504d6a70b7d35fa2b2a5683e1f6d19b36e4d1c755b0036d1141d"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/final-single-run-browser-summary.json",
+      "bytes": 4469,
+      "sha256": "edd85428338d3fb27497f4b910240dcd720e0ee48517e4454b0a8ce0b919f2be"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/production-browser-release-summary.json",
+      "bytes": 9405,
+      "sha256": "cf1c4c3a0e867f553ee2153b214205aa058575723071cc4c990ec3a772a88a3a"
+    },
+    {
+      "path": "docs/qa/automatic-publishing-20261020/proposed-firestore-private-content-20261020.rules",
+      "bytes": 4479,
+      "sha256": "66780161035d667fa5eb5344897f40d47d5e7b43b2c675a05240d77dff1c657b"
+    },
+    {
+      "path": "docs/tournament-final-backlog-inspection-2026-10-20.json",
+      "bytes": 409,
+      "sha256": "5968c296459dbd2050aefaa0558dcea22206459ca6383e6829ccc323a019ca18"
+    },
+    {
+      "path": "docs/tournament-final-external-prerequisites-2026-10-20.md",
+      "bytes": 5787,
+      "sha256": "5c182eb6f02ec876d40589df157b56e3b83b1693636169841ae0723a856b1b53"
+    },
+    {
+      "path": "docs/tournament-final-monitoring-integration-inspection-2026-10-20.json",
+      "bytes": 414,
+      "sha256": "cadcc501bbbedbb81eb74c09bc9b9bda3923f47ff3d859a0a4853a7e588dea52"
+    },
+    {
+      "path": "docs/tournament-foundation-execution-2026-10-20.json",
+      "bytes": 2998,
+      "sha256": "e47905e9607990fb7bdf90fdecacdd1174cde5196f32d37ef179d96e42000ea4"
+    },
+    {
+      "path": "docs/tournament-paused-scheduler-execution-2026-10-20.json",
+      "bytes": 1460,
+      "sha256": "a2fda2f4c84355535c4f1fb983e05c019441865ec3503ed6cf3cc3b69c4e34a1"
+    },
+    {
+      "path": "docs/tournament-probe-identity-permission-2026-10-20.json",
+      "bytes": 238,
+      "sha256": "0d33c28a5c90682e5dcd80af8ec5d5dfee53c3b99572f3a26bb26aa03fd2902e"
+    },
+    {
+      "path": "docs/tournament-production-change-request-2026-10-20.md",
+      "bytes": 9412,
+      "sha256": "06d4731fd3a7e9276b4a8b61c146a50645b6b97e3e20ffad18baaeb3b63d29a7"
+    },
+    {
+      "path": "docs/tournament-production-env-execution-2026-10-20.json",
+      "bytes": 1747,
+      "sha256": "0227217a96204d489ad14bfe092e64e9432634c7f60156a780f60a5f38dbd58e"
+    },
+    {
+      "path": "docs/tournament-runtime-verification-isolation-2026-10-20.md",
+      "bytes": 5321,
+      "sha256": "14807fdef282816afa80fa34e60657aba35d1ebe4f3416eb84e246ddcc3e0797"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "bytes": 324,
+      "sha256": "2b6e05fc79d7174de4dac72bdb014058c7a22fb71eabd200240fb7dc4bc25a49"
+    },
+    {
+      "path": "firestore.indexes.json",
+      "bytes": 23930,
+      "sha256": "2c62808ea7691bde367d7a0807d07dd4aa5ce5d1deb7c0d4e5d390cc407ee1ac"
+    },
+    {
+      "path": "lib/firebase/admin.ts",
+      "bytes": 3959,
+      "sha256": "7adc8d1ebe6a1ae424f3c3d419d6274d72ee42c22fe188d4e61c818335a5daf2"
+    },
+    {
+      "path": "lib/historical-publication-remediation.ts",
+      "bytes": 2938,
+      "sha256": "db62f224bb09d72bb7876c8686f831ca666c850d2e1744955189309c35d00da0"
+    },
+    {
+      "path": "lib/live-event-policy.ts",
+      "bytes": 12415,
+      "sha256": "2513c4227f33896d7cccd32e3f19eb65c1de2bc2c5ea17dfeedf77e3a3f76264"
+    },
+    {
+      "path": "lib/normal-challenge-frontend.ts",
+      "bytes": 12089,
+      "sha256": "daf73da1468a19d6521b6e506002ea76cb0978c936c71cba7e0d253292c41dc6"
+    },
+    {
+      "path": "lib/normal-challenge-prize-allocation.ts",
+      "bytes": 2443,
+      "sha256": "222e1005c4baaf092ed208e77c21f0cdedf7d2e49e83bc6ada629020cc8000ff"
+    },
+    {
+      "path": "lib/normal-challenge-readiness.ts",
+      "bytes": 13041,
+      "sha256": "44bfdbf20d68450e76930480d7fc0a8a777bfb88c36a6c2b6e889b3df7de8f62"
+    },
+    {
+      "path": "lib/publishing-policy.ts",
+      "bytes": 4222,
+      "sha256": "d8d610407a901f81232781ddbd3abe5f78a56460c64189a3bd91bf81856bee1f"
+    },
+    {
+      "path": "lib/server/challenge-admin-review.ts",
+      "bytes": 3991,
+      "sha256": "ecf46d6bd7cea917516032655d518f219d0ad7e03f54d545458bb807bc162fda"
+    },
+    {
+      "path": "lib/server/challenge-drafts.ts",
+      "bytes": 4506,
+      "sha256": "7ccb2edae7f41230664af98e38bdfa6c24ca2ec06a193e24138fa2daf67c356e"
+    },
+    {
+      "path": "lib/server/challenge-media-delivery.ts",
+      "bytes": 2982,
+      "sha256": "ac53ca854d84672acfdff3d4ecafa99acaa6d9618c57d85504e0d03b53868189"
+    },
+    {
+      "path": "lib/server/challenge-moderation.ts",
+      "bytes": 4895,
+      "sha256": "999af89c2a492e1e1a047188f6b94dd378a387f5f99b43a3de4995e7125b8af1"
+    },
+    {
+      "path": "lib/server/challenge-review-submission.ts",
+      "bytes": 15378,
+      "sha256": "de3606ed212f722d294cd1049ac38f4d7c9ebce18e81f2d646d35291cc46fa0e"
+    },
+    {
+      "path": "lib/server/challenge-validation.ts",
+      "bytes": 46732,
+      "sha256": "9b6b87c9521cb94460ba555579d3a0821bded6de43dddc6d121457f77ce08612"
+    },
+    {
+      "path": "lib/server/media-verification-errors.ts",
+      "bytes": 2457,
+      "sha256": "9f2b026014de3cd22c1b7c3fe03ba699d76415e3ed6315a319ce68160c229aef"
+    },
+    {
+      "path": "lib/server/media-verification.ts",
+      "bytes": 14199,
+      "sha256": "c982ee03aa912e93fa4c0da3dabf172ecc0b714d770bb5202f88b88a5f7ad6d5"
+    },
+    {
+      "path": "lib/server/official-winner-records.ts",
+      "bytes": 3350,
+      "sha256": "db47aada237ed3c56b286993365fdfe2154b7fb7c1c881bbe8932d801fa723e5"
+    },
+    {
+      "path": "lib/server/prize-approvals.ts",
+      "bytes": 23032,
+      "sha256": "0359b02bb6ef292c2db67a28d1e53c4e44b69dd9e44b0c85d130d4ee7770ffd4"
+    },
+    {
+      "path": "lib/server/public-challenge.ts",
+      "bytes": 10002,
+      "sha256": "900b8d90a792ae65fb7a27b5de71b6a30bb0145db28aafa8011271c3065576ac"
+    },
+    {
+      "path": "lib/server/publication-guards.ts",
+      "bytes": 4831,
+      "sha256": "4669d72444bbb1ea16f07ddcd5c7a0768a79e7379848c6997b9d4432a44e30de"
+    },
+    {
+      "path": "lib/server/tournament-match-lifecycle-jobs.ts",
+      "bytes": 15935,
+      "sha256": "af415092d5a1938160e90770f31d9a2c8ff53439b62cc6ce5b454b86f80c63cd"
+    },
+    {
+      "path": "lib/server/tournament-public-policy.ts",
+      "bytes": 4500,
+      "sha256": "a2917994e6c86872a4d711a744a3ba491c1d24db3f9430e09628bb0be91d502a"
+    },
+    {
+      "path": "lib/server/tournament-public.ts",
+      "bytes": 12018,
+      "sha256": "6637d6f24d037b85d1e17de781ce7664ce6eb5a4edf2dd7f51d571b457f454a3"
+    },
+    {
+      "path": "lib/server/tournament-publication.ts",
+      "bytes": 5163,
+      "sha256": "f4f3bbb242bd336085be9644deb1d43f41e06564fde797b1418d64b131029158"
+    },
+    {
+      "path": "lib/server/tournament-runtime-verification.ts",
+      "bytes": 5890,
+      "sha256": "4d795334ed5d8eba5c402dd2385cb0696074e6f84cbdc815df81c3a6bde7b91a"
+    },
+    {
+      "path": "lib/server/tournament-validation.ts",
+      "bytes": 15041,
+      "sha256": "932458f9f37164796ab47088c4b67127b9b1b6b2db834e91f10c0c7c906bfa4d"
+    },
+    {
+      "path": "lib/tournament-types.ts",
+      "bytes": 12247,
+      "sha256": "9a7835410318426595c8642123fadd7ed7ef2bf7116034efe3963e0f73b8399a"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1733,
+      "sha256": "fe190e0728163a375fb43ae2e01bef4cebbd80552be20c98ae4b975430835454"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 250130,
+      "sha256": "87a58b2d65f19afcd54bb8e226596e5409f9b95f0cdaede4b3bdd5fb2f79212d"
+    },
+    {
+      "path": "scripts/audit-historical-publications.mjs",
+      "bytes": 1738,
+      "sha256": "c7351b6da0ed9c060b8a822c6ffd2afb0fe9fb0f8da5fe1e307da3798bb1c943"
+    },
+    {
+      "path": "scripts/qa/run-p1-browser-e2e.mjs",
+      "bytes": 160199,
+      "sha256": "008db136aa8e9300dcc3fc3526eb3a4e9be8c85709ee6d87486c77a16b0ee672"
+    },
+    {
+      "path": "scripts/run-isolated-p0-emulators.mjs",
+      "bytes": 5994,
+      "sha256": "5c3965f8ec5b148642fd9e2c14ad0318d906b1e19f0f6327760083b59079eecf"
+    },
+    {
+      "path": "scripts/run-local-verification-suite.mjs",
+      "bytes": 1119,
+      "sha256": "56d80c6b485f469df214cc301f3a18a0d0ee9812ea1465403a2cab69cf3bff0f"
+    },
+    {
+      "path": "scripts/run-p0-emulator-regressions.mjs",
+      "bytes": 6882,
+      "sha256": "7e1af2bfa51f9c94c393f90c3ab5ca53d5c4ae9e39150d19d105990213c07970"
+    },
+    {
+      "path": "scripts/smoke-production-read-only.mjs",
+      "bytes": 2770,
+      "sha256": "cc38c73f7c10a040e829dc3314046ed4b9442e7c18499026eca94d936018f3cb"
+    },
+    {
+      "path": "scripts/test-automatic-publishing-emulator.mjs",
+      "bytes": 26020,
+      "sha256": "dc51226d3e86fe79fe6a8e50d51a8928e924f5a95853c5c2cf587a15e2ff1f28"
+    },
+    {
+      "path": "scripts/test-deployed-firestore-rule-repair-emulator.mjs",
+      "bytes": 3863,
+      "sha256": "e408ef784597a0cc7ed9c9b0720b21a7425ad4a9c6a75bdf4a40852f1bbfb0d3"
+    },
+    {
+      "path": "scripts/test-discovery-analytics-scalability.mjs",
+      "bytes": 27070,
+      "sha256": "79498656a4265dcb009770ff41d63167858d5be8073260c7b5b5df564d549b03"
+    },
+    {
+      "path": "scripts/test-historical-publication-dry-run.mjs",
+      "bytes": 1331,
+      "sha256": "4bd56d631ee31404f7d78a596812e2de55f72c27426eae2aff052e3eb9c2856c"
+    },
+    {
+      "path": "scripts/test-media-publish-handlers-emulator.mjs",
+      "bytes": 9736,
+      "sha256": "54cf7cc35196803a4c5d1e5b9612b5e8f29419909facd7630b6a6e6a39e82b57"
+    },
+    {
+      "path": "scripts/test-normal-base-prize-policy.mjs",
+      "bytes": 1463,
+      "sha256": "dd3a8752b70110224c47b568c27ecd062f38a70cd17327bd6a73a7a7aafdb924"
+    },
+    {
+      "path": "scripts/test-normal-review-funding-emulator.mjs",
+      "bytes": 5441,
+      "sha256": "af532532d5222df9452bee0cc3b4be98976598dff84b124e566990d5f93199f5"
+    },
+    {
+      "path": "scripts/test-publishing-review-emulator.mjs",
+      "bytes": 252,
+      "sha256": "259e0c81c12a4500727629eb9d5d8947babcfd2a03510abcce832b3c66611040"
+    },
+    {
+      "path": "scripts/test-tournament-cloud-tasks.mjs",
+      "bytes": 23851,
+      "sha256": "b2bd275f9e7cdc9b4152c1a0a09398d02e389987e7bbba6d284624ca6c1145aa"
+    },
+    {
+      "path": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+      "bytes": 17377,
+      "sha256": "710373873a9a7edaf2132ad28ac22f014b684a85f26f19b4c55aeef7eedf80cf"
+    },
+    {
+      "path": "scripts/test-tournament-runtime-verification-emulator.mjs",
+      "bytes": 8193,
+      "sha256": "3a2e4152eeab8698ac7cf39e0afaead41fd4b649b1c37ee0c300243a4290dc7a"
+    },
+    {
+      "path": "scripts/verify-production-media-synthetic.mjs",
+      "bytes": 5514,
+      "sha256": "0ee5a83491738b7deddc7dec6e69f8690ab2dbdf7699e83065c0e9b55b25228a"
+    }
+  ],
+  "additionalManifestPath": "docs/automatic-publishing-final-candidate-files-2026-10-20.json",
+  "excludedOriginalDirtyFiles": [
+    "next-env.d.ts",
+    "tsconfig.json",
+    "tsconfig.tsbuildinfo"
+  ],
+  "privateEnvironmentFilesExcluded": true,
+  "operationalProvisioningScriptsExcluded": true,
+  "stagingPerformed": false
+}

@@ -7,7 +7,9 @@ import { isPublicChallenge, isQaOrDemoRecord, isRetiredHybridCompetition, public
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { FieldPath, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
+import { isPublishedTournament, withTournamentRegistrationAvailability } from "@/lib/server/tournament-public-policy";
+import { tournamentRegistrationReady } from "@/lib/server/tournament-publication";
 import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
 import { NORMAL_CHALLENGE_CATEGORIES } from "@/lib/normal-challenge-config";
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 const EXPLORE_SCAN_PAGE = 180;
 
+type ExploreDoc = { id: string; stream: string; data: () => Record<string, unknown> };
 type PhaseSummary = ReturnType<typeof getChallengePhaseSummary>;
 
 function text(value: unknown) {
@@ -66,6 +69,7 @@ function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseS
 }
 
 function isLockedPublicPreview(id: string, challenge: Record<string, unknown>) {
+  if (["held", "suspended", "removed", "confirmed_abuse"].includes(String(challenge.moderationStatus))) return false;
   if (challenge.adminReviewRequired === true || ["pending_review", "changes_requested", "rejected"].includes(String(challenge.adminApprovalStatus ?? challenge.reviewStatus ?? ""))) return false;
   const visibility = text(challenge.visibility).toLowerCase();
   const type = text(challenge.type ?? challenge.competitionType).toLowerCase();
@@ -87,11 +91,11 @@ function cursorValue(challenge: Record<string, unknown>, field: string) {
   return value ?? 0;
 }
 
-function compareExploreDocs(left: QueryDocumentSnapshot, right: QueryDocumentSnapshot, field: string, direction: "asc" | "desc") {
+function compareExploreDocs(left: ExploreDoc, right: ExploreDoc, field: string, direction: "asc" | "desc") {
   const leftValue = cursorValue(left.data() as Record<string, unknown>, field);
   const rightValue = cursorValue(right.data() as Record<string, unknown>, field);
   const comparison = typeof leftValue === "number" && typeof rightValue === "number" ? leftValue - rightValue : String(leftValue).localeCompare(String(rightValue));
-  return (direction === "asc" ? comparison : -comparison) || left.id.localeCompare(right.id) * (direction === "asc" ? 1 : -1);
+  return (direction === "asc" ? comparison : -comparison) || left.id.localeCompare(right.id) * (direction === "asc" ? 1 : -1) || left.stream.localeCompare(right.stream);
 }
 
 function trustedRecentActivity(item: Record<string, unknown>) {
@@ -134,9 +138,7 @@ function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary
   if (input.sponsor) return { label: "View Challenge", href: detailHref, action: "view" };
   if (kind === "private") return { label: "Enter Access Code", href: detailHref, action: "access_code" };
   if (kind === "live_event") {
-    if (["completed", "winners_announced"].includes(input.phase.phase)) return { label: "Event Completed", href: detailHref, action: "view" };
-    if (!input.phase.registrationOpen) return { label: "View Event", href: detailHref, action: "view" };
-    return isPaidEntryChallenge(input.challenge) ? { label: "Buy Ticket", href: detailHref, action: "ticket" } : { label: "Register for Event", href: detailHref, action: "register" };
+    return { label: ["completed", "winners_announced"].includes(input.phase.phase) ? "Event Completed" : "View Event", href: `/live-events/${input.challenge.id}`, action: "view" };
   }
   if (kind === "tournament") {
     if (Boolean(input.challenge.bracketGeneratedAt)) return { label: "View Bracket", href: `/tournaments/${input.challenge.id}`, action: "bracket" };
@@ -167,11 +169,12 @@ export async function GET(request: NextRequest) {
   const category = text(url.searchParams.get("category")).slice(0, 80).toLowerCase();
   const phaseFilter = text(url.searchParams.get("phase")).slice(0, 40).toLowerCase();
   const entry = text(url.searchParams.get("entry")).slice(0, 20).toLowerCase();
-  const typeFilter = text(url.searchParams.get("type")).slice(0, 24).toLowerCase();
+  const requestedType = text(url.searchParams.get("type")).slice(0, 24).toLowerCase();
+  const typeFilter = requestedType === "normal" ? "standard" : requestedType;
   const sponsorReady = url.searchParams.get("sponsorReady") === "true";
   const sort = text(url.searchParams.get("sort")).slice(0, 40).toLowerCase() || "recent";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
-  const cursor = text(url.searchParams.get("cursor")).slice(0, 200);
+  const cursor = text(url.searchParams.get("cursor")).slice(0, 2000);
   const limit = CHALLENGE_PAGE_SIZE;
   if (page > 1 && !cursor) return serverError("Explore requires a cursor to continue this filtered result set.", "EXPLORE_CURSOR_REQUIRED");
   try {
@@ -187,28 +190,45 @@ export async function GET(request: NextRequest) {
       if (visibility === "private") query = query.where("publicPreviewEnabled", "==", true);
       return query;
     };
-    let publicQuery = orderQuery("public");
-    let lockedQuery = orderQuery("private");
+    let positions: Record<string, string> = {};
     if (cursor) {
-      const cursorSnapshot = await challengesRef.doc(cursor).get();
-      if (!cursorSnapshot.exists) return serverError("Explore pagination cursor is no longer available.", "EXPLORE_CURSOR_NOT_FOUND");
-      publicQuery = publicQuery.startAfter(cursorSnapshot);
-      lockedQuery = lockedQuery.startAfter(cursorSnapshot);
+      try { positions = cursor.startsWith("v2:") ? JSON.parse(Buffer.from(cursor.slice(3), "base64url").toString()) : { public: cursor, private: cursor }; }
+      catch { return serverError("Explore pagination cursor is invalid.", "EXPLORE_CURSOR_INVALID"); }
+      if (!positions || typeof positions !== "object" || Array.isArray(positions) || Object.entries(positions).some(([key,value]) => !["public","private","tournaments"].includes(key) || typeof value !== "string" || value.includes("/") || value.length > 1500)) return serverError("Explore pagination cursor is invalid.", "EXPLORE_CURSOR_INVALID");
     }
-    const [publicSnap, lockedSnap, participantSnap] = await Promise.all([
-      publicQuery.limit(EXPLORE_SCAN_PAGE + 1).get(),
-      typeFilter === "private" ? lockedQuery.limit(EXPLORE_SCAN_PAGE + 1).get() : Promise.resolve(null),
-      user ? db.collection("challengeParticipants").where("userId", "==", user.uid).limit(200).get() : Promise.resolve(null)
+    const includePrivate = !typeFilter || typeFilter === "private";
+    const includeTournament = !typeFilter || typeFilter === "tournament";
+    const tournamentField = sortField === "submissionDeadline" ? "createdAt" : sortField;
+    const streams = [
+      { name: "public", collection: "challenges", query: orderQuery("public") },
+      ...(includePrivate ? [{ name: "private", collection: "challenges", query: orderQuery("private") }] : []),
+      ...(includeTournament ? [{ name: "tournaments", collection: "tournaments", query: db.collection("tournaments").where("privacy", "==", "public").orderBy(tournamentField, sortDirection).orderBy(FieldPath.documentId(), sortDirection) }] : [])
+    ];
+    const [snapshots, participantSnap, schedulingReady] = await Promise.all([
+      Promise.all(streams.map(async stream => {
+        let ordered = stream.query;
+        if (positions[stream.name]) {
+          const saved = await db.collection(stream.collection).doc(positions[stream.name]).get();
+          if (!saved.exists) throw new Error("EXPLORE_CURSOR_NOT_FOUND");
+          ordered = ordered.startAfter(saved);
+        }
+        return ordered.limit(EXPLORE_SCAN_PAGE + 1).get();
+      })),
+      user ? db.collection("challengeParticipants").where("userId", "==", user.uid).limit(200).get() : Promise.resolve(null),
+      includeTournament ? tournamentRegistrationReady(db) : Promise.resolve(false)
     ]);
-    const lockedDocs = lockedSnap?.docs ?? [];
-    const candidateDocs = [...new Map([...publicSnap.docs, ...lockedDocs].map((doc) => [doc.id, doc])).values()]
-      .sort((left, right) => compareExploreDocs(left, right, sortField, sortDirection))
-      .slice(0, EXPLORE_SCAN_PAGE * 2);
+    const candidateDocs: ExploreDoc[] = snapshots.flatMap((snapshot,index) => snapshot.docs.map(doc => ({
+      id: doc.id, stream: streams[index].name, data: () => {
+        const record = withTournamentRegistrationAvailability(doc.data(), schedulingReady);
+        if (streams[index].name !== "tournaments") return record;
+        return { ...record, _tournamentSource: true, visibility: record.privacy, challengeType: "tournament", type: "Tournament Challenge", coverImageUrl: record.coverMedia?.url, creatorId: record.hostId, submissionDeadline: record.createdAt, entryFeeAmountCents: record.entryFeeAmountMinor ?? 0, paidEntryEnabled: record.entryType === "paid_entry_setup_required" };
+      }
+    }))).sort((left,right) => compareExploreDocs(left,right,sortField,sortDirection));
     const participantByChallenge = new Map((participantSnap?.docs ?? []).map((doc) => [String(doc.data().challengeId ?? ""), { id: doc.id, ...doc.data() }]));
     const all = candidateDocs.flatMap<Record<string, unknown> & { _sortDocId: string }>((doc) => {
       const raw = { id: doc.id, ...doc.data() } as Record<string, unknown>;
       const lockedPreview = isLockedPublicPreview(doc.id, raw);
-      if (!lockedPreview && !isPublicChallenge(doc.id, raw)) return [];
+      if (raw._tournamentSource ? !isPublishedTournament(raw) : !lockedPreview && !isPublicChallenge(doc.id, raw)) return [];
       const phase = getChallengePhaseSummary(raw, new Date(), { eligibleSubmissionCount: Number(raw.approvedSubmissionCount ?? raw.eligibleSubmissionCount ?? 0) });
       if (!isDefaultDiscoverable(raw, phase)) return [];
       if (phaseFilter && phase.phase !== phaseFilter) return [];
@@ -239,7 +259,7 @@ export async function GET(request: NextRequest) {
           detailHref: `/private/preview/${doc.id}`,
           cta: { label: "View Locked Challenge", href: `/private/preview/${doc.id}`, action: "locked_preview" }
         };
-        return [{ ...item, _sortDocId: doc.id }];
+        return [{ ...item, _sortDocId: doc.stream + ":" + doc.id }];
       }
       const publicFields = publicChallengeFields(raw, doc.id);
       const paid = isPaidEntryChallenge(raw);
@@ -251,7 +271,7 @@ export async function GET(request: NextRequest) {
         id: doc.id,
         challengeType: kind,
         typeLabel: typeLabel(kind),
-        detailHref: `/challenges/${doc.id}`,
+        detailHref: `/${kind === "tournament" ? "tournaments" : kind === "live_event" ? "live-events" : "challenges"}/${doc.id}`,
         title: text(publicFields.title ?? raw.title) || "Untitled challenge",
         shortDescription: text(raw.shortDescription ?? raw.summary),
         coverImageUrl: text(publicFields.coverImageUrl ?? raw.bannerUrl ?? raw.mediaUrl),
@@ -275,17 +295,20 @@ export async function GET(request: NextRequest) {
         activityLabel: trend?.activityLabel ?? null,
         paidEntry: { required: paid, amountCents: paid ? paidEntryAmountCents(raw) : 0, currency: "usd" },
         creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
-        cta: ctaFor({ challenge: raw, phase, userId: user?.uid ?? null, sponsor, participant: participantByChallenge.get(doc.id) })
+        cta: raw._tournamentSource ? { label: raw.registrationAvailability === "temporarily_unavailable" ? "Registration Temporarily Unavailable" : "View Tournament", href: `/tournaments/${doc.id}`, action: "view" } : ctaFor({ challenge: raw, phase, userId: user?.uid ?? null, sponsor, participant: participantByChallenge.get(doc.id) })
       };
-      return [{ ...challenge, _sortDocId: doc.id }];
+      return [{ ...challenge, _sortDocId: doc.stream + ":" + doc.id }];
     });
     const pageItems = all.slice(0, limit);
     const hasExtraMatch = all.length > limit;
-    const hasMoreCandidates = publicSnap.size > EXPLORE_SCAN_PAGE || Boolean(lockedSnap && lockedSnap.size > EXPLORE_SCAN_PAGE) || candidateDocs.length < publicSnap.size + lockedDocs.length;
+    const hasMoreCandidates = snapshots.some(snapshot => snapshot.size > EXPLORE_SCAN_PAGE);
     const hasMore = hasExtraMatch || hasMoreCandidates;
-    const nextCursor = hasExtraMatch
-      ? String(pageItems.at(-1)?._sortDocId ?? "")
-      : hasMoreCandidates ? candidateDocs.at(-1)?.id ?? "" : null;
+    const consumedKey = hasExtraMatch ? String(pageItems.at(-1)?._sortDocId ?? "") : null;
+    for (const doc of candidateDocs) {
+      positions[doc.stream] = doc.id;
+      if (consumedKey === doc.stream + ":" + doc.id) break;
+    }
+    const nextCursor = hasMore ? "v2:" + Buffer.from(JSON.stringify(positions)).toString("base64url") : null;
     const items = pageItems.map((item) => {
       const { _sortDocId: _cursorId, ...publicItem } = item;
       return withoutRankingSignals(publicItem);
@@ -295,7 +318,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 12)
       .map((item) => { const { _sortDocId: _cursorId, ...publicItem } = item; return withoutRankingSignals(publicItem); });
     const categories = NORMAL_CHALLENGE_CATEGORIES.map((item) => item.label);
-    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: null, hasMore, nextCursor: nextCursor || null, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: true, cursorPagination: true, scannedPageLimit: EXPLORE_SCAN_PAGE * (typeFilter === "private" ? 2 : 1), lockedPrivatePreviewsIncluded: typeFilter === "private", privateChallengesRequireExplicitFilter: true }, "Explore challenges loaded.");
+    return ok({ challenges: items, featured: trending, trending, categories, page, limit, total: null, hasMore, nextCursor: nextCursor || null, filters: { q: query, category, phase: phaseFilter, entry, type: typeFilter, sort, sponsorReady }, privateFieldsExcluded: true, realDataOnly: true, defaultClosedExcluded: true, cursorPagination: true, scannedPageLimit: EXPLORE_SCAN_PAGE * streams.length, lockedPrivatePreviewsIncluded: includePrivate, privateChallengesRequireExplicitFilter: false }, "Explore challenges loaded.");
   } catch (error) {
     return serverError("Explore challenges could not be loaded.", error instanceof Error ? error.message : error);
   }

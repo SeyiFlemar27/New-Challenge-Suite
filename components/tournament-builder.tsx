@@ -120,14 +120,14 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
     const errors: string[] = [];
     const warnings: string[] = [];
     if (!form.title.trim() || form.title.trim().length > 120) errors.push("Tournament title is required and must be 120 characters or fewer.");
-    if (form.description.trim().length < 20 || form.description.trim().length > 1200) errors.push("Full description must be 20–1,200 characters.");
+    if (!form.description.trim() || form.description.trim().length > 1200) errors.push("Describe the Tournament in up to 1,200 characters.");
     if (!form.category.trim()) errors.push("Category is required.");
     if (!form.coverImageUrl || !form.coverImagePath) errors.push("Cover media upload must complete.");
     if (form.participationMode === "team" && (!Number.isInteger(form.minimumTeamSize) || !Number.isInteger(form.maximumTeamSize) || form.minimumTeamSize < 1 || form.minimumTeamSize > form.maximumTeamSize || form.maximumTeamSize > 20)) errors.push("Team size must satisfy 1 <= minimum <= maximum <= 20.");
     if (form.entryType === "paid_entry_setup_required" && form.entryFeeAmountMinor < 500) errors.push("Set a valid paid entry amount.");
     const funding = tournamentBasePrizeReadiness(form.basePrizeAmountMinor, confirmedCreatorCents);
     if (!funding.valid) errors.push("Choose no Base Prize or a Base Prize of at least $5.");
-    else if (!funding.fullyFunded) errors.push(`Your Base Prize is $${(form.basePrizeAmountMinor / 100).toFixed(2)}, but only $${(confirmedCreatorCents / 100).toFixed(2)} is confirmed. Fund the remaining $${(funding.outstandingCents / 100).toFixed(2)} before Admin Review.`);
+    else if (!funding.fullyFunded) errors.push(`Your Base Prize is $${(form.basePrizeAmountMinor / 100).toFixed(2)}, but only $${(confirmedCreatorCents / 100).toFixed(2)} is confirmed. Fund the remaining $${(funding.outstandingCents / 100).toFixed(2)} before publishing.`);
     if (form.entryType === "paid_entry_setup_required") warnings.push("Paid entry remains provider-confirmed and setup-gated.");
     if (["uploading", "preparing", "processing"].includes(coverStatus)) errors.push("Wait for cover upload to finish.");
     if (["uploading", "preparing", "processing"].includes(trailerStatus)) errors.push("Wait for trailer upload to finish.");
@@ -170,7 +170,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   function persistDraft(payload: ReturnType<typeof draftPayload>) {
     const pending = saveQueue.current.then(async () => {
       if (!creationKey.current) creationKey.current = crypto.randomUUID();
-      const result = await apiRequest<{ tournament: { id: string; updatedAt?: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", ...(!createdId ? { headers: { "x-challenge-creation-key": creationKey.current } } : {}), body: JSON.stringify({ ...payload, ...(createdId && serverUpdatedAt.current ? { expectedUpdatedAt: serverUpdatedAt.current } : {}) }) });
+      const result = await apiRequest<{ tournament: { id: string; updatedAt?: string; status?: string; publicationOutcome?: string } }>(createdId ? `/api/tournaments/${createdId}` : "/api/tournaments", { method: createdId ? "PATCH" : "POST", ...(!createdId ? { headers: { "x-challenge-creation-key": creationKey.current } } : {}), body: JSON.stringify({ ...payload, ...(createdId && serverUpdatedAt.current ? { expectedUpdatedAt: serverUpdatedAt.current } : {}) }) });
       if (result.ok && result.data?.tournament.updatedAt) serverUpdatedAt.current = result.data.tournament.updatedAt;
       return result;
     });
@@ -217,10 +217,11 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
     setCreatedId(result.data.tournament.id);
     if (status === "pending_review") {
       invalidateAutosave();
+      setSubmittedStatus(String(result.data.tournament.publicationOutcome === "held_for_moderation" ? "held_for_moderation" : result.data.tournament.status));
       setSubmitted(true);
       setNotice("");
     }
-    if (!quiet) setNotice(status === "pending_review" ? "Your challenge has been submitted for review." : "Tournament draft saved.");
+    if (!quiet) setNotice(status === "pending_review" ? "Your Tournament is published." : "Tournament draft saved.");
     return result.data.tournament.id;
   }
 
@@ -264,7 +265,7 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   }
 
   function currentStepError() {
-    if (stepKey === "overview" && (!form.title.trim() || form.title.trim().length > 120 || !form.category.trim() || !form.subcategory.trim() || form.description.trim().length < 20 || form.description.trim().length > 1200)) return "Add a title of up to 120 characters, category, subcategory, and a 20–1,200 character full description before continuing.";
+    if (stepKey === "overview" && (!form.title.trim() || form.title.trim().length > 120 || !form.category.trim() || !form.description.trim() || form.description.trim().length > 1200)) return "Add a title of up to 120 characters, category and a description of up to 1,200 characters before continuing.";
     if (stepKey === "registration" && form.participationMode === "team" && (form.minimumTeamSize < 1 || form.minimumTeamSize > form.maximumTeamSize || form.maximumTeamSize > 20)) return "Set valid tournament team sizes before continuing.";
     if (stepKey === "monetization" && form.entryType === "paid_entry_setup_required" && form.entryFeeAmountMinor < 500) return "Set a valid paid entry amount.";
     if (stepKey === "media" && (!form.coverImageUrl || !form.coverImagePath)) return "Upload the tournament cover before continuing.";
@@ -290,14 +291,14 @@ export function TournamentBuilder({ enterpriseOwnership, draftId }: { enterprise
   if (!auth.user) return <AppShell><main className="mx-auto max-w-xl px-4 py-10"><Card className="p-8"><h1 className="text-2xl font-black">Sign in to create a tournament</h1><LinkButton href="/auth/login?next=%2Ftournaments%2Fcreate" className="mt-5">Sign In</LinkButton></Card></main></AppShell>;
   if (legacyDraftHeld) return <AppShell><main className="mx-auto max-w-2xl px-4 py-10"><Card className="p-6"><h1 className="text-xl font-black">Existing Tournament draft preserved</h1><p role="status" className="mt-3">This draft uses earlier competition or financial terms. No saved fields, media, funding or participant records have been changed.</p><p className="mt-3 text-sm text-[var(--muted)]">The responsible owner may explicitly convert an unused draft to the current public Tournament rules. The server archives its original contents and refuses conversion if competition activity, funding or financial references exist. Those drafts require Support review.</p>{notice ? <p role="alert" className="mt-3 text-sm">{notice}</p> : null}<div className="mt-5 flex flex-wrap gap-3"><Button disabled={saving} onClick={() => void adoptLegacyDraft()}>Convert unused draft to current rules</Button><LinkButton href="/my-tournaments" variant="secondary">My Tournaments</LinkButton><LinkButton href="/support/new" variant="secondary">Contact Support</LinkButton></div></Card></main></AppShell>;
   if (restoreFailed) return <AppShell><Card className="mx-auto my-10 max-w-xl p-6"><h1 className="text-xl font-black">Draft unavailable</h1><p role="alert" className="mt-3">{notice}</p><Button className="mt-4" onClick={() => window.location.reload()}>Retry</Button></Card></AppShell>;
-  if (submitted && createdId) return <AppShell><main className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Card className="p-6 sm:p-8"><div className="grid size-12 place-items-center rounded-full bg-emerald-100 text-emerald-800"><Check size={24} /></div><h1 className="mt-5 text-2xl font-black">{submittedStatus === "pending_review" ? "Tournament Submitted" : "Tournament is read-only"}</h1><p className="mt-3 text-sm font-bold">Current status: {submittedStatus.replaceAll("_", " ")}.</p><p className="mt-3 text-sm leading-6 text-slate-600">Editing is unavailable during Admin review and after publication. Your existing Tournament has not been recreated.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href={`/tournaments/${createdId}`}>View Tournament</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/contact" variant="ghost">Contact Support</LinkButton></div></Card></main></AppShell>;
+  if (submitted && createdId) return <AppShell><main className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Card className="p-6 sm:p-8"><div className="grid size-12 place-items-center rounded-full bg-emerald-100 text-emerald-800"><Check size={24} /></div><h1 className="mt-5 text-2xl font-black">{submittedStatus === "held_for_moderation" ? "Held for moderation" : "Tournament Published"}</h1><p className="mt-3 text-sm font-bold">Current status: {submittedStatus.replaceAll("_", " ")}.</p><p className="mt-3 text-sm leading-6 text-slate-600">Publication and registration availability are separate. Descriptive edits remain available; participant and financial commitments are protected.</p><div className="mt-6 flex flex-wrap gap-3"><LinkButton href={`/tournaments/${createdId}`}>View Tournament</LinkButton><LinkButton href="/dashboard/host" variant="secondary">Back to Dashboard</LinkButton><LinkButton href="/contact" variant="ghost">Contact Support</LinkButton></div></Card></main></AppShell>;
 
   const userId = auth.user.uid;
   const guide = (tournamentRegistry[step] ?? tournamentRegistry[0]).guide;
   return (
     <AppShell>
       <main ref={mainRef} className="mx-auto w-full max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8">
-        <PageTitle title="Create Tournament Challenge" subtitle="Configure a first-class Tournament Challenge using the reviewed publishing workflow." icon={<Trophy />} />
+        <PageTitle title="Create Tournament Challenge" subtitle="Configure your Tournament, then publish when the essential checks pass." icon={<Trophy />} />
         <ChallengeBuilderFrame steps={steps} currentStep={step} unlockedStep={unlocked} guide={guide} guideOpen={mobileGuideOpen} setGuideOpen={setMobileGuideOpen} onStepChange={value => { if (mediaBusy) { setNotice("Wait for your media upload to finish before leaving this step."); return; } setStep(value); }}>
             <BuilderSurface>
              <BuilderContent>
@@ -398,12 +399,12 @@ function ReviewStep({ form, readiness, roundPlan, confirmedCreatorCents, edit }:
     ["format", "Tournament Format & Bracket", `${form.participationMode} / ${form.format.replaceAll("_", " ")}\n${form.participantCapacity} slots; up to ${roundPlan.length} stages${form.format === "double_elimination" ? ", including a conditional Grand Final reset" : ", including the Third-Place Match"}; full-capacity random pairing without initial byes.`],
     ["registration", "Registration & Teams", form.participationMode === "team" ? `${form.minimumTeamSize}–${form.maximumTeamSize} members; ${form.teamJoiningMode.replaceAll("_", " ")}. Each member pays their own fee within the captain-started ${form.teamPaymentWindowMinutes}-minute window.` : "Open registration for eligible individuals. Paid entry requires server-confirmed payment."],
     ["monetization", "Monetization & Prize Pool", `${form.entryType === "free" ? "Free entry" : `$${(form.entryFeeAmountMinor / 100).toFixed(2)} entry per ${form.participationMode === "team" ? "member" : "individual"}`}\nBase Prize: $${(form.basePrizeAmountMinor / 100).toFixed(2)}. Confirmed creator funding: $${(confirmedCreatorCents / 100).toFixed(2)}. ${form.basePrizeAmountMinor === 0 ? "No Base Prize funding required." : `Outstanding: $${(funding.outstandingCents / 100).toFixed(2)}.`}\nSponsorship: ${form.sponsorReady ? "open to proposals; no unconfirmed money counted" : "off"}. Winner allocation: 60% / 25% / 15%.`],
-    ["media", "Media", `${form.coverImagePath ? "Cover uploaded" : "Cover required"}; ${form.galleryMedia.length} additional images; ${form.trailerPath ? "optional video uploaded" : "no optional video"}. Server verification is required before review.`],
+    ["media", "Media", `${form.coverImagePath ? "Cover uploaded" : "Cover required"}; ${form.galleryMedia.length} additional images; ${form.trailerPath ? "optional video uploaded" : "no optional video"}. Server verification is required before publishing.`],
     ["rounds", "Round Timing & Submissions", `${form.submissionDurationHours}-hour submission window; ${form.votingDurationHours}-hour voting window. Accepted media: ${form.submissionMediaTypes.join(" / ")}.\n${form.submissionInstructions.join("\n") || "No additional submission instructions."}\nAutomatic Free-first voting, then optional additional votes at 5 DoroCoins each.`],
   ] as const;
-  return <section><StepTitle title="Review & Publish" body="Review the actual saved configuration and confirmed funding before Admin Review." />
+  return <section><StepTitle title="Review & Publish" body="Review the actual saved configuration and confirmed funding before publishing." />
     <div className="mt-5 divide-y divide-[var(--line)]">{summaries.map(([key, label, body]) => <section key={key} className="flex items-start justify-between gap-4 py-5"><div className="min-w-0"><h3 className="font-black">{label}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--muted)]">{body}</p></div><Button variant="ghost" onClick={() => edit(key)} aria-label={`Edit ${label}`}>Edit</Button></section>)}</div>
-    <Card className="mt-5 p-5"><h3 className="font-black">{readiness.ready ? "Ready to submit for review" : "Needs fixes"}</h3><ul className="mt-3 space-y-2 text-sm">{readiness.errors.map(item => <li key={item} className="text-red-700 dark:text-red-300">{item}</li>)}{readiness.warnings.map(item => <li key={item} className="text-amber-800 dark:text-amber-200">{item}</li>)}</ul></Card>
+    <Card className="mt-5 p-5"><h3 className="font-black">{readiness.ready ? "Ready to publish" : "Needs fixes"}</h3><ul className="mt-3 space-y-2 text-sm">{readiness.errors.map(item => <li key={item} className="text-red-700 dark:text-red-300">{item}</li>)}{readiness.warnings.map(item => <li key={item} className="text-amber-800 dark:text-amber-200">{item}</li>)}</ul></Card>
   </section>;
 }
 

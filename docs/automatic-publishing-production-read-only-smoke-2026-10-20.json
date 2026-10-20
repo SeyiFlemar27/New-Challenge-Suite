@@ -1,0 +1,86 @@
+{
+  "target": "https://www.challengesuite.com",
+  "readOnly": true,
+  "recordsCreated": 0,
+  "noFinancialOperations": true,
+  "applicationReleaseUnchanged": true,
+  "results": [
+    {
+      "label": "Homepage",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Authentication page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Explore page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Public Explore API",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Tournament listing API",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Sponsor application route",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Enterprise contact route",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Voting requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Creator draft requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Admin moderation requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Public challenge detail API",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Public challenge detail page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Anonymous direct challenges read denied",
+      "status": 403,
+      "passed": true
+    },
+    {
+      "label": "Anonymous direct submissions read denied",
+      "status": 403,
+      "passed": true
+    },
+    {
+      "label": "Anonymous direct votes read denied",
+      "status": 403,
+      "passed": true
+    }
+  ],
+  "authenticatedAcceptance": "Not performed: no approved isolated production identity.",
+  "completedAt": "2026-10-20T12:51:29.649Z"
+}
