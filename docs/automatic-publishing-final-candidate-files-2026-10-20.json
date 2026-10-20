@@ -315,8 +315,8 @@
     },
     {
       "path": "docs/qa/automatic-publishing-20261020/deployed-firestore-rules-before-20261020.rules",
-      "bytes": 4548,
-      "sha256": "d885a2fd027abb5eb519dca06c6ac07785890db36c9f7a9b09ff0dd8cfe3b417"
+      "bytes": 4547,
+      "sha256": "8d83240a73b7e6042824ee0126acade8ac88bd9ddd3f021f4270fbd75907dc5a"
     },
     {
       "path": "docs/qa/automatic-publishing-20261020/final-runtime-browser-summary.json",
@@ -335,8 +335,8 @@
     },
     {
       "path": "docs/qa/automatic-publishing-20261020/proposed-firestore-private-content-20261020.rules",
-      "bytes": 4479,
-      "sha256": "66780161035d667fa5eb5344897f40d47d5e7b43b2c675a05240d77dff1c657b"
+      "bytes": 4478,
+      "sha256": "a7c0d47304c9a1597cf37a0c9cd166c422dae03baea19aa6895263654c58629f"
     },
     {
       "path": "docs/tournament-final-backlog-inspection-2026-10-20.json",
@@ -632,5 +632,10 @@
   ],
   "privateEnvironmentFilesExcluded": true,
   "operationalProvisioningScriptsExcluded": true,
-  "stagingPerformed": false
+  "stagingPerformed": false,
+  "documentationWhitespaceCorrection": [
+    "docs/qa/automatic-publishing-20261020/deployed-firestore-rules-before-20261020.rules",
+    "docs/qa/automatic-publishing-20261020/proposed-firestore-private-content-20261020.rules"
+  ],
+  "hashBasis": "Windows working-tree bytes before Git line-ending normalization"
 }
