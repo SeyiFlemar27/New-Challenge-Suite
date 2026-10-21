@@ -27,13 +27,13 @@ type DashboardResponse = {
 
 export default function SponsorDashboardPage() {
   const router = useRouter();
-  const { user, loading: userLoading } = useCurrentUser();
+  const { user, loading: userLoading, revision } = useCurrentUser();
   const searchParams = useSearchParams();
   const initialOpportunityTab = searchParams.get("opportunities");
   const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">(initialOpportunityTab === "creators" ? "creators" : "challenges");
   const isSponsorAccount = Boolean(user?.selectedAccountType === "sponsor" || user?.isSponsor || user?.accountType === "sponsor");
   const pendingProfileSetup = Boolean(isSponsorAccount && !user?.hasSponsorProfile && !user?.sponsorOrganizationId);
-  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard"], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false, enabled: !userLoading && isSponsorAccount && !pendingProfileSetup });
+  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard", user?.uid, user?.sponsorOrganizationId, revision], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false, enabled: !userLoading && isSponsorAccount && !pendingProfileSetup });
   const reloadDashboard = async () => { await dashboardQuery.refetch(); };
   const dashboard = dashboardQuery.data?.ok ? dashboardQuery.data.data ?? null : null;
   const loading = userLoading || dashboardQuery.isLoading;

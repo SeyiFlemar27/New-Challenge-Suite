@@ -1,11 +1,15 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { AccountResolutionState } from "@/components/account-resolution-state";
+import { AccountRouteGate } from "@/components/account-route-gate";
 import { Card, LinkButton } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 import { isPublicTournamentRoute } from "@/lib/tournament-public-route-policy";
 import { isPublicLiveEventRoute } from "@/lib/live-event-public-route-policy";
+import { safeInternalDestination } from "@/lib/account-routing";
 
 const publicPrefixes = ["/auth", "/categories", "/mobile-preview"];
 const publicRoutes = new Set([
@@ -36,14 +40,22 @@ function isPublicRoute(pathname: string) {
 
 export function VerificationGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { loading, firebaseConfigured, user, verified } = useAuth();
+  const { loading, error, refreshProfile, firebaseConfigured, user, verified } = useAuth();
   const publicPage = isPublicRoute(pathname);
 
   if (publicPage || !firebaseConfigured) return <>{children}</>;
-  if (loading) return null;
-  if (!user) return <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref={`/auth/login?next=${encodeURIComponent(pathname)}`} actionLabel="Sign In" />;
-  if (!verified) return <Gate title="Check your email" body="Enter the 6-digit code we sent to continue into Challenge Suite." actionHref="/auth/verify-email" actionLabel="Enter Code" />;
-  return <>{children}</>;
+  if (loading) return <AccountResolutionState />;
+  if (error) return <AccountResolutionState error={error} onRetry={() => void refreshProfile()} />;
+  if (!user || !verified) return <Suspense fallback={<AccountResolutionState />}><AuthenticationGate pathname={pathname} verification={Boolean(user)} /></Suspense>;
+  return <Suspense fallback={<AccountResolutionState />}><AccountRouteGate>{children}</AccountRouteGate></Suspense>;
+}
+
+function AuthenticationGate({ pathname, verification }: { pathname: string; verification: boolean }) {
+  const search = useSearchParams().toString();
+  const destination = safeInternalDestination(pathname + (search ? `?${search}` : "")) || "/dashboard";
+  return verification
+    ? <Gate title="Check your email" body="Enter the 6-digit code we sent to continue into Challenge Suite." actionHref={`/auth/verify-email?returnUrl=${encodeURIComponent(destination)}`} actionLabel="Enter Code" />
+    : <Gate title="Sign in required" body="Please sign in before continuing into Challenge Suite." actionHref={`/auth/login?next=${encodeURIComponent(destination)}`} actionLabel="Sign In" />;
 }
 
 function Gate({ title, body, actionHref, actionLabel }: { title: string; body: string; actionHref: string; actionLabel: string }) {

@@ -30,6 +30,7 @@ export interface SignupInput {
 }
 
 export interface AuthProfile {
+  [key: string]: unknown;
   uid: string;
   firstName: string;
   lastName: string;
@@ -44,6 +45,9 @@ export interface AuthProfile {
   accountIntroOnboardingCompletedAt?: string | null;
   dashboardType?: string;
   planId?: UserPlanId;
+  planStatus?: string;
+  creatorOnboardingComplete?: boolean;
+  hostOnboardingComplete?: boolean;
   doroBalance?: number;
   premium: boolean;
   verified: boolean;
@@ -82,7 +86,7 @@ export async function syncServerSession(user: User, rememberMe = getRememberMePr
       Authorization: `Bearer ${idToken}`
     },
       body: JSON.stringify({ rememberMe }),
-      signal: controller.signal
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)])
     });
     if (version !== sessionSyncVersion) return;
     const result = await parseApiResponse<unknown>(response);
@@ -102,25 +106,28 @@ async function clearServerSession() {
   activeSessionSync = null;
   await fetch("/api/auth/session", {
     method: "DELETE",
-    credentials: "same-origin"
+    credentials: "same-origin",
+    signal: AbortSignal.timeout(20000)
   }).catch(() => undefined);
 }
 
-export function listenToAuth(callback: (user: User | null) => void) {
+export function listenToAuth(callback: (user: User | null) => void, onError?: () => void) {
   if (!isFirebaseConfigured) {
     callback(null);
     return () => undefined;
   }
   if (!auth) throw new Error("Authentication is not configured yet.");
-  return onIdTokenChanged(auth, callback);
+  return onIdTokenChanged(auth, callback, onError);
 }
 
 async function callProfileBootstrap(user: User, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", headers.get("Content-Type") || "application/json");
-  headers.set("Authorization", `Bearer ${await user.getIdToken(true)}`);
+  // A forced refresh here re-enters onIdTokenChanged while its profile read is
+  // still resolving. Explicit verification flows refresh the token themselves.
+  headers.set("Authorization", `Bearer ${await user.getIdToken()}`);
 
-  const response = await fetch("/api/auth/profile/bootstrap", { ...init, headers });
+  const response = await fetch("/api/auth/profile/bootstrap", { ...init, headers, cache: "no-store", signal: init.signal ?? AbortSignal.timeout(20000) });
   const body = await parseApiResponse<BootstrapResponse>(response);
   if (!body.ok || !body.data) {
     throw new Error(body.message || "Profile could not be prepared.");
@@ -199,6 +206,8 @@ export async function sendResetEmail(email: string) {
 export async function logout() {
   if (!isFirebaseConfigured) return;
   if (!auth) throw new Error("Authentication is not configured yet.");
+  window.dispatchEvent(new Event("challenge-suite-auth-transition"));
+  invalidateCurrentProfileRead();
   try {
     await clearServerSession();
   } finally {
@@ -222,11 +231,18 @@ export async function loginWithGoogle(rememberMe = false) {
     syncServerSession(credential.user, rememberMe),
     ensureGoogleProfile(credential.user)
   ]);
-  return { mode: "firebase" as const, user: credential.user, emailVerified: Boolean(profile.verified || profile.emailVerified || credential.user.emailVerified) };
+  return { mode: "firebase" as const, user: credential.user, profile, emailVerified: Boolean(profile.verified || profile.emailVerified || credential.user.emailVerified) };
 }
 
+let pendingProfile: { uid: string; promise: Promise<AuthProfile> } | null = null;
+export function invalidateCurrentProfileRead() { pendingProfile = null; }
 export async function getCurrentProfile(uid: string) {
   if (!auth?.currentUser || auth.currentUser.uid !== uid) return null;
-  const result = await callProfileBootstrap(auth.currentUser, { method: "GET" });
-  return result.user;
+  if (pendingProfile?.uid === uid) return pendingProfile.promise;
+  const promise = callProfileBootstrap(auth.currentUser, { method: "GET" }).then(result => {
+    if (result.user.uid !== uid) throw new Error("Your account changed. Please try again.");
+    return result.user;
+  }).finally(() => { if (pendingProfile?.promise === promise) pendingProfile = null; });
+  pendingProfile = { uid, promise };
+  return promise;
 }

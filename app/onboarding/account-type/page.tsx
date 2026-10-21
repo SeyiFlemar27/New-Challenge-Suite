@@ -6,6 +6,8 @@ import { Building2, Megaphone } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { Button, Card } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { useAuth } from "@/components/auth-provider";
+import { getAuthenticatedDestination, requestedAccountDestination } from "@/lib/account-routing";
 
 const options = [
   { id: "creator", title: "Creator", icon: Megaphone, copy: "Create challenges, grow an audience, and unlock sponsorship opportunities." },
@@ -14,6 +16,7 @@ const options = [
 
 export default function AccountTypeOnboardingPage() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const [selected, setSelected] = useState<(typeof options)[number]["id"] | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -31,7 +34,10 @@ export default function AccountTypeOnboardingPage() {
       setError(result.message || "Account type could not be saved.");
       return;
     }
-    router.replace(result.data.destination);
+    window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+    const profile = await refreshProfile();
+    if (!profile) { setSaving(false); setError("Your selection was saved, but account access could not be refreshed. Please try again."); return; }
+    router.replace(getAuthenticatedDestination(profile, requestedAccountDestination(window.location.search)));
   }
 
   return (

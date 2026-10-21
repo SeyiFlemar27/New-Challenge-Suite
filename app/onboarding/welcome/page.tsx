@@ -6,6 +6,8 @@ import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { BrandLogo } from "@/components/brand";
 import { Button, Card } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { useAuth } from "@/components/auth-provider";
+import { getAuthenticatedDestination, requestedAccountDestination } from "@/lib/account-routing";
 
 type AccountType = "creator" | "sponsor";
 type IntroResponse = { status: "in_progress" | "complete"; step: number; accountType: AccountType | null; destination?: string };
@@ -26,6 +28,7 @@ const screens: Record<AccountType, Array<{ title: string; description: string }>
 
 export default function AccountWelcomePage() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [flow, setFlow] = useState<FlowState>({ kind: "loading" });
   const [saving, setSaving] = useState(false);
@@ -81,7 +84,10 @@ export default function AccountWelcomePage() {
     try {
       const result = await apiRequest<IntroResponse>("/api/onboarding/intro", { method: "PATCH", body: JSON.stringify({ complete: true }) });
       if (!result.ok || !result.data) throw new Error(result.message || "Your onboarding could not be completed.");
-      router.replace(result.data.destination || (flow.accountType === "sponsor" ? "/sponsor/dashboard" : "/dashboard"));
+      window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+      const profile = await refreshProfile();
+      if (!profile) throw new Error("Your introduction was saved, but account access could not be refreshed. Please try again.");
+      router.replace(getAuthenticatedDestination(profile, requestedAccountDestination(window.location.search)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Your onboarding could not be completed.");
       setSaving(false);

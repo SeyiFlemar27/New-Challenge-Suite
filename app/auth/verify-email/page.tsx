@@ -8,7 +8,7 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
 import { useAuth } from "@/components/auth-provider";
 import { fetchBootstrapProfile, requestEmailVerificationCode, verifyEmailCode } from "@/lib/api/services";
-import { getAuthenticatedDestination } from "@/lib/account-routing";
+import { getAuthenticatedDestination, safeInternalDestination } from "@/lib/account-routing";
 import { auth } from "@/lib/firebase/client";
 
 const RESEND_SECONDS = 60;
@@ -27,7 +27,7 @@ function getSafeReturnUrl() {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const value = params.get("returnUrl") || params.get("next") || params.get("returnTo");
-  return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : null;
+  return safeInternalDestination(value) || null;
 }
 
 async function getVerifiedDestination() {

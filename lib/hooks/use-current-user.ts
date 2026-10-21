@@ -1,28 +1,11 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { fetchBootstrapProfile } from "@/lib/api/services";
+import type { AuthProfile } from "@/lib/firebase/auth-service";
 import type { AccountType, AppRole, UserPlanId } from "@/lib/types";
 import type { ProfileCustomization } from "@/lib/customization/options";
 import { resolveProfileIdentity } from "@/lib/profile-identity";
-
-type BootstrapResult = Awaited<ReturnType<typeof fetchBootstrapProfile>>;
-let cachedBootstrap: { uid: string; result: BootstrapResult } | null = null;
-let pendingBootstrap: { uid: string; promise: Promise<BootstrapResult> } | null = null;
-
-async function loadBootstrapProfile(uid: string) {
-  if (cachedBootstrap?.uid === uid) return cachedBootstrap.result;
-  if (pendingBootstrap?.uid === uid) return pendingBootstrap.promise;
-  const promise = fetchBootstrapProfile().then((result) => {
-    if (result.ok && result.data?.user) cachedBootstrap = { uid, result };
-    return result;
-  }).finally(() => {
-    if (pendingBootstrap?.uid === uid) pendingBootstrap = null;
-  });
-  pendingBootstrap = { uid, promise };
-  return promise;
-}
 
 export interface CurrentUserProfile {
   uid: string;
@@ -75,15 +58,6 @@ export interface CurrentUserProfile {
   sponsorOrganizationLogoUrl?: string | null;
 }
 
-function initialsFromName(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 function accountTypeFromProfile(profile: Record<string, unknown>) {
   if (profile.isAdmin || profile.accountType === "admin") return "admin" as const;
@@ -91,52 +65,16 @@ function accountTypeFromProfile(profile: Record<string, unknown>) {
   return "user" as const;
 }
 
-export function useCurrentUser() {
-  const auth = useAuth();
-  const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    const refresh = () => {
-      cachedBootstrap = null;
-      setRefreshKey((current) => current + 1);
-    };
-    window.addEventListener("challenge-suite-profile-updated", refresh);
-    return () => window.removeEventListener("challenge-suite-profile-updated", refresh);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCurrentUser() {
-      if (auth.loading) return;
-      if (!auth.user) {
-        setCurrentUser(null);
-        setLoadingProfile(false);
-        setError(null);
-        return;
-      }
-
-      setLoadingProfile(true);
-      setError(null);
-
-      try {
-        const result = await loadBootstrapProfile(auth.user.uid);
-        if (cancelled) return;
-        if (!result.ok || !result.data?.user) {
-          throw new Error(result.message || "Profile could not be loaded.");
-        }
-
-        const profile = result.data.user;
+function resolvedCurrentUser(profile: AuthProfile, identityUser: { uid: string; email: string | null; displayName: string | null }) {
+  const auth = { user: identityUser };
         const profileRecord = profile as Record<string, unknown>;
         const identity = resolveProfileIdentity(profileRecord, String(auth.user.email || profile.email || ""), String(auth.user.displayName || ""));
         const displayName = identity.displayName;
         const planId = typeof profile.planId === "string" ? profile.planId as UserPlanId : undefined;
         const accountType = accountTypeFromProfile(profileRecord);
 
-        setCurrentUser({
+        return {
           uid: auth.user.uid,
           email: String(auth.user.email || profile.email || ""),
           displayName,
@@ -185,28 +123,13 @@ export function useCurrentUser() {
           sponsorOrganizationId: typeof profileRecord.sponsorOrganizationId === "string" ? profileRecord.sponsorOrganizationId : null,
           sponsorOrganizationName: typeof profileRecord.sponsorOrganizationName === "string" ? profileRecord.sponsorOrganizationName : null,
           sponsorOrganizationLogoUrl: typeof profileRecord.sponsorOrganizationLogoUrl === "string" ? profileRecord.sponsorOrganizationLogoUrl : null
-        });
-      } catch (caught) {
-        if (!cancelled) {
-          setCurrentUser(null);
-          setError(caught instanceof Error ? caught.message : "Profile could not be loaded.");
-        }
-      } finally {
-        if (!cancelled) setLoadingProfile(false);
-      }
-    }
+        } as CurrentUserProfile;
+}
 
-    void loadCurrentUser();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [auth.loading, auth.user, refreshKey]);
-
-  return useMemo(() => ({
-    user: currentUser,
-    loading: auth.loading || loadingProfile,
-    signedOut: !auth.loading && !auth.user,
-    error
-  }), [auth.loading, auth.user, currentUser, error, loadingProfile]);
+/** All consumers share AuthProvider's authenticated, UID-checked bootstrap. */
+export function useCurrentUser() {
+  const auth = useAuth();
+  const user = useMemo(() => !auth.loading && !auth.error && auth.user && auth.profile?.uid === auth.user.uid
+    ? resolvedCurrentUser(auth.profile, auth.user) : null, [auth.loading, auth.error, auth.user, auth.profile]);
+  return { user, loading: auth.loading, signedOut: !auth.loading && !auth.user, error: auth.error, revision: auth.revision, refreshProfile: auth.refreshProfile };
 }

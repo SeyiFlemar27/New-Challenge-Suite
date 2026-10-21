@@ -6,10 +6,11 @@ import { BriefcaseBusiness, Check, ChevronDown, LogOut, Settings, UserRound } fr
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "@/lib/api/client";
 import { logout } from "@/lib/firebase/auth-service";
+import { getDefaultRouteForAccount } from "@/lib/account-routing";
 import type { CurrentUserProfile } from "@/lib/hooks/use-current-user";
 
 type Workspace = "personal" | "enterprise";
-type SwitcherUser = Pick<CurrentUserProfile, "activeWorkspace" | "availableWorkspaces" | "displayName" | "initials" | "avatarUrl" | "planName" | "planId">;
+type SwitcherUser = CurrentUserProfile;
 
 const workspaceLabels: Record<Workspace, { label: string; subtitle: string; icon: typeof UserRound }> = {
   personal: { label: "Personal Workspace", subtitle: "Personal account", icon: UserRound },
@@ -55,10 +56,11 @@ export function WorkspaceSwitcher({ user, compact = false, placement = "top" }: 
       setBusy(null);
       return;
     }
-    window.location.assign(workspace === "enterprise" ? "/enterprise" : "/dashboard");
+    window.dispatchEvent(new CustomEvent("challenge-suite-profile-updated", { detail: { source: "workspace-switch" } }));
+    window.location.assign(workspace === "enterprise" ? "/enterprise" : getDefaultRouteForAccount({ ...user, activeWorkspace: "personal" }));
   }
 
-  const personalPlan = String(user.planName ?? user.planId ?? "").replaceAll("_", " ").trim();
+  const personalPlan = ["incomplete", "pending", "processing", "activation_pending"].includes(String(user.planStatus)) ? "Membership activation pending" : String(user.planName ?? user.planId ?? "").replaceAll("_", " ").trim();
   return <div ref={ref} className="relative" data-workspace-switcher>
     <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu" className={"flex min-h-14 w-full items-center gap-3 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-3 text-left text-[var(--foreground)] transition hover:border-[var(--gold)]/50 " + (compact ? "mt-1" : "")}>
       {user.avatarUrl ? <ContentImage src={user.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{user.initials || "?"}</span>}

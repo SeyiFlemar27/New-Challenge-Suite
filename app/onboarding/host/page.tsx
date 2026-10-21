@@ -10,13 +10,14 @@ import { apiRequest } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getEffectiveTier } from "@/lib/plan-access";
 import { profileMediaPath } from "@/lib/media-upload-paths";
+import { getAuthenticatedDestination, requestedAccountDestination } from "@/lib/account-routing";
 
 const hostTypes = ["Online challenges", "Live events", "Tournaments", "School competitions", "Talent shows", "Pageants", "Sports competitions", "Business pitch competitions", "Community contests", "Other"];
 const hostAccess = ["Competition builder", "Participant management", "Submission review", "Voting control", "Live event tools", "Reports and results"] as const;
 
 export default function HostOnboardingPage() {
   const router = useRouter();
-  const { user, loading } = useCurrentUser();
+  const { user, loading, refreshProfile } = useCurrentUser();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ organizationName: "", eventBrandName: "", location: "", contactEmail: user?.email ?? "", publicProfileUrl: "", logoUrl: "", hostType: "Online challenges", competitionSize: "under_50", votingPreference: "public", eventMode: "online", revenueAcknowledged: false });
   const [saving, setSaving] = useState(false);
@@ -30,7 +31,10 @@ export default function HostOnboardingPage() {
     const result = await apiRequest<{ destination: string }>("/api/onboarding", { method: "POST", body: JSON.stringify({ type: "host", ...form, contactEmail: form.contactEmail || user?.email || "" }) });
     setSaving(false);
     if (!result.ok) return setError(result.message);
-    router.replace(destination);
+    window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+    const profile = await refreshProfile();
+    if (!profile) return setError("Your setup was saved, but account access could not be refreshed. Please try again.");
+    router.replace(getAuthenticatedDestination(profile, requestedAccountDestination(window.location.search) || destination));
   }
 
   if (loading) return <OnboardingShell eyebrow="Host Plan" title="Preparing Host Control Center" subtitle="Loading your verified plan access." currentStep={1} totalSteps={5}><Card className="h-[520px] animate-pulse" /></OnboardingShell>;

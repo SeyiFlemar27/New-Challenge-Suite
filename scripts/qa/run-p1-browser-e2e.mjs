@@ -133,7 +133,7 @@ async function test(name, fn, { requiresMedia = false } = {}) {
   const publishingGroup = /^(Automatic publication:|Media publication|Normal Builder|Tournament V3|Live Event V2 .* builder draft)/.test(name);
   const followUpGroup = /^(Media publication|Live Event V2 .* builder draft)/.test(name);
   const privateAccessGroup = /^(Private requester|Challenge owner approves access request)/.test(name);
-  if (journeyFilter && !(journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
+  if (journeyFilter && !(journeyFilter === "dashboard release" ? publishingGroup || name.startsWith("Dashboard stability:") : journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
     results.push({ name, status: "SKIP", assertions: 0, message: "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY." });
     return;
   }
@@ -359,7 +359,7 @@ async function waitForServer() {
         const contentType = response.headers.get("content-type") ?? "";
         const html = await response.text();
         if (response.status === 200) {
-          const loginMarker = /Sign In|Loading sign-in|We couldn't open your workspace/i.test(html);
+          const loginMarker = /Sign In|Loading sign-in|Preparing your workspace|We couldn't open your workspace/i.test(html);
           if (contentType.includes("text/html") && loginMarker) return;
           if(nextMode==="dev"&&contentType.includes("text/html")){
             // Development renders the root shell before client hydration. Require
@@ -526,9 +526,16 @@ try {
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 
+  if (!journeyFilter || journeyFilter === "dashboard stability" || journeyFilter === "dashboard release") {
+    const { dashboardProviderRaceFixture } = await import("./dashboard-provider-race-fixture.mjs");
+    await dashboardProviderRaceFixture({ browser, test, check, expect, baseUrl });
+    const { dashboardAuthJourneys } = await import("./dashboard-auth-journeys.mjs");
+    await dashboardAuthJourneys({ browser, test, check, expect, db, authAdmin, seedUser, baseUrl, artifacts, join, pageErrors });
+  }
+
   for (const kind of ["normal", "private", "tournament", "attendance_only", "physical_competition"]) await test(`Automatic publication: ${kind} upload, save, restore, Publish and public refresh`, async () => {
     const owner = await seedUser(`automatic-${kind}`, { role: "creator" });
-    await Promise.all([db.collection("users").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true }), db.collection("profiles").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true })]);
+    await Promise.all([db.collection("users").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true, hostOnboardingComplete: true }), db.collection("profiles").doc(owner.uid).update({ planId: "host", planStatus: "active", creatorOnboardingComplete: true, hostOnboardingComplete: true })]);
     const context = await browser.newContext({ viewport: { width: kind === "private" ? 390 : 1440, height: 1000 } });
     const page = await login(context, owner, { rememberMe: true });
     const signedIn = await fetch(`http://${host}:${authEmulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: owner.email, password: owner.password, returnSecureToken: true }) });
@@ -1496,7 +1503,7 @@ try {
   for(const builderFormat of ["attendance_only","physical_competition"]){
   await test(`Live Event V2 ${builderFormat} builder draft, media and automatic publication`, async () => {
     const owner=await seedUser(`live-builder-owner-${builderFormat}`,{role:"host"});
-    await Promise.all([db.collection("users").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true})]);
+    await Promise.all([db.collection("users").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true,hostOnboardingComplete:true}),db.collection("profiles").doc(owner.uid).update({planId:"verified_host",planStatus:"active",creatorOnboardingComplete:true,hostOnboardingComplete:true})]);
     const context=await browser.newContext({viewport:{width:1440,height:1000}});
     const page=await login(context,owner,{rememberMe:true});
     await page.goto(`${baseUrl}/live/create`,{waitUntil:"domcontentloaded"});

@@ -6,24 +6,20 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button, Card, Field, inputClass } from "@/components/ui";
 import { BrandLogo } from "@/components/brand";
-import { fetchBootstrapProfile } from "@/lib/api/services";
-import { getAuthenticatedDestination } from "@/lib/account-routing";
+import { getAuthenticatedDestination, safeInternalDestination } from "@/lib/account-routing";
+import { AccountResolutionState } from "@/components/account-resolution-state";
 import { loginWithEmail, loginWithGoogle, logout } from "@/lib/firebase/auth-service";
 import { useLanguage } from "@/lib/i18n/use-language";
 import { useAuth } from "@/components/auth-provider";
 
 const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
-function safeInternalPath(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "";
-  return value;
-}
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
   const authState = useAuth();
+  const refreshProfile = authState.refreshProfile;
   const [form, setForm] = useState({ email: "", password: "", rememberMe: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -31,23 +27,21 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const routedUserId = useRef("");
   const interactiveLoginInProgress = useRef(false);
-  const nextPath = safeInternalPath(searchParams.get("next") ?? searchParams.get("returnTo"));
+  const nextPath = safeInternalDestination(searchParams.get("next") ?? searchParams.get("returnTo"));
 
   const routeAfterLogin = useCallback(async (resolvedProfile?: object | null) => {
     let profile = resolvedProfile;
     if (!profile) {
-      const response = await fetchBootstrapProfile();
-      if (!response.ok || !response.data?.user) {
-        throw new Error(response.message || "Profile could not be loaded.");
-      }
-      profile = response.data.user;
+      profile = await refreshProfile();
+      if (!profile) throw new Error("Your account could not be confirmed. Please try again.");
     }
     router.replace(getAuthenticatedDestination(profile, nextPath));
-  }, [nextPath, router]);
+  }, [refreshProfile, nextPath, router]);
 
   useEffect(() => {
     const uid = authState.user?.uid;
     if (authState.loading) return;
+    if (authState.error) return;
     if (interactiveLoginInProgress.current) return;
     if (!uid) {
       routedUserId.current = "";
@@ -62,7 +56,7 @@ function LoginForm() {
       setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
     });
     return () => { active = false; };
-  }, [authState.loading, authState.profile, authState.user?.uid, routeAfterLogin]);
+  }, [authState.error, authState.loading, authState.profile, authState.user?.uid, routeAfterLogin]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,7 +103,7 @@ function LoginForm() {
       const result = await loginWithGoogle(form.rememberMe);
       routedUserId.current = result.user.uid;
       try {
-        await routeAfterLogin();
+        await routeAfterLogin(result.profile);
       } catch (caught) {
         setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.");
       }
@@ -121,7 +115,8 @@ function LoginForm() {
     }
   }
 
-  if ((authState.loading || authState.user) && !redirectError) return null;
+  if (authState.error && !redirectError) return <AccountResolutionState error={authState.error} onRetry={() => void authState.refreshProfile()} />;
+  if ((authState.loading || authState.user) && !redirectError) return <AccountResolutionState />;
 
   if (authState.user && redirectError) {
     return (
@@ -130,7 +125,7 @@ function LoginForm() {
           <BrandLogo className="mb-7" imageClassName="h-20 w-20 border-2 border-[var(--gold)] gold-glow" />
           <h1 className="text-2xl font-black">We couldn&apos;t open your workspace</h1>
           <p role="alert" className="mt-3 text-sm leading-6 text-red-700">{redirectError}</p>
-          <div className="mt-7 grid gap-3"><Button onClick={() => { setRedirectError(""); void routeAfterLogin(authState.profile).catch((caught: unknown) => setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.")); }}>Try again</Button><Button variant="secondary" onClick={() => void logout()}>Sign out to switch account</Button></div>
+          <div className="mt-7 grid gap-3"><Button onClick={() => { setRedirectError(""); void routeAfterLogin().catch((caught: unknown) => setRedirectError(caught instanceof Error ? caught.message : "Your workspace could not be opened.")); }}>Try again</Button><Button variant="secondary" onClick={() => void logout()}>Sign out to switch account</Button></div>
         </Card>
       </main>
     );

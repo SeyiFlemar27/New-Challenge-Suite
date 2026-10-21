@@ -244,7 +244,8 @@ export function Sidebar() {
     selectedAccountType: user?.selectedAccountType,
     role: user?.role
   });
-  const workspaceContext = workspaceNavigationContext(pathname, user?.activeWorkspace, user?.availableWorkspaces ?? ["personal"]);
+  const routeContext = workspaceNavigationContext(pathname, user?.activeWorkspace, user?.availableWorkspaces ?? ["personal"]);
+  const workspaceContext = routeContext === "user" && capabilities.canManageHostOperations ? pathname === "/dashboard" ? "creator" : "host" : routeContext;
   const [normalAllowance, setNormalAllowance] = useState<{ uid: string; remaining: number } | null>(null);
   useEffect(() => {
     if (!user || capabilities.normalChallengeQuota.period !== "lifetime" || !capabilities.canCreateNormalChallenge) return;
@@ -266,7 +267,7 @@ export function Sidebar() {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
-  if (loading) return <WorkspaceNavigationLoading />;
+  if (loading || ["incomplete", "pending", "processing", "activation_pending"].includes(String(user?.planStatus))) return <WorkspaceNavigationLoading />;
 
   return (
     <>

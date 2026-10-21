@@ -66,14 +66,14 @@ function nextDeadline(challenge: RecordRow) {
 }
 
 export default function HostControlCenterPage() {
-  const { user } = useCurrentUser();
+  const { user, revision } = useCurrentUser();
   const searchParams = useSearchParams();
   const hostPlan = getUserPlanAccess({ planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType });
   const pendingCheckoutReturn = searchParams.get("checkout") === "success" && searchParams.get("activation") === "pending" && !hostPlan.isHost;
   const [activationHelp, setActivationHelp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activationMessage, setActivationMessage] = useState("Your Host membership is still being activated. Please try again shortly.");
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard", "host"], queryFn: fetchDashboard, staleTime: 30_000 });
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard", "host", user?.uid, user?.activeWorkspace, revision], queryFn: fetchDashboard, staleTime: 30_000, enabled: Boolean(user) });
   const [activeTab, setActiveTab] = useState<CompetitionTab>("active");
   const dashboard = data?.ok ? data.data : null;
   const challenges = useMemo<RecordRow[]>(() => (dashboard?.hostedChallenges ?? []) as RecordRow[], [dashboard]);

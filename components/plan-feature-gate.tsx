@@ -4,6 +4,7 @@ import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, LinkButton } from "@/components/ui";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { AccountResolutionState } from "@/components/account-resolution-state";
 import { canAccessPlanFeature, getEffectiveTier, getPlanExperience, type PlanFeature } from "@/lib/plan-access";
 
 export function PlanFeatureGate({
@@ -19,15 +20,16 @@ export function PlanFeatureGate({
   allowPendingPreview?: boolean;
   children: React.ReactNode;
 }) {
-  const { user, loading, signedOut, error } = useCurrentUser();
+  const { user, loading, signedOut, error, refreshProfile } = useCurrentUser();
   const profile = { planId: user?.planId, planStatus: user?.planStatus, accountType: user?.accountType, selectedAccountType: user?.selectedAccountType, role: user?.role };
   const experience = getPlanExperience(profile);
   const tier = getEffectiveTier(profile);
 
   if (loading) {
-    return <AppShell><Card className="mx-auto mt-14 h-72 max-w-3xl animate-pulse bg-[#151515]" /></AppShell>;
+    return <AccountResolutionState />;
   }
-  if (signedOut || error) {
+  if (error) return <AccountResolutionState error={error} onRetry={() => void refreshProfile()} />;
+  if (signedOut) {
     return (
       <AppShell>
         <Card className="mx-auto mt-14 max-w-2xl p-8 text-center">

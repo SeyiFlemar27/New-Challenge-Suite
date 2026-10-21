@@ -27,7 +27,7 @@ assert.doesNotMatch(login, /Opening your workspace|Taking you to the right place
 assert.match(login, /routeAfterLogin\(result\.profile\)/, "The successful sign-in result must navigate with its already verified profile.");
 assert.match(login, /interactiveLoginInProgress\.current/, "Interactive login and auth-state restoration must not navigate twice.");
 assert.match(login, /searchParams\.get\("next"\) \?\? searchParams\.get\("returnTo"\)/, "Login must preserve safe returnTo aliases from protected routes.");
-assert.match(login, /if \(\(authState\.loading \|\| authState\.user\) && !redirectError\) return null;/, "Session resolution must not render an intermediary screen.");
+assert.match(login, /if \(\(authState\.loading \|\| authState\.user\) && !redirectError\) return <AccountResolutionState/, "Session resolution uses neutral branding, never a temporary dashboard.");
 assert.match(authService, /syncServerSession\(credential\.user, rememberMe\)/, "Direct navigation must retain server-side session establishment.");
 assert.match(verifyEmail, /params\.get\("returnUrl"\) \|\| params\.get\("next"\) \|\| params\.get\("returnTo"\)/, "Verification must preserve returnTo across required email verification.");
 assert.doesNotMatch(verifyEmail, /900|Redirecting\.\.\./, "Email verification must not add an artificial redirect delay.");

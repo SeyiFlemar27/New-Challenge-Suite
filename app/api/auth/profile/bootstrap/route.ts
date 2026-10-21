@@ -38,11 +38,11 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-function toProfile(user: { uid: string; email?: string; emailVerified?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>, sponsorAccess: SponsorOrganizationAccess | null) {
+function toProfile(user: { uid: string; email?: string; emailVerified?: boolean; isAdmin?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>, sponsorAccess: SponsorOrganizationAccess | null) {
   const identity = resolveProfileIdentity({ ...profile, ...account }, String(user.email ?? ""));
   const displayName = identity.displayName;
   const merged = { ...profile, ...account };
-  const isAdmin = Boolean(account.isAdmin || profile.isAdmin);
+  const isAdmin = user.isAdmin === true;
   const legacyEnterpriseIdentity = merged.accountType === "enterprise" || merged.dashboardType === "enterprise_studio";
   const legacySponsorIdentity = merged.accountType === "sponsor" || merged.dashboardType === "sponsor_dashboard";
   const preservedPersonalType = legacyEnterpriseIdentity || legacySponsorIdentity
@@ -75,6 +75,7 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     accountTypeSelectionComplete,
     roleIntent: String(merged.role_intent ?? merged.roleIntent ?? "compete"),
     planId: planAccess.normalizedPlanId,
+    subscriptionPlan: merged.planId ?? merged.subscriptionPlan ?? "free",
     legacyPlanId: planAccess.planId,
     doroBalance: typeof wallet.balance === "number" ? wallet.balance : 0,
     customization: sanitizeCustomization((profile.customization ?? account.customization) as any),
@@ -103,15 +104,15 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean 
     enterpriseAccessStatus: typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : "not_submitted",
     enterpriseApprovalStatus: typeof merged.enterpriseApprovalStatus === "string" ? merged.enterpriseApprovalStatus : typeof merged.enterpriseAccessStatus === "string" ? merged.enterpriseAccessStatus : "not_submitted",
     enterpriseApplicationId: typeof merged.enterpriseApplicationId === "string" ? merged.enterpriseApplicationId : null,
-    enterpriseRole: typeof merged.enterpriseRole === "string" ? merged.enterpriseRole : null,
-    enterpriseScope: typeof merged.enterpriseScope === "string" ? merged.enterpriseScope : null,
-    enterpriseDepartment: typeof merged.enterpriseDepartment === "string" ? merged.enterpriseDepartment : null,
-    enterprisePermissions: Array.isArray(merged.enterprisePermissions) ? merged.enterprisePermissions : [],
-    enterpriseStaffStatus: typeof merged.enterpriseStaffStatus === "string" ? merged.enterpriseStaffStatus : null,
-    enterpriseOnboardingComplete: Boolean(merged.enterpriseOnboardingComplete),
+    enterpriseRole: enterpriseAccess?.role ?? null,
+    enterpriseScope: enterpriseAccess?.scope ?? null,
+    enterpriseDepartment: enterpriseAccess?.department ?? null,
+    enterprisePermissions: enterpriseAccess?.permissions ?? [],
+    enterpriseStaffStatus: enterpriseAccess?.status ?? null,
+    enterpriseOnboardingComplete: enterpriseAccess?.onboardingComplete ?? false,
     activeWorkspace: resolveActiveWorkspace(merged, enterpriseAccess, sponsorAvailable),
     availableWorkspaces,
-    accountStatus: normalizeAccountDeletionStatus(merged.accountStatus),
+    accountStatus: ["suspended", "restricted", "banned", "disabled"].includes(String(merged.accountStatus)) ? String(merged.accountStatus) : normalizeAccountDeletionStatus(merged.accountStatus),
     deletionStatus: normalizeAccountDeletionStatus(merged.accountStatus)
   };
 }

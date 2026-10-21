@@ -34,7 +34,7 @@ const register = read("app/auth/register/page.tsx");
 assert.match(register, /process\.env\.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"/);
 assert.match(register, /googleAuthEnabled \? <Button[^]*Continue with Google[^]*<\/Button> : null/);
 assert.match(login, /authState\.user\?\.uid/);
-assert.match(login, /safeInternalPath/);
+assert.match(login, /safeInternalDestination/);
 assert.match(verify, /account was created, but we could not send the verification code/);
 assert.match(verify, /Resend Code/);
 assert.match(verify, /href="\/contact"/);

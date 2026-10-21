@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, type ReactNode } from "react";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { AccountResolutionState } from "@/components/account-resolution-state";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Card, EmptyState, LinkButton, PageTitle } from "@/components/ui";
@@ -53,21 +54,18 @@ function numberField(record: Record<string, unknown>, keys: string[]) {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { data, isLoading } = useQuery({
-    queryKey: ["dashboard"],
+  const { user, revision } = useCurrentUser();
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["dashboard", user?.uid, user?.activeWorkspace, revision],
     queryFn: fetchDashboard,
-    staleTime: 30_000
+    staleTime: 30_000,
+    enabled: Boolean(user)
   });
 
-  const { data: usageData } = useQuery({ queryKey: ["challenge-usage"], queryFn: () => apiRequest<{ freeBasic: { used: number; limit: number; remaining: number; rule: "lifetime" } }>("/api/challenges/usage"), staleTime: 30_000 });
+  const { data: usageData } = useQuery({ queryKey: ["challenge-usage", user?.uid, revision], queryFn: () => apiRequest<{ freeBasic: { used: number; limit: number; remaining: number; rule: "lifetime" } }>("/api/challenges/usage"), staleTime: 30_000, enabled: Boolean(user) });
   const dashboard = data?.ok ? data.data : null;
   const redirectTo = (dashboard as DashboardRedirectData | null)?.redirectTo;
   const sponsorAccount = (dashboard as DashboardRedirectData | null)?.user?.accountType === "sponsor";
-
-  useEffect(() => {
-    if (redirectTo) router.replace(redirectTo);
-  }, [redirectTo, router]);
 
   const hostedChallenges = useMemo<DashboardChallenge[]>(() => {
     return (dashboard?.hostedChallenges ?? []).map((item) => ({ ...(item as Record<string, unknown>), ...normalizeChallenge(item as ChallengeApiRecord) })).filter((item) => item.id);
@@ -77,26 +75,18 @@ export default function DashboardPage() {
   const firstName = (dashboard?.user.displayName || "there").split(" ")[0] || "there";
   const dashboardStyle = findCustomizationOption(dashboard?.user.customization?.dashboardStyleId, "dashboardStyle")?.previewClass;
   const planExperience = getPlanExperience({
-    planId: dashboard?.user.planId,
-    planStatus: dashboard?.user.planStatus,
-    accountType: dashboard?.user.accountType
+    planId: user?.planId,
+    planStatus: user?.planStatus,
+    accountType: user?.accountType
   });
-  const selectedAccountType = dashboard?.user.selectedAccountType ?? dashboard?.user.role ?? dashboard?.user.accountType;
+  const selectedAccountType = user?.selectedAccountType ?? user?.role ?? user?.accountType;
   const effectiveTier = getEffectiveTier({
-    planId: dashboard?.user.planId,
-    planStatus: dashboard?.user.planStatus,
-    accountType: dashboard?.user.accountType,
+    planId: user?.planId,
+    planStatus: user?.planStatus,
+    accountType: user?.accountType,
     selectedAccountType,
-    role: dashboard?.user.role
+    role: user?.role
   });
-  useEffect(() => {
-    if (isLoading || redirectTo) return;
-    if (effectiveTier.id === "host") {
-      router.replace(dashboard?.user.hostOnboardingComplete ? "/dashboard/host" : "/onboarding/host");
-    } else if (effectiveTier.id === "creator" && !dashboard?.user.creatorOnboardingComplete) {
-      router.replace("/onboarding/creator");
-    }
-  }, [dashboard?.user.creatorOnboardingComplete, dashboard?.user.hostOnboardingComplete, effectiveTier.id, isLoading, redirectTo, router]);
   const freeCompetitor = planExperience.planId === "free" && selectedAccountType !== "creator" && selectedAccountType !== "host";
   const creatorPublicChallenges = hostedChallenges.filter((challenge) => !isPrivateCreatorChallenge(challenge));
   const creatorPrivateChallenges = hostedChallenges.filter((challenge) => isPrivateCreatorChallenge(challenge));
@@ -183,7 +173,7 @@ export default function DashboardPage() {
     { title: "Creator Profile", body: "Update public profile and settings.", icon: User, href: "/profile" },
     { title: "Settings", body: "Manage creator account preferences.", icon: Settings, href: "/settings" }
   ];
-  if (isLoading) {
+  if (!user || isLoading) {
     return (
       <AppShell>
         <div className="mx-auto max-w-7xl">
@@ -196,7 +186,8 @@ export default function DashboardPage() {
     );
   }
 
-  if (redirectTo || sponsorAccount) {
+  if (!dashboard) return <AccountResolutionState error={data?.message || "Dashboard information could not be loaded."} onRetry={() => void refetch()} />;
+  if (sponsorAccount) {
     return (
       <AppShell>
         <Card className="mt-12 p-8 text-center">
@@ -208,7 +199,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (planExperience.planId === "creator") {
+  if (planExperience.planId === "creator" || planExperience.planId === "host") {
     const cashWallet = dashboard?.cashWallet as { availableBalanceCents?: number; pendingBalanceCents?: number } | null | undefined;
     return <AppShell><CreatorStudio displayName={dashboard?.user.displayName ?? ""} challenges={hostedChallenges} availableEarningsCents={Number(cashWallet?.availableBalanceCents ?? 0)} pendingEarningsCents={Number(cashWallet?.pendingBalanceCents ?? 0)} /></AppShell>;
   }

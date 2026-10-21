@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { apiRequest } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { workspaceRouteNeedsSwitch, type WorkspaceId } from "@/lib/workspace-routing";
+import { AccountResolutionState } from "@/components/account-resolution-state";
 
 export function WorkspaceRouteBoundary({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useCurrentUser();
+  const { user, loading, error: profileError, refreshProfile } = useCurrentUser();
   const [failure, setFailure] = useState<{ pathname: string; message: string } | null>(null);
   const error = failure?.pathname === pathname ? failure.message : "";
   const attemptedSwitch = useRef("");
@@ -34,10 +35,12 @@ export function WorkspaceRouteBoundary({ children }: { children: React.ReactNode
         setFailure(null);
         window.dispatchEvent(new CustomEvent("challenge-suite-profile-updated", { detail: { source: "workspace-switch" } }));
       } else setFailure({ pathname, message: result.message || "Workspace access could not be refreshed." });
-    });
+    }).catch(() => { if (active) setFailure({ pathname, message: "Workspace access could not be refreshed. Please try again." }); });
     return () => { active = false; };
   }, [pathname, required, user]);
 
+  if (loading || required && !error) return <AccountResolutionState />;
+  if (profileError) return <AccountResolutionState error={profileError} onRetry={() => void refreshProfile()} />;
   if (error) return <div className="grid min-h-screen place-items-center bg-[var(--background)] px-6 text-center"><div><h1 className="text-xl font-black">Workspace unavailable</h1><p className="mt-2 text-sm text-[var(--muted)]">{error}</p><button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-[8px] bg-[var(--gold)] px-5 py-3 text-sm font-black text-black">Try Again</button></div></div>;
   return <>{children}</>;
 }

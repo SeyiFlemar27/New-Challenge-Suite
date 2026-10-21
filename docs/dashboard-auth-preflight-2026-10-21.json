@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-21T07:47:06.995Z",
+  "phase": "preflight",
+  "readOnly": true,
+  "productionMutations": 0,
+  "expectedSha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "projectId": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "teamId": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "deploymentId": "dpl_9NY3gfa9Zq2omWAYbbvogemU8h4r",
+  "url": "https://challenge-suite-btmgx2xap-seyiflemar27s-projects.vercel.app",
+  "state": "READY",
+  "target": "production",
+  "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "branch": "main",
+  "domain": "www.challengesuite.com",
+  "projectMatches": true,
+  "sourceMatches": true,
+  "domainMatches": true,
+  "flags": [
+    {
+      "name": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "productionLiteralFalse": true
+    },
+    {
+      "name": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "productionLiteralFalse": true
+    }
+  ],
+  "schedulerState": "PAUSED",
+  "queueEmpty": true,
+  "passed": true
+}

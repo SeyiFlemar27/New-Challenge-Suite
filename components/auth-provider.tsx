@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
-import { demoAuthEnabled, getCurrentProfile, listenToAuth, syncServerSession, type AuthProfile } from "@/lib/firebase/auth-service";
+import { useQueryClient } from "@tanstack/react-query";
+import { demoAuthEnabled, getCurrentProfile, invalidateCurrentProfileRead, listenToAuth, syncServerSession, type AuthProfile } from "@/lib/firebase/auth-service";
 
 interface AuthContextValue {
   user: User | null;
@@ -10,62 +11,85 @@ interface AuthContextValue {
   loading: boolean;
   firebaseConfigured: boolean;
   verified: boolean;
+  error: string | null;
+  revision: number;
   refreshProfile: () => Promise<AuthProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<{ user: User | null; profile: AuthProfile | null; loading: boolean; error: string | null; revision: number }>({ user: null, profile: null, loading: true, error: null, revision: 0 });
+  const currentUser = useRef<User | null>(null);
+  const resolvedScope = useRef<string | null>(null);
   const authCallbackGeneration = useRef(0);
-
-  const refreshProfile = useCallback(async () => {
-    const activeUser = user;
-    if (!activeUser) {
-      setProfile(null);
-      return null;
+  const pending = useRef<{ uid: string; promise: Promise<AuthProfile | null> } | null>(null);
+  const resolveUser = useCallback((activeUser: User | null, force = false): Promise<AuthProfile | null> => {
+    if (!force && activeUser && pending.current?.uid === activeUser.uid) return pending.current.promise;
+    const generation = ++authCallbackGeneration.current;
+    const identityChanged = currentUser.current?.uid !== activeUser?.uid;
+    currentUser.current = activeUser;
+    if (identityChanged || !activeUser) {
+      void queryClient.cancelQueries();
+      queryClient.clear();
     }
-    const nextProfile = await getCurrentProfile(activeUser.uid).catch(() => null);
-    setProfile(nextProfile);
-    return nextProfile;
-  }, [user]);
+    setState(previous => ({ user: activeUser, profile: null, loading: Boolean(activeUser), error: null, revision: previous.revision }));
+    if (!activeUser) { pending.current = null; resolvedScope.current = null; return Promise.resolve(null); }
+    const promise = (async () => {
+      try {
+        const [, profile] = await Promise.all([syncServerSession(activeUser), getCurrentProfile(activeUser.uid)]);
+        if (generation !== authCallbackGeneration.current || currentUser.current?.uid !== activeUser.uid) return null;
+        if (!profile || profile.uid !== activeUser.uid) throw new Error("Your account could not be confirmed. Please try again.");
+        const scope = JSON.stringify([profile.uid, profile.activeWorkspace, profile.sponsorOrganizationId, profile.planId, profile.planStatus, profile.isAdmin, profile.enterprisePermissions, profile.accountStatus]);
+        if (resolvedScope.current && resolvedScope.current !== scope) { void queryClient.cancelQueries(); queryClient.clear(); }
+        resolvedScope.current = scope;
+        setState(previous => ({ user: activeUser, profile, loading: false, error: null, revision: previous.revision + 1 }));
+        return profile;
+      } catch (error) {
+        if (generation === authCallbackGeneration.current) setState(previous => ({ ...previous, profile: null, loading: false, error: error instanceof Error ? error.message : "Your account could not be confirmed. Please try again." }));
+        return null;
+      }
+    })().finally(() => { if (pending.current?.promise === promise) pending.current = null; });
+    pending.current = { uid: activeUser.uid, promise };
+    return promise;
+  }, [queryClient]);
+  const refreshProfile = useCallback(() => resolveUser(currentUser.current), [resolveUser]);
+  const cancelResolution = useCallback(() => { ++authCallbackGeneration.current; }, []);
 
   useEffect(() => {
-    const unsubscribe = listenToAuth(async (nextUser) => {
-      const generation = ++authCallbackGeneration.current;
-      setUser(nextUser);
-      if (nextUser) {
-        const [, nextProfile] = await Promise.all([
-          syncServerSession(nextUser).catch(() => undefined),
-          getCurrentProfile(nextUser.uid).catch(() => null)
-        ]);
-        if (generation === authCallbackGeneration.current) setProfile(nextProfile);
-      } else {
-        setProfile(null);
-      }
-      if (generation === authCallbackGeneration.current) setLoading(false);
+    const unsubscribe = listenToAuth(nextUser => { void resolveUser(nextUser); }, () => {
+      ++authCallbackGeneration.current;
+      pending.current = null;
+      setState(previous => ({ ...previous, profile: null, loading: false, error: "Your session could not be restored. Please sign in again." }));
     });
-    return unsubscribe;
-  }, []);
+    return () => { cancelResolution(); unsubscribe(); };
+  }, [cancelResolution, resolveUser]);
 
   useEffect(() => {
     function handleProfileUpdated() {
-      void refreshProfile();
+      invalidateCurrentProfileRead();
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      void resolveUser(currentUser.current, true);
+    }
+    function handleTransition() {
+      ++authCallbackGeneration.current;
+      pending.current = null;
+      void queryClient.cancelQueries(); queryClient.clear();
+      setState(previous => ({ ...previous, profile: null, loading: true, error: null }));
     }
     window.addEventListener("challenge-suite-profile-updated", handleProfileUpdated);
-    return () => window.removeEventListener("challenge-suite-profile-updated", handleProfileUpdated);
-  }, [refreshProfile]);
+    window.addEventListener("challenge-suite-auth-transition", handleTransition);
+    return () => { window.removeEventListener("challenge-suite-profile-updated", handleProfileUpdated); window.removeEventListener("challenge-suite-auth-transition", handleTransition); };
+  }, [queryClient, resolveUser]);
 
   const value = useMemo<AuthContextValue>(() => ({
-    user,
-    profile,
-    loading,
+    ...state,
     firebaseConfigured: !demoAuthEnabled,
-    verified: demoAuthEnabled ? true : Boolean(profile?.verified || profile?.emailVerified || user?.emailVerified),
+    verified: demoAuthEnabled ? true : Boolean(state.profile?.verified || state.profile?.emailVerified || state.user?.emailVerified),
     refreshProfile
-  }), [loading, profile, refreshProfile, user]);
+  }), [state, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

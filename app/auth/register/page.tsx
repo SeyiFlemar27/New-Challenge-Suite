@@ -8,15 +8,14 @@ import { Button, Card, Field, inputClass } from "@/components/ui";
 import { legalDocuments } from "@/lib/legal";
 import { BrandLogo } from "@/components/brand";
 import { loginWithGoogle, signUpWithProfile } from "@/lib/firebase/auth-service";
-import { fetchBootstrapProfile } from "@/lib/api/services";
-import { getAuthenticatedDestination } from "@/lib/account-routing";
+import { getAuthenticatedDestination, safeInternalDestination } from "@/lib/account-routing";
 import { AuthFlowError, type SignupEmailState } from "@/lib/firebase/auth-errors";
 import { useLanguage } from "@/lib/i18n/use-language";
 
 const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
 function safeInternalPath(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("://") ? value : "";
+  return safeInternalDestination(value);
 }
 
 function requestedReturnPath() {
@@ -92,10 +91,8 @@ export default function RegisterPage() {
     setErrors({});
     setAuthIssue(null);
     try {
-      await loginWithGoogle();
-      const response = await fetchBootstrapProfile();
-      if (!response.ok || !response.data?.user) throw new Error(response.message || "Profile could not be loaded.");
-      router.replace(getAuthenticatedDestination(response.data.user, requestedReturnPath()));
+      const result = await loginWithGoogle();
+      router.replace(getAuthenticatedDestination(result.profile, requestedReturnPath()));
     } catch (caught) {
       setErrors({ google: caught instanceof Error ? caught.message : "Could not sign in with Google." });
       setLoading(false);

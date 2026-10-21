@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
+import { getAuthenticatedDestination } from "@/lib/account-routing";
 
 type Onboarding = {
   subscription: { active: boolean; providerConfirmed: boolean; planName: string; status: string; billingCycle: string; amountCents: number | null; currency: string; paymentReference: string | null; subscriptionReference: string | null; activationDate: string | null; nextRenewalDate: string | null; paymentMethod: string };
@@ -13,6 +16,8 @@ type Onboarding = {
 };
 
 export default function PremiumOnboardingPage() {
+  const { refreshProfile } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<Onboarding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,7 +28,13 @@ export default function PremiumOnboardingPage() {
   }, []);
   async function load() {
     setLoading(true);
-    applyResult(await request());
+    const result = await request();
+    applyResult(result);
+    if (result.ok && result.data?.subscription.active && result.data.subscription.providerConfirmed) window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+  }
+  async function continueDashboard() {
+    const profile = await refreshProfile();
+    if (profile) router.replace(getAuthenticatedDestination(profile, data?.dashboardHref || ""));
   }
   useEffect(() => {
     let active = true;
@@ -32,7 +43,7 @@ export default function PremiumOnboardingPage() {
   }, [applyResult, request]);
 
   return <AppShell><main className="mx-auto max-w-5xl">
-    {loading ? <Card className="h-72 animate-pulse" aria-label="Loading verified membership status" /> : error || !data ? <Card className="p-7"><h1 className="text-3xl font-black">Membership status unavailable</h1><p className="mt-3 text-red-200">{error}</p><Button className="mt-5" onClick={() => void load()}>Retry</Button></Card> : !data.subscription.active || !data.subscription.providerConfirmed ? <Pending data={data} refresh={load} /> : <Activated data={data} />}
+    {loading ? <Card className="h-72 animate-pulse" aria-label="Loading verified membership status" /> : error || !data ? <Card className="p-7"><h1 className="text-3xl font-black">Membership status unavailable</h1><p className="mt-3 text-red-200">{error}</p><Button className="mt-5" onClick={() => void load()}>Retry</Button></Card> : !data.subscription.active || !data.subscription.providerConfirmed ? <Pending data={data} refresh={load} /> : <Activated data={data} onContinue={continueDashboard} />}
   </main></AppShell>;
 }
 
@@ -40,7 +51,7 @@ function Pending({ data, refresh }: { data: Onboarding; refresh: () => Promise<v
   return <><h1 className="text-3xl font-black sm:text-4xl">Confirming your membership</h1><p className="mt-4 max-w-2xl leading-7 text-slate-300">Your provider-confirmed subscription record is still being synchronized. Access will update after server verification.</p><Card className="mt-7 p-6"><Summary label="Subscription status" value={label(data.subscription.status)} /><Button className="mt-5" variant="secondary" onClick={() => void refresh()}>Refresh Status</Button></Card></>;
 }
 
-function Activated({ data }: { data: Onboarding }) {
+function Activated({ data, onContinue }: { data: Onboarding; onContinue: () => Promise<void> }) {
   const rows = [
     ["Plan name", data.subscription.planName],
     ["Billing cycle", label(data.subscription.billingCycle)],
@@ -63,7 +74,7 @@ function Activated({ data }: { data: Onboarding }) {
     <div className="mt-8 grid gap-6 lg:grid-cols-2"><Card className="p-6"><h2 className="text-xl font-black">Purchase summary</h2><dl className="mt-5 divide-y divide-white/10">{rows.map(([name, value]) => <div key={name} className="grid gap-1 py-3 sm:grid-cols-[150px_1fr]"><dt className="text-sm text-slate-400">{name}</dt><dd className="break-words font-bold">{value}</dd></div>)}</dl></Card>
       <Card className="p-6"><h2 className="text-xl font-black">Recommended setup</h2><ol className="mt-5 space-y-3">{checks.map(([name, complete, status], index) => <li key={name} className="flex items-center justify-between gap-4 rounded-[8px] border border-white/10 p-4"><span className="font-bold">{index + 1}. {name}</span><span className={complete ? "text-sm font-black text-emerald-300" : "text-sm font-black text-yellow-200"}>{status}</span></li>)}</ol></Card></div>
     <Card className="mt-6 p-5"><p className="text-sm leading-6 text-slate-300">Your membership tools are available where plan, payment, ownership, and review requirements are satisfied.</p></Card>
-    <div className="mt-6 flex flex-wrap gap-3"><LinkButton href={data.dashboardHref}>Continue to Dashboard</LinkButton></div>
+    <div className="mt-6 flex flex-wrap gap-3"><Button onClick={() => void onContinue()}>Continue to Dashboard</Button></div>
   </>;
 }
 function Summary({ label: name, value }: { label: string; value: string }) { return <div><p className="text-xs font-black uppercase text-slate-500">{name}</p><p className="mt-2 font-black">{value}</p></div>; }

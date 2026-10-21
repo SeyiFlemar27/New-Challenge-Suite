@@ -1,0 +1,710 @@
+{
+  "checkedAt": "2026-10-21T08:16:21.2003526Z",
+  "routingAssertions": 49,
+  "typecheck": "passed",
+  "lint": "passed",
+  "frozenOfflineInstall": "passed",
+  "combinedBrowser": {
+    "passed": 22,
+    "assertions": 178,
+    "journeys": [
+      {
+        "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+        "status": "PASS",
+        "assertions": 8
+      },
+      {
+        "name": "Dashboard stability: Free default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Creator default login under delayed profile",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: Host default login under delayed profile",
+        "status": "PASS",
+        "assertions": 5
+      },
+      {
+        "name": "Dashboard stability: Host onboarding default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Restricted default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Host logout and login again enters Host directly",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: requested action and unsafe redirects",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: verified email required before dashboard",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+        "status": "PASS",
+        "assertions": 4
+      },
+      {
+        "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+        "status": "PASS",
+        "assertions": 11
+      },
+      {
+        "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+        "status": "PASS",
+        "assertions": 12
+      },
+      {
+        "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+        "status": "PASS",
+        "assertions": 10
+      },
+      {
+        "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+        "status": "PASS",
+        "assertions": 9
+      },
+      {
+        "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+        "status": "PASS",
+        "assertions": 9
+      },
+      {
+        "name": "Media publication and private credential preparation, reveal and copy",
+        "status": "PASS",
+        "assertions": 16
+      },
+      {
+        "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+        "status": "PASS",
+        "assertions": 36
+      },
+      {
+        "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+        "status": "PASS",
+        "assertions": 20
+      },
+      {
+        "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+        "status": "PASS",
+        "assertions": 11
+      },
+      {
+        "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+        "status": "PASS",
+        "assertions": 13
+      }
+    ],
+    "clientErrorCount": 0,
+    "failed": 0
+  },
+  "finalDashboardBrowser": {
+    "passed": 13,
+    "assertions": 33,
+    "journeys": [
+      {
+        "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+        "status": "PASS",
+        "assertions": 8
+      },
+      {
+        "name": "Dashboard stability: Free default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Creator default login under delayed profile",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: Host default login under delayed profile",
+        "status": "PASS",
+        "assertions": 5
+      },
+      {
+        "name": "Dashboard stability: Host onboarding default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Restricted default login under delayed profile",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Host logout and login again enters Host directly",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: requested action and unsafe redirects",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: verified email required before dashboard",
+        "status": "PASS",
+        "assertions": 1
+      },
+      {
+        "name": "Dashboard stability: protected direct navigation preserves action query at login",
+        "status": "PASS",
+        "assertions": 2
+      },
+      {
+        "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+        "status": "PASS",
+        "assertions": 4
+      }
+    ],
+    "clientErrorCount": 0,
+    "failed": 0
+  },
+  "p0InitialBatch": {
+    "complete": false,
+    "passed": 68,
+    "results": [
+      {
+        "test": "scripts/test-normal-base-prize-policy.mjs",
+        "startedAt": "2026-10-21T07:41:25.66Z",
+        "completedAt": "2026-10-21T07:41:27.794Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-review-funding-emulator.mjs",
+        "startedAt": "2026-10-21T07:41:27.796Z",
+        "completedAt": "2026-10-21T07:42:10.579Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-paid-entry-emulator.mjs",
+        "startedAt": "2026-10-21T07:42:10.618Z",
+        "completedAt": "2026-10-21T07:42:58.782Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-lifecycle-emulator.mjs",
+        "startedAt": "2026-10-21T07:42:58.833Z",
+        "completedAt": "2026-10-21T07:43:22.741Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+        "startedAt": "2026-10-21T07:43:22.751Z",
+        "completedAt": "2026-10-21T07:43:43.9Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-settlement-emulator.mjs",
+        "startedAt": "2026-10-21T07:43:43.903Z",
+        "completedAt": "2026-10-21T07:43:53.808Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-scheduler-emulator.mjs",
+        "startedAt": "2026-10-21T07:43:53.81Z",
+        "completedAt": "2026-10-21T07:44:23.554Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-normal-qualified-prizes.mjs",
+        "startedAt": "2026-10-21T07:44:23.573Z",
+        "completedAt": "2026-10-21T07:44:32.805Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-submission-edit-handler-emulator.mjs",
+        "startedAt": "2026-10-21T07:44:32.829Z",
+        "completedAt": "2026-10-21T07:44:53.464Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-submission-resubmission-policy.mjs",
+        "startedAt": "2026-10-21T07:44:53.468Z",
+        "completedAt": "2026-10-21T07:44:54.128Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-sponsor-reservation-policy.mjs",
+        "startedAt": "2026-10-21T07:44:54.13Z",
+        "completedAt": "2026-10-21T07:44:55.382Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-prize-exposure.mjs",
+        "startedAt": "2026-10-21T07:44:55.383Z",
+        "completedAt": "2026-10-21T07:45:00.294Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-revenue-foundation-ownership.mjs",
+        "startedAt": "2026-10-21T07:45:00.296Z",
+        "completedAt": "2026-10-21T07:45:04.624Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+        "startedAt": "2026-10-21T07:45:04.632Z",
+        "completedAt": "2026-10-21T07:45:13.992Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+        "startedAt": "2026-10-21T07:45:13.994Z",
+        "completedAt": "2026-10-21T07:45:28.074Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+        "startedAt": "2026-10-21T07:45:28.077Z",
+        "completedAt": "2026-10-21T07:45:39.377Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-review-authorization.mjs",
+        "startedAt": "2026-10-21T07:45:39.379Z",
+        "completedAt": "2026-10-21T07:45:46.413Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+        "startedAt": "2026-10-21T07:45:46.415Z",
+        "completedAt": "2026-10-21T07:45:55.117Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-storage-rules.mjs",
+        "startedAt": "2026-10-21T07:45:55.127Z",
+        "completedAt": "2026-10-21T07:46:15.114Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-storage-rules-document-access-limit.mjs",
+        "startedAt": "2026-10-21T07:46:15.118Z",
+        "completedAt": "2026-10-21T07:46:15.693Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+        "startedAt": "2026-10-21T07:46:15.695Z",
+        "completedAt": "2026-10-21T07:46:29.352Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-challenge-media-serialization.mjs",
+        "startedAt": "2026-10-21T07:46:29.354Z",
+        "completedAt": "2026-10-21T07:46:30.242Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-challenge-comments-route.mjs",
+        "startedAt": "2026-10-21T07:46:30.244Z",
+        "completedAt": "2026-10-21T07:46:40.372Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+        "startedAt": "2026-10-21T07:46:40.375Z",
+        "completedAt": "2026-10-21T07:46:53.052Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-media-upload-storage-rules.mjs",
+        "startedAt": "2026-10-21T07:46:53.055Z",
+        "completedAt": "2026-10-21T07:47:02.751Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-ownership-migration.mjs",
+        "startedAt": "2026-10-21T07:47:02.755Z",
+        "completedAt": "2026-10-21T07:47:03.236Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-authoritative-media-verification.mjs",
+        "startedAt": "2026-10-21T07:47:03.237Z",
+        "completedAt": "2026-10-21T07:47:04.548Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-media-verification-reuse.mjs",
+        "startedAt": "2026-10-21T07:47:04.549Z",
+        "completedAt": "2026-10-21T07:47:08.446Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-private-access-method-enforcement.mjs",
+        "startedAt": "2026-10-21T07:47:08.448Z",
+        "completedAt": "2026-10-21T07:47:08.736Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-sponsor-proposal-retirement.mjs",
+        "startedAt": "2026-10-21T07:47:08.737Z",
+        "completedAt": "2026-10-21T07:47:09.113Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-payment-return-routes.mjs",
+        "startedAt": "2026-10-21T07:47:09.115Z",
+        "completedAt": "2026-10-21T07:47:37.892Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+        "startedAt": "2026-10-21T07:47:37.898Z",
+        "completedAt": "2026-10-21T07:47:52.487Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-cloud-tasks.mjs",
+        "startedAt": "2026-10-21T07:47:52.489Z",
+        "completedAt": "2026-10-21T07:48:01.907Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+        "startedAt": "2026-10-21T07:48:01.908Z",
+        "completedAt": "2026-10-21T07:48:13.923Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+        "startedAt": "2026-10-21T07:48:13.924Z",
+        "completedAt": "2026-10-21T07:48:28.109Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+        "startedAt": "2026-10-21T07:48:28.121Z",
+        "completedAt": "2026-10-21T07:48:41.854Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-enterprise-finance-route.mjs",
+        "startedAt": "2026-10-21T07:48:41.857Z",
+        "completedAt": "2026-10-21T07:48:50.384Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-private-access-requests-route.mjs",
+        "startedAt": "2026-10-21T07:48:50.385Z",
+        "completedAt": "2026-10-21T07:49:06.199Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-team-privacy-route.mjs",
+        "startedAt": "2026-10-21T07:49:06.201Z",
+        "completedAt": "2026-10-21T07:49:19.856Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-auth-session-persistence-route.mjs",
+        "startedAt": "2026-10-21T07:49:19.864Z",
+        "completedAt": "2026-10-21T07:49:27.449Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+        "startedAt": "2026-10-21T07:49:27.456Z",
+        "completedAt": "2026-10-21T07:49:28.005Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+        "startedAt": "2026-10-21T07:49:28.008Z",
+        "completedAt": "2026-10-21T07:49:28.602Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+        "startedAt": "2026-10-21T07:49:28.604Z",
+        "completedAt": "2026-10-21T07:49:28.858Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-voting-route.mjs",
+        "startedAt": "2026-10-21T07:49:28.86Z",
+        "completedAt": "2026-10-21T07:49:45.29Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-voting-judging.mjs",
+        "startedAt": "2026-10-21T07:49:45.292Z",
+        "completedAt": "2026-10-21T07:49:45.761Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+        "startedAt": "2026-10-21T07:49:45.762Z",
+        "completedAt": "2026-10-21T07:50:08.201Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+        "startedAt": "2026-10-21T07:50:08.203Z",
+        "completedAt": "2026-10-21T07:50:15.196Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-discovery-analytics-scalability.mjs",
+        "startedAt": "2026-10-21T07:50:15.198Z",
+        "completedAt": "2026-10-21T07:50:31.065Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-dedicated-discovery-pagination.mjs",
+        "startedAt": "2026-10-21T07:50:31.068Z",
+        "completedAt": "2026-10-21T07:50:39.692Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-admin-support-workflows.mjs",
+        "startedAt": "2026-10-21T07:50:39.695Z",
+        "completedAt": "2026-10-21T07:50:52.047Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-new-policy.mjs",
+        "startedAt": "2026-10-21T07:50:52.062Z",
+        "completedAt": "2026-10-21T07:50:55.676Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-public-route-policy.mjs",
+        "startedAt": "2026-10-21T07:50:55.719Z",
+        "completedAt": "2026-10-21T07:50:56.958Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+        "startedAt": "2026-10-21T07:50:56.995Z",
+        "completedAt": "2026-10-21T07:51:04.785Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-public-team-emulator.mjs",
+        "startedAt": "2026-10-21T07:51:04.789Z",
+        "completedAt": "2026-10-21T07:51:12.801Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-vote-pagination.mjs",
+        "startedAt": "2026-10-21T07:51:12.802Z",
+        "completedAt": "2026-10-21T07:51:13.598Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-settlement-allocation.mjs",
+        "startedAt": "2026-10-21T07:51:13.6Z",
+        "completedAt": "2026-10-21T07:51:16.301Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+        "startedAt": "2026-10-21T07:51:16.302Z",
+        "completedAt": "2026-10-21T07:51:39.237Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+        "startedAt": "2026-10-21T07:51:39.24Z",
+        "completedAt": "2026-10-21T07:51:57.601Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+        "startedAt": "2026-10-21T07:51:57.607Z",
+        "completedAt": "2026-10-21T07:52:07.983Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-member-payments-emulator.mjs",
+        "startedAt": "2026-10-21T07:52:07.988Z",
+        "completedAt": "2026-10-21T07:52:33.971Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-settlement-emulator.mjs",
+        "startedAt": "2026-10-21T07:52:33.977Z",
+        "completedAt": "2026-10-21T07:52:45.588Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-submission-media-emulator.mjs",
+        "startedAt": "2026-10-21T07:52:45.594Z",
+        "completedAt": "2026-10-21T07:53:00.277Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-automatic-voting-emulator.mjs",
+        "startedAt": "2026-10-21T07:53:00.282Z",
+        "completedAt": "2026-10-21T07:53:21.86Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+        "startedAt": "2026-10-21T07:53:21.864Z",
+        "completedAt": "2026-10-21T07:53:23.127Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+        "startedAt": "2026-10-21T07:53:23.129Z",
+        "completedAt": "2026-10-21T07:53:55.755Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-notifications-emulator.mjs",
+        "startedAt": "2026-10-21T07:53:55.775Z",
+        "completedAt": "2026-10-21T07:54:18.703Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+        "startedAt": "2026-10-21T07:54:18.728Z",
+        "completedAt": "2026-10-21T07:54:34.003Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+        "startedAt": "2026-10-21T07:54:34.015Z",
+        "completedAt": "2026-10-21T07:54:52.688Z",
+        "exitCode": 0,
+        "errorCode": null
+      },
+      {
+        "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+        "startedAt": "2026-10-21T07:54:52.694Z",
+        "completedAt": "2026-10-21T07:55:32.68Z",
+        "exitCode": 1,
+        "errorCode": null
+      }
+    ],
+    "failure": "Tournament lifecycle authenticated vote returned 401; initial batch stopped before last three suites.",
+    "total": 72
+  },
+  "targetedRecovery": {
+    "tournamentLifecycle": {
+      "exitCode": 0,
+      "assertions": 424
+    },
+    "liveEventAdmission": {
+      "exitCode": 0,
+      "assertions": 348
+    },
+    "mediaPublishHandlers": {
+      "exitCode": 0,
+      "assertions": 33
+    },
+    "publishingReview": {
+      "assertions": 225,
+      "exitCode": 0,
+      "priorWrapperShutdownTimeout": 2
+    }
+  },
+  "coverage": "All 72 P0 suites have successful results across the initial batch and isolated reruns; the initial full command was not a clean pass.",
+  "productionAccountAcceptance": "Host and other live account journeys pending; emulator evidence is not live-provider acceptance."
+}

@@ -7,6 +7,7 @@ import { OnboardingShell } from "@/components/onboarding-shell";
 import { Button, Card, Field, inputClass, LinkButton } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { getAuthenticatedDestination, requestedAccountDestination } from "@/lib/account-routing";
 import { getEffectiveTier } from "@/lib/plan-access";
 
 const unlockedTools = [
@@ -21,7 +22,7 @@ const unlockedTools = [
 
 export default function CreatorOnboardingPage() {
   const router = useRouter();
-  const { user, loading } = useCurrentUser();
+  const { user, loading, refreshProfile } = useCurrentUser();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ niche: "", profileGoal: "" });
   const [saving, setSaving] = useState(false);
@@ -38,7 +39,10 @@ export default function CreatorOnboardingPage() {
     });
     setSaving(false);
     if (!result.ok) return setError(result.message);
-    router.replace(destination);
+    window.dispatchEvent(new Event("challenge-suite-profile-updated"));
+    const profile = await refreshProfile();
+    if (!profile) return setError("Your setup was saved, but account access could not be refreshed. Please try again.");
+    router.replace(getAuthenticatedDestination(profile, requestedAccountDestination(window.location.search) || destination));
   }
 
   if (loading) return <OnboardingShell eyebrow="Creator Plan" title="Preparing your studio" subtitle="Loading your verified plan access." currentStep={1} totalSteps={4}><Card className="h-[480px] animate-pulse" /></OnboardingShell>;
