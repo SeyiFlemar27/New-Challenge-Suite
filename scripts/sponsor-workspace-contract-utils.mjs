@@ -54,7 +54,7 @@ export function runSponsorWorkspaceContract(name) {
       break;
     case "state-canonical":
       hasAll(source.access, ["resolveSponsorWorkspaceState", '"draft"', '"submitted"', '"pending_review"', '"needs_changes"', '"approved"', '"rejected"', '"suspended"', "calculateSponsorCompletion"], "Canonical sponsor resolver incomplete");
-      assert(source.shell.includes("resolveSponsorWorkspaceState") && source.dashboard.includes("resolveSponsorWorkspaceState"), "Shell and dashboard must share canonical sponsor state.");
+      assert(source.shell.includes("resolveSponsorWorkspaceState") && source.dashboard.includes('<SponsorShell profile={data.sponsorProfile}>'), "Dashboard must delegate its authoritative profile to the canonical guarded Sponsor shell.");
       break;
     case "dashboard-simple-kpis":
       hasAll(source.dashboard, ["Active Sponsorships", "Open Proposals", "Needs Attention", "Wallet Balance"], "Dashboard KPI missing");

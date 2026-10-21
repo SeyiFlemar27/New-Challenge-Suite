@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {dashboardCount,dashboardSum,dashboardPreviews,dashboardChallengeAction,activeDashboardChallenge,dashboardMoney,confirmedDashboardParticipant} from '../lib/dashboard-presentation.ts';
+let assertions=0;function eq(a,b){assert.deepEqual(a,b);assertions++;}
+for(const bad of [null,undefined,{},[],NaN,Infinity,-1,'','unknown'])eq(dashboardCount(bad),null);
+eq(dashboardCount(0),0);eq(dashboardCount('12'),12);
+eq(dashboardSum([],'votes'),0);eq(dashboardSum([{votes:4},{votes:6}],'votes'),10);eq(dashboardSum([{votes:4},{}],'votes'),null);
+eq(activeDashboardChallenge({status:'draft'}),false);eq(activeDashboardChallenge({status:'published'}),false);eq(activeDashboardChallenge({status:'voting_open'}),true);
+eq(activeDashboardChallenge({status:'published',managementState:'active'}),false);
+eq(activeDashboardChallenge({status:'active',moderationStatus:'held'}),false);
+eq(confirmedDashboardParticipant({participantId:'p',participantStatus:'joined',paymentStatus:'not_required'}),true);
+eq(confirmedDashboardParticipant({participantId:'p',participantStatus:'pending',paymentStatus:'not_required'}),false);
+eq(confirmedDashboardParticipant({participantId:'p',participantStatus:'joined',paymentStatus:'awaiting_payment'}),false);
+const rows=[{id:'a',status:'draft'},{id:'b',status:'active'},{id:'c',status:'active'},{id:'d',status:'active'},{id:'a',status:'draft'}];
+eq(dashboardPreviews(rows).map(row=>row.id),['b','c','d']);eq(rows.length,5);
+eq(dashboardChallengeAction({id:'one',status:'draft'}).href,'/challenges/create/one');
+eq(dashboardChallengeAction({id:'two',status:'draft',visibility:'private'}).href,'/private/create/two');
+eq(dashboardChallengeAction({id:'three',status:'draft',isLiveEvent:true}).href,'/host/live/create?draftId=three');
+eq(dashboardChallengeAction({id:'four',status:'draft',type:'tournament'}).href,'/host/tournaments/create?draft=four');
+eq(dashboardChallengeAction({id:'five',status:'active'}).href,'/challenges/five/manage');eq(dashboardMoney(null),'Not available');eq(dashboardMoney(0),'$0.00');
+console.log(JSON.stringify({suite:'dashboard presentation semantics',assertions,passed:true}));

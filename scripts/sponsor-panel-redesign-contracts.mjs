@@ -46,7 +46,7 @@ export function runSponsorPanelContract(name) {
     all(access, ['canDiscover = status !== "suspended"', "canSendProposal = approved", "canFund = canSendProposal"], name);
     all(org, ["includeHistorical", 'status: "active" | "restricted" | "suspended" | "closed"', "candidates.sort"], name);
     all(sponsorServer, ["allowHistorical", "includeHistorical: options.allowHistorical === true"], name);
-    all(studio, ["Historical records only", "new proposals and funding actions are disabled"], name);
+    all(studio, ["Historical records only", "New commercial activity and funding remain unavailable", "!historical?"], name);
   } else if (name === "retired-v1-surfaces") {
     assert(read("app/sponsor/campaigns/page.tsx").includes("Campaign briefs") && read("app/sponsor/campaigns/page.tsx").includes("/api/sponsor/campaigns"), "Campaign Brief route must render the canonical campaign list");
     assert(read("app/sponsor/team/page.tsx").includes('redirect("/sponsor/settings")'), "Team route must redirect");

@@ -3,11 +3,12 @@ import { enterpriseChallengeInScope } from "@/lib/enterprise-access";
 import { createNotification } from "@/lib/server/notifications";
 import { requireEnterprisePermission } from "@/lib/server/enterprise-access";
 import { writeAuditLog } from "@/lib/server/audit";
+import { publicChallengeFields } from "@/lib/server/public-challenge";
 import { fail, ok, readJson, validationError } from "@/lib/server/responses";
 
 export const dynamic = "force-dynamic";
 
-const activeStatuses = new Set(["approved", "scheduled", "active", "submission_open", "voting_open", "voting_closed", "under_review", "results_review"]);
+const activeStatuses = new Set(["active", "registration_open", "submission_open", "voting_open"]);
 
 function iso(value: unknown) {
   if (typeof value === "string") return value;
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     return groups;
   }, []);
   const [participantGroups, submissionGroups, activityGroups] = await Promise.all([
-    Promise.all(idGroups.map((group) => db.collection("participants").where("challengeId", "in", group).count().get())),
+    Promise.all(idGroups.map((group) => db.collection("challengeParticipants").where("challengeId", "in", group).count().get())),
     Promise.all(idGroups.map((group) => db.collection("submissions").where("challengeId", "in", group).count().get())),
     Promise.all(idGroups.map((group) => db.collection("auditLogs").where("targetId", "in", group).orderBy("createdAt", "desc").limit(100).get().catch(() => null)))
   ]);
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
     return {
       id: challenge.id,
       title: String(challenge.title ?? "Untitled challenge"),
+      coverImageUrl: publicChallengeFields(challenge, challenge.id).coverImageUrl ?? null,
       category: String(challenge.category ?? "Uncategorized"),
       region: String(challenge.region ?? challenge.country ?? "All regions"),
       status: String(challenge.status ?? "draft"),

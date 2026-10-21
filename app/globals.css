@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/dashboard/dashboard.css";
 
 /* Advanced builders share a light surface while legacy field groups are normalized. */
 [data-builder-surface] .text-white { color: #0f172a !important; }

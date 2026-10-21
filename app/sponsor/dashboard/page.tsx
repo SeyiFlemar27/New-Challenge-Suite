@@ -1,110 +1,40 @@
 "use client";
+import { useQuery } from '@tanstack/react-query';
+import { BarChart3, Compass, Handshake, WalletCards, MousePointerClick, Eye } from 'lucide-react';
+import { SponsorShell, type SponsorShellProfile } from '@/components/sponsor/sponsor-shell';
+import { useCurrentUser } from '@/lib/hooks/use-current-user';
+import { AccountResolutionState } from '@/components/account-resolution-state';
+import { apiRequest } from '@/lib/api/client';
+import { hasSponsorPanelContext } from '@/lib/account-routing';
+import { dashboardCount, dashboardMoney, type DashboardRecord } from '@/lib/dashboard-presentation';
+import { LinkButton } from '@/components/ui';
+import { DashboardAttention, DashboardEmpty, DashboardHeader, DashboardMetric, DashboardPanel, DashboardPerformance, DashboardQuickActions } from '@/components/dashboard/dashboard-ui';
+import Link from 'next/link';
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { ArrowRight, CircleAlert, Handshake, LineChart, RefreshCw, WalletCards, ShieldCheck } from "lucide-react";
-import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
-import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
-import { apiRequest } from "@/lib/api/client";
-import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { getDefaultRouteForAccount, hasSponsorPanelContext } from "@/lib/account-routing";
-
-type RecordItem = Record<string, unknown> & { id: string };
-type Attention = { id: string; title: string; context: string; reason: string; href: string; actionLabel: string; deadline: string | null };
-type Opportunity = { id: string; title?: string; displayName?: string; creatorName?: string; category?: string; status?: string; href: string; imageUrl?: unknown; avatarUrl?: unknown };
-type DashboardResponse = {
-  sponsorProfile: SponsorShellProfile;
-  metrics: { activeSponsorships: number; openProposals: number; needsAttention: number; walletBalanceCents: number };
-  attention: Attention[];
-  sponsorships: RecordItem[];
-  recommendations: { challenges: Opportunity[]; creators: Opportunity[]; source: string };
-  performance: RecordItem | null;
-  performanceState: "live" | "finalized" | "not_recorded";
-  widgetErrors?: Record<string, string>;
-};
-
-export default function SponsorDashboardPage() {
-  const router = useRouter();
-  const { user, loading: userLoading, revision } = useCurrentUser();
-  const searchParams = useSearchParams();
-  const initialOpportunityTab = searchParams.get("opportunities");
-  const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">(initialOpportunityTab === "creators" ? "creators" : "challenges");
-  const isSponsorAccount = Boolean(user && hasSponsorPanelContext(user));
-  const pendingProfileSetup = Boolean(isSponsorAccount && !user?.hasSponsorProfile && !user?.sponsorOrganizationId);
-  const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard", user?.uid, user?.sponsorOrganizationId, revision], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false, enabled: !userLoading && isSponsorAccount && !pendingProfileSetup });
-  const reloadDashboard = async () => { await dashboardQuery.refetch(); };
-  const dashboard = dashboardQuery.data?.ok ? dashboardQuery.data.data ?? null : null;
-  const loading = userLoading || dashboardQuery.isLoading;
-  const error = dashboardQuery.data && !dashboardQuery.data.ok ? dashboardQuery.data.message || "Sponsor Studio could not be loaded." : "";
-
-  useEffect(() => {
-    if (userLoading) return;
-    if (!user) router.replace("/auth/login?next=%2Fsponsor%2Fdashboard");
-    else if (!isSponsorAccount) router.replace(getDefaultRouteForAccount({ ...user }));
-  }, [isSponsorAccount, router, user, userLoading]);
-
-  if (!userLoading && !user) return <main className="theme-workspace grid min-h-screen place-items-center bg-[var(--background)] px-5"><Card className="max-w-lg p-7 text-center"><h1 className="text-2xl font-black">Sign in to open Sponsor Studio</h1><LinkButton href="/auth/login?next=%2Fsponsor%2Fdashboard" className="mt-5">Sign in</LinkButton></Card></main>;
-  if (!userLoading && user && !isSponsorAccount) return <main className="theme-workspace grid min-h-screen place-items-center bg-[var(--background)] px-5"><p role="status">Opening your account workspace…</p></main>;
-
-  function selectTab(tab: "challenges" | "creators") {
-    setOpportunityTab(tab);
-    const url = new URL(window.location.href);
-    if (tab === "challenges") url.searchParams.delete("opportunities");
-    else url.searchParams.set("opportunities", tab);
-    window.history.replaceState(null, "", url.pathname + url.search);
-  }
-
-  if (loading) return <SponsorShell><div className="mx-auto max-w-[1320px] space-y-7"><div className="h-28 animate-pulse rounded-[8px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0,1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-[8px] bg-white" />)}</div><div className="h-72 animate-pulse rounded-[8px] bg-white" /></div></SponsorShell>;
-
-  if (pendingProfileSetup && user) return <SponsorShell profile={{ brandName: user.displayName || "Sponsor", sponsorOnboardingStatus: "not_started", organizationStatus: "pending_onboarding" }}><div className="mx-auto max-w-4xl"><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Sponsor Studio</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">Welcome to Challenge Suite</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Your Sponsor dashboard is ready. Add your business details when you are ready to review agreements or take protected sponsorship actions.</p><Card className="mt-7 border-amber-200 bg-amber-50 p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-1 shrink-0 text-amber-800" /><div><h2 className="font-black text-amber-950">Business verification stays separate</h2><p className="mt-2 text-sm leading-6 text-amber-900">The three-screen introduction is complete. Sponsor profile review and required verification remain in place before agreements, funding, or other protected actions.</p><LinkButton href="/sponsor/onboarding" className="mt-5">Set up Sponsor profile <ArrowRight size={16} /></LinkButton></div></div></Card></div></SponsorShell>;
-
-  const metrics = dashboard?.metrics ?? { activeSponsorships: 0, openProposals: 0, needsAttention: 0, walletBalanceCents: 0 };
-  const opportunities = opportunityTab === "challenges" ? dashboard?.recommendations.challenges ?? [] : dashboard?.recommendations.creators ?? [];
-  const historicalOnly = dashboard?.sponsorProfile.organizationStatus === "restricted";
-  return <SponsorShell profile={dashboard?.sponsorProfile}><div className="mx-auto max-w-[1320px]">
-    <header className="flex flex-col gap-5 border-b border-slate-200 pb-7 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Sponsor Studio</p><h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">Welcome back, {String(dashboard?.sponsorProfile.brandName || "Sponsor")}</h1><p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">Manage sponsorships, proposals and brand performance.</p></div><div className="flex flex-wrap gap-3">{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges">Discover Opportunities <ArrowRight size={16} /></LinkButton>}<LinkButton href="/sponsor/sponsorships" variant="secondary">View Sponsorships</LinkButton></div></header>
-
-    {historicalOnly ? <div className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50 px-5 py-4"><p className="font-black text-amber-950">Historical records only</p><p className="mt-1 text-sm leading-6 text-amber-900">This Sponsor Organization is restricted. Existing sponsorships, reports, analytics and wallet history remain available, but new proposals and funding actions are disabled.</p></div> : null}
-
-    {error ? <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-red-200 bg-red-50 px-5 py-4"><p className="text-sm font-bold text-red-800">{error}</p><Button variant="secondary" onClick={() => void dashboardQuery.refetch()}><RefreshCw size={16} /> Try Again</Button></div> : null}
-
-    <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sponsor Studio metrics">
-      <Metric title="Active Sponsorships" value={String(metrics.activeSponsorships)} detail="Active and scheduled partnerships" />
-      <Metric title="Open Proposals" value={String(metrics.openProposals)} detail="Proposals still in progress" />
-      <Metric title="Needs Attention" value={String(metrics.needsAttention)} detail="Actions requiring your review" />
-      <Metric title="Wallet Balance" value={money(metrics.walletBalanceCents)} detail="Available Sponsor funds only" icon={<WalletCards size={18} />} />
-    </section>
-
-    <div className="mt-9 grid gap-9 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)]">
-      <section><SectionTitle title="Needs Attention" href={dashboard?.attention.length === 5 ? "/sponsor/dashboard?view=attention" : undefined} />
-        {dashboard?.widgetErrors?.proposals || dashboard?.widgetErrors?.deliverables ? <WidgetError message="Some attention items could not be loaded." retry={reloadDashboard} /> : null}
-        {!historicalOnly && dashboard?.attention.length ? <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{dashboard.attention.map((item) => <div key={item.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-black text-slate-950">{item.title}</p><p className="mt-1 text-sm font-bold text-amber-800">{item.context}</p><p className="mt-1 text-sm leading-6 text-slate-600">{item.reason}</p>{item.deadline ? <p className="mt-1 text-xs text-slate-500">Due {date(item.deadline)}</p> : null}</div><LinkButton href={item.href} variant="ghost">{item.actionLabel} <ArrowRight size={15} /></LinkButton></div>)}</div> : <EmptyState icon={<CircleAlert />} title="Nothing needs your attention" body="Funding actions and deliverable reviews will appear here." />}
-      </section>
-
-      <section><SectionTitle title="Active Sponsorships" href="/sponsor/sponsorships" />
-        {dashboard?.widgetErrors?.sponsorships ? <WidgetError message="Sponsorships could not be loaded." retry={reloadDashboard} /> : dashboard?.sponsorships.length ? <div className="mt-3 space-y-3">{dashboard.sponsorships.map((item) => <Card key={item.id} className="p-4 shadow-none"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-black text-slate-950">{String(item.challengeTitle ?? item.title ?? "Sponsorship")}</p><p className="mt-1 text-xs font-bold uppercase text-amber-800">{label(item.status)}</p><p className="mt-2 text-sm text-slate-600">{label(item.sponsorRole ?? "supporting")} Sponsor</p></div><Handshake className="shrink-0 text-amber-700" size={19} /></div><Link href={"/sponsor/sponsorships/" + item.id} className="mt-4 inline-flex min-h-10 items-center text-sm font-black text-slate-950">View Sponsorship <ArrowRight className="ml-1" size={15} /></Link></Card>)}</div> : <div className="mt-3 rounded-[8px] bg-[#DCD9D2]/60 p-5"><p className="font-black text-slate-950">No active sponsorships yet.</p><p className="mt-2 text-sm leading-6 text-slate-600">Discover sponsorship-ready Challenges and Creators to start your first partnership.</p>{historicalOnly ? null : <LinkButton href="/sponsor/discover?tab=challenges" className="mt-4">Discover Opportunities</LinkButton>}</div>}
-      </section>
-    </div>
-
-    {historicalOnly ? null : <section className="mt-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-2xl font-black text-slate-950">Recommended Opportunities</h2><p className="mt-1 text-sm text-slate-600">Real sponsorship-ready records from Discover.</p></div><Link href={"/sponsor/discover?tab=" + opportunityTab} className="text-sm font-black text-amber-800">Discover all</Link></div>
-      <div className="mt-4 inline-flex rounded-[8px] bg-slate-100 p-1" role="tablist" aria-label="Opportunity type">{(["challenges","creators"] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={opportunityTab === tab} onClick={() => selectTab(tab)} className={"min-h-10 rounded-[6px] px-5 text-sm font-black capitalize " + (opportunityTab === tab ? "bg-white text-slate-950 shadow-sm" : "text-slate-600")}>{tab}</button>)}</div>
-      {dashboard?.widgetErrors?.[opportunityTab] ? <WidgetError message={opportunityTab + " could not be loaded."} retry={reloadDashboard} /> : opportunities.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{opportunities.map((item) => <Link key={item.id} href={item.href} className="min-w-0 rounded-[8px] border border-slate-200 bg-white p-5 transition hover:border-amber-400"><p className="text-xs font-black uppercase text-amber-800">{item.category || (opportunityTab === "challenges" ? "Challenge" : "Creator")}</p><h3 className="mt-2 line-clamp-2 font-black text-slate-950">{item.title || item.displayName}</h3>{item.creatorName ? <p className="mt-2 truncate text-sm text-slate-600">{item.creatorName}</p> : null}<span className="mt-5 inline-flex items-center text-sm font-black">View {opportunityTab === "challenges" ? "Opportunity" : "Creator"} <ArrowRight className="ml-1" size={15} /></span></Link>)}</div> : <div className="mt-4 rounded-[8px] border border-slate-200 bg-white p-6 text-sm text-slate-600">No matching {opportunityTab} are available right now.</div>}
-    </section>}
-
-    <section className="mt-10 border-t border-slate-200 pt-8"><SectionTitle title="Performance Snapshot" href="/sponsor/analytics" />
-      <div className="mt-4 grid gap-4 sm:grid-cols-3"><Snapshot label="Valid impressions" value={metric(dashboard?.performance, "validImpressions")} /><Snapshot label="Unique CTA clicks" value={metric(dashboard?.performance, "uniqueCtaClicks")} /><Snapshot label="Participants reached" value={metric(dashboard?.performance, "participantsReached")} /></div>
-      <p className="mt-3 text-xs text-slate-500">{dashboard?.performanceState === "finalized" ? "Finalized and reconciled metrics" : dashboard?.performanceState === "live" ? "Live provisional metrics" : "Performance appears after measurable sponsored placements are active."}</p>
-    </section>
+type Opportunity=DashboardRecord&{href:string;title?:string;displayName?:string;category?:string};
+type Dashboard={sponsorProfile:SponsorShellProfile;metrics:{activeSponsorships:number;walletBalanceCents:number};attention:Array<{id:string;title:string;reason:string;context:string;href:string}>;sponsorships:DashboardRecord[];performance:DashboardRecord|null;performanceState:string;recommendations:{challenges:Opportunity[];creators:Opportunity[]};widgetErrors?:Record<string,string>};
+export default function SponsorDashboardPage(){
+  const {user,loading,revision}=useCurrentUser();
+  const context=Boolean(user&&hasSponsorPanelContext(user));
+  const setup=context&&!user?.hasSponsorProfile&&!user?.sponsorOrganizationId;
+  const query=useQuery({queryKey:['sponsor-dashboard',user?.uid,user?.sponsorOrganizationId,revision],queryFn:()=>apiRequest<Dashboard>('/api/sponsor/dashboard'),staleTime:30000,retry:false,enabled:!loading&&context&&!setup});
+  if(loading||(!setup&&query.isLoading))return <AccountResolutionState/>;
+  if(!user||!context)return <AccountResolutionState error="Sponsor access could not be confirmed."/>;
+  if(setup)return <SponsorShell profile={{brandName:user.displayName,sponsorOnboardingStatus:'not_started',organizationStatus:'pending_onboarding'}}><div className="dashboard-home" data-dashboard-home="sponsor"><DashboardHeader title="Welcome to Challenge Suite" subtitle="Your Sponsor introduction is complete. Business setup and review remain separate from operational access."/><DashboardPanel title="Set up your Sponsor profile"><p className="dashboard-caption">Complete the business profile before protected sponsorship actions. Setup does not approve funding or change your personal plan.</p><LinkButton href="/sponsor/onboarding" className="mt-5">Set up Sponsor profile</LinkButton></DashboardPanel></div></SponsorShell>;
+  const data=query.data?.ok?query.data.data:null;
+  if(!data)return <SponsorShell><AccountResolutionState error={query.data?.message||'Sponsor dashboard could not be loaded.'} onRetry={()=>void query.refetch()}/></SponsorShell>;
+  const historical=data.sponsorProfile.organizationStatus==='restricted';
+  const errors=data.widgetErrors??{};
+  const snapshot=data.performance?.metrics&&typeof data.performance.metrics==='object'?data.performance.metrics as Record<string,unknown>:data.performance;
+  const metric=(key:string)=>errors.analytics?null:dashboardCount(snapshot?.[key]);
+  return <SponsorShell profile={data.sponsorProfile}><div className="dashboard-home" data-dashboard-home="sponsor">
+    <DashboardHeader title="Sponsor Dashboard" subtitle={`Welcome back, ${String(data.sponsorProfile.brandName||'Sponsor')}. Manage real partnerships and recorded brand performance.`} action={!historical?<LinkButton href="/sponsor/discover?tab=challenges"><Compass size={16}/>Find Opportunities</LinkButton>:undefined}/>
+    {historical?<div role="status" className="dashboard-panel border-amber-200 bg-amber-50"><b>Historical records only</b><p className="dashboard-caption mt-2">This organization is restricted. New commercial activity and funding remain unavailable.</p></div>:null}
+    {Object.keys(errors).length?<div className="dashboard-panel" role="status"><p className="dashboard-caption">Some sections are unavailable: {Object.keys(errors).join(', ')}.</p><button type="button" className="dashboard-text-link" onClick={()=>void query.refetch()}>Retry unavailable sections</button></div>:null}
+    <div className="dashboard-metrics"><DashboardMetric label="Active Sponsorships" value={errors.sponsorships?'—':data.metrics.activeSponsorships} icon={<Handshake/>}/><DashboardMetric label="Valid Impressions" value={metric('validImpressions')?.toLocaleString()??'—'} detail="Recorded analytics snapshot" tone="blue" icon={<Eye/>}/><DashboardMetric label="Unique CTA Clicks" value={metric('uniqueCtaClicks')?.toLocaleString()??'—'} detail="Verified recorded clicks" tone="green" icon={<MousePointerClick/>}/><DashboardMetric label="Available Sponsor Funds" value={errors.wallet?'—':dashboardMoney(data.metrics.walletBalanceCents)} detail="Wallet balance, not total spending" tone="rose" icon={<WalletCards/>}/></div>
+    <div className="dashboard-columns"><DashboardPanel title="Quick Actions" description="Find, manage and track your sponsorships."><DashboardQuickActions actions={[...(!historical?[{label:'Find Opportunities',description:'Discover eligible records',href:'/sponsor/discover',icon:<Compass/>}]:[]),{label:'Sponsorships',description:'Existing partnerships',href:'/sponsor/sponsorships',icon:<Handshake/>},{label:'Performance',description:'Recorded analytics',href:'/sponsor/analytics',icon:<BarChart3/>},{label:'Transactions',description:'Authorized spending records',href:'/sponsor/wallet/transactions',icon:<WalletCards/>}]}/></DashboardPanel><DashboardPanel title="Needs Your Attention">{historical?<p className="dashboard-caption">New actions are disabled in historical-only mode.</p>:errors.proposals||errors.deliverables?<p className="dashboard-caption">Attention records could not be verified. Retry above.</p>:<DashboardAttention items={data.attention.map(item=>({title:item.title,body:item.context+' · '+item.reason,href:item.href}))}/>}</DashboardPanel></div>
+    <div className="dashboard-columns"><DashboardPanel title="Sponsorship Performance" description="Snapshot metrics, not a fabricated audience or spending trend." href="/sponsor/analytics" linkLabel="View performance"><DashboardPerformance description="Count-only metrics from the most recent recorded organization snapshot." items={[{label:'Impressions',value:metric('validImpressions')},{label:'CTA clicks',value:metric('uniqueCtaClicks')},{label:'Participants',value:metric('participantsReached')}]}/><p className="dashboard-footnote">Snapshot state: {data.performanceState.replaceAll('_',' ')}. Spending and financial history remain in the wallet section.</p></DashboardPanel><DashboardPanel title="Sponsor Wallet" href="/sponsor/wallet" linkLabel="View wallet"><div className="dashboard-balance"><small>Available funds</small><strong>{errors.wallet?'Not available':dashboardMoney(data.metrics.walletBalanceCents)}</strong><span>Not a spending total or a payout authorization</span></div><Link className="dashboard-button-secondary mt-5" href="/sponsor/wallet/transactions">View Transactions</Link></DashboardPanel></div>
+    <DashboardPanel title="Recent Sponsorships" description="Up to three relevant active or scheduled partnerships." href="/sponsor/sponsorships">{errors.sponsorships?<p className="dashboard-caption">Sponsorship records are unavailable.</p>:data.sponsorships.length?<div className="dashboard-previews">{data.sponsorships.slice(0,3).map(item=><article key={item.id} data-dashboard-preview className="dashboard-preview"><div className="dashboard-preview-image"><Handshake size={28}/><span>{String(item.status??'Recorded').replaceAll('_',' ')}</span></div><div className="dashboard-preview-content"><h3>{String(item.challengeTitle??item.title??'Sponsorship')}</h3><p className="dashboard-caption">{String(item.sponsorRole??'Supporting')} Sponsor</p><Link className="dashboard-button-secondary" href={'/sponsor/sponsorships/'+encodeURIComponent(item.id)}>View Sponsorship</Link></div></article>)}</div>:<DashboardEmpty title="No active sponsorships yet" body="Eligible partnerships will appear after the established sponsorship process."/>}</DashboardPanel>
+    {!historical?<DashboardPanel title="Relevant Opportunities" description="Existing sponsorship-ready records from Discover, without suggested budgets." href="/sponsor/discover">{errors.challenges?<p className="dashboard-caption">Opportunities are temporarily unavailable.</p>:data.recommendations.challenges.length?<DashboardAttention items={data.recommendations.challenges.slice(0,3).map(item=>({title:item.title??'Challenge',body:item.category,href:item.href}))}/>:<DashboardEmpty title="No matching challenges right now" body="Explore current challenge and creator opportunities in Discover."/>}</DashboardPanel>:null}
   </div></SponsorShell>;
 }
-
-function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon?: React.ReactNode }) { return <Card className="min-h-28 border-slate-200 bg-[#DCD9D2]/55 p-5 shadow-none"><div className="flex items-start justify-between gap-2"><p className="text-sm font-bold text-slate-600">{title}</p>{icon}</div><p className="mt-2 text-3xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></Card>; }
-function SectionTitle({ title, href }: { title: string; href?: string }) { return <div className="flex items-center justify-between gap-4"><h2 className="text-2xl font-black text-slate-950">{title}</h2>{href ? <Link href={href} className="text-sm font-black text-amber-800">View all</Link> : null}</div>; }
-function WidgetError({ message, retry }: { message: string; retry: () => Promise<void> }) { return <div className="mt-3 flex items-center justify-between gap-3 rounded-[8px] border border-amber-200 bg-amber-50 p-4"><p className="text-sm font-bold text-amber-900">{message}</p><button type="button" onClick={() => void retry()} className="shrink-0 text-sm font-black text-amber-900">Retry</button></div>; }
-function Snapshot({ label: name, value }: { label: string; value: string }) { return <div className="rounded-[8px] border border-slate-200 bg-white p-5"><LineChart size={18} className="text-amber-700" /><p className="mt-3 text-sm text-slate-600">{name}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div>; }
-function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100); }
-function date(value: string) { const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "date unavailable" : new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(parsed); }
-function label(value: unknown) { return String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-function metric(item: RecordItem | null | undefined, key: string) { const source = item?.metrics && typeof item.metrics === "object" ? item.metrics as Record<string, unknown> : item; const value = Number(source?.[key]); return Number.isFinite(value) ? value.toLocaleString() : "Not recorded"; }

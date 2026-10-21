@@ -1,0 +1,284 @@
+{
+  "passed": 23,
+  "failed": 0,
+  "skipped": 26,
+  "assertions": 173,
+  "results": [
+    {
+      "name": "Dashboard redesign: free",
+      "status": "PASS",
+      "assertions": 22
+    },
+    {
+      "name": "Dashboard redesign: creator",
+      "status": "PASS",
+      "assertions": 18
+    },
+    {
+      "name": "Dashboard redesign: host",
+      "status": "PASS",
+      "assertions": 18
+    },
+    {
+      "name": "Dashboard redesign: enterprise",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Dashboard redesign: sponsor",
+      "status": "PASS",
+      "assertions": 21
+    },
+    {
+      "name": "Dashboard redesign: admin",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Free default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator default login under delayed profile",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Host default login under delayed profile",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Dashboard stability: Host onboarding default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Restricted default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Dashboard stability: Host legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Dashboard stability: Host logout and login again enters Host directly",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: requested action and unsafe redirects",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: verified email required before dashboard",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: protected direct navigation preserves action query at login",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    }
+  ],
+  "pageErrors": [],
+  "authResponses": [],
+  "authStorageSnapshots": [],
+  "browserDiagnostics": [],
+  "nextLog": "├ ƒ /api/internal/tournament-activation\n├ ƒ /api/internal/tournament-scheduler\n├ ƒ /api/kyc\n├ ƒ /api/kyc/sumsub/start\n├ ƒ /api/kyc/sumsub/status\n├ ƒ /api/kyc/sumsub/webhook\n├ ƒ /api/leaderboards\n├ ƒ /api/live-events\n├ ƒ /api/live-events/[id]\n├ ƒ /api/live-events/[id]/bookings\n├ ƒ /api/live-events/[id]/changes\n├ ƒ /api/live-events/[id]/check-in\n├ ƒ /api/live-events/[id]/checkout\n├ ƒ /api/live-events/[id]/earnings\n├ ƒ /api/live-events/[id]/email-preferences\n├ ƒ /api/live-events/[id]/guest-verification\n├ ƒ /api/live-events/[id]/management\n├ ƒ /api/live-events/[id]/messages\n├ ƒ /api/live-events/[id]/presentation\n├ ƒ /api/live-events/[id]/public\n├ ƒ /api/live-events/[id]/refunds\n├ ƒ /api/live-events/[id]/staff\n├ ƒ /api/live-events/[id]/tickets\n├ ƒ /api/live-events/[id]/updates\n├ ƒ /api/live-events/[id]/user-state\n├ ƒ /api/live-events/[id]/withdraw\n├ ƒ /api/live-events/configuration\n├ ƒ /api/messages\n├ ƒ /api/messages/[conversationId]\n├ ƒ /api/notifications\n├ ƒ /api/notifications/[id]/read\n├ ƒ /api/notifications/enable\n├ ƒ /api/onboarding\n├ ƒ /api/onboarding/intro\n├ ƒ /api/onboarding/premium\n├ ƒ /api/onboarding/walkthrough\n├ ƒ /api/payments/status\n├ ƒ /api/payout-methods\n├ ƒ /api/predictions\n├ ƒ /api/private-challenges/[id]/access\n├ ƒ /api/private-challenges/[id]/preview\n├ ƒ /api/private-exclusive\n├ ƒ /api/profile/customization\n├ ƒ /api/profile/language\n├ ƒ /api/profile/me\n├ ƒ /api/public/home\n├ ƒ /api/public/profiles/[username]\n├ ƒ /api/public/profiles/[username]/connections\n├ ƒ /api/public/profiles/[username]/follow\n├ ƒ /api/rewards\n├ ƒ /api/rewards/check-in\n├ ƒ /api/rewards/claim\n├ ƒ /api/rewards/claims/[claimId]\n├ ƒ /api/rewards/creator-boost\n├ ƒ /api/rewards/history\n├ ƒ /api/rewards/prizes\n├ ƒ /api/rewards/settings\n├ ƒ /api/rewards/spin\n├ ƒ /api/rewards/summary\n├ ƒ /api/settings\n├ ƒ /api/sponsor/activity\n├ ƒ /api/sponsor/agreements/[agreementId]/accept\n├ ƒ /api/sponsor/analytics\n├ ƒ /api/sponsor/analytics/campaigns/[campaignId]\n├ ƒ /api/sponsor/analytics/events\n├ ƒ /api/sponsor/approvals\n├ ƒ /api/sponsor/approvals/[approvalId]\n├ ƒ /api/sponsor/assets\n├ ƒ /api/sponsor/assets/[assetId]\n├ ƒ /api/sponsor/billing\n├ ƒ /api/sponsor/billing/invoices\n├ ƒ /api/sponsor/billing/invoices/[invoiceId]\n├ ƒ /api/sponsor/campaigns\n├ ƒ /api/sponsor/campaigns/[campaignId]\n├ ƒ /api/sponsor/campaigns/[campaignId]/promote\n├ ƒ /api/sponsor/challenges/[id]/funding-checkout\n├ ƒ /api/sponsor/challenges/[id]/interest\n├ ƒ /api/sponsor/contracts\n├ ƒ /api/sponsor/contracts/[contractId]\n├ ƒ /api/sponsor/contracts/templates\n├ ƒ /api/sponsor/contributions/[id]\n├ ƒ /api/sponsor/dashboard\n├ ƒ /api/sponsor/deliverables\n├ ƒ /api/sponsor/deliverables/[deliverableId]\n├ ƒ /api/sponsor/discover/challenges\n├ ƒ /api/sponsor/discover/challenges/[challengeId]\n├ ƒ /api/sponsor/discover/creators\n├ ƒ /api/sponsor/discover/creators/[creatorId]\n├ ƒ /api/sponsor/discover/creators/compare\n├ ƒ /api/sponsor/internal-notes\n├ ƒ /api/sponsor/invitations\n├ ƒ /api/sponsor/messages\n├ ƒ /api/sponsor/messages/[conversationId]\n├ ƒ /api/sponsor/milestones\n├ ƒ /api/sponsor/milestones/[milestoneId]\n├ ƒ /api/sponsor/notifications\n├ ƒ /api/sponsor/notifications/preferences\n├ ƒ /api/sponsor/onboarding\n├ ƒ /api/sponsor/profile\n├ ƒ /api/sponsor/proposals\n├ ƒ /api/sponsor/proposals/[proposalId]\n├ ƒ /api/sponsor/proposals/[proposalId]/activity\n├ ƒ /api/sponsor/proposals/[proposalId]/revisions\n├ ƒ /api/sponsor/reports\n├ ƒ /api/sponsor/reports/[reportId]\n├ ƒ /api/sponsor/saved\n├ ƒ /api/sponsor/saved/challenges\n├ ƒ /api/sponsor/saved/challenges/[challengeId]\n├ ƒ /api/sponsor/saved/creators\n├ ƒ /api/sponsor/saved/creators/[creatorId]\n├ ƒ /api/sponsor/settings\n├ ƒ /api/sponsor/sponsorships\n├ ƒ /api/sponsor/sponsorships/[sponsorshipId]\n├ ƒ /api/sponsor/start\n├ ƒ /api/sponsor/team\n├ ƒ /api/sponsor/team/[memberId]\n├ ƒ /api/sponsor/team/invitations\n├ ƒ /api/sponsor/wallet\n├ ƒ /api/sponsor/wallet/add-funds\n├ ƒ /api/sponsor/wallet/fund-campaign-foundation\n├ ƒ /api/sponsor/wallet/transactions\n├ ƒ /api/sponsorships/[id]/approval\n├ ƒ /api/stories/track\n├ ƒ /api/stripe/checkout\n├ ƒ /api/stripe/dorocoin-checkout\n├ ƒ /api/stripe/subscription\n├ ƒ /api/stripe/webhook\n├ ƒ /api/submissions\n├ ƒ /api/submissions/[id]\n├ ƒ /api/submissions/[id]/appeal\n├ ƒ /api/subscriptions\n├ ƒ /api/support/tickets\n├ ƒ /api/support/tickets/[ticketId]/attachments\n├ ƒ /api/support/tickets/[ticketId]/messages\n├ ƒ /api/tournaments\n├ ƒ /api/tournaments/[id]\n├ ƒ /api/tournaments/[id]/adopt-draft-policy\n├ ƒ /api/tournaments/[id]/bracket\n├ ƒ /api/tournaments/[id]/check-in\n├ ƒ /api/tournaments/[id]/entry-payment\n├ ƒ /api/tournaments/[id]/invitations\n├ ƒ /api/tournaments/[id]/join\n├ ƒ /api/tournaments/[id]/judges\n├ ƒ /api/tournaments/[id]/lifecycle\n├ ƒ /api/tournaments/[id]/manage/actions\n├ ƒ /api/tournaments/[id]/media/[asset]\n├ ƒ /api/tournaments/[id]/prize-funding\n├ ƒ /api/tournaments/[id]/publish\n├ ƒ /api/tournaments/[id]/published-details\n├ ƒ /api/tournaments/[id]/results\n├ ƒ /api/tournaments/[id]/sponsor-proposals\n├ ƒ /api/tournaments/[id]/sponsorship-interests\n├ ƒ /api/tournaments/[id]/submissions\n├ ƒ /api/tournaments/[id]/submissions/[submissionId]/media\n├ ƒ /api/tournaments/[id]/team-payment\n├ ƒ /api/tournaments/[id]/teams\n├ ƒ /api/tournaments/[id]/votes\n├ ƒ /api/tournaments/[id]/waitlist\n├ ƒ /api/verify-checkout\n├ ƒ /api/vote-packages\n├ ƒ /api/votes\n├ ƒ /api/wallet\n├ ƒ /api/webhooks/resend/inbound\n├ ƒ /api/winner-claims\n├ ƒ /api/winners\n├ ƒ /api/winners/[id]\n├ ƒ /api/withdrawals\n├ ○ /auth/forgot-password\n├ ○ /auth/login\n├ ○ /auth/register\n├ ○ /auth/verify-email\n├ ƒ /brands/[brandSlug]/[[...section]]\n├ ● /categories/[slug]\n│ ├ /categories/fitness\n│ ├ /categories/gaming\n│ ├ /categories/design-creative\n│ └ [+7 more paths]\n├ ○ /challenge-credits\n├ ○ /challenge-credits/success\n├ ○ /challenges\n├ ƒ /challenges/[id]\n├ ƒ /challenges/[id]/access\n├ ƒ /challenges/[id]/bonus-votes\n├ ƒ /challenges/[id]/boost\n├ ƒ /challenges/[id]/enroll\n├ ƒ /challenges/[id]/entry-requests\n├ ƒ /challenges/[id]/invite\n├ ƒ /challenges/[id]/join\n├ ƒ /challenges/[id]/manage\n├ ƒ /challenges/[id]/paid-votes/success\n├ ƒ /challenges/[id]/participants\n├ ƒ /challenges/[id]/prediction\n├ ƒ /challenges/[id]/prize-funding\n├ ƒ /challenges/[id]/prize-funding/success\n├ ƒ /challenges/[id]/propose-winners\n├ ƒ /challenges/[id]/registration-success\n├ ƒ /challenges/[id]/sponsor\n├ ƒ /challenges/[id]/votes\n├ ƒ /challenges/[id]/watch\n├ ○ /challenges/create\n├ ƒ /challenges/create/[draftId]\n├ ƒ /challenges/create/[draftId]/preview\n├ ○ /checkout/cancel\n├ ○ /checkout/dorocoins/success\n├ ƒ /checkout/subscription/success\n├ ○ /checkout/success\n├ ○ /community-guidelines\n├ ƒ /contact\n├ ○ /contact-sales\n├ ○ /cookie-policy\n├ ○ /creator\n├ ƒ /creator/[tool]\n├ ○ /creator/challenges\n├ ○ /creator/growth-wallet\n├ ○ /creator/private-challenges\n├ ○ /creator/private-challenges/create\n├ ○ /creator/sponsorships\n├ ○ /dashboard\n├ ○ /dashboard/host\n├ ƒ /dashboard/host/[tool]\n├ ○ /dashboard/host/team\n├ ○ /dorocoins\n├ ○ /earnings\n├ ○ /earnings/transactions\n├ ○ /earnings/withdraw\n├ ○ /enterprise\n├ ○ /enterprise/activity\n├ ○ /enterprise/analytics\n├ ○ /enterprise/application\n├ ○ /enterprise/application/edit\n├ ○ /enterprise/apply\n├ ○ /enterprise/assigned\n├ ○ /enterprise/challenges\n├ ƒ /enterprise/challenges/create\n├ ○ /enterprise/challenges/create/official/live\n├ ○ /enterprise/challenges/create/official/normal\n├ ○ /enterprise/challenges/create/official/private\n├ ƒ /enterprise/challenges/create/official/tournament\n├ ○ /enterprise/challenges/create/personal/live\n├ ○ /enterprise/challenges/create/personal/normal\n├ ○ /enterprise/challenges/create/personal/private\n├ ƒ /enterprise/challenges/create/personal/tournament\n├ ○ /enterprise/contact\n├ ○ /enterprise/dashboard\n├ ○ /enterprise/finance\n├ ○ /enterprise/onboarding\n├ ○ /enterprise/reviews\n├ ○ /enterprise/saved\n├ ○ /enterprise/sponsorships\n├ ○ /enterprise/status\n├ ○ /enterprise/submissions\n├ ○ /enterprise/team\n├ ○ /explore\n├ ○ /favorites\n├ ○ /feed\n├ ƒ /for-talent\n├ ○ /help\n├ ƒ /help/[slug]\n├ ○ /help/earnings\n├ ƒ /host/[tool]\n├ ○ /host/challenges\n├ ○ /host/challenges/create\n├ ○ /host/hybrid\n├ ○ /host/hybrid/create\n├ ○ /host/live-events\n├ ○ /host/live/create\n├ ○ /host/private\n├ ○ /host/private/create\n├ ○ /host/team\n├ ○ /host/tournaments\n├ ƒ /host/tournaments/create\n├ ○ /hybrid\n├ ○ /hybrid/create\n├ ○ /kyc\n├ ○ /kyc/failed\n├ ○ /kyc/start\n├ ○ /kyc/status\n├ ○ /kyc/success\n├ ○ /landing\n├ ○ /leaderboards\n├ ○ /live\n├ ○ /live-events\n├ ƒ /live-events/[id]\n├ ƒ /live-events/[id]/check-in\n├ ƒ /live-events/[id]/manage\n├ ƒ /live-events/[id]/register\n├ ƒ /live-events/[id]/ticket\n├ ○ /live-events/host/apply\n├ ○ /live/create\n├ ○ /messages\n├ ƒ /messages/[conversationId]\n├ ○ /mobile-preview\n├ ○ /my-challenges\n├ ○ /my-entries\n├ ƒ /my-tournaments\n├ ○ /notifications\n├ ○ /notifications/unavailable\n├ ○ /onboarding/account-type\n├ ○ /onboarding/creator\n├ ○ /onboarding/host\n├ ○ /onboarding/premium\n├ ○ /onboarding/welcome\n├ ○ /opengraph-image\n├ ○ /prediction-arena\n├ ○ /privacy\n├ ○ /private\n├ ○ /private-exclusive\n├ ƒ /private/[code]\n├ ○ /private/code\n├ ○ /private/create\n├ ƒ /private/create/[id]\n├ ƒ /private/invite/[token]\n├ ƒ /private/preview/[id]\n├ ○ /profile\n├ ƒ /profile/[username]\n├ ƒ /profile/[username]/[section]\n├ ○ /profile/edit\n├ ○ /refund-policy\n├ ○ /revenue-share\n├ ○ /rewards\n├ ○ /rewards/history\n├ ○ /rewards/wheel\n├ ○ /robots.txt\n├ ○ /settings\n├ ƒ /settings/[section]\n├ ○ /settings/customization\n├ ○ /sign-in\n├ ○ /sitemap.xml\n├ ƒ /sponsor/[feature]\n├ ○ /sponsor/analytics\n├ ƒ /sponsor/analytics/campaigns/[campaignId]\n├ ○ /sponsor/approvals\n├ ƒ /sponsor/approvals/[approvalId]\n├ ○ /sponsor/assets\n├ ƒ /sponsor/assets/[assetId]\n├ ○ /sponsor/benefits\n├ ○ /sponsor/billing\n├ ○ /sponsor/billing/invoices\n├ ƒ /sponsor/billing/invoices/[invoiceId]\n├ ○ /sponsor/campaigns\n├ ƒ /sponsor/campaigns/[campaignId]\n├ ƒ /sponsor/campaigns/[campaignId]/deliverables\n├ ƒ /sponsor/campaigns/[campaignId]/edit\n├ ƒ /sponsor/campaigns/[campaignId]/funding\n├ ƒ /sponsor/campaigns/[campaignId]/milestones\n├ ○ /sponsor/campaigns/create\n├ ○ /sponsor/campaigns/new\n├ ƒ /sponsor/click/[sponsorshipId]\n├ ○ /sponsor/contracts\n├ ƒ /sponsor/contracts/[contractId]\n├ ○ /sponsor/contracts/templates\n├ ○ /sponsor/dashboard\n├ ○ /sponsor/deliverables\n├ ƒ /sponsor/deliverables/[deliverableId]\n├ ○ /sponsor/discover\n├ ○ /sponsor/discover/challenges\n├ ƒ /sponsor/discover/challenges/[challengeId]\n├ ○ /sponsor/discover/creators\n├ ƒ /sponsor/discover/creators/[creatorId]\n├ ○ /sponsor/discover/creators/compare\n├ ○ /sponsor/discover/tournaments\n├ ƒ /sponsor/funding/[challengeId]/checkout\n├ ƒ /sponsor/funding/[challengeId]/success\n├ ○ /sponsor/messages\n├ ƒ /sponsor/messages/[conversationId]\n├ ○ /sponsor/milestones\n├ ○ /sponsor/notifications\n├ ○ /sponsor/onboarding\n├ ○ /sponsor/plans\n├ ○ /sponsor/profile\n├ ○ /sponsor/profile/edit\n├ ○ /sponsor/proposals\n├ ƒ /sponsor/proposals/[proposalId]\n├ ○ /sponsor/proposals/new\n├ ○ /sponsor/reports\n├ ƒ /sponsor/reports/[reportId]\n├ ○ /sponsor/saved\n├ ○ /sponsor/settings\n├ ○ /sponsor/sponsorships\n├ ƒ /sponsor/sponsorships/[sponsorshipId]\n├ ○ /sponsor/start\n├ ○ /sponsor/support\n├ ○ /sponsor/team\n├ ○ /sponsor/team/invite\n├ ○ /sponsor/wallet\n├ ○ /sponsor/wallet/fund-campaign\n├ ○ /sponsor/wallet/return\n├ ○ /sponsor/wallet/transactions\n├ ƒ /submissions/[id]\n├ ○ /subscriptions\n├ ○ /support/new\n├ ○ /support/tickets\n├ ƒ /support/tickets/[ticketId]\n├ ○ /terms\n├ ƒ /tournaments\n├ ƒ /tournaments/[id]\n├ ƒ /tournaments/[id]/join\n├ ƒ /tournaments/[id]/lobby\n├ ƒ /tournaments/[id]/manage\n├ ƒ /tournaments/[id]/matches/[matchId]\n├ ƒ /tournaments/[id]/me\n├ ƒ /tournaments/[id]/results\n├ ƒ /tournaments/[id]/teams/[teamId]\n├ ƒ /tournaments/create\n├ ○ /wallet\n├ ○ /wallet/transactions\n├ ○ /wallet/withdraw\n├ ○ /winners\n└ ƒ /winners/[id]\n\n\n○  (Static)   prerendered as static content\n●  (SSG)      prerendered as static HTML (uses generateStaticParams)\nƒ  (Dynamic)  server-rendered on demand\n\n▲ Next.js 16.2.9\n- Local:         http://127.0.0.1:64407\n- Network:       http://127.0.0.1:64407\n✓ Ready in 794ms\n"
+}

@@ -1,0 +1,21 @@
+import { ClipboardCheck, DollarSign, Plus, Trophy, UsersRound, BarChart3, FolderOpen } from 'lucide-react';
+import { LinkButton } from '@/components/ui';
+import { activeDashboardChallenge, dashboardCount, dashboardPreviews, dashboardSum, dashboardMoney, type DashboardRecord } from '@/lib/dashboard-presentation';
+import { DashboardAttention, DashboardChallengePreview, DashboardEarnings, DashboardEmpty, DashboardHeader, DashboardMetric, DashboardPanel, DashboardPerformance, DashboardQuickActions } from './dashboard-ui';
+
+export function CreatorOverview({displayName,challenges,availableEarningsCents,pendingEarningsCents=0}:{displayName:string;challenges:DashboardRecord[];availableEarningsCents:number;pendingEarningsCents?:number}) {
+  const active=challenges.filter(activeDashboardChallenge);
+  const participants=dashboardSum(active,'participantCount'),submissions=dashboardSum(active,'submissionCount');
+  const previews=dashboardPreviews(challenges);
+  const attention=challenges.flatMap(row=>{
+    const pending=dashboardCount(row.pendingSubmissionCount);
+    return pending?[{title:`${pending} submissions need review`,body:String(row.title??'Challenge'),href:`/challenges/${encodeURIComponent(row.id)}/manage?tab=submissions`}]:[];
+  });
+  return <div className="dashboard-home" data-dashboard-home="creator" data-creator-studio>
+    <DashboardHeader title="Creator Studio" subtitle={`Welcome back${displayName?', '+displayName.split(' ')[0]:''}. Manage your challenges, audience and earnings.`} action={<LinkButton href="/challenges/create"><Plus size={16}/>Create Challenge</LinkButton>}/>
+    <div className="dashboard-metrics" aria-label="Creator metrics"><DashboardMetric label="Active Challenges" value={active.length} icon={<Trophy/>}/><DashboardMetric label="Participants" value={participants?.toLocaleString()??'—'} detail="Registrations across active challenges" tone="blue" icon={<UsersRound/>}/><DashboardMetric label="Submissions" value={submissions?.toLocaleString()??'—'} detail="Recorded active challenge entries" tone="green" icon={<ClipboardCheck/>}/><DashboardMetric label="Available Earnings" value={dashboardMoney(availableEarningsCents)} detail="Cash wallet · excludes pending funds" tone="rose" icon={<DollarSign/>}/></div>
+    <div className="dashboard-columns"><DashboardPanel title="Quick Actions" description="Create, manage and grow your challenges."><DashboardQuickActions actions={[{label:'Create Challenge',description:'Start a new challenge',href:'/challenges/create',icon:<Plus/>},{label:'My Challenges',description:'Manage your challenges',href:'/creator/challenges',icon:<FolderOpen/>},{label:'Submissions',description:'Review entries',href:'/creator/submissions',icon:<ClipboardCheck/>},{label:'View Analytics',description:'Recorded performance',href:'/creator/analytics',icon:<BarChart3/>}]}/></DashboardPanel><DashboardPanel title="Needs Your Attention" href="/creator/submissions"><DashboardAttention items={attention} empty="Pending review items will appear when recorded on your challenges."/></DashboardPanel></div>
+    <div className="dashboard-columns"><DashboardPanel title="Challenge Performance" description="Activity across your current active challenges." href="/creator/analytics" linkLabel="View analytics"><DashboardPerformance description="Participants, submissions and votes are counts; cash earnings are shown separately." items={[{label:'Participants',value:participants},{label:'Submissions',value:submissions},{label:'Votes',value:dashboardSum(active,'voteCount')}]}/></DashboardPanel><DashboardPanel title="Earnings" href="/earnings" linkLabel="View earnings"><DashboardEarnings available={availableEarningsCents} pending={pendingEarningsCents}/></DashboardPanel></div>
+    <DashboardPanel title="Your Challenges" description="Three relevant previews, with active work first." href="/creator/challenges" linkLabel="View All Challenges">{previews.length?<div className="dashboard-previews">{previews.map(row=><DashboardChallengePreview key={row.id} row={row}/>)}</div>:<DashboardEmpty title="No challenges yet" body="Create a challenge to begin building your community."/>}<p className="dashboard-footnote">Based on up to 50 creator-owned challenges in the dashboard snapshot. Missing counters display —; no month-over-month trend is inferred.</p></DashboardPanel>
+  </div>;
+}

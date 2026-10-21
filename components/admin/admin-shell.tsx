@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  Activity, BriefcaseBusiness, ClipboardCheck, FileClock, Flag, FolderCog, Gift, Home, Landmark, LifeBuoy, ListChecks, Menu,
+  Activity, BriefcaseBusiness, ChevronDown, ClipboardCheck, FileClock, Flag, FolderCog, Gift, Home, Landmark, LifeBuoy, ListChecks, Menu,
   Megaphone, Radio, RefreshCw, Search, Settings, ShieldCheck, SlidersHorizontal,
   Trophy, UserCog, UsersRound, WalletCards, X
 } from "lucide-react";
@@ -14,6 +14,7 @@ import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { apiRequest } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { MobileFooter } from "@/components/mobile-footer";
+import { AuthenticatedTopbar } from "@/components/authenticated-topbar";
 import type { AdminPermission } from "@/lib/server/admin-permissions";
 
 type NavItem = { href: string; label: string; icon: typeof Home; permission: AdminPermission; developerOnly?: boolean };
@@ -136,7 +137,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   })).filter((group) => group.items.length > 0);
   const navigation = <nav className="mt-7 space-y-4" aria-label="Admin navigation">{allowedGroups.map((group) => {
     const containsActive = group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-    return <details key={group.label} open={group.label === "Overview" || containsActive || undefined} className="group"><summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{group.label}</summary><div className="mt-1 space-y-1">{group.items.map((item) => {
+    return <details key={group.label} open={group.label === "Overview" || containsActive || undefined} className="group"><summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600"><span>{group.label}</span><ChevronDown size={14} aria-hidden="true" className="transition-transform group-open:rotate-180"/></summary><div className="mt-1 space-y-1">{group.items.map((item) => {
       const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(`${item.href}/`));
       const Icon = item.icon;
       return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-10 items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white", active && "bg-[var(--gold)] text-black hover:bg-[var(--gold)] hover:text-black")}><Icon size={16} /><span>{item.label}</span></Link>;
@@ -144,20 +145,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   })}</nav>;
 
   return (
-    <div className="admin-mobile-shell theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
+    <div className="admin-mobile-shell dashboard-workspace theme-workspace min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
       <a href="#admin-workspace" className="sr-only z-[120] rounded-[8px] bg-[var(--gold)] px-4 py-3 font-bold text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to admin workspace</a>
       <header className="sticky top-0 z-40 border-b border-[var(--gold)]/20 bg-[var(--panel)] px-4 py-2.5 backdrop-blur lg:hidden">
         <div className="grid min-h-12 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
           <button type="button" onClick={() => setDrawerPath(pathname)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 text-[var(--gold)]" aria-label="Open admin navigation"><Menu /></button>
           <Link href="/admin" className="flex min-w-0 items-center justify-center gap-2 text-center"><BrandLogo imageClassName="h-9 w-9 border border-[var(--gold)]" /><span className="truncate text-sm font-black text-white">Admin Workspace</span></Link>
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--gold)] text-xs font-black text-black">{String(user?.displayName || "A").slice(0, 2).toUpperCase()}</span>
+          <span aria-hidden="true" />
         </div>
       </header>
       {drawer ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation"><button className="absolute inset-0 bg-black/80" onClick={() => setDrawerPath(null)} aria-label="Close admin navigation" /><aside ref={drawerRef} className="absolute inset-y-0 left-0 w-[min(90vw,370px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5"><div className="flex items-center justify-between"><p className="font-black text-[var(--gold)]">Admin Navigation</p><button onClick={() => setDrawerPath(null)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close admin navigation"><X /></button></div>{navigation}</aside></div> : null}
-      <aside className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[var(--panel)] p-5 lg:block">
-        <div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Internal</p><p className="font-black">Admin Workspace</p></div></div>
+      <aside data-dashboard-sidebar className="fixed inset-y-5 left-5 hidden w-[290px] overflow-y-auto rounded-[8px] border border-[var(--gold)]/20 bg-[var(--panel)] p-5 lg:block">
+        <div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Internal</p><p data-workspace-title className="break-words font-black leading-snug">Admin Panel</p></div></div>
         {navigation}
-        <div className="mt-8 border-t border-white/10 pt-5"><p className="text-sm font-bold">{user?.displayName || "Administrator"}</p><p className="mt-1 text-xs text-slate-500">{accessDetails?.roles.map((role) => role.replaceAll("_", " ")).join(", ") || "Authorized administrator"}</p><p className="mt-2 text-xs text-slate-500">Sensitive actions require recent authentication. MFA is not currently verified by this console.</p></div>
       </aside>
       <main id="admin-workspace" className="admin-workspace px-5 py-7 sm:px-8 lg:ml-[330px] lg:px-10">
         <div className="mx-auto max-w-[1500px]">
@@ -171,11 +171,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold">View live site</Link>
               <button type="button" onClick={() => window.dispatchEvent(new Event("admin:refresh"))} className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] border border-black/10 bg-white" aria-label="Refresh admin data"><RefreshCw size={16} /></button>
               <span className="inline-flex min-h-11 items-center rounded-[8px] border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-950"><Activity size={15} className="mr-2 text-amber-600" /> {environmentLabel}</span>
-              <span className="inline-flex min-h-11 items-center rounded-[8px] border border-black/10 bg-white px-4 text-sm font-bold">{user?.displayName || "Admin"}</span>
+              <AuthenticatedTopbar showSearch={false}/>
             </div>
           </div>
           {children}
-          <MobileFooter />
+          {pathname !== '/admin' ? <MobileFooter /> : null}
         </div>
       </main>
     </div>

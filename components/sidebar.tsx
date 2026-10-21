@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigationDialog } from "@/lib/hooks/use-navigation-dialog";
 import {
   Award,
   BarChart3,
@@ -20,7 +21,6 @@ import {
   Settings,
   ShieldCheck,
   LogIn,
-  LogOut,
   Star,
   Swords,
   Target,
@@ -32,12 +32,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { BrandLogo, planBadgeLabel } from "./brand";
-import { findCustomizationOption } from "@/lib/customization/options";
+import { BrandLogo } from "./brand";
 import { getEffectiveTier, getPersonalCapabilities, type PersonalCapabilities } from "@/lib/plan-access";
-import { logout } from "@/lib/firebase/auth-service";
 import { fetchChallengeUsage } from "@/lib/api/services";
-import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { DashboardPromotion } from "@/components/dashboard/dashboard-promotion";
 import { workspaceForRoute } from "@/lib/workspace-routing";
 
 type NavIcon = typeof Home;
@@ -216,19 +214,20 @@ function workspaceIdentity(context: WorkspaceNavigationContext, isAdmin: boolean
   if (context === "admin") return isAdmin
     ? { name: "Admin Command Center", homeHref: "/admin" }
     : { name: "Challenge Suite", homeHref: "/dashboard" };
-  if (context === "enterprise") return { name: "Enterprise Studio", homeHref: "/enterprise" };
+  if (context === "enterprise") return { name: "Enterprise Workspace", homeHref: "/enterprise" };
   if (context === "host" && capabilities.canManageHostOperations) return { name: "Host Control Center", homeHref: "/dashboard/host" };
   if (context === "creator" || capabilities.canCreatePrivateChallenge) return { name: "Creator Studio", homeHref: "/dashboard" };
   if (context === "sponsor") return { name: "Sponsor Dashboard", homeHref: "/sponsor/dashboard" };
-  return { name: fallbackName, homeHref: "/dashboard" };
+  return { name: fallbackName === "Competitor Dashboard" ? "Free Dashboard" : fallbackName, homeHref: "/dashboard" };
 }
 
 export function Sidebar() {
+  const drawerRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
   const [drawerPath, setDrawerPath] = useState<string | null>(null);
   const drawerOpen = drawerPath === pathname;
+  useNavigationDialog(drawerOpen, drawerRef, () => setDrawerPath(null));
   const { user, loading, signedOut } = useCurrentUser();
-  const avatarRingClass = findCustomizationOption(user?.customization?.avatarRingId, "avatarRing")?.previewClass;
   const effectiveTier = getEffectiveTier({
     planId: user?.planId,
     planStatus: user?.planStatus,
@@ -255,11 +254,9 @@ export function Sidebar() {
   }, [user, capabilities.normalChallengeQuota.period, capabilities.canCreateNormalChallenge]);
   const sections = signedOut
     ? guestSections
-    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true, { ...capabilities, canCreateNormalChallenge: capabilities.canCreateNormalChallenge && (capabilities.normalChallengeQuota.period !== "lifetime" || (normalAllowance?.uid === user?.uid && (normalAllowance?.remaining ?? 0) > 0)) }, user?.accountType === "sponsor", user?.enterprisePermissions ?? [], effectiveTier.dashboardName);
-  const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true, effectiveTier.dashboardName, capabilities);
+    : sectionsForWorkspace(workspaceContext, user?.isAdmin === true && user?.accountType === "admin", { ...capabilities, canCreateNormalChallenge: capabilities.canCreateNormalChallenge && (capabilities.normalChallengeQuota.period !== "lifetime" || (normalAllowance?.uid === user?.uid && (normalAllowance?.remaining ?? 0) > 0)) }, user?.accountType === "sponsor", user?.enterprisePermissions ?? [], effectiveTier.dashboardName);
+  const workspace = workspaceIdentity(workspaceContext, user?.isAdmin === true && user?.accountType === "admin", effectiveTier.dashboardName, capabilities);
   const activeHref = activeNavigationHref(pathname);
-  const planLabel = effectiveTier.displayName || planBadgeLabel(user?.planId);
-  const planButtonLabel = effectiveTier.paid ? planLabel : effectiveTier.id === "free_competitor" ? "Become a Creator" : planLabel;
   const personalEconomyContext = workspaceContext === "user" || workspaceContext === "creator" || workspaceContext === "host";
   useEffect(() => {
     if (!drawerOpen) return;
@@ -281,40 +278,31 @@ export function Sidebar() {
           {signedOut ? (
             <Link href={`/auth/login?next=${encodeURIComponent(pathname)}`} className="flex min-h-11 items-center justify-center text-xs font-black text-[var(--gold)]">Login</Link>
           ) : (
-            <Link href="/profile" aria-label="Open profile" className={cn("mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--gold)] text-xs font-black text-black", avatarRingClass ?? "border-white/10")}>{user?.initials || "?"}</Link>
+            <span aria-hidden="true" />
           )}
         </div>
       </header>
 
       {drawerOpen ? <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
         <button type="button" className="absolute inset-0 bg-black/80" onClick={() => setDrawerPath(null)} aria-label="Close navigation menu" />
-        <aside className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5">
+        <aside ref={drawerRef} className="absolute bottom-0 left-0 top-0 w-[min(88vw,360px)] overflow-y-auto border-r border-[var(--gold)]/20 bg-[var(--panel)] p-5">
           <div className="flex items-center justify-between"><div className="flex items-center gap-3"><BrandLogo imageClassName="h-12 w-12 border border-[var(--gold)]" /><div><p className="text-xs font-black uppercase text-[var(--gold)]">Challenge Suite</p><p className="font-black">{workspace.name}</p></div></div><button type="button" onClick={() => setDrawerPath(null)} className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10" aria-label="Close menu"><X /></button></div>
           <NavigationSections sections={sections} activeHref={activeHref} pathname={pathname} mobile />
           <div className="mt-6 border-t border-white/10 pt-5">
-            {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <>
-              <button type="button" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-white/10 px-4 text-sm font-black text-slate-300"><LogOut size={17} /> Logout</button>
-              {personalEconomyContext && !user?.isSponsor ? <Link href="/sponsor/start" className="mt-3 flex min-h-11 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-sm font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
-            </>}
-            {!signedOut ? <WorkspaceSwitcher user={user} compact /> : null}
+            {signedOut ? <div className="grid gap-3"><Link href="/auth/login" className="flex min-h-12 items-center justify-center rounded-[8px] border border-[var(--gold)] text-sm font-black text-white">Sign In</Link><Link href="/auth/register" className="flex min-h-12 items-center justify-center rounded-[8px] bg-[var(--gold)] text-sm font-black text-black">Join / Create Account</Link></div> : <DashboardPromotion user={user} enabled={personalEconomyContext} />}
           </div>
         </aside>
       </div> : null}
 
-      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] shadow-2xl lg:flex xl:w-[320px]">
+      <aside data-dashboard-sidebar className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] shadow-2xl lg:flex xl:w-[320px]">
         <div className="flex h-28 items-center gap-4 border-b border-white/10 px-6">
           <BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" />
-          <div className="min-w-0"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p className="mt-1 truncate font-black">{workspace.name}</p></div>
+          <div className="min-w-0 flex-1"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--gold)]">Challenge Suite</p><p data-workspace-title className="mt-1 break-words text-sm font-black leading-snug">{workspace.name}</p></div>
         </div>
         <nav className="scrollbar-dark flex-1 overflow-y-auto border-b border-white/10 px-5 py-4" aria-label="Primary navigation">
           <NavigationSections sections={sections} activeHref={activeHref} pathname={pathname} />
         </nav>
-        <div className="space-y-3 p-5">
-          <WorkspaceSwitcher user={user} />
-          {personalEconomyContext ? <Link href="/dorocoins" aria-label={`${Number(user?.doroBalance ?? 0).toLocaleString()} DoroCoins. Open DoroCoin wallet.`} className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel-2)] px-2 text-xs font-bold text-[var(--foreground)] hover:border-yellow-500/40"><Coins size={15} className="text-yellow-600" /> {loading ? "..." : Number(user?.doroBalance ?? 0).toLocaleString()} DC</Link> : null}
-          {personalEconomyContext ? <Link href="/subscriptions" className="flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-yellow-500/30 bg-[var(--panel-2)] px-3 text-sm font-black"><Diamond size={16} className="text-[var(--gold)]" /> {loading ? "Plan" : planButtonLabel}</Link> : null}
-          {!loading && !signedOut && personalEconomyContext && !user?.isSponsor ? <Link href="/sponsor/start" className="flex min-h-10 items-center justify-center rounded-[8px] border border-[var(--gold)]/30 bg-[var(--gold)]/10 px-3 text-xs font-black text-[var(--gold)]">Become a Sponsor</Link> : null}
-        </div>
+        {!signedOut ? <DashboardPromotion user={user} enabled={personalEconomyContext} /> : null}
       </aside>
     </>
   );
@@ -330,7 +318,7 @@ function WorkspaceNavigationLoading() {
           <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
         </div>
       </header>
-      <aside className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] p-6 lg:flex xl:w-[320px]">
+      <aside data-dashboard-sidebar className="fixed left-5 top-5 z-20 hidden h-[calc(100vh-40px)] w-[280px] flex-col rounded-[8px] border border-yellow-500/20 bg-[var(--panel)] p-6 lg:flex xl:w-[320px]">
         <div className="flex items-center gap-4"><BrandLogo imageClassName="h-14 w-14 border border-[var(--gold)]" /><div className="h-5 w-36 animate-pulse rounded bg-white/10" /></div>
         <div className="mt-10 space-y-3">{[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="h-11 animate-pulse rounded-[8px] bg-white/5" />)}</div>
         <p className="mt-auto text-sm font-bold text-slate-400">Loading your workspace...</p>

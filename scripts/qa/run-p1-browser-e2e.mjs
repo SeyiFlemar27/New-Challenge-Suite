@@ -12,7 +12,8 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const require = createRequire(import.meta.url);
-const { chromium, expect } = require("@playwright/test");
+const { chromium, expect: baseExpect } = require("@playwright/test");
+const expect = baseExpect.configure({ timeout: 15000 });
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 if (resolve(process.cwd()) !== repoRoot) {
   throw new Error(`Run this browser suite from its repository root: ${repoRoot}`);
@@ -133,7 +134,7 @@ async function test(name, fn, { requiresMedia = false } = {}) {
   const publishingGroup = /^(Automatic publication:|Media publication|Normal Builder|Tournament V3|Live Event V2 .* builder draft)/.test(name);
   const followUpGroup = /^(Media publication|Live Event V2 .* builder draft)/.test(name);
   const privateAccessGroup = /^(Private requester|Challenge owner approves access request)/.test(name);
-  if (journeyFilter && !(journeyFilter === "dashboard release" ? publishingGroup || name.startsWith("Dashboard stability:") : journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
+  if (journeyFilter && !(journeyFilter === "dashboard redesign" ? name.startsWith("Dashboard redesign:") || name.startsWith("Dashboard stability:") : journeyFilter === "dashboard release" ? publishingGroup || name.startsWith("Dashboard stability:") : journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
     results.push({ name, status: "SKIP", assertions: 0, message: "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY." });
     return;
   }
@@ -525,8 +526,12 @@ try {
     context.setDefaultTimeout(interactionTimeout);
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  if (journeyFilter === 'dashboard redesign') {
+    const { dashboardRedesignJourneys } = await import('./dashboard-redesign-journeys.mjs');
+    await dashboardRedesignJourneys({browser,test,check,expect,db,seedUser,baseUrl,artifacts,join,pageErrors});
+  }
 
-  if (!journeyFilter || journeyFilter === "dashboard stability" || journeyFilter === "dashboard release") {
+  if (!journeyFilter || journeyFilter === "dashboard stability" || journeyFilter === "dashboard release" || (journeyFilter === "dashboard redesign" && process.env.CHALLENGE_SUITE_DASHBOARD_VISUAL_PHASE !== "before")) {
     const { dashboardProviderRaceFixture } = await import("./dashboard-provider-race-fixture.mjs");
     await dashboardProviderRaceFixture({ browser, test, check, expect, baseUrl });
     const { dashboardAuthJourneys } = await import("./dashboard-auth-journeys.mjs");

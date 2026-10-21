@@ -16,6 +16,10 @@ function personalChallengeFields(id: string, data: Record<string, unknown>, rela
     id,
     ...publicChallengeFields(data, id),
     relationship,
+    ...(relationship === "created" ? {
+      pendingSubmissionCount: typeof data.pendingSubmissionCount === "number" ? data.pendingSubmissionCount : null,
+      pendingEntryRequestCount: typeof data.pendingEntryRequestCount === "number" ? data.pendingEntryRequestCount : null
+    } : {}),
     status: data.status ?? data.lifecycleStatus ?? "draft",
     lifecycleStatus: data.lifecycleStatus ?? data.status ?? "draft",
     reviewStatus: data.reviewStatus ?? data.adminReviewStatus ?? null,

@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button, Card, EmptyState, inputClass, LinkButton, PageTitle, textareaClass } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
+import { DashboardAttention, DashboardEmpty, DashboardHeader, DashboardMetric, DashboardPanel, DashboardPerformance, DashboardQuickActions } from "@/components/dashboard/dashboard-ui";
+import { activeDashboardChallenge } from "@/lib/dashboard-presentation";
 
 type AdminRecord = Record<string, unknown> & { id: string; status?: string };
 type AdminData = {
@@ -182,9 +184,9 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
 
   return (
     <>
-      <PageTitle title={meta.title} subtitle={meta.description} icon={<ShieldCheck />} />
-      {normalizedSection === "overview" ? <NormalMaterialAdminReview /> : null}
-      {normalizedSection === "overview" ? <NormalMaterialAdminReview kind="live_event" /> : null}
+      {normalizedSection === 'overview' ? <DashboardHeader title={meta.title} subtitle={meta.description}/> : <PageTitle title={meta.title} subtitle={meta.description} icon={<ShieldCheck />} />}
+      {normalizedSection === "challenges" ? <NormalMaterialAdminReview /> : null}
+      {normalizedSection === "events" ? <NormalMaterialAdminReview kind="live_event" /> : null}
       {notice ? <Card className="mt-6 border-yellow-500/20 p-4 text-sm text-slate-200">{notice}</Card> : null}
       {loading ? <div className="mt-8 grid gap-5 md:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((item) => <Card key={item} className="h-36 animate-pulse" />)}</div> : null}
       {!loading && data && normalizedSection === "overview" ? <Overview data={data} /> : null}
@@ -201,36 +203,18 @@ export function AdminControlCenter({ section = "overview" }: { section?: string 
   );
 }
 
-function Overview({ data }: { data: AdminData }) {
-  const cards = [
-    ["Pending sponsor reviews", data.overview.pendingSponsorReviews, "/admin/sponsors?status=pending_review", ShieldCheck],
-    ["Pending host verifications", data.overview.pendingHostVerifications, "/admin/hosts?status=pending_review", UserCog],
-    ["Challenge moderation", data.overview.pendingChallengeReviews, "/admin/challenges", Trophy],
-    ["Pending submissions", data.overview.pendingSubmissions, "/admin/submissions?status=pending_review", ClipboardCheck],
-    ["Flagged submissions", data.overview.flaggedSubmissions, "/admin/submissions?status=flagged", ShieldAlert],
-    ["Participant approvals", data.overview.participantApprovals, "/admin/participants?status=pending", UsersRound],
-    ["Winner confirmations", data.overview.winnerConfirmations, "/admin/winners?status=pending_admin_review", Trophy],
-    ["Enterprise applications", data.overview.pendingEnterpriseApplications, "/admin/enterprise-applications?status=pending", BriefcaseBusiness],
-    ["Withdrawal reviews", data.overview.pendingWithdrawalReviews, "/admin/withdrawals?status=pending_review", Landmark],
-    ["Open disputes", data.overview.openDisputes, "/admin/disputes?status=open", Flag],
-    ["Revenue review items", data.overview.revenueReviewItems, "/admin/reports?type=revenue_review", BarChart3]
-  ] as const;
-  const urgent = [
-    [Number(data.overview.pendingSponsorReviews ?? 0), "sponsor application", "/admin/sponsors?status=pending_review", "Review Sponsors"],
-    [Number(data.overview.pendingSubmissions ?? 0), "submission", "/admin/submissions?status=pending_review", "Review Submissions"],
-    [Number(data.overview.pendingWithdrawalReviews ?? 0), "withdrawal request", "/admin/withdrawals?status=pending_review", "Review Withdrawals"],
-    [Number(data.overview.pendingEnterpriseApplications ?? 0), "Enterprise application", "/admin/enterprise-applications?status=pending", "Review Applications"],
-    [Number(data.overview.winnerConfirmations ?? 0), "winner announcement", "/admin/winners?status=pending_admin_review", "Review Winners"]
-  ] as const;
-  const activeUrgent = urgent.filter(([count]) => count > 0);
-  return <>
-    <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, href, Icon]) => <Link key={label} href={href} className="group"><Card className="h-full p-5 transition duration-200 group-hover:-translate-y-1 group-hover:border-[var(--gold)]/50 group-hover:bg-[var(--gold)]/[0.04]"><div className="flex items-start justify-between"><Icon className="text-[var(--gold)]" /><ArrowRight size={17} className="text-slate-600 transition group-hover:translate-x-1 group-hover:text-[var(--gold)]" /></div><p className="mt-4 text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black">{String(value ?? 0)}</p></Card></Link>)}</div>
-    <Card className="mt-8 border-[var(--gold)]/20 p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]">Action Required</p><h2 className="mt-2 text-2xl font-black">Urgent operational queues</h2>{activeUrgent.length ? <div className="mt-6 grid gap-3 lg:grid-cols-2">{activeUrgent.map(([count, label, href, cta]) => <div key={label} className="flex flex-col gap-4 rounded-[8px] border border-white/10 bg-white/[0.025] p-5 sm:flex-row sm:items-center sm:justify-between"><p className="font-bold"><span className="text-[var(--gold)]">{count}</span> {label}{count === 1 ? "" : "s"} need review</p><LinkButton href={href} variant="secondary">{cta}</LinkButton></div>)}</div> : <div className="mt-6 rounded-[8px] border border-emerald-500/20 bg-emerald-500/5 p-6"><ShieldCheck className="text-emerald-300" /><p className="mt-3 text-lg font-black">All queues are clear.</p><p className="mt-1 text-sm text-slate-400">No urgent reviews are waiting right now.</p></div>}</Card>
-    <Card className="mt-8 border-emerald-500/20 p-6"><h2 className="text-xl font-black">System Safety</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(data.overview.safety ?? {}).map(([key, value]) => <div key={key} className="rounded-[8px] bg-white/[0.03] p-4"><p className="text-xs font-bold text-slate-500">{friendlyLabel(key)}</p><p className="mt-2 font-black text-emerald-300">{String(value)}</p></div>)}</div></Card>
-    <Card className="mt-8 p-6"><h2 className="text-xl font-black">Recent Audit Events</h2><div className="mt-4 space-y-3">{(data.overview.recentAuditEvents ?? []).length ? (data.overview.recentAuditEvents ?? []).map((item) => <AuditRow key={item.id} record={item} />) : <p className="rounded-[8px] bg-white/[0.025] p-5 text-slate-400">No recent administrative events.</p>}</div></Card>
-  </>;
+function Overview({data}:{data:AdminData}) {
+  const queues=[{title:'Sponsor applications',value:data.overview.pendingSponsorReviews,href:'/admin/sponsors'},{title:'Submission reviews',value:data.overview.pendingSubmissions,href:'/admin/submissions'},{title:'Challenge safety exceptions',value:data.overview.pendingChallengeReviews,href:'/admin/challenges'},{title:'Withdrawal reviews',value:data.overview.pendingWithdrawalReviews,href:'/admin/withdrawals'},{title:'Enterprise applications',value:data.overview.pendingEnterpriseApplications,href:'/admin/enterprise-applications'}];
+  const openTickets=data.support.filter(item=>!['resolved','closed'].includes(recordStatus(item)));
+  const reports=[...data.disputes.map(row=>({...row,href:'/admin/disputes'})),...data.submissions.filter(row=>recordStatus(row)==='flagged').map(row=>({...row,href:'/admin/submissions?status=flagged'}))].slice(0,4);
+  return <div className="dashboard-home mt-6" data-dashboard-home="admin">
+    <div className="dashboard-metrics"><DashboardMetric label="Users in Snapshot" value={data.users.length} detail="Bounded authorized operational records" icon={<UsersRound/>}/><DashboardMetric label="Active Challenges" value={data.challenges.filter(activeDashboardChallenge).length} detail="Active within loaded records" tone="blue" icon={<Trophy/>}/><DashboardMetric label="Tournaments in Snapshot" value={data.tournaments.length} detail="All loaded tournament states" tone="green" icon={<Radio/>}/><DashboardMetric label="Open Support Tickets" value={openTickets.length} detail="Unresolved tickets in snapshot" tone="rose" icon={<LifeBuoy/>}/></div>
+    <div className="dashboard-columns"><DashboardPanel title="Quick Actions" description="Existing protected management workflows."><DashboardQuickActions actions={[{label:'View Users',description:'Account oversight',href:'/admin/people/users',icon:<UsersRound/>},{label:'Moderation',description:'Credible exceptions',href:'/admin/challenges',icon:<ShieldAlert/>},{label:'Support Tickets',description:'Resolve customer issues',href:'/admin/safety-support/support-tickets',icon:<LifeBuoy/>},{label:'Withdrawal Review',description:'Protected financial review',href:'/admin/withdrawals',icon:<Landmark/>}]}/></DashboardPanel><DashboardPanel title="Operational Alerts" href="/admin/action-centre"><DashboardAttention items={queues.filter(item=>Number(item.value)>0).map(item=>({title:`${item.value} ${item.title.toLowerCase()}`,body:'Open the protected review queue',href:item.href}))}/></DashboardPanel></div>
+    <div className="dashboard-columns"><DashboardPanel title="Platform Activity" description="Counts from the current bounded operational snapshot." href="/admin/reports" linkLabel="View reports"><DashboardPerformance description="These are record counts, not platform-wide totals or historical growth." items={[{label:'Users',value:data.users.length},{label:'Challenges',value:data.challenges.length},{label:'Submissions',value:data.submissions.length}]}/></DashboardPanel><DashboardPanel title="System Status" href="/admin/settings" linkLabel="View settings"><p className="dashboard-caption">Live provider telemetry is not verified by this overview. Configuration states below do not certify service health.</p><dl className="dashboard-breakdown">{Object.entries(data.overview.safety??{}).slice(0,4).map(([key,value])=><div key={key}><dt>{friendlyLabel(key)}</dt><dd>{String(value)}</dd></div>)}</dl><p className="dashboard-footnote">No “all systems operational” claim is made. Sensitive actions retain their existing provider and authorization checks.</p></DashboardPanel></div>
+    <div className="dashboard-columns"><DashboardPanel title="Recent Challenges" href="/admin/challenges">{data.challenges.length?<div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-200"><th className="py-3">Challenge</th><th>Status</th><th>Action</th></tr></thead><tbody>{data.challenges.slice(0,3).map(row=><tr className="border-b border-slate-100" key={row.id}><td className="py-4 pr-3 font-bold">{recordTitle(row)}</td><td>{recordStatus(row).replaceAll('_',' ')}</td><td><Link className="dashboard-text-link" href="/admin/challenges">Review</Link></td></tr>)}</tbody></table></div>:<DashboardEmpty title="No challenges in this snapshot" body="Recorded challenges will appear in the management section."/>}</DashboardPanel><DashboardPanel title="Recent Reports" href="/admin/disputes"><DashboardAttention items={reports.map(row=>({title:recordTitle(row),body:recordStatus(row),href:row.href}))}/></DashboardPanel></div>
+    <div className="dashboard-columns"><DashboardPanel title="Support Ticket Overview" href="/admin/safety-support/support-tickets"><DashboardAttention items={data.support.slice(0,3).map(row=>({title:String(row.subject??row.title??'Support ticket'),body:`${recordStatus(row)} · ${String(row.priority??'Priority not recorded')}`,href:'/admin/safety-support/support-tickets'}))}/></DashboardPanel><DashboardPanel title="Recent Activity" href="/admin/audit-logs"><DashboardAttention items={(data.overview.recentAuditEvents??[]).slice(0,4).map(row=>({title:String(row.action??'Admin activity').replaceAll('_',' '),body:'Recorded audit event',href:'/admin/audit-logs'}))}/></DashboardPanel></div>
+  </div>;
 }
-
 function ActionCentre({ data, onSelect }: { data: AdminData; onSelect: (record: AdminRecord) => void }) {
   const taskGroups = [
     ["Sponsor applications", data.sponsors.filter((item) => ["pending", "pending_review", "needs_changes"].includes(recordStatus(item))), "/admin/sponsors"],
