@@ -38,7 +38,7 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-function toProfile(user: { uid: string; email?: string; emailVerified?: boolean; isAdmin?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>, sponsorAccess: SponsorOrganizationAccess | null) {
+function toProfile(user: { uid: string; email?: string; emailVerified?: boolean; isAdmin?: boolean; adminAccount?: boolean }, account: Record<string, unknown>, profile: Record<string, unknown>, wallet: Record<string, unknown>, sponsorAccess: SponsorOrganizationAccess | null) {
   const identity = resolveProfileIdentity({ ...profile, ...account }, String(user.email ?? ""));
   const displayName = identity.displayName;
   const merged = { ...profile, ...account };
@@ -50,7 +50,9 @@ function toProfile(user: { uid: string; email?: string; emailVerified?: boolean;
     : String(merged.accountType ?? "");
   const personalIdentity = { ...merged, accountType: preservedPersonalType, role: legacySponsorIdentity ? String(merged.sponsorPreviousRole ?? "user") : merged.role, dashboardType: legacyEnterpriseIdentity || legacySponsorIdentity ? undefined : merged.dashboardType };
   const planAccess = getUserPlanAccess(personalIdentity);
-  const accountType = isAdmin ? "admin" : normalizeAccountType(personalIdentity);
+  // Legacy Admin capability can coexist with a personal Creator/Host account.
+  // Only an explicit, server-authorized Admin identity selects the Admin home.
+  const accountType = isAdmin && user.adminAccount === true ? "admin" : normalizeAccountType(personalIdentity);
   const sponsorOnboardingStatus = typeof merged.sponsorOnboardingStatus === "string" ? merged.sponsorOnboardingStatus : sponsorAccess ? "not_started" : null;
   const hasSponsorProfile = Boolean(merged.hasSponsorProfile || merged.brandProfileComplete || merged.sponsorOnboardingComplete);
   const accountTypeSelectionComplete = merged.accountTypeSelectionComplete === false

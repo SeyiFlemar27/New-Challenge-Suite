@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const [, profile] = await Promise.all([syncServerSession(activeUser), getCurrentProfile(activeUser.uid)]);
         if (generation !== authCallbackGeneration.current || currentUser.current?.uid !== activeUser.uid) return null;
         if (!profile || profile.uid !== activeUser.uid) throw new Error("Your account could not be confirmed. Please try again.");
-        const scope = JSON.stringify([profile.uid, profile.activeWorkspace, profile.sponsorOrganizationId, profile.planId, profile.planStatus, profile.isAdmin, profile.enterprisePermissions, profile.accountStatus]);
+        const scope = JSON.stringify([profile.uid, profile.accountType, profile.role, profile.activeWorkspace, profile.sponsorOrganizationId, profile.planId, profile.planStatus, profile.isAdmin, profile.enterprisePermissions, profile.accountStatus]);
         if (resolvedScope.current && resolvedScope.current !== scope) { void queryClient.cancelQueries(); queryClient.clear(); }
         resolvedScope.current = scope;
         setState(previous => ({ user: activeUser, profile, loading: false, error: null, revision: previous.revision + 1 }));

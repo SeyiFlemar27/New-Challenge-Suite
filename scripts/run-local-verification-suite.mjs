@@ -4,6 +4,7 @@ const allowed = ["scripts/run-p0-emulator-regressions.mjs", "scripts/test-enterp
 allowed.push("scripts/test-media-publish-handlers-emulator.mjs", "scripts/test-publishing-review-emulator.mjs", "scripts/test-automatic-publishing-emulator.mjs", "scripts/test-tournament-cloud-tasks.mjs");
 allowed.push("scripts/test-deployed-firestore-rule-repair-emulator.mjs");
 allowed.push("scripts/test-tournament-runtime-verification-emulator.mjs");
+allowed.push("scripts/test-admin-account-identity-emulator.mjs");
 if (!allowed.includes(selected)) throw new Error("Unsupported local verification suite");
 process.chdir(fileURLToPath(new URL("../", import.meta.url)));
 await import(new URL(`../${selected}`, import.meta.url));

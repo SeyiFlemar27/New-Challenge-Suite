@@ -10,6 +10,7 @@ export interface RequestUser {
   role?: string;
   planId?: string;
   isAdmin?: boolean;
+  adminAccount?: boolean;
   adminRoles?: AdminRole[];
   adminPermissions?: AdminPermission[];
   authTime?: number;
@@ -79,6 +80,7 @@ export async function getRequestUser(request: Request): Promise<RequestUser | nu
       role: decoded.admin === true ? "admin" : profile?.role,
       planId: typeof profile?.planId === "string" ? profile.planId : undefined,
       isAdmin: adminRoles.length > 0,
+      adminAccount: adminRoles.length > 0 && (decoded.admin === true || allowlisted || profileRoles.length > 0 || profile?.role === "admin" || profile?.accountType === "admin"),
       adminRoles,
       adminPermissions,
       authTime: typeof decoded.auth_time === "number" ? decoded.auth_time : undefined,

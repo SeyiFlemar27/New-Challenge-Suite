@@ -60,7 +60,7 @@ export interface CurrentUserProfile {
 
 
 function accountTypeFromProfile(profile: Record<string, unknown>) {
-  if (profile.isAdmin || profile.accountType === "admin") return "admin" as const;
+  if (profile.isAdmin === true && profile.accountType === "admin") return "admin" as const;
   if (profile.accountType === "sponsor" || profile.role === "sponsor" || profile.dashboardType === "sponsor_dashboard") return "sponsor" as const;
   return "user" as const;
 }

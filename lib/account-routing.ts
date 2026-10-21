@@ -15,7 +15,7 @@ function destinationState(profileValue: object): AuthDestinationState {
     accountIntroOnboardingInProgress: profile.accountIntroOnboardingStatus === "in_progress",
     sponsorAccount: sponsorAccount || profile.activeWorkspace === "sponsor",
     enterpriseWorkspaceActive: profile.activeWorkspace === "enterprise" && availableWorkspaces.includes("enterprise"),
-    adminAccount: profile.isAdmin === true,
+    adminAccount: profile.isAdmin === true && profile.accountType === "admin",
     emailVerificationRequired: profile.verified === false && profile.emailVerified !== true,
     subscriptionActivationPending: ["incomplete", "pending", "processing", "activation_pending"].includes(String(profile.planStatus ?? profile.subscriptionStatus ?? "")),
     hostAccount: plan.isHost,
@@ -65,7 +65,7 @@ export function safeInternalDestination(value: string | null | undefined) {
 function requestedWorkspaceAllowed(profileValue: object, path: string) {
   const p = profileValue as Record<string, unknown>;
   const pathname = new URL(path, "https://challenge-suite.invalid").pathname;
-  if (/^\/admin(\/|$)/.test(pathname)) return p.isAdmin === true;
+  if (/^\/admin(\/|$)/.test(pathname)) return destinationState(p).adminAccount === true;
   if (/^\/enterprise(\/|$)/.test(pathname) && !/^\/enterprise\/(apply|status|application|contact)(\/|$)/.test(pathname)) return Array.isArray(p.availableWorkspaces) && p.availableWorkspaces.includes("enterprise");
   if (/^\/sponsor(\/|$)/.test(pathname) && !/^\/sponsor\/(start|apply|onboarding)(\/|$)/.test(pathname)) return p.isSponsor === true || isSponsorAccount(p);
   if (/^\/(dashboard\/host|host)(\/|$)/.test(pathname)) return getUserPlanAccess(p).isHost;
@@ -93,7 +93,7 @@ export function getAccountRouteRedirect(profile: object, pathname: string, searc
   if (pathname === "/dashboard/host" && (!getUserPlanAccess(p).isHost || p.hostOnboardingComplete !== true)) return destination;
   if (pathname === "/onboarding/host" && (!getUserPlanAccess(p).isHost || p.hostOnboardingComplete === true)) return destination;
   if (pathname === "/onboarding/creator" && ((!getUserPlanAccess(p).isCreator && !getUserPlanAccess(p).isPro) || p.creatorOnboardingComplete === true)) return destination;
-  if ((pathname === "/admin" || pathname.startsWith("/admin/")) && p.isAdmin !== true) return destination;
+  if ((pathname === "/admin" || pathname.startsWith("/admin/")) && !destinationState(p).adminAccount) return destination;
   if (pathname === "/sponsor/dashboard" && !requestedWorkspaceAllowed(profile, pathname)) return destination;
   return "";
 }

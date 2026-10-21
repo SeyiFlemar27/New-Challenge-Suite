@@ -11,7 +11,7 @@ for(const [name,p,route]of [
  ['Host role is not a subscription',{...ready,role:'host'},'/dashboard'],
  ['Expired Host',{...host,planStatus:'expired'},'/dashboard'],
  ['Pending Host',{...host,planStatus:'incomplete'},'/onboarding/premium'],
- ['Admin',{...ready,isAdmin:true},'/admin'],['Untrusted Admin label',{...ready,accountType:'admin'},'/dashboard'],
+ ['Admin',{...ready,isAdmin:true,accountType:'admin'},'/admin'],['Untrusted Admin label',{...ready,accountType:'admin'},'/dashboard'],
  ['Sponsor',{...ready,selectedAccountType:'sponsor',sponsorOnboardingComplete:true},'/sponsor/dashboard'],
  ['Sponsor setup',{...ready,selectedAccountType:'sponsor',sponsorOnboardingComplete:false},'/sponsor/onboarding'],
  ['Authorized Enterprise',{...host,activeWorkspace:'enterprise',availableWorkspaces:['personal','enterprise']},'/enterprise'],
@@ -22,6 +22,13 @@ for(const [name,p,route]of [
  ['Deletion',{...host,accountStatus:'scheduled_for_deletion'},'/account/deletion-status']
 ])eq(getDefaultRouteForAccount(p),route,name);
 eq(getAuthenticatedDestination(host,'/challenges/fixture?join=1'),'/challenges/fixture?join=1','safe action takes precedence over default hub');
+eq(getDefaultRouteForAccount({...host,isAdmin:true}),'/dashboard/host','legacy Admin capability does not replace Host identity');
+eq(getAuthenticatedDestination({...host,isAdmin:true},'/admin'),'/dashboard/host','stale Admin return intent cannot replace Host identity');
+eq(getAccountRouteRedirect({...host,isAdmin:true},'/admin'),'/dashboard/host','Admin UI follows explicit account identity');
+eq(getDefaultRouteForAccount({...ready,planId:'creator',creatorOnboardingComplete:true,isAdmin:true}),'/dashboard','legacy Admin capability does not replace Creator identity');
+eq(getDefaultRouteForAccount({...ready,isAdmin:true}),'/dashboard','legacy Admin capability does not replace Free identity');
+eq(getDefaultRouteForAccount({...ready,isAdmin:true,selectedAccountType:'sponsor',sponsorOnboardingComplete:true}),'/sponsor/dashboard','legacy Admin capability does not replace Sponsor identity');
+eq(getDefaultRouteForAccount({...host,isAdmin:true,activeWorkspace:'enterprise',availableWorkspaces:['personal','enterprise']}),'/enterprise','legacy Admin capability does not replace Enterprise identity');
 eq(getAuthenticatedDestination({...host,creatorOnboardingComplete:false},'/explore?type=normal'),'/explore?type=normal','completed Host setup supersedes unrelated Creator setup when preserving intent');
 eq(getAuthenticatedDestination(host,'/dashboard/host'),'/dashboard/host','Host requested workspace');
 eq(getAuthenticatedDestination(ready,'/admin'),'/dashboard','non-Admin request denied');
