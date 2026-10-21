@@ -17,18 +17,17 @@ const sponsorGoals = ["Brand awareness", "Product launch", "Creator collaboratio
 const DRAFT_KEY = "challenge-suite-sponsor-onboarding-draft";
 
 function subscribeDraft(onChange: () => void) {
-  const onStorage = (event: StorageEvent) => { if (event.key === DRAFT_KEY) onChange(); };
+  const onStorage = (event: StorageEvent) => { if (event.key?.startsWith(DRAFT_KEY + ":")) onChange(); };
   window.addEventListener("storage", onStorage);
   window.addEventListener("sponsor-onboarding-draft-change", onChange);
   return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("sponsor-onboarding-draft-change", onChange); };
 }
 
-function readDraft() { return window.localStorage.getItem(DRAFT_KEY) ?? "{}"; }
-
 export default function SponsorOnboardingPage() {
   const auth = useAuth();
+  const draftKey = auth.user ? `${DRAFT_KEY}:${auth.user.uid}` : null;
   const [profile, setProfile] = useState<SponsorShellProfile | null>(null);
-  const storedDraft = useSyncExternalStore(subscribeDraft, readDraft, () => "{}");
+  const storedDraft = useSyncExternalStore(subscribeDraft, () => draftKey ? window.localStorage.getItem(draftKey) ?? "{}" : "{}", () => "{}");
   const localDraft = useMemo(() => { try { const value: unknown = JSON.parse(storedDraft); return value && typeof value === "object" ? value as Partial<typeof initial> : {}; } catch { return {}; } }, [storedDraft]);
   const [profileValues, setProfileValues] = useState<Partial<typeof initial>>({});
   const [formEdits, setFormEdits] = useState<Partial<typeof initial>>({});
@@ -37,11 +36,16 @@ export default function SponsorOnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const workspace = resolveSponsorWorkspaceState(profile ?? form);
 
   useEffect(() => {
+    let active = true;
     void apiRequest<{ sponsorProfile: SponsorShellProfile }>("/api/sponsor/profile").then((result) => {
-      if (!result.ok || !result.data) return;
+      if (!active) return;
+      if (!result.ok || !result.data) { setLoadError(result.message || "Sponsor profile could not be loaded. Please try again."); return; }
+      setLoadError("");
       const saved = result.data.sponsorProfile;
       setProfile(saved);
       const billingAddress = saved.billingAddress && typeof saved.billingAddress === "object" ? saved.billingAddress as Record<string, unknown> : {};
@@ -51,9 +55,10 @@ export default function SponsorOnboardingPage() {
       const values: Partial<typeof initial> = { brandName: String(saved.brandName || ""), workEmail: String(saved.businessEmail || ""), website: String(saved.website || ""), industry: String(saved.industry || ""), countryRegion: String(saved.countryLocation || saved.headquartersLocation || billingAddress.country || ""), contactPerson: String(saved.contactPerson || ""), contactPersonRole: String(saved.contactPersonRole || ""), billingStreet: String(billingAddress.street || ""), billingCity: String(billingAddress.city || ""), billingState: String(billingAddress.state || ""), billingZip: String(billingAddress.zip || ""), sponsorGoal: String(goals[0] || ""), brandDescription: String(saved.brandDescription || ""), sponsorshipType: String(saved.preferredSponsorshipStructure || ""), primaryCampaignKpi: String(kpis[0] || ""), targetAudience: String(saved.preferredAudienceSize || ""), targetAudienceDemographics: String(saved.targetAudienceDemographics || ""), typicalBudget: String(saved.targetBudgetRange || saved.typicalCampaignBudget || ""), campaignDuration: String(saved.preferredCampaignDuration || ""), preferredCurrency: String(saved.preferredPaymentCurrency || ""), legalApproval: saved.legalApprovalRequired ? "yes" : "no", logoUrl: String(saved.logoUrl || ""), logoPath: String(saved.logoPath || ""), bannerUrl: String(saved.bannerUrl || ""), bannerPath: String(saved.bannerPath || ""), socialLink1: String(socialLinks[0] || ""), socialLink2: String(socialLinks[1] || ""), socialLink3: String(socialLinks[2] || "") };
       for (const [key, value] of Object.entries(values)) if (value === "") delete values[key as keyof typeof initial];
       setProfileValues(values);
-    });
-  }, []);
-  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); window.dispatchEvent(new Event("sponsor-onboarding-draft-change")); }, [form]);
+    }).catch(() => { if (active) setLoadError("Sponsor profile could not be loaded. Please try again."); });
+    return () => { active = false; };
+  }, [loadAttempt]);
+  useEffect(() => { if (!draftKey) return; localStorage.setItem(draftKey, JSON.stringify(form)); window.dispatchEvent(new Event("sponsor-onboarding-draft-change")); }, [draftKey, form]);
 
   function update(field: keyof typeof form, value: string) { setFormEdits((current) => ({ ...current, [field]: value })); setMessage(""); setError(""); }
   const requiredReady = form.brandName.trim().length >= 2 && form.workEmail.includes("@") && form.industry.trim().length >= 2 && form.countryRegion.trim().length >= 2 && form.brandDescription.trim().length >= 20 && Boolean(form.contactPerson.trim()) && Boolean(form.contactPersonRole.trim()) && Boolean(form.billingStreet.trim()) && Boolean(form.billingCity.trim()) && Boolean(form.billingState.trim()) && Boolean(form.billingZip.trim()) && Boolean(form.logoPath) && Boolean(form.sponsorGoal) && Boolean(form.sponsorshipType) && Boolean(form.typicalBudget.trim()) && Boolean(form.targetAudienceDemographics.trim());
@@ -69,9 +74,11 @@ export default function SponsorOnboardingPage() {
     setSaving(false);
     if (!result.ok || !result.data) { setError(result.message || "Sponsor profile could not be saved."); return; }
     setProfile(result.data.sponsorProfile);
-    if (reviewAction === "submit") localStorage.removeItem(DRAFT_KEY);
+    if (reviewAction === "submit" && draftKey) localStorage.removeItem(draftKey);
     setMessage(reviewAction === "submit" ? "Sponsor profile submitted for review." : "Sponsor profile saved. You can finish it later.");
   }
+
+  if (loadError) return <main className="grid min-h-screen place-items-center px-5"><Card className="max-w-lg p-7"><h1 className="text-xl font-black">Sponsor profile unavailable</h1><p role="alert" className="mt-3">{loadError}</p><div className="mt-5 flex gap-3"><Button onClick={() => { setLoadError(""); setLoadAttempt((value) => value + 1); }}>Try again</Button><LinkButton href="/sponsor/start" variant="secondary">Start Sponsor setup</LinkButton></div></Card></main>;
 
   if (["submitted", "pending_review"].includes(workspace.status)) return <main className="grid min-h-[100dvh] place-items-center bg-[var(--background)] px-5 py-10"><div className="w-full max-w-3xl"><Card className="border-amber-200 bg-white p-7 sm:p-10"><CheckCircle2 className="text-amber-700" size={36} /><p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-amber-700">Sponsor review</p><h1 className="mt-3 text-3xl font-black text-slate-950">Your sponsor profile is pending review.</h1><p className="mt-4 leading-7 text-slate-600">Your submitted profile is safely stored. Challenge Suite will unlock the approved sponsor workspace only after review. Funding and campaign actions remain unavailable while review is pending.</p><div className="mt-7 rounded-[8px] border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-black text-slate-950">Status: {workspace.statusLabel}</p><p className="mt-1 text-sm text-slate-600">Brand profile: {workspace.completionPercent}% complete</p></div><div className="mt-7 flex flex-wrap gap-3"><LinkButton href="/contact" variant="secondary">Contact Support</LinkButton><LinkButton href="/dashboard" variant="ghost">Return to Dashboard</LinkButton></div></Card></div></main>;
 

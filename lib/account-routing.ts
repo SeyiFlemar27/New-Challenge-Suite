@@ -67,7 +67,7 @@ function requestedWorkspaceAllowed(profileValue: object, path: string) {
   const pathname = new URL(path, "https://challenge-suite.invalid").pathname;
   if (/^\/admin(\/|$)/.test(pathname)) return destinationState(p).adminAccount === true;
   if (/^\/enterprise(\/|$)/.test(pathname) && !/^\/enterprise\/(apply|status|application|contact)(\/|$)/.test(pathname)) return Array.isArray(p.availableWorkspaces) && p.availableWorkspaces.includes("enterprise");
-  if (/^\/sponsor(\/|$)/.test(pathname) && !/^\/sponsor\/(start|apply|onboarding)(\/|$)/.test(pathname)) return p.isSponsor === true || isSponsorAccount(p);
+  if (/^\/sponsor(\/|$)/.test(pathname) && !/^\/sponsor\/(start|apply|onboarding)(\/|$)/.test(pathname)) return hasSponsorPanelContext(p);
   if (/^\/(dashboard\/host|host)(\/|$)/.test(pathname)) return getUserPlanAccess(p).isHost;
   return true;
 }
@@ -101,4 +101,10 @@ export function getAccountRouteRedirect(profile: object, pathname: string, searc
 export function isSponsorAccount(profileValue: object = {}) {
   const profile = profileValue as Record<string, unknown>;
   return profile.account_type === "sponsor" || profile.selectedAccountType === "sponsor" || normalizeAccountType(profile) === "sponsor";
+}
+
+/** UI entry only; each Sponsor API still verifies organization membership and permissions. */
+export function hasSponsorPanelContext(profileValue: object = {}) {
+  const p = profileValue as Record<string, unknown>;
+  return p.isSponsor === true || isSponsorAccount(p) || p.hasSponsorProfile === true || Boolean(p.sponsorOrganizationId) || Boolean(p.sponsorOnboardingStatus);
 }

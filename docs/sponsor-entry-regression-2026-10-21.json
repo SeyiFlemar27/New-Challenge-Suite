@@ -1,0 +1,106 @@
+{
+  "checkedAt": "2026-10-21T15:11:57.3778023Z",
+  "isolatedDemoFirebase": true,
+  "productionBuild": true,
+  "passed": 17,
+  "failed": 0,
+  "skipped": 26,
+  "assertions": 54,
+  "pageErrorCount": 0,
+  "routingAssertions": 69,
+  "typecheck": "passed",
+  "lint": "passed",
+  "diffCheck": "passed",
+  "journeys": [
+    {
+      "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Free default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator default login under delayed profile",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Host default login under delayed profile",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Dashboard stability: Host onboarding default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Restricted default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Dashboard stability: Host legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Dashboard stability: Host logout and login again enters Host directly",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: requested action and unsafe redirects",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: verified email required before dashboard",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: protected direct navigation preserves action query at login",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+      "status": "PASS",
+      "assertions": 5
+    }
+  ],
+  "limitations": [
+    "No authenticated Production Sponsor setup or provider funding acceptance performed.",
+    "Legacy source-only Sponsor polish contract references a retired component and fails before assertions.",
+    "Initial sandbox emulator startup timed out; final escalated run completed with exit 0."
+  ]
+}

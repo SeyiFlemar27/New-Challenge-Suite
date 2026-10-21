@@ -47,4 +47,11 @@ eq(getAccountRouteRedirect(ready,'/dashboard/host'),'/dashboard','Free cannot re
 eq(getAccountRouteRedirect({...host,hostOnboardingComplete:false},'/private/invitation','code=fixture'),'/onboarding/host?returnTo=%2Fprivate%2Finvitation%3Fcode%3Dfixture','direct action retains query through route setup gate');
 eq(isRestrictedAccount({...ready,accountStatus:'suspended'}),true,'suspension not normalized away');
 eq(isRestrictedAccount(ready),false,'active account unaffected');
+for (const fields of [{hasSponsorProfile:true}, {sponsorOrganizationId:'fixture-pending-org'}, {isSponsor:true}, {sponsorOnboardingStatus:'not_started'}]) {
+  const member = {...host,...fields};
+  eq(getAuthenticatedDestination(member,'/sponsor/dashboard'),'/sponsor/dashboard','existing Sponsor context preserves intentional panel access');
+  eq(getAccountRouteRedirect(member,'/sponsor/dashboard'),'','existing Sponsor context does not bounce to Host');
+  eq(getDefaultRouteForAccount(member),'/dashboard/host','Sponsor capability does not replace personal default');
+}
+eq(getAccountRouteRedirect(host,'/sponsor/dashboard'),'/dashboard/host','no Sponsor context does not grant panel access');
 console.log(JSON.stringify({suite:'authoritative account routing behavior',assertions,passed:true}));

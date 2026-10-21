@@ -9,7 +9,7 @@ import { Button, Card, EmptyState, LinkButton } from "@/components/ui";
 import { SponsorShell, type SponsorShellProfile } from "@/components/sponsor/sponsor-shell";
 import { apiRequest } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { getDefaultRouteForAccount } from "@/lib/account-routing";
+import { getDefaultRouteForAccount, hasSponsorPanelContext } from "@/lib/account-routing";
 
 type RecordItem = Record<string, unknown> & { id: string };
 type Attention = { id: string; title: string; context: string; reason: string; href: string; actionLabel: string; deadline: string | null };
@@ -31,7 +31,7 @@ export default function SponsorDashboardPage() {
   const searchParams = useSearchParams();
   const initialOpportunityTab = searchParams.get("opportunities");
   const [opportunityTab, setOpportunityTab] = useState<"challenges" | "creators">(initialOpportunityTab === "creators" ? "creators" : "challenges");
-  const isSponsorAccount = Boolean(user?.selectedAccountType === "sponsor" || user?.isSponsor || user?.accountType === "sponsor");
+  const isSponsorAccount = Boolean(user && hasSponsorPanelContext(user));
   const pendingProfileSetup = Boolean(isSponsorAccount && !user?.hasSponsorProfile && !user?.sponsorOrganizationId);
   const dashboardQuery = useQuery({ queryKey: ["sponsor-dashboard", user?.uid, user?.sponsorOrganizationId, revision], queryFn: () => apiRequest<DashboardResponse>("/api/sponsor/dashboard"), staleTime: 30_000, retry: false, enabled: !userLoading && isSponsorAccount && !pendingProfileSetup });
   const reloadDashboard = async () => { await dashboardQuery.refetch(); };

@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { logout } from "@/lib/firebase/auth-service";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { hasSponsorPanelContext } from "@/lib/account-routing";
 
 export function AuthenticatedTopbar() {
   const { user, loading, signedOut } = useCurrentUser();
@@ -55,7 +56,8 @@ function AccountMenu() {
     : user.hasSponsorProfile || user.sponsorOnboardingStatus
       ? "/sponsor/onboarding"
       : "/sponsor/start";
-  const hasSponsorAccess = !user.isAdmin && Boolean(user.isSponsor || user.hasSponsorProfile || user.sponsorOnboardingStatus);
+  const adminAccount = user.isAdmin && user.accountType === "admin";
+  const hasSponsorAccess = hasSponsorPanelContext(user) || Boolean(user.sponsorOnboardingStatus);
   return (
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-11 items-center gap-2 rounded-[8px] border border-white/10 px-2 text-left hover:border-[var(--gold)]/40" aria-label="Open account menu" aria-expanded={open} aria-haspopup="menu">
@@ -74,7 +76,7 @@ function AccountMenu() {
           <MenuLink href="/profile" label="View Profile" icon={<UserRound size={16} />} onSelect={() => setOpen(false)} />
           <MenuLink href="/settings" label="Account Settings" icon={<Settings size={16} />} onSelect={() => setOpen(false)} />
           {personalContext ? <MenuLink href="/subscriptions" label="Subscription / Plan" onSelect={() => setOpen(false)} /> : null}
-          {personalContext && !user.isAdmin ? <MenuLink href={sponsorHref} label={hasSponsorAccess ? "Sponsor Panel" : "Become a Sponsor"} icon={<Handshake size={16} />} onSelect={() => setOpen(false)} /> : null}
+          {personalContext && !adminAccount ? <MenuLink href={sponsorHref} label={hasSponsorAccess ? "Sponsor Panel" : "Become a Sponsor"} icon={<Handshake size={16} />} onSelect={() => setOpen(false)} /> : null}
           {personalContext ? <MenuLink href="/settings/payouts" label="Payout Settings" icon={<WalletCards size={16} />} onSelect={() => setOpen(false)} /> : null}
           <MenuLink href="/contact" label="Help Center" icon={<CircleHelp size={16} />} onSelect={() => setOpen(false)} />
           <button type="button" role="menuitem" onClick={() => void logout().finally(() => { window.location.href = "/auth/login"; })} className="flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 text-sm font-bold text-slate-300 hover:bg-white/5 hover:text-white"><LogOut size={16} /> Log Out</button>

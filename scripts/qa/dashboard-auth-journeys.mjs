@@ -52,6 +52,65 @@ export async function dashboardAuthJourneys({browser,test,check,expect,db,authAd
     const user=await seedUser('protected-intent');const context=await browser.newContext();const page=await context.newPage();
     try{await page.goto(baseUrl+'/profile?tab=fixture');await page.getByRole('link',{name:'Sign In',exact:true}).click();await expect.poll(()=>new URL(page.url()).searchParams.get('next')).toBe('/profile?tab=fixture');check(true,'protected login preserves the complete query');await page.getByLabel('Email Address').fill(user.email);await page.getByLabel('Password',{exact:true}).fill(user.password);await page.getByRole('button',{name:'Sign In',exact:true}).click();await expect(page).toHaveURL(/\/profile\?tab=fixture$/);check(true,'authenticated action returns to the intended query');}finally{await context.close();}
   });
+  await test('Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges',async()=>{
+    const anonymous=await browser.newContext();
+    try { const denied=await anonymous.request.post(baseUrl+'/api/sponsor/start');check(denied.status()===401,'anonymous setup request is rejected'); }
+    finally { await anonymous.close(); }
+    const user=await seedUser('become-sponsor-host');
+    await update(user,{planId:'host',planStatus:'active',hostOnboardingComplete:true});
+    const {context,page}=await start(user);
+    try {
+      await expect(page.getByRole('heading',{name:'Host Control Center',exact:true})).toBeVisible();
+      await page.evaluate(()=>{localStorage.setItem('challenge-suite-sponsor-onboarding-draft',JSON.stringify({brandName:'Another account legacy brand'}));});
+      await page.getByRole('link',{name:'Become a Sponsor',exact:true}).first().click();
+      await expect(page).toHaveURL(/\/sponsor\/start$/);
+      await page.getByRole('button',{name:'Start Sponsor Profile',exact:true}).click();
+      await expect(page).toHaveURL(/\/sponsor\/onboarding$/);
+      await expect(page.getByRole('heading',{name:'Build your brand profile',exact:true})).toBeVisible();
+      check(!(await page.locator('input').evaluateAll(inputs=>inputs.some(input=>input.value==='Another account legacy brand'))),'unscoped legacy Sponsor draft cannot leak into this account');
+      await page.route('**/api/sponsor/profile',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,message:'Fixture Sponsor profile unavailable'})}));
+      await page.reload({waitUntil:'domcontentloaded'});
+      await expect(page.getByRole('heading',{name:'Sponsor profile unavailable',exact:true})).toBeVisible();
+      await page.unroute('**/api/sponsor/profile');
+      await page.getByRole('button',{name:'Try again',exact:true}).click();
+      await expect(page.getByRole('heading',{name:'Build your brand profile',exact:true})).toBeVisible();
+      check(true,'Sponsor profile load failure is visible and retry recovers');
+      await page.getByRole('link',{name:'Return to Overview',exact:true}).click();
+      await expect(page.getByRole('heading',{name:'Welcome to Challenge Suite',exact:true})).toBeVisible();
+      check(true,'new Sponsor setup has a stable overview without Host bounce');
+      const stored=(await db.collection('users').doc(user.uid).get()).data();
+      check(stored.sponsorOnboardingStatus==='not_started'&&stored.planId==='host','setup intent persists without replacing Host subscription');
+      check(!stored.isSponsor&&!stored.sponsorOrganizationId&&!stored.sponsorVerificationStatus,'setup does not grant operational access or approval');
+      await page.goto(baseUrl+'/sponsor/start');
+      await page.getByRole('button',{name:'Start Sponsor Profile',exact:true}).click();
+      await expect(page).toHaveURL(/\/sponsor\/onboarding$/);
+      check((await db.collection('users').doc(user.uid).get()).data().planId==='host','repeat setup retains account identity');
+      await update(user,{sponsorOnboardingStatus:'pending_review',sponsorOnboardingComplete:true});
+      await page.goto(baseUrl+'/sponsor/start');
+      await page.getByRole('button',{name:'Start Sponsor Profile',exact:true}).click();
+      await expect(page).toHaveURL(/\/sponsor\/onboarding$/);
+      check((await db.collection('users').doc(user.uid).get()).data().sponsorOnboardingStatus==='pending_review','repeat setup never resets a submitted review');
+    } finally { await context.close(); }
+  });
+  await test('Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization',async()=>{
+    const user=await seedUser('sponsor-personal-panel');
+    await update(user,{planId:'host',planStatus:'active',hostOnboardingComplete:true,isAdmin:true,hasSponsorProfile:true,sponsorOnboardingComplete:true});
+    const org='routing_pending_sponsor';
+    await db.collection('sponsorOrganizations').doc(org).set({id:org,name:'Pending Sponsor Fixture',status:'pending_onboarding',sponsorOnboardingComplete:false});
+    await db.collection('sponsorMemberships').doc('routing_pending_member').set({sponsorOrganizationId:org,userId:user.uid,role:'owner',status:'active'});
+    const {context,page}=await start(user);
+    try {
+      await expect(page.getByRole('heading',{name:'Host Control Center',exact:true})).toBeVisible();
+      await page.getByRole('button',{name:'Open account menu',exact:true}).click();
+      await page.getByRole('menuitem',{name:'Sponsor Panel',exact:true}).click();
+      await expect(page).toHaveURL(/\/sponsor\/dashboard$/);
+      await expect(page.getByRole('heading',{name:/^Welcome back, /})).toBeVisible();
+      check(true,'personal legacy capability retains Sponsor menu and pending organization entry');
+      await page.reload({waitUntil:'domcontentloaded'});
+      await expect(page.getByRole('heading',{name:/^Welcome back, /})).toBeVisible();
+      check(true,'Sponsor panel survives refresh without personal dashboard bounce');
+    } finally { await context.close(); }
+  });
   await test('Dashboard stability: Sponsor Enterprise Admin and workspace switching',async()=>{
     const sponsor=await seedUser('routing-sponsor',{sponsorOrg:'routing_sponsor_fixture'});await db.collection('sponsorOrganizations').doc('routing_sponsor_fixture').set({id:'routing_sponsor_fixture',name:'Routing Sponsor',status:'active',sponsorOnboardingComplete:true,verificationStatus:'verified',primary:true});await db.collection('sponsorMemberships').doc('routing_sponsor_member').set({sponsorOrganizationId:'routing_sponsor_fixture',userId:sponsor.uid,role:'owner',status:'active'});await update(sponsor,{selectedAccountType:'sponsor',account_type:'sponsor'});
     const enterprise=await seedUser('routing-enterprise',{enterpriseOrg:'routing_enterprise_fixture'});await db.collection('enterpriseOrganizations').doc('routing_enterprise_fixture').set({id:'routing_enterprise_fixture',status:'active'});await update(enterprise,{activeWorkspace:'enterprise',planId:'host',planStatus:'active',hostOnboardingComplete:true});
