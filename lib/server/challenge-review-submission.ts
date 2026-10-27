@@ -59,18 +59,12 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
   const revisionAuditRef = db.collection("auditLogs").doc(input.revisionAudit.id);
 
   return db.runTransaction(async (transaction) => {
-    const [latestChallengeSnap, prizePoolSnap] = await Promise.all([
-      transaction.get(challengeRef),
-      transaction.get(prizePoolRef)
-    ]);
+    const [latestChallengeSnap, prizePoolSnap] = await transaction.getAll(challengeRef, prizePoolRef);
     if (!latestChallengeSnap.exists) throw new ChallengeReviewTransitionError("CHALLENGE_NOT_FOUND", "Challenge draft not found.");
     const latestChallenge = { id: latestChallengeSnap.id, ...latestChallengeSnap.data() } as Record<string, unknown>;
     const enterpriseOwned = isEnterpriseFinanceResource(latestChallenge);
     if (enterpriseOwned) {
-      const [account, profile] = await Promise.all([
-        transaction.get(db.collection("users").doc(input.userId)),
-        transaction.get(db.collection("profiles").doc(input.userId)),
-      ]);
+      const [account, profile] = await transaction.getAll(db.collection("users").doc(input.userId), db.collection("profiles").doc(input.userId));
       const access = normalizeEnterpriseAccess({ ...(profile.data() ?? {}), ...(account.data() ?? {}) });
       if (!access?.organizationId || !hasEnterprisePermission(access, "challenge.edit") || !enterpriseChallengeInScope(access, latestChallenge, input.userId, true)) {
         throw new ChallengeReviewTransitionError("PERMISSION_DENIED", "Your Enterprise access does not allow this review submission.");
@@ -92,11 +86,8 @@ export async function commitChallengeReviewSubmission(db: Firestore, input: Revi
     if (safety) return { idempotent: false, challenge: { ...latestChallenge, ...recordPublicationHold(db, transaction, input.challengeId, "challenges", input.userId, safety, String(input.update.updatedAt)) } };
     const fundingEvidence = await requireConfirmedPublicationFunding(db, transaction, input.challengeId, latestChallenge, input.update);
     if (!enterpriseOwned) {
-      const [account, profile, owned] = await Promise.all([
-        transaction.get(db.collection("users").doc(input.userId)),
-        transaction.get(db.collection("profiles").doc(input.userId)),
-        transaction.get(db.collection("challenges").where("creatorId", "==", input.userId)),
-      ]);
+      const [account, profile] = await transaction.getAll(db.collection("users").doc(input.userId), db.collection("profiles").doc(input.userId));
+      const owned = await transaction.get(db.collection("challenges").where("creatorId", "==", input.userId));
       const latestProfile = { ...profile.data(), ...account.data() }, plan = getUserPlanAccess(latestProfile), limits = getPlanExperience(latestProfile);
       const entitlement = canCreateChallenge(latestProfile, { ...input.update, creatorPrizeFundingConfirmed: fundingEvidence.confirmed >= fundingEvidence.required }, 0);
       if (!entitlement.allowed) throw new ChallengeReviewTransitionError("PERMISSION_DENIED", entitlement.message);

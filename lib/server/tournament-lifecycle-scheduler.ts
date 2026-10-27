@@ -3,6 +3,7 @@ import { createNotification } from "@/lib/server/notifications";
 import { advanceWinner, finalPlacements, resolveTournamentNoSubmission, resolveTournamentSubmissionDeadline } from "@/lib/server/tournament-operations";
 import { fail, ok } from "@/lib/server/responses";
 import type { TournamentFoundation, TournamentMatchFoundation } from "@/lib/tournament-types";
+import { recoverIndividualTournamentBracket } from "@/lib/server/tournament-bracket-recovery";
 
 const dateMs = (value: unknown) => { const result = new Date(String(value ?? "")).getTime(); return Number.isFinite(result) ? result : 0; };
 function permitsDeadlineTransition(tournament: Record<string, unknown> | undefined, match: Record<string, unknown> | undefined) {
@@ -129,7 +130,7 @@ export async function processTournamentLifecycleAction(args: {
           const dependentRefs = [match.nextMatchId, match.loserNextMatchId].filter(Boolean).map((matchId) => db.collection("tournamentMatches").doc(String(matchId)));
           const held = await db.runTransaction(async (transaction) => {
             const tournamentState = await transaction.get(tournamentRef);
-            const [current, participantA, participantB, submissionA, submissionB, ...dependents] = await Promise.all([transaction.get(matchRef), transaction.get(participantARef), transaction.get(participantBRef), transaction.get(submissionARef), transaction.get(submissionBRef), ...dependentRefs.map((ref) => transaction.get(ref))]);
+            const [current, participantA, participantB, submissionA, submissionB, ...dependents] = await transaction.getAll(matchRef, participantARef, participantBRef, submissionARef, submissionBRef, ...dependentRefs);
             if (!permitsDeadlineTransition(tournamentState.data(), current.data())) return false;
             if (!current.exists || !participantA.exists || !participantB.exists || current.data()?.noSubmissionExtensionUsed !== true || !["submissions_open", "submission_review"].includes(String(current.data()?.status ?? ""))) return false;
             const currentData = current.data() ?? {};
@@ -191,6 +192,7 @@ export async function processTournamentLifecycleAction(args: {
               const updated = { ...value };
               if (participantId && slot === "A") updated.participantAId = participantId;
               if (participantId && slot === "B") updated.participantBId = participantId;
+              if (["held", "disputed"].includes(updated.status)) return updated;
               if (!updated.participantAId || !updated.participantBId || ["confirmed", "forfeit", "bye", "completed"].includes(updated.status)) return updated;
               return { ...updated, status: "submissions_open" as const, openedAt, submissionsOpenedAt: openedAt, submissionDeadlineAt: new Date(now.getTime() + submissionDurationMs).toISOString(), updatedAt: openedAt };
             };
@@ -289,7 +291,8 @@ export async function processTournamentLifecycleAction(args: {
         if (closed) outcomes.push({ matchId: match.id, action: "voting_closed" });
       }
     }
-    return ok({ processed: outcomes.length, outcomes, clientTimerUsed: false }, "Tournament match deadlines processed server-side.");
+    const recovery = await recoverIndividualTournamentBracket(db, id, now);
+    return ok({ processed: outcomes.length, outcomes, recovery, clientTimerUsed: false }, "Tournament match deadlines processed server-side.");
   }
 
   if (action === "process_check_in_close") {

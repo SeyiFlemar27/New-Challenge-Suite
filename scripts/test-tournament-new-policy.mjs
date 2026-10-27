@@ -4,6 +4,7 @@ import { validateTournamentFoundation } from "../lib/server/tournament-validatio
 import { validateTournamentSubmission } from "../lib/server/tournament-operations.ts";
 import { tournamentPlacementFingerprint } from "../lib/server/tournament-settlement-policy.ts";
 import { TOURNAMENT_PRODUCT_POLICY, tournamentBuilderStep } from "../lib/tournament-builder-policy.ts";
+import { INDIVIDUAL_TOURNAMENT_POLICY } from "../lib/individual-tournament-policy.ts";
 let assertions = 0;
 const equal = (actual, expected) => { assert.equal(actual, expected); assertions++; };
 const draft = tournamentDraftFromInput({}, "owner");
@@ -26,6 +27,14 @@ equal(validateTournamentSubmission({ ...submission, round: { startsAt: null, end
 const placement = { id: "p1", placement: 1, participantId: `${"a".repeat(130)}first`, sourceMatchId: "verified_final" };
 assert.notEqual(tournamentPlacementFingerprint([placement], TOURNAMENT_PRODUCT_POLICY), tournamentPlacementFingerprint([{ ...placement, participantId: `${"a".repeat(130)}other` }], TOURNAMENT_PRODUCT_POLICY)); assertions++;
 equal(tournamentPlacementFingerprint([placement]).startsWith("tournament_placements_v2_"), false);
+const individualFingerprint = tournamentPlacementFingerprint([placement], INDIVIDUAL_TOURNAMENT_POLICY);
+equal(individualFingerprint.startsWith("individual_tournament_placements_v4_"), true);
+for (const field of ["participantId", "userId", "teamId", "sourceMatchId"]) {
+  assert.notEqual(individualFingerprint, tournamentPlacementFingerprint([{ ...placement, [field]: "changed" }], INDIVIDUAL_TOURNAMENT_POLICY)); assertions++;
+}
+assert.notEqual(individualFingerprint, tournamentPlacementFingerprint([placement], TOURNAMENT_PRODUCT_POLICY)); assertions++;
+const secondPlacement = { id: "p2", placement: 2, participantId: "runner_up", sourceMatchId: "verified_final" };
+equal(tournamentPlacementFingerprint([placement, secondPlacement], INDIVIDUAL_TOURNAMENT_POLICY), tournamentPlacementFingerprint([secondPlacement, placement], INDIVIDUAL_TOURNAMENT_POLICY));
 equal(tournamentBuilderStep("schedule", 1), "rounds");
 equal(tournamentBuilderStep(8, 1), "review");
 for (const capacity of [4, 8, 16, 32, 64, 128]) {

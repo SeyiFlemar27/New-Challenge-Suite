@@ -39,6 +39,29 @@ export async function managePrivateAccess(db: Firestore, input: {
       transaction.create(auditRef, { challengeId: input.challengeId, actorId: input.actorId, action: "credential_rotated", beforeInviteId: challenge.privateCredentialId ?? null, afterInviteId: credential.inviteId, reason, createdAt: now });
       return { status: "rotated" };
     }
+    if (["revoke_grant", "restore_grant"].includes(input.action) && input.requestId) {
+      const accessRef = db.collection("privateChallengeAccess").doc(input.requestId);
+      const grant = await transaction.get(accessRef), data = grant.data() ?? {}, userId = String(data.userId ?? "");
+      if (!grant.exists || data.challengeId !== input.challengeId || accessRef.id !== `${input.challengeId}_${userId}` || !userId || userId.includes("/")) throw new Error("REQUEST_NOT_FOUND");
+      const [participant, account, profile, request] = await transaction.getAll(
+        db.collection("challengeParticipants").doc(accessRef.id), db.collection("users").doc(userId), db.collection("profiles").doc(userId), db.collection("privateAccessRequests").doc(accessRef.id)
+      );
+      if (privateParticipantJoined(participant.data())) throw new Error("JOINED_PARTICIPANT_PROTECTED");
+      const desired = input.action === "revoke_grant" ? "revoked" : "approved";
+      if (data.status === desired) return { status: desired, duplicate: true };
+      if (data.status !== (desired === "revoked" ? "approved" : "revoked")) throw new Error("ACCESS_STATE_CHANGED");
+      if (desired === "approved") {
+        const error = validatePrivateParticipantEligibility(challenge, { ...profile.data(), ...account.data() });
+        if (error) throw new Error(error);
+        if (typeof validatePrivateRequirementEvidence(challenge, data) === "string") throw new Error("REQUIREMENTS_CHANGED");
+      }
+      transaction.update(accessRef, { status: desired, decisionReason: reason, decidedBy: input.actorId, updatedAt: now });
+      if (request.exists && request.data()?.challengeId === input.challengeId && request.data()?.userId === userId) transaction.update(request.ref, { status: desired, decisionReason: reason, decidedBy: input.actorId, updatedAt: now });
+      setPrivateChallengeMediaAccessInTransaction(db, transaction, { challengeId: input.challengeId, userId, allowed: desired === "approved", now });
+      transaction.create(auditRef, { challengeId: input.challengeId, userId, actorId: input.actorId, action: input.action, before: data.status, after: desired, reason, createdAt: now });
+      transaction.create(db.collection("notifications").doc(`private_access_${auditRef.id}`), { userId, type: "private_access_decision", title: "Private challenge access updated", body: `Your access is ${desired}. ${reason}`, status: "unread", read: false, targetId: input.challengeId, actionUrl: desired === "approved" ? `/challenges/${input.challengeId}` : "/private-exclusive", createdAt: now });
+      return { status: desired, duplicate: false };
+    }
     if (!["approve", "reject", "revoke", "restore"].includes(input.action) || !input.requestId) throw new Error("INVALID_ACCESS_ACTION");
     const requestRef = db.collection("privateAccessRequests").doc(input.requestId);
     const requestSnap = await transaction.get(requestRef);
@@ -46,10 +69,9 @@ export async function managePrivateAccess(db: Firestore, input: {
     const userId = String(requestData.userId ?? "");
     if (!requestSnap.exists || requestData.challengeId !== input.challengeId || requestRef.id !== `${input.challengeId}_${userId}`) throw new Error("REQUEST_NOT_FOUND");
     const accessRef = db.collection("privateChallengeAccess").doc(`${input.challengeId}_${userId}`);
-    const [grant, participant, account, profile] = await Promise.all([
-      transaction.get(accessRef), transaction.get(db.collection("challengeParticipants").doc(accessRef.id)),
-      transaction.get(db.collection("users").doc(userId)), transaction.get(db.collection("profiles").doc(userId))
-    ]);
+    const [grant, participant, account, profile] = await transaction.getAll(
+      accessRef, db.collection("challengeParticipants").doc(accessRef.id), db.collection("users").doc(userId), db.collection("profiles").doc(userId)
+    );
     if (privateParticipantJoined(participant.data())) throw new Error("JOINED_PARTICIPANT_PROTECTED");
     const prior = String(requestData.status);
     const desired = input.action === "approve" || input.action === "restore" ? "approved" : input.action === "revoke" ? "revoked" : "rejected";

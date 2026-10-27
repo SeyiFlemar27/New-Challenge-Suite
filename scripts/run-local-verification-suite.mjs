@@ -5,6 +5,16 @@ allowed.push("scripts/test-media-publish-handlers-emulator.mjs", "scripts/test-p
 allowed.push("scripts/test-deployed-firestore-rule-repair-emulator.mjs");
 allowed.push("scripts/test-tournament-runtime-verification-emulator.mjs");
 allowed.push("scripts/test-admin-account-identity-emulator.mjs");
+allowed.push("scripts/test-tournament-media-visibility-emulator.mjs");
+allowed.push("scripts/test-private-v2-access-emulator.mjs");
+allowed.push("scripts/test-my-tournaments-emulator.mjs");
+allowed.push("scripts/test-individual-recovery-emulator.mjs");
+allowed.push("scripts/test-individual-automatic-settlement-emulator.mjs");
+allowed.push("scripts/test-individual-cancellation-emulator.mjs");
+allowed.push("scripts/test-tournament-submission-media-emulator.mjs");
+allowed.push("scripts/test-automatic-voting-emulator.mjs");
+allowed.push("scripts/test-individual-correction-emulator.mjs");
+allowed.push("scripts/test-firestore-transaction-runtime-emulator.mjs");
 if (!allowed.includes(selected)) throw new Error("Unsupported local verification suite");
 process.chdir(fileURLToPath(new URL("../", import.meta.url)));
 await import(new URL(`../${selected}`, import.meta.url));

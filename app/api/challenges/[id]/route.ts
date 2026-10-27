@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { isPublicPrivatePreviewRecord } from "@/lib/server/challenge-media-delivery";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { fail, ok, serverUnavailable } from "@/lib/server/responses";
 import { canAccessChallenge } from "@/lib/plan-access";
@@ -58,6 +59,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   let requestProfile: Record<string, unknown> = {};
   let hasPrivateAccess = false;
   if (!user && !publiclyVisible) {
+    if (isPublicPrivatePreviewRecord({ id: challengeSnap.id, ...challengeData })) return fail("Private challenge access is required.", 403, undefined, "PRIVATE_PREVIEW_AVAILABLE");
     return fail("Challenge not found.", 404, undefined, "NOT_FOUND");
   }
   if (user) {

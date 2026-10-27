@@ -47,6 +47,8 @@ export async function dashboardRedesignJourneys({browser,test,check,expect,db,se
       else await expect(page.locator('[data-dashboard-home="'+kind+'"]')).toBeVisible({timeout:60000});
       if(!baseline){
         const home=page.locator('[data-dashboard-home="'+kind+'"]');
+        if(kind!=='admin')await expect(page.getByRole('textbox',{name:'Search public challenges',exact:true})).toHaveCount(0);
+        else await expect(page.getByPlaceholder('Search users, sponsors, challenges...')).toBeVisible();
         if(['free','creator','host','enterprise','sponsor'].includes(kind))await expect(home.locator('[data-dashboard-preview]')).toHaveCount(3);
         if(kind!=='admin')check(!(await home.innerText()).includes('Confidential'),kind+' does not show another organization records');
         if(['free','creator','host','enterprise'].includes(kind)){

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdminAuth } from "@/lib/firebase/admin";
 import { sendEmail, type EmailMessage } from "@/lib/server/email";
+import { tournamentReminderEligible } from "@/lib/server/tournament-submission-reminders";
 
 const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 type Delivery = { resolveRecipient(userId: string): Promise<string | null>; send(message: EmailMessage): Promise<void> };
@@ -35,6 +36,7 @@ async function deliverLifecycleEmailOutbox(db: Firestore, challengeId: string, k
       const value = latest.data() ?? {};
       if (kind === "tournament") {
         const preferences = await transaction.get(db.collection("notificationPreferences").doc(String(value.userId)));
+        if (value.reminderMatchId && !await tournamentReminderEligible(db, transaction, value, new Date(now))) { transaction.update(entry.ref, { status: "review_required", reason: "SUBMISSION_REMINDER_STALE" }); return null; }
         if (preferences.data()?.email !== true || preferences.data()?.[String(value.category)] === false) { if (latest.exists) transaction.update(entry.ref, { status: "review_required", reason: "EMAIL_PERMISSION_UNAVAILABLE" }); return null; }
       }
       if (!latest.exists || ["accepted", "review_required"].includes(String(value.status)) || Date.parse(String(value.nextAttemptAt)) > now || (value.status === "sending" && Date.parse(String(value.leaseUntil)) > now)) return null;

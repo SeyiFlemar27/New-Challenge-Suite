@@ -8,6 +8,9 @@ import { TOURNAMENT_PRODUCT_POLICY } from "../lib/tournament-builder-policy.ts";
 import { freezeTournamentBuilderMedia, verifyTournamentBuilderMedia } from "../lib/server/tournament-media-verification.ts";
 assert.match(process.env.GCLOUD_PROJECT ?? "", /^demo-/);
 for (const name of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"]) assert.match(process.env[name] ?? "", /^127\.0\.0\.1:\d+$/);
+process.env.CHALLENGE_SUITE_USE_FIREBASE_EMULATORS = "true";
+process.env.FIREBASE_PROJECT_ID = process.env.GCLOUD_PROJECT;
+process.env.FIREBASE_STORAGE_BUCKET = `${process.env.GCLOUD_PROJECT}.appspot.com`;
 const app = initializeApp({ projectId: process.env.GCLOUD_PROJECT, storageBucket: `${process.env.GCLOUD_PROJECT}.appspot.com` });
 const db = getFirestore(app), bucket = getStorage(app).bucket();
 const { POST: submit } = await import("../app/api/tournaments/[id]/submissions/route.ts");
@@ -60,10 +63,12 @@ try {
   equal((await adminAction(request(admin.token, { action: "submission_approved", submissionId, reason: "Verified original image" }), context)).status, 422);
   equal((await adminAction(request(admin.token, { action: "submission_approved", submissionId, reason: "Verified original image", confirmed: true }), context)).status, 200);
   const approved = await media(new Request("http://localhost/media"), mediaContext);
-  equal(approved.status, 200);
-  const originalBytes = Buffer.from(await approved.arrayBuffer());
+  equal(approved.status, 404);
+  const approvedOwn = await media(new Request("http://localhost/media", { headers: { authorization: `Bearer ${owner.token}` } }), mediaContext);
+  equal(approvedOwn.status, 200);
+  const originalBytes = Buffer.from(await approvedOwn.arrayBuffer());
   await bucket.file(first.mediaPath).save(Buffer.from("changed source"), { metadata: { contentType: "image/png" } });
-  const stable = await media(new Request("http://localhost/media"), mediaContext);
+  const stable = await media(new Request("http://localhost/media", { headers: { authorization: `Bearer ${owner.token}` } }), mediaContext);
   assert.deepEqual(Buffer.from(await stable.arrayBuffer()), originalBytes); assertions++;
   const replacement = await image("replacement", "blue");
   const competing = await image("competing", "green");
@@ -73,6 +78,16 @@ try {
   equal((await media(new Request("http://localhost/media"), mediaContext)).status, 404);
   await db.collection("tournamentMatches").doc(matchId).update({ submissionDeadlineAt: new Date(Date.now() - 1).toISOString() });
   equal((await submit(request(owner.token, { ...replacement, expectedRevision: 2 }), context)).status, 400);
-  equal((await adminAction(request(admin.token, { action: "resolve_dispute", reason: "Unsupported arbitrary action", confirmed: true }), context)).status, 409);
+  equal((await adminAction(request(admin.token, { action: "resolve_dispute", reason: "Unsupported arbitrary action", confirmed: true }), context)).status, 422);
+  equal((await adminAction(request(admin.token, { action: "submission_approved", submissionId, expectedRevision: 1, reason: "Stale reviewed revision", confirmed: true }), context)).status, 409);
+  equal((await adminAction(request(admin.token, { action: "submission_approved", submissionId, expectedRevision: 2, reason: "Verified replacement image", confirmed: true }), context)).status, 200);
+  await db.collection("tournamentMatches").doc(matchId).update({ status: "voting_open", votingOpenedAt: new Date(Date.now() - 1000).toISOString(), votingClosesAt: new Date(Date.now() + 60000).toISOString() });
+  equal((await media(new Request("http://localhost/media"), mediaContext)).status, 200);
+  const protectedState = (await db.collection("tournaments").doc(id).get()).data();
+  for (const action of ["disqualify", "cancel", "resolve_dispute"]) {
+    equal((await adminAction(request(owner.token, { action, confirmed: true, reason: "Unauthorized owner request", evidenceReference: "demo-evidence" }), context)).status, 403);
+    equal((await adminAction(request(null, { action, confirmed: true, reason: "Anonymous request" }), context)).status, 401);
+  }
+  assert.deepEqual((await db.collection("tournaments").doc(id).get()).data(), protectedState); assertions++;
   console.log(`Tournament submission and media handlers: ${assertions} emulator assertions passed, including immutable reviewed content, confirmation, concurrent revisions and privacy.`);
 } finally { await db.terminate(); }

@@ -7,6 +7,7 @@ import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation
 import { createHash } from "node:crypto";
 import { verifyTournamentSubmissionMedia } from "@/lib/server/tournament-submission-media";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentParticipantFoundation, TournamentRoundFoundation, TournamentSubmissionStatus } from "@/lib/tournament-types";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const validation = validateTournamentSubmission({ tournament, round: validationRound as TournamentRoundFoundation, mediaUrl: String(body.mediaUrl ?? ""), mediaPath: String(body.mediaPath ?? ""), mediaType: String(body.mediaType ?? ""), replacementAllowed: Boolean((tournament.voting as Record<string, unknown>)?.submissionReplacementAllowed), existingStatus: existingSnap.exists ? String(existingSnap.data()?.status ?? "") as TournamentSubmissionStatus : null });
   if (!validation.valid) return fail(validation.message, 400, validation, validation.code);
   let verifiedMedia: Awaited<ReturnType<typeof verifyTournamentSubmissionMedia>> | null = null;
-  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament as unknown as Record<string, unknown>)) {
     try { verifiedMedia = await verifyTournamentSubmissionMedia({ tournamentId: id, submissionId: ref.id, path: String(body.mediaPath), mediaType: mediaType as "image" | "video" }); }
     catch { return fail("The uploaded match media could not be verified. Upload an accepted file and retry.", 422, undefined, "SUBMISSION_MEDIA_VERIFICATION_FAILED"); }
   }
@@ -105,7 +106,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         idempotentReplay = true;
         return;
       }
-      if (currentTournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+      if (currentTournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(currentTournament as unknown as Record<string, unknown>)) {
         if (!verifiedMedia) throw Object.assign(new Error("SUBMISSION_MEDIA_VERIFICATION_FAILED"), { code: "SUBMISSION_MEDIA_VERIFICATION_FAILED" });
         const expectedRevision = Number(body.expectedRevision ?? 0);
         if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== Number(prior?.revision ?? 0)) throw Object.assign(new Error("SUBMISSION_REVISION_STALE"), { code: "SUBMISSION_REVISION_STALE" });

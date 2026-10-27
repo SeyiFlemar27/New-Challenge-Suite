@@ -19,8 +19,11 @@ import { getConfirmedEnterprisePromotionalPrizeFunding, isEnterpriseFinanceResou
 import { normalQualifiedWinnerDistribution, allocateNormalQualifiedPrizeCents } from "@/lib/normal-challenge-prize-allocation";
 import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
 import { TOURNAMENT_PLACEMENT_SPLITS } from "@/lib/tournament-builder-policy";
+import { INDIVIDUAL_TOURNAMENT_PLACEMENTS, isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import { getTournamentFundingSources } from "@/lib/server/tournament-funding-sources";
 import { tournamentPlacementFingerprint, validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
+import { assertIndividualSettlementClearance } from "@/lib/server/individual-settlement-clearance";
+import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
 
 export const SPONSOR_PRIZE_PLATFORM_FEE_PERCENT = 0;
 
@@ -221,13 +224,15 @@ export function buildSettlementBreakdown(input: {
   const netSponsorPrizeAmount = grossConfirmedSponsorPrizeAmount - sponsorPrizePlatformFeeAmount;
   const placementCount = new Set(input.winners.map((winner) => winner.placement)).size;
   const fixedTournament = input.challenge.settlementEntityType === "tournament" && Number(input.challenge.configVersion ?? 1) >= 3;
+  const individualTournament = fixedTournament && isIndividualTournamentPolicy(input.challenge);
+  if (fixedTournament && Number(input.challenge.configVersion) >= 4 && !individualTournament) throw new Error("TOURNAMENT_SETTLEMENT_POLICY_INVALID");
   if (fixedTournament && (![2, 3].includes(placementCount) || !input.winners.some(winner => winner.placement === 1) || !input.winners.some(winner => winner.placement === 2)
     || (placementCount === 2 && input.challenge.thirdPlaceOutcome !== "unawarded"))) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const fixedNormalPrizeDistribution = input.challenge.builderVersion === "normal_v3"
     ? normalQualifiedWinnerDistribution(Number(input.challenge.numberOfWinners), placementCount)
     : null;
   if (input.challenge.builderVersion === "normal_v3" && !fixedNormalPrizeDistribution?.length) throw new Error("NORMAL_WINNER_CONFIGURATION_INVALID");
-  const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : fixedTournament ? TOURNAMENT_PLACEMENT_SPLITS.map(item => ({ position: item.placement, percent: item.percent })) : defaultPlacementSplit(placementCount);
+  const prizePlacementDistribution = fixedNormalPrizeDistribution?.length ? fixedNormalPrizeDistribution : individualTournament ? INDIVIDUAL_TOURNAMENT_PLACEMENTS.map((percent, index) => ({ position: index + 1, percent })) : fixedTournament ? TOURNAMENT_PLACEMENT_SPLITS.map(item => ({ position: item.placement, percent: item.percent })) : defaultPlacementSplit(placementCount);
   const generatedPlacementDistribution = fixedNormalPrizeDistribution?.length
     ? allocateNormalQualifiedPrizeCents(generatedSplit.winnerShareCents, Number(input.challenge.numberOfWinners), placementCount)
     : fixedTournament ? distributeByPercent(generatedSplit.winnerShareCents, prizePlacementDistribution) : distributeByWeights(generatedSplit.winnerShareCents, generatedRevenueWinnerWeights(placementCount));
@@ -526,8 +531,9 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       };
     }
     const atomicNormalApproval = input.proposalApproval && challengeSnap.data()?.normalLifecyclePolicyVersion === 1 && entityCollection === "challenges";
+    const automaticIndividual = entityCollection === "tournaments" && input.adminId === "system_individual_settlement" && isIndividualTournamentPolicy(challengeSnap.data() ?? {}) && input.proposalMetadata?.source === "automatic_verified_individual_placements";
     const atomicTournamentApproval = entityCollection === "tournaments" && input.proposalMetadata?.id === input.proposalId && input.proposalMetadata?.challengeId === input.challengeId
-      && input.proposalMetadata?.status === "approved" && input.proposalMetadata?.source === "competition_derived_tournament_placements";
+      && input.proposalMetadata?.status === "approved" && (input.proposalMetadata?.source === "competition_derived_tournament_placements" || automaticIndividual);
     if ((!proposalSnap.exists || proposalSnap.data()?.status !== "approved") && !atomicNormalApproval && !atomicTournamentApproval) {
       throw new Error("Admin-approved winners are required before settlement.");
     }
@@ -542,7 +548,15 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       const placements = await transaction.get(db.collection("tournamentPlacements").where("tournamentId", "==", input.challengeId));
       const rows = placements.docs.map(document => ({ ...document.data(), id: document.id })).filter(row => [1, 2, 3].includes(Number((row as Record<string, unknown>).placement)));
       const fingerprint = tournamentPlacementFingerprint(rows, latestChallenge.productPolicyVersion);
-      if (fingerprint !== input.sourceProvenance?.placementFingerprint || latestChallenge.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_PLACEMENTS_CHANGED");
+      if (fingerprint !== input.sourceProvenance?.placementFingerprint || !automaticIndividual && latestChallenge.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_PLACEMENTS_CHANGED");
+      if (automaticIndividual) {
+        if (rows.length !== 3 || JSON.stringify(rows.map(row => Number((row as Record<string, unknown>).placement)).sort()) !== "[1,2,3]") throw new Error("INDIVIDUAL_THREE_WINNERS_REQUIRED");
+        await assertIndividualSettlementClearance(db, transaction, input.challengeId, latestChallenge, input.winners.map(winner => winner.userId));
+        const guaranteeValues = [Number(latestChallenge.basePrizeAmountMinor ?? 0), Number(latestChallenge.creatorPrizeGuaranteeCents ?? 0)];
+        if (guaranteeValues.some(value => !Number.isSafeInteger(value) || value < 0)) throw new Error("INDIVIDUAL_CREATOR_FUNDING_UNVERIFIED");
+        const creatorFunding = await getTournamentCreatorFunding(db, input.challengeId, latestChallenge, transaction);
+        if (creatorFunding.reviewCount || creatorFunding.pendingCount || creatorFunding.confirmedCreatorCents !== latestSources.confirmedCreatorPrizeCents || creatorFunding.confirmedCreatorCents < Math.max(...guaranteeValues)) throw new Error("INDIVIDUAL_CREATOR_FUNDING_UNVERIFIED");
+      }
       const matchRefs = rows.map(row => db.collection("tournamentMatches").doc(String((row as Record<string, unknown>).sourceMatchId ?? "")));
       const evidence = matchRefs.length ? await transaction.getAll(...matchRefs) : [];
       if (rows.some((row, index) => !evidence[index].exists || !validateTournamentPlacementEvidence({ ...latestChallenge, id: input.challengeId }, row, { ...evidence[index].data(), id: evidence[index].id }))) throw new Error("TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID");
@@ -763,7 +777,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     }
 
     for (const credit of walletCredits) {
-      transaction.create(db.collection("cashLedger").doc(credit.id), credit);
+      transaction.create(db.collection("cashLedger").doc(credit.id), automaticIndividual ? { ...credit, createdBy: "system_individual_settlement", automaticIndividual: true } : credit);
       transaction.set(db.collection("cashWallets").doc(credit.userId), {
         userId: credit.userId,
         status: "review_only",
@@ -828,6 +842,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     const settlement = {
       id: settlementId,
       settlementId,
+      automaticIndividual,
       challengeId: input.challengeId,
       proposalId: input.proposalId,
       status: hasConfirmedMoney ? "created_pending_review" : latestChallenge.normalLifecyclePolicyVersion === 1 ? "no_cash_allocation_required" : "awaiting_confirmed_revenue",
@@ -835,7 +850,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       sourceBreakdown: sources.sourceBreakdown,
       approvedWinnerIds: input.winners.map((winner) => winner.userId),
       createdBy: input.adminId,
-      reviewedByAdminId: input.adminId,
+      reviewedByAdminId: automaticIndividual ? null : input.adminId,
       createdAt: now,
       updatedAt: now,
       settledAt: now,
@@ -867,7 +882,8 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       settlementStatus: settlement.status,
       ledgerFinalizationStatus: settlement.status,
       ledgerFinalizedAt: now,
-      ledgerFinalizedByAdminId: input.adminId,
+      ledgerFinalizedByAdminId: automaticIndividual ? null : input.adminId,
+      ...(automaticIndividual ? { ledgerFinalizedBySystem: input.adminId } : {}),
       ledgerEntriesCreated: walletCredits.length > 0 || platformEntries.length > 0,
       ledgerEntryCount: walletCredits.length + platformEntries.length,
       cashBalancesCredited: walletCredits.length > 0,
@@ -881,8 +897,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       ...(entityCollection === "tournaments" && typeof input.sourceProvenance?.placementFingerprint === "string" ? { settlementPlacementFingerprint: input.sourceProvenance.placementFingerprint } : {}),
       ...(entityCollection === "tournaments" && input.sourceProvenance?.unawardedThirdPlaceMatchId ? { thirdPlaceOutcome: "unawarded" } : {}),
       winnersApprovedAt: now,
-      adminWinnersApprovedAt: now,
-      adminWinnerApprovalStatus: "approved",
+      ...(automaticIndividual ? { automaticWinnerVerificationStatus: "verified", automaticWinnersVerifiedAt: now } : { adminWinnersApprovedAt: now, adminWinnerApprovalStatus: "approved" }),
       approvedWinnerIds: input.winners.map((winner) => winner.userId),
       settlementId,
       settlementStatus: settlement.status,
@@ -892,7 +907,7 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     }, { merge: true });
     if (entityCollection === "tournaments") {
       const placementIds = input.sourceProvenance?.placementIds;
-      transaction.create(db.collection("tournamentAuditEvents").doc(`${settlementId}_prepared`), { tournamentId: input.challengeId, actorId: input.adminId, action: "tournament_settlement_prepared", createdAt: now, metadata: { settlementId, proposalId: input.proposalId, externalPayoutExecuted: false } });
+      transaction.create(db.collection("tournamentAuditEvents").doc(`${settlementId}_prepared`), { tournamentId: input.challengeId, actorId: input.adminId, action: automaticIndividual ? "individual_settlement_prepared" : "tournament_settlement_prepared", createdAt: now, metadata: { settlementId, proposalId: input.proposalId, externalPayoutExecuted: false } });
       if (!Array.isArray(placementIds) || placementIds.some(id => typeof id !== "string" || !id)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
       for (const id of placementIds) transaction.set(db.collection("tournamentPlacements").doc(id), { payoutStatus: "pending_admin_review", settlementId, settlementProposalId: input.proposalId, settlementPlacementFingerprint: input.sourceProvenance?.placementFingerprint, updatedAt: now }, { merge: true });
     }
@@ -900,11 +915,11 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     transaction.set(db.collection("auditLogs").doc(String(settlement.auditLogId)), {
       id: settlement.auditLogId,
       actorId: input.adminId,
-      actorType: "admin",
+      actorType: automaticIndividual ? "system" : "admin",
       action: entityCollection === "tournaments" ? "tournament.settlement_created" : "challenge.settlement_created",
       targetType: entityCollection === "tournaments" ? "tournament" : "challenge",
       targetId: input.challengeId,
-      reason: "Admin-approved winners created internal settlement credits. No external payout was executed.",
+      reason: automaticIndividual ? "Verified Individual results created internal settlement credits. No external payout was executed." : "Admin-approved winners created internal settlement credits. No external payout was executed.",
       metadata: {
         proposalId: input.proposalId,
         settlementId,

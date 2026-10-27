@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { randomUUID, randomBytes } from "node:crypto";
-import { readFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
+import { readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -48,6 +48,19 @@ if (reusedNextDistDir && (!/^\.next\/e2e\/[a-f0-9]{32}$/.test(reusedNextDistDir)
 }
 const isolatedNextDistDir = reusedNextDistDir || `.next/e2e/${runId}`;
 mkdirSync(artifacts, { recursive: true });
+function sourceFingerprint() {
+  const hash = createHash("sha256");
+  function walk(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a,b) => a.name.localeCompare(b.name))) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.(?:tsx?|mjs|cjs)$/.test(entry.name)) hash.update(path.slice(repoRoot.length)).update(readFileSync(path));
+    }
+  }
+  for (const directory of ["app", "components", "lib", "scripts/qa"]) walk(join(repoRoot, directory));
+  return hash.digest("hex");
+}
+const initialSourceFingerprint = sourceFingerprint();
 
 for (const [name, value] of Object.entries({
   FIREBASE_PROJECT_ID: projectId,
@@ -134,7 +147,7 @@ async function test(name, fn, { requiresMedia = false } = {}) {
   const publishingGroup = /^(Automatic publication:|Media publication|Normal Builder|Tournament V3|Live Event V2 .* builder draft)/.test(name);
   const followUpGroup = /^(Media publication|Live Event V2 .* builder draft)/.test(name);
   const privateAccessGroup = /^(Private requester|Challenge owner approves access request)/.test(name);
-  if (journeyFilter && !(journeyFilter === "dashboard redesign" ? name.startsWith("Dashboard redesign:") || name.startsWith("Dashboard stability:") : journeyFilter === "dashboard release" ? publishingGroup || name.startsWith("Dashboard stability:") : journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
+  if (journeyFilter && !(journeyFilter === "master acceptance" ? name.startsWith("Master ") : journeyFilter === "dashboard redesign" ? name.startsWith("Dashboard redesign:") || name.startsWith("Dashboard stability:") : journeyFilter === "dashboard release" ? publishingGroup || name.startsWith("Dashboard stability:") : journeyFilter === "private access follow-up" ? privateAccessGroup : journeyFilter === "publishing regression" ? publishingGroup : journeyFilter === "publishing follow-up" ? followUpGroup : name.toLowerCase().includes(journeyFilter))) {
     results.push({ name, status: "SKIP", assertions: 0, message: "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY." });
     return;
   }
@@ -448,7 +461,7 @@ function restoreNextGeneratedRouteTypeImport() {
 try {
   await assertPortAvailable(port);
   if (nextMode === "production") {
-    buildProcess = spawn(process.execPath, [nextEntrypoint, "build"], { cwd: repoRoot, env: serverEnv, stdio: ["ignore", "pipe", "pipe"] });
+    buildProcess = spawn(process.execPath, [nextEntrypoint, "build", nextBundler], { cwd: repoRoot, env: serverEnv, stdio: ["ignore", "pipe", "pipe"] });
     attachServerLogs(buildProcess);
     await waitForChild(buildProcess, "Isolated Next.js production build");
     buildProcess = undefined;
@@ -531,7 +544,7 @@ try {
     await dashboardRedesignJourneys({browser,test,check,expect,db,seedUser,baseUrl,artifacts,join,pageErrors});
   }
 
-  if (!journeyFilter || journeyFilter === "dashboard stability" || journeyFilter === "dashboard release" || (journeyFilter === "dashboard redesign" && process.env.CHALLENGE_SUITE_DASHBOARD_VISUAL_PHASE !== "before")) {
+  if (!journeyFilter || journeyFilter.startsWith("dashboard stability") || journeyFilter === "dashboard release" || (journeyFilter === "dashboard redesign" && process.env.CHALLENGE_SUITE_DASHBOARD_VISUAL_PHASE !== "before")) {
     const { dashboardProviderRaceFixture } = await import("./dashboard-provider-race-fixture.mjs");
     await dashboardProviderRaceFixture({ browser, test, check, expect, baseUrl });
     const { dashboardAuthJourneys } = await import("./dashboard-auth-journeys.mjs");
@@ -826,6 +839,15 @@ try {
     await legacyContext.close();
   }, { requiresMedia: true });
 
+  if (journeyFilter === "master details" || journeyFilter === "master acceptance") {
+    const { masterDetailJourneys } = await import("./master-detail-journeys.mjs");
+    await masterDetailJourneys({ browser, test, check, expect, db, baseUrl, artifacts, join, login, creator, admin, publicChallengeId, privateChallengeId, tournamentId });
+  }
+  if (journeyFilter === "master participant" || journeyFilter === "master acceptance") {
+    const { masterParticipantJourneys } = await import("./master-participant-journeys.mjs");
+    await masterParticipantJourneys({ browser, test, check, expect, db, baseUrl, artifacts, join, login, creator, participant, tournamentId });
+  }
+
   await test("Creator login establishes a server session and Explore renders API-backed challenge", async () => {
     const page = await login(desktop, creator);
     const cookie = (await page.context().cookies()).find((item) => item.name === "challenge_suite_session");
@@ -1026,11 +1048,11 @@ try {
     await publicPage.goto(`${baseUrl}/tournaments/${bracketId}`, { waitUntil: "domcontentloaded" });
     const tablist = publicPage.getByRole("tablist", { name: "Tournament information" });
     await tablist.waitFor({ state: "visible" });
-    check(await tablist.getByRole("tab").allTextContents().then(labels => labels.join("|") === "Overview|Bracket|Matches|Participants|Prizes|Rules"), "Details exposes exactly the six required tabs");
+    check(await tablist.getByRole("tab").allTextContents().then(labels => labels.join("|") === "Overview|Tournament Bracket|Rules|Participants|Prizes"), "Details exposes exactly the five locked tabs");
     await tablist.getByRole("tab", { name: "Overview", exact: true }).focus();
     await publicPage.keyboard.press("ArrowRight");
-    await publicPage.getByRole("button", { name: "Round View", exact: true }).waitFor();
-    check(await publicPage.getByRole("button", { name: "Round View", exact: true }).getAttribute("aria-pressed") === "true", "keyboard tab navigation opens default Round View");
+    await publicPage.getByRole("button", { name: "Current Round", exact: true }).waitFor();
+    check(await publicPage.getByRole("button", { name: "Current Round", exact: true }).getAttribute("aria-pressed") === "true", "keyboard tab navigation opens default Round View");
     await publicPage.getByRole("button", { name: "Full Bracket", exact: true }).click();
     const bracket = publicPage.getByRole("region", { name: /^Full Tournament bracket/ });
     await bracket.waitFor({ state: "visible" });
@@ -1088,13 +1110,13 @@ try {
 
     await tournamentPage.goto(`${baseUrl}/tournaments/${tournamentId}/matches/${tournamentMatchId}`, { waitUntil: "domcontentloaded" });
     await tournamentPage.getByRole("heading", { name: "Vote in this match" }).waitFor({ timeout: 15000 });
-    check(await tournamentPage.getByRole("button", { name: "Free vote" }).count() === 2, "eligible entrant in an unrelated match sees one free-vote action for each approved submission");
+    check(await tournamentPage.getByRole("button", { name: /^Vote for Entry [AB]$/ }).count() === 2, "eligible entrant in an unrelated match sees one voting action for each approved submission");
     check(!(await tournamentPage.locator("body").innerText()).includes("Verified final votes:"), "live vote totals remain hidden in the Match Details UI");
     const tournamentVoteResponsePromise = tournamentPage.waitForResponse((response) => {
       const url = new URL(response.url());
       return url.pathname === `/api/tournaments/${tournamentId}/votes` && response.request().method() === "POST";
     }, { timeout: interactionTimeout });
-    await tournamentPage.getByRole("button", { name: "Free vote" }).first().click();
+    await tournamentPage.getByRole("button", { name: /^Vote for Entry [AB]$/ }).first().click();
     const tournamentVoteResponse = await tournamentVoteResponsePromise;
     const tournamentVoteEnvelope = await tournamentVoteResponse.json().catch(() => null);
     check(tournamentVoteResponse.ok() && tournamentVoteEnvelope?.ok === true, `Match Details free vote should reach the authorized handler (HTTP ${tournamentVoteResponse.status()}, code=${String(tournamentVoteEnvelope?.code ?? "unknown")}).`);
@@ -1148,11 +1170,12 @@ try {
       const page = await login(context, person, { rememberMe: true });
       await page.goto(`${baseUrl}/tournaments/${id}/matches/${matchId}`, { waitUntil: "domcontentloaded" });
       await page.getByRole("heading", { name: "Your fresh match submission", exact: true }).waitFor();
+      const response = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${id}/submissions` && response.request().method() === "POST");
       await page.locator('input[type="file"]').first().setInputFiles({ name: `match-${color}.png`, mimeType: "image/png", buffer: await sharp({ create: { width: 24, height: 24, channels: 3, background: color } }).png().toBuffer() });
         await expect(page.getByRole("paragraph").filter({ hasText: "Upload complete." })).toBeVisible();
-      const response = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${id}/submissions` && response.request().method() === "POST");
-      await page.getByRole("button", { name: replacement ? "Submit replacement" : "Submit match entry", exact: true }).click();
-      check((await response).ok(), "Match UI saves verified media through the actual authorized endpoint");
+      const saved = await response;
+      check(saved.ok(), "Match UI automatically saves verified media through the actual authorized endpoint");
+      check((await saved.json()).data.submission.revision === (replacement ? 2 : 1), "Automatic submission confirms the expected actual revision");
       return page;
     }
     await upload(participant, "red");
@@ -1177,12 +1200,12 @@ try {
     const voterContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); contexts.push(voterContext);
     const page = await login(voterContext, voter, { rememberMe: true });
     await page.goto(`${baseUrl}/tournaments/${id}/matches/${matchId}`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "Vote", exact: true }).first().waitFor();
+    await page.getByRole("button", { name: /^Vote for Entry [AB]$/ }).first().waitFor();
     check(await page.getByLabel("Verified final vote tally").count() === 0, "Live totals remain hidden before verification");
     for (let index = 0; index < 2; index++) {
       if (index) page.once("dialog", dialog => dialog.accept());
       const response = page.waitForResponse(response => new URL(response.url()).pathname === `/api/tournaments/${id}/votes` && response.request().method() === "POST");
-      await page.getByRole("button", { name: "Vote", exact: true }).first().click();
+      await page.getByRole("button", { name: /^Vote for Entry [AB]$/ }).first().click();
       check((await response).ok(), index ? "Confirmed additional browser vote uses DoroCoins" : "First browser vote is free");
     }
     check((await db.collection("doroCoinWallets").doc(voter.uid).get()).data()?.balance === 5, "Exactly five DoroCoins are debited once");
@@ -1432,7 +1455,7 @@ try {
     const request=(await db.collection("liveEventChangeRequests").where("eventId","==",id).get()).docs[0];
     check(request.data().proposed.checkInStartAt===arrival.toISOString(),"the request preserves explicit check-in timing for review");
     const adminContext=await browser.newContext({timezoneId:"UTC"}),adminPage=await login(adminContext,admin,{rememberMe:true});
-    await adminPage.goto(`${baseUrl}/admin`,{waitUntil:"domcontentloaded"});
+    await adminPage.goto(`${baseUrl}/admin/events`,{waitUntil:"domcontentloaded"});
     const review=adminPage.getByRole("heading",{name:"Published Live Event changes",exact:true}).locator("..");
     await review.getByLabel("Decision reason",{exact:true}).fill("Verified the venue, schedule and existing booking protections");
     await review.getByRole("checkbox",{name:"I reviewed the existing and proposed values and confirm this decision.",exact:true}).check();
@@ -1678,8 +1701,10 @@ for(const [label,value] of [["Venue name","Verified local event venue"],["Full a
   removeNextGeneratedTsconfigIncludes();
   restoreNextGeneratedRouteTypeImport();
   await firebaseApp.delete().catch(() => undefined);
-  writeFileSync(join(artifacts, "results.json"), JSON.stringify({ passed, failed: results.filter((result) => result.status === "FAIL").length, skipped: results.filter((result) => result.status === "SKIP").length, assertions, results, pageErrors, authResponses, authStorageSnapshots, browserDiagnostics, nextLog: serverLog.join("").slice(-12000) }, null, 2));
+  const finalSourceFingerprint = sourceFingerprint(), sourceStable = initialSourceFingerprint === finalSourceFingerprint;
+  writeFileSync(join(artifacts, "results.json"), JSON.stringify({ passed, failed: results.filter((result) => result.status === "FAIL").length, skipped: results.filter((result) => result.status === "SKIP").length, assertions, results, pageErrors, authResponses, authStorageSnapshots, browserDiagnostics, sourceStable, initialSourceFingerprint, finalSourceFingerprint, nextLog: serverLog.join("").slice(-12000) }, null, 2));
   console.log(`Browser QA artifacts: ${artifacts}`);
   console.log(`Browser journeys: ${passed}/${results.filter((result) => result.status !== "SKIP").length} passed; ${assertions} assertions.`);
-  if (results.some((result) => result.status === "FAIL") || pageErrors.length) process.exitCode = 1;
+  if (!sourceStable) console.error("Browser source changed during build/acceptance; results cannot verify one source snapshot.");
+  if (results.some((result) => result.status === "FAIL") || pageErrors.length || !sourceStable) process.exitCode = 1;
 }

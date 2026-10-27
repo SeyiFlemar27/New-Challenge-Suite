@@ -2,6 +2,7 @@ import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 import { getOptionalRequestUser } from "@/lib/server/auth";
 import { canEditTournament } from "@/lib/server/tournament-permissions";
 import { isPublishedTournament } from "@/lib/server/tournament-public-policy";
+import { tournamentSubmissionRevealed } from "@/lib/server/tournament-submission-visibility";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ id: string; submissionId: string }> }) {
@@ -13,7 +14,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   ]);
   const tournament = tournamentSnap.data(), submission = submissionSnap.data();
   if (!tournament || !submission || submission.tournamentId !== id) return new Response(null, { status: 404 });
-  const publicMedia = isPublishedTournament(tournament) && tournament.privacy === "public" && ["approved", "active", "eliminated", "winner"].includes(String(submission.status));
+  const matchId = typeof submission.matchId === "string" && !submission.matchId.includes("/") ? submission.matchId : "";
+  const matchSnap = matchId ? await db.collection("tournamentMatches").doc(matchId).get() : null;
+  const match = matchSnap?.exists ? { ...matchSnap.data(), id: matchSnap.id } : null;
+  const roundId = typeof submission.roundId === "string" && !submission.roundId.includes("/") ? submission.roundId : "";
+  const roundSnap = roundId ? await db.collection("tournamentRounds").doc(roundId).get() : null;
+  const round = roundSnap?.exists ? { ...roundSnap.data(), id: roundSnap.id } : null;
+  const publicMedia = isPublishedTournament(tournament) && tournament.privacy === "public"
+    && tournamentSubmissionRevealed({ tournamentId: id, submission, match, round });
   let canView = publicMedia || Boolean(viewer && (submission.userId === viewer.uid || canEditTournament({ ...viewer }, { ...tournament, id }).allowed));
   if (!canView && viewer && submission.teamId) {
     const membership = await db.collection("tournamentTeamMemberships").doc(`${id}_${viewer.uid}`).get();

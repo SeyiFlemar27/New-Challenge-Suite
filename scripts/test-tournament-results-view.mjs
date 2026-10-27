@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { tournamentResultAllocation } from '../lib/tournament-results-view.ts';
+const settlement={challengeId:'t',currency:'USD',winnerDistribution:[{placement:1,netAmountCents:500},{placement:2,netAmountCents:300}],sponsorPrizeDistribution:[{placement:1,netAmountCents:90}]};
+assert.deepEqual(tournamentResultAllocation(settlement,'t',1),{amountCents:590,currency:'USD'});
+assert.equal(tournamentResultAllocation(settlement,'other',1),null);
+assert.equal(tournamentResultAllocation(settlement,'t',3),null);
+assert.equal(tournamentResultAllocation(null,'t',1),null);
+assert.equal(tournamentResultAllocation({...settlement,currency:'unverified'},'t',1),null);
+assert.equal(tournamentResultAllocation({...settlement,winnerDistribution:[{placement:1,netAmountCents:-1}]},'t',1),null);
+assert.equal(tournamentResultAllocation({...settlement,winnerDistribution:[{placement:1,netAmountCents:1.5}]},'t',1),null);
+console.log('Tournament results projection: 7 allocation and isolation assertions passed.');

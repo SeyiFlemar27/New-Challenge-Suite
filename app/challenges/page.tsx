@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MyTournaments } from "@/components/my-tournaments";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock3, PencilLine, Trophy, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -37,8 +39,15 @@ function managementState(challenge: Record<string, unknown>): ManagementState {
 }
 
 export default function ChallengesPage() {
+  return <Suspense fallback={<AppShell><p role="status">Loading your challenges…</p></AppShell>}><ChallengesContent /></Suspense>;
+}
+
+function ChallengesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tournamentView = searchParams.get("tab") === "tournaments";
   const { user } = useCurrentUser();
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard", "owned-challenges"], queryFn: fetchDashboard, staleTime: 30_000 });
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard", "owned-challenges", user?.uid ?? "signed-out"], queryFn: fetchDashboard, staleTime: 30_000, enabled: Boolean(user) && !tournamentView });
   const [activeTab, setActiveTab] = useState<ManagementState>("active");
   const challenges = useMemo(() => {
     if (!data?.ok) return [];
@@ -59,6 +68,12 @@ export default function ChallengesPage() {
         <div className="flex flex-wrap gap-3">{user ? <InvitationCodeDialog /> : null}{canCreate ? <LinkButton href="/challenges/create" className="w-full sm:w-auto">Create Challenge</LinkButton> : null}</div>
       </div>
 
+      <div role="tablist" aria-label="My Challenges views" className="mt-7 flex gap-2" onKeyDown={event => { const target = event.key === "ArrowLeft" || event.key === "Home" ? 0 : event.key === "ArrowRight" || event.key === "End" ? 1 : null; if (target === null) return; event.preventDefault(); router.replace(target ? "/challenges?tab=tournaments" : "/challenges"); (event.currentTarget.querySelectorAll("button")[target] as HTMLButtonElement)?.focus(); }}>
+        <button id="created-challenges-tab" role="tab" aria-controls="my-challenges-view" tabIndex={tournamentView ? -1 : 0} aria-selected={!tournamentView} onClick={() => router.replace("/challenges")} className={`min-h-11 rounded-lg px-4 text-sm font-bold focus-visible:outline-2 focus-visible:outline-amber-600 ${!tournamentView ? "bg-amber-300 text-slate-950" : "border border-slate-200 bg-white text-slate-700"}`}>Created Challenges</button>
+        <button id="participation-tournaments-tab" role="tab" aria-controls="my-challenges-view" tabIndex={tournamentView ? 0 : -1} aria-selected={tournamentView} onClick={() => router.replace("/challenges?tab=tournaments")} className={`min-h-11 rounded-lg px-4 text-sm font-bold focus-visible:outline-2 focus-visible:outline-amber-600 ${tournamentView ? "bg-amber-300 text-slate-950" : "border border-slate-200 bg-white text-slate-700"}`}>Tournaments</button>
+      </div>
+      <div id="my-challenges-view" role="tabpanel" aria-labelledby={tournamentView ? "participation-tournaments-tab" : "created-challenges-tab"}>
+      {tournamentView ? <MyTournaments key={user?.uid ?? "signed-out"} /> : <>
       <Card className="mt-7 p-3">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {tabs.map((tab) => <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={(activeTab === tab.id ? "bg-[var(--gold)] text-black" : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]") + " min-h-11 shrink-0 rounded-[8px] px-4 text-sm font-black uppercase tracking-[0.08em]"}>{tab.label} ({counts[tab.id] ?? 0})</button>)}
@@ -78,6 +93,8 @@ export default function ChallengesPage() {
       ) : (
         <Card className="mt-8 p-8"><EmptyState icon={<Trophy />} title={tabs.find((tab) => tab.id === activeTab)?.empty ?? "No challenges yet."} body={activeTab === "draft" ? "Start a challenge draft and continue editing whenever you are ready." : ""} action={activeTab === "draft" && canCreate ? <LinkButton href="/challenges/create">Create Challenge</LinkButton> : undefined} /></Card>
       )}
+      </>}
+      </div>
     </AppShell>
   );
 }

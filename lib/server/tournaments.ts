@@ -1,5 +1,6 @@
 import type { TournamentFoundation, TournamentPrizeDistribution, TournamentResultMethod, TournamentRoundPlanItem } from "@/lib/tournament-types";
 import { tournamentOrderedText, TOURNAMENT_PLACEMENT_SPLITS, TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy, individualTournamentPolicyIssues } from "@/lib/individual-tournament-policy";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -202,6 +203,7 @@ export function tournamentSubdomainFoundation() {
 export function evaluateTournamentReadiness(tournament: Record<string, unknown>) {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (Number(tournament.configVersion) >= 4) errors.push(...individualTournamentPolicyIssues(tournament).map(issue => issue.message));
   if (!text(tournament.title)) errors.push("Tournament name is required.");
   if (!text(tournament.description)) errors.push("Full description is required.");
   if (!text(tournament.category)) errors.push("Category is required.");
@@ -227,7 +229,7 @@ export function evaluateTournamentReadiness(tournament: Record<string, unknown>)
   if (!Array.isArray(tournament.roundPlan) || !tournament.roundPlan.length) errors.push("Round plan is required.");
   if (!text(tournament.tieBreaker)) errors.push("Tie-breaker is required.");
   const distribution = Array.isArray(tournament.prizeDistribution) ? tournament.prizeDistribution as TournamentPrizeDistribution[] : [];
-  const expectedDistribution = configVersion >= 3 ? [60, 25, 15] : [25, 20, 20];
+  const expectedDistribution = isIndividualTournamentPolicy(tournament) ? [50, 30, 20] : configVersion >= 3 ? [60, 25, 15] : [25, 20, 20];
   if (distribution.length !== 3 || distribution.some((item, index) => Number(item.placement) !== index + 1 || Number(item.percent) !== expectedDistribution[index])) errors.push("Winner placement allocations do not match the approved Tournament policy.");
   if (text(tournament.entryType) === "paid_entry_setup_required") warnings.push("Paid entry requires provider-confirmed checkout before registrations can become paid.");
   if (Number((tournament.prizePool as Record<string, unknown> | undefined)?.confirmedPrizePoolMinor ?? 0) <= 0) warnings.push("No confirmed prize funding is available yet.");

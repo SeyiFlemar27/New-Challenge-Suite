@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { exploreNextMilestone } from '../lib/explore-card-policy.ts';
+const now=Date.parse('2026-10-27T12:00:00Z');
+let assertions=0;const equal=(a,b)=>{assert.deepEqual(a,b);assertions++;};
+equal(exploreNextMilestone({},now),null);
+equal(exploreNextMilestone({createdAt:'2026-10-28T12:00:00Z'},now),null);
+equal(exploreNextMilestone({challengeType:'tournament',submissionDeadline:'2026-10-28T12:00:00Z'},now),null);
+equal(exploreNextMilestone({challengeType:'tournament',nextSubmissionDeadlineAt:'2026-10-28T12:00:00Z'},now),{label:'Submissions due',at:'2026-10-28T12:00:00.000Z'});
+equal(exploreNextMilestone({challengeType:'live_event',startsAt:'2026-10-29T18:00:00+01:00'},now),{label:'Event starts',at:'2026-10-29T17:00:00.000Z'});
+equal(exploreNextMilestone({registrationDeadline:'2026-10-27T11:00:00Z',submissionDeadline:'2026-10-28T12:00:00Z',votingDeadline:'2026-10-29T12:00:00Z'},now),{label:'Submissions due',at:'2026-10-28T12:00:00.000Z'});
+equal(exploreNextMilestone({submissionDeadline:'invalid',votingDeadline:'2026-10-29T12:00:00Z'},now),{label:'Voting ends',at:'2026-10-29T12:00:00.000Z'});
+equal(exploreNextMilestone({submissionDeadline:'2026-10-27T12:00:00Z'},now),null);
+equal(exploreNextMilestone({challengeType:'tournament',activationWindowEndsAt:'2026-10-27T12:00:05Z'},now),{label:'Starts',at:'2026-10-27T12:00:05.000Z'});
+console.log(`Explore milestone policy: ${assertions} assertions passed.`);

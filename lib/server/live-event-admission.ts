@@ -11,7 +11,7 @@ export type EventActor = { uid: string; email?: string; emailVerified?: boolean;
 /** Read the canonical challenge and its operational projection in the same transaction. */
 export async function readLiveEvent(db: Firestore, transaction: Transaction, id: string) {
   const ref = db.collection("liveEvents").doc(id), challengeRef = db.collection("challenges").doc(id);
-  const [projection, challenge] = await Promise.all([transaction.get(ref), transaction.get(challengeRef)]);
+  const [projection, challenge] = await transaction.getAll(ref, challengeRef);
   if (!projection.exists) throw new LiveEventPolicyError("EVENT_NOT_FOUND", 404);
   if (challenge.exists && challenge.data()?.isLiveEvent !== true) throw new LiveEventPolicyError("EVENT_NOT_FOUND", 404);
   // Challenge content/approval always wins; operational counters remain on liveEvents.
@@ -42,7 +42,8 @@ export async function bookFreeLiveEvent(db: Firestore, input: { eventId: string;
   const registrationRef = db.collection("liveEventRegistrations").doc(`${input.eventId}_${input.actor.uid}`);
   const tokens = names.map(() => randomBytes(32).toString("base64url"));
   return db.runTransaction(async tx => {
-    const [{ ref, event }, previous, registration] = await Promise.all([readLiveEvent(db, tx, input.eventId), tx.get(bookingRef), tx.get(registrationRef)]);
+    const { ref, event } = await readLiveEvent(db, tx, input.eventId);
+    const [previous, registration] = await tx.getAll(bookingRef, registrationRef);
     const fingerprint = hash(JSON.stringify({ names, kind: input.kind,...(input.upgradeTicketId?{upgradeTicketId:input.upgradeTicketId}:{}) }));
     if (previous.exists) {
       if (previous.data()?.fingerprint !== fingerprint) throw new LiveEventPolicyError("BOOKING_REFERENCE_REUSED");

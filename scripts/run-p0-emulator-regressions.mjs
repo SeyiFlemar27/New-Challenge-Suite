@@ -100,6 +100,12 @@ const tests = [
   "scripts/test-live-event-admission-emulator.mjs",
   "scripts/test-media-publish-handlers-emulator.mjs",
   "scripts/test-publishing-review-emulator.mjs",
+  "scripts/test-individual-recovery-emulator.mjs",
+  "scripts/test-individual-automatic-settlement-emulator.mjs",
+  "scripts/test-individual-cancellation-emulator.mjs",
+  "scripts/test-individual-correction-emulator.mjs",
+  "scripts/test-my-tournaments-emulator.mjs",
+  "scripts/test-private-v2-access-emulator.mjs",
 ];
 
 const results = [];

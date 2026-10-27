@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { INDIVIDUAL_TOURNAMENT_POLICY, individualTournamentPolicyIssues, individualTournamentVoteDay, isIndividualTournamentPolicy } from '../lib/individual-tournament-policy.ts';
+let assertions=0;const check=(value,label)=>{assert.ok(value,label);assertions++;};
+const record={configVersion:4,productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,participationMode:'individual',participantCapacity:4,format:'single_elimination',privacy:'public',registrationType:'open',prizeDistribution:[50,30,20].map((percent,index)=>({placement:index+1,percent}))};
+for(const participantCapacity of [4,8,16,32])for(const format of ['single_elimination','double_elimination'])check(individualTournamentPolicyIssues({...record,participantCapacity,format}).length===0,'approved matrix');
+for(const participantCapacity of [0,3,5,64,128,'4'])check(individualTournamentPolicyIssues({...record,participantCapacity}).some(e=>e.field==='participantCapacity'),'reject unsupported capacity');
+check(individualTournamentPolicyIssues({...record,participationMode:'team'}).some(e=>e.field==='participationMode'),'reject new Teams server-side');
+check(individualTournamentPolicyIssues({...record,prizeDistribution:[60,25,15].map((percent,index)=>({placement:index+1,percent}))}).some(e=>e.field==='prizeDistribution'),'reject legacy allocation on new policy');
+check(!isIndividualTournamentPolicy({...record,productPolicyVersion:'tournament_v3_20261015'}),'legacy never silently adopts');
+check(individualTournamentVoteDay(new Date('2026-10-26T23:59:59.999Z'))==='2026-10-26','UTC last instant');
+check(individualTournamentVoteDay(new Date('2026-10-27T00:00:00.000Z'))==='2026-10-27','UTC reset');
+check(individualTournamentVoteDay(new Date('2026-10-27T01:00:00+01:00'))==='2026-10-27','Nigeria reset corresponds to UTC midnight');
+console.log(`Individual Tournament policy: ${assertions} assertions passed; creation activation is not enabled by this test.`);

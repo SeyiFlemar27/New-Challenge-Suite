@@ -23,8 +23,9 @@ for(const [name,p,route]of [
 ])eq(getDefaultRouteForAccount(p),route,name);
 eq(getAuthenticatedDestination(host,'/challenges/fixture?join=1'),'/challenges/fixture?join=1','safe action takes precedence over default hub');
 eq(getDefaultRouteForAccount({...host,isAdmin:true}),'/dashboard/host','legacy Admin capability does not replace Host identity');
-eq(getAuthenticatedDestination({...host,isAdmin:true},'/admin'),'/dashboard/host','stale Admin return intent cannot replace Host identity');
-eq(getAccountRouteRedirect({...host,isAdmin:true},'/admin'),'/dashboard/host','Admin UI follows explicit account identity');
+eq(getAuthenticatedDestination({...host,isAdmin:true},'/admin'),'/admin','explicit Admin intent respects server-confirmed permission without changing default Host identity');
+eq(getAccountRouteRedirect({...host,isAdmin:true},'/admin'),'','intentional Admin access reaches the independent server guard');
+eq(getAccountRouteRedirect({...host,isAdmin:true},'/admin/users'),'','authorized Admin deep links remain available');
 eq(getDefaultRouteForAccount({...ready,planId:'creator',creatorOnboardingComplete:true,isAdmin:true}),'/dashboard','legacy Admin capability does not replace Creator identity');
 eq(getDefaultRouteForAccount({...ready,isAdmin:true}),'/dashboard','legacy Admin capability does not replace Free identity');
 eq(getDefaultRouteForAccount({...ready,isAdmin:true,selectedAccountType:'sponsor',sponsorOnboardingComplete:true}),'/sponsor/dashboard','legacy Admin capability does not replace Sponsor identity');

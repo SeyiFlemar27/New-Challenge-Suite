@@ -152,5 +152,15 @@ try {
   await ref.update({ status: "registration_open", registrationDeadline: future(-1) });
   equal((await decide("restore")).status, 409, "closed enrollment rejects restoration");
   equal((await getAccess(new Request(`${accessUrl}?share=true`, { headers: { authorization: `Bearer ${owner.token}` } }), { params: Promise.resolve({ id }) })).status, 409, "closed enrollment rejects sharing");
+
+  await ref.update({status:'registration_open',registrationDeadline:future(3600000)});
+  const grantId=id+'_'+publicVoter.id;await db.collection('privateChallengeAccess').doc(grantId).set({challengeId:id,userId:publicVoter.id,status:'approved',source:'invitation_code',requirementAcknowledgements:[],participantAnswers:{},requirementsAcceptedAt:new Date().toISOString()});
+  const listResponse=await getAccess(new Request(accessUrl,{headers:{authorization:'Bearer '+owner.token}}),{params:Promise.resolve({id})});const listData=(await listResponse.json()).data;
+  equal(listData.grants.find(row=>row.id===grantId).joined,false,'granted viewer is not a joined participant');
+  equal((await manage({action:'revoke_grant',requestId:grantId,confirmed:true,reason:'Revoke nonjoined invitation'})).status,200,'nonjoined code grant revocable');
+  equal((await db.collection('privateChallengeAccess').doc(grantId).get()).data().status,'revoked','grant state actually revoked');
+  equal((await manage({action:'restore_grant',requestId:grantId,confirmed:true,reason:'Restore verified invitation'})).status,200,'nonjoined code grant restorable');
+  await db.collection('challengeParticipants').doc(grantId).set({challengeId:id,userId:publicVoter.id,status:'entered'});
+  equal((await manage({action:'revoke_grant',requestId:grantId,confirmed:true,reason:'Attempt joined removal'})).status,409,'grant action cannot remove joined rights');
   console.log(`PASS Private V2 actual-handler and transaction security: ${count} assertions`);
 } finally { await db.terminate(); await app.delete(); }

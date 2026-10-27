@@ -13,6 +13,7 @@ import { freezeTournamentBuilderMedia, normalizeTournamentReviewMedia, verifyTou
 import { mediaVerificationFailure } from "@/lib/server/media-verification-errors";
 import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const expectedUpdatedAt = body.expectedUpdatedAt;
   delete body.expectedUpdatedAt;
   const immutableFields = ["id", "hostId", "creatorId", "createdAt", "ownershipType", "officialChallenge", "enterpriseOrganizationId", "configVersion", "productPolicyVersion"];
-  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament as unknown as Record<string, unknown>)) {
     const editable = new Set([...immutableFields, "title", "description", "category", "subcategory", "tournamentRules", "submissionInstructions", "submissionMediaTypes", "basePrizeAmountMinor", "galleryMedia", "coverImageUrl", "coverImagePath", "trailerUrl", "trailerPath", "coverMedia", "trailerMedia", "format", "participationMode", "participantCapacity", "minimumTeamSize", "maximumTeamSize", "teamJoiningMode", "teamPaymentWindowMinutes", "privacy", "registrationType", "submissionDurationHours", "votingDurationHours", "paidVotingEnabled", "seedingMethod", "resultMethod", "scoreVisibility", "tieBreaker", "thirdPlaceMethod", "entryType", "entryFeeAmountMinor", "currency", "sponsorReady", "acceptSponsorshipProposals", "sponsorshipGoal", "sponsorCategories", "sponsorNote", "sponsorPlacementPreferences", "sponsorship", "prizeDistribution", "roundPlan", "eligibility", "builderCurrentStep", "builderUnlockedStep", "builderNavigationVersion", "status"]);
     if (Object.keys(body).some(field => !editable.has(field))) return fail("This field cannot be edited through the Tournament Builder.", 409, undefined, "TOURNAMENT_SERVER_STATE_REQUIRED");
   }
@@ -121,7 +122,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     catch (error) { const diagnostic = mediaVerificationFailure(error, `TPUB-${crypto.randomUUID().slice(0,8)}`); console.warn("[tournament-media-verification]", {category:diagnostic.category,stage:diagnostic.stage,requestId:diagnostic.requestId}); return fail(diagnostic.message, diagnostic.status, {requestId:diagnostic.requestId}, diagnostic.code); }
   }
   const update = { ...body, ...(transitionToReview ? { submittedAt: now, reviewRevision, reviewStatus: "pending_review" } : {}), readiness, updatedAt: now, bracketExecutionEnabled: true, paymentActivationEnabled: false, payoutExecutionEnabled: false };
-  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) Object.assign(update, {
+  if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament as unknown as Record<string, unknown>)) Object.assign(update, {
     sponsorship: { ...tournament.sponsorship, sponsorReady: body.sponsorReady === undefined ? tournament.sponsorship?.sponsorReady === true : body.sponsorReady === true },
   });
   if (body.minimumTeamSize !== undefined || body.maximumTeamSize !== undefined || body.teamJoiningMode !== undefined || body.participationMode !== undefined) {

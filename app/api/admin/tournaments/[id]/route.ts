@@ -6,6 +6,11 @@ import { requireAdminPermission, requireRecentAdminAuthentication } from "@/lib/
 import { fail, ok, readJson, serverUnavailable } from "@/lib/server/responses";
 import { adminTournamentActionFoundation, deriveTournamentCorrectionImpact } from "@/lib/server/tournament-operations";
 import { finalizeTournamentSettlement } from "@/lib/server/tournament-settlement";
+import { cancelIndividualTournament } from "@/lib/server/individual-tournament-cancellation";
+import { disqualifyIndividualCompetitor } from "@/lib/server/individual-tournament-disqualification";
+import { reviewIndividualMatch } from "@/lib/server/individual-match-review";
+import { correctIndividualPrizeResult } from "@/lib/server/individual-prize-correction";
+import { reviewIndividualStructuralConflict } from "@/lib/server/individual-review-escalation";
 import { reconcileTournamentTeamEntitlements } from "@/lib/server/tournament-team-entitlements";
 import { evaluateTournamentReadiness } from "@/lib/server/tournaments";
 import { getTournamentCreatorFunding } from "@/lib/server/tournament-creator-funding";
@@ -71,6 +76,39 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (reason.length < 5) return fail("Admin tournament actions require a reason.", 400, foundation, "ADMIN_TOURNAMENT_REASON_REQUIRED");
   if (body.confirmed !== true) return fail("Confirm this Tournament decision before continuing.", 422, undefined, "TOURNAMENT_CONFIRMATION_REQUIRED");
   const now = new Date().toISOString();
+  if (action === "resolve_dispute") {
+    const recent = await requireRecentAdminAuthentication(request, "settlements.approve");
+    if (recent.response) return recent.response;
+    const decision = String(body.decision);
+    if (decision === "recheck_structural_conflict") {
+      try { return ok(await reviewIndividualStructuralConflict(db, { tournamentId: id, matchId: String(body.matchId ?? ""), adminId: user.uid, reason, evidenceReference: String(body.evidenceReference ?? ""), requestKey: String(body.idempotencyKey ?? "") }), "Real eligibility was rechecked. Two eligible first-loss competitors remain held under the locked policy; no selection or extra match is authorized."); }
+      catch (error) { return fail("Structural review requires the original double-forfeit evidence.", 409, undefined, error instanceof Error ? error.message : "STRUCTURAL_REVIEW_FAILED"); }
+    }
+    if (decision === "correct_verified_result") {
+      try { return ok(await correctIndividualPrizeResult(db, { tournamentId: id, matchId: String(body.matchId ?? ""), caseKey: String(body.caseKey ?? ""), requestKey: String(body.idempotencyKey ?? ""), expectedVersion: Number(body.expectedVersion), adminId: user.uid, reason, evidenceReference: String(body.evidenceReference ?? ""), confirmed: true }), "The verified correction or affected-money recovery hold was recorded. No external payout was reversed."); }
+      catch (error) { return fail("The correction requires verified evidence or additional structural review.", 409, undefined, error instanceof Error ? error.message : "CORRECTION_FAILED"); }
+    }
+    if (!["hold", "confirm_existing_result"].includes(decision)) return fail("Choose a scoped hold or confirm the unchanged verified result. Result replacement requires a separate evidence-backed correction.", 422);
+    try { return ok(await reviewIndividualMatch(db, { tournamentId: id, matchId: String(body.matchId ?? ""), adminId: user.uid, decision: decision as "hold" | "confirm_existing_result", reason, evidenceReference: String(body.evidenceReference ?? ""), requestKey: String(body.idempotencyKey ?? "") }), "The scoped match review state was updated. No winner or vote total was changed."); }
+    catch (error) { return fail("The scoped match review needs refreshed evidence or state.", 409, undefined, error instanceof Error ? error.message : "MATCH_REVIEW_FAILED"); }
+  }
+  if (action === "disqualify") {
+    const recent = await requireRecentAdminAuthentication(request, "challenges.review");
+    if (recent.response) return recent.response;
+    try {
+      const result = await disqualifyIndividualCompetitor(db, { tournamentId: id, participantId: String(body.participantId ?? ""), adminId: user.uid, confirmed: true, reason, evidenceReference: String(body.evidenceReference ?? "") });
+      let reconciliationPending = false;
+      try { await reconcileTournamentLifecycleAfterStateChange(db, id); }
+      catch { reconciliationPending = true; }
+      return ok({ ...result, reconciliationPending }, "Competitor disqualified. Recovery status is reported separately; affected disputes and prize corrections remain held for audited resolution.");
+    } catch (error) { return fail("Disqualification could not be completed safely.", 409, undefined, error instanceof Error ? error.message : "DISQUALIFICATION_FAILED"); }
+  }
+  if (action === "cancel") {
+    const recent = await requireRecentAdminAuthentication(request, "settlements.approve");
+    if (recent.response) return recent.response;
+    try { return ok(await cancelIndividualTournament(db, { tournamentId: id, actorId: user.uid, isAdmin: true, confirmed: true, reason }), "Tournament cancelled with an audited entry-refund liability. Provider confirmation remains required."); }
+    catch (error) { return fail("Cancellation needs payment or activation reconciliation.", 409, undefined, error instanceof Error ? error.message : "CANCELLATION_FAILED"); }
+  }
   if (action === "reconcile_team_entitlements") {
     const recent = await requireRecentAdminAuthentication(request, "settlements.approve");
     if (recent.response) return recent.response;
@@ -121,6 +159,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const submissionSnap = await transaction.get(submissionRef);
       if (!submissionSnap.exists || submissionSnap.data()?.tournamentId !== id) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_NOT_FOUND"), { code: "TOURNAMENT_SUBMISSION_NOT_FOUND" });
       const submission = submissionSnap.data() ?? {};
+      if (Number(body.expectedRevision ?? (Number(submission.revision ?? 1) === 1 ? 1 : NaN)) !== Number(submission.revision ?? 1)) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_REVISION_STALE"), { code: "TOURNAMENT_SUBMISSION_REVISION_STALE" });
       const matchId = String(submission.matchId ?? "");
       if (!matchId) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_MATCH_MISSING"), { code: "TOURNAMENT_SUBMISSION_MATCH_MISSING" });
       const matchRef = db.collection("tournamentMatches").doc(matchId);
@@ -132,9 +171,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (currentStatus === targetStatus) return { idempotent: true, status: targetStatus, matchId, configVersion };
       if (!["submitted", "pending_moderation", "under_review"].includes(currentStatus) || !["submissions_open", "submission_review"].includes(String(matchSnap.data()?.status ?? ""))) throw Object.assign(new Error("TOURNAMENT_SUBMISSION_REVIEW_CLOSED"), { code: "TOURNAMENT_SUBMISSION_REVIEW_CLOSED" });
       transaction.set(submissionRef, { status: targetStatus, reviewedAt: now, reviewedBy: user.uid, reviewReason: reason, updatedAt: now }, { merge: true });
-      const reviewRef = db.collection("tournamentSubmissionReviews").doc(`${submissionId}_${action}`);
-      transaction.create(reviewRef, { id: reviewRef.id, tournamentId: id, submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, action, status: targetStatus, actorId: user.uid, reason, createdAt: now });
-      const auditRef = db.collection("tournamentAuditEvents").doc(`${id}_${action}_${submissionId}`);
+      const reviewRef = db.collection("tournamentSubmissionReviews").doc(`${submissionId}_revision_${Number(submission.revision ?? 1)}_${action}`);
+      transaction.create(reviewRef, { id: reviewRef.id, tournamentId: id, submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, revision: Number(submission.revision ?? 1), mediaFingerprint: submission.mediaVerification?.sha256 ?? null, action, status: targetStatus, actorId: user.uid, reason, createdAt: now });
+      const auditRef = db.collection("tournamentAuditEvents").doc(`${id}_${action}_${submissionId}_revision_${Number(submission.revision ?? 1)}`);
       transaction.create(auditRef, { id: auditRef.id, tournamentId: id, actorId: user.uid, action, reason, createdAt: now, metadata: { submissionId, matchId, roundId: submission.roundId, participantId: submission.participantId, previousStatus: currentStatus, resultingStatus: targetStatus } });
         return { idempotent: false, status: targetStatus, matchId, configVersion };
       });

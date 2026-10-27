@@ -7,8 +7,19 @@ import { tournamentRegistrationReady } from "@/lib/server/tournament-publication
 import { getStripe } from "@/lib/stripe";
 import { createTournamentEntryCheckout } from "@/lib/server/tournament-paid-entry";
 import { dispatchTournamentActivationOutbox, isTournamentV3SchedulingReady } from "@/lib/server/tournament-cloud-tasks";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
+import { withdrawIndividualEntry } from "@/lib/server/individual-entry-withdrawal";
 
 export const dynamic = "force-dynamic";
+
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { user, response } = await requireRequestUser(request);
+  if (response) return response;
+  const db = getAdminDb();
+  if (!db) return serverUnavailable("Tournament withdrawal");
+  try { return ok(await withdrawIndividualEntry(db, (await context.params).id, user.uid), "Entry withdrawn. Any full entry-fee refund remains subject to provider confirmation."); }
+  catch (error) { return fail("Withdrawal is unavailable after the bracket fills or requires entry/payment reconciliation.", 409, undefined, error instanceof Error ? error.message : "WITHDRAWAL_FAILED"); }
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { user, response } = await requireRequestUser(request);
@@ -127,7 +138,8 @@ async function registerVersionThreeEntrant(params: {
         transaction.get(db.collection("tournamentParticipants").where("tournamentId", "==", id).limit(129))
       ]);
       if (!tournamentSnap.exists) throw Object.assign(new Error("Tournament not found."), { code: "TOURNAMENT_NOT_FOUND", status: 404 });
-      if (participantSnap.exists) throw Object.assign(new Error("You already have a Tournament registration state."), { code: "DUPLICATE_PARTICIPANT", status: 409 });
+      const rejoining = participantSnap.exists && participantSnap.data()?.status === "withdrawn" && isIndividualTournamentPolicy(tournamentSnap.data()!);
+      if (participantSnap.exists && !rejoining) throw Object.assign(new Error("You already have a Tournament registration state."), { code: "DUPLICATE_PARTICIPANT", status: 409 });
       const tournament = { id, ...tournamentSnap.data() } as TournamentFoundation;
       if (tournament.participationMode !== "individual") throw Object.assign(new Error("This Tournament requires team registration."), { code: "TEAM_REGISTRATION_REQUIRED", status: 409 });
       if (tournament.entryType !== "free") throw Object.assign(new Error("Paid Tournament entry is not available until its provider-confirmed checkout and refund flow are enabled."), { code: "TOURNAMENT_PAID_ENTRY_SETUP_REQUIRED", status: 409 });
@@ -153,7 +165,10 @@ async function registerVersionThreeEntrant(params: {
       activationQueued = count === tournament.participantCapacity;
       const activationVersion = Math.max(0, Number(tournament.activationVersion ?? 0)) + (activationQueued ? 1 : 0);
       const activationWindowEndsAt = activationQueued ? new Date(now.getTime() + 5_000).toISOString() : null;
-      transaction.create(participantRef, participant);
+      if (rejoining) {
+        transaction.create(db.collection("tournamentRegistrationHistory").doc(`${participantRef.id}_${Number(participantSnap.data()?.registrationRevision ?? 0)}`), { ...participantSnap.data(), archivedAt: nowIso });
+        transaction.set(participantRef, { ...participant, registrationRevision: Number(participantSnap.data()?.registrationRevision ?? 0) + 1 });
+      } else transaction.create(participantRef, participant);
       transaction.update(tournamentRef, {
         participantCount: count,
         firstConfirmedEntrantAt: tournament.firstConfirmedEntrantAt ?? nowIso,
@@ -161,7 +176,8 @@ async function registerVersionThreeEntrant(params: {
         ...(activationQueued ? { activationVersion, activationState: "provisional", activationWindowEndsAt, registrationFullAt: nowIso } : {}),
         updatedAt: nowIso
       });
-      transaction.create(db.collection("tournamentAuditEvents").doc(`${participantRef.id}_join`), { id: `${participantRef.id}_join`, tournamentId: id, actorId: user.uid, action: "participant_registered", createdAt: nowIso, metadata: { outcome: "registered", count, capacity: tournament.participantCapacity } });
+      const registrationAuditId = `${participantRef.id}_join_${rejoining ? Number(participantSnap.data()?.registrationRevision ?? 0) + 1 : 0}`;
+      transaction.create(db.collection("tournamentAuditEvents").doc(registrationAuditId), { id: registrationAuditId, tournamentId: id, actorId: user.uid, action: "participant_registered", createdAt: nowIso, metadata: { outcome: "registered", count, capacity: tournament.participantCapacity } });
       if (activationQueued) {
         activationJobId = id + "_activation_v" + activationVersion;
         transaction.create(db.collection("tournamentJobs").doc(activationJobId), { id: activationJobId, tournamentId: id, type: "activate_full_tournament", status: "pending", version: activationVersion, runAt: activationWindowEndsAt, schedulerDispatchState: "pending", schedulerDispatchAttempts: 0, createdAt: nowIso, updatedAt: nowIso });

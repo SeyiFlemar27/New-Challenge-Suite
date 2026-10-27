@@ -1,4 +1,4 @@
-import { joinStoragePath, sanitizeStorageSegment } from "./media-upload";
+import { assertStorageResourceIdentifier, joinStoragePath, sanitizeStorageSegment } from "./media-upload";
 
 export type ChallengeDraftMediaFolder = "banner" | "gallery" | "video" | "documents";
 export type ChallengeMediaFolder = "banner" | "gallery" | "video" | "documents";
@@ -61,7 +61,7 @@ export function tournamentDraftMediaPath(userId: string, folder: TournamentDraft
 }
 
 export function tournamentSubmissionMediaPath(tournamentId: string, roundId: string, matchId: string, participantId: string, folder: TournamentSubmissionMediaFolder) {
-  return joinStoragePath("tournaments", tournamentId, "rounds", roundId, "matches", matchId, "participants", participantId, folder);
+  return ["tournaments", tournamentId, "rounds", roundId, "matches", matchId, "participants", participantId, folder].map(assertStorageResourceIdentifier).join("/");
 }
 
 export function legacyHostDraftMediaPath(userId: string, folder: string) {

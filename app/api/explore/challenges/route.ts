@@ -5,7 +5,7 @@ import { getChallengePhaseSummary, PUBLIC_CHALLENGE_STATUS_VALUES } from "@/lib/
 import { isPaidEntryChallenge, paidEntryAmountCents } from "@/lib/server/monetization-payments";
 import { isPublicChallenge, isQaOrDemoRecord, isRetiredHybridCompetition, publicChallengeFields } from "@/lib/server/public-challenge";
 import { userOwnsChallenge } from "@/lib/server/challenge-access";
-import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
+import { isEnteredParticipantStatus, isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { FieldPath } from "firebase-admin/firestore";
 import { isPublishedTournament, withTournamentRegistrationAvailability } from "@/lib/server/tournament-public-policy";
@@ -13,6 +13,7 @@ import { tournamentRegistrationReady } from "@/lib/server/tournament-publication
 import { CHALLENGE_PAGE_SIZE } from "@/lib/challenge-pagination";
 import { monthlyBoostRankingWeight } from "@/lib/monthly-boost";
 import { NORMAL_CHALLENGE_CATEGORIES } from "@/lib/normal-challenge-config";
+import { exploreNextMilestone } from "@/lib/explore-card-policy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -51,7 +52,7 @@ function challengeType(challenge: Record<string, unknown>) {
 }
 
 function typeLabel(type: string) {
-  return type === "private" ? "Private Challenge" : type === "live_event" ? "Live Event" : type === "tournament" ? "Tournament" : "Standard Challenge";
+  return type === "private" ? "Private Challenge" : type === "live_event" ? "Live Event" : type === "tournament" ? "Tournament" : "Normal Challenge";
 }
 
 function completedWithinExploreWindow(challenge: Record<string, unknown>, phase: PhaseSummary) {
@@ -63,7 +64,7 @@ function completedWithinExploreWindow(challenge: Record<string, unknown>, phase:
 function isDefaultDiscoverable(challenge: Record<string, unknown>, phase: PhaseSummary) {
   const status = text(challenge.status ?? challenge.lifecycleStatus).toLowerCase();
   if (["draft", "cancelled", "canceled", "deleted", "rejected", "hidden", "admin_removed", "pending_review"].includes(status)) return false;
-  if (["completed", "winners_announced"].includes(phase.phase)) return completedWithinExploreWindow(challenge, phase);
+  if (["completed", "winners_announced"].includes(phase.phase)) return challenge._tournamentSource === true || completedWithinExploreWindow(challenge, phase);
   if (["cancelled", "draft", "pending_review"].includes(phase.phase)) return false;
   return true;
 }
@@ -149,8 +150,9 @@ function ctaFor(input: { challenge: Record<string, unknown>; phase: PhaseSummary
   if (input.phase.phase === "completed") return { label: "View Results", href: detailHref, action: "results" };
   if (input.phase.phase === "voting_closed") return hasResults(input.challenge) ? { label: "View Results", href: detailHref, action: "results" } : { label: "Voting Closed", href: detailHref, action: "closed", disabled: true };
   if (input.phase.canVote) return { label: "Vote Now", href: `${detailHref}/votes`, action: "vote" };
-  if (input.phase.canSubmit) return { label: "Submit Entry", href: `${detailHref}/join`, action: "submit" };
-  if (input.participant) return { label: "Continue Challenge", href: detailHref, action: "continue" };
+  const entered = isEnteredParticipantStatus(input.participant?.status);
+  if (input.phase.canSubmit && entered && input.participant?.status !== "submitted") return { label: "Submit Entry", href: `${detailHref}/join`, action: "submit" };
+  if (entered) return { label: "Continue Challenge", href: detailHref, action: "continue" };
   if (isPaidEntryChallenge(input.challenge) && input.phase.canJoin) {
     const fee = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(paidEntryAmountCents(input.challenge) / 100);
     return { label: `Pay & Enter - ${fee}`, href: detailHref, action: "pay" };
@@ -229,7 +231,10 @@ export async function GET(request: NextRequest) {
       const raw = { id: doc.id, ...doc.data() } as Record<string, unknown>;
       const lockedPreview = isLockedPublicPreview(doc.id, raw);
       if (raw._tournamentSource ? !isPublishedTournament(raw) : !lockedPreview && !isPublicChallenge(doc.id, raw)) return [];
+      const completedTournament = raw._tournamentSource === true && ["completed", "winners_announced"].includes(String(raw.status));
       const phase = getChallengePhaseSummary(raw, new Date(), { eligibleSubmissionCount: Number(raw.approvedSubmissionCount ?? raw.eligibleSubmissionCount ?? 0) });
+      if (completedTournament) { phase.phase = "completed"; phase.label = "Completed"; phase.canJoin = false; phase.canSubmit = false; phase.canVote = false; }
+      if (completedTournament && !phaseFilter) return [];
       if (!isDefaultDiscoverable(raw, phase)) return [];
       if (phaseFilter && phase.phase !== phaseFilter) return [];
       if (category && String(raw.category ?? "").toLowerCase() !== category) return [];
@@ -256,8 +261,10 @@ export async function GET(request: NextRequest) {
           coverImageUrl: typeof raw.coverImagePath === "string" ? `/api/challenge-media?path=${encodeURIComponent(raw.coverImagePath)}` : null,
           creator: { displayName: text(raw.creatorName ?? raw.creatorDisplayName) || "Challenge creator", username: text(raw.creatorUsername), avatarUrl: text(raw.creatorAvatarUrl ?? raw.creatorAvatar) },
           completedInteractionsDisabled: true,
-          detailHref: `/private/preview/${doc.id}`,
-          cta: { label: "View Locked Challenge", href: `/private/preview/${doc.id}`, action: "locked_preview" }
+          detailHref: `/challenges/${doc.id}`,
+          category: text(raw.category),
+          participantCountVisible: false,
+          cta: { label: raw.privateAccessMethod === "invitation_code" ? "Enter Invitation Code" : raw.privateJoiningPolicy === "invite_and_request" ? "Request Access" : "View Private Challenge", href: `/challenges/${doc.id}`, action: "locked_preview" }
         };
         return [{ ...item, _sortDocId: doc.stream + ":" + doc.id }];
       }
@@ -279,7 +286,8 @@ export async function GET(request: NextRequest) {
         publishedAt: toIso(raw.publishedAt ?? raw.createdAt),
         updatedAt: toIso(raw.updatedAt ?? raw.publishedAt ?? raw.createdAt),
         registrationDeadline: toIso(raw.registrationDeadline ?? raw.registrationEndAt ?? raw.registrationClosesAt) ?? raw.registrationDeadline,
-        submissionDeadline: toIso(raw.submissionDeadline ?? raw.submissionEndAt ?? raw.submissionClosesAt) ?? raw.submissionDeadline,
+        submissionDeadline: raw._tournamentSource ? null : toIso(raw.submissionDeadline ?? raw.submissionEndAt ?? raw.submissionClosesAt) ?? raw.submissionDeadline,
+        nextMilestone: exploreNextMilestone({ ...raw, challengeType: kind }),
         participantCount: raw.hideParticipantList === true ? null : Number(raw.participantCount ?? raw.participants ?? 0),
         voteCount: raw.hideVoteTotals === true ? null : Number(raw.voteCount ?? 0),
         participantCountVisible: raw.hideParticipantList !== true,
@@ -309,9 +317,25 @@ export async function GET(request: NextRequest) {
       if (consumedKey === doc.stream + ":" + doc.id) break;
     }
     const nextCursor = hasMore ? "v2:" + Buffer.from(JSON.stringify(positions)).toString("base64url") : null;
+    const sourceByKey = new Map(candidateDocs.map(doc => [doc.stream + ":" + doc.id, doc.data()]));
+    const creatorIdFor = (item: { _sortDocId: string }) => {
+      const source = sourceByKey.get(item._sortDocId) ?? {};
+      const id = text(source.creatorId ?? source.hostId ?? source.ownerId);
+      return id && !id.includes("/") && id.length <= 128 ? id : null;
+    };
+    const creatorIds = [...new Set(pageItems.map(creatorIdFor).filter((id): id is string => Boolean(id)))];
+    // Resolve only this bounded result page, never scan all profiles for a card.
+    const creatorSnapshots = creatorIds.length ? await db.getAll(...creatorIds.flatMap(id => [db.collection("profiles").doc(id), db.collection("users").doc(id)])) : [];
+    const creators = new Map(creatorIds.map((id, index) => {
+      const profile = creatorSnapshots[index * 2]?.data() ?? {};
+      const account = creatorSnapshots[index * 2 + 1]?.data() ?? {};
+      const visible = profile.publicProfile !== false && profile.profileVisibility !== "private" && account.publicProfile !== false && account.profileVisibility !== "private" && !["suspended", "deleted", "disabled"].includes(String(account.accountStatus));
+      return [id, visible ? { displayName: text(profile.displayName ?? account.displayName ?? profile.username), username: text(profile.username ?? account.username), avatarUrl: text(profile.avatarUrl ?? account.avatarUrl) } : null] as const;
+    }));
     const items = pageItems.map((item) => {
       const { _sortDocId: _cursorId, ...publicItem } = item;
-      return withoutRankingSignals(publicItem);
+      const creator = creators.get(creatorIdFor(item) ?? "");
+      return withoutRankingSignals({ ...publicItem, ...(creator?.displayName ? { creator } : {}) });
     });
     const trending = all.filter((item) => Number(item.trendingScore ?? 0) > 0 && !item.completedInteractionsDisabled)
       .sort((a, b) => Number(b.trendingScore ?? 0) - Number(a.trendingScore ?? 0))

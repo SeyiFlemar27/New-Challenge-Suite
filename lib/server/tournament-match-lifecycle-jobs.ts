@@ -3,6 +3,11 @@ import type { Firestore } from "firebase-admin/firestore";
 import { processTournamentLifecycleAction } from "@/lib/server/tournament-lifecycle-scheduler";
 import { createGoogleCloudTasksScheduler, reconcileTournamentActivationOutbox } from "@/lib/server/tournament-cloud-tasks";
 import { confirmScheduledTournamentResult } from "@/lib/server/tournament-result-confirmation";
+import { recoverIndividualTournamentBracket } from "@/lib/server/tournament-bracket-recovery";
+import { queueTournamentSubmissionReminders } from "@/lib/server/tournament-submission-reminders";
+import { reconcileAutomaticIndividualSettlement } from "@/lib/server/individual-automatic-settlement";
+import { processIndividualCancellationRefunds } from "@/lib/server/individual-tournament-cancellation";
+import { escalateOverdueIndividualReviews } from "@/lib/server/individual-review-escalation";
 
 const REVIEW_RECHECK_MS = 5 * 60_000;
 const TERMINAL_MATCH_STATES = new Set(["confirmed", "forfeit", "bye", "completed", "held", "double_forfeit_hold"]);
@@ -33,6 +38,11 @@ function isoOrNull(value: unknown) {
  * persisted review polling times prevent duplicate schedules.
  */
 export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tournamentId: string, now = new Date(), limit = 500, immediateMatchIds: string[] = []) {
+  await escalateOverdueIndividualReviews(db, tournamentId, now);
+  await recoverIndividualTournamentBracket(db, tournamentId, now);
+  await processIndividualCancellationRefunds(db, tournamentId);
+  await reconcileAutomaticIndividualSettlement(db, tournamentId, now);
+  await queueTournamentSubmissionReminders(db, tournamentId, now);
   const tournamentSnapshot = await db.collection("tournaments").doc(tournamentId).get();
   if (!tournamentSnapshot.exists || Number(tournamentSnapshot.data()?.configVersion ?? 1) < 3
       || !["active", "round_active", "under_review"].includes(String(tournamentSnapshot.data()?.status ?? ""))) {

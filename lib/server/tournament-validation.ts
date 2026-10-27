@@ -2,6 +2,7 @@ import { TOURNAMENT_STATUSES, type TournamentFormat, type TournamentPrivacy, typ
 import { isCanonicalChallengeCategory, isCanonicalChallengeSubcategory } from "@/lib/normal-challenge-config";
 import { validateOwnedStorageMedia } from "@/lib/server/media-storage-validation";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { INDIVIDUAL_TOURNAMENT_POLICY, individualTournamentPolicyIssues } from "@/lib/individual-tournament-policy";
 
 export const TOURNAMENT_CAPACITY_MIN = 4;
 export const TOURNAMENT_CAPACITY_MAX = 128;
@@ -33,6 +34,8 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   const errors: TournamentValidationIssue[] = [];
   const format = text(input.format || "single_elimination") as TournamentFormat;
   const configVersion = Number(input.configVersion ?? 2);
+  const individualPolicy = input.productPolicyVersion === INDIVIDUAL_TOURNAMENT_POLICY;
+  if (individualPolicy || configVersion >= 4) errors.push(...individualTournamentPolicyIssues(input));
   const capacity = Number(input.participantCapacity ?? 0);
   const participationMode = text(input.participationMode || "individual");
   const registrationOpensAt = dateValue(input.registrationOpensAt);
@@ -58,7 +61,7 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   else if (category && !isCanonicalChallengeCategory(category)) errors.push({ field: "category", message: "Choose a category from the available options." });
   if (subcategory && !isCanonicalChallengeSubcategory(category, subcategory)) errors.push({ field: "subcategory", message: "Choose a subcategory that belongs to the selected category." });
   if (text(input.currency || "USD") !== "USD") errors.push({ field: "currency", message: "Tournament money values are recorded in USD." });
-  if (input.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+  if (input.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || individualPolicy) {
     if (text(input.privacy || "public") !== "public" || text(input.registrationType || "open") !== "open") errors.push({ field: "registration", message: "New Tournaments use public discovery and open eligible registration." });
     if (input.entryType === "paid_entry_setup_required" && (!Number.isSafeInteger(Number(input.entryFeeAmountMinor)) || Number(input.entryFeeAmountMinor) < 500)) errors.push({ field: "entryFeeAmountMinor", message: "Paid entry must be at least $5 per individual or team member." });
   }
@@ -98,9 +101,9 @@ export function validateTournamentFoundation(input: Record<string, unknown>, opt
   if (prizeDistributionTotal !== null && prizeDistributionTotal !== (configVersion >= 3 ? 100 : 65)) errors.push({ field: "prizeDistribution", message: configVersion >= 3 ? "Winner placement allocations must total 100% of the winners’ share." : "Legacy winner allocations must total 65% of eligible generated revenue." });
   if (configVersion >= 3 && Array.isArray(input.prizeDistribution)) {
     const allocations = input.prizeDistribution as Array<Record<string, unknown>>;
-    const expected = [60, 25, 15];
+    const expected = individualPolicy ? [50, 30, 20] : [60, 25, 15];
     if (allocations.length !== expected.length || allocations.some((item, index) => Number(item.placement) !== index + 1 || Number(item.percent) !== expected[index])) {
-      errors.push({ field: "prizeDistribution", message: "New Tournaments use the fixed 60% / 25% / 15% winner placement allocation." });
+      errors.push({ field: "prizeDistribution", message: individualPolicy ? "Individual Tournaments use the fixed 50% / 30% / 20% allocation." : "This Tournament retains its 60% / 25% / 15% placement allocation." });
     }
   }
   const hybridScoreTotal = percentTotal(input.hybridScoring);

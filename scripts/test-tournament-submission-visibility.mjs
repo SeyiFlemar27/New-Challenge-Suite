@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { tournamentSubmissionRevealed } from '../lib/server/tournament-submission-visibility.ts';
+const now=Date.parse('2026-10-26T12:00:00Z');
+const submission={tournamentId:'t',matchId:'m',roundId:'r',participantId:'a',status:'approved'};
+const match={id:'m',tournamentId:'t',roundId:'r',participantAId:'a',participantBId:'b',status:'voting_open',votingOpenedAt:'2026-10-26T12:00:00Z'};
+let assertions=0;
+const check=(expected,patch={})=>{assert.equal(tournamentSubmissionRevealed({tournamentId:'t',submission,match,now,...patch}),expected);assertions++;};
+check(true);check(false,{now:now-1});check(false,{match:null});
+for(const status of ['submissions_open','submission_review','draft','double_forfeit_hold'])check(false,{match:{...match,status}});
+for(const status of ['submitted','rejected','withdrawn'])check(false,{submission:{...submission,status}});
+for(const field of ['tournamentId','matchId','roundId','participantId'])check(false,{submission:{...submission,[field]:'other'}});
+check(false,{match:{...match,votingOpenedAt:'invalid'}});
+check(false,{match:{...match,votingOpenedAt:null}});
+check(true,{match:{...match,votingOpenedAt:null},round:{id:'r',tournamentId:'t',votingOpensAt:match.votingOpenedAt}});
+check(false,{match:{...match,votingOpenedAt:null},round:{id:'r',tournamentId:'other',votingOpensAt:match.votingOpenedAt}});
+check(true,{match:{...match,status:'forfeit',votingOpenedAt:null,submissionDeadlineAt:match.votingOpenedAt}});
+check(false,{match:{...match,status:'forfeit',votingOpenedAt:null,submissionDeadlineAt:'2026-10-27T00:00:00Z'}});
+console.log(`Tournament submission visibility: ${assertions} assertions passed.`);

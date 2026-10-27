@@ -6,6 +6,7 @@ import { canPerformTournamentRole } from "@/lib/server/tournament-permissions";
 import { canPauseTournament } from "@/lib/server/tournament-lifecycle";
 import type { TournamentFoundation, TournamentRoundPlanItem, TournamentStatus } from "@/lib/tournament-types";
 import { tournamentPlacementFingerprint } from "@/lib/server/tournament-settlement";
+import { cancelIndividualTournament } from "@/lib/server/individual-tournament-cancellation";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!action) return fail("Tournament action is required.", 400, undefined, "TOURNAMENT_ACTION_REQUIRED");
   if (["schedule_change", "pause", "cancel", "resume", "participant_removed", "submission_rejected", "dispute_resolved"].includes(action) && reason.length < 5) return fail("A reason is required for sensitive tournament actions.", 400, foundation, "TOURNAMENT_ACTION_REASON_REQUIRED");
   const now = new Date().toISOString();
+  if (action === "cancel") {
+    try { return ok(await cancelIndividualTournament(db, { tournamentId: id, actorId: user.uid, isAdmin: user.isAdmin === true, confirmed: body.confirmed === true, reason }), "Tournament cancelled. Eligible entry refunds await provider confirmation; no refund is claimed complete."); }
+    catch (error) { return fail("The Tournament could not be cancelled safely. Refresh its current activation and payment state.", 409, undefined, error instanceof Error ? error.message : "CANCELLATION_FAILED"); }
+  }
   if (action === "review_final_placements") {
     if (body.confirmed !== true || reason.trim().length < 5) return fail("Confirm the reviewed placements and provide a reason.", 422, undefined, "TOURNAMENT_PLACEMENT_REVIEW_CONFIRMATION_REQUIRED");
     const placementsSnap = await db.collection("tournamentPlacements").where("tournamentId", "==", id).get();

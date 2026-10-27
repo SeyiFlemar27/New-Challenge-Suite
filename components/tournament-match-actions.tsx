@@ -7,6 +7,7 @@ import { Button, Card, Field } from "@/components/ui";
 import { apiRequest } from "@/lib/api/client";
 import { tournamentSubmissionMediaPath } from "@/lib/media-upload-paths";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 
 type Row = Record<string, unknown>;
 
@@ -42,8 +43,11 @@ export function TournamentMatchActions({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [needsCoins, setNeedsCoins] = useState(false);
+  const [submissionFailed, setSubmissionFailed] = useState(false);
+  const submissionInFlight = useRef(false);
+  const acceptedRevision = useRef(0);
   const paidAttempts = useRef<Record<string, string>>({});
-  const automaticVoting = tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY;
+  const automaticVoting = tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament);
   const id = encodeURIComponent(tournamentId);
   const matchId = String(match.id ?? "");
   const assigned = [match.participantAId, match.participantBId].map(String);
@@ -56,21 +60,31 @@ export function TournamentMatchActions({
   const submissionDeadline = String(match.submissionDeadlineAt ?? "");
   const votingClosesAt = String(match.votingClosesAt ?? "");
 
-  async function submit() {
-    if (busy || !mediaUrl || !mediaPath || !round?.id) return;
+  async function submit(upload?: { url: string; path: string }) {
+    const selectedUrl = upload?.url ?? mediaUrl;
+    const selectedPath = upload?.path ?? mediaPath;
+    if (submissionInFlight.current || !selectedUrl || !selectedPath || !round?.id) return;
+    submissionInFlight.current = true;
     setBusy(true);
-    setNotice("");
+    setSubmissionFailed(false);
+    setNotice("Upload complete. Confirming your match entry…");
     try {
-    const result = await apiRequest(`/api/tournaments/${id}/submissions`, {
+    const result = await apiRequest<{ submission: { revision: number } }>(`/api/tournaments/${id}/submissions`, {
       method: "POST",
-      body: JSON.stringify({ matchId, roundId: round.id, mediaUrl, mediaPath, mediaType, caption, expectedRevision: Number(existingSubmission?.revision ?? 0) })
+      body: JSON.stringify({ matchId, roundId: round.id, mediaUrl: selectedUrl, mediaPath: selectedPath, mediaType, caption, expectedRevision: Math.max(acceptedRevision.current, Number(existingSubmission?.revision ?? 0)) })
     });
     setNotice(result.message || (result.ok ? "Submission saved." : "Submission could not be saved."));
-    if (result.ok) router.refresh();
+    if (result.ok) {
+      acceptedRevision.current = Number(result.data?.submission?.revision ?? acceptedRevision.current + 1);
+      setNotice("Your match entry is submitted. You can replace it before the deadline.");
+      router.refresh();
+    } else setSubmissionFailed(true);
     } catch {
       setNotice("The submission save could not be confirmed. Your selected media remains here. Refresh its current status before retrying to avoid overwriting a newer revision.");
+      setSubmissionFailed(true);
     } finally {
       setBusy(false);
+      submissionInFlight.current = false;
     }
   }
 
@@ -126,18 +140,18 @@ export function TournamentMatchActions({
       <p className="mt-1 text-sm text-slate-500">{submissionDeadline ? `Server deadline: ${new Date(submissionDeadline).toLocaleString()}.` : "The server validates the match submission window."} Every round requires fresh content.</p>
       {existingSubmission ? <p className="mt-3 text-sm" role="status">Current submission: {String(existingSubmission.status ?? "submitted").replaceAll("_", " ")}. Replacements are accepted only when Tournament rules and the server allow them.</p> : null}
       {allowedMedia.length > 1 ? <Field label="Media type"><select className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3" value={mediaType} onChange={(event) => setMediaType(event.target.value as "image" | "video")}><option value="image">Image</option><option value="video">Video</option></select></Field> : null}
-      {allowedMedia.includes(mediaType) ? <MediaUploadField label={mediaType === "image" ? "Match image" : "Match video"} value={mediaUrl} storagePath={tournamentSubmissionMediaPath(tournamentId, String(round?.id ?? ""), matchId, competitorId ?? "", mediaType === "image" ? "images" : "videos")} kind={mediaType} onChange={(url, metadata) => { setMediaUrl(url); setMediaPath(metadata?.path ?? ""); }} helperText="Uploads are tied to this Tournament, round, match, and competitor. The server verifies ownership and media before accepting the submission." /> : <p className="text-sm text-amber-700">This round does not accept {mediaType} submissions.</p>}
       <label className="grid gap-2 text-sm font-semibold">Caption (optional)<textarea className="min-h-20 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3" value={caption} maxLength={400} onChange={(event) => setCaption(event.target.value)} /></label>
-      <Button disabled={busy || !mediaUrl || !mediaPath || !allowedMedia.includes(mediaType)} onClick={() => void submit()}>{busy ? "Saving…" : existingSubmission ? "Submit replacement" : "Submit match entry"}</Button>
+      {allowedMedia.includes(mediaType) ? <MediaUploadField label={mediaType === "image" ? "Match image" : "Match video"} value={mediaUrl} storagePath={tournamentSubmissionMediaPath(tournamentId, String(round?.id ?? ""), matchId, competitorId ?? "", mediaType === "image" ? "images" : "videos")} kind={mediaType} disabled={busy} onChange={(url, metadata) => { setMediaUrl(url); setMediaPath(metadata?.path ?? ""); if (url && metadata?.path) void submit({ url, path: metadata.path }); }} helperText="Choose a file to upload and submit your entry automatically. Wait for confirmation before leaving." /> : <p className="text-sm text-amber-700">This round does not accept {mediaType} submissions.</p>}
+      {submissionFailed ? <Button disabled={busy || !mediaUrl || !mediaPath || !allowedMedia.includes(mediaType)} onClick={() => void submit()}>Retry entry confirmation</Button> : null}
     </Card> : null}
     {canVote ? <Card className="p-5" aria-labelledby="match-vote-heading">
       <h2 id="match-vote-heading" className="text-lg font-black">Vote in this match</h2>
-      <p className="mt-1 text-sm text-slate-500">One free vote per match per local day. Competitors and the Tournament host cannot vote in this match. Live totals stay hidden.</p>
-      <div className="mt-4 flex flex-wrap gap-2">{submissions.filter((submission) => ["submitted", "approved", "active"].includes(String(submission.status))).map((submission) => <div key={String(submission.id)} className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] p-3"><span className="text-sm">Entry {String(submission.participantId ?? "")}</span><Button disabled={busy} onClick={() => void vote(submission, "free")}>{automaticVoting ? "Vote" : "Free vote"}</Button>{paidVotesActive && !automaticVoting ? <Button variant="secondary" disabled={busy} onClick={() => void vote(submission, "dorocoin")}>Vote · 5 DoroCoins</Button> : null}</div>)}</div>
+      <p className="mt-1 text-sm text-slate-500">One free vote per match per {isIndividualTournamentPolicy(tournament) ? "UTC" : "local"} day. Competitors and the Tournament host cannot vote in this match. Live totals stay hidden.</p>
+      <div className="mt-4 flex flex-wrap gap-2">{submissions.filter((submission) => ["submitted", "approved", "active"].includes(String(submission.status))).map((submission) => <div key={String(submission.id)} className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] p-3"><span className="text-sm">{submission.participantId === match.participantAId ? "Entry A" : "Entry B"}</span><Button aria-label={`Vote for ${submission.participantId === match.participantAId ? "Entry A" : "Entry B"}`} disabled={busy} onClick={() => void vote(submission, "free")}>{automaticVoting ? "Vote" : "Free vote"}</Button>{paidVotesActive && !automaticVoting ? <Button variant="secondary" disabled={busy} onClick={() => void vote(submission, "dorocoin")}>Vote · 5 DoroCoins</Button> : null}</div>)}</div>
       {needsCoins ? <a className="mt-3 inline-block font-bold underline" href={`/dorocoins?tab=buy&returnTo=${encodeURIComponent(`/tournaments/${tournamentId}/matches/${matchId}`)}`}>Buy DoroCoins and return to this match</a> : null}
       {votingClosesAt ? <p className="mt-3 text-xs text-slate-500">Voting closes {new Date(votingClosesAt).toLocaleString()}.</p> : null}
     </Card> : null}
     {canConfirm ? <Card className="p-5"><h2 className="text-lg font-black">Result review</h2><p className="mt-1 text-sm text-slate-500">The server verifies the voting deadline, full vote event sequence, and bracket dependency before confirming and advancing. Requests before the deadline remain blocked.</p><Button className="mt-4" disabled={busy} onClick={() => void confirmResult()}>{busy ? "Verifying…" : "Request result verification"}</Button></Card> : null}
-    {viewerId && isCompetitor && !canSubmit ? <p className="text-sm text-slate-500">Participant actions are unavailable for your role or in this match phase. Match deadlines and eligibility are enforced by the server.</p> : null}
+    {viewerId && isCompetitor && !canSubmit ? <p className="text-sm text-slate-500">{match.status === "voting_open" ? "Voting in Progress. You cannot vote in your own match." : "Match deadlines and eligible participant actions are enforced by the server."}</p> : null}
   </div>;
 }

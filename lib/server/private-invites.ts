@@ -183,15 +183,11 @@ export async function admitPrivateChallenge(db: Firestore, input: {
   const accessRef = db.collection("privateChallengeAccess").doc(`${challengeId}_${input.userId}`);
   const participantRef = db.collection("challengeParticipants").doc(`${challengeId}_${input.userId}`);
   return db.runTransaction(async (transaction) => {
-    const [inviteSnap, challengeSnap, accessSnap, participantSnap, accountSnap, profileSnap, requestSnap] = await Promise.all([
-      transaction.get(inviteRef),
-      transaction.get(db.collection("challenges").doc(challengeId)),
-      transaction.get(accessRef),
-      transaction.get(participantRef),
-      transaction.get(db.collection("users").doc(input.userId)),
-      transaction.get(db.collection("profiles").doc(input.userId)),
-      transaction.get(db.collection("privateAccessRequests").doc(`${challengeId}_${input.userId}`))
-    ]);
+    const [inviteSnap, challengeSnap, accessSnap, participantSnap, accountSnap, profileSnap, requestSnap] = await transaction.getAll(
+      inviteRef, db.collection("challenges").doc(challengeId), accessRef, participantRef,
+      db.collection("users").doc(input.userId), db.collection("profiles").doc(input.userId),
+      db.collection("privateAccessRequests").doc(`${challengeId}_${input.userId}`)
+    );
     if (privateAccessDenied(requestSnap.data(), accessSnap.data())) throw new Error("ACCESS_RESTORATION_REQUIRED");
     if (accessSnap.exists && accessSnap.data()?.status === "approved") return { challengeId, alreadyAdmitted: true, membershipStatus: participantSnap.data()?.status ?? "not_joined" };
     if (!challengeSnap.exists || !isPrivateChallengeRecord(challengeSnap.data() ?? {})) throw new Error("CHALLENGE_UNAVAILABLE");
@@ -260,7 +256,7 @@ export async function revokePrivateChallengeInvite(db: Firestore, input: { chall
   const challengeRef = db.collection("challenges").doc(input.challengeId);
   const now = input.now ?? new Date().toISOString();
   await db.runTransaction(async (transaction) => {
-    const [inviteSnap, challengeSnap] = await Promise.all([transaction.get(inviteRef), transaction.get(challengeRef)]);
+    const [inviteSnap, challengeSnap] = await transaction.getAll(inviteRef, challengeRef);
     if (!inviteSnap.exists || String(inviteSnap.data()?.challengeId) !== input.challengeId) throw new Error("INVITE_NOT_FOUND");
     if (!challengeSnap.exists || String(challengeSnap.data()?.creatorId ?? challengeSnap.data()?.hostId ?? "") !== input.actorId) throw new Error("PERMISSION_DENIED");
     if (inviteSnap.data()?.policyVersion === 2) throw new Error("ROTATION_CONFIRMATION_REQUIRED");

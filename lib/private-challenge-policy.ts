@@ -28,6 +28,7 @@ export function privateLockedPreview(challenge: Record<string, unknown>) {
     creatorName: String(challenge.creatorName ?? challenge.hostName ?? ""),
     description: String(challenge.description ?? "").slice(0, 180),
     locked: true, visibility: "private", publicPreviewEnabled: true,
+    accessMethod: ["invitation_code", "invite_link", "direct_invitations"].includes(String(challenge.privateAccessMethod)) ? String(challenge.privateAccessMethod) : null,
     canRequestAccess: challenge.privateJoiningPolicy === "invite_and_request" && privateEnrollmentOpen(challenge), publicVotingAvailable: privatePublicVotingOpen(challenge)
   };
 }

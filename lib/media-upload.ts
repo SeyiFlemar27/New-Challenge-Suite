@@ -62,8 +62,19 @@ export function joinStoragePath(...segments: string[]) {
 }
 
 export function appendUploadFileName(basePath: string, fileName: string, now = Date.now()) {
-  const cleanBase = basePath.split("/").map(sanitizeStorageSegment).filter(Boolean).join("/");
+  const segments = basePath.split("/");
+  const tournamentSubmission = segments.length === 9 && segments[0] === "tournaments" && segments[2] === "rounds" && segments[4] === "matches" && segments[6] === "participants" && ["images", "videos"].includes(segments[8]);
+  // Resource IDs must match Firestore and Storage Rules exactly. Sanitizing or
+  // truncating them changes ownership scope; filenames remain sanitized below.
+  const cleanBase = tournamentSubmission
+    ? segments.map(assertStorageResourceIdentifier).join("/")
+    : segments.map(sanitizeStorageSegment).filter(Boolean).join("/");
   return `${cleanBase}/${now}-${sanitizeFileName(fileName)}`;
+}
+
+export function assertStorageResourceIdentifier(value: string) {
+  if (!value || value.length > 1500 || value === "." || value === ".." || /[\\/\u0000-\u001f\u007f]/.test(value)) throw new Error("INVALID_STORAGE_RESOURCE_IDENTIFIER");
+  return value;
 }
 
 export function validateMediaFile(file: Pick<File, "type" | "size" | "name">, kind: MediaUploadKind, maxSizeMb = defaultMaxSizeMb(kind)): MediaUploadValidation {

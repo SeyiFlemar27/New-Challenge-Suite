@@ -7,6 +7,8 @@ import { canEditTournament } from "@/lib/server/tournament-permissions";
 import { loadTournamentTeamDirectory } from "@/lib/server/tournament-team-directory";
 import { getPublicTournamentFunding } from "@/lib/server/tournament-public-funding";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
+import { tournamentSubmissionRevealed } from "@/lib/server/tournament-submission-visibility";
 
 type TournamentRow = Record<string, unknown> & { id: string };
 
@@ -91,12 +93,14 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
       db.collection("tournamentMatches").where("tournamentId", "==", id).limit(260).get(),
       db.collection("tournamentSubmissions").where("tournamentId", "==", id).limit(520).get(),
       db.collection("tournamentAnnouncements").where("tournamentId", "==", id).limit(50).get(),
-      db.collection(tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? "sponsorships" : "tournamentSponsorProposals").where("tournamentId", "==", id).get(),
+      db.collection(tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament) ? "sponsorships" : "tournamentSponsorProposals").where("tournamentId", "==", id).get(),
       db.collection("tournamentPlacements").where("tournamentId", "==", id).limit(20).get(),
       db.collection("tournamentAuditEvents").where("tournamentId", "==", id).limit(100).get()
     ]);
-    const publicFunding = tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY ? await getPublicTournamentFunding(db, id) : null;
+    const publicFunding = tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament) ? await getPublicTournamentFunding(db, id) : null;
     if (publicFunding) tournament.prizePool = publicFunding.prizePool;
+    const matchById = new Map(rows(matches).map(match => [match.id, match]));
+    const roundById = new Map(rows(rounds).map(round => [round.id, round]));
     return {
       available: true,
       tournament,
@@ -119,7 +123,7 @@ export async function getTournamentBundle(id: string, viewer: RequestUser | null
       }),
       submissions: rows(submissions).filter(submission => canManage || (viewer && submission.userId === viewer.uid)
         || (viewerTeamId && submission.teamId === viewerTeamId)
-        || ["approved", "active", "eliminated", "winner"].includes(String(submission.status))),
+        || tournamentSubmissionRevealed({ tournamentId: id, submission, match: matchById.get(String(submission.matchId)), round: roundById.get(String(submission.roundId)) })),
       announcements: rows(announcements).filter((item) => item.status === "published"),
       sponsors: rows(sponsors).filter((item) => item.publicDisplayApproved === true && (!publicFunding || (item.status === "approved" && publicFunding.eligibleSponsorIds.includes(String(item.sponsorContributionId))))),
       placements: rows(placements),

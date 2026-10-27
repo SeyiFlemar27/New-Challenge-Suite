@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/master-completion-2026-10-27": false
+    }
+  },
   "crons": [
     {
       "path": "/api/internal/sponsor-completion",

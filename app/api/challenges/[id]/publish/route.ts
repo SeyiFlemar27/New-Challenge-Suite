@@ -357,7 +357,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return rejectPublish(error.message, status, undefined, error.code);
     }
     await writeAuditLog({ actorId: user.uid, actorType: "creator", action: "challenge.publish_failed", targetType: "challenge", targetId: id, before: { status: String(current.status ?? current.lifecycleStatus ?? "unknown") }, after: { attemptedStatus: lifecycleStatus }, reason: "Challenge submission write failed.", metadata: { action: "publish_challenge", causeCode: "PUBLISH_WRITE_FAILED", planId: planAccess.normalizedPlanId, accountType: planAccess.accountType, media: mediaSummary, paidEntry: { requested: monetizationIntent.paidEntryRequested }, sponsorReady: { requested: monetizationIntent.sponsorReady }, prizePool: { requested: monetizationIntent.prizePoolRequested }, occurredAt: now }, createdAt: now }, db).catch(() => undefined);
-    return rejectPublish("Publication could not be saved. Please retry; your draft is preserved.", 503, undefined, "PUBLISH_WRITE_FAILED");
+    const transactionCode = typeof (error as { code?: unknown })?.code === "number" ? (error as { code: number }).code : null;
+    console.error("[challenge.publish] commit failed", { requestId: publishRequestId, transactionCode, stage: "review_submission_commit" });
+    return rejectPublish("Publication could not be saved. Please retry; your draft is preserved.", 503, { requestId: publishRequestId }, "PUBLISH_WRITE_FAILED");
   }
   if (transition.challenge.publicationOutcome === "held_for_moderation") return ok({ challenge: transition.challenge, outcome: "held_for_moderation" }, "Held for moderation. An existing account or content restriction requires investigation.");
   if (transition.idempotent) return ok({ challenge: transition.challenge, outcome: "published", idempotent: true }, "Challenge is published.");

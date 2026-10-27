@@ -1,0 +1,1147 @@
+{
+  "baseline": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "branch": "codex/master-completion-2026-10-27",
+  "files": [
+    {
+      "path": "app/api/admin/tournaments/[id]/route.ts",
+      "sha256": "da6cbe720b8f12c262042de8f518dbd08fddc1a337d69467a941f7e1164fd6c7",
+      "bytes": 19729,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/challenges/[id]/publish/route.ts",
+      "sha256": "339b4a6308093039756a070b8155e598c3044e9fc46bb347b73e0b785b7f5d2b",
+      "bytes": 30604,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/challenges/[id]/route.ts",
+      "sha256": "6ccd5dbdaeec437bb9a0e44162b05520c3421943e77cde8f66a497bc73756a2f",
+      "bytes": 26741,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/explore/challenges/route.ts",
+      "sha256": "adbf3a39559bfaf13ad406d8c1bff45fab19917246accfa550231991aa4b5957",
+      "bytes": 26449,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/me/tournaments/route.ts",
+      "sha256": "2c5e50b0fdc3ca1f1524489619fd58aa3f6adeb9f6f0a39b12e54a70ba9d01cd",
+      "bytes": 6751,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/private-challenges/[id]/access/route.ts",
+      "sha256": "2fe121ee38ad96819a1bf2a403dd73939e50cb6749de572e5d815a4984febf09",
+      "bytes": 6986,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/join/route.ts",
+      "sha256": "ab32c6b6d9d80f21c2ede622de6714d9f450396c4c999fd5c21e94d1211c1f00",
+      "bytes": 15983,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/manage/actions/route.ts",
+      "sha256": "6c18fca2c082261d771320c6e4ca889a81deb832568b53b4682b1f457c1a2b8e",
+      "bytes": 10546,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/route.ts",
+      "sha256": "ef102721a37484fb2b75dda9a5693af620918e6a7b032e431eb62499ccafde4d",
+      "bytes": 20277,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/submissions/[submissionId]/media/route.ts",
+      "sha256": "428b8a4b4c29f0b8ef7a8a778e1a2757981b63e8a937c03554232711234751d9",
+      "bytes": 3194,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/submissions/route.ts",
+      "sha256": "88105b6a92c630ae519efc406a6db056111573321e6121df28a41dd20f0e824a",
+      "bytes": 16253,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/api/tournaments/[id]/votes/route.ts",
+      "sha256": "97674f40ac8804f577dc0a467e9dd6b8303677f604355353489d4758cf33a52e",
+      "bytes": 22116,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/challenges/[id]/access/page.tsx",
+      "sha256": "6ddcd996809be48031bf2bf2e78e7f95f2d9cb8ddd40f3f2ef69d05a681eb70b",
+      "bytes": 692,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/challenges/[id]/page.tsx",
+      "sha256": "850ab639e98a9300f73437b968a350af93b8042b04956494216b2b41dbb3540d",
+      "bytes": 61122,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/challenges/page.tsx",
+      "sha256": "292849a7d0979c5d570235275839ef1e4e3cf4cd6b41735a3f70690051a722fe",
+      "bytes": 10965,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/explore/page.tsx",
+      "sha256": "306d71f81ba94ff0acf6d4ce10c54b41f5c40b0f69eb39a2ce1590f151444fd9",
+      "bytes": 12752,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/live-events/[id]/page.tsx",
+      "sha256": "f48bfb0c044fd5422059e86743d7e1541a1cfd7585bd7710311c9dd52f153bec",
+      "bytes": 29352,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/my-challenges/page.tsx",
+      "sha256": "219caca3b369de4b513ba0c913bafde3d3bd32adb3f5574e184251eb0e3b1fbd",
+      "bytes": 293,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/private/preview/[id]/page.tsx",
+      "sha256": "f445cebc2040d434617c15286127b3020a9c7cd8456924205b2a6257cc3efd81",
+      "bytes": 252,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/tournaments/[id]/matches/[matchId]/page.tsx",
+      "sha256": "e3cbac8595d5cae0d086cf1fe18f462b35a9c23e47ed6d9bd0b63627aba165c2",
+      "bytes": 9928,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/tournaments/[id]/me/page.tsx",
+      "sha256": "a7c02bf1cae6d3fbd0cbc1f09e89cfa4eccc724a426a5ea856e50fe99466fcd5",
+      "bytes": 6035,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/tournaments/[id]/page.tsx",
+      "sha256": "f4ec85a4f97ccf114151ae40bccb04248a6b9a049066777c48f978efae8d3db2",
+      "bytes": 8718,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "app/tournaments/[id]/results/page.tsx",
+      "sha256": "bcea8c697848f657a24676d8dec64c10e6b1e0c20333e9d4e4f02dd893a8c568",
+      "bytes": 5672,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/admin/admin-tournament-decisions.tsx",
+      "sha256": "6a8b057412da18bb3a96220e90a4ca65047a1a996e1a0ded386dd95faa981a1b",
+      "bytes": 12491,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/admin/individual-correction-evidence.tsx",
+      "sha256": "55426415ec9f2c2cb11a99437f881874159468ba8b142fcdee8d500d8a9a139e",
+      "bytes": 3676,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/app-shell.tsx",
+      "sha256": "40b45521f50d53373a61634798ee38566f899e1cd748153b9ce018796a8e8b0a",
+      "bytes": 1603,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/explore-challenge-card.tsx",
+      "sha256": "f1b555e788d81653c944a1933dd48f48c33b56f188dcd5a59c25aed408bfe8fe",
+      "bytes": 3885,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/mobile-footer.tsx",
+      "sha256": "7a351a17ad4e932e5de37a1ebb489d7b7c38bfa31deb8a061e58a8f1ad18f086",
+      "bytes": 4722,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/my-tournaments.tsx",
+      "sha256": "676a4ee5c3fdfa335a210f33d5491c0142c3c98639699a29ba47bc54c5d76f73",
+      "bytes": 3931,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/private-access-manager.tsx",
+      "sha256": "e46d0fe0ea93e075f44f97305fe81d3ba5c65a20def5469ce8d06016a693aa50",
+      "bytes": 12717,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/private-detail-actions.tsx",
+      "sha256": "43bce004c2b885ab1a3a963a3c0a92b9a8c1f364d391bee245b1fdfe84df49cf",
+      "bytes": 2170,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/private-locked-detail.tsx",
+      "sha256": "c0295eb1ada841a25fdaf4e4783e4fa4c276e94d759f17bdd883b8bdb0d946cf",
+      "bytes": 5776,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/sponsor/sponsor-shell.tsx",
+      "sha256": "fcb1b30393f7bc2a29b2facdefa39156d00d5fdaca0b2fa4d7c7259d80fc87c1",
+      "bytes": 8340,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/tournament-detail-content.tsx",
+      "sha256": "dde9f1d1ecc345a7464aa8bfd013656a7465ddb1e44b50dce25b451c7cf27141",
+      "bytes": 10889,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/tournament-entry-withdrawal.tsx",
+      "sha256": "4e27ed14ec597d0b34d2d217463dab6402108c1505384b40918ba581ff49dedd",
+      "bytes": 1618,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "components/tournament-match-actions.tsx",
+      "sha256": "a710eb157d77826de03368bf534ff25b825ec226eee22fe206759406abb92259",
+      "bytes": 12406,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "docs/explore-details-tournament-continuation-2026-10-27.md",
+      "sha256": "f5ceb09c659d99adb6b823c089ae3e8567ea95d1ec534bc41f122bdeb418abfd",
+      "bytes": 17658,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/explore-details-tournament-execution-ledger-2026-10-22.md",
+      "sha256": "3527a3b48e34d30b5f7ee41f38ff632eda74b778b04b3242e5ca8f81a729b275",
+      "bytes": 6525,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/explore-details-tournament-resume-2026-10-26.md",
+      "sha256": "b57e0814865983e7932fcb9d37001af8a1e9449e39d87974be07819c0b1b2389",
+      "bytes": 11925,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-completion-acceptance-2026-10-27.md",
+      "sha256": "ef9a284b3c630b6d2a85b9e1fde9ca7120161ae06c422f060447fadefeddbb30",
+      "bytes": 30134,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-critical-continuation-2026-10-27.md",
+      "sha256": "c4933009ac116121523df9cd13792bc5349223ebda1365b8faa04679b873c9e6",
+      "bytes": 21547,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/admin-mobile.png",
+      "sha256": "c28d09e6b0c992eb354d6ddc751ef9ea2aa506914555dbc9a7ed676dc90d3da3",
+      "bytes": 20346,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/automatic-attendance_only-public.png",
+      "sha256": "e26aab9148f14e07043059256863cd1d6d125682a1c27b8bb84ff6414199c9a7",
+      "bytes": 168595,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/automatic-normal-public.png",
+      "sha256": "224d39a696f52715398aec67a6d1b9a6d8eabaf4434ad350b008a4a188f87dbc",
+      "bytes": 215299,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/automatic-physical_competition-public.png",
+      "sha256": "ab08a401db084fd661bcf510fe143c9ecc45a58285b877384718c617f12e397a",
+      "bytes": 179541,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/automatic-private-public.png",
+      "sha256": "491f5281f1391b72accc5e3ce5f1c19c83bbdd137e9fba3944456f162c273832",
+      "bytes": 104325,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/automatic-tournament-public.png",
+      "sha256": "cf438e2418bfbb24bcb600df29ec101572bd3d928bfb997ed0d7a6dd0f212d54",
+      "bytes": 179598,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/creator-explore-desktop.png",
+      "sha256": "7f5a6f964e5f61e2ec94d56b5ddc8d2d02fa0c5f4c5e67f810769a6c3f284815",
+      "bytes": 135942,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/host-routing-desktop.png",
+      "sha256": "705dc4801a72a5104f3c2fa7717039426c49ff91cdb27945e27ae6129bd7f5dd",
+      "bytes": 287930,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/host-routing-mobile.png",
+      "sha256": "021e66b93fb3aa137fae74eae7941fb6682c955ab40cc1f202d45294799cb9a5",
+      "bytes": 288006,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-admin-financial-review.png",
+      "sha256": "e487057a04651f738b5c3c349b108d7ec888307ef87354f12a8416643149f9fd",
+      "bytes": 242688,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-creator-earnings-clearance.png",
+      "sha256": "acfef6d03c5c7a69ddf00a1decb32c28db16090329bbaa1e95053142ee7b4f0a",
+      "bytes": 178611,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-paginated-roster.png",
+      "sha256": "b171ab11eaeabe75ddb04ab8f2f130c511166fffa34b72f69f7e54c98ed27470",
+      "bytes": 95666,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-physical-results.png",
+      "sha256": "4479e4a04add76bbd68fcb74f1c5cb58b41cbe2fdccc48e3266500d32595b392",
+      "bytes": 178034,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-registration-mobile.png",
+      "sha256": "31d8a0754c813a9e2b34634051a628be9a733547ad19646ed235a73e5f2260b3",
+      "bytes": 77620,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-reviewed-reschedule.png",
+      "sha256": "c8b8fb1d361789a3ce6236603e2ec7f00cba5252667324913314e4ac02c2bc6b",
+      "bytes": 285818,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-v2-builder-attendance_only-draft.png",
+      "sha256": "a708b16e8bffa62f15a2b15e0982a5a9be592082eed3396a821ba6b629f8648c",
+      "bytes": 183547,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-v2-builder-physical_competition-draft.png",
+      "sha256": "a708b16e8bffa62f15a2b15e0982a5a9be592082eed3396a821ba6b629f8648c",
+      "bytes": 183547,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-v2-desktop.png",
+      "sha256": "d6b3f130dcaeb404741c0ed174a7c12b5af68e553c15b6acafff2f704393b033",
+      "bytes": 240880,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/live-event-v2-mobile.png",
+      "sha256": "e1b0d8d7ae1aa400f0b2b2f20390184504ef9fdf91191e68f728a73f7c2119b5",
+      "bytes": 241871,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/normal-builder-mobile.png",
+      "sha256": "e2c5b5358e6b4d55d78a322e0f466e6d1062705ae843e5c79a0d8452688b8a01",
+      "bytes": 107500,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/normal-builder-tablet.png",
+      "sha256": "b59438def3dd54934655e40a5601e36dde4d61da995eba338ea0331945b3c1a8",
+      "bytes": 126666,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/normal-challenge-join-mobile.png",
+      "sha256": "c0d04fbd1828e2979878739ca641adb152dda8121597959eae4e407c497e8782",
+      "bytes": 114737,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/private-access-mobile.png",
+      "sha256": "26743b2dc257b14251fdf7cdadf254beb130fe0b4fc987b1bd2983734ed685e4",
+      "bytes": 165548,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/private-code-prepared.png",
+      "sha256": "415d84810cd374a8b821620c79067943ae0a6da85823ffa3efe9bac243d59295",
+      "bytes": 222475,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/summary.json",
+      "sha256": "cec6f2e84aecd7576a8dc336ec5eceff966bebe74705954585c6ed0307840ffc",
+      "bytes": 7322,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/support-admin-ticket.png",
+      "sha256": "fa187449feffe2cb1ce72c7bcbc95d869b5f8fff598840530d263c11db71a7ac",
+      "bytes": 270474,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/support-customer-ticket.png",
+      "sha256": "1b3e3881d4ed5aad38db8ed20fc25e5201f0e66f2f60b213e81c4ca893ec843e",
+      "bytes": 151688,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/tournament-bracket-desktop.png",
+      "sha256": "a288818c5844bed1bd586d04aba8cf555534d0210b86da6ab67b29917f245190",
+      "bytes": 199728,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/tournament-bracket-mobile.png",
+      "sha256": "a2f0be12fa547dd79697e75cb5a3b5871d046eba4bea7431119daba6af0bd97d",
+      "bytes": 153609,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-browser/tournament-match-verified-mobile.png",
+      "sha256": "c200915e3d885d95d55d7e9193235c2cf4240ddc957b5333e6fa47ae5ea004f5",
+      "bytes": 90416,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/full-p0-results.json",
+      "sha256": "8f706c58866f7cba0d79f51cb1f7996dffd96c07de996ec9379511a10df29560",
+      "bytes": 17155,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-admin-review-desktop.png",
+      "sha256": "45ab73e20acacee130ac35d7ad8f70ff8e87726a34331465a487023d334a130f",
+      "bytes": 299855,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-admin-review-mobile.png",
+      "sha256": "b9a6888e381d28cebdfae9f15f1ca1e970ecd2b380dfb3b1076d920921960249",
+      "bytes": 302867,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-admin-review-tablet.png",
+      "sha256": "ebcc3c339e5760925290d3450066412f1b850c19c61ab39acb07fca69be660a4",
+      "bytes": 305981,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-attendance_only-desktop.png",
+      "sha256": "0c6e0291acfb269b632a7b7c466f8fb56af26c20700c30e5084b8c478a5fa1d4",
+      "bytes": 150980,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-attendance_only-mobile.png",
+      "sha256": "2b7cf7f5bf4fc7bd27194ffbdbd4cbc8a220f9ff5a67b5962fe5c52e57446b0b",
+      "bytes": 131033,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-attendance_only-tablet.png",
+      "sha256": "2092ae15e0c219d259855d6dfa25aeaad2da8abb8ce39485a14e93fef2d62fb3",
+      "bytes": 141094,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-explore-desktop.png",
+      "sha256": "6799e208b743a119a062f4105d0b315b346dfadd790ede8f371e0b329e288506",
+      "bytes": 204191,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-explore-empty.png",
+      "sha256": "77bf7256fe6ba59f7cca017404b47aa827f2453c421483ec4388eeb5b1b559a1",
+      "bytes": 83345,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-explore-error.png",
+      "sha256": "1e959d1d991ab1e5f3bff2731cd66090a81270dd986b805c439c13ae4e43d15e",
+      "bytes": 94213,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-explore-mobile.png",
+      "sha256": "5bc18a6937b1d0b00f9112a867acf731ec6ef888f16af72623a3ded93a98c40e",
+      "bytes": 222314,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-explore-tablet.png",
+      "sha256": "30641f16d7f8a63a2f4350550028c46f9739b43509208f932c02a78752a9668f",
+      "bytes": 220288,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-global-priority-desktop.png",
+      "sha256": "0a49beb05cb7c5eafa172951c1956abc84d205f56717487cc8333d6f22789e96",
+      "bytes": 225680,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-match-automatic-submission-desktop.png",
+      "sha256": "7974fcb8fc25d83a88bb116237eef04b482a41409f9d9952993e6c4364d68360",
+      "bytes": 198484,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-match-voting-navigation-desktop.png",
+      "sha256": "2f238bb9c73faa7f80969953e95821f10381a68edcec28c27a6c93eb6ec494b0",
+      "bytes": 159761,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-normal-desktop.png",
+      "sha256": "e9184ac7c49c9a51fbbae3f60d20539e6d59cd0840f603dde766250c8e5a3460",
+      "bytes": 308368,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-normal-mobile.png",
+      "sha256": "b5aa06cdb63c007a9e0b92da7cd1a5a90077d442ea7dc647dfe4734671903f6e",
+      "bytes": 223305,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-normal-tablet.png",
+      "sha256": "3bdc4a41be9102f02d2971a2a68b92488be2c5643d4a6a4a592af4ebb6fef46d",
+      "bytes": 339274,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-participation-desktop.png",
+      "sha256": "4189d60718df35d78f91929a7f12d581978e19c42e989a348331d2945f5a53b0",
+      "bytes": 111766,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-participation-mobile.png",
+      "sha256": "4786c4c6deb92b9d93addccd3d3198e574d25ef4c1893b577aa53f6ac89702c5",
+      "bytes": 80823,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-participation-tablet.png",
+      "sha256": "f454eb231bd016c970a5671af99bee70236778c2dd1911d1a6a137bd9faf5dee",
+      "bytes": 89283,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-physical_competition-desktop.png",
+      "sha256": "cd5dc188982f256c7797f9470c22ede400af3a254f493844b37131247800fa38",
+      "bytes": 173476,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-physical_competition-mobile.png",
+      "sha256": "b75cea4eb061128063e5a152157d8c5e08a69b26f141448a0de032a1274eea3f",
+      "bytes": 154144,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-physical_competition-tablet.png",
+      "sha256": "bc2a46af4f654e3606f16f66c7aa65765b1e6f085d72dd66c2e3d79a8b3c0698",
+      "bytes": 161438,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-desktop.png",
+      "sha256": "cd684008b052d67043ce267d16dde79793f20ea1bc2b86548d8a9865abaa0321",
+      "bytes": 113631,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-manage-access-desktop.png",
+      "sha256": "1155b5cf3410c0e9c0f785205cae18541300bea9ae275a897ba40a91297466ea",
+      "bytes": 186958,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-manage-access-mobile.png",
+      "sha256": "80619c34c6fb55d83ba7d9dd3f1b8b130d59b0b36c3d2be2f9c9e677d529ebbf",
+      "bytes": 155487,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-manage-access-tablet.png",
+      "sha256": "94081f33bece98dd12cd385098c5dbf4410a334db0058bf47ee44af46e26531c",
+      "bytes": 163639,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-mobile.png",
+      "sha256": "a6c247303a63eea3e2d6e5616dc6ec34946555888bc154cea6e1f82b725207bd",
+      "bytes": 101403,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-tablet.png",
+      "sha256": "81eaa4a3212e0bd0fd0990ef44f7f254a68143722fcbc2e9ca7487d450e4c45d",
+      "bytes": 111684,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-unlocked-desktop.png",
+      "sha256": "0504b84b7d970992bea778344f67e30597f75c252e9313de5ae91146f6977c04",
+      "bytes": 234460,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-unlocked-mobile.png",
+      "sha256": "db953b079d087db1d81fe674ee8f5f7a57d9cdfb18613ed6237f57711c896248",
+      "bytes": 186556,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-private-unlocked-tablet.png",
+      "sha256": "8c4e6c65228e339849d7d5a8016e6c410644304c36bf74bb1c26debe7a165841",
+      "bytes": 209963,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-tournament-desktop.png",
+      "sha256": "c360c5dc8dd0454bf5dd04fdbe558a7151fed75ecb1422ae653d6771d653ef68",
+      "bytes": 171084,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-tournament-mobile.png",
+      "sha256": "ce75a695290a7c9d38c48c4cfabf5cec3d98eae0ca56e4b9250581a748c0fa65",
+      "bytes": 149848,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-tournament-tablet.png",
+      "sha256": "3508def3282532ce9266e2879412e486702d943c1e4483f278a8b688f30ad13d",
+      "bytes": 169029,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-winners-desktop.png",
+      "sha256": "5cb8a3202b17409a34b51e27cb05467bc095dfc37e21167b0d573efb7d3a3625",
+      "bytes": 130080,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-winners-mobile.png",
+      "sha256": "6fcca9bcc51c0b807afd31e5a1aabb2c7e0b76b35a31ada805bf2d6c20d3570c",
+      "bytes": 131440,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-winners-recorded-allocation-desktop.png",
+      "sha256": "9cad1fd06f435c96be2a16027fddcbac0aa0d9cf267ed6e2f2bd3efe8a97d7c3",
+      "bytes": 136623,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-winners-tablet.png",
+      "sha256": "65b58dc49af454291d349c6d6895e5c09d2d93ecde00b2de5c9e769785767bef",
+      "bytes": 122771,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/master-withdrawal-mobile.png",
+      "sha256": "e2a3949ba3f2d9e3d629465a86c05911f334152f9e9dd415b96b9aff8be1ffcf",
+      "bytes": 112346,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/master-browser/summary.json",
+      "sha256": "4f2ba5faeeb058a0f610ade3cdb2f136399c33927decf18d7860071541beba52",
+      "bytes": 8237,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-2026-10-27/static-exits.json",
+      "sha256": "25f190c3e6a1dde45e9311edb30a3ecf93865b0b7f4c9eeb6b5e8a65b59ef622",
+      "bytes": 52,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-github-completion-report-2026-10-27.md",
+      "sha256": "b0b72a81ad7cb888d6848ae84f6db5406bc6435467161749c43b5fef00627cf2",
+      "bytes": 16108,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "docs/master-requirement-code-checklist-2026-10-26.md",
+      "sha256": "99cd9d1a77ea07bc66c4097cd1c4d043741fcc0b59dd92ff4038fe614642ce83",
+      "bytes": 27879,
+      "purpose": "Project checkpoint and sanitized visual/test evidence"
+    },
+    {
+      "path": "lib/account-routing.ts",
+      "sha256": "fbf99644db99f2f8864cd29ac7e2d3e1804834549be69c21aacab620c91da14d",
+      "bytes": 7435,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/explore-card-policy.ts",
+      "sha256": "9336307efc45eb8de2feffc1b9132d820ab55f326fda07e093fa4af5e2e8df60",
+      "bytes": 1503,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/individual-tournament-policy.ts",
+      "sha256": "571ddf042de0346f57c2b6b8d2b42df0b316111e059b5ab006c77b61692a2a42",
+      "bytes": 2484,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/media-upload-paths.ts",
+      "sha256": "dc3c4b66bd43bcb3aa757befbfe4c0a1f1a126613ac3ef9dc388563e9e6cbb75",
+      "bytes": 3613,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/media-upload.ts",
+      "sha256": "da37795d608018f65b99a3c0e7877c6dabb42ea401336aa0e590a05a59c36c60",
+      "bytes": 7317,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/private-challenge-policy.ts",
+      "sha256": "2ec7130e100401dbf118cdcd18ae6559d668690c679575bc2aa9835fa74299ed",
+      "bytes": 2256,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/challenge-review-submission.ts",
+      "sha256": "93dc7f6cab053bb2ddc819bf2f6077ec78168a642dcd751dcb75c72a5c3ba263",
+      "bytes": 15225,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/challenge-settlement.ts",
+      "sha256": "5ac19faef2d1ae9acd7069ef75a61abe050f0bf814d0fbf76e118d13853d4680",
+      "bytes": 62046,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-automatic-settlement.ts",
+      "sha256": "a5819f7ebdffcb143f52b29bb0a88a8d9529fa9ed986ac134fca7f3755057448",
+      "bytes": 6156,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-entry-withdrawal.ts",
+      "sha256": "56ff93d4abc69322fa7c3fb5faa01abf53d658c0f13943dba8a1518dfb29fd66",
+      "bytes": 4859,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-match-review.ts",
+      "sha256": "8e5417822473663b08b0cb4f941df84c8e0a7887bd5de3c8d0c645f3d01b4c6e",
+      "bytes": 10998,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-prize-correction.ts",
+      "sha256": "5c5a951a89a688ff8da56034f286653eed255f0c5f205886f18578e53930b2a8",
+      "bytes": 23198,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-review-escalation.ts",
+      "sha256": "789f0b82730ed2c0e0623e0c9fb30443c5aea5c05fa1f8c245dac503e02ae938",
+      "bytes": 4926,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-settlement-clearance.ts",
+      "sha256": "8f8e65b62c8c51764e6dc1305767a6881962165dd0abe224f6f03c17ad6f44dc",
+      "bytes": 3665,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-tournament-cancellation.ts",
+      "sha256": "7c24a510f38455529c995e6aee3aae872770e28da10d33808ce3be1d78ed4808",
+      "bytes": 6262,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/individual-tournament-disqualification.ts",
+      "sha256": "fd5dbe0e63c2777046a6ceecb336331cc59d4eb165dbfa274b28391f4226d22b",
+      "bytes": 6033,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/live-event-admission.ts",
+      "sha256": "2c52780e363f08d31514959da7aa9bb598b8f5177fe3a297dee5d46ace783be2",
+      "bytes": 13895,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/normal-email.ts",
+      "sha256": "af5e840e2342559b4583b838e27695db0f36d810f50123e2eb6262cf99d6ffa8",
+      "bytes": 5054,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/private-access-management.ts",
+      "sha256": "d1ca3572fa5f305cac0bf0a3c439090f0a0a63ec8ed258bc09e67f48fb03eb79",
+      "bytes": 9931,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/private-invites.ts",
+      "sha256": "024e0380acbf055b51680d24eb88f9422c4b59e67d7cc10470bbc01134523a1b",
+      "bytes": 15343,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/public-creator.ts",
+      "sha256": "4a6d032fc05251695cf55c759c16dc2044a1668ba2f246919c974c15b52f56b4",
+      "bytes": 934,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/publication-guards.ts",
+      "sha256": "3423e28afded7476717b13d19158b493f502db36b8235a4dc0b5197a42708383",
+      "bytes": 4854,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-bracket-recovery.ts",
+      "sha256": "29ce83324f4615f8c2a16c57b8e38ec768d28e64bd2aa5f258007a14b6154c2d",
+      "bytes": 12117,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-draft-adoption.ts",
+      "sha256": "06cb418b887bf6e84101f3642e153c6b3c893656f6c37ca2520a40bef92aeb69",
+      "bytes": 6119,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-lifecycle-scheduler.ts",
+      "sha256": "0c0175d757152a406c0f0366d45e8d73aa3264ca3f0d853e2a76e5880957ecfc",
+      "bytes": 39782,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-match-lifecycle-jobs.ts",
+      "sha256": "0960952998e9ea591bc0b10e9b155399d9cfb4614315e51ee0c52191f435d6e2",
+      "bytes": 17023,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-notifications.ts",
+      "sha256": "e2572f3c42771875835463f74a2d4a824e2197632d36f588f9ec2194a9138cb7",
+      "bytes": 16167,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-operations.ts",
+      "sha256": "1bcbaf58723737b6953d115445e9f6a4fc8ec8b7eda71d2921ddfe899d5a0585",
+      "bytes": 37504,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-paid-entry.ts",
+      "sha256": "5bb66b9d08a56a135b3979c2417ff61f2dbdc16bf4b1e23824f601fdc30ad8f5",
+      "bytes": 61889,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-public.ts",
+      "sha256": "7d6ed3828c5ac93a07399d286dc30470a5539eaa669611793c7dd7776fd47178",
+      "bytes": 12676,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-result-confirmation.ts",
+      "sha256": "db2de8d6baf37f647a08894f4e16caa1104dcce17828fbbb7ec6d4147a0e4470",
+      "bytes": 27178,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-settlement-policy.ts",
+      "sha256": "c54aac155573d47c3de18015caad3ac67b819c8fe31a49497c32dffe12178dc0",
+      "bytes": 3112,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-settlement.ts",
+      "sha256": "ef2d0dc8d18042c114d653d85a2b8b77a60189d8d311b930fd7130662de72550",
+      "bytes": 10640,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-submission-reminders.ts",
+      "sha256": "84fd6640383ae3800fe40e29dafc65e931587c644fb952c498d18906258beebf",
+      "bytes": 5446,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-submission-visibility.ts",
+      "sha256": "6048ecd293c6152a82541c6b4474fbbfbe97bdcd78039f9192d773ff3f5a4e4e",
+      "bytes": 1384,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournament-validation.ts",
+      "sha256": "c6b37be5a037bc338ab9ec193e0c1b47e72b3f14bf915752db90b9fe8c47ba89",
+      "bytes": 15485,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/server/tournaments.ts",
+      "sha256": "37f5708471bc5dd01229a480506f2fcccb575b841f71ad8b5633e2ac2a3bf5a4",
+      "bytes": 16665,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/tournament-participant-view.ts",
+      "sha256": "b7458614d786ce96a960c75268af84bad915d49dd2e4f107e8dbc8acb360338c",
+      "bytes": 1818,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/tournament-results-view.ts",
+      "sha256": "2f3a03bfdf92c16c988caa6af47bc458f12e9259b9dc50bad97b9f8caac148d4",
+      "bytes": 903,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/tournament-smart-priority.ts",
+      "sha256": "1aa51789b51bdfc233c7f12b0f92a592c32b690c1f542279dc9ec2d6bb5105c3",
+      "bytes": 886,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "lib/tournament-types.ts",
+      "sha256": "c2b7b9afc94fb6ccd3ebbf74f37bd7917b553560ee69710dcca1e23e8f4e50b2",
+      "bytes": 12458,
+      "purpose": "Cumulative approved master implementation"
+    },
+    {
+      "path": "scripts/qa/dashboard-auth-journeys.mjs",
+      "sha256": "2b82d0c1df66c6e58bcdd5dd5d607f0be36d145e5577e145a844c52c270fe68c",
+      "bytes": 19781,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/qa/dashboard-redesign-journeys.mjs",
+      "sha256": "d7fb23fe388a9b54b4da500f45786edbde57a4878a0b44eaa7f7876b78190b34",
+      "bytes": 18329,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/qa/master-detail-journeys.mjs",
+      "sha256": "8fdae60e407e4c8df2b6edbc6da63c4fef478970e0d76e541fcce6f0a45c2519",
+      "bytes": 20830,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/qa/master-participant-journeys.mjs",
+      "sha256": "a9462068990fbe332207e92589d134b45b9d71d6fb2666c01fd9cd96541dfa82",
+      "bytes": 13650,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/qa/run-p1-browser-e2e.mjs",
+      "sha256": "baa65391efbf19db8ab86a4da6613912aa73ae6b21853f1ed52ef26cdf89094b",
+      "bytes": 163406,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/run-isolated-p0-emulators.mjs",
+      "sha256": "a8f2a8df1074605f5575252edfdc83dd8f4d707374ef41da6db5c03863c84c28",
+      "bytes": 6662,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/run-local-verification-suite.mjs",
+      "sha256": "30b6e2f9334548125871d0e9a547408177a6199f90758574e38527d1ac4c95ad",
+      "bytes": 1856,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/run-media-publish-emulators.cjs",
+      "sha256": "c07473944e81cef32a42ef1eccb2575ef6d2c72ce24b53847a5ac8edb188bb30",
+      "bytes": 2110,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/run-p0-emulator-regressions.mjs",
+      "sha256": "f1b44c654d0968ef437f9f312fcccdcd5897a1f7cbca21b78f18c9ff2eec5c1b",
+      "bytes": 7205,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-automatic-voting-emulator.mjs",
+      "sha256": "584878a90cc5846db1e8013c1c49ae933fd9471980f313f49da2c87a9750ffd2",
+      "bytes": 10691,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-dashboard-auth-routing.mjs",
+      "sha256": "1d7c7ef89288501d979b71bb60972dc08b1f8acb0d1b8cb99364de2cb0ffce1a",
+      "bytes": 6975,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-explore-card-policy.mjs",
+      "sha256": "fa3c4d59a3bc5d11ba7b8637746b0e4e8e0dea3a75dbe03b0c602d55c333280f",
+      "bytes": 1463,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "sha256": "1bbf3538a80d108e2a113e5d4f8b8917d40142a971aace3ede0a3f33d95df75a",
+      "bytes": 2508,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-automatic-settlement-emulator.mjs",
+      "sha256": "7468380a70e3fc635de149b63b529cce611ec5c691876759bc6d5a689163d6ae",
+      "bytes": 5128,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-cancellation-emulator.mjs",
+      "sha256": "4f8a7dd9e578981feed0e7c5ac5330d33721f9068173762d6afca31f7abf99fc",
+      "bytes": 15158,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-correction-emulator.mjs",
+      "sha256": "29d4e9a9f9eb91447152b77892143c4d7d3cca2ad03201f8ead119b79f7c7fb5",
+      "bytes": 12959,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-recovery-emulator.mjs",
+      "sha256": "213a624220ea1cdc75c6ca427251394c5bf2713dee407188addc0b84332c0d40",
+      "bytes": 8320,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-tournament-bracket-matrix.mjs",
+      "sha256": "ddcdd468918242e3a36fb6d9b48c32efa222acf574713580798ccd660ebd164b",
+      "bytes": 3802,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-tournament-foundation.mjs",
+      "sha256": "9c594b94c165467150ecf4922aa5fb819452cc8b2f4c052b0e5f420f84d27319",
+      "bytes": 2149,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-individual-tournament-policy.mjs",
+      "sha256": "938c04bfc6992cb91ee2136457867fc9587b3fd454eff3ae22fdd65810c2d5ea",
+      "bytes": 1969,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-my-tournaments-emulator.mjs",
+      "sha256": "f76b8050f369d94dce77410b996da26b1ac7fdbd91c49098a74a5ca89e4b0d6f",
+      "bytes": 6890,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-private-v2-access-emulator.mjs",
+      "sha256": "f31f2988648d06e71ce9c1527b75a6a3224896a828fbb1ae82ec4e4d9fc2ac01",
+      "bytes": 19192,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+      "sha256": "2c6751b06fb9b526b17724fd0c9275101fc0c4fb0ab46461bbb52b491b266942",
+      "bytes": 19687,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-media-visibility-emulator.mjs",
+      "sha256": "a8cade626f7603603dc6f7ee89889976e871bd9ae2ff1e7098a14b6c44f8c2a7",
+      "bytes": 5189,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-new-policy.mjs",
+      "sha256": "344c3ee400fea8b73ce201ce624ee476bac4e3b8382374e5fb4c5dd5d1893e51",
+      "bytes": 3999,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-participant-view.mjs",
+      "sha256": "e524c2a928d03fecc18244fe12886d6a15c049fa4c8a9e69f55b383c42035984",
+      "bytes": 2098,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-results-view.mjs",
+      "sha256": "b289e8e9bb09aabfd55994cfdf60298c1c12af5261f919bfadb94e83bb24707b",
+      "bytes": 1040,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-settlement-allocation.mjs",
+      "sha256": "03841d8f6ea672915dacffa7d1f5a4e44c536a4c014b7b2d08ba799ffc22722f",
+      "bytes": 4362,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-submission-media-emulator.mjs",
+      "sha256": "dfed24d1daae1a6759e9767b12609fdb45ff46e0cf975c8550d2778c50c8c940",
+      "bytes": 9642,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-submission-visibility.mjs",
+      "sha256": "9e7cd00ff64813e081ee8fddc676a2d3461df98c13058150c233953f1a00f3ec",
+      "bytes": 1695,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "scripts/test-tournament-upload-path-identifiers.mjs",
+      "sha256": "727a4196ba35dc1cf7144b042a6b98ce5c9bdfc24428dfa223e0d8365107eea4",
+      "bytes": 1192,
+      "purpose": "Authorized regression test and isolated verification harness"
+    },
+    {
+      "path": "vercel.json",
+      "sha256": "e79d95223cdaeae6e9cb8d53fb25baaf1c9fba902cf9e3610ef164b26cae6461",
+      "bytes": 225,
+      "purpose": "Disable deployment for exact non-production branch"
+    }
+  ],
+  "excludedTracked": [
+    "next-env.d.ts",
+    "tsconfig.json",
+    "tsconfig.tsbuildinfo"
+  ],
+  "excludedUntrackedCount": 461,
+  "secretPatternScan": "No private-key blocks, GitHub token values or live Stripe secret values detected. This is a scoped pattern check, not proof of all possible secrets."
+}

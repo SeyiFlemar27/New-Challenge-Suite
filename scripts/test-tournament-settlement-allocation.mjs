@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildSettlementBreakdown } from "../lib/server/challenge-settlement.ts";
+import { INDIVIDUAL_TOURNAMENT_POLICY } from "../lib/individual-tournament-policy.ts";
 const challenge = { settlementEntityType: "tournament", configVersion: 3 };
 const winners = [1, 2, 3].map(placement => ({ userId: `winner_${placement}`, placement, submissionId: null, splitPercent: 0 }));
 let assertions = 0;
@@ -19,5 +20,21 @@ const team = buildSettlementBreakdown({ challenge, winners: winners.flatMap(winn
 for (const placement of [1, 2, 3]) {
   const members = team.sponsorPrizeDistribution.filter(row => row.placement === placement);
   assert.ok(Math.abs(members[0].netAmountCents - members[1].netAmountCents) <= 1); assertions++;
+}
+const individual = { ...challenge, configVersion: 4, productPolicyVersion: INDIVIDUAL_TOURNAMENT_POLICY };
+for (const amount of [0, 1, 7, 99, 100, 501, 10001]) {
+  const input = { challenge: individual, winners, confirmedEntryRevenueCents: amount, confirmedPaidVoteRevenueCents: amount, confirmedSponsorPrizeCents: amount, confirmedCreatorPrizeCents: amount };
+  const result = buildSettlementBreakdown(input);
+  const pool = result.winnerPoolAmount + result.netSponsorPrizeAmount;
+  const totals = result.winnerDistribution.map((row, index) => row.netAmountCents + result.sponsorPrizeDistribution[index].netAmountCents);
+  assert.deepEqual(totals, [Math.floor(pool * .50), Math.floor(pool * .30), pool - Math.floor(pool * .50) - Math.floor(pool * .30)]); assertions++;
+  assert.equal(totals.reduce((sum, value) => sum + value, 0) + result.creatorHostAmount + result.platformChallengeFeeAmount, amount * 4); assertions++;
+  const bronze = buildSettlementBreakdown({ ...input, challenge: { ...individual, thirdPlaceOutcome: "unawarded" }, winners: winners.slice(0, 2) });
+  assert.equal(bronze.unawardedThirdPlaceHoldCents, totals[2]); assertions++;
+  assert.equal(bronze.winnerDistribution.reduce((sum, row) => sum + row.netAmountCents, 0) + bronze.sponsorPrizeDistribution.reduce((sum, row) => sum + row.netAmountCents, 0) + bronze.unawardedThirdPlaceHoldCents, pool); assertions++;
+  assert.equal(result.externalPayoutExecuted, false); assertions++;
+}
+for (const productPolicyVersion of [undefined, "unknown", "tournament_v3_20261015"]) {
+  assert.throws(() => buildSettlementBreakdown({ challenge: { ...individual, productPolicyVersion }, winners, confirmedEntryRevenueCents: 100, confirmedPaidVoteRevenueCents: 0, confirmedSponsorPrizeCents: 0 }), /SETTLEMENT_POLICY_INVALID/); assertions++;
 }
 console.log(`Tournament allocation: ${assertions} deterministic assertions passed; no provider execution.`);

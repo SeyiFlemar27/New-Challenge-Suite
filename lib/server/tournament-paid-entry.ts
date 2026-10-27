@@ -5,6 +5,7 @@ import type { TournamentFoundation, TournamentParticipantFoundation, TournamentT
 import { deterministicId } from "@/lib/server/idempotency";
 import { dispatchTournamentActivationOutbox } from "@/lib/server/tournament-cloud-tasks";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import { confirmTournamentTeamMemberPayment, expireTournamentTeamAttempt, reserveTournamentTeamMemberEntry } from "@/lib/server/tournament-team-entry";
 import { deliverTournamentNotifications } from "@/lib/server/tournament-notifications";
 
@@ -71,6 +72,7 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     const [tournamentSnap, lockSnap, subjectSnap, accountSnap, profileSnap, invitationSnap, competitorsSnap, reservationsSnap, captainMembershipSnap] = reads;
     if (!tournamentSnap.exists) throw coded("Tournament not found.", "TOURNAMENT_NOT_FOUND", 404);
     const tournament = { id: input.tournamentId, ...tournamentSnap.data() } as TournamentFoundation & Record<string, unknown>;
+    if (isIndividualTournamentPolicy(tournament) && (input.target.mode !== "individual" || tournament.participationMode !== "individual")) throw coded("This Tournament supports individual entry only.", "TOURNAMENT_MODE_MISMATCH");
     if (Number(tournament.configVersion ?? 1) < 3) throw coded("Paid entry checkout is available only for Tournament V3.", "TOURNAMENT_VERSION_UNSUPPORTED");
     if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && input.target.mode === "team") throw coded("This Tournament requires individual member payments; captain-paid checkout is unavailable.", "TEAM_MEMBER_PAYMENTS_REQUIRED");
     if (tournament.entryType === "free") throw coded("This Tournament does not require an entry payment.", "PAYMENT_NOT_REQUIRED", 409);
@@ -90,7 +92,8 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     const subject = subjectSnap.data() ?? {};
     if (input.target.mode === "individual") {
       if (subjectSnap.exists && subject.userId !== input.target.userId) throw coded("This Tournament participant record belongs to another account.", "PARTICIPANT_OWNERSHIP_MISMATCH", 403);
-      if (subjectSnap.exists && !["payment_pending"].includes(String(subject.status ?? ""))) throw coded("You already have a Tournament registration state.", "DUPLICATE_PARTICIPANT");
+      const rejoining = isIndividualTournamentPolicy(tournament) && subject.status === "withdrawn" && subject.paymentStatus === "refunded";
+      if (subjectSnap.exists && !["payment_pending"].includes(String(subject.status ?? "")) && !rejoining) throw coded("You already have a Tournament registration state or a refund awaiting confirmation.", "DUPLICATE_PARTICIPANT");
       if (competitorsSnap.size >= 501) throw coded("Tournament capacity requires reconciliation.", "TOURNAMENT_CAPACITY_RECONCILIATION_REQUIRED");
     } else {
       const team = subject as TournamentTeamFoundation & Record<string, unknown>;
@@ -159,7 +162,7 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     };
     transaction.create(reservationRef, record);
     transaction.create(paymentRef, { ...record, provider: "stripe", paymentPurpose: "tournament_entry", status: "pending", webhookConfirmed: false, providerSessionId: null, providerPaymentIntentId: null, refundStatus: "not_required", idempotencyKey: reservationId });
-    if (participantRef && subjectSnap.exists) transaction.set(participantRef, { entryPaymentId: reservationId, updatedAt: nowIso }, { merge: true });
+    if (participantRef && subjectSnap.exists && subject.status !== "withdrawn") transaction.set(participantRef, { entryPaymentId: reservationId, updatedAt: nowIso }, { merge: true });
     if (teamRef) transaction.set(teamRef, { paymentReservationId: reservationId, paymentReservationExpiresAt: expiresAt, updatedAt: nowIso }, { merge: true });
     transaction.set(lockRef, { tournamentId: input.tournamentId, entrantType: input.target.mode, entrantId: subjectId, activeReservationId: reservationId, sequence, updatedAt: nowIso }, { merge: true });
     // Every reservation mutates the Tournament row so concurrent last-slot attempts serialize on one document.
@@ -314,7 +317,8 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
         && (!invitationSnap.data()?.expiresAt || Date.parse(String(invitationSnap.data()?.expiresAt)) > now.getTime()));
     }
     if (entrantType === "individual") eligible &&= !competitorSnap.exists
-      || competitor.userId === userId && competitor.status === "payment_pending" && competitor.entryPaymentId === paymentId;
+      || competitor.userId === userId && (competitor.status === "payment_pending" && competitor.entryPaymentId === paymentId
+        || isIndividualTournamentPolicy(tournament) && competitor.tournamentId === tournamentId && competitor.status === "withdrawn" && competitor.paymentStatus === "refunded");
     else {
       const roster = Array.isArray(competitor.memberUserIds) ? competitor.memberUserIds.map(String) : [];
       const reservedRoster = Array.isArray(reservation.rosterUserIds) ? reservation.rosterUserIds.map(String) : [];
@@ -357,7 +361,10 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
     if (entrantType === "individual") {
       if (competitorSnap.exists && competitor.status !== "withdrawn") throw new Error("Tournament participant already exists for this successful payment.");
       const participant = { id: entrantId, tournamentId, userId, status: "registered", checkInStatus: "pending", seed: null, inviteId: reservation.invitationId ?? null, waitlistPosition: null, entryPaymentId: paymentId, createdAt: String(reservation.reservationCreatedAt), updatedAt: now.toISOString() } satisfies TournamentParticipantFoundation & Record<string, unknown>;
-      transaction.set(competitorRef, participant);
+      if (isIndividualTournamentPolicy(tournament) && competitorSnap.exists && competitor.status === "withdrawn") {
+        transaction.create(db.collection("tournamentRegistrationHistory").doc(`${competitorRef.id}_${Number(competitor.registrationRevision ?? 0)}`), { ...competitor, archivedAt: now.toISOString() });
+        transaction.set(competitorRef, { ...participant, paymentStatus: "confirmed", registrationRevision: Number(competitor.registrationRevision ?? 0) + 1 });
+      } else transaction.set(competitorRef, participant);
     } else {
     transaction.set(competitorRef, { status: "ready", paymentStatus: "confirmed", slotReservedAt: now.toISOString(), rosterLockedAt: now.toISOString(), paymentReservationId: null, paymentReservationExpiresAt: null, entryPaymentId: paymentId, readyAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
     }
@@ -589,6 +596,12 @@ export async function reconcileTournamentEntryRefund(db: Firestore, input: {
     transaction.set(paymentRef, { status: "refunded", refundStatus: "succeeded", providerRefundId: input.providerRefundId, refundedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
     transaction.set(db.collection("tournamentEntryReservations").doc(paymentId), { status: "refunded", refundedAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
     transaction.set(db.collection("cashLedger").doc(`refund_${input.refundCaseId}`), { id: `refund_${input.refundCaseId}`, transactionType: "refund", sourceType: "tournament_entry", sourceId: paymentId, amountCents: Number(payment.amountCents), currency: payment.currency, direction: "debit", status: "posted", immutable: true, providerReference: input.providerRefundId, idempotencyKey: input.refundCaseId, tournamentId, createdAt: now.toISOString(), updatedAt: now.toISOString() }, { merge: true });
+    const plannedWithdrawal = isIndividualTournamentPolicy(tournamentSnap.data() ?? {}) && payment.refundReason === "PARTICIPANT_WITHDREW" && competitorSnap.data()?.withdrawalBeforeActivation === true && competitorSnap.data()?.status === "withdrawn" && competitorSnap.data()?.entryPaymentId === paymentId && !matchesSnap.docs.some(row => [row.data().participantAId, row.data().participantBId].includes(entrantId));
+    if (plannedWithdrawal) {
+      transaction.update(competitorRef, { paymentStatus: "refunded", updatedAt: now.toISOString() });
+      transaction.create(db.collection("tournamentAuditEvents").doc(`${paymentId}_withdrawal_refunded`), { tournamentId, actorId: "stripe", action: "individual_entry_refund_confirmed", createdAt: now.toISOString(), metadata: { entrantId, paymentId, refundCaseId: input.refundCaseId, providerRefundId: input.providerRefundId, unrelatedProgressionPreserved: true } });
+      return { idempotent: false, tournamentId, entrantId, entrantType, wasConfirmed: previouslyConfirmed };
+    }
     if (previouslyConfirmed && competitorSnap.exists) {
       const competitor = competitorSnap.data() ?? {};
       const currentCount = Math.max(0, Number(tournamentSnap.data()?.participantCount ?? 0));

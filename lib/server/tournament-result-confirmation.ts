@@ -173,7 +173,7 @@ async function confirmResult(db: Firestore, id: string, body: Record<string, unk
     const submissionDurationMs = Number(currentTournament.submissionDurationHours ?? 48) * 60 * 60 * 1000;
     const openedAt = new Date().toISOString();
     const openedNextMatch = (next: TournamentMatchFoundation | null) => {
-      if (!next?.participantAId || !next.participantBId || ["confirmed", "forfeit", "bye", "completed"].includes(next.status)) return next;
+      if (!next?.participantAId || !next.participantBId || ["confirmed", "forfeit", "bye", "completed", "held", "disputed"].includes(next.status)) return next;
       if (Number(currentTournament.configVersion ?? 1) < 3) return { ...next, status: "ready" as const, updatedAt: openedAt };
       return { ...next, status: "submissions_open" as const, openedAt, submissionsOpenedAt: openedAt, submissionDeadlineAt: new Date(Date.parse(openedAt) + submissionDurationMs).toISOString(), updatedAt: openedAt };
     };

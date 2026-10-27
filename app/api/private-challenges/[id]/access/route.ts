@@ -29,18 +29,25 @@ async function getAccess(request: Request, { params }: { params: Promise<{ id: s
   const url = new URL(request.url);
   const requestCursor = url.searchParams.get("requestCursor") ?? "";
   const participantCursor = url.searchParams.get("participantCursor") ?? "";
-  if ([requestCursor, participantCursor].some((cursor) => cursor.length > 300 || cursor.includes("/"))) return fail("Invalid management cursor.", 400);
+  const grantCursor = url.searchParams.get("grantCursor") ?? "";
+  if ([requestCursor, participantCursor, grantCursor].some((cursor) => cursor.length > 300 || cursor.includes("/"))) return fail("Invalid management cursor.", 400);
   let requestsQuery = db.collection("privateAccessRequests").where("challengeId", "==", id).orderBy("__name__").limit(51);
   let participantsQuery = db.collection("challengeParticipants").where("challengeId", "==", id).orderBy("__name__").limit(51);
   if (requestCursor) requestsQuery = requestsQuery.startAfter(requestCursor);
   if (participantCursor) participantsQuery = participantsQuery.startAfter(participantCursor);
-  const [requests, participants] = await Promise.all([requestsQuery.get(), participantsQuery.get()]);
+  let grantsQuery = db.collection("privateChallengeAccess").where("challengeId", "==", id).orderBy("__name__").limit(51);
+  if (grantCursor) grantsQuery = grantsQuery.startAfter(grantCursor);
+  const [requests, participants, grants] = await Promise.all([requestsQuery.get(), participantsQuery.get(), grantsQuery.get()]);
+  const grantDocs = grants.docs.slice(0, 50);
+  const grantParticipants = grantDocs.length ? await db.getAll(...grantDocs.map(doc => db.collection("challengeParticipants").doc(doc.id))) : [];
   const requestDocs = requests.docs.slice(0, 50), participantDocs = participants.docs.slice(0, 50);
   const relatedParticipants = requestDocs.length ? await db.getAll(...requestDocs.map((doc) => db.collection("challengeParticipants").doc(`${id}_${doc.data().userId}`))) : [];
   const joined = new Set(relatedParticipants.filter((doc) => privateParticipantJoined(doc.data())).map((doc) => String(doc.data()?.userId)));
   return ok({ enrollmentOpen: privateEnrollmentOpen(access.challenge), invitationMethod: String(access.challenge.privateAccessMethod ?? ""), publicPreviewEnabled: access.challenge.publicPreviewEnabled === true,
     requests: requestDocs.map((doc) => ({ id: doc.id, userId: doc.data().userId, reason: doc.data().reason ?? "", status: doc.data().status, decisionReason: doc.data().decisionReason ?? "", joined: joined.has(String(doc.data().userId)) })),
     participants: participantDocs.filter((doc) => privateParticipantJoined(doc.data())).map((doc) => ({ id: doc.id, userId: doc.data().userId, status: doc.data().status })),
+    grants: grantDocs.map((doc, index) => ({ id: doc.id, userId: doc.data().userId, status: doc.data().status, source: doc.data().source ?? "access_grant", joined: privateParticipantJoined(grantParticipants[index]?.data()) })),
+    nextGrantCursor: grants.size > 50 ? grantDocs.at(-1)?.id : null,
     nextRequestCursor: requests.size > 50 ? requestDocs.at(-1)?.id : null, nextParticipantCursor: participants.size > 50 ? participantDocs.at(-1)?.id : null }, "Access management loaded.");
 }
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

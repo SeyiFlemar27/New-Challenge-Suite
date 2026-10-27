@@ -53,7 +53,7 @@ export type TournamentFoundation = {
   moderationStatus?: string;
   registrationAvailability?: "open" | "temporarily_unavailable";
   registrationHoldReason?: string | null;
-  productPolicyVersion?: "tournament_v3_20261015";
+  productPolicyVersion?: "tournament_v3_20261015" | "individual_tournament_v4_20261026";
   subcategory?: string;
   tournamentRules?: string[] | string;
   submissionInstructions?: string[];

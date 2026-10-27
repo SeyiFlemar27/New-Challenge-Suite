@@ -9,6 +9,7 @@ import { processTournamentLifecycleAction } from "../lib/server/tournament-lifec
 import { createPendingCreatorPrizeFunding, confirmCreatorPrizeFunding } from "../lib/server/prize-funding.ts";
 import { createTournamentEntryCheckout, confirmTournamentEntryPayment } from "../lib/server/tournament-paid-entry.ts";
 import { setTournamentRegistrationReadinessForTests } from "../lib/server/tournament-publication.ts";
+import { INDIVIDUAL_TOURNAMENT_POLICY, INDIVIDUAL_TOURNAMENT_PLACEMENTS } from "../lib/individual-tournament-policy.ts";
 assert.match(process.env.GCLOUD_PROJECT ?? "", /^demo-/);
 for (const name of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"]) assert.match(process.env[name] ?? "", /^127\.0\.0\.1:\d+$/);
 setTournamentRegistrationReadinessForTests(true);
@@ -55,9 +56,12 @@ async function pay(id, player, target) {
 }
 await db.collection("doroCoinWallets").doc(voter.uid).set({ balance: 1000 });
 try {
-  for (const mode of ["individual", "team"]) for (const format of ["single_elimination", "double_elimination"]) {
+  const individualPolicyFixture = process.env.CHALLENGE_SUITE_TEST_POLICY === "individual-v4";
+  const fixtureCapacity = individualPolicyFixture ? Number(process.env.CHALLENGE_SUITE_TEST_CAPACITY ?? 4) : 4;
+  assert.ok([4, 8, 16, 32].includes(fixtureCapacity), "Only locked Individual capacities may be tested");
+  for (const mode of (individualPolicyFixture ? ["individual"] : ["individual", "team"])) for (const format of ["single_elimination", "double_elimination"]) {
     const label = `${mode}_${format}`;
-    const players = await Promise.all(Array.from({ length: mode === "team" ? 8 : 4 }, (_, index) => user(`${label}_${index}`)));
+    const players = await Promise.all(Array.from({ length: mode === "team" ? 8 : fixtureCapacity }, (_, index) => user(`${label}_${index}`)));
     const owners = new Map();
     const image = await sharp({ create: { width: 32, height: 24, channels: 3, background: "gold" } }).png().toBuffer();
     const coverPath = `tournaments/drafts/${host.uid}/cover/${randomUUID()}.png`;
@@ -69,6 +73,11 @@ try {
     if (paidEntry) { body.entryType = "paid_entry_setup_required"; body.entryFeeAmountMinor = 500; }
     const created = await call(create, host, body);
     const id = created.tournament.id;
+    if (individualPolicyFixture) {
+      // Demo-only fixture conversion tests downstream compatibility. It does not
+      // enable v4 creation or migrate any real record.
+      await db.collection("tournaments").doc(id).update({ configVersion: 4, participantCapacity: fixtureCapacity, productPolicyVersion: INDIVIDUAL_TOURNAMENT_POLICY, prizeDistribution: INDIVIDUAL_TOURNAMENT_PLACEMENTS.map((percent, index) => ({ placement: index + 1, percent })) });
+    }
     const payment = await createPendingCreatorPrizeFunding(db, { challengeId: id, subjectType: "tournament", creatorId: host.uid, amountCents: 10000 });
     await confirmCreatorPrizeFunding(db, { id: `${id}_creator_fixture` }, { id: `${id}_session`, mode: "payment", payment_status: "paid", amount_total: 10000, currency: "usd", payment_intent: `${id}_intent`, metadata: { paymentPurpose: "prize_pool_funding", creatorPrizeFundingId: payment.id, fundingSubjectType: "tournament", challengeId: id, userId: host.uid, initiatedByUserId: host.uid, organizationOwnerId: "" } });
     await call(edit, host, { status: "pending_review", expectedUpdatedAt: (await db.collection("tournaments").doc(id).get()).data().updatedAt }, id, "PATCH");
@@ -92,7 +101,7 @@ try {
     }
     const tournamentRef = db.collection("tournaments").doc(id);
     const registered = (await tournamentRef.get()).data();
-    eq(registered.participantCount, 4);
+    eq(registered.participantCount, fixtureCapacity);
     const jobId = `${id}_activation_v${registered.activationVersion}`;
     eq((await processTournamentActivationJobById(db, jobId, registered.activationVersion, new Date(Date.parse(registered.activationWindowEndsAt) - 1))).code, "ACTIVATION_WINDOW_OPEN");
     const activationWait = Math.max(0, Date.parse(registered.activationWindowEndsAt) - Date.now());
@@ -134,7 +143,7 @@ try {
             eq(saved.submission.revision, 2);
             eq((await db.collection("tournamentSubmissionRevisions").doc(`${saved.submission.id}_revision_1`).get()).exists, true);
           }
-          await call(adminAction, admin, { action: "submission_approved", submissionId: saved.submission.id, confirmed: true, reason: "Verified acceptable isolated match media" }, id);
+          await call(adminAction, admin, { action: "submission_approved", submissionId: saved.submission.id, expectedRevision: saved.submission.revision, confirmed: true, reason: "Verified acceptable isolated match media" }, id);
         }
         const target = { matchId: match.id, selectedParticipantId: match.participantAId, submissionId: `${id}_${match.id}_${match.participantAId}` };
         eq((await vote(request(voter, { ...target, voteType: "free" }), context(id))).ok, false, "no early voting");
@@ -152,7 +161,14 @@ try {
         await call(vote, voter, { ...voted, selectedParticipantId: opposite, submissionId: `${id}_${match.id}_${opposite}`, voteType: "dorocoin", confirmedDoroCoinSpend: true, idempotencyKey: `${id}_${match.id}_paid` }, id);
         await row.ref.update({ votingClosesAt: new Date(Date.now() - 1).toISOString() });
         await processTournamentLifecycleAction({ db, id, tournament: { id, ...(await tournamentRef.get()).data() }, action: "process_match_deadlines", actorId: "system_tournament_lifecycle" });
-        const confirmed = await call(result, host, { matchId: match.id }, id);
+        let confirmed;
+        try { confirmed = await call(result, host, { matchId: match.id }, id); }
+        catch (error) {
+          const current = (await row.ref.get()).data();
+          const next = current.nextMatchId ? (await db.collection("tournamentMatches").doc(current.nextMatchId).get()).data() : null;
+          console.error("DEMO advancement diagnostic", JSON.stringify({ format, capacity: fixtureCapacity, source: current, next }));
+          throw error;
+        }
         eq(confirmed.voteOutcome.tied, true, "tied result uses complete authoritative vote sequence");
         eq((await row.ref.get()).data().winnerParticipantId, selected);
         if (confirmed.grandFinalResetRequired) resetSeen = true;
@@ -163,13 +179,20 @@ try {
     const placements = await db.collection("tournamentPlacements").where("tournamentId", "==", id).get();
     eq(placements.size, 3, `${label}: three real placements`);
     if (format === "double_elimination") eq(resetSeen, true, "Grand Final reset executed");
-    await call(manage, host, { action: "review_final_placements", confirmed: true, reason: "Reviewed the actual competition placements" }, id);
-    await call(adminAction, admin, { action: "approve_payout_foundation", confirmed: true, reason: "Verified final placements and confirmed funding" }, id);
+    if (individualPolicyFixture) {
+      const { reconcileAutomaticIndividualSettlement } = await import("../lib/server/individual-automatic-settlement.ts");
+      const automatic = await reconcileAutomaticIndividualSettlement(db, id);
+      eq(automatic.status, "credits_recorded", `Automatic settlement must satisfy actual funding/placement checks: ${automatic.reason ?? ""}`);
+      eq((await tournamentRef.get()).data().automaticWinnerVerificationStatus, "verified");
+    } else {
+      await call(manage, host, { action: "review_final_placements", confirmed: true, reason: "Reviewed the actual competition placements" }, id);
+      await call(adminAction, admin, { action: "approve_payout_foundation", confirmed: true, reason: "Verified final placements and confirmed funding" }, id);
+    }
     eq((await tournamentRef.get()).data().status, "winners_announced");
     const ledger = await db.collection("cashLedger").where("challengeId", "==", id).get();
     eq(ledger.docs.filter(row => row.data().sourceType === "challenge_winner_prize").reduce((sum, row) => sum + row.data().netAmountCents, 0), 10000 + (paidEntry ? players.length * 500 * 0.65 : 0), "creator funds remain entirely in the winner pool; only entry revenue uses 65/20/15");
     eq(ledger.docs.some(row => row.data().externalPayoutExecuted === true), false);
     console.log(`PASS complete backend lifecycle ${label}: ${processed} verified matches, three placements and internal settlement; ${paidEntry ? "paid-entry" : "free-entry"} scenario with deterministic provider fixtures.`);
   }
-  console.log(`Tournament four lifecycle scenarios: ${assertions} actual-handler/service assertions passed. Test-controlled deadlines; no live Stripe or external payout.`);
+  console.log(`Tournament ${individualPolicyFixture ? "v4 Individual downstream fixture" : "four legacy lifecycle"} scenarios: ${assertions} actual-handler/service assertions passed. Test-controlled deadlines; no live Stripe or external payout. Settlement uses ${individualPolicyFixture ? "verified automatic internal credits" : "the reviewed manual approval path"}.`);
 } finally { await app.delete(); }

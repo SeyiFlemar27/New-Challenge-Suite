@@ -8,6 +8,7 @@ import { DOROCOIN_COST_PER_VOTE, validVotingTimeZone, voteDateKeyForTimeZone } f
 import { getActiveEconomyRules } from "@/lib/server/economy-rules";
 import type { TournamentFoundation, TournamentMatchFoundation, TournamentRoundFoundation } from "@/lib/tournament-types";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import { isSponsorProfile } from "@/lib/server/submission-lifecycle";
 import { votingAccountRestricted } from "@/lib/voting-account-policy";
 
@@ -30,12 +31,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!match.participantAId || !match.participantBId) return fail("Match assignments are not ready.", 409, undefined, "TOURNAMENT_MATCH_NOT_READY");
   const collection = tournament.participationMode === "team" ? "tournamentTeams" : "tournamentParticipants";
   const [roundSnap, first, second] = await db.getAll(db.collection("tournamentRounds").doc(match.roundId), db.collection(collection).doc(match.participantAId), db.collection(collection).doc(match.participantBId));
-  const date = voteDateKeyForTimeZone(new Date(), validVotingTimeZone(profile.data()?.timeZone ?? profile.data()?.timezone));
+  const date = voteDateKeyForTimeZone(new Date(), isIndividualTournamentPolicy(tournament) ? "UTC" : validVotingTimeZone(profile.data()?.timeZone ?? profile.data()?.timezone));
   const key = createHash("sha256").update(`${id}:${matchId}:${user.uid}:${date}`).digest("hex");
   const [free, paid] = await db.getAll(db.collection("tournamentFreeVoteDailyGuards").doc(key), db.collection("tournamentPaidVoteDailyGuards").doc(key));
   const blocked = tournament.hostId === user.uid || isSponsorProfile(account.data() ?? {}) || votingAccountRestricted(account.data() ?? {}) || [first, second].some(side => !side.exists || isTournamentCompetitorVoter({ userId: user.uid, participationMode: tournament.participationMode, competitor: side.data() ?? {}, membership: membership.data() ?? null, teamId: side.id }));
   const eligible = roundSnap.exists && roundSnap.data()?.tournamentId === id && validateTournamentVote({ tournament, match, round: { ...roundSnap.data(), id: roundSnap.id } as TournamentRoundFoundation }).valid;
-  return ok({ canVote: Boolean(eligible && !blocked), automaticFreeFirst: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY, freeVote: { used: free.exists, available: !free.exists }, balance: Number(wallet.data()?.balance ?? 0), doroCoinCost: DOROCOIN_COST_PER_VOTE, paidVotesUsed: Number(paid.data()?.quantity ?? 0) }, "Current match voting state; vote execution rechecks eligibility.");
+  return ok({ canVote: Boolean(eligible && !blocked), automaticFreeFirst: tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(tournament), freeVote: { used: free.exists, available: !free.exists }, balance: Number(wallet.data()?.balance ?? 0), doroCoinCost: DOROCOIN_COST_PER_VOTE, paidVotesUsed: Number(paid.data()?.quantity ?? 0) }, "Current match voting state; vote execution rechecks eligibility.");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -58,7 +59,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const tournamentConfigSnap = await db.collection("tournaments").doc(id).get();
   const requestConfigVersion = Number(tournamentConfigSnap.data()?.configVersion ?? 1);
   const profileSnap = await db.collection("profiles").doc(user.uid).get();
-  const configuredTimeZone = validVotingTimeZone(String(profileSnap.data()?.timeZone ?? profileSnap.data()?.timezone ?? (user as typeof user & { timeZone?: string }).timeZone ?? "UTC"));
+  const configuredTimeZone = isIndividualTournamentPolicy(tournamentConfigSnap.data() ?? {}) ? "UTC" : validVotingTimeZone(String(profileSnap.data()?.timeZone ?? profileSnap.data()?.timezone ?? (user as typeof user & { timeZone?: string }).timeZone ?? "UTC"));
   const voteDate = voteDateKeyForTimeZone(new Date(), configuredTimeZone);
   const requestHash = createHash("sha256").update(requestedVoteType === "dorocoin" ? requestKey : voteDate).digest("hex").slice(0, 32);
   const voteRef = db.collection("tournamentVotes").doc(requestConfigVersion >= 3 ? `${id}_${matchId}_${user.uid}_${requestedVoteType}_${requestHash}` : `${id}_${matchId}_${user.uid}`);
@@ -102,6 +103,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
       const configVersion = Number(tournament.configVersion ?? 1);
       if (configVersion !== requestConfigVersion) throw Object.assign(new Error("Tournament configuration changed. Retry this vote."), { code: "TOURNAMENT_CONFIG_CHANGED", status: 409 });
+      if (tournament.productPolicyVersion !== tournamentConfigSnap.data()?.productPolicyVersion) throw Object.assign(new Error("Tournament policy changed. Retry this vote."), { code: "TOURNAMENT_CONFIG_CHANGED", status: 409 });
+      if (isIndividualTournamentPolicy(tournament) && voteDateKeyForTimeZone(new Date(), "UTC") !== voteDate) throw Object.assign(new Error("The UTC voting day changed. Retry this vote."), { code: "TOURNAMENT_VOTE_DAY_CHANGED", status: 409 });
+      if (isIndividualTournamentPolicy(tournament) && requestedVoteType === "dorocoin") {
+        if (!freeVoteSnap?.exists) throw Object.assign(new Error("Use your available free vote before spending DoroCoins in this match today."), { code: "FREE_VOTE_AVAILABLE", status: 409 });
+        if (body.confirmedDoroCoinSpend !== true) throw Object.assign(new Error("Confirm the 5 DoroCoin cost before voting."), { code: "DOROCOIN_SPEND_CONFIRMATION_REQUIRED", status: 422 });
+      }
       if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && requestedVoteType === "dorocoin" && !freeVoteSnap?.exists) throw Object.assign(new Error("Use your available free vote before spending DoroCoins in this match today."), { code: "FREE_VOTE_AVAILABLE", status: 409 });
       if (tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY && requestedVoteType === "dorocoin" && body.confirmedDoroCoinSpend !== true) throw Object.assign(new Error("Confirm the 5 DoroCoin cost before voting."), { code: "DOROCOIN_SPEND_CONFIRMATION_REQUIRED", status: 422 });
       if (configVersion >= 3 && requestedVoteType === "dorocoin" && ((tournament.voting as Record<string, unknown>)?.paidVotesActive !== true || !economyRules?.voting.paidVotingEnabled)) throw Object.assign(new Error("Additional DoroCoin Tournament voting is not enabled."), { code: "PAID_VOTING_DISABLED", status: 403 });

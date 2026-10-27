@@ -2,6 +2,8 @@
 import { ContentImage } from "@/components/content-image";
 import { ChallengeDescription } from "@/components/challenge-description";
 import { NormalParticipationWithdrawal } from "@/components/normal-participation-withdrawal";
+import { PrivateLockedDetail } from "@/components/private-locked-detail";
+import { PrivateDetailActions } from "@/components/private-detail-actions";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -24,7 +26,7 @@ import { ChallengeMilestoneCountdown } from "@/components/challenge-milestone-co
 import { SponsorPlacement, type PublicSponsorPlacement } from "@/components/sponsor-placement";
 import type { DynamicTranslations } from "@/lib/i18n/dynamic-content";
 
-type ChallengeGuideSection = "overview" | "rules" | "entry" | "voting";
+type ChallengeGuideSection = "overview" | "rules" | "entry" | "voting" | "prizes";
 type ChallengeComment = { id: string; username: string | null; avatarUrl: string | null; body: string; createdAt: string | null; canDelete?: boolean };
 type ChallengeCommentsPage = { comments: ChallengeComment[]; pagination: { total: number; hasMore: boolean; nextCursor: string | null } };
 
@@ -254,6 +256,7 @@ export default function ChallengeDetailPage() {
 
   if ((data && !data.ok) || requestThrew) {
     const failure = data && !data.ok ? data : null;
+    if (failure?.code === "PRIVATE_INVITE_REQUIRED" || failure?.code === "PRIVATE_PREVIEW_AVAILABLE") return <PrivateLockedDetail id={challengeId} />;
     const notFound = failure?.code === "NOT_FOUND" || failure?.status === 404;
     const needsSignIn = failure?.code === "SESSION_REQUIRED" || failure?.status === 401;
     const forbidden = failure?.status === 403 || failure?.code === "PERMISSION_DENIED" || failure?.code === "PRIVATE_INVITE_REQUIRED";
@@ -360,7 +363,8 @@ export default function ChallengeDetailPage() {
     { id: "overview", label: "Overview", body: challenge.description },
     { id: "rules", label: "Rules", body: challenge.rules.length ? challenge.rules.map((rule) => rule.editableText).join("\n") : String(rawChallenge?.standardRules ?? rawChallenge?.challengeRules ?? rawChallenge?.policyTerms ?? "").trim() },
     { id: "entry", label: "How to Enter", body: "" },
-    { id: "voting", label: "Voting & Results", body: "" }
+    { id: "voting", label: "Voting & Results", body: "" },
+    { id: "prizes", label: "Prizes", body: "" }
   ];
   const activeGuide = guideSections.find((section) => section.id === guideSection) ?? guideSections[0];
 
@@ -389,6 +393,7 @@ export default function ChallengeDetailPage() {
     <AppShell>
       <div className="grid max-w-[1240px] gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_370px]">
         <div className="min-w-0">
+          <div className="mb-4 flex items-center gap-3"><LinkButton variant="ghost" href="/explore">← Back to Explore</LinkButton>{ownerAccount && rawChallenge?.visibility === "private" ? <PrivateDetailActions challengeId={challengeId} /> : null}</div>
           {rawChallenge?.normalOutcome === "no_winners" ? <div role="status" className="mb-4 rounded-xl border border-[var(--gold)]/30 p-4"><h2 className="font-bold">No Winners</h2><p className="mt-2 text-sm">This challenge completed without an eligible winner. No winner payout was created.</p></div> : null}
           {rawChallenge?.normalLifecyclePolicyVersion === 1 && userState?.joined && !rawChallenge.effectiveVotingStartsAt && !["completed", "cancelled", "winners_announced"].includes(String(rawChallenge.status)) ? <NormalParticipationWithdrawal challengeId={challengeId} onComplete={() => { void refetch(); }} /> : null}
           <div data-mobile-challenge-meta className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.12em]">
@@ -441,6 +446,7 @@ export default function ChallengeDetailPage() {
             <div id="challenge-guide-panel" role="tabpanel" aria-labelledby={`challenge-guide-${activeGuide.id}`} className="mt-4 rounded-[8px] border border-slate-200 bg-white p-5 text-slate-900">
               <h3 className="font-black text-amber-700">{activeGuide.label}</h3>
               {activeGuide.id === "overview" ? <div className="mt-3"><ChallengeDescription description={challenge.description} translations={challengeTranslations.description} /></div> : null}
+              {activeGuide.id === "prizes" ? <div className="mt-3 space-y-3 text-sm text-slate-700"><p>{prizeStatusLabel}</p><p className="text-xl font-bold text-amber-800">{prizeValue}</p>{winnerSplits.length ? <ol className="space-y-2">{winnerSplits.map(split => <li key={split.position}>Place {split.position}: {split.percent}% — {new Intl.NumberFormat(undefined, { style: "currency", currency: prizeCurrency }).format(Number(split.expectedAmountCents ?? 0) / 100)}</li>)}</ol> : <p>No verified prize allocation is available.</p>}<p>Displayed amounts follow the published prize terms and confirmed funding. They do not confirm a completed withdrawal.</p></div> : null}
               {activeGuide.id === "rules" ? activeGuide.body ? <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{activeGuide.body}</p> : <p className="mt-2 text-sm text-slate-600">No additional challenge-specific rules were published.</p> : null}
               {activeGuide.id === "entry" ? <GuideFacts facts={entryFacts} empty="Entry requirements have not been published." /> : null}
               {activeGuide.id === "entry" && submissionInstructions.length ? <><h4 className="mt-5 font-bold">Submission instructions</h4><ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">{submissionInstructions.map((instruction, index) => <li key={`${index}-${instruction.slice(0, 24)}`}>{instruction}</li>)}</ol></> : null}

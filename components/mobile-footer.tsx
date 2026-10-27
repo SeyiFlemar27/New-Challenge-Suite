@@ -51,7 +51,7 @@ export function MobileFooter() {
               </summary>
               <div className="grid gap-1 pb-4">
                 {section.links.map(([label, href]) => (
-                  <Link key={href} href={href} className="flex min-h-11 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+                  <Link key={`${href}:${label}`} href={href} className="flex min-h-11 items-center rounded-[8px] px-3 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white">
                     {label}
                   </Link>
                 ))}

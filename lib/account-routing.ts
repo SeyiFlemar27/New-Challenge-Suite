@@ -65,7 +65,9 @@ export function safeInternalDestination(value: string | null | undefined) {
 function requestedWorkspaceAllowed(profileValue: object, path: string) {
   const p = profileValue as Record<string, unknown>;
   const pathname = new URL(path, "https://challenge-suite.invalid").pathname;
-  if (/^\/admin(\/|$)/.test(pathname)) return destinationState(p).adminAccount === true;
+  // An intentional Admin visit is a permission check, not a personal dashboard choice.
+  // AdminShell and every Admin API independently verify server authorization.
+  if (/^\/admin(\/|$)/.test(pathname)) return p.isAdmin === true;
   if (/^\/enterprise(\/|$)/.test(pathname) && !/^\/enterprise\/(apply|status|application|contact)(\/|$)/.test(pathname)) return Array.isArray(p.availableWorkspaces) && p.availableWorkspaces.includes("enterprise");
   if (/^\/sponsor(\/|$)/.test(pathname) && !/^\/sponsor\/(start|apply|onboarding)(\/|$)/.test(pathname)) return hasSponsorPanelContext(p);
   if (/^\/(dashboard\/host|host)(\/|$)/.test(pathname)) return getUserPlanAccess(p).isHost;
@@ -93,7 +95,7 @@ export function getAccountRouteRedirect(profile: object, pathname: string, searc
   if (pathname === "/dashboard/host" && (!getUserPlanAccess(p).isHost || p.hostOnboardingComplete !== true)) return destination;
   if (pathname === "/onboarding/host" && (!getUserPlanAccess(p).isHost || p.hostOnboardingComplete === true)) return destination;
   if (pathname === "/onboarding/creator" && ((!getUserPlanAccess(p).isCreator && !getUserPlanAccess(p).isPro) || p.creatorOnboardingComplete === true)) return destination;
-  if ((pathname === "/admin" || pathname.startsWith("/admin/")) && !destinationState(p).adminAccount) return destination;
+  if ((pathname === "/admin" || pathname.startsWith("/admin/")) && !requestedWorkspaceAllowed(profile, pathname)) return destination;
   if (pathname === "/sponsor/dashboard" && !requestedWorkspaceAllowed(profile, pathname)) return destination;
   return "";
 }

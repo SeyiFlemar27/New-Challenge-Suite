@@ -3,6 +3,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { createInternalChallengeSettlement, type SettlementWinner } from "@/lib/server/challenge-settlement";
 import { deterministicId } from "@/lib/server/idempotency";
 import { tournamentPlacementFingerprint, validateTournamentPlacementEvidence } from "@/lib/server/tournament-settlement-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 export { tournamentPlacementFingerprint } from "@/lib/server/tournament-settlement-policy";
 
 type Row = Record<string, unknown> & { id: string };
@@ -42,7 +43,16 @@ async function resolveTeamWinners(db: Firestore, tournamentId: string, placement
   return winners;
 }
 
-export async function finalizeTournamentSettlement(db: Firestore, input: { tournamentId: string; adminId: string; reason: string }) {
+export function finalizeTournamentSettlement(db: Firestore, input: { tournamentId: string; adminId: string; reason: string }) {
+  return finalizeSettlement(db, input, false);
+}
+
+/** Only lifecycle/recovery code calls this; an HTTP body cannot opt into system approval. */
+export function finalizeVerifiedIndividualSettlement(db: Firestore, tournamentId: string) {
+  return finalizeSettlement(db, { tournamentId, adminId: "system_individual_settlement", reason: "Verified Individual competition and funding settlement" }, true);
+}
+
+async function finalizeSettlement(db: Firestore, input: { tournamentId: string; adminId: string; reason: string }, automatic: boolean) {
   if (!input.adminId || input.reason.trim().length < 5) throw new Error("TOURNAMENT_ADMIN_REASON_REQUIRED");
   const tournamentRef = db.collection("tournaments").doc(input.tournamentId);
   const [tournamentSnap, placementsSnap] = await Promise.all([
@@ -51,13 +61,15 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
   ]);
   if (!tournamentSnap.exists) throw new Error("TOURNAMENT_NOT_FOUND");
   const tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as Row;
+  if (automatic && (!isIndividualTournamentPolicy(tournament) || tournament.participationMode !== "individual")) throw new Error("INDIVIDUAL_AUTOMATIC_POLICY_REQUIRED");
   if (tournament.financialHold === true) throw new Error("TOURNAMENT_FINANCIAL_HOLD");
   if (!["under_review", "final", "completed", "winners_announced"].includes(String(tournament.status ?? ""))) throw new Error("TOURNAMENT_RESULTS_NOT_FINAL");
   const expectedEndAt = Date.parse(String(tournament.expectedEndAt ?? ""));
-  if (Number.isFinite(expectedEndAt) && expectedEndAt > Date.now()) throw new Error("TOURNAMENT_RESULTS_NOT_FINAL");
+  if (!automatic && Number.isFinite(expectedEndAt) && expectedEndAt > Date.now()) throw new Error("TOURNAMENT_RESULTS_NOT_FINAL");
   const placements = placementsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Row)).filter((item) => [1, 2, 3].includes(Number(item.placement)));
   if (!placements.some((item) => Number(item.placement) === 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   const orderedPositions = placements.map((item) => Number(item.placement)).sort((a, b) => a - b);
+  if (automatic && JSON.stringify(orderedPositions) !== "[1,2,3]") throw new Error("INDIVIDUAL_THREE_WINNERS_REQUIRED");
   if (new Set(orderedPositions).size !== orderedPositions.length || orderedPositions.some((position, index) => position !== index + 1)) throw new Error("TOURNAMENT_OFFICIAL_PLACEMENTS_REQUIRED");
   let unawardedThirdPlaceMatchId: string | null = null;
   if (Number(tournament.configVersion ?? 1) >= 3 && !orderedPositions.includes(3)) {
@@ -76,7 +88,7 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
   }));
   if (evidence.some((valid) => !valid)) throw new Error("TOURNAMENT_PLACEMENT_SOURCE_MATCH_INVALID");
   const fingerprint = tournamentPlacementFingerprint(placements, tournament.productPolicyVersion);
-  if (tournament.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_CREATOR_REVIEW_REQUIRED");
+  if (!automatic && tournament.creatorPlacementReviewFingerprint !== fingerprint) throw new Error("TOURNAMENT_CREATOR_REVIEW_REQUIRED");
   if (tournament.settlementPlacementFingerprint && tournament.settlementPlacementFingerprint !== fingerprint) throw new Error("TOURNAMENT_SETTLEMENT_CORRECTION_REQUIRED");
 
   const competitorCollection = tournament.participationMode === "team" ? "tournamentTeams" : "tournamentParticipants";
@@ -111,14 +123,15 @@ export async function finalizeTournamentSettlement(db: Firestore, input: { tourn
       tournamentId: input.tournamentId,
       entityType: "tournament",
       status: "approved",
-      source: "competition_derived_tournament_placements",
+      source: automatic ? "automatic_verified_individual_placements" : "competition_derived_tournament_placements",
       placementFingerprint: fingerprint,
       placementIds: placements.map((item) => item.id),
       winners,
       lockedRosterSnapshots,
       reviewedAt: now,
-      reviewedByAdminId: input.adminId,
-      adminDecision: "approved",
+      reviewedByAdminId: automatic ? null : input.adminId,
+      adminDecision: automatic ? null : "approved",
+      ...(automatic ? { systemDecision: "verified", verifiedBy: input.adminId } : {}),
       adminNote: input.reason,
       payoutExecutionEnabled: false,
       updatedAt: now,

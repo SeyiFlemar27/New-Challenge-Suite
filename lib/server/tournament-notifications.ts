@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 
 const events: Record<string, { title: string; message: string; category: string; competition?: boolean }> = {
+  competitor_disqualified: { title: "Tournament entry disqualified", message: "Admin recorded an evidence-backed disqualification. Review your entry and any affected progression or financial hold. Existing payment history is preserved.", category: "challengeReminders", competition: true },
+  individual_settlement_prepared: { title: "Tournament prize credits recorded", message: "Verified results and funding created internal prize credits. Clearance and withdrawal checks still apply. No external payout was executed.", category: "billingAlerts", competition: true },
   match_assigned: { title: "Match assigned — submission window open", message: "Your next match is assigned. Submit fresh content before the full server-recorded deadline shown in Match Details.", category: "challengeReminders", competition: true },
   competitor_advanced: { title: "Tournament progression verified", message: "Your verified result advanced your competition path. Check the bracket for your next assignment or final placement review.", category: "challengeReminders", competition: true },
   competitor_eliminated: { title: "Tournament elimination verified", message: "The verified match outcome concluded this competition path. Check official results; prize status remains separately reviewed.", category: "challengeReminders", competition: true },

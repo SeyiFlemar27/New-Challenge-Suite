@@ -1,5 +1,6 @@
 import { createTournamentVoteSequenceVerifier } from "@/lib/server/tournament-vote-sequence";
 import { TOURNAMENT_PRODUCT_POLICY } from "@/lib/tournament-builder-policy";
+import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import type {
   TournamentFoundation,
   TournamentInvitationStatus,
@@ -192,7 +193,12 @@ export function generateDoubleEliminationBracket(params: { tournament: Tournamen
     const pairRound = Math.ceil(loserRound / 2);
     const count = Math.max(1, 2 ** Math.max(0, winnerRounds - pairRound - 1));
     for (let index = 1; index <= count; index += 1) {
-      const nextCount = Math.max(1, Math.ceil(count / 2));
+      // New-policy odd LB rounds feed one-to-one into the next round;
+      // only even LB rounds consolidate pairs. Clamping odd rounds to
+      // half their size assigns two winners to the same slot at capacity 8+.
+      // Existing historical contracts/records are not rewritten.
+      const nextCount = isIndividualTournamentPolicy(params.tournament) && loserRound % 2 === 1
+        ? count : Math.max(1, Math.ceil(count / 2));
       const nextRound = loserRound + 1;
       const hasNext = loserRound < 2 * (winnerRounds - 1);
       losers.push({ id: `${params.tournament.id}_lb_r${loserRound}_m${index}`, tournamentId: params.tournament.id, roundId: `${params.tournament.id}_lb_round_${loserRound}`, roundNumber: winnerRounds + loserRound, matchNumber: index, bracket: "losers", status: "scheduled", participantAId: null, participantBId: null, winnerParticipantId: null, loserParticipantId: null, nextMatchId: hasNext ? `${params.tournament.id}_lb_r${nextRound}_m${Math.min(nextCount, loserRound % 2 === 1 ? index : Math.ceil(index / 2))}` : `${params.tournament.id}_grand_final`, nextSlot: hasNext ? (loserRound % 2 === 1 ? "A" : index % 2 === 1 ? "A" : "B") : "B", resultMethod: params.tournament.resultMethod, resultStatus: null, ...(Number(params.tournament.configVersion ?? 1) >= 3 ? { tiePrioritySlot: randomInt(2) === 0 ? "A" as const : "B" as const } : {}) });
@@ -230,7 +236,7 @@ export function validateTournamentSubmission(params: { tournament: TournamentFou
   if (deadline && now >= new Date(deadline)) return { valid: false, code: "SUBMISSION_DEADLINE_CLOSED", message: "Submission deadline has passed." };
   if (!params.mediaUrl || !params.mediaPath) return { valid: false, code: "UPLOADED_MEDIA_REQUIRED", message: "Tournament submissions require uploaded media URL and storage path." };
   if (!["image", "video"].includes(String(params.mediaType))) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "Tournament submissions support image or video media." };
-  if (params.tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) {
+  if (params.tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY || isIndividualTournamentPolicy(params.tournament as unknown as Record<string, unknown>)) {
     if (!opensAt || !deadline || !Number.isFinite(Date.parse(String(opensAt))) || !Number.isFinite(Date.parse(String(deadline)))) return { valid: false, code: "SUBMISSION_WINDOW_INVALID", message: "The authoritative submission window is unavailable." };
     if (!params.tournament.submissionMediaTypes?.includes(params.mediaType as "image" | "video")) return { valid: false, code: "MEDIA_TYPE_UNSUPPORTED", message: "This Tournament does not accept that media type." };
     if (params.existingStatus && !["submitted", "pending_moderation", "under_review", "approved", "rejected"].includes(params.existingStatus)) return { valid: false, code: "SUBMISSION_ALREADY_RECORDED", message: "This submission requires exceptional review." };
@@ -389,7 +395,7 @@ export function advanceWinner(params: { match: TournamentMatchFoundation; existi
     if (nextMatch.participantBId) return { advanced: false, code: "ADVANCEMENT_SLOT_OCCUPIED", nextMatch };
     nextMatch.participantBId = params.match.winnerParticipantId;
   }
-  nextMatch.status = nextMatch.participantAId && nextMatch.participantBId ? "ready" : nextMatch.status;
+  if (!["held", "disputed"].includes(nextMatch.status)) nextMatch.status = nextMatch.participantAId && nextMatch.participantBId ? "ready" : nextMatch.status;
   return { advanced: true, code: "WINNER_ADVANCED", nextMatch };
 }
 

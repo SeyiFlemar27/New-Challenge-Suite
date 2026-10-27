@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import { disqualifyIndividualCompetitor } from '../lib/server/individual-tournament-disqualification.ts';
+import { reviewIndividualMatch } from '../lib/server/individual-match-review.ts';
+import { generateTournamentBracket, advanceWinner } from '../lib/server/tournament-operations.ts';
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { cancelIndividualTournament, processIndividualCancellationRefunds } from '../lib/server/individual-tournament-cancellation.ts';
+import { INDIVIDUAL_TOURNAMENT_POLICY } from '../lib/individual-tournament-policy.ts';
+import { withdrawIndividualEntry } from '../lib/server/individual-entry-withdrawal.ts';
+import { reserveTournamentPaidEntry, confirmTournamentEntryPayment } from '../lib/server/tournament-paid-entry.ts';
+assert.match(process.env.GCLOUD_PROJECT??'',/^demo-/);assert.match(process.env.FIRESTORE_EMULATOR_HOST??'',/^127\.0\.0\.1:\d+$/);
+const db=getFirestore(initializeApp({projectId:process.env.GCLOUD_PROJECT}));let checks=0;const equal=(a,b)=>{assert.deepEqual(a,b);checks++;};
+async function fixture(id,status='registration_open'){
+ await db.collection('tournaments').doc(id).set({hostId:'host',productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,configVersion:4,participationMode:'individual',status,participantCount:1});
+ await db.collection('tournamentParticipants').doc(id+'_participant').set({tournamentId:id,userId:'user',status:'registered'});
+ await db.collection('tournamentEntryPayments').doc(id+'_payment').set({tournamentId:id,userId:'user',entrantType:'individual',entrantId:id+'_participant',status:'confirmed',webhookConfirmed:true,confirmedAt:new Date().toISOString(),amountCents:500,currency:'usd',providerPaymentIntentId:id+'_pi'});
+}
+const input={tournamentId:'cancel_before',actorId:'host',isAdmin:false,confirmed:true,reason:'Organizer cannot safely hold this event'};
+await fixture(input.tournamentId);await assert.rejects(cancelIndividualTournament(db,{...input,actorId:'outsider'}),/ADMIN_REQUIRED/);checks++;
+const result=await Promise.all([cancelIndividualTournament(db,input),cancelIndividualTournament(db,input)]);equal(result.filter(row=>!row.idempotent).length,1);equal((await db.collection('refundCases').where('tournamentId','==',input.tournamentId).get()).size,1);
+equal((await processIndividualCancellationRefunds(db,input.tournamentId)).status,'provider_unavailable');
+const calls=new Map();const adapter={refunds:{create:async(body,options)=>{calls.set(options.idempotencyKey,body);return{id:'demo_refund_'+body.payment_intent,status:'succeeded',amount:500,currency:'usd',payment_intent:body.payment_intent};}}};
+await Promise.all([processIndividualCancellationRefunds(db,input.tournamentId,adapter),processIndividualCancellationRefunds(db,input.tournamentId,adapter)]);
+equal(calls.size,1);equal((await db.collection('tournamentEntryPayments').doc(input.tournamentId+'_payment').get()).data().status,'refunded');equal((await db.collection('tournaments').doc(input.tournamentId).get()).data().cancellationRefundStatus,'provider_confirmed');equal((await db.collection('tournaments').doc(input.tournamentId).get()).data().participantCount,0);
+await fixture('cancel_after','active');await assert.rejects(cancelIndividualTournament(db,{...input,tournamentId:'cancel_after'}),/ADMIN_REQUIRED/);checks++;
+equal((await cancelIndividualTournament(db,{...input,tournamentId:'cancel_after',actorId:'existing_admin',isAdmin:true})).status,'cancelled');
+await fixture('cancel_unconfirmed');await assert.rejects(cancelIndividualTournament(db,{...input,tournamentId:'cancel_unconfirmed',confirmed:false}),/CONFIRMATION_REQUIRED/);checks++;
+console.log(`Individual cancellation emulator: ${checks} authorization, full-refund, provider-boundary and retry assertions passed.`);
+
+const reviewStart=checks;
+for(const capacity of [4,8,16,32])for(const format of ['single_elimination','double_elimination']){
+const caseId=`admin_review_${capacity}_${format}`,tournament={id:caseId,hostId:'host',configVersion:4,productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,participationMode:'individual',format,participantCapacity:capacity,participantCount:capacity,status:'active',resultMethod:'votes',thirdPlaceMethod:'third_place_match',submissionDurationHours:48};
+const entrants=Array.from({length:capacity},(_,i)=>({id:caseId+'_p'+i,tournamentId:caseId,userId:caseId+'_u'+i,status:'active',lossCount:0,seed:i+1}));
+const graph=generateTournamentBracket({tournament,participants:entrants,existingMatches:[]});let batch=db.batch();batch.set(db.collection('tournaments').doc(caseId),tournament);for(const row of entrants){batch.set(db.collection('tournamentParticipants').doc(row.id),row);batch.set(db.collection('users').doc(row.userId),{accountStatus:'active'});}for(const row of graph.matches)batch.set(db.collection('tournamentMatches').doc(row.id),row);for(const row of graph.rounds)batch.set(db.collection('tournamentRounds').doc(row.id),row);await batch.commit();
+const first=graph.matches.find(row=>row.roundNumber===1),unrelated=graph.matches.find(row=>row.roundNumber===1&&row.id!==first.id);
+const dq={tournamentId:caseId,participantId:first.participantAId,adminId:'existing_admin',confirmed:true,reason:'Verified prohibited conduct',evidenceReference:'moderation-evidence-record'};
+await assert.rejects(disqualifyIndividualCompetitor(db,{...dq,confirmed:false}),/EVIDENCE_REQUIRED/);checks++;
+await disqualifyIndividualCompetitor(db,dq);equal((await db.collection('tournamentParticipants').doc(dq.participantId).get()).data().lossCount,0);equal((await db.collection('tournamentParticipants').doc(dq.participantId).get()).data().status,'disqualified');equal((await db.collection('tournamentMatches').doc(first.id).get()).data().status,'bye');equal((await db.collection('tournamentMatches').doc(first.id).get()).data().winnerParticipantId,null);equal((await disqualifyIndividualCompetitor(db,dq)).idempotent,true);
+const opened=new Date(),deadline=new Date(opened.getTime()+6*3600000).toISOString();await db.collection('tournamentMatches').doc(unrelated.id).update({status:'submissions_open',submissionDeadlineAt:deadline});
+const review={tournamentId:caseId,matchId:unrelated.id,adminId:'existing_admin',decision:'hold',reason:'Credible report requires review',evidenceReference:'report-local-evidence',requestKey:'review_request_one'};
+await reviewIndividualMatch(db,review,opened);await reviewIndividualMatch(db,{...review,requestKey:'review_request_two'},new Date(opened.getTime()+1000));equal((await db.collection('tournamentMatches').doc(unrelated.id).get()).data().status,'held');
+await reviewIndividualMatch(db,{...review,decision:'confirm_existing_result'},new Date(opened.getTime()+2000));equal((await db.collection('tournamentMatches').doc(unrelated.id).get()).data().status,'held');
+await reviewIndividualMatch(db,{...review,requestKey:'review_request_two',decision:'confirm_existing_result'},new Date(opened.getTime()+3000));const restored=(await db.collection('tournamentMatches').doc(unrelated.id).get()).data();equal(restored.status,'submissions_open');equal(Date.parse(restored.submissionDeadlineAt),Date.parse(deadline)+3000);
+equal(advanceWinner({match:{...first,winnerParticipantId:first.participantBId,nextMatchId:'target',nextSlot:'A'},existingNextMatch:{id:'target',status:'held',participantAId:null,participantBId:'other'}}).nextMatch.status,'held');
+}
+console.log(`Individual Admin review/DQ: ${checks-reviewStart} evidence, loss-preservation, valid-bye, overlapping holds and clock-restoration assertions passed across all capacities and both formats.`);
+
+const withdrawalStart=checks;
+for(const capacity of [4,8,16,32])for(const format of ['single_elimination','double_elimination'])for(const entryType of ['free','paid']){
+ const id=`withdraw_${capacity}_${format}_${entryType}`,uid='withdraw_user',participantId=id+'_'+uid,paymentId=id+'_payment';
+ await db.collection('tournaments').doc(id).set({hostId:'host',productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,configVersion:4,participationMode:'individual',format,participantCapacity:capacity,participantCount:1,status:'registration_open',entryType,paymentActivationEnabled:true,entryFeeAmountMinor:500,currency:'USD'});
+ await db.collection('tournamentParticipants').doc(participantId).set({tournamentId:id,userId:uid,status:'registered',lossCount:0,...(entryType==='paid'?{entryPaymentId:paymentId}:{})});
+ if(entryType==='paid')await db.collection('tournamentEntryPayments').doc(paymentId).set({tournamentId:id,userId:uid,entrantType:'individual',entrantId:participantId,status:'confirmed',webhookConfirmed:true,confirmedAt:new Date().toISOString(),amountCents:500,currency:'usd',providerPaymentIntentId:id+'_pi'});
+ const outcomes=await Promise.all([withdrawIndividualEntry(db,id,uid),withdrawIndividualEntry(db,id,uid)]);
+ equal(outcomes.filter(row=>!row.idempotent).length,1);equal((await db.collection('tournaments').doc(id).get()).data().participantCount,0);equal((await db.collection('tournamentParticipants').doc(participantId).get()).data().lossCount,0);
+ if(entryType==='paid'){
+  equal((await processIndividualCancellationRefunds(db,id)).status,'provider_unavailable');
+  equal((await processIndividualCancellationRefunds(db,id,adapter)).status,'provider_confirmed');
+  equal((await db.collection('tournamentParticipants').doc(participantId).get()).data().paymentStatus,'refunded');
+  const state=(await db.collection('tournaments').doc(id).get()).data();equal(state.participantCount,0);equal(state.financialHold??false,false);equal(state.status,'registration_open');
+  equal((await processIndividualCancellationRefunds(db,id,adapter)).processed,0);
+  await db.collection('users').doc(uid).set({accountStatus:'active',displayName:'Demo entrant'});
+  const reservation=await reserveTournamentPaidEntry(db,{tournamentId:id,target:{mode:'individual',participantId,userId:uid},rulesAccepted:true});
+  equal((await db.collection('tournamentParticipants').doc(participantId).get()).data().entryPaymentId,paymentId);
+  const pi=id+'_fresh_pi',ch=id+'_fresh_charge',session={id:id+'_session',mode:'payment',payment_status:'paid',payment_method_types:['card'],amount_total:500,currency:'usd',payment_intent:pi,metadata:{paymentPurpose:'tournament_entry',reservationId:reservation.reservationId,paymentId:reservation.paymentId,tournamentId:id,entrantType:'individual',entrantId:participantId,userId:uid}};
+  const evidence={paymentIntent:{id:pi,status:'succeeded',capture_method:'automatic',amount_received:500,currency:'usd',latest_charge:ch},charge:{id:ch,paid:true,captured:true,status:'succeeded',payment_method_details:{type:'card'},amount_captured:500,currency:'usd',payment_intent:pi}};
+  await db.collection('tournamentEntryPayments').doc(reservation.paymentId).update({providerSessionId:session.id});
+  await confirmTournamentEntryPayment(db,session,evidence);
+  const rejoined=(await db.collection('tournamentParticipants').doc(participantId).get()).data();equal(rejoined.status,'registered');equal(rejoined.registrationRevision,1);equal(rejoined.entryPaymentId,reservation.paymentId);equal((await db.collection('tournaments').doc(id).get()).data().participantCount,1);
+  equal((await db.collection('tournamentRegistrationHistory').doc(participantId+'_0').get()).data().entryPaymentId,paymentId);
+  await confirmTournamentEntryPayment(db,session,evidence);equal((await db.collection('tournaments').doc(id).get()).data().participantCount,1);
+ }else equal((await processIndividualCancellationRefunds(db,id,adapter)).status,'not_required');
+ await assert.rejects(withdrawIndividualEntry(db,id,'foreign'),/ENTRY_REQUIRED/);checks++;
+ await db.collection('tournamentParticipants').doc(participantId).update({status:'registered'});
+ await db.collection('tournaments').doc(id).update({participantCount:capacity});
+ await assert.rejects(withdrawIndividualEntry(db,id,uid),/LOCKED_AFTER_FILL/);checks++;
+ await db.collection('tournaments').doc(id).update({participantCount:1,activationState:'provisional'});
+ await assert.rejects(withdrawIndividualEntry(db,id,uid),/LOCKED_AFTER_FILL/);checks++;
+}
+console.log(`Individual withdrawal matrix: ${checks-withdrawalStart} ownership, capacity, idempotency, full-refund and unaffected-progression assertions passed across 4/8/16/32 Single/Double Elimination.`);
+assert.notEqual(process.env.NODE_ENV,'production','Positive registration handler acceptance must use the non-production demo runtime');
+const {POST:joinEntry,DELETE:withdrawEntry}=await import('../app/api/tournaments/[id]/join/route.ts');
+const email='withdraw-handler@example.test',password='Only-demo-auth-fixture-123!';
+const signed=await(await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})})).json();
+await getAuth().updateUser(signed.localId,{emailVerified:true});
+const authResult=await(await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})})).json();
+await db.collection('users').doc(signed.localId).set({emailVerified:true,accountStatus:'active',role:'user',displayName:'Demo withdrawal handler'});
+const handlerId='withdraw_handler',entryId=handlerId+'_'+signed.localId,context={params:Promise.resolve({id:handlerId})};
+await db.collection('tournaments').doc(handlerId).set({hostId:'host',configVersion:4,productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,participationMode:'individual',format:'single_elimination',status:'registration_open',participantCount:0,participantCapacity:4,entryType:'free',registrationType:'open'});
+const request=(method)=>new Request('http://localhost/api/tournaments/'+handlerId+'/join',{method,headers:{authorization:'Bearer '+authResult.idToken,'content-type':'application/json'},...(method==='POST'?{body:JSON.stringify({rulesAccepted:true})}:{})});
+equal((await joinEntry(request('POST'),context)).status,200);
+equal((await withdrawEntry(request('DELETE'),context)).status,200);
+const rejoinResults=await Promise.all([joinEntry(request('POST'),context),joinEntry(request('POST'),context)]);equal(rejoinResults.map(row=>row.status).sort(),[200,409]);
+equal((await db.collection('tournamentParticipants').doc(entryId).get()).data().registrationRevision,1);equal((await db.collection('tournaments').doc(handlerId).get()).data().participantCount,1);
+equal((await db.collection('tournamentRegistrationHistory').doc(entryId+'_0').get()).data().status,'withdrawn');
+equal((await db.collection('tournamentAuditEvents').doc(entryId+'_join_0').get()).exists,true);equal((await db.collection('tournamentAuditEvents').doc(entryId+'_join_1').get()).exists,true);
+console.log('Individual free join/withdraw/rejoin: 8 authenticated actual-handler assertions passed, including concurrent rejoin and preserved audit revisions.');

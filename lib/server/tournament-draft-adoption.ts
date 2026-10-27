@@ -19,6 +19,7 @@ export async function adoptTournamentDraftPolicy(db: Firestore, input: { tournam
     const current = snapshot.data() ?? {};
     if (!snapshot.exists) throw denied("TOURNAMENT_NOT_FOUND");
     if (current.hostId !== input.actor.uid) throw denied("DRAFT_POLICY_OWNER_REQUIRED");
+    if (Number(current.configVersion ?? 1) >= 4) throw denied("TOURNAMENT_POLICY_DOWNGRADE_FORBIDDEN");
     if (current.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY) return { id: ref.id, adopted: false, duplicate: true };
     if (current.status !== "draft" || current.publishedAt || current.timingLockedAt || current.bracketGeneratedAt || current.settlementId || current.creatorPrizeGuaranteeLockedAt
       || Number(current.participantCount ?? 0) !== 0 || current.financialHold || current.settlementRestricted

@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { initializeApp, deleteApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
+assert.match(process.env.GCLOUD_PROJECT??'',/^demo-/);
+for(const name of ['FIRESTORE_EMULATOR_HOST','FIREBASE_AUTH_EMULATOR_HOST','FIREBASE_STORAGE_EMULATOR_HOST'])assert.match(process.env[name]??'',/^127\.0\.0\.1:\d+$/);
+process.env.FIREBASE_STORAGE_BUCKET=`${process.env.GCLOUD_PROJECT}.appspot.com`;
+const app=initializeApp({projectId:process.env.GCLOUD_PROJECT,storageBucket:process.env.FIREBASE_STORAGE_BUCKET});
+const db=getFirestore(app),bucket=getStorage(app).bucket();
+const {GET}=await import('../app/api/tournaments/[id]/submissions/[submissionId]/media/route.ts');
+const {getTournamentBundle}=await import('../lib/server/tournament-public.ts');
+let checks=0;const eq=(actual,expected,message)=>{assert.deepEqual(actual,expected,message);checks++;};
+async function identity(label){
+  const email=`${label}-${randomUUID()}@example.test`,password='EmulatorOnly123!';
+  const endpoint=`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:`;
+  const send=async action=>(await fetch(endpoint+action+'?key=demo',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})})).json();
+  const created=await send('signUp');assert.ok(created.localId);
+  await getAuth(app).updateUser(created.localId,{emailVerified:true});
+  await db.collection('users').doc(created.localId).set({accountStatus:'active',emailVerified:true,displayName:label});
+  const signed=await send('signInWithPassword');assert.ok(signed.idToken);
+  return {uid:created.localId,token:signed.idToken};
+}
+try{
+  const own=await identity('owner'),other=await identity('opponent'),host=await identity('host');
+  const id='media_'+randomUUID(),matchId=id+'_match',roundId=id+'_round',submissionId=id+'_submission';
+  const path=`verified-tournament-submissions/${id}/${submissionId}/fixture`,bytes=Buffer.from('isolated media bytes');
+  const file=bucket.file(path);await file.save(bytes,{resumable:false,metadata:{contentType:'image/png'}});const [meta]=await file.getMetadata();
+  await db.collection('tournaments').doc(id).set({status:'active',privacy:'public',hostId:host.uid,configVersion:3,participationMode:'individual'});
+  const matchRef=db.collection('tournamentMatches').doc(matchId);
+  await matchRef.set({tournamentId:id,roundId,participantAId:'a',participantBId:'b',status:'submissions_open',submissionDeadlineAt:new Date(Date.now()+3600000).toISOString()});
+  await db.collection('tournamentRounds').doc(roundId).set({tournamentId:id});
+  const submissionRef=db.collection('tournamentSubmissions').doc(submissionId);
+  await submissionRef.set({tournamentId:id,matchId,roundId,participantId:'a',userId:own.uid,status:'approved',mediaUrl:`/api/tournaments/${id}/submissions/${submissionId}/media`,mediaVerification:{status:'verified',path,generation:String(meta.generation),size:bytes.length,contentType:'image/png'}});
+  const media=async user=>GET(new Request('http://localhost/media',{headers:user?{authorization:'Bearer '+user.token}:{}}),{params:Promise.resolve({id,submissionId})});
+  eq((await media()).status,404,'anonymous cannot retrieve pre-voting bytes');
+  eq((await media(other)).status,404,'opponent cannot retrieve pre-voting bytes');
+  eq((await media(own)).status,200,'owner can retrieve own verified entry');
+  eq((await media(host)).status,200,'authorized host moderation remains accessible');
+  eq((await getTournamentBundle(id)).submissions.length,0,'public bundle omits pre-voting entry');
+  await matchRef.update({status:'voting_open',votingOpenedAt:new Date(Date.now()+3600000).toISOString()});
+  eq((await media()).status,404,'future voting state does not reveal early');
+  await matchRef.update({votingOpenedAt:new Date(Date.now()-1000).toISOString()});
+  const publicResponse=await media();eq(publicResponse.status,200,'eligible media reveals after authoritative opening');
+  eq(publicResponse.headers.get('cache-control'),'private, no-store','phase-private bytes never CDN cached');
+  eq(Buffer.from(await publicResponse.arrayBuffer()),bytes,'canonical bytes retained');
+  eq((await getTournamentBundle(id)).submissions.length,1,'public bundle reveals same eligible entry');
+  await submissionRef.update({status:'rejected'});eq((await media()).status,404,'rejected entry never public');
+  eq((await getTournamentBundle(id)).submissions.length,0,'rejected entry omitted from bundle');
+  await submissionRef.update({status:'approved',participantId:'unassigned'});eq((await media()).status,404,'unassigned entry cannot borrow another match opening');
+  await submissionRef.update({participantId:'a'});await db.collection('tournaments').doc(id).update({privacy:'private'});
+  eq((await media()).status,404,'private Tournament never gains anonymous media access');
+  console.log(`Tournament media visibility emulator: ${checks} assertions passed.`);
+}finally{await deleteApp(app);}

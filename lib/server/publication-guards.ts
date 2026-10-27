@@ -6,7 +6,7 @@ export class PublicationGuardError extends Error {
 }
 
 export async function readPublicationSafety(db: Firestore, tx: Transaction, userId: string, challenge: Record<string, unknown>) {
-  const [account, profile] = await Promise.all([tx.get(db.collection("users").doc(userId)), tx.get(db.collection("profiles").doc(userId))]);
+  const [account, profile] = await tx.getAll(db.collection("users").doc(userId), db.collection("profiles").doc(userId));
   return publicationSafetyHold({ ...profile.data(), ...account.data() }, challenge);
 }
 
