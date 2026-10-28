@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-20T17:57:37.178Z",
+  "readOnly": true,
+  "eventsReviewed": 100,
+  "stages": {
+    "dependenciesInstalled": false,
+    "compileStarted": false,
+    "compileSucceeded": false,
+    "staticGenerationCompleted": false,
+    "buildCompleted": true
+  },
+  "errorMarkers": false,
+  "rawLogsOmitted": true
+}

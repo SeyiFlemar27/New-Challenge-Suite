@@ -1,0 +1,37 @@
+{
+  "branch": "codex/master-completion-2026-10-27",
+  "commit": "ccf39f987a1bea52bad13f4090bf5ff6ea29e7c5",
+  "message": "wip: preserve master implementation and global tournament priority",
+  "pushExitCode": 0,
+  "remoteBranchVerified": true,
+  "mainUnchanged": true,
+  "mainSha": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "productionDeploymentId": "dpl_DtepZCxm8w1hXGDYmmYZmQy5zuf5",
+  "productionSha": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "productionState": "READY",
+  "releaseDeploymentCount": 0,
+  "recentDeploymentsInspected": 20,
+  "githubActionsRunsAtInspection": 0,
+  "githubCommitStatusesAtInspection": 0,
+  "productionDeployed": false,
+  "stagingAcceptanceComplete": false,
+  "masterAcceptanceComplete": false,
+  "backend": {
+    "passed": 75,
+    "total": 78,
+    "exitCode": 1
+  },
+  "browser": {
+    "passed": 44,
+    "total": 44,
+    "assertions": 393,
+    "exitCode": 0
+  },
+  "masterBrowser": {
+    "passed": 14,
+    "total": 14,
+    "assertions": 100,
+    "filtered": 26,
+    "exitCode": 0
+  }
+}

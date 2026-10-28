@@ -184,7 +184,8 @@ try {
   equal((await db.collection("tournaments").doc(tournamentId).get()).data()?.participantCount, 1, "confirmed entry increments participant count exactly once");
   const entryConfirmations = await db.collection("notifications").where("userId", "==", createdSession.metadata.userId).where("metadata.paymentId", "==", createdSession.metadata.paymentId).get();
   equal(entryConfirmations.size, 1, `payer receives one idempotent in-app confirmation (matching notifications: ${entryConfirmations.size})`);
-  const expectedConfirmationId = `tournament_entry_${createHash("sha256").update(createdSession.metadata.paymentId).digest("hex")}_confirmed`;
+  const confirmationKey = `tournament_entry_${createHash("sha256").update(createdSession.metadata.paymentId).digest("hex")}_confirmed`;
+  const expectedConfirmationId = createHash("sha256").update(`${createdSession.metadata.userId}\0${confirmationKey}`).digest("hex");
   equal(entryConfirmations.docs[0]?.id, expectedConfirmationId, "confirmation notification uses a bounded, collision-resistant payment-scoped idempotency key");
   equal(entryConfirmations.docs[0]?.data()?.metadata?.paymentStatus, "confirmed", "confirmation notification records the authoritative payment status");
   const duplicateWebhook = await deliverPaidWebhook(webhook, createdSession.id, "capacity_race_duplicate");

@@ -1,0 +1,77 @@
+{
+  "checkedAt": "2026-10-21T08:57:19.187Z",
+  "readOnly": true,
+  "mutations": 0,
+  "complete": true,
+  "configuration": [
+    {
+      "name": "ADMIN_EMAIL_ALLOWLIST",
+      "present": false,
+      "type": null,
+      "entryCount": 0
+    },
+    {
+      "name": "NEXT_PUBLIC_INITIAL_ADMIN_EMAILS",
+      "present": false,
+      "type": null,
+      "entryCount": 0
+    }
+  ],
+  "accounts": [
+    {
+      "accountTag": "7a55a8333d",
+      "plan": "creator",
+      "role": "user",
+      "accountType": "user",
+      "adminFlag": true,
+      "adminFlagType": "boolean",
+      "serverAllowlistMatch": false,
+      "signupAllowlistMatch": false,
+      "roleAssignments": []
+    },
+    {
+      "accountTag": "10139d0eae",
+      "plan": "creator",
+      "role": "creator",
+      "accountType": null,
+      "adminFlag": true,
+      "adminFlagType": "boolean",
+      "serverAllowlistMatch": false,
+      "signupAllowlistMatch": false,
+      "roleAssignments": []
+    },
+    {
+      "accountTag": "f0b5373083",
+      "plan": "host",
+      "role": "admin",
+      "accountType": "user",
+      "adminFlag": true,
+      "adminFlagType": "boolean",
+      "serverAllowlistMatch": false,
+      "signupAllowlistMatch": false,
+      "roleAssignments": []
+    },
+    {
+      "accountTag": "7b7c1b9198",
+      "plan": "host",
+      "role": "user",
+      "accountType": "user",
+      "adminFlag": true,
+      "adminFlagType": "boolean",
+      "serverAllowlistMatch": false,
+      "signupAllowlistMatch": false,
+      "roleAssignments": []
+    },
+    {
+      "accountTag": "0bb83231b0",
+      "plan": "host",
+      "role": "host",
+      "accountType": "user",
+      "adminFlag": true,
+      "adminFlagType": "boolean",
+      "serverAllowlistMatch": false,
+      "signupAllowlistMatch": false,
+      "roleAssignments": []
+    }
+  ]
+}

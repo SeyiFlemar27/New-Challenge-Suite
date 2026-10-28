@@ -88,8 +88,6 @@ export async function closeExpiredSupportTickets(db: Firestore, now = new Date()
       const taskRef = db.collection("adminActionTasks").doc(operationalTaskId("support_ticket", candidate.id));
       const messageRef = candidate.ref.collection("messages").doc(auditId);
       const outboxRef = db.collection("supportEmailOutbox").doc(`ticket_auto_closed_${auditId}`);
-      const notificationId = `support_auto_closed_${createHash("sha256").update(candidate.id).digest("hex")}`;
-      const notificationRef = db.collection("notifications").doc(notificationId);
       const [audit, task] = await Promise.all([transaction.get(auditRef), transaction.get(taskRef)]);
       if (audit.exists) return null;
       transaction.set(candidate.ref, { status: "closed", closedAt: nowIso, closeReason: "reopen_window_expired", updatedAt: nowIso, version: Number(ticket.version ?? 0) + 1 }, { merge: true });
@@ -104,7 +102,6 @@ export async function closeExpiredSupportTickets(db: Firestore, now = new Date()
         replyTo: null
       };
       transaction.create(outboxRef, { id: outboxRef.id, ticketId: candidate.id, messageId: auditId, type: "ticket_auto_closed", recipient: ticket.contactEmail ?? ticket.userEmail ?? null, ...content, status: ticket.contactEmail || ticket.userEmail ? "waiting_configuration" : "blocked", lastError: ticket.contactEmail || ticket.userEmail ? null : "recipient_email_unavailable", attempts: 0, createdAt: nowIso, updatedAt: nowIso });
-      if (typeof ticket.userId === "string" && ticket.userId) transaction.create(notificationRef, { id: notificationId, userId: ticket.userId, accountType: ticket.accountType ?? null, type: "support_ticket_closed", title: "Support request closed", message: `Ticket ${ticketNumber} was closed after its seven-day response window expired.`, body: `Ticket ${ticketNumber} was closed after its seven-day response window expired.`, status: "unread", priority: "normal", entityType: "supportTicket", entityId: candidate.id, targetId: candidate.id, actionUrl: `/support/tickets/${encodeURIComponent(candidate.id)}`, read: false, readAt: null, archivedAt: null, delivery: { inApp: true, email: false, push: false }, metadata: {}, createdAt: nowIso, updatedAt: nowIso });
       transaction.create(auditRef, createAuditLogRecord({ actorId: "system:support-ticket-closure", actorType: "system", action: "support.ticket_auto_closed", targetType: "supportTicket", targetId: candidate.id, reason: "The seven-day user response window expired.", before: { status: "resolved" }, after: { status: "closed", outcome: "success" }, metadata: { legacyResolvedTicket } }, auditId, nowIso));
       return outboxRef.id;
     });

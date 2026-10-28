@@ -1,0 +1,38 @@
+{
+  "typecheck": {
+    "command": "pnpm.cmd typecheck",
+    "exitCode": 0,
+    "log": "notification-handover-types-20261028.log"
+  },
+  "lint": {
+    "command": "pnpm.cmd lint",
+    "exitCode": 0,
+    "log": "notification-handover-lint-20261028.log"
+  },
+  "build": {
+    "command": "CHALLENGE_SUITE_NEXT_DIST_DIR=.next/notification-handover-20261028 pnpm.cmd build",
+    "exitCode": 0,
+    "log": "notification-handover-build-20261028.log"
+  },
+  "whitespace": {
+    "command": "git diff --check",
+    "exitCode": 0
+  },
+  "focusedNotificationBackend": {
+    "assertions": 44,
+    "exitCode": 0,
+    "log": "notification-final-payer-identity-backend-20261028.log"
+  },
+  "fullBackend": {
+    "passed": 80,
+    "total": 81,
+    "exitCode": 1
+  },
+  "nativeSdkDiagnostic": {
+    "exitCode": 1,
+    "failureRoundZeroBased": 5,
+    "code": 3,
+    "applicationRetriesAdded": 0,
+    "applicationServicesUsed": false
+  }
+}

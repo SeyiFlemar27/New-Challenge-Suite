@@ -1,0 +1,262 @@
+{
+  "finalSourceFingerprint": "93b93cfc691438f72770a05bcafea4b2be83307bb7f16b814e7a7dcd94731548",
+  "assertions": 393,
+  "skipped": 0,
+  "initialSourceFingerprint": "93b93cfc691438f72770a05bcafea4b2be83307bb7f16b814e7a7dcd94731548",
+  "failed": 0,
+  "results": [
+    {
+      "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: intentional Admin access preserves personal default and server authorization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Free default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator default login under delayed profile",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Host default login under delayed profile",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Dashboard stability: Host onboarding default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Restricted default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Dashboard stability: Host legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Dashboard stability: Host logout and login again enters Host directly",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: requested action and unsafe redirects",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: verified email required before dashboard",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: protected direct navigation preserves action query at login",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 12
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 10
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "PASS",
+      "assertions": 16
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "PASS",
+      "assertions": 36
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "PASS",
+      "assertions": 4
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "PASS",
+      "assertions": 6
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "PASS",
+      "assertions": 21
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "PASS",
+      "assertions": 23
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "PASS",
+      "assertions": 18
+    }
+  ],
+  "screenshotReferences": [
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\admin-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\automatic-attendance_only-public.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\automatic-normal-public.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\automatic-physical_competition-public.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\automatic-private-public.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\automatic-tournament-public.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\creator-explore-desktop.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\host-routing-desktop.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\host-routing-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-admin-financial-review.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-creator-earnings-clearance.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-paginated-roster.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-physical-results.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-registration-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-reviewed-reschedule.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-v2-builder-attendance_only-draft.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-v2-builder-physical_competition-draft.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-v2-desktop.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\live-event-v2-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\normal-builder-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\normal-builder-tablet.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\normal-challenge-join-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\private-access-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\private-code-prepared.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\support-admin-ticket.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\support-customer-ticket.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\tournament-bracket-desktop.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\tournament-bracket-mobile.png",
+    "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WVWPjc\\runtime-temp\\challenge-suite-p1-browser-b9c90a2c22374a08af00b4505710e03e\\tournament-match-verified-mobile.png"
+  ],
+  "sourceStable": true,
+  "passed": 44
+}

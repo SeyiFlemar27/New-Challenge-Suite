@@ -1,0 +1,21 @@
+import nextEnv from '@next/env';
+import {cert,initializeApp,deleteApp} from 'firebase-admin/app';
+import {getFirestore,FieldPath} from 'firebase-admin/firestore';
+nextEnv.loadEnvConfig(process.cwd(),false,{info(){},error(){}});
+const project=process.env.FIREBASE_PROJECT_ID||process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;if(project!=='challenge-suite'||process.env.FIRESTORE_EMULATOR_HOST)throw Error('WRONG_TARGET');
+const app=initializeApp({projectId:project,credential:cert({projectId:project,clientEmail:process.env.FIREBASE_CLIENT_EMAIL,privateKey:process.env.FIREBASE_PRIVATE_KEY.trim().replace(/\\n/g,'\n')})},'release-query-read-only');
+const db=getFirestore(app),probes=[];
+const add=(name,collection,filters,orders=[])=>probes.push({name,collection,filters,orders});
+for(const [field,dir]of [['createdAt','desc'],['createdAt','asc'],['participantCount','desc']])add('Tournament Explore '+field+' '+dir,'tournaments',[['privacy','==','public']],[[field,dir],['__name__',dir]]);
+add('Registration recovery','tournaments',[['status','==','scheduled'],['publicationPolicyVersion','==',1],['registrationHoldReason','==','scheduler_unavailable']],[['__name__','asc']]);
+add('Due activation and lifecycle','tournamentJobs',[['status','==','pending'],['type','==','activate_full_tournament'],['runAt','<=',new Date().toISOString()]],[['runAt','asc']]);
+add('Stale lifecycle dispatch','tournamentJobs',[['status','==','pending'],['type','==','process_tournament_match_lifecycle'],['schedulerDispatchState','==','scheduled'],['runAt','<=',new Date().toISOString()]],[['runAt','asc']]);
+add('Pending dispatch','tournamentJobs',[['status','==','pending'],['type','in',['activate_full_tournament','process_tournament_match_lifecycle','expire_team_registration']],['schedulerDispatchState','==','pending']],[['createdAt','asc']]);
+add('Expired dispatch lease','tournamentJobs',[['status','==','pending'],['type','in',['activate_full_tournament','process_tournament_match_lifecycle','expire_team_registration']],['schedulerDispatchState','==','dispatching'],['schedulerDispatchLeaseUntilAt','<=',new Date().toISOString()]],[['schedulerDispatchLeaseUntilAt','asc']]);
+const synthetic='release-index-probe-no-record';
+add('Verified vote pages','tournamentVotes',[['tournamentId','==',synthetic],['matchId','==',synthetic]],[['voteSequence','asc']]);
+add('Legacy voter duplicate query','tournamentVotes',[['tournamentId','==',synthetic],['matchId','==',synthetic],['voterId','==',synthetic]]);
+add('Invitation authorization','tournamentTeamInvitations',[['tournamentId','==',synthetic],['inviteeUserId','==',synthetic]]);
+for(const visibility of ['public','private'])for(const [field,dir]of [['createdAt','desc'],['submissionDeadline','asc'],['participantCount','desc']])add('Explore '+visibility+' '+field,'challenges',[['visibility','==',visibility],['status','in',['scheduled','active','completed']],...(visibility==='private'?[['publicPreviewEnabled','==',true]]:[])],[[field,dir],['__name__',dir]]);
+const results=[];
+try{for(const probe of probes){let query=db.collection(probe.collection);for(const args of probe.filters)query=query.where(...args);for(const [field,dir]of probe.orders)query=query.orderBy(field==='__name__'?FieldPath.documentId():field,dir);try{await query.select().limit(1).get();results.push({...probe,available:true});}catch(e){results.push({...probe,available:false,code:e.code,missingIndex:e.code===9&&/index/i.test(e.message)});}}console.log(JSON.stringify({readOnly:true,project,noContentOrIdentifiersOutput:true,results},null,2));}finally{await deleteApp(app);}

@@ -1,3 +1,4 @@
+import { queueVoterAudience } from "@/lib/server/voter-notifications";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import {
   getConfirmedEntryRevenueForChallenge,
@@ -892,6 +893,10 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
       holdUntil,
       updatedAt: now
     }, { merge: true });
+    if (entityCollection === "challenges") {
+      queueVoterAudience(db, transaction, { kind: "challenge", id: input.challengeId }, now);
+      transaction.create(db.collection("normalNotificationOutbox").doc(`${settlementId}_official_results`), { challengeId: input.challengeId, type: "challenge_results", title: "Official results are ready", message: "Authorized review confirmed the official results. Prize allocation, clearance and withdrawal status are tracked separately.", status: "pending", createdAt: now });
+    }
     transaction.set(challengeRef, {
       ...(entityCollection === "tournaments" ? { status: "winners_announced", officialPlacementsFinalizedAt: now, officialPlacementsFinalizedBy: input.adminId, payoutExecutionEnabled: false } : {}),
       ...(entityCollection === "tournaments" && typeof input.sourceProvenance?.placementFingerprint === "string" ? { settlementPlacementFingerprint: input.sourceProvenance.placementFingerprint } : {}),
@@ -964,6 +969,12 @@ export async function createInternalChallengeSettlement(db: Firestore, input: {
     ]);
   }
 
+  if (entityCollection === "challenges") {
+    const { deliverVoterNotifications } = await import("@/lib/server/voter-notifications");
+    const { deliverNormalNotificationOutbox } = await import("@/lib/server/normal-notifications");
+    await deliverVoterNotifications(db, { kind: "challenge", id: input.challengeId }, "results").catch(() => undefined);
+    await deliverNormalNotificationOutbox(db, input.challengeId).catch(() => undefined);
+  }
   return {
     ...result,
     breakdown,

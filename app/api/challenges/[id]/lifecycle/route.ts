@@ -73,6 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         if (data.normalLifecyclePolicyVersion === 1 && (data.effectiveVotingStartsAt || data.winnersApprovedAt)) throw new Error("ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED");
         const release = await prepareEnterpriseActiveChallengeRelease(state.db!, transaction, String(data.organizationOwnerId ?? "") || null, id);
         transaction.set(challengeRef, { status: "cancelled", lifecycleStatus: "cancelled", visibility: "hidden", cancellationReason: reason, cancelledAt: now, cancelledBy: state.user!.uid, ...(data.normalLifecyclePolicyVersion === 1 ? { approvedCancellationAt: now, approvedCancellationBy: state.user!.uid } : {}), updatedAt: now }, { merge: true });
+        transaction.create(state.db!.collection("normalNotificationOutbox").doc(`${id}_cancelled_${now}`), { challengeId: id, type: "challenge_cancelled", title: "Challenge cancelled", message: "The authorized challenge cancellation was recorded. Any eligible refund is tracked separately and is not yet claimed complete.", status: "pending", createdAt: now });
         release.apply();
       });
     } else if (parsed.data.action === "archive") {

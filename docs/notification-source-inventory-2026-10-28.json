@@ -1,0 +1,197 @@
+[
+  {
+    "path": "app/api/notifications/[id]/read/route.ts",
+    "sha256": "0f71ae7258eb201a25a1deb5920f38067e4caf9bc028cbac53d83527c0a4279b",
+    "purpose": "Authenticated inbox ownership, pagination, preference and read APIs"
+  },
+  {
+    "path": "app/api/notifications/preferences/route.ts",
+    "sha256": "df778c14881eb6c891da7f87931ed9000043b62d7ee3ecee99a8acf566a4ab04",
+    "purpose": "Authenticated inbox ownership, pagination, preference and read APIs"
+  },
+  {
+    "path": "app/api/notifications/route.ts",
+    "sha256": "88cfb0730abf2a9bcdb9f2715d23d0543e2e321510951d319331d86679e72381",
+    "purpose": "Authenticated inbox ownership, pagination, preference and read APIs"
+  },
+  {
+    "path": "app/api/submissions/route.ts",
+    "sha256": "b8580ab05f85fd293cae6fc2f41ba4bc04116da5ac87a6697a34e5f225ee7659",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "app/notifications/page.tsx",
+    "sha256": "7972fa3c4438a290671f97841429d020d3a277809249c9b404255cb2dd38e12b",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "app/settings/[section]/page.tsx",
+    "sha256": "5286434fb64b98655e85ccad96766583ce49d9cb7a753deaea09985aa590ac3a",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "components/notification-bell.tsx",
+    "sha256": "9a35d8405d5915f3e7597871fa47b09d19a15dadb92994488bcb63bb06441c65",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "components/notification-preferences.tsx",
+    "sha256": "4b28baec6d28eefe7df3870c319fa2472c51ecd53d0cf254ffb359694f5370a5",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "lib/hooks/use-notifications.ts",
+    "sha256": "7e2d3b3d5e98750e567b79e6a7f8a0757f2705d75517e2afc3a5749960a1b037",
+    "purpose": "Shared notification presentation, account-scoped state and settings"
+  },
+  {
+    "path": "lib/notification-navigation.ts",
+    "sha256": "80f96bd593cd04c3d0a908e720c919977bcc6cbb4a79fb92fb5330d238679620",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/notification-policy.ts",
+    "sha256": "f2707882fa9faaa6fdc7ab3e7ec7f3cc5510d582f909be3624fb626f2ffaaf0e",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/enterprise-active-challenge-limit.ts",
+    "sha256": "3d9aea20fa9c791a7de41bd5ad7a62d5c0236a0078fc4d1c9a1dfaa9de7b6368",
+    "purpose": "Transaction read ordering and concurrency stabilization"
+  },
+  {
+    "path": "lib/server/live-event-admission.ts",
+    "sha256": "c19f8dde0ff5811d95e35e7cb281e0696b277b376d5a94a027c44167ca9d7712",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-cancellation.ts",
+    "sha256": "dbe4da7381175c8dd3d2561d6c72b483d63ad3684f211fd9233fa08a8025ce86",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-communications.ts",
+    "sha256": "0622197b179fb7e1de2b27ffbec0994b378dbbba6f038cca48abd83f64df06e5",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-job-outbox.ts",
+    "sha256": "a26023d34011aa4f3c8073a2e3bf2e7392cabed91ce3b494af7d32383c51953b",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-jobs.ts",
+    "sha256": "81141dbf379ca5f5802aad3c4417db2f8ce41d052eec781252afa5448f37b09a",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-payments.ts",
+    "sha256": "2669c584f07e6d4dd3d27c96fc61ce9517a7ba66a3d72fae81779e762e070e51",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/live-event-updates.ts",
+    "sha256": "192b0ee266c526deb57079514cca20d02612014f4fe32c5cbc3ea365ebe63b68",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/monetization-payments.ts",
+    "sha256": "1826884ed2e3b81bd0f18b9989c6bb83a017e71193caf567c68c2531cf642df9",
+    "purpose": "Transaction read ordering and concurrency stabilization"
+  },
+  {
+    "path": "lib/server/normal-lifecycle-jobs.ts",
+    "sha256": "a8e8752689a882a582b220aeb8ff20f7b82b81869fc96aaaef73c80a28c82494",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/normal-lifecycle-scheduler.ts",
+    "sha256": "dc7c00be51b65d67bcec3246ab3fedb9c079782707063f5de61433d449648e97",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/normal-notifications.ts",
+    "sha256": "46aa629d761dd77b56b8e5adc12aa686d0c9ddd487dde4e3ca1d045f33c206aa",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/normal-submission-reminders.ts",
+    "sha256": "ecf2be202bf851435d5f2bf8438d9a4998e1bd8f8e63b3a85d7a3fda1cceb83d",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/notifications.ts",
+    "sha256": "b42991a86395b82fc62871291962268ee19426d9b0c44b772171ff59d78d5b61",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/tournament-match-lifecycle-jobs.ts",
+    "sha256": "6493ecdfa87ee84f5ff44fcfcbc1488d5d6aea67ca145e5b576c532c34bb1e23",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/tournament-notifications.ts",
+    "sha256": "9826c56e7c3da87b6fa1a37230a5a6ebdb35d689f096d7bf5dcfa65173795fca",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "lib/server/tournament-paid-entry.ts",
+    "sha256": "5e2a6fc5a5882e59fa48f7178c60b4ec0eddafdc3b3442b9c9fa4a3e78b09c24",
+    "purpose": "Transaction read ordering and concurrency stabilization"
+  },
+  {
+    "path": "lib/server/tournament-submission-reminders.ts",
+    "sha256": "a55578eec5b6c4723f95c91c7a8dfd88b270913801d9539422eeac0b4d9c0a33",
+    "purpose": "Notification policy, durable delivery, lifecycle source integration and reminders"
+  },
+  {
+    "path": "scripts/run-isolated-p0-emulators.mjs",
+    "sha256": "561c932efd78d787592ef3cca2cf317e909d06b025723aac6b7996505219c54f",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/run-local-verification-suite.mjs",
+    "sha256": "33cb3d2e828db4c14585b2d4dd6c6bf4934c0e4c40711b6c8f3e0c60ec634ed6",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/run-p0-emulator-regressions.mjs",
+    "sha256": "4b3d823b1e4b0d86ad68270a73c0e8354e9fdc96a12fdf8343d205ba7e788fa7",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-backend-stabilization-emulator.mjs",
+    "sha256": "4fed0726ed53354d2cb299443d4835f47b6d8367374b06e8d026a32381a692b4",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-individual-cancellation-emulator.mjs",
+    "sha256": "ba4a3a3524d61e60ab1c8b49e43ba237bb397c119bbc05dc0b58cadc3ad892b4",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-live-event-admission-emulator.mjs",
+    "sha256": "5f3b98219f112a9195bd7bb8db93653d80f97ca507345eb5e952c485ff385e09",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-normal-notification-reminders-emulator.mjs",
+    "sha256": "37c55e3b847116d4f2bad69c1d534c8ab69a0efd1227d6af1739e895b43417ae",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-notification-inbox-emulator.mjs",
+    "sha256": "8eaacb44532f43cf31cacd3acd0098ad2f89d8fbbd767e71e875a7d7b2f81d95",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-tournament-notifications-emulator.mjs",
+    "sha256": "cb1c680f9495b27d56f69837c15af5b95f138c2a87867ca76a58c225667dbcce",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  },
+  {
+    "path": "scripts/test-tournament-paid-entry-emulator.mjs",
+    "sha256": "5f63a2cfe43c5d8448cd043bee24a3d4cbbd9ee857ec01110dc7e6b07e7ae697",
+    "purpose": "Regression verification and explicit isolated-runner allowlists"
+  }
+]

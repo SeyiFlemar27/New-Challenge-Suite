@@ -229,6 +229,7 @@ export async function POST(request: Request) {
   await createNotification(db, {
     userId: user.uid,
     type: "submission_uploaded",
+    idempotencyKey: `submission_received_${String(submission.id)}`,
     title: body.mediaUploadPending ? "Submission received" : "Submission uploaded",
     body: status === "pending_review" ? "Your submission is pending review." : status === "submitted" ? "Your submission metadata was saved and media upload is pending." : "Your submission is live.",
     targetId: String(submission.id)

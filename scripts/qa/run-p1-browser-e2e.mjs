@@ -539,6 +539,10 @@ try {
     context.setDefaultTimeout(interactionTimeout);
   });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  if (!journeyFilter || journeyFilter === "notification acceptance") {
+    const { notificationJourneys } = await import("./notification-journeys.mjs");
+    await notificationJourneys({ browser, test, check, expect, db, seedUser, login, admin, baseUrl, artifacts, join });
+  }
   if (journeyFilter === 'dashboard redesign') {
     const { dashboardRedesignJourneys } = await import('./dashboard-redesign-journeys.mjs');
     await dashboardRedesignJourneys({browser,test,check,expect,db,seedUser,baseUrl,artifacts,join,pageErrors});

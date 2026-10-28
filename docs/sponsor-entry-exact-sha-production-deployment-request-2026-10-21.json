@@ -1,0 +1,12 @@
+{
+  "name": "challenge-suite",
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "target": "production",
+  "gitSource": {
+    "type": "github",
+    "repoId": 1273399679,
+    "ref": "main",
+    "sha": "f7f6674fabb19802a19800d5a1a93c2a67248d36"
+  },
+  "withLatestCommit": false
+}

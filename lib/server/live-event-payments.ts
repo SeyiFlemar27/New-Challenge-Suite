@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { queueInAppNotification } from "@/lib/server/notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { allocateLiveEventRevenue, eventCapacities, eventTime, LiveEventPolicyError } from "@/lib/live-event-policy";
@@ -76,6 +77,7 @@ export async function confirmLiveEventPayment(db: Firestore, event: Stripe.Event
     tx.update(ref, { ...financialRefs, status: "confirmed", paymentConfirmed: true, capacityState: "confirmed", ticketIds, activeTicketCount:quantity, allocation, providerRefundedCents:0,admissionRefundedCents:0,entryRefundedCents:0,refundReservedCents:0,confirmedAt: now, settlementRestricted: true });
     tx.update(eventRef, { [field]: Number(current[field]) - quantity, [confirmedField]: Number(current[confirmedField]) + quantity,...(upgrade?{audienceCount:Number(current.audienceCount)-1}:{}), updatedAt: now });
     tx.create(db.collection("liveEventEmailOutbox").doc(`booking_${id}`), { eventId: booking.eventId, bookingId: id, userId: booking.userId, status: "pending", type: "ticket_confirmation", createdAt: now });
+    if (!booking.guestSession) queueInAppNotification(db, tx, { eventId: `live_booking_${id}`, userId: String(booking.userId), type: upgrade ? "live_event_pass_upgraded" : booking.kind === "competitor" ? "live_event_registration" : "live_event_ticket", title: upgrade ? "Participant Pass confirmed" : booking.kind === "competitor" ? "Event registration confirmed" : "Your event tickets are ready", message: "Your payment and booking are confirmed. Open the event to review your tickets and current details.", actionUrl: `/live-events/${booking.eventId}`, createdAt: now });
     if(upgrade){convertLiveEventAdmission(tx,upgrade,ticketIds[0],id,now);tx.create(db.collection("auditLogs").doc(`live_upgrade_${id}`),{actorId:"stripe_verified_webhook",action:"live_event.admission_upgraded",eventId:booking.eventId,originalTicketId:upgrade.ticket.id,originalBookingId:upgrade.booking.id,competitionBookingId:id,participantPassId:ticketIds[0],additionalPaymentCents:booking.amountCents,providerPaymentIntentId:intent.id,createdAt:now});}
     tx.create(db.collection("auditLogs").doc(), { actorId: "stripe_verified_webhook", action: "live_event.payment_confirmed", eventId: booking.eventId, targetId: id, providerEventId: event.id, providerPaymentIntentId: intent.id, amountCents: booking.amountCents, createdAt: now });
     return { bookingId: id, status: "confirmed", duplicate: false };

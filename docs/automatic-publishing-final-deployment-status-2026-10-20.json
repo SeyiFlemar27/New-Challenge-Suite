@@ -1,0 +1,32 @@
+{
+  "readOnly": true,
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "team": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "expectedSha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "deployments": [
+    {
+      "id": "dpl_9NY3gfa9Zq2omWAYbbvogemU8h4r",
+      "state": "BUILDING",
+      "target": "production",
+      "url": "challenge-suite-btmgx2xap-seyiflemar27s-projects.vercel.app",
+      "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+      "branch": "main",
+      "createdAt": 1792518828211
+    },
+    {
+      "id": "dpl_8gtF4N5hTtgqNvLDBrTYaWRiQUyw",
+      "state": "READY",
+      "target": "preview",
+      "url": "challenge-suite-kmt9ic0gd-seyiflemar27s-projects.vercel.app",
+      "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+      "branch": "codex/automatic-publishing-exception-moderation",
+      "createdAt": 1792505117360
+    }
+  ],
+  "servingProduction": {
+    "id": "dpl_9NY3gfa9Zq2omWAYbbvogemU8h4r",
+    "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4"
+  },
+  "checkedAt": "2026-10-20T17:54:18.420Z",
+  "productionMutations": 0
+}

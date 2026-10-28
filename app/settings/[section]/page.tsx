@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/api/client";
 import { profileMediaPath } from "@/lib/media-upload-paths";
 import { setAppTheme } from "@/components/app-theme-provider";
 import { logout } from "@/lib/firebase/auth-service";
+import { NotificationPreferences } from "@/components/notification-preferences";
 
 type SettingsData = {
   account: { displayName: string; username: string; email: string; phone: string; accountType: string; planId: string; subscriptionStatus: string; effectiveTier?: { id: string; displayName: string } };
@@ -136,7 +137,7 @@ export default function SettingsSectionPage() {
   }
 
   if (loading) return <AppShell><Card className="h-[420px] animate-pulse bg-[#171717]" /></AppShell>;
-  const editable = ["account", "profile", "appearance", "notifications", "privacy", "preferences"].includes(section);
+  const editable = ["account", "profile", "appearance", "privacy", "preferences"].includes(section);
 
   return (
     <AppShell>
@@ -151,7 +152,7 @@ export default function SettingsSectionPage() {
           {section === "account" ? <Account settings={settings} update={update} /> : null}
           {section === "profile" ? <Profile settings={settings} update={update} list={list} userId={auth.user?.uid ?? "anonymous"} /> : null}
           {section === "appearance" ? <Appearance value={settings.preferences.appearance} choose={chooseAppearance} /> : null}
-          {section === "notifications" ? <NotificationSettings values={settings.notifications} onChange={(key, value) => update("notifications", key, value)} /> : null}
+          {section === "notifications" ? <NotificationPreferences /> : null}
           {section === "privacy" ? <Privacy settings={settings} update={update} setSettings={setSettings} /> : null}
           {section === "security" ? <Security /> : null}
           {section === "billing" ? <Billing settings={settings} confirmCancel={confirmCancel} setConfirmCancel={setConfirmCancel} canceling={canceling} cancelSubscription={cancelSubscription} /> : null}
@@ -222,12 +223,4 @@ function title(section: string) {
 
 function description(section: string) {
   return ({ account: "Manage your identity and contact details.", profile: "Shape your public competition profile.", appearance: "Choose how Challenge Suite should look.", notifications: "Control the alerts you receive.", privacy: "Choose what other people can see and do.", security: "Protect access to your account.", billing: "Review plan access and billing portal status.", wallet: "Review internal platform credits and purchase history.", preferences: "Personalize challenge discovery and content.", danger: "Protected account lifecycle controls." } as Record<string, string>)[section];
-}
-function NotificationSettings({ values, onChange }: { values: Record<string, boolean>; onChange: (key: string, value: boolean) => void }) {
-  const active = Object.fromEntries(Object.entries(values).filter(([key]) => !["email", "push", "inApp", "userId", "updatedAt"].includes(key)));
-  return <div className="space-y-5"><Card className="border-emerald-500/20 bg-emerald-500/5 p-4"><p className="font-black text-emerald-100">In-app notifications are active</p><p className="mt-2 text-sm leading-6 text-slate-300">Challenge Suite records supported alerts in your notification center.</p></Card><ToggleList values={active} onChange={onChange} /><div className="grid gap-3 sm:grid-cols-2"><DeliveryState title="Email notifications" body="Setup required. Email delivery is not active yet." /><DeliveryState title="Push notifications" body="Setup required. Push delivery is not active yet." /></div></div>;
-}
-
-function DeliveryState({ title, body }: { title: string; body: string }) {
-  return <div className="rounded-[8px] border border-white/10 bg-black/30 p-4"><p className="font-black">{title}</p><p className="mt-2 text-sm text-slate-400">{body}</p><span className="mt-3 inline-flex rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-400">Unavailable</span></div>;
 }

@@ -1,89 +1,25 @@
 "use client";
-
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Button, Card, EmptyState, PageTitle } from "@/components/ui";
-
-type NotificationRecord = {
-  id: string;
-  title?: string;
-  message?: string;
-  body?: string;
-  status?: string;
-  read?: boolean;
-  priority?: string;
-  type?: string;
-  actionUrl?: string | null;
-  createdAt?: string;
-};
-
-async function fetchNotifications() {
-  const response = await fetch("/api/notifications", { cache: "no-store" });
-  return response.json() as Promise<{ ok: boolean; message?: string; data?: { notifications: NotificationRecord[]; unreadCount: number } }>;
-}
-
+import { Button, Card, PageTitle } from "@/components/ui";
+import { notificationTime, useNotifications } from "@/lib/hooks/use-notifications";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 export default function NotificationsPage() {
-  const { data, isLoading, refetch } = useQuery({ queryKey: ["notifications"], queryFn: fetchNotifications, staleTime: 15_000 });
-  const notifications = data?.ok ? data.data?.notifications ?? [] : [];
-  const unreadCount = data?.ok ? data.data?.unreadCount ?? 0 : 0;
-
-  async function markAllRead() {
-    await fetch("/api/notifications", { method: "POST" }).catch(() => null);
-    await refetch();
-  }
-
-  function openNotification(id: string, unread: boolean) {
-    if (unread) void fetch(`/api/notifications/${id}/read`, { method: "POST" }).then(() => refetch()).catch(() => undefined);
-  }
-
-  return (
-    <AppShell>
-      <div className="mx-auto max-w-5xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <PageTitle title="Notifications" subtitle="In-app updates for challenges, payments, sponsorships, reviews, tournaments, and admin actions." icon={<Bell className="text-[var(--gold)]" />} />
-          <Button variant="secondary" onClick={() => void markAllRead()} disabled={!unreadCount}><CheckCheck size={17} /> Mark All Read</Button>
-        </div>
-
-        <Card className="mt-6 border-[var(--gold)]/20 bg-[var(--gold)]/5 p-4 text-sm leading-6 text-slate-300">
-          V1 notifications are in-app only. Email and push delivery are not active.
-        </Card>
-
-        {isLoading ? <div className="mt-8 space-y-3">{[0, 1, 2].map((item) => <Card key={item} className="h-24 animate-pulse bg-[#151515]" />)}</div> : null}
-
-        {!isLoading && !data?.ok ? <Card className="mt-8 p-6 text-slate-300">{data?.message ?? "Notifications could not be loaded."}</Card> : null}
-
-        {!isLoading && data?.ok && !notifications.length ? (
-          <Card className="mt-8">
-            <EmptyState icon={<Bell className="text-[var(--gold)]" />} title="No notifications yet" body="Real challenge, payment, sponsor, tournament, and admin events will appear here when they occur." />
-          </Card>
-        ) : null}
-
-        {notifications.length ? (
-          <div className="mt-8 space-y-3">
-            {notifications.map((notification) => {
-              const unread = notification.status === "unread" || notification.read === false;
-              return <Link key={notification.id} href={notification.actionUrl ?? "/notifications/unavailable"} onClick={() => openNotification(notification.id, unread)} className="block rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]" aria-label={`Open notification: ${notification.title ?? "Notification"}`}>
-                <Card className={`p-5 transition hover:border-[var(--gold)]/45 hover:bg-[var(--gold)]/5 ${unread ? "border-[var(--gold)]/35 bg-[var(--gold)]/5" : "bg-[#141414]"}`}>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="break-words text-lg font-black">{notification.title ?? "Notification"}</h2>
-                        {unread ? <span className="rounded-full bg-[var(--gold)] px-2 py-1 text-[10px] font-black uppercase text-black">Unread</span> : null}
-                        <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black uppercase text-slate-400">{notification.type ?? "update"}</span>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{notification.message ?? notification.body ?? "Notification update"}</p>
-                      <p className="mt-2 text-xs text-slate-500">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "Time not available"}</p>
-                    </div>
-                    <span className="shrink-0 text-sm font-black text-amber-700">Open</span>
-                  </div>
-                </Card>
-              </Link>;
-            })}
-          </div>
-        ) : null}
-      </div>
-    </AppShell>
-  );
+  const { user } = useCurrentUser();
+  const [filter, setFilter] = useState("all"), [paging, setPaging] = useState({ uid: "", cursors: [""] }), [error, setError] = useState(""), [saving, setSaving] = useState(false), [category, setCategory] = useState("all");
+  const pages = paging.uid === user?.uid ? paging.cursors : [""];
+  const setPages = (update: string[] | ((value: string[]) => string[])) => setPaging(previous => ({ uid: user?.uid ?? "", cursors: typeof update === "function" ? update(previous.uid === user?.uid ? previous.cursors : [""]) : update }));
+  const query = useNotifications(pages.at(-1) ?? "", filter, category);
+  async function read(id?: string) { setSaving(true); setError(""); try { await query.markRead(id); } catch (error) { setError(error instanceof Error ? error.message : "Please retry."); } finally { setSaving(false); } }
+  return <AppShell><div className="mx-auto max-w-5xl">
+    <div className="flex flex-wrap items-start justify-between gap-4"><PageTitle title="Notifications" subtitle="Your important updates, together in one place." icon={<Bell />} /><Button variant="secondary" disabled={!query.data?.unreadCount || saving} onClick={() => void read()}>{saving ? "Updating…" : "Mark all as read"}</Button></div>
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-2" aria-label="Notification filters">{["all", "unread"].map(value => <button key={value} type="button" aria-pressed={filter === value} onClick={() => { setFilter(value); setPages([""]); }} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${filter === value ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-600"}`}>{value === "all" ? "All updates" : "Unread"}</button>)}</div><Link className="text-sm font-semibold text-amber-800" href="/settings/notifications">Notification settings</Link></div>
+    <p className="mt-3 text-sm text-slate-500">Your latest 12 months of in-app updates. Older updates are archived; official records are preserved.</p>
+    <label className="mt-4 block text-sm font-semibold text-slate-600">Category <select value={category} onChange={event => { setCategory(event.target.value); setPages([""]); }} className="ml-2 rounded-lg border border-slate-200 bg-white p-2">{[["all", "All categories"], ["participation", "Challenges and events"], ["money", "Payments and wallet"], ["account", "Account and security"], ["updates", "Optional updates"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    {error ? <p role="alert" className="mt-4 text-sm text-red-700">{error}</p> : null}
+    {query.isLoading || query.authLoading ? <p className="mt-8" role="status">Loading your updates…</p> : query.isError ? <Card className="mt-6 p-6"><p>Notifications could not load.</p><Button className="mt-3" onClick={() => void query.refetch()}>Retry</Button></Card> : !query.data?.notifications.length ? <Card className="mt-6 p-8 text-center"><Bell className="mx-auto text-amber-500" /><h2 className="mt-3 font-bold">{query.data?.nextCursor ? "More history is available" : category !== "all" || pages.length > 1 ? "No matching updates on this page" : filter === "unread" ? "You're all caught up" : "No notifications yet"}</h2><p className="mt-2 text-sm text-slate-500">{query.data?.nextCursor ? "Continue to the next page to check older updates in this category." : "Relevant updates will appear here."}</p></Card> : <div className="mt-6 space-y-3">{query.data.notifications.map(item => <Card key={item.id} className={`p-5 ${!item.read ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-white"}`}><div className="flex flex-wrap items-start justify-between gap-3"><h2 className="font-bold text-slate-950">{item.title}{!item.read ? <span className="ml-2 text-xs font-semibold text-amber-800">Unread</span> : null}</h2><time className="text-xs text-slate-500" dateTime={item.createdAt}>{notificationTime(item.createdAt)}</time></div><p className="mt-2 text-sm leading-6 text-slate-600">{item.message}</p><div className="mt-3 flex gap-4 text-sm font-semibold"><Link href={item.actionUrl ?? "/notifications/unavailable"} className="text-amber-800" onClick={() => { if (!item.read) void read(item.id); }}>View update</Link>{!item.read ? <button disabled={saving} onClick={() => void read(item.id)} className="text-slate-600">Mark as read</button> : null}</div></Card>)}</div>}
+    {pages.length > 1 || query.data?.nextCursor ? <nav className="mt-6 flex items-center justify-center gap-4" aria-label="Notification history"><Button variant="secondary" disabled={pages.length === 1 || query.isFetching} onClick={() => setPages(value => value.slice(0, -1))}>Previous</Button><span>Page {pages.length}</span><Button variant="secondary" disabled={!query.data?.nextCursor || query.isFetching} onClick={() => setPages(value => [...value, query.data!.nextCursor!])}>Next</Button></nav> : null}
+  </div></AppShell>;
 }

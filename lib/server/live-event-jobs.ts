@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { recoverNotificationDeliveries } from "@/lib/server/notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import { eventOptions, eventTime, LiveEventPolicyError } from "@/lib/live-event-policy";
 import { readLiveEvent } from "@/lib/server/live-event-admission";
@@ -97,6 +98,7 @@ export async function runLiveEventJob(db: Firestore, jobId: string, version: num
       }
     }
     await deliverLiveEventEmail(db, eventId);
+    await recoverNotificationDeliveries(db).catch(() => undefined);
     const { event } = await db.runTransaction(tx => readLiveEvent(db, tx, eventId));
     const options = eventOptions(event), nextTimes = [eventTime(options.registrationOpensAt), eventTime(options.registrationClosesAt), eventTime(event.startsAt), eventTime(event.endsAt)].filter(time => Number.isFinite(time) && time > now);
     // Bounded recovery polling remains durable; no request relies on an in-memory timer.

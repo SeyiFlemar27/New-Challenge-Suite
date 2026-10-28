@@ -8,7 +8,6 @@ import type { AdminPermission } from "@/lib/server/admin-permissions";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
 import { normalizeSupportTicketStatus, isFinalSupportIssueCondition } from "@/lib/support/catalog";
 import { supportIssuesConcluded } from "@/lib/server/support-tickets";
-import { supportNotificationRecord } from "@/lib/server/support-tickets";
 import { dispatchSupportEmailOutbox, supportEmailContent } from "@/lib/server/support-email";
 
 const config: Record<string, { collection: string; readPermission: AdminPermission }> = { support: { collection: "supportTickets", readPermission: "tickets.view" }, disputes: { collection: "disputes", readPermission: "disputes.review" }, appeals: { collection: "appeals", readPermission: "appeals.review" }, safety: { collection: "safetyReports", readPermission: "safetyReports.review" } };
@@ -106,11 +105,7 @@ export async function PATCH(request: Request) {
         const taskRef = db.collection("adminActionTasks").doc(operationalTaskId("support_ticket", ref.id));
         const taskState = parsed.data.action === "wait_provider" ? "waiting_for_provider" : nextStatus === "waiting_for_you" ? "waiting_for_user" : ["resolved", "closed"].includes(String(nextStatus)) ? "resolved" : "in_progress";
         transaction.set(taskRef, { state: taskState, updatedAt: now, ...(taskState === "resolved" ? { resolvedAt: now } : {}) }, { merge: true });
-        const notice = customerNoticeRef.value;
-        if (notice?.userId) {
-          const notificationId = `support_case_${auditId}`;
-          transaction.create(db.collection("notifications").doc(notificationId), supportNotificationRecord({ id: notificationId, userId: notice.userId, type: notice.type, title: notice.title, message: notice.body, ticketId: ref.id, createdAt: now }));
-        }
+        // Customer communication is queued through the existing email workflow.
       }
       if (parsed.data.action !== "view_reported_message") transaction.set(ref, update, { merge: true });
       if (parsed.data.action === "add_note") { const noteRef = ref.collection("staffNotes").doc(`note_${auditId}`); transaction.create(noteRef, { id: noteRef.id, body: parsed.data.note ?? parsed.data.reason, authorId: user!.uid, internalOnly: true, createdAt: now }); }

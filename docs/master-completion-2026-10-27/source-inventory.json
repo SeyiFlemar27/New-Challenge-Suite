@@ -1,0 +1,816 @@
+{
+  "head": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "branch": "main",
+  "trackedDirty": [
+    "app/api/admin/tournaments/[id]/route.ts",
+    "app/api/challenges/[id]/route.ts",
+    "app/api/explore/challenges/route.ts",
+    "app/api/private-challenges/[id]/access/route.ts",
+    "app/api/tournaments/[id]/join/route.ts",
+    "app/api/tournaments/[id]/manage/actions/route.ts",
+    "app/api/tournaments/[id]/route.ts",
+    "app/api/tournaments/[id]/submissions/[submissionId]/media/route.ts",
+    "app/api/tournaments/[id]/submissions/route.ts",
+    "app/api/tournaments/[id]/votes/route.ts",
+    "app/challenges/[id]/access/page.tsx",
+    "app/challenges/[id]/page.tsx",
+    "app/challenges/page.tsx",
+    "app/explore/page.tsx",
+    "app/live-events/[id]/page.tsx",
+    "app/my-challenges/page.tsx",
+    "app/private/preview/[id]/page.tsx",
+    "app/tournaments/[id]/matches/[matchId]/page.tsx",
+    "app/tournaments/[id]/me/page.tsx",
+    "app/tournaments/[id]/page.tsx",
+    "app/tournaments/[id]/results/page.tsx",
+    "components/admin/admin-tournament-decisions.tsx",
+    "components/app-shell.tsx",
+    "components/mobile-footer.tsx",
+    "components/private-access-manager.tsx",
+    "components/sponsor/sponsor-shell.tsx",
+    "components/tournament-detail-content.tsx",
+    "components/tournament-match-actions.tsx",
+    "lib/account-routing.ts",
+    "lib/media-upload-paths.ts",
+    "lib/media-upload.ts",
+    "lib/private-challenge-policy.ts",
+    "lib/server/challenge-settlement.ts",
+    "lib/server/live-event-admission.ts",
+    "lib/server/normal-email.ts",
+    "lib/server/private-access-management.ts",
+    "lib/server/private-invites.ts",
+    "lib/server/tournament-draft-adoption.ts",
+    "lib/server/tournament-lifecycle-scheduler.ts",
+    "lib/server/tournament-match-lifecycle-jobs.ts",
+    "lib/server/tournament-notifications.ts",
+    "lib/server/tournament-operations.ts",
+    "lib/server/tournament-paid-entry.ts",
+    "lib/server/tournament-public.ts",
+    "lib/server/tournament-result-confirmation.ts",
+    "lib/server/tournament-settlement-policy.ts",
+    "lib/server/tournament-settlement.ts",
+    "lib/server/tournament-validation.ts",
+    "lib/server/tournaments.ts",
+    "lib/tournament-types.ts",
+    "next-env.d.ts",
+    "scripts/qa/dashboard-auth-journeys.mjs",
+    "scripts/qa/dashboard-redesign-journeys.mjs",
+    "scripts/qa/run-p1-browser-e2e.mjs",
+    "scripts/run-isolated-p0-emulators.mjs",
+    "scripts/run-local-verification-suite.mjs",
+    "scripts/run-media-publish-emulators.cjs",
+    "scripts/run-p0-emulator-regressions.mjs",
+    "scripts/test-automatic-voting-emulator.mjs",
+    "scripts/test-dashboard-auth-routing.mjs",
+    "scripts/test-private-v2-access-emulator.mjs",
+    "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+    "scripts/test-tournament-new-policy.mjs",
+    "scripts/test-tournament-settlement-allocation.mjs",
+    "scripts/test-tournament-submission-media-emulator.mjs",
+    "tsconfig.json",
+    "tsconfig.tsbuildinfo"
+  ],
+  "sourceInventory": [
+    {
+      "path": "app/api/admin/tournaments/[id]/route.ts",
+      "state": "tracked_modified",
+      "sha256": "da6cbe720b8f12c262042de8f518dbd08fddc1a337d69467a941f7e1164fd6c7"
+    },
+    {
+      "path": "app/api/challenges/[id]/route.ts",
+      "state": "tracked_modified",
+      "sha256": "6ccd5dbdaeec437bb9a0e44162b05520c3421943e77cde8f66a497bc73756a2f"
+    },
+    {
+      "path": "app/api/explore/challenges/route.ts",
+      "state": "tracked_modified",
+      "sha256": "adbf3a39559bfaf13ad406d8c1bff45fab19917246accfa550231991aa4b5957"
+    },
+    {
+      "path": "app/api/me/tournaments/route.ts",
+      "state": "untracked_preserved",
+      "sha256": "cd25fc06ad9711e719a9bf6ab657be54f4202fa1fe8f3dc8b5fe3352de024518"
+    },
+    {
+      "path": "app/api/private-challenges/[id]/access/route.ts",
+      "state": "tracked_modified",
+      "sha256": "2fe121ee38ad96819a1bf2a403dd73939e50cb6749de572e5d815a4984febf09"
+    },
+    {
+      "path": "app/api/tournaments/[id]/join/route.ts",
+      "state": "tracked_modified",
+      "sha256": "ab32c6b6d9d80f21c2ede622de6714d9f450396c4c999fd5c21e94d1211c1f00"
+    },
+    {
+      "path": "app/api/tournaments/[id]/manage/actions/route.ts",
+      "state": "tracked_modified",
+      "sha256": "6c18fca2c082261d771320c6e4ca889a81deb832568b53b4682b1f457c1a2b8e"
+    },
+    {
+      "path": "app/api/tournaments/[id]/route.ts",
+      "state": "tracked_modified",
+      "sha256": "ef102721a37484fb2b75dda9a5693af620918e6a7b032e431eb62499ccafde4d"
+    },
+    {
+      "path": "app/api/tournaments/[id]/submissions/[submissionId]/media/route.ts",
+      "state": "tracked_modified",
+      "sha256": "428b8a4b4c29f0b8ef7a8a778e1a2757981b63e8a937c03554232711234751d9"
+    },
+    {
+      "path": "app/api/tournaments/[id]/submissions/route.ts",
+      "state": "tracked_modified",
+      "sha256": "88105b6a92c630ae519efc406a6db056111573321e6121df28a41dd20f0e824a"
+    },
+    {
+      "path": "app/api/tournaments/[id]/votes/route.ts",
+      "state": "tracked_modified",
+      "sha256": "97674f40ac8804f577dc0a467e9dd6b8303677f604355353489d4758cf33a52e"
+    },
+    {
+      "path": "app/challenges/[id]/access/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "6ddcd996809be48031bf2bf2e78e7f95f2d9cb8ddd40f3f2ef69d05a681eb70b"
+    },
+    {
+      "path": "app/challenges/[id]/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "850ab639e98a9300f73437b968a350af93b8042b04956494216b2b41dbb3540d"
+    },
+    {
+      "path": "app/challenges/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "292849a7d0979c5d570235275839ef1e4e3cf4cd6b41735a3f70690051a722fe"
+    },
+    {
+      "path": "app/explore/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "306d71f81ba94ff0acf6d4ce10c54b41f5c40b0f69eb39a2ce1590f151444fd9"
+    },
+    {
+      "path": "app/live-events/[id]/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "f48bfb0c044fd5422059e86743d7e1541a1cfd7585bd7710311c9dd52f153bec"
+    },
+    {
+      "path": "app/my-challenges/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "219caca3b369de4b513ba0c913bafde3d3bd32adb3f5574e184251eb0e3b1fbd"
+    },
+    {
+      "path": "app/private/preview/[id]/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "f445cebc2040d434617c15286127b3020a9c7cd8456924205b2a6257cc3efd81"
+    },
+    {
+      "path": "app/tournaments/[id]/matches/[matchId]/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "e3cbac8595d5cae0d086cf1fe18f462b35a9c23e47ed6d9bd0b63627aba165c2"
+    },
+    {
+      "path": "app/tournaments/[id]/me/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "a7c02bf1cae6d3fbd0cbc1f09e89cfa4eccc724a426a5ea856e50fe99466fcd5"
+    },
+    {
+      "path": "app/tournaments/[id]/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "f4ec85a4f97ccf114151ae40bccb04248a6b9a049066777c48f978efae8d3db2"
+    },
+    {
+      "path": "app/tournaments/[id]/results/page.tsx",
+      "state": "tracked_modified",
+      "sha256": "bcea8c697848f657a24676d8dec64c10e6b1e0c20333e9d4e4f02dd893a8c568"
+    },
+    {
+      "path": "components/admin/admin-tournament-decisions.tsx",
+      "state": "tracked_modified",
+      "sha256": "6a8b057412da18bb3a96220e90a4ca65047a1a996e1a0ded386dd95faa981a1b"
+    },
+    {
+      "path": "components/admin/individual-correction-evidence.tsx",
+      "state": "untracked_preserved",
+      "sha256": "55426415ec9f2c2cb11a99437f881874159468ba8b142fcdee8d500d8a9a139e"
+    },
+    {
+      "path": "components/app-shell.tsx",
+      "state": "tracked_modified",
+      "sha256": "40b45521f50d53373a61634798ee38566f899e1cd748153b9ce018796a8e8b0a"
+    },
+    {
+      "path": "components/explore-challenge-card.tsx",
+      "state": "untracked_preserved",
+      "sha256": "f1b555e788d81653c944a1933dd48f48c33b56f188dcd5a59c25aed408bfe8fe"
+    },
+    {
+      "path": "components/mobile-footer.tsx",
+      "state": "tracked_modified",
+      "sha256": "7a351a17ad4e932e5de37a1ebb489d7b7c38bfa31deb8a061e58a8f1ad18f086"
+    },
+    {
+      "path": "components/my-tournaments.tsx",
+      "state": "untracked_preserved",
+      "sha256": "113f81c90980d34e3e06e25a31889945e9521d1f799db780339f5e3db01e409f"
+    },
+    {
+      "path": "components/private-access-manager.tsx",
+      "state": "tracked_modified",
+      "sha256": "e46d0fe0ea93e075f44f97305fe81d3ba5c65a20def5469ce8d06016a693aa50"
+    },
+    {
+      "path": "components/private-detail-actions.tsx",
+      "state": "untracked_preserved",
+      "sha256": "43bce004c2b885ab1a3a963a3c0a92b9a8c1f364d391bee245b1fdfe84df49cf"
+    },
+    {
+      "path": "components/private-locked-detail.tsx",
+      "state": "untracked_preserved",
+      "sha256": "c0295eb1ada841a25fdaf4e4783e4fa4c276e94d759f17bdd883b8bdb0d946cf"
+    },
+    {
+      "path": "components/sponsor/sponsor-shell.tsx",
+      "state": "tracked_modified",
+      "sha256": "fcb1b30393f7bc2a29b2facdefa39156d00d5fdaca0b2fa4d7c7259d80fc87c1"
+    },
+    {
+      "path": "components/tournament-detail-content.tsx",
+      "state": "tracked_modified",
+      "sha256": "dde9f1d1ecc345a7464aa8bfd013656a7465ddb1e44b50dce25b451c7cf27141"
+    },
+    {
+      "path": "components/tournament-entry-withdrawal.tsx",
+      "state": "untracked_preserved",
+      "sha256": "4e27ed14ec597d0b34d2d217463dab6402108c1505384b40918ba581ff49dedd"
+    },
+    {
+      "path": "components/tournament-match-actions.tsx",
+      "state": "tracked_modified",
+      "sha256": "a710eb157d77826de03368bf534ff25b825ec226eee22fe206759406abb92259"
+    },
+    {
+      "path": "lib/account-routing.ts",
+      "state": "tracked_modified",
+      "sha256": "fbf99644db99f2f8864cd29ac7e2d3e1804834549be69c21aacab620c91da14d"
+    },
+    {
+      "path": "lib/explore-card-policy.ts",
+      "state": "untracked_preserved",
+      "sha256": "9336307efc45eb8de2feffc1b9132d820ab55f326fda07e093fa4af5e2e8df60"
+    },
+    {
+      "path": "lib/individual-tournament-policy.ts",
+      "state": "untracked_preserved",
+      "sha256": "571ddf042de0346f57c2b6b8d2b42df0b316111e059b5ab006c77b61692a2a42"
+    },
+    {
+      "path": "lib/media-upload-paths.ts",
+      "state": "tracked_modified",
+      "sha256": "dc3c4b66bd43bcb3aa757befbfe4c0a1f1a126613ac3ef9dc388563e9e6cbb75"
+    },
+    {
+      "path": "lib/media-upload.ts",
+      "state": "tracked_modified",
+      "sha256": "da37795d608018f65b99a3c0e7877c6dabb42ea401336aa0e590a05a59c36c60"
+    },
+    {
+      "path": "lib/private-challenge-policy.ts",
+      "state": "tracked_modified",
+      "sha256": "2ec7130e100401dbf118cdcd18ae6559d668690c679575bc2aa9835fa74299ed"
+    },
+    {
+      "path": "lib/server/challenge-settlement.ts",
+      "state": "tracked_modified",
+      "sha256": "5ac19faef2d1ae9acd7069ef75a61abe050f0bf814d0fbf76e118d13853d4680"
+    },
+    {
+      "path": "lib/server/individual-automatic-settlement.ts",
+      "state": "untracked_preserved",
+      "sha256": "a5819f7ebdffcb143f52b29bb0a88a8d9529fa9ed986ac134fca7f3755057448"
+    },
+    {
+      "path": "lib/server/individual-entry-withdrawal.ts",
+      "state": "untracked_preserved",
+      "sha256": "56ff93d4abc69322fa7c3fb5faa01abf53d658c0f13943dba8a1518dfb29fd66"
+    },
+    {
+      "path": "lib/server/individual-match-review.ts",
+      "state": "untracked_preserved",
+      "sha256": "8e5417822473663b08b0cb4f941df84c8e0a7887bd5de3c8d0c645f3d01b4c6e"
+    },
+    {
+      "path": "lib/server/individual-prize-correction.ts",
+      "state": "untracked_preserved",
+      "sha256": "5c5a951a89a688ff8da56034f286653eed255f0c5f205886f18578e53930b2a8"
+    },
+    {
+      "path": "lib/server/individual-review-escalation.ts",
+      "state": "untracked_preserved",
+      "sha256": "789f0b82730ed2c0e0623e0c9fb30443c5aea5c05fa1f8c245dac503e02ae938"
+    },
+    {
+      "path": "lib/server/individual-settlement-clearance.ts",
+      "state": "untracked_preserved",
+      "sha256": "8f8e65b62c8c51764e6dc1305767a6881962165dd0abe224f6f03c17ad6f44dc"
+    },
+    {
+      "path": "lib/server/individual-tournament-cancellation.ts",
+      "state": "untracked_preserved",
+      "sha256": "7c24a510f38455529c995e6aee3aae872770e28da10d33808ce3be1d78ed4808"
+    },
+    {
+      "path": "lib/server/individual-tournament-disqualification.ts",
+      "state": "untracked_preserved",
+      "sha256": "fd5dbe0e63c2777046a6ceecb336331cc59d4eb165dbfa274b28391f4226d22b"
+    },
+    {
+      "path": "lib/server/live-event-admission.ts",
+      "state": "tracked_modified",
+      "sha256": "2c52780e363f08d31514959da7aa9bb598b8f5177fe3a297dee5d46ace783be2"
+    },
+    {
+      "path": "lib/server/normal-email.ts",
+      "state": "tracked_modified",
+      "sha256": "af5e840e2342559b4583b838e27695db0f36d810f50123e2eb6262cf99d6ffa8"
+    },
+    {
+      "path": "lib/server/private-access-management.ts",
+      "state": "tracked_modified",
+      "sha256": "d1ca3572fa5f305cac0bf0a3c439090f0a0a63ec8ed258bc09e67f48fb03eb79"
+    },
+    {
+      "path": "lib/server/private-invites.ts",
+      "state": "tracked_modified",
+      "sha256": "024e0380acbf055b51680d24eb88f9422c4b59e67d7cc10470bbc01134523a1b"
+    },
+    {
+      "path": "lib/server/public-creator.ts",
+      "state": "untracked_preserved",
+      "sha256": "4a6d032fc05251695cf55c759c16dc2044a1668ba2f246919c974c15b52f56b4"
+    },
+    {
+      "path": "lib/server/tournament-bracket-recovery.ts",
+      "state": "untracked_preserved",
+      "sha256": "29ce83324f4615f8c2a16c57b8e38ec768d28e64bd2aa5f258007a14b6154c2d"
+    },
+    {
+      "path": "lib/server/tournament-draft-adoption.ts",
+      "state": "tracked_modified",
+      "sha256": "06cb418b887bf6e84101f3642e153c6b3c893656f6c37ca2520a40bef92aeb69"
+    },
+    {
+      "path": "lib/server/tournament-lifecycle-scheduler.ts",
+      "state": "tracked_modified",
+      "sha256": "0c0175d757152a406c0f0366d45e8d73aa3264ca3f0d853e2a76e5880957ecfc"
+    },
+    {
+      "path": "lib/server/tournament-match-lifecycle-jobs.ts",
+      "state": "tracked_modified",
+      "sha256": "0960952998e9ea591bc0b10e9b155399d9cfb4614315e51ee0c52191f435d6e2"
+    },
+    {
+      "path": "lib/server/tournament-notifications.ts",
+      "state": "tracked_modified",
+      "sha256": "e2572f3c42771875835463f74a2d4a824e2197632d36f588f9ec2194a9138cb7"
+    },
+    {
+      "path": "lib/server/tournament-operations.ts",
+      "state": "tracked_modified",
+      "sha256": "1bcbaf58723737b6953d115445e9f6a4fc8ec8b7eda71d2921ddfe899d5a0585"
+    },
+    {
+      "path": "lib/server/tournament-paid-entry.ts",
+      "state": "tracked_modified",
+      "sha256": "5bb66b9d08a56a135b3979c2417ff61f2dbdc16bf4b1e23824f601fdc30ad8f5"
+    },
+    {
+      "path": "lib/server/tournament-public.ts",
+      "state": "tracked_modified",
+      "sha256": "7d6ed3828c5ac93a07399d286dc30470a5539eaa669611793c7dd7776fd47178"
+    },
+    {
+      "path": "lib/server/tournament-result-confirmation.ts",
+      "state": "tracked_modified",
+      "sha256": "db2de8d6baf37f647a08894f4e16caa1104dcce17828fbbb7ec6d4147a0e4470"
+    },
+    {
+      "path": "lib/server/tournament-settlement-policy.ts",
+      "state": "tracked_modified",
+      "sha256": "c54aac155573d47c3de18015caad3ac67b819c8fe31a49497c32dffe12178dc0"
+    },
+    {
+      "path": "lib/server/tournament-settlement.ts",
+      "state": "tracked_modified",
+      "sha256": "ef2d0dc8d18042c114d653d85a2b8b77a60189d8d311b930fd7130662de72550"
+    },
+    {
+      "path": "lib/server/tournament-submission-reminders.ts",
+      "state": "untracked_preserved",
+      "sha256": "84fd6640383ae3800fe40e29dafc65e931587c644fb952c498d18906258beebf"
+    },
+    {
+      "path": "lib/server/tournament-submission-visibility.ts",
+      "state": "untracked_preserved",
+      "sha256": "6048ecd293c6152a82541c6b4474fbbfbe97bdcd78039f9192d773ff3f5a4e4e"
+    },
+    {
+      "path": "lib/server/tournament-validation.ts",
+      "state": "tracked_modified",
+      "sha256": "c6b37be5a037bc338ab9ec193e0c1b47e72b3f14bf915752db90b9fe8c47ba89"
+    },
+    {
+      "path": "lib/server/tournaments.ts",
+      "state": "tracked_modified",
+      "sha256": "37f5708471bc5dd01229a480506f2fcccb575b841f71ad8b5633e2ac2a3bf5a4"
+    },
+    {
+      "path": "lib/tournament-participant-view.ts",
+      "state": "untracked_preserved",
+      "sha256": "b7458614d786ce96a960c75268af84bad915d49dd2e4f107e8dbc8acb360338c"
+    },
+    {
+      "path": "lib/tournament-results-view.ts",
+      "state": "untracked_preserved",
+      "sha256": "2f3a03bfdf92c16c988caa6af47bc458f12e9259b9dc50bad97b9f8caac148d4"
+    },
+    {
+      "path": "lib/tournament-types.ts",
+      "state": "tracked_modified",
+      "sha256": "c2b7b9afc94fb6ccd3ebbf74f37bd7917b553560ee69710dcca1e23e8f4e50b2"
+    },
+    {
+      "path": "scripts/audit-publication-failures-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "e3649ab2067b38233e5a4266fa521689df56a4627bfa21a6abd68871c933eab0"
+    },
+    {
+      "path": "scripts/audit-release-query-indexes-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "2ba14ee840db5eddcdb1961851d00335485c2d9a96a3aabe425a14192ad74e7a"
+    },
+    {
+      "path": "scripts/audit-tournament-backlog-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "48117489d4182a18e6141ff2cafb6ed73078382541720be8506e408bb9f18a69"
+    },
+    {
+      "path": "scripts/audit-tournament-cloud-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "60201b875df30d42ba50724740dc6d861dc26e881c9354fb707a738e34b90ec6"
+    },
+    {
+      "path": "scripts/check-tournament-probe-identity-permission-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "3fced422cf0eebcf7ba50f24a3f9c44965859f0d5139a5078ca9480c6e762236"
+    },
+    {
+      "path": "scripts/classify-production-error-log-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "d9416b771caec2af5820d78b13d6f437e8fa16263c5806dcb46838f3b69fa45d"
+    },
+    {
+      "path": "scripts/create-approved-paused-tournament-scheduler.mjs",
+      "state": "untracked_preserved",
+      "sha256": "9d90a47229e7b746c836283717d2a711924e54084220e2fcb645f3fdfab72489"
+    },
+    {
+      "path": "scripts/create-approved-release-indexes.mjs",
+      "state": "untracked_preserved",
+      "sha256": "076b1edea75a000e3385849d70b49a0d988803534aeb5a2e150affb21d823120"
+    },
+    {
+      "path": "scripts/diagnose-google-storage-transports.mjs",
+      "state": "untracked_preserved",
+      "sha256": "b2f4b37fa0502b06527d6ea20cd747b707c39fa63a8cb258982fea06ebcbe461"
+    },
+    {
+      "path": "scripts/diagnose-production-storage-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "5265f2bc6a6f682d409817f82ca4288d10d0fb6b06039a3c51ccc6428ab1f1a2"
+    },
+    {
+      "path": "scripts/inspect-final-monitoring-integrations-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "9a78e8a606afde7747bae072d5a600c5a51ac8ff1efbdad5e34728e2074baa1b"
+    },
+    {
+      "path": "scripts/inspect-final-vercel-release-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "8ef0c3681a1aeb8a3edf9206dc2e4d108d34f78306ea0dff80b8231d9fe4d0d5"
+    },
+    {
+      "path": "scripts/inspect-production-build-progress-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "22ca2d8f3ff52b96998c65a77264f06f2558aeee4f231ce2178cac3f1c3e7750"
+    },
+    {
+      "path": "scripts/inspect-production-release-runtime-logs-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "c98161b9d8dcbe424f7a9f6af34ee9fbe9f494328bf18c3e19b9fd578f085e46"
+    },
+    {
+      "path": "scripts/inspect-production-rollout-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "ac8204d7dde7aeb8c67f7b07291700a3889e3f71c4e192816092fd57b22aa01a"
+    },
+    {
+      "path": "scripts/inspect-release-deployments-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "48fe364287de8b58fc51558bf55ad05cedcc8f9423838795758619537209b774"
+    },
+    {
+      "path": "scripts/inspect-staging-preview-metadata-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "0e66ce16a9ce9100643a30a29ce5a54443fdc2fd5b401b205c20c57cefa0a363"
+    },
+    {
+      "path": "scripts/prepare-final-release-file-inventory.mjs",
+      "state": "untracked_preserved",
+      "sha256": "c59302560ef10a3d76cc6cf44870412533fa297c32268bc89800ab99f5413142"
+    },
+    {
+      "path": "scripts/provision-approved-tournament-foundation.mjs",
+      "state": "untracked_preserved",
+      "sha256": "48894a8a700b4b6f0b37f5640cda4b2bef538b5b84ee426ae3033f66097f3054"
+    },
+    {
+      "path": "scripts/publish-approved-firestore-privacy-rules.mjs",
+      "state": "untracked_preserved",
+      "sha256": "ecad630fac90de5d4c8de8a0a0c864172f1e34e41400ee50f4333f077c86397e"
+    },
+    {
+      "path": "scripts/qa/audit-admin-authority-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "f01dab1d59a3803d37dc19cb6c62f7cf4e5afe657bef4463ba5a39eacbcba287"
+    },
+    {
+      "path": "scripts/qa/audit-admin-routing-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "ec8a1ab2b27ac37e13fddf8293ae2d5f4ac0f81e1a15f520bf4465015f212b37"
+    },
+    {
+      "path": "scripts/qa/classify-six-dashboard-runtime-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "7006eddc031b2ef227e4a4fec5fc83b8dc1d05159f40c1ea6275a149185f87a6"
+    },
+    {
+      "path": "scripts/qa/dashboard-auth-journeys.mjs",
+      "state": "tracked_modified",
+      "sha256": "2b82d0c1df66c6e58bcdd5dd5d607f0be36d145e5577e145a844c52c270fe68c"
+    },
+    {
+      "path": "scripts/qa/dashboard-redesign-journeys.mjs",
+      "state": "tracked_modified",
+      "sha256": "d7fb23fe388a9b54b4da500f45786edbde57a4878a0b44eaa7f7876b78190b34"
+    },
+    {
+      "path": "scripts/qa/inspect-admin-routing-runtime-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "b44cc7abe732718c5eb792f0ec25393418745088875dc50220f3203314896aca"
+    },
+    {
+      "path": "scripts/qa/inspect-sponsor-entry-runtime-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "0b7df5fbaa4fc8ca7f00515d7f87a521fc1c79e1d92b0305d069a295bd9bc51e"
+    },
+    {
+      "path": "scripts/qa/inspect-sponsor-live-runtime-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "6a52819664b7bc63089e8ad671287caa410fbeabd893bc9aabf209736f76506f"
+    },
+    {
+      "path": "scripts/qa/master-detail-journeys.mjs",
+      "state": "untracked_preserved",
+      "sha256": "8fdae60e407e4c8df2b6edbc6da63c4fef478970e0d76e541fcce6f0a45c2519"
+    },
+    {
+      "path": "scripts/qa/master-participant-journeys.mjs",
+      "state": "untracked_preserved",
+      "sha256": "b4f1581fe75c11823253608a7421c3ad6fed0fb04f6f5a2e72b5e734fba380d4"
+    },
+    {
+      "path": "scripts/qa/run-p1-browser-e2e.mjs",
+      "state": "tracked_modified",
+      "sha256": "baa65391efbf19db8ab86a4da6613912aa73ae6b21853f1ed52ef26cdf89094b"
+    },
+    {
+      "path": "scripts/qa/smoke-admin-routing-production-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "7f50844edf4a1d0e9df312084e866872d3268d53609f39b47c5f3ba2dde4b6da"
+    },
+    {
+      "path": "scripts/qa/smoke-sponsor-entry-production-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "d1f236f2ed13d5d4a160dd14e9c6864e14beb2b8478a96efe05cce0d0adfa4c9"
+    },
+    {
+      "path": "scripts/qa/smoke-sponsor-live-production-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "2f668517bcada1e1b5d189b36cd78e66b65c5fb25ef5f3678d4d745f63e3a4c6"
+    },
+    {
+      "path": "scripts/qa/verify-admin-routing-release-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "320304bce5865334d28eb74cd938a32f4115d11240317fbfa374eefd5a72cf98"
+    },
+    {
+      "path": "scripts/qa/verify-sponsor-entry-release-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "89e0628ca33c7f6a504aecaf948ea11a611e8482ef3a1a555321d33f4316dbfe"
+    },
+    {
+      "path": "scripts/qa/verify-sponsor-live-release-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "c8ab5f2d95e5a7556bd50e6f67aaf4e6bda85cf4a756f1e44e5f31a9b833415c"
+    },
+    {
+      "path": "scripts/run-isolated-p0-emulators.mjs",
+      "state": "tracked_modified",
+      "sha256": "a8f2a8df1074605f5575252edfdc83dd8f4d707374ef41da6db5c03863c84c28"
+    },
+    {
+      "path": "scripts/run-local-verification-suite.mjs",
+      "state": "tracked_modified",
+      "sha256": "30b6e2f9334548125871d0e9a547408177a6199f90758574e38527d1ac4c95ad"
+    },
+    {
+      "path": "scripts/run-media-publish-emulators.cjs",
+      "state": "tracked_modified",
+      "sha256": "c07473944e81cef32a42ef1eccb2575ef6d2c72ce24b53847a5ac8edb188bb30"
+    },
+    {
+      "path": "scripts/run-p0-emulator-regressions.mjs",
+      "state": "tracked_modified",
+      "sha256": "f1b44c654d0968ef437f9f312fcccdcd5897a1f7cbca21b78f18c9ff2eec5c1b"
+    },
+    {
+      "path": "scripts/sanitize-vercel-deployment-inspection.mjs",
+      "state": "untracked_preserved",
+      "sha256": "efa195e7dd974b89e00d7dcad04c3c3aace30842f45a33db9e19127f11dc331f"
+    },
+    {
+      "path": "scripts/smoke-production-release-acceptance-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "81396fd7fffac22dbe6a633818521785e34d7839de79cbb34b8dc318325aaf69"
+    },
+    {
+      "path": "scripts/smoke-protected-preview-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "cad8bacb851210c833f6a75e629a5f00e6e3f00c0eaccc3aec1487ce7fa04c5e"
+    },
+    {
+      "path": "scripts/snapshot-master-implementation.mjs",
+      "state": "untracked_preserved",
+      "sha256": "e7c6e24ee27dd8b9a3e9ca4a7b4b736e7843bca9a14e02e29c5d15286e7060f5"
+    },
+    {
+      "path": "scripts/stage-approved-tournament-production-env.mjs",
+      "state": "untracked_preserved",
+      "sha256": "4c16759265576e014fcc5df52037de65acd312a27059eb127f669802bd957904"
+    },
+    {
+      "path": "scripts/test-automatic-voting-emulator.mjs",
+      "state": "tracked_modified",
+      "sha256": "584878a90cc5846db1e8013c1c49ae933fd9471980f313f49da2c87a9750ffd2"
+    },
+    {
+      "path": "scripts/test-dashboard-auth-routing.mjs",
+      "state": "tracked_modified",
+      "sha256": "1d7c7ef89288501d979b71bb60972dc08b1f8acb0d1b8cb99364de2cb0ffce1a"
+    },
+    {
+      "path": "scripts/test-explore-card-policy.mjs",
+      "state": "untracked_preserved",
+      "sha256": "fa3c4d59a3bc5d11ba7b8637746b0e4e8e0dea3a75dbe03b0c602d55c333280f"
+    },
+    {
+      "path": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "1bbf3538a80d108e2a113e5d4f8b8917d40142a971aace3ede0a3f33d95df75a"
+    },
+    {
+      "path": "scripts/test-individual-automatic-settlement-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "7468380a70e3fc635de149b63b529cce611ec5c691876759bc6d5a689163d6ae"
+    },
+    {
+      "path": "scripts/test-individual-cancellation-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "4f8a7dd9e578981feed0e7c5ac5330d33721f9068173762d6afca31f7abf99fc"
+    },
+    {
+      "path": "scripts/test-individual-correction-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "29d4e9a9f9eb91447152b77892143c4d7d3cca2ad03201f8ead119b79f7c7fb5"
+    },
+    {
+      "path": "scripts/test-individual-recovery-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "213a624220ea1cdc75c6ca427251394c5bf2713dee407188addc0b84332c0d40"
+    },
+    {
+      "path": "scripts/test-individual-tournament-bracket-matrix.mjs",
+      "state": "untracked_preserved",
+      "sha256": "ddcdd468918242e3a36fb6d9b48c32efa222acf574713580798ccd660ebd164b"
+    },
+    {
+      "path": "scripts/test-individual-tournament-foundation.mjs",
+      "state": "untracked_preserved",
+      "sha256": "9c594b94c165467150ecf4922aa5fb819452cc8b2f4c052b0e5f420f84d27319"
+    },
+    {
+      "path": "scripts/test-individual-tournament-policy.mjs",
+      "state": "untracked_preserved",
+      "sha256": "938c04bfc6992cb91ee2136457867fc9587b3fd454eff3ae22fdd65810c2d5ea"
+    },
+    {
+      "path": "scripts/test-my-tournaments-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "7161fce0e5bd119faff475e3625527e7f5c4b426c095f9bf5447dcf00cf6f2d3"
+    },
+    {
+      "path": "scripts/test-private-v2-access-emulator.mjs",
+      "state": "tracked_modified",
+      "sha256": "f31f2988648d06e71ce9c1527b75a6a3224896a828fbb1ae82ec4e4d9fc2ac01"
+    },
+    {
+      "path": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+      "state": "tracked_modified",
+      "sha256": "2c6751b06fb9b526b17724fd0c9275101fc0c4fb0ab46461bbb52b491b266942"
+    },
+    {
+      "path": "scripts/test-tournament-media-visibility-emulator.mjs",
+      "state": "untracked_preserved",
+      "sha256": "a8cade626f7603603dc6f7ee89889976e871bd9ae2ff1e7098a14b6c44f8c2a7"
+    },
+    {
+      "path": "scripts/test-tournament-new-policy.mjs",
+      "state": "tracked_modified",
+      "sha256": "344c3ee400fea8b73ce201ce624ee476bac4e3b8382374e5fb4c5dd5d1893e51"
+    },
+    {
+      "path": "scripts/test-tournament-participant-view.mjs",
+      "state": "untracked_preserved",
+      "sha256": "e524c2a928d03fecc18244fe12886d6a15c049fa4c8a9e69f55b383c42035984"
+    },
+    {
+      "path": "scripts/test-tournament-results-view.mjs",
+      "state": "untracked_preserved",
+      "sha256": "b289e8e9bb09aabfd55994cfdf60298c1c12af5261f919bfadb94e83bb24707b"
+    },
+    {
+      "path": "scripts/test-tournament-settlement-allocation.mjs",
+      "state": "tracked_modified",
+      "sha256": "03841d8f6ea672915dacffa7d1f5a4e44c536a4c014b7b2d08ba799ffc22722f"
+    },
+    {
+      "path": "scripts/test-tournament-submission-media-emulator.mjs",
+      "state": "tracked_modified",
+      "sha256": "dfed24d1daae1a6759e9767b12609fdb45ff46e0cf975c8550d2778c50c8c940"
+    },
+    {
+      "path": "scripts/test-tournament-submission-visibility.mjs",
+      "state": "untracked_preserved",
+      "sha256": "9e7cd00ff64813e081ee8fddc676a2d3461df98c13058150c233953f1a00f3ec"
+    },
+    {
+      "path": "scripts/test-tournament-upload-path-identifiers.mjs",
+      "state": "untracked_preserved",
+      "sha256": "727a4196ba35dc1cf7144b042a6b98ce5c9bdfc24428dfa223e0d8365107eea4"
+    },
+    {
+      "path": "scripts/verify-final-release-infrastructure-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "1f5fd63272a6b4c8cd0c74756cf522f53a47d14680741e4f7b4498a46a6c19db"
+    },
+    {
+      "path": "scripts/verify-production-diagnostic-auth-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "bd50058d9a5a0fc69708f335dac7bcb7896e4883135ae67bb361636a6b9c9f74"
+    },
+    {
+      "path": "scripts/verify-production-disabled-state-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "c6b92b30499fed412871a78065273004cf1b52072b2d7413c4553c02106473a9"
+    },
+    {
+      "path": "scripts/verify-production-environment-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "f607cdbb7fa1c45ca1790eb2010a5e886118dd7ecf06aa676f556235bf962fe8"
+    },
+    {
+      "path": "scripts/verify-production-release-data-compatibility-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "b556dde2c0b25a5bbf6bc1310e222667f8c32caf67a8956b14bfa7f6eb7e464e"
+    },
+    {
+      "path": "scripts/verify-production-release-gates-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "ec4955ff2245b9bbe0c25d776c130ffd3ba7dd3ad83056f37732af09b09e3485"
+    },
+    {
+      "path": "scripts/verify-staging-preprovision-read-only.mjs",
+      "state": "untracked_preserved",
+      "sha256": "9fdd15fd87cd240d96c9e7857aeb79cf96dae3dfbdf6732163bf1f87af8fc484"
+    }
+  ],
+  "note": "Cumulative dirty source, including preserved prior work. Not a staging list. Excludes credentials, caches, logs and generated machine-specific type files."
+}

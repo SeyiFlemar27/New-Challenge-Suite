@@ -61,14 +61,17 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     const participantQuery = db.collection("tournamentParticipants").where("tournamentId", "==", input.tournamentId).limit(501);
     const teamQuery = db.collection("tournamentTeams").where("tournamentId", "==", input.tournamentId).limit(501);
     const reservationQuery = db.collection("tournamentEntryReservations").where("tournamentId", "==", input.tournamentId).where("status", "==", "pending").limit(501);
-    const reads = await Promise.all([
-      transaction.get(tournamentRef), transaction.get(lockRef),
-      transaction.get(participantRef ?? teamRef!), transaction.get(accountRef), transaction.get(profileRef),
-      invitationRef ? transaction.get(invitationRef) : Promise.resolve(null),
-      transaction.get(input.target.mode === "individual" ? participantQuery : teamQuery),
-      transaction.get(reservationQuery),
-      input.target.mode === "team" ? transaction.get(db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${input.target.userId}`)) : Promise.resolve(null)
-    ]);
+    const reads = [
+      await (transaction.get(tournamentRef)),
+      await (transaction.get(lockRef)),
+      await (transaction.get(participantRef ?? teamRef!)),
+      await (transaction.get(accountRef)),
+      await (transaction.get(profileRef)),
+      await (invitationRef ? transaction.get(invitationRef) : Promise.resolve(null)),
+      await (transaction.get(input.target.mode === "individual" ? participantQuery : teamQuery)),
+      await (transaction.get(reservationQuery)),
+      await (input.target.mode === "team" ? transaction.get(db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${input.target.userId}`)) : Promise.resolve(null))
+    ] as const;
     const [tournamentSnap, lockSnap, subjectSnap, accountSnap, profileSnap, invitationSnap, competitorsSnap, reservationsSnap, captainMembershipSnap] = reads;
     if (!tournamentSnap.exists) throw coded("Tournament not found.", "TOURNAMENT_NOT_FOUND", 404);
     const tournament = { id: input.tournamentId, ...tournamentSnap.data() } as TournamentFoundation & Record<string, unknown>;
@@ -103,10 +106,10 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
       const members = Array.isArray(team.memberUserIds) ? team.memberUserIds.map(String) : [];
       if (!config || members.length < config.minimumSize || members.length > config.maximumSize || new Set(members).size !== members.length) throw coded("Complete a valid Tournament roster before checkout.", "TEAM_ROSTER_INVALID", 422);
       if (!captainMembershipSnap?.exists || captainMembershipSnap.data()?.teamId !== input.target.teamId || captainMembershipSnap.data()?.status !== "active") throw coded("Active Captain membership is required.", "TEAM_CAPTAIN_REQUIRED", 403);
-      const [memberAccounts, memberMemberships] = await Promise.all([
-        transaction.getAll(...members.map((memberId) => db.collection("users").doc(memberId))),
-        transaction.getAll(...members.map((memberId) => db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${memberId}`)))
-      ]);
+      const [memberAccounts, memberMemberships] = [
+      await (transaction.getAll(...members.map((memberId) => db.collection("users").doc(memberId)))),
+      await (transaction.getAll(...members.map((memberId) => db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${memberId}`))))
+    ] as const;
       if (memberAccounts.some((account) => !account.exists || !accountEligible(account.data()))
         || memberMemberships.some((membership, index) => !membership.exists || membership.data()?.teamId !== subjectId || membership.data()?.status !== "active" || (members[index] === input.target.userId && membership.data()?.role !== "captain"))) {
         throw coded("Every Tournament team member must pass account and membership verification.", "TEAM_MEMBER_REVALIDATION_FAILED", 403);
@@ -120,7 +123,10 @@ export async function reserveTournamentPaidEntry(db: Firestore, input: {
     if (priorId) {
       const priorRef = db.collection("tournamentEntryReservations").doc(priorId);
       const priorPaymentRef = db.collection("tournamentEntryPayments").doc(priorId);
-      const [priorReservationSnap, priorPaymentSnap] = await Promise.all([transaction.get(priorRef), transaction.get(priorPaymentRef)]);
+      const [priorReservationSnap, priorPaymentSnap] = [
+      await (transaction.get(priorRef)),
+      await (transaction.get(priorPaymentRef))
+    ] as const;
       const prior = priorReservationSnap.data() ?? {};
       if (priorReservationSnap.exists && prior.status === "pending" && Date.parse(String(prior.reservationExpiresAt ?? "")) > nowMs) {
         const payment = priorPaymentSnap.data() ?? {};
@@ -202,7 +208,10 @@ export async function createTournamentEntryCheckout(db: Firestore, stripe: Strip
   await db.runTransaction(async (transaction) => {
     const paymentRef = db.collection("tournamentEntryPayments").doc(reservation.paymentId);
     const reservationRef = db.collection("tournamentEntryReservations").doc(reservation.reservationId);
-    const [paymentSnap, reservationSnap] = await Promise.all([transaction.get(paymentRef), transaction.get(reservationRef)]);
+    const [paymentSnap, reservationSnap] = [
+      await (transaction.get(paymentRef)),
+      await (transaction.get(reservationRef))
+    ] as const;
     const payment = paymentSnap.data() ?? {};
     if (!paymentSnap.exists || !reservationSnap.exists || payment.status !== "pending" || payment.reservationExpiresAt !== reservation.expiresAt) throw coded("Tournament payment reservation changed during checkout creation.", "TOURNAMENT_RESERVATION_CHANGED");
     if (payment.providerSessionId && payment.providerSessionId !== session.id) throw coded("A different Checkout Session is already linked to this reservation.", "TOURNAMENT_SESSION_CONFLICT");
@@ -225,7 +234,11 @@ export async function expireTournamentEntryReservation(db: Firestore, session: S
   const teamRef = session.metadata?.entrantType === "team" && session.metadata?.entrantId
     ? db.collection("tournamentTeams").doc(String(session.metadata.entrantId)) : null;
   return db.runTransaction(async (transaction) => {
-    const [reservationSnap, paymentSnap, teamSnap] = await Promise.all([transaction.get(reservationRef), transaction.get(paymentRef), teamRef ? transaction.get(teamRef) : Promise.resolve(null)]);
+    const [reservationSnap, paymentSnap, teamSnap] = [
+      await (transaction.get(reservationRef)),
+      await (transaction.get(paymentRef)),
+      await (teamRef ? transaction.get(teamRef) : Promise.resolve(null))
+    ] as const;
     if (!reservationSnap.exists || !paymentSnap.exists) throw new Error("Tournament reservation/payment record is missing.");
     const reservation = reservationSnap.data() ?? {};
     const payment = paymentSnap.data() ?? {};
@@ -269,10 +282,17 @@ export async function confirmTournamentEntryPayment(db: Firestore, session: Stri
   let activationJobId: string | null = null;
 
   await db.runTransaction(async (transaction) => {
-    const [reservationSnap, paymentSnap, tournamentSnap, competitorSnap, competitorRows, reservationRows, accountSnap, profileSnap, lockSnap] = await Promise.all([
-      transaction.get(reservationRef), transaction.get(paymentRef), transaction.get(tournamentRef), transaction.get(competitorRef),
-      transaction.get(competitorQuery), transaction.get(reservationQuery), transaction.get(accountRef), transaction.get(profileRef), transaction.get(lockRef)
-    ]);
+    const [reservationSnap, paymentSnap, tournamentSnap, competitorSnap, competitorRows, reservationRows, accountSnap, profileSnap, lockSnap] = [
+      await (transaction.get(reservationRef)),
+      await (transaction.get(paymentRef)),
+      await (transaction.get(tournamentRef)),
+      await (transaction.get(competitorRef)),
+      await (transaction.get(competitorQuery)),
+      await (transaction.get(reservationQuery)),
+      await (transaction.get(accountRef)),
+      await (transaction.get(profileRef)),
+      await (transaction.get(lockRef))
+    ] as const;
     if (!reservationSnap.exists || !paymentSnap.exists || !tournamentSnap.exists) throw new Error("Tournament entry reservation, payment, or Tournament record is missing.");
     const payment = paymentSnap.data() ?? {};
     const reservation = reservationSnap.data() ?? {};
@@ -405,7 +425,7 @@ export async function initiateTournamentEntryRefund(stripe: Stripe, db: Firestor
   const refundRef = db.collection("refundCases").doc(refundCaseId);
   const now = new Date().toISOString();
   const details = await db.runTransaction(async (transaction) => {
-    const [paymentSnap, refundSnap] = await Promise.all([transaction.get(paymentRef), transaction.get(refundRef)]);
+    const [paymentSnap, refundSnap] = await transaction.getAll(paymentRef, refundRef);
     if (!paymentSnap.exists || !refundSnap.exists) throw new Error("Required Tournament refund records are missing.");
     const payment = paymentSnap.data() ?? {};
     const refund = refundSnap.data() ?? {};
@@ -467,9 +487,12 @@ export async function recordTournamentEntryDispute(db: Firestore, input: {
   const tournamentRef = db.collection("tournaments").doc(tournamentId);
   const matchQuery = db.collection("tournamentMatches").where("tournamentId", "==", tournamentId).limit(490);
   const result = await db.runTransaction(async (transaction) => {
-    const [latestPayment, tournamentSnap, matchesSnap, disputeSnap] = await Promise.all([
-      transaction.get(paymentRef), transaction.get(tournamentRef), transaction.get(matchQuery), transaction.get(reviewRef)
-    ]);
+    const [latestPayment, tournamentSnap, matchesSnap, disputeSnap] = [
+      await (transaction.get(paymentRef)),
+      await (transaction.get(tournamentRef)),
+      await (transaction.get(matchQuery)),
+      await (transaction.get(reviewRef))
+    ] as const;
     if (!latestPayment.exists || !tournamentSnap.exists || matchesSnap.size >= 490) throw new Error("Tournament dispute requires manual financial reconciliation.");
     const currentPayment = latestPayment.data() ?? {};
     if (currentPayment.providerPaymentIntentId !== paymentIntentId) throw new Error("Tournament dispute PaymentIntent changed during verification.");
@@ -552,7 +575,7 @@ export async function reconcileTournamentEntryRefund(db: Firestore, input: {
   const paymentId = String(initialRefund.data()?.paymentId ?? "");
   const paymentRef = db.collection("tournamentEntryPayments").doc(paymentId);
   const result = await db.runTransaction(async (transaction) => {
-    const [refundSnap, paymentSnap] = await Promise.all([transaction.get(refundRef), transaction.get(paymentRef)]);
+    const [refundSnap, paymentSnap] = await transaction.getAll(refundRef, paymentRef);
     if (!refundSnap.exists || !paymentSnap.exists) throw new Error("Tournament refund/payment record is missing.");
     const refund = refundSnap.data() ?? {};
     const payment = paymentSnap.data() ?? {};
@@ -566,7 +589,8 @@ export async function reconcileTournamentEntryRefund(db: Firestore, input: {
     const tournamentRef = db.collection("tournaments").doc(tournamentId);
     const competitorRef = db.collection(entrantType === "team" ? "tournamentTeams" : "tournamentParticipants").doc(entrantId);
     const matchesQuery = db.collection("tournamentMatches").where("tournamentId", "==", tournamentId).limit(490);
-    const [tournamentSnap, competitorSnap, matchesSnap] = await Promise.all([transaction.get(tournamentRef), transaction.get(competitorRef), transaction.get(matchesQuery)]);
+    const [tournamentSnap, competitorSnap] = await transaction.getAll(tournamentRef, competitorRef);
+    const matchesSnap = await transaction.get(matchesQuery);
     if (!tournamentSnap.exists || matchesSnap.size >= 490) throw new Error("Tournament refund requires manual bracket reconciliation.");
     const providerMismatch = input.providerAmountCents !== undefined && input.providerAmountCents !== Number(payment.amountCents)
       || input.providerPaymentIntentId !== undefined && input.providerPaymentIntentId !== paymentIntentId

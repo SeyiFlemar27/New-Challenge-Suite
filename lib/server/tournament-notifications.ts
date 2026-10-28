@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 
 const events: Record<string, { title: string; message: string; category: string; competition?: boolean }> = {
+  individual_match_hold: { title: "Affected Tournament progression held", message: "An authorized evidence review holds only the affected matches and related financial releases. Unrelated competition continues; no results were invented.", category: "challengeReminders", competition: true },
+  individual_match_confirm_existing_result: { title: "Affected match review concluded", message: "The existing verified result was confirmed without inventing a new outcome. Review the restored deadlines and any independently remaining holds.", category: "challengeReminders", competition: true },
+  cancel: { title: "Tournament cancelled", message: "The authorized cancellation is recorded. Any eligible entry refund remains subject to provider confirmation; no completed refund is implied.", category: "challengeReminders", competition: true },
+  individual_entry_withdrawn: { title: "Tournament withdrawal recorded", message: "Your entry withdrawal is recorded. Check the authoritative entry and any pending refund separately.", category: "challengeReminders" },
+  individual_review_overdue: { title: "Affected match review escalated", message: "The affected review was escalated. Scoped progression and financial holds remain until an authorized resolution.", category: "challengeReminders", competition: true },
+  individual_structural_review: { title: "Bracket dependency review updated", message: "Admin recorded an evidence-based structural review. Existing legitimate losses are preserved; unresolved dependencies remain held.", category: "challengeReminders", competition: true },
   competitor_disqualified: { title: "Tournament entry disqualified", message: "Admin recorded an evidence-backed disqualification. Review your entry and any affected progression or financial hold. Existing payment history is preserved.", category: "challengeReminders", competition: true },
   individual_settlement_prepared: { title: "Tournament prize credits recorded", message: "Verified results and funding created internal prize credits. Clearance and withdrawal checks still apply. No external payout was executed.", category: "billingAlerts", competition: true },
   match_assigned: { title: "Match assigned — submission window open", message: "Your next match is assigned. Submit fresh content before the full server-recorded deadline shown in Match Details.", category: "challengeReminders", competition: true },
@@ -43,6 +49,9 @@ const events: Record<string, { title: string; message: string; category: string;
   sponsor_terms_accept: { title: "Tournament sponsorship terms accepted", message: "The organizer accepted the recorded agreement version. Sponsor acceptance and eligible provider-confirmed payment are still required.", category: "sponsorRequestUpdates" },
   sponsor_terms_reject: { title: "Tournament sponsorship interest rejected", message: "The organizer recorded a decision on the proposed agreement. Review its status in your Sponsor workspace.", category: "sponsorRequestUpdates" },
 };
+const hostEvents = new Set(["individual_match_hold", "individual_match_confirm_existing_result","cancel", "individual_review_overdue", "individual_structural_review","full_tournament_activated", "submitted_for_review", "tournament_approve", "tournament_reject", "double_forfeit_dependency_hold", "pause", "resume", "team_entitlements_reconciled", "tournament_settlement_prepared", "individual_settlement_prepared"]);
+const actorEvents = new Set(["individual_entry_withdrawn","participant_registered", "paid_entry_slot_reserved", "paid_tournament_entry_confirmed", "submission_submitted", "submission_replaced", "team_slot_reserved", "team_member_payment_attempt_started", "team_member_payment_confirmed", "team_registration_confirmed", "team_registration_failed", "team_registration_expired", "team_entry_payment_review_required", "sponsor_terms_accept", "sponsor_terms_reject"]);
+const participantBroadcasts = new Set(["cancel","full_tournament_activated", "pause", "resume", "tournament_settlement_prepared", "individual_settlement_prepared"]);
 
 /** Audit events are the durable source; delivery state never mutates audit history. */
 export async function deliverTournamentNotifications(db: Firestore, tournamentId: string) {
@@ -59,9 +68,11 @@ export async function deliverTournamentNotifications(db: Firestore, tournamentId
     const source = audit.data(), policy = events[String(source.action)];
     if (!policy) continue;
     const metadata = source.metadata ?? {};
-    const recipients = new Set<string>([hostId]);
+    const action = String(source.action);
+    const recipients = new Set<string>(hostEvents.has(action) ? [hostId] : []);
     const add = (value: unknown) => { if (typeof value === "string" && value && !/^(system_|stripe$)/.test(value)) recipients.add(value); };
-    add(source.actorId); add(metadata.payerUserId); add(metadata.sponsorUserId);
+    if (actorEvents.has(action)) add(source.actorId);
+    add(metadata.payerUserId); add(metadata.sponsorUserId);
     if (typeof metadata.paymentId === "string") {
       const payment = await db.collection("tournamentEntryPayments").doc(metadata.paymentId).get();
       if (payment.data()?.tournamentId === tournamentId) add(payment.data()?.userId);
@@ -69,10 +80,14 @@ export async function deliverTournamentNotifications(db: Firestore, tournamentId
     if (Array.isArray(metadata.rosterUserIds)) metadata.rosterUserIds.forEach(add);
     const matchId = typeof metadata.matchId === "string" ? metadata.matchId : null;
     const match = matchId ? await db.collection("tournamentMatches").doc(matchId).get() : null;
+    const affectedIds = Array.isArray(metadata.affectedMatchIds) ? [...new Set<string>(metadata.affectedMatchIds.filter((value: unknown): value is string => typeof value === "string" && Boolean(value) && !value.includes("/")))].slice(0, 130) : [];
+    const affected = affectedIds.length ? await db.getAll(...affectedIds.map(value => db.collection("tournamentMatches").doc(value))) : [];
+    const affectedCompetitors = affected.filter(row => row.data()?.tournamentId === tournamentId).flatMap(row => [row.data()?.participantAId, row.data()?.participantBId]);
     const competitorIds = Array.isArray(metadata.targetCompetitorIds) ? metadata.targetCompetitorIds : match ? [match.data()?.participantAId, match.data()?.participantBId] : [];
-    const targeted = Boolean(matchId) || Array.isArray(metadata.targetCompetitorIds);
-    participants.docs.filter(row => policy.competition && ["registered", "active", "eliminated", "winner", "completed"].includes(String(row.data().status)) && (!targeted || competitorIds.includes(row.id))).forEach(row => add(row.data().userId));
-    teams.docs.filter(row => (policy.competition && ["ready", "registered", "active", "eliminated", "winner", "completed"].includes(String(row.data().status)) && (!targeted || competitorIds.includes(row.id))) || row.id === metadata.teamId).forEach(row => {
+    if (affectedCompetitors.length) competitorIds.push(...affectedCompetitors);
+    const targeted = Boolean(matchId) || Array.isArray(metadata.targetCompetitorIds) || affectedIds.length > 0;
+    participants.docs.filter(row => policy.competition && (targeted ? competitorIds.includes(row.id) : participantBroadcasts.has(action) && ["registered", "active", "eliminated", "winner", "completed"].includes(String(row.data().status)))).forEach(row => add(row.data().userId));
+    teams.docs.filter(row => (policy.competition && (targeted ? competitorIds.includes(row.id) : participantBroadcasts.has(action) && ["ready", "registered", "active", "eliminated", "winner", "completed"].includes(String(row.data().status)))) || row.id === metadata.teamId).forEach(row => {
       if (Array.isArray(row.data().memberUserIds)) row.data().memberUserIds.forEach(add);
     });
     const users = [...recipients].filter(Boolean).sort();
@@ -87,15 +102,14 @@ export async function deliverTournamentNotifications(db: Firestore, tournamentId
         const cursor = Number(state.data()?.cursor ?? 0);
         const page = recipientIds.slice(cursor, cursor + 32);
         const refs = page.map(userId => ({ userId, ref: db.collection("notifications").doc(createHash("sha256").update(`tournament:${audit.id}:${userId}`).digest("hex")) }));
-        const existing = await Promise.all(refs.map(row => transaction.get(row.ref)));
-        const emails = await Promise.all(refs.map(row => transaction.get(db.collection("tournamentEmailOutbox").doc(row.ref.id))));
-        const preferences = await Promise.all(refs.map(row => transaction.get(db.collection("notificationPreferences").doc(row.userId))));
+        const existing = refs.length ? await transaction.getAll(...refs.map(row => row.ref)) : [];
+        const emails = refs.length ? await transaction.getAll(...refs.map(row => db.collection("tournamentEmailOutbox").doc(row.ref.id))) : [];
+        const preferences = refs.length ? await transaction.getAll(...refs.map(row => db.collection("notificationPreferences").doc(row.userId))) : [];
         const now = new Date().toISOString(); let count = 0;
         refs.forEach((row, index) => {
           const preference = preferences[index].data() ?? {};
-          if (preference[policy.category] === false) return;
-          if (preference.email === true && !emails[index].exists) transaction.create(db.collection("tournamentEmailOutbox").doc(row.ref.id), { tournamentId, userId: row.userId, sourceEventId: audit.id, title: policy.title, message: policy.message, category: policy.category, status: "pending", createdAt: now, recipientDeliveryVerified: false });
-          if (existing[index].exists || preference.inApp === false) return;
+          if (preference.email === true && preference[policy.category] !== false && !emails[index].exists) transaction.create(db.collection("tournamentEmailOutbox").doc(row.ref.id), { tournamentId, userId: row.userId, sourceEventId: audit.id, title: policy.title, message: policy.message, category: policy.category, status: "pending", createdAt: now, recipientDeliveryVerified: false });
+          if (existing[index].exists) return;
           const actionUrl = /sponsor/.test(String(source.action)) && row.userId !== hostId ? "/sponsor/dashboard" : matchId ? `/tournaments/${encodeURIComponent(tournamentId)}/matches/${encodeURIComponent(matchId)}` : `/tournaments/${encodeURIComponent(tournamentId)}`;
           transaction.create(row.ref, { id: row.ref.id, userId: row.userId, type: `tournament_${source.action}`, title: policy.title, message: policy.message, body: policy.message, status: "unread", read: false, actionUrl, entityType: "tournament", entityId: tournamentId, targetId: tournamentId, delivery: { inApp: true, email: false, push: false }, metadata: { sourceEventId: audit.id, tournamentId }, createdAt: now, updatedAt: now }); count++;
         });

@@ -8,10 +8,10 @@ export async function tournamentReminderEligible(db: Firestore, transaction: Tra
   const tournamentId = String(value.tournamentId ?? ""), matchId = String(value.reminderMatchId ?? ""), participantId = String(value.reminderParticipantId ?? "");
   const userId = String(value.userId ?? "");
   if (![tournamentId, matchId, participantId, userId].every(id => id && !id.includes("/"))) return false;
-  const [tournament, match, participant, submission, account] = await Promise.all([
-    transaction.get(db.collection("tournaments").doc(tournamentId)), transaction.get(db.collection("tournamentMatches").doc(matchId)),
-    transaction.get(db.collection("tournamentParticipants").doc(participantId)), transaction.get(db.collection("tournamentSubmissions").doc(`${tournamentId}_${matchId}_${participantId}`)), transaction.get(db.collection("users").doc(userId))
-  ]);
+  const [tournament, match, participant, submission, account] = await transaction.getAll(
+    db.collection("tournaments").doc(tournamentId), db.collection("tournamentMatches").doc(matchId),
+    db.collection("tournamentParticipants").doc(participantId), db.collection("tournamentSubmissions").doc(`${tournamentId}_${matchId}_${participantId}`), db.collection("users").doc(userId)
+  );
   return tournament.exists && isIndividualTournamentPolicy(tournament.data()!) && ["active", "round_active"].includes(String(tournament.data()?.status))
     && account.exists && account.data()?.disabled !== true && account.data()?.suspended !== true && !["suspended", "disabled", "deleted", "deactivated", "blocked", "deletion_requested", "anonymized"].includes(String(account.data()?.accountStatus))
     && match.data()?.tournamentId === tournamentId && match.data()?.status === "submissions_open" && [match.data()?.participantAId, match.data()?.participantBId].includes(participantId)
@@ -38,10 +38,10 @@ export async function queueTournamentSubmissionReminders(db: Firestore, tourname
         const userId = String(participant.data()?.userId ?? "");
         if (!userId || userId.includes("/")) return false;
         const value = { tournamentId, userId, reminderMatchId: match.id, reminderParticipantId: participantId, reminderDeadlineAt: deadline, reminderHours: hours };
-        const [existing, preferences] = await Promise.all([transaction.get(db.collection("tournamentReminderDeliveries").doc(identity)), transaction.get(db.collection("notificationPreferences").doc(userId))]);
+        const [existing, preferences] = await transaction.getAll(db.collection("tournamentReminderDeliveries").doc(identity), db.collection("notificationPreferences").doc(userId));
         if (existing.exists || !await tournamentReminderEligible(db, transaction, value, now)) return false;
-        const prefs = preferences.data() ?? {}, title = `${hours}-hour submission reminder`, message = `Your Tournament match still needs a valid entry. Submit before ${deadline}.`;
-        if (prefs.challengeReminders !== false && prefs.inApp !== false) transaction.create(db.collection("notifications").doc(identity), { ...value, id: identity, title, message, body: message, type: "tournament_submission_reminder", category: "challengeReminders", read: false, status: "unread", actionUrl: `/tournaments/${tournamentId}/matches/${match.id}`, entityType: "tournament", entityId: tournamentId, delivery: { inApp: true, email: false }, createdAt: now.toISOString() });
+        const prefs = preferences.data() ?? {}, title = "Match submission deadline approaching", message = "Your Tournament match still needs a valid entry. Open Match Details for the current deadline.";
+        transaction.create(db.collection("notifications").doc(identity), { ...value, id: identity, title, message, body: message, type: "tournament_submission_reminder", category: "participation", essential: true, read: false, status: "unread", actionUrl: `/tournaments/${tournamentId}/matches/${match.id}`, entityType: "tournament", entityId: tournamentId, delivery: { inApp: true, email: false }, createdAt: now.toISOString() });
         if (prefs.challengeReminders !== false && prefs.email === true) transaction.create(db.collection("tournamentEmailOutbox").doc(identity), { ...value, title, message, category: "challengeReminders", status: "pending", recipientDeliveryVerified: false, createdAt: now.toISOString() });
         transaction.create(db.collection("tournamentReminderDeliveries").doc(identity), { ...value, queuedAt: now.toISOString(), emailDelivered: false });
         return true;

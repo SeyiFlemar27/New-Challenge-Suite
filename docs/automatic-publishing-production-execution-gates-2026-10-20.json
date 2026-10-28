@@ -1,0 +1,119 @@
+{
+  "checkedAt": "2026-10-20T17:51:25.253Z",
+  "candidate": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "readOnly": true,
+  "productionMutations": 0,
+  "credentialValuesPrinted": false,
+  "results": [
+    {
+      "label": "productionConfigurationPresence",
+      "passed": true,
+      "missing": [],
+      "valuesOmitted": true
+    },
+    {
+      "label": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "passed": true,
+      "literalFalse": true
+    },
+    {
+      "label": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "passed": true,
+      "literalFalse": true
+    },
+    {
+      "label": "TOURNAMENT_ENTRY_PAYMENTS_ENABLED",
+      "passed": true,
+      "absent": true
+    },
+    {
+      "label": "LIVE_EVENT_PAID_CHECKOUT_ENABLED",
+      "passed": true,
+      "absent": true
+    },
+    {
+      "label": "LIVE_EVENT_AUTOMATIC_REFUNDS_ENABLED",
+      "passed": true,
+      "absent": true
+    },
+    {
+      "label": "LIVE_EVENT_CREATOR_FUNDING_ENABLED",
+      "passed": true,
+      "absent": true
+    },
+    {
+      "label": "LIVE_EVENT_SPONSOR_FUNDING_ENABLED",
+      "passed": true,
+      "absent": true
+    },
+    {
+      "label": "rollbackDeploymentAvailable",
+      "passed": true,
+      "id": "dpl_DyD6caF8diEezVDYUZdxz8cVffo5",
+      "state": "READY",
+      "url": "challenge-suite-h6p98hg17-seyiflemar27s-projects.vercel.app"
+    },
+    {
+      "label": "gitIntegration",
+      "passed": true,
+      "repo": "New-Challenge-Suite",
+      "org": "SeyiFlemar27",
+      "productionBranch": "main"
+    },
+    {
+      "label": "eightRequiredIndexesReady",
+      "passed": true,
+      "ready": 8
+    },
+    {
+      "label": "servingApprovedFirestoreRules",
+      "passed": true,
+      "ruleset": "projects/challenge-suite/rulesets/09a2f92c-d0b4-4b85-830e-c5482b851f91"
+    },
+    {
+      "label": "tournamentSchedulerPaused",
+      "passed": true,
+      "state": "PAUSED"
+    },
+    {
+      "label": "tournamentQueueEmpty",
+      "passed": true
+    },
+    {
+      "label": "applicationCredentialFirestoreRead",
+      "passed": true,
+      "noDocumentContentExported": true
+    },
+    {
+      "label": "applicationCredentialAuthRead",
+      "passed": true,
+      "code": "auth/user-not-found"
+    },
+    {
+      "label": "applicationCredentialStorageMetadataRead",
+      "passed": true,
+      "location": "US"
+    }
+  ],
+  "sourcePreservation": [
+    {
+      "file": ".env.local",
+      "exists": true,
+      "snapshotPresent": true
+    },
+    {
+      "file": "next-env.d.ts",
+      "exists": true,
+      "snapshotPresent": true
+    },
+    {
+      "file": "tsconfig.json",
+      "exists": true,
+      "snapshotPresent": true
+    }
+  ],
+  "limitations": [
+    "Credential reads use configured local application identity; Production runtime is independently checked after deployment.",
+    "No publishing mutation, live provider acceptance, new media writes or authenticated browser journey performed."
+  ]
+}

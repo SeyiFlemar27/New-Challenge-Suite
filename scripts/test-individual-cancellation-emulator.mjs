@@ -11,6 +11,8 @@ import { withdrawIndividualEntry } from '../lib/server/individual-entry-withdraw
 import { reserveTournamentPaidEntry, confirmTournamentEntryPayment } from '../lib/server/tournament-paid-entry.ts';
 assert.match(process.env.GCLOUD_PROJECT??'',/^demo-/);assert.match(process.env.FIRESTORE_EMULATOR_HOST??'',/^127\.0\.0\.1:\d+$/);
 const db=getFirestore(initializeApp({projectId:process.env.GCLOUD_PROJECT}));let checks=0;const equal=(a,b)=>{assert.deepEqual(a,b);checks++;};
+let phase='cancellation';
+process.on('uncaughtExceptionMonitor',error=>console.error('Individual acceptance failure phase:',JSON.stringify({phase,checks,code:error?.code??null})));
 async function fixture(id,status='registration_open'){
  await db.collection('tournaments').doc(id).set({hostId:'host',productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,configVersion:4,participationMode:'individual',status,participantCount:1});
  await db.collection('tournamentParticipants').doc(id+'_participant').set({tournamentId:id,userId:'user',status:'registered'});
@@ -29,6 +31,7 @@ await fixture('cancel_unconfirmed');await assert.rejects(cancelIndividualTournam
 console.log(`Individual cancellation emulator: ${checks} authorization, full-refund, provider-boundary and retry assertions passed.`);
 
 const reviewStart=checks;
+phase='admin_review';
 for(const capacity of [4,8,16,32])for(const format of ['single_elimination','double_elimination']){
 const caseId=`admin_review_${capacity}_${format}`,tournament={id:caseId,hostId:'host',configVersion:4,productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,participationMode:'individual',format,participantCapacity:capacity,participantCount:capacity,status:'active',resultMethod:'votes',thirdPlaceMethod:'third_place_match',submissionDurationHours:48};
 const entrants=Array.from({length:capacity},(_,i)=>({id:caseId+'_p'+i,tournamentId:caseId,userId:caseId+'_u'+i,status:'active',lossCount:0,seed:i+1}));
@@ -47,8 +50,10 @@ equal(advanceWinner({match:{...first,winnerParticipantId:first.participantBId,ne
 console.log(`Individual Admin review/DQ: ${checks-reviewStart} evidence, loss-preservation, valid-bye, overlapping holds and clock-restoration assertions passed across all capacities and both formats.`);
 
 const withdrawalStart=checks;
+phase='withdrawal';
 for(const capacity of [4,8,16,32])for(const format of ['single_elimination','double_elimination'])for(const entryType of ['free','paid']){
  const id=`withdraw_${capacity}_${format}_${entryType}`,uid='withdraw_user',participantId=id+'_'+uid,paymentId=id+'_payment';
+ phase=`withdrawal_${capacity}_${format}_${entryType}`;
  await db.collection('tournaments').doc(id).set({hostId:'host',productPolicyVersion:INDIVIDUAL_TOURNAMENT_POLICY,configVersion:4,participationMode:'individual',format,participantCapacity:capacity,participantCount:1,status:'registration_open',entryType,paymentActivationEnabled:true,entryFeeAmountMinor:500,currency:'USD'});
  await db.collection('tournamentParticipants').doc(participantId).set({tournamentId:id,userId:uid,status:'registered',lossCount:0,...(entryType==='paid'?{entryPaymentId:paymentId}:{})});
  if(entryType==='paid')await db.collection('tournamentEntryPayments').doc(paymentId).set({tournamentId:id,userId:uid,entrantType:'individual',entrantId:participantId,status:'confirmed',webhookConfirmed:true,confirmedAt:new Date().toISOString(),amountCents:500,currency:'usd',providerPaymentIntentId:id+'_pi'});

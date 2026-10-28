@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const git=(args)=>{const r=spawnSync('git',args,{encoding:'utf8',maxBuffer:4_000_000});if(r.status)throw Error('GIT_INVENTORY_FAILED');return r.stdout.split('\0').filter(Boolean);};
+const excluded=new Set(['next-env.d.ts','tsconfig.json','tsconfig.tsbuildinfo']);
+const newScripts=new Set(['scripts/audit-historical-publications.mjs','scripts/test-automatic-publishing-emulator.mjs','scripts/test-historical-publication-dry-run.mjs','scripts/test-deployed-firestore-rule-repair-emulator.mjs','scripts/test-tournament-runtime-verification-emulator.mjs','scripts/verify-production-media-synthetic.mjs','scripts/smoke-production-read-only.mjs']);
+const manifest='docs/automatic-publishing-final-candidate-files-2026-10-20.json';
+const tracked=git(['diff','--name-only','-z']).filter(p=>!excluded.has(p));
+const added=git(['ls-files','--others','--exclude-standard','-z']).filter(p=>/^(app|lib|components|docs)\//.test(p)||newScripts.has(p)).filter(p=>p!==manifest);
+const paths=[...new Set([...tracked,...added])].sort();
+for(const p of paths)if(/(^|\/)\.env|\.log$|\.tsbuildinfo$|\.pnpm-store|(^|\/)auth.*(state|snapshot)|(^|\/)(credentials|private-config).*\.json$/i.test(p))throw Error('EXCLUDED_RELEASE_PATH:'+p);
+const files=paths.map(p=>{const b=fs.readFileSync(p);if(!p.endsWith('.png')&&(/-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(b.toString())||/sk_live_[A-Za-z0-9]{20,}/.test(b.toString())))throw Error('POTENTIAL_SECRET_IN_RELEASE_FILE');return {path:p,bytes:b.length,sha256:createHash('sha256').update(b).digest('hex')};});
+const report={capturedAt:new Date().toISOString(),base:'4e0c5cee1c012361f492fd37a50518194fd909d6',sourceBranch:'codex/automatic-publishing-exception-moderation',files,additionalManifestPath:manifest,excludedOriginalDirtyFiles:[...excluded],privateEnvironmentFilesExcluded:true,operationalProvisioningScriptsExcluded:true,stagingPerformed:false};
+fs.writeFileSync(manifest,JSON.stringify(report,null,2)+'\n');
+fs.writeFileSync('automatic-publishing-final-stage-paths.txt',[...paths,manifest].join('\n')+'\n');
+console.log(JSON.stringify({candidateFiles:paths.length,manifestPath:manifest,stagingPerformed:false}));

@@ -3,6 +3,7 @@ import { createGoogleCloudTasksScheduler, verifyTournamentCloudTaskRequest, type
 import { processNormalChallengeLifecycle } from "@/lib/server/normal-lifecycle-jobs";
 import { clearNormalChallengeEarnings } from "@/lib/server/normal-earnings-clearance";
 import { normalTimestamp } from "@/lib/server/normal-lifecycle-policy";
+import { recoverNotificationDeliveries } from "@/lib/server/notifications";
 
 function normalCloudTaskEnvironment(env: NodeJS.ProcessEnv) {
   return { ...env, TOURNAMENT_CLOUD_TASKS_QUEUE: env.NORMAL_CLOUD_TASKS_QUEUE, TOURNAMENT_CLOUD_TASKS_WORKER_URL: env.NORMAL_CLOUD_TASKS_WORKER_URL, TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT: env.NORMAL_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT, TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT: env.NORMAL_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT, TOURNAMENT_CLOUD_TASKS_OIDC_AUDIENCE: env.NORMAL_CLOUD_TASKS_OIDC_AUDIENCE };
@@ -87,6 +88,14 @@ export async function runNormalLifecycleJob(db: Firestore, jobId: string, expect
     const [challenge, submissions, credits, liabilities, notices, entries] = await Promise.all([db.collection("challenges").doc(claim.challengeId).get(), db.collection("submissions").where("challengeId", "==", claim.challengeId).get(), db.collection("cashLedger").where("challengeId", "==", claim.challengeId).get(), db.collection("refundCases").where("challengeId", "==", claim.challengeId).get(), db.collection("normalNotificationOutbox").where("challengeId", "==", claim.challengeId).get(), db.collection("challengeEntryPayments").where("challengeId", "==", claim.challengeId).get()]);
     const data = challenge.data() ?? {};
     const times = [data.registrationOpensAt, data.submissionStartAt, data.submissionDeadline, data.votingStartsAt, data.effectiveVotingEndsAt, ...submissions.docs.flatMap(submission => { const entry = submission.data(); return [entry.resubmissionDeadline, entry.correctionAutoReviewAt, entry.appealDeadline, entry.submittedAt ? new Date(normalTimestamp(entry.submittedAt) + 24 * 60 * 60_000).toISOString() : null]; }), ...credits.docs.map(credit => credit.data().holdUntil)].map(normalTimestamp).filter(time => Number.isFinite(time) && time > now.getTime());
+    const submissionDeadline = normalTimestamp(data.submissionDeadline);
+    for (const hours of [6, 1]) { const reminderAt = submissionDeadline - hours * 3600000; if (Number.isFinite(reminderAt) && reminderAt > now.getTime()) times.push(reminderAt); }
+    for (const submission of submissions.docs) {
+      if (!["resubmission_requested", "correction_requested"].includes(String(submission.data().status))) continue;
+      for (const hours of [6, 1]) { const reminderAt = normalTimestamp(submission.data().resubmissionDeadline) - hours * 3600000; if (Number.isFinite(reminderAt) && reminderAt > now.getTime()) times.push(reminderAt); }
+    }
+    const votingReminderAt = normalTimestamp(data.effectiveVotingEndsAt ?? data.votingDeadline ?? data.votingEndsAt) - 3600000;
+    if (Number.isFinite(votingReminderAt) && votingReminderAt > now.getTime()) times.push(votingReminderAt);
     const noticesPending = notices.docs.some(notice => notice.data().status === "pending");
     const emailNotices = process.env.NORMAL_EMAIL_DELIVERY_ENABLED === "true" ? await db.collection("normalEmailOutbox").where("challengeId", "==", claim.challengeId).get() : null;
     const emailPending = emailNotices?.docs.some(notice => !["accepted", "review_required"].includes(String(notice.data().status))) ?? false;
@@ -103,7 +112,8 @@ export async function runNormalLifecycleJob(db: Firestore, jobId: string, expect
       if (Number(latest.data()?.version) !== claim.version) return;
       transaction.update(ref, { version: claim.version + 1, status: complete ? "completed" : "pending", runAt: complete ? null : new Date(times.length ? Math.min(...times) : now.getTime() + 60_000).toISOString(), dispatchState: complete ? "completed" : "pending", leaseUntil: null, updatedAt: now.toISOString() });
     });
-    return { lifecycle, clearance };
+    const notifications = await recoverNotificationDeliveries(db).catch(() => ({ pendingRecovery: true }));
+    return { lifecycle, clearance, notifications };
   } catch (error) {
     await db.runTransaction(async transaction => {
       const latest = await transaction.get(ref);

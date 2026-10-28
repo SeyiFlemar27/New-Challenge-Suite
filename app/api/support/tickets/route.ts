@@ -5,7 +5,7 @@ import { operationalTaskId } from "@/lib/server/admin-operations";
 import { requireRequestUser } from "@/lib/server/auth";
 import { dispatchSupportEmailOutbox, supportEmailContent } from "@/lib/server/support-email";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled, supportNotificationRecord } from "@/lib/server/support-tickets";
+import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled } from "@/lib/server/support-tickets";
 import { SUPPORT_CATEGORIES, supportIssueTypeAllowed } from "@/lib/support/catalog";
 
 export const dynamic = "force-dynamic";
@@ -104,8 +104,6 @@ export async function POST(request: Request) {
   const messageRef = ticketRef.collection("messages").doc("initial");
   const issueRef = ticketRef.collection("issues").doc("primary");
   const emailRef = db.collection("supportEmailOutbox").doc(`ticket_created_${ticketRef.id}`);
-  const notificationId = `support_ticket_created_${ticketRef.id}`;
-  const notificationRef = db.collection("notifications").doc(notificationId);
   let ticketNumber = "";
   let duplicateTicketId: string | null = null;
   try {
@@ -131,7 +129,6 @@ export async function POST(request: Request) {
       transaction.create(taskRef, { id: taskId, sourceType: "support_ticket", sourceCollection: "supportTickets", sourceId: ticketRef.id, title: parsed.data.subject, reason: "A customer submitted a support ticket.", state: "unassigned", priority: "normal", createdAt: now, updatedAt: now });
       transaction.create(requestRef, { userId: user!.uid, ticketId: ticketRef.id, createdAt: now });
       transaction.create(emailRef, { id: emailRef.id, ticketId: ticketRef.id, messageId: "initial", type: "ticket_created", recipient: contactEmail || null, ...emailContent, status: "waiting_configuration", attempts: 0, createdAt: now, updatedAt: now });
-      transaction.create(notificationRef, supportNotificationRecord({ id: notificationId, userId: user!.uid, type: "support_ticket_created", title: "Support request received", message: `Ticket ${ticketNumber} is open. You can follow its progress in My Requests.`, ticketId: ticketRef.id, createdAt: now }));
     });
     if (duplicateTicketId) {
       const duplicateSnap = await db.collection("supportTickets").doc(duplicateTicketId).get();

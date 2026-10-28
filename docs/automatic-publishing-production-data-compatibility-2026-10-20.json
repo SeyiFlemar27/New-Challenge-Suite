@@ -1,0 +1,15 @@
+{
+  "readOnly": true,
+  "productionMutations": 0,
+  "checkedAt": "2026-10-20T17:52:57.913Z",
+  "storageRules": {
+    "ruleset": "projects/challenge-suite/rulesets/a262ea20-b3a0-48ee-a24b-9426df37d64f",
+    "candidateMatchesServing": true
+  },
+  "registrationOpenRecords": {
+    "count": 0,
+    "inventoryComplete": true,
+    "legacyWithoutNewSchedulerGuard": 0
+  },
+  "passed": true
+}

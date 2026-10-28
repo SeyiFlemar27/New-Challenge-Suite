@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-20T18:00:08.349Z",
+  "readOnlyAcceptance": true,
+  "recordsCreated": 0,
+  "correctedMethod": "POST",
+  "status": 401,
+  "passed": true,
+  "originalFailure": {
+    "method": "GET",
+    "status": 405,
+    "cause": "POST-only route; unsupported-method test expectation was incorrect"
+  },
+  "sourceReviewedAuthenticationBeforeWrites": true
+}

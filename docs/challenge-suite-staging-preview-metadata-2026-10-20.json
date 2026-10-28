@@ -1,0 +1,451 @@
+{
+  "checkedAt": "2026-10-20T17:49:34.831Z",
+  "readOnly": true,
+  "resourceMutations": 0,
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "team": "team_Aof3F7rzekkBNGBsPb6p9XmO",
+  "branch": "codex/automatic-publishing-exception-moderation",
+  "productionDeployment": {
+    "id": "dpl_DyD6caF8diEezVDYUZdxz8cVffo5",
+    "sha": "4e0c5cee1c012361f492fd37a50518194fd909d6"
+  },
+  "records": [
+    {
+      "name": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_RECONCILER_AUDIENCE",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_OIDC_AUDIENCE",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_WORKER_URL",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "TOURNAMENT_CLOUD_TASKS_QUEUE",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "PRIVATE_INVITE_ENCRYPTION_KEY",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "NORMAL_EMAIL_DELIVERY_ENABLED",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_AUTOMATIC_REFUNDS_ENABLED",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_LIFECYCLE_SCHEDULER_ENABLED",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_CLOUD_TASKS_ENQUEUER_SERVICE_ACCOUNT",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_CLOUD_TASKS_OIDC_AUDIENCE",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_CLOUD_TASKS_WORKER_URL",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NORMAL_CLOUD_TASKS_QUEUE",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "GOOGLE_WORKLOAD_IDENTITY_POOL_PROVIDER_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "GOOGLE_WORKLOAD_IDENTITY_POOL_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "CLOUD_TASKS_LOCATION",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "GOOGLE_CLOUD_PROJECT_NUMBER",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "GOOGLE_CLOUD_PROJECT",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "plain"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_API_KEY",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_APP_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "encrypted"
+    },
+    {
+      "name": "STRIPE_PRICE_DOROCOIN_500",
+      "scope": [
+        "preview",
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_PRICE_DOROCOIN_100",
+      "scope": [
+        "preview",
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_PRICE_DOROCOIN_50",
+      "scope": [
+        "preview",
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "FIREBASE_STORAGE_BUCKET",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "NEXT_PUBLIC_SUMSUB_ENABLED",
+      "scope": [
+        "preview",
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_ENVIRONMENT",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_BASE_URL",
+      "scope": [
+        "preview",
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_WEBHOOK_SECRET",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_LEVEL_NAME",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_SECRET_KEY",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "SUMSUB_APP_TOKEN",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_WEBHOOK_SECRET",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_PRICE_HOST",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_PRICE_PRO",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_PRICE_CREATOR",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "STRIPE_SECRET_KEY",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+      "scope": [
+        "production",
+        "preview"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "NEXT_PUBLIC_APP_URL",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "EMAIL_FROM",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "RESEND_API_KEY",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "EMAIL_PROVIDER",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "OTP_HASH_SECRET",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "FIREBASE_PRIVATE_KEY",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "FIREBASE_CLIENT_EMAIL",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    },
+    {
+      "name": "FIREBASE_PROJECT_ID",
+      "scope": [
+        "production"
+      ],
+      "gitBranch": null,
+      "type": "sensitive"
+    }
+  ],
+  "valuesOmitted": true
+}

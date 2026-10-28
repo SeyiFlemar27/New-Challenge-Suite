@@ -237,11 +237,11 @@ export async function prepareEnterprisePrizeValueUpdate(db: Firestore, transacti
   let legacyCreatorReservedCents = 0;
   let legacyAdditionalReservedCents = 0;
   if (!limitSnap.exists) {
-    const [creatorPending, sponsorPending, entryPending] = await Promise.all([
-      transaction.get(db.collection("creatorPrizeFundingPayments").where("challengeId", "==", input.challengeId).where("status", "==", "pending").where("reservationStatus", "==", "pending_payment")),
-      transaction.get(db.collection("sponsorContributions").where("challengeId", "==", input.challengeId).where("status", "==", "pending")),
-      transaction.get(db.collection("challengeEntryPayments").where("challengeId", "==", input.challengeId).where("status", "==", "pending")),
-    ]);
+    const [creatorPending, sponsorPending, entryPending] = [
+      await (transaction.get(db.collection("creatorPrizeFundingPayments").where("challengeId", "==", input.challengeId).where("status", "==", "pending").where("reservationStatus", "==", "pending_payment"))),
+      await (transaction.get(db.collection("sponsorContributions").where("challengeId", "==", input.challengeId).where("status", "==", "pending"))),
+      await (transaction.get(db.collection("challengeEntryPayments").where("challengeId", "==", input.challengeId).where("status", "==", "pending")))
+    ] as const;
     legacyReservedCents = creatorPending.docs.reduce((sum, item) => sum + cents(item.data().amountCents), 0)
       + sponsorPending.docs.reduce((sum, item) => sum + cents(item.data().amountCents), 0)
       + entryPending.docs.reduce((sum, item) => sum + cents(item.data().winnerShareCents), 0);
@@ -287,7 +287,10 @@ export async function claimEnterpriseRefundLock(db: Firestore, input: {
   const refundRef = db.collection("refundCases").doc(input.refundCaseId);
   const paymentRef = db.collection(input.paymentCollection).doc(input.paymentId);
   return db.runTransaction(async (transaction) => {
-    const [refundSnap, paymentSnap] = await Promise.all([transaction.get(refundRef), transaction.get(paymentRef)]);
+    const [refundSnap, paymentSnap] = [
+      await (transaction.get(refundRef)),
+      await (transaction.get(paymentRef))
+    ] as const;
     if (!refundSnap.exists || !paymentSnap.exists) throw new Error("ENTERPRISE_REFUND_SOURCE_NOT_FOUND");
     const refund = refundSnap.data() ?? {};
     const payment = paymentSnap.data() ?? {};
@@ -299,9 +302,11 @@ export async function claimEnterpriseRefundLock(db: Firestore, input: {
     const challengeRef = db.collection("challenges").doc(challengeId);
     const lockRef = db.collection("enterpriseChallengeFinanceLocks").doc(challengeId);
     const settlementQuery = db.collection("challengeSettlements").where("challengeId", "==", challengeId).limit(1);
-    const [challengeSnap, lockSnap, settlementSnap] = await Promise.all([
-      transaction.get(challengeRef), transaction.get(lockRef), transaction.get(settlementQuery),
-    ]);
+    const [challengeSnap, lockSnap, settlementSnap] = [
+      await (transaction.get(challengeRef)),
+      await (transaction.get(lockRef)),
+      await (transaction.get(settlementQuery))
+    ] as const;
     if (!challengeSnap.exists) throw new Error("ENTERPRISE_REFUND_CHALLENGE_NOT_FOUND");
     const ownership = resolveEnterpriseFinancialOwnership(challengeSnap.data() ?? {});
     if (ownership.workspaceType !== "enterprise" || String(payment.organizationOwnerId ?? "") !== ownership.organizationOwnerId) {
@@ -338,7 +343,10 @@ export async function releaseEnterpriseRefundLock(db: Firestore, input: {
   const lockRef = db.collection("enterpriseChallengeFinanceLocks").doc(input.challengeId);
   const refundRef = db.collection("refundCases").doc(input.refundCaseId);
   return db.runTransaction(async (transaction) => {
-    const [lockSnap, refundSnap] = await Promise.all([transaction.get(lockRef), transaction.get(refundRef)]);
+    const [lockSnap, refundSnap] = [
+      await (transaction.get(lockRef)),
+      await (transaction.get(refundRef))
+    ] as const;
     if (!refundSnap.exists) throw new Error("ENTERPRISE_REFUND_SOURCE_NOT_FOUND");
     if (refundSnap.data()?.status === "succeeded") return { released: false, stale: true };
     const lock = lockSnap.data() ?? {};
@@ -392,7 +400,10 @@ export async function applyEnterprisePromotionalPrizeFundingInTransaction(db: Fi
     }
     return { idempotent: true, record: prior };
   }
-  const [challengeSnap, poolSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(poolRef)]);
+  const [challengeSnap, poolSnap] = [
+      await (transaction.get(challengeRef)),
+      await (transaction.get(poolRef))
+    ] as const;
   if (!challengeSnap.exists) throw new Error("CHALLENGE_NOT_FOUND");
   const challenge = challengeSnap.data() ?? {};
   const ownership = resolveEnterpriseFinancialOwnership(challenge);
@@ -502,7 +513,10 @@ export async function finalizeEnterprisePrizeFundingRefund(db: Firestore, input:
   const refundRef = db.collection("refundCases").doc(input.refundCaseId);
   const paymentRef = db.collection(input.paymentCollection).doc(input.paymentId);
   return db.runTransaction(async (transaction) => {
-    const [refundSnap, paymentSnap] = await Promise.all([transaction.get(refundRef), transaction.get(paymentRef)]);
+    const [refundSnap, paymentSnap] = [
+      await (transaction.get(refundRef)),
+      await (transaction.get(paymentRef))
+    ] as const;
     if (!refundSnap.exists || !paymentSnap.exists) throw new Error("ENTERPRISE_REFUND_SOURCE_NOT_FOUND");
     const refund = refundSnap.data() ?? {};
     const payment = paymentSnap.data() ?? {};
@@ -513,7 +527,10 @@ export async function finalizeEnterprisePrizeFundingRefund(db: Firestore, input:
     const challengeId = String(payment.challengeId ?? "");
     const challengeRef = db.collection("challenges").doc(challengeId);
     const lockRef = db.collection("enterpriseChallengeFinanceLocks").doc(challengeId);
-    const [challengeSnap, lockSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(lockRef)]);
+    const [challengeSnap, lockSnap] = [
+      await (transaction.get(challengeRef)),
+      await (transaction.get(lockRef))
+    ] as const;
     if (!challengeSnap.exists) throw new Error("ENTERPRISE_REFUND_CHALLENGE_NOT_FOUND");
     const challenge = challengeSnap.data() ?? {};
     const ownership = resolveEnterpriseFinancialOwnership(challenge);
@@ -536,7 +553,11 @@ export async function finalizeEnterprisePrizeFundingRefund(db: Firestore, input:
       : input.paymentCollection === "sponsorContributions"
         ? db.collection("challengeFinancialLedger").where("sponsorContributionId", "==", input.paymentId)
         : db.collection("challengeFinancialLedger").where("transactionId", "==", input.paymentId);
-    const [limitSnap, poolSnap, sourceLedgers] = await Promise.all([transaction.get(limitRef), transaction.get(poolRef), transaction.get(sourceLedgerQuery)]);
+    const [limitSnap, poolSnap, sourceLedgers] = [
+      await (transaction.get(limitRef)),
+      await (transaction.get(poolRef)),
+      await (transaction.get(sourceLedgerQuery))
+    ] as const;
     const limit = limitSnap.data() ?? {};
     if (String(limit.organizationOwnerId ?? ownership.organizationOwnerId) !== ownership.organizationOwnerId) {
       throw new Error("ENTERPRISE_FINANCE_OWNER_MISMATCH");
@@ -646,7 +667,10 @@ export async function finalizeEnterprisePaidVoteRefund(db: Firestore, input: {
   const refundRef = db.collection("refundCases").doc(input.refundCaseId);
   const paymentRef = db.collection("paidVotePurchases").doc(input.paymentId);
   return db.runTransaction(async (transaction) => {
-    const [refundSnap, paymentSnap] = await Promise.all([transaction.get(refundRef), transaction.get(paymentRef)]);
+    const [refundSnap, paymentSnap] = [
+      await (transaction.get(refundRef)),
+      await (transaction.get(paymentRef))
+    ] as const;
     if (!refundSnap.exists || !paymentSnap.exists) throw new Error("ENTERPRISE_REFUND_SOURCE_NOT_FOUND");
     const refund = refundSnap.data() ?? {};
     const payment = paymentSnap.data() ?? {};
@@ -657,7 +681,12 @@ export async function finalizeEnterprisePaidVoteRefund(db: Firestore, input: {
     const lockRef = db.collection("enterpriseChallengeFinanceLocks").doc(challengeId);
     const ledgerQuery = db.collection("challengeFinancialLedger").where("paidVotePurchaseId", "==", input.paymentId);
     const creditsQuery = db.collection("paidVoteCredits").where("purchaseId", "==", input.paymentId);
-    const [challengeSnap, lockSnap, ledgerSnap, creditsSnap] = await Promise.all([transaction.get(challengeRef), transaction.get(lockRef), transaction.get(ledgerQuery), transaction.get(creditsQuery)]);
+    const [challengeSnap, lockSnap, ledgerSnap, creditsSnap] = [
+      await (transaction.get(challengeRef)),
+      await (transaction.get(lockRef)),
+      await (transaction.get(ledgerQuery)),
+      await (transaction.get(creditsQuery))
+    ] as const;
     if (!challengeSnap.exists) throw new Error("ENTERPRISE_REFUND_CHALLENGE_NOT_FOUND");
     const challenge = challengeSnap.data() ?? {};
     const ownership = resolveEnterpriseFinancialOwnership(challenge);

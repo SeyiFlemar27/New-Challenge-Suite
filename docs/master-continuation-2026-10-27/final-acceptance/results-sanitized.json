@@ -1,0 +1,221 @@
+{
+  "evidenceSource": "docs/master-continuation-2026-10-27/final-acceptance/results.json",
+  "authenticationDiagnosticsOmitted": true,
+  "passed": 11,
+  "failed": 0,
+  "skipped": 26,
+  "assertions": 72,
+  "results": [
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Master details: Explore canonical minimal cards and completed history",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Master details: Normal V2 guide and locked Private authorization",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Master details: Explore empty and recoverable failure states",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Master details: Private owner menu and authoritative access page",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Master details: Tournament approved tabs and responsive context",
+      "status": "PASS",
+      "assertions": 4
+    },
+    {
+      "name": "Master details: Live Event attendance_only actions and content",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Master details: Live Event physical_competition actions and content",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Master details: Winners show only verified allocations and history",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Master participant: scoped My Tournament and Tournaments tab",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Master participant: uploaded match entry submits and replaces automatically",
+      "status": "PASS",
+      "assertions": 10
+    },
+    {
+      "name": "Master participant: voting navigation never votes or spends",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    }
+  ]
+}

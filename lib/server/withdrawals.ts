@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { deterministicId } from "@/lib/server/idempotency";
 import { createCashWalletDefaults } from "@/lib/server/cash-wallet";
@@ -193,6 +194,7 @@ export async function createWithdrawalRequest(
       updatedAt: input.now
     }, { merge: true });
   }
+  queueInAppNotification(db, transaction, { eventId: `withdrawal_requested_${requestId}`, userId: input.userId, type: "withdrawal_status", title: "Withdrawal request recorded", message: "Your request is awaiting the required review and provider processing. No payout is confirmed by this request.", actionUrl: "/wallet", createdAt: input.now });
   transaction.create(requestRef, request);
   transaction.create(db.collection("cashLedger").doc(ledgerId), createWithdrawalLedgerRecord({
     id: ledgerId,

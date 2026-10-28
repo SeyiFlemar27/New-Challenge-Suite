@@ -1,0 +1,162 @@
+{
+  "readOnly": true,
+  "identitySource": "existing_firebase_cli_login",
+  "authenticatedAccountPresent": true,
+  "credentialsAndOwnerEmailsOmitted": true,
+  "checkedAt": "2026-10-20T17:15:39.191Z",
+  "candidate": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "checks": [
+    {
+      "label": "productionBucketMetadata",
+      "httpStatus": 200,
+      "pages": 1,
+      "name": "challenge-suite.firebasestorage.app",
+      "location": "US",
+      "locationType": "multi-region",
+      "storageClass": "MULTI_REGIONAL",
+      "uniformBucketLevelAccess": false,
+      "publicAccessPrevention": "inherited",
+      "softDeleteRetentionSeconds": "604800"
+    },
+    {
+      "label": "projectIdAvailability",
+      "httpStatus": 200,
+      "pages": 1,
+      "proposedId": "challenge-suite-staging",
+      "status": "PROJECT_ID_AVAILABLE",
+      "suggestedAlternativeReturned": true
+    },
+    {
+      "label": "productionOwnership",
+      "httpStatus": 200,
+      "pages": 1,
+      "ownerBindings": [
+        {
+          "memberCount": 3,
+          "memberTypes": [
+            "user"
+          ],
+          "existingCliAccountIsOwner": true,
+          "conditional": false
+        }
+      ],
+      "otherPrincipalValuesOmitted": true
+    },
+    {
+      "label": "productionBillingLink",
+      "httpStatus": 200,
+      "pages": 1,
+      "projectId": "challenge-suite",
+      "billingEnabled": true,
+      "billingAccountReference": "ending-CCD8B6"
+    },
+    {
+      "label": "productionProject",
+      "httpStatus": 200,
+      "pages": 1,
+      "projectId": "challenge-suite",
+      "name": "projects/599920137316",
+      "parent": null,
+      "state": "ACTIVE"
+    },
+    {
+      "label": "billingAccounts",
+      "httpStatus": 200,
+      "pages": 1,
+      "accounts": [
+        {
+          "reference": "ending-E8EECA",
+          "open": false,
+          "currencyCode": "USD",
+          "organization": null
+        },
+        {
+          "reference": "ending-27BC1B",
+          "open": false,
+          "currencyCode": "USD",
+          "organization": null
+        },
+        {
+          "reference": "ending-775116",
+          "open": false,
+          "currencyCode": "USD",
+          "organization": null
+        }
+      ],
+      "fullIdsAndDisplayNamesOmitted": true
+    },
+    {
+      "label": "visibleOrganizations",
+      "httpStatus": 200,
+      "pages": 1,
+      "organizations": [
+        {
+          "name": "organizations/329774095603",
+          "state": "ACTIVE"
+        }
+      ],
+      "privateDomainsOmitted": true
+    },
+    {
+      "label": "productionDatabases",
+      "httpStatus": 200,
+      "pages": 1,
+      "databases": [
+        {
+          "name": "projects/challenge-suite/databases/(default)",
+          "databaseEdition": "STANDARD",
+          "type": "FIRESTORE_NATIVE",
+          "locationId": "nam5",
+          "concurrencyMode": "PESSIMISTIC",
+          "deleteProtectionState": "DELETE_PROTECTION_DISABLED",
+          "pointInTimeRecoveryEnablement": "POINT_IN_TIME_RECOVERY_DISABLED"
+        }
+      ]
+    },
+    {
+      "label": "billingPermissions-ending-E8EECA",
+      "httpStatus": 200,
+      "pages": 1,
+      "permissions": [
+        "billing.accounts.get",
+        "billing.budgets.create",
+        "billing.budgets.get",
+        "billing.resourceAssociations.create"
+      ]
+    },
+    {
+      "label": "billingPermissions-ending-27BC1B",
+      "httpStatus": 200,
+      "pages": 1,
+      "permissions": [
+        "billing.accounts.get",
+        "billing.budgets.create",
+        "billing.budgets.get",
+        "billing.resourceAssociations.create"
+      ]
+    },
+    {
+      "label": "billingPermissions-ending-775116",
+      "httpStatus": 200,
+      "pages": 1,
+      "permissions": [
+        "billing.accounts.get",
+        "billing.budgets.create",
+        "billing.budgets.get",
+        "billing.resourceAssociations.create"
+      ]
+    },
+    {
+      "label": "productionLinkedBillingAccount",
+      "status": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "label": "productionLinkedBillingPermissions",
+      "httpStatus": 200,
+      "pages": 1,
+      "permissions": []
+    }
+  ],
+  "resourceMutations": 0
+}

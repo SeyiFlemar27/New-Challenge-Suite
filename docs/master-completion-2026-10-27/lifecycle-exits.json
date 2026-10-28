@@ -1,0 +1,18 @@
+[
+  {
+    "capacity": 4,
+    "exitCode": 0
+  },
+  {
+    "capacity": 8,
+    "exitCode": 0
+  },
+  {
+    "capacity": 16,
+    "exitCode": 0
+  },
+  {
+    "capacity": 32,
+    "exitCode": 0
+  }
+]

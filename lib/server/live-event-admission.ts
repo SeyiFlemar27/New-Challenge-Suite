@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { queueInAppNotification } from "@/lib/server/notifications";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { wakeLiveEventJob } from "@/lib/server/live-event-job-outbox";
 import {readLiveEventUpgrade,convertLiveEventAdmission} from "@/lib/server/live-event-upgrades";
@@ -85,6 +86,7 @@ export async function bookFreeLiveEvent(db: Firestore, input: { eventId: string;
     if (input.kind === "competitor") tx.set(registrationRef, { id: registrationRef.id, eventId: input.eventId, userId: input.actor.uid, fullName: names[0], kind: "competitor", ticketId: ticketIds[0], status: "confirmed", eligible: true, checkedInAt: null, createdAt });
     tx.update(ref, { [input.kind === "audience" ? "audienceCount" : "competitorCount"]: Number(event[input.kind === "audience" ? "audienceCount" : "competitorCount"]) + names.length,...(upgrade?{audienceCount:Number(event.audienceCount)-1}:{}), updatedAt: createdAt });
     tx.create(db.collection("liveEventEmailOutbox").doc(`booking_${bookingId}`), { eventId: input.eventId, bookingId, userId: input.actor.uid, status: "pending", type: "ticket_confirmation", createdAt });
+    if (!input.actor.guestSession) queueInAppNotification(db, tx, { eventId: `live_booking_${bookingId}`, userId: input.actor.uid, type: upgrade ? "live_event_pass_upgraded" : input.kind === "competitor" ? "live_event_registration" : "live_event_ticket", title: upgrade ? "Participant Pass confirmed" : input.kind === "competitor" ? "Event registration confirmed" : "Your event tickets are ready", message: "Your booking is confirmed. Open the event to review your tickets and current details.", actionUrl: `/live-events/${input.eventId}`, createdAt });
     wakeLiveEventJob(db,tx,input.eventId,createdAt);
     if(upgrade){convertLiveEventAdmission(tx,upgrade,ticketIds[0],bookingId,createdAt);tx.create(db.collection("auditLogs").doc(`live_upgrade_${bookingId}`),{actorId:input.actor.uid,action:"live_event.admission_upgraded",eventId:input.eventId,originalTicketId:upgrade.ticket.id,originalBookingId:upgrade.booking.id,competitionBookingId:bookingId,participantPassId:ticketIds[0],personalAdmissionConfirmed:true,additionalPaymentCents:0,createdAt});}
     return { bookingId, ticketIds, repeated: false };
@@ -107,12 +109,20 @@ export async function inspectLiveEventTicket(db: Firestore, input: { eventId: st
     const retainedAdmission=data.kind==="competitor"&&data.admissionRetained===true&&Boolean(data.competitionWithdrawnAt)&&registration?.data()?.status==="withdrawn"&&registration.data()?.withdrawnAt===data.competitionWithdrawnAt&&registration.data()?.eligible===false;
     if (data.kind === "competitor" && (!registration?.exists || registration.data()?.ticketId !== ticket.id || !retainedAdmission&&(registration.data()?.eligible !== true || !["confirmed", "checked_in"].includes(String(registration.data()?.status))))) throw new LiveEventPolicyError("COMPETITOR_NOT_ELIGIBLE");
     if (input.confirm && !data.checkedInAt) {
+      const booking = typeof data.bookingId === "string" && data.bookingId && !data.bookingId.includes("/") ? await tx.get(db.collection("liveEventBookings").doc(data.bookingId)) : null;
       if (data.kind === "competitor" && input.competitorIdentityConfirmed !== true) throw new LiveEventPolicyError("COMPETITOR_IDENTITY_REQUIRED", 422);
       const checkedInAt = new Date(input.now ?? Date.now()).toISOString();
+      // A corrected arrival may legitimately be confirmed again. Keep the first
+      // ticket confirmation intent immutable instead of failing the admission
+      // transaction or resetting a notification the purchaser has already read.
+      const notificationIntent = booking?.exists && booking.data()?.guestSession !== true
+        ? await tx.get(db.collection("notificationDeliveryOutbox").doc(hash(`${String(data.userId)}\0live_check_in_${ticket.id}`)))
+        : null;
       tx.update(ticketRef, { status: "checked_in", checkedInAt, checkedInBy: input.actor.uid, updatedAt: checkedInAt });
       if (data.kind === "competitor"&&!retainedAdmission) tx.update(registrationRef, { status: "checked_in", checkedInAt, updatedAt: checkedInAt });
       tx.update(ref, { checkInCount: Number(event.checkInCount) + 1, updatedAt: checkedInAt });
       tx.create(db.collection("auditLogs").doc(), { actorId: input.actor.uid, action: "live_event.arrival_confirmed", targetId: ticket.id, eventId: input.eventId, competitorIdentityConfirmed: data.kind === "competitor", createdAt: checkedInAt });
+      if (notificationIntent && !notificationIntent.exists) queueInAppNotification(db, tx, { eventId: `live_check_in_${ticket.id}`, userId: String(data.userId), type: "event_check_in_confirmed", title: "Event check-in confirmed", message: "Check-in was confirmed for a ticket in your booking.", actionUrl: `/live-events/${input.eventId}`, createdAt: checkedInAt });
     }
     return { ticketId: ticket.id, guestName: data.guestName, kind: data.kind, competitionWithdrawn:retainedAdmission, competitorId: data.kind === "competitor" ? data.userId : null, alreadyCheckedIn: Boolean(data.checkedInAt), confirmed: input.confirm, status: input.confirm ? "checked_in" : data.status };
   });

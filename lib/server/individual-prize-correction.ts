@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import { createHash } from "node:crypto";
 import type { Firestore, QuerySnapshot } from "firebase-admin/firestore";
 import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
@@ -80,6 +81,7 @@ export async function correctIndividualPrizeResult(db: Firestore, input: { tourn
       tx.update(reviewRef, { status: "open", competitivePolicyRequired: true, correctionReviewStatus: status, correctionProposal: proposal, affectedMatchIds: [...affectedIds], affectedCreditIds: affectedCredits.map(row => row.id), updatedAt: now.toISOString() });
       tx.create(revisionRef, { tournamentId: input.tournamentId, matchId: match.id, caseId: review.id, status, version: input.expectedVersion, requestFingerprint, actorId: input.adminId, reason: input.reason, evidenceReference: input.evidenceReference, proposal, externalPayoutExecuted: false, externalPayoutReversed: false, createdAt: now.toISOString() });
       tx.create(db.collection("auditLogs").doc(revisionRef.id), { actorId: input.adminId, actorType: "admin", action: "tournament.upstream_correction_policy_hold", targetId: input.tournamentId, caseId: review.id, status, reason: input.reason, evidenceReference: input.evidenceReference, createdAt: now.toISOString() });
+      for (const userId of new Set(participants.map(row => String(row.data()?.userId ?? "")).filter(Boolean))) queueInAppNotification(db, tx, { eventId: `tournament_upstream_review_${revisionRef.id}`, userId, type: "tournament_result_review", title: "Affected Tournament results under review", message: "An evidence-backed correction requires review of affected progression and financial releases. Historical match records are preserved; no replacement outcome or payout was invented.", actionUrl: `/tournaments/${input.tournamentId}/matches/${input.matchId}`, createdAt: now.toISOString() });
       return { status, idempotent: false, version: input.expectedVersion };
     }
     if (placements.size !== 3) throw new Error("CORRECTION_RECONCILIATION_REQUIRED");
@@ -165,6 +167,8 @@ export async function correctIndividualPrizeResult(db: Firestore, input: { tourn
     }
     tx.create(revisionRef, { tournamentId: input.tournamentId, matchId: match.id, settlementId, status, version: held ? input.expectedVersion : input.expectedVersion + 1, requestFingerprint, actorId: input.adminId, reason: input.reason, evidenceReference: input.evidenceReference, originalMatch: matchSnap.data(), originalPlacements, changes, verifiedOutcome: outcome, externalPayoutExecuted: false, externalPayoutReversed: false, createdAt: now.toISOString() });
     tx.create(db.collection("auditLogs").doc(revisionRef.id), { actorId: input.adminId, actorType: "admin", action: "tournament.prize_correction", targetId: input.tournamentId, status, reason: input.reason, evidenceReference: input.evidenceReference, revisionId: revisionRef.id, createdAt: now.toISOString() });
+    const notificationUsers = new Set((held ? affected.flatMap(row => [row.data().userId, recipientMap.get(String(nextPlacements.find(p => Number(p.placement) === Number(row.data().placement))?.participantId))]) : changes.flatMap(change => [(change.before as Record<string, unknown>).userId, (change.after as Record<string, unknown>).userId])).filter((uid): uid is string => typeof uid === "string" && Boolean(uid)));
+    for (const userId of notificationUsers) queueInAppNotification(db, tx, { eventId: `tournament_prize_correction_${revisionRef.id}`, userId, type: "financial_correction", title: held ? "Prize correction requires recovery review" : "Internal prize correction recorded", message: held ? "Affected credits and releases remain held for authorized recovery. Withdrawn funds were not silently reversed." : "Verified placements and unreleased internal prize credits were reconciled. Wallet clearance and withdrawal checks still apply; no external payout was executed.", actionUrl: "/wallet", createdAt: now.toISOString() });
     return { status, idempotent: false, version: held ? input.expectedVersion : input.expectedVersion + 1 };
   });
 }

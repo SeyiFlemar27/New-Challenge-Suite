@@ -1,0 +1,88 @@
+{
+  "startedAt": "2026-10-28T08:51:56.725Z",
+  "project": "challenge-suite",
+  "database": "(default)",
+  "authorization": "Owner approved exactly these three COLLECTION composites in this conversation",
+  "documentWrites": 0,
+  "existingIndexesModified": 0,
+  "results": [
+    {
+      "definition": {
+        "collectionGroup": "notifications",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      "operation": "projects/challenge-suite/databases/(default)/operations/S0k1d2dpUGdBQ0lDDCoDIGNlODgwY2RlMDI4Mi04M2E4LWZlNDQtYzVhMy1kNDY3YmM3NyQac2VuaWxlcGlwCQpBEg",
+      "state": "READY",
+      "created": true,
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgPigw5IK"
+    },
+    {
+      "definition": {
+        "collectionGroup": "notifications",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "read",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      "operation": "projects/challenge-suite/databases/(default)/operations/S0VKaW1qSmdBQ0lDDCoDIDcyNzBjMjU3YzI2Ny1lMzc5LTI1NjQtNTMxYS01ZDA2NmY5ZiQac2VuaWxlcGlwCQpBEg",
+      "state": "READY",
+      "created": true,
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjmiJEK"
+    },
+    {
+      "definition": {
+        "collectionGroup": "notifications",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "status",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "read",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      "operation": "projects/challenge-suite/databases/(default)/operations/S3M1eEZqSmdBQ0lDDCoDIGY1MWM0MzQwNzA0MC1iNzdiLTI5YTQtNDcxYS05MTYyNTY4ZiQac2VuaWxlcGlwCQpBEg",
+      "state": "READY",
+      "created": true,
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjFx5sK"
+    }
+  ],
+  "completedAt": "2026-10-28T08:57:05.334Z",
+  "allReady": true
+}

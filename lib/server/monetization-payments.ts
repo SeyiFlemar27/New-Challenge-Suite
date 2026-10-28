@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { getChallengeLifecycleState } from "@/lib/challenge-status";
@@ -334,11 +335,11 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
     const allPayments = db.collection("challengeEntryPayments").where("challengeId", "==", challengeId);
     const participantQuery = challengeSnap.data()?.builderVersion === "normal_v3" ? allParticipants : allParticipants.limit(1000);
     const paymentQuery = challengeSnap.data()?.builderVersion === "normal_v3" ? allPayments : allPayments.limit(1000);
-    const [participantSnap, participantRows, paymentRows] = await Promise.all([
-      transaction.get(participantRef),
-      transaction.get(participantQuery),
-      transaction.get(paymentQuery)
-    ]);
+    // Keep one transactional stream in flight: a failed query must reach the
+    // transaction runner before another read continues against its closed ID.
+    const participantSnap = await transaction.get(participantRef);
+    const participantRows = await transaction.get(participantQuery);
+    const paymentRows = await transaction.get(paymentQuery);
     if (!challengeSnap.exists) throw new Error("Challenge not found for paid-entry confirmation.");
     const challenge = { id: challengeSnap.id, ...challengeSnap.data() } as Record<string, unknown>;
     const normalEntry = challenge.builderVersion === "normal_v3";
@@ -434,6 +435,7 @@ export async function confirmChallengeEntryPayment(db: Firestore, event: Stripe.
       joinedAt: now,
       registeredAt: now
     }, { merge: true });
+    queueInAppNotification(db, transaction, { eventId: `challenge_entry_confirmed_${id}`, userId, type: "payment_confirmed", title: "Entry payment confirmed", message: manualApproval ? "Your payment is confirmed. Participation still requires the recorded approval decision." : "Your payment is confirmed and eligible entry was recorded. Open the challenge for current participation details.", actionUrl: `/challenges/${challengeId}`, createdAt: now });
     transaction.set(challengeRef, {
       pendingEntryFeeRevenueGrossCents: FieldValue.increment(amountCents),
       pendingEntryFeePlatformFeeCents: FieldValue.increment(revenue.platformFeeCents),
@@ -704,6 +706,7 @@ export async function createPendingSponsorContribution(db: Firestore, input: { s
     challengeId: input.challengeId,
     ...(subjectType === "tournament" ? { subjectType, tournamentId: input.challengeId, fundingPurpose: "prize_funding", sponsorUserId: input.sponsorUserId ?? null } : {}),
     agreementId: input.agreementId ?? null,
+    sponsorUserId: input.sponsorUserId ?? null,
     sponsorOrganizationId: input.sponsorOrganizationId ?? input.sponsorId,
     organizationOwnerId: text(input.challenge.organizationOwnerId, 160) || null,
     paymentPurpose: "sponsor_funding",

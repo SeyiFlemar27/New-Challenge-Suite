@@ -49,10 +49,11 @@ export async function reserveTournamentTeamMemberEntry(db: Firestore, input: { t
   let dispatchJobId: string | null = null;
   const reservation = await db.runTransaction(async transaction => {
     const tournamentRef = db.collection("tournaments").doc(input.tournamentId);
-    const [tournamentSnap, teamSnap, pending] = await Promise.all([
-      transaction.get(tournamentRef), transaction.get(teamRef),
-      transaction.get(db.collection("tournamentTeamRegistrationAttempts").where("tournamentId", "==", input.tournamentId).where("status", "==", "pending"))
-    ]);
+    const [tournamentSnap, teamSnap, pending] = [
+      await (transaction.get(tournamentRef)),
+      await (transaction.get(teamRef)),
+      await (transaction.get(db.collection("tournamentTeamRegistrationAttempts").where("tournamentId", "==", input.tournamentId).where("status", "==", "pending")))
+    ] as const;
     const tournament = tournamentSnap.data() ?? {};
     const team = teamSnap.data() ?? {};
     if (!tournamentSnap.exists || !teamSnap.exists || team.tournamentId !== input.tournamentId) throw error("Tournament team not found.", "TOURNAMENT_TEAM_NOT_FOUND", 404);
@@ -63,10 +64,10 @@ export async function reserveTournamentTeamMemberEntry(db: Firestore, input: { t
     const config = tournament.teamConfig ?? {};
     if (!roster.includes(input.userId) || input.userId === tournament.hostId) throw error("Active team membership is required.", "TEAM_MEMBERSHIP_REQUIRED", 403);
     if (new Set(roster).size !== roster.length || roster.length < Number(config.minimumSize) || roster.length > Number(config.maximumSize) || roster.length > 20) throw error("Complete a valid team roster first.", "TEAM_ROSTER_INVALID", 422);
-    const [accounts, memberships] = await Promise.all([
-      transaction.getAll(...roster.map(id => db.collection("users").doc(id))),
-      transaction.getAll(...roster.map(id => db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${id}`)))
-    ]);
+    const [accounts, memberships] = [
+      await (transaction.getAll(...roster.map(id => db.collection("users").doc(id)))),
+      await (transaction.getAll(...roster.map(id => db.collection("tournamentTeamMemberships").doc(`${input.tournamentId}_${id}`))))
+    ] as const;
     if (roster.some((id, index) => !eligible(accounts[index].data()) || memberships[index].data()?.teamId !== input.teamId || memberships[index].data()?.status !== "active"
       || (id === team.captainUserId && memberships[index].data()?.role !== "captain"))) throw error("Every member must have valid, consenting membership and an eligible account.", "TEAM_MEMBER_REVALIDATION_FAILED", 403);
     let attemptId = String(team.activeRegistrationAttemptId ?? "");
@@ -124,7 +125,11 @@ export async function expireTournamentTeamAttempt(db: Firestore, attemptId: stri
     const paymentRefs = strings(attempt.paymentIds).map(id => db.collection("tournamentEntryPayments").doc(id));
     const teamRef = db.collection("tournamentTeams").doc(String(attempt.teamId));
     const tournamentRef = db.collection("tournaments").doc(String(attempt.tournamentId));
-    const [payments, team, tournament] = await Promise.all([transaction.getAll(...paymentRefs), transaction.get(teamRef), transaction.get(tournamentRef)]);
+    const [payments, team, tournament] = [
+      await (transaction.getAll(...paymentRefs)),
+      await (transaction.get(teamRef)),
+      await (transaction.get(tournamentRef))
+    ] as const;
     if (!tournament.exists) { transaction.update(attemptRef, { status: "review_required", reason: "TOURNAMENT_MISSING", updatedAt: now.toISOString() }); return { status: "held", code: "TOURNAMENT_MISSING" }; }
     payments.forEach(payment => { if (payment.exists) stageMemberReview(db, transaction, { id: payment.id, ...payment.data() }, reversalReason ?? "TEAM_REGISTRATION_WINDOW_EXPIRED", now.toISOString()); });
     transaction.update(attemptRef, { status: reversalReason ? "failed" : "expired", outcomeReason: reversalReason ?? "TEAM_REGISTRATION_WINDOW_EXPIRED", endedAt: now.toISOString(), ...(!reversalReason ? { expiredAt: now.toISOString() } : {}), updatedAt: now.toISOString() });
@@ -150,15 +155,19 @@ export async function confirmTournamentTeamMemberPayment(db: Firestore, session:
     const attemptRef = db.collection("tournamentTeamRegistrationAttempts").doc(String(payment.teamAttemptId));
     const tournamentRef = db.collection("tournaments").doc(String(payment.tournamentId));
     const teamRef = db.collection("tournamentTeams").doc(String(payment.teamId));
-    const [attemptSnap, tournamentSnap, teamSnap] = await Promise.all([transaction.get(attemptRef), transaction.get(tournamentRef), transaction.get(teamRef)]);
+    const [attemptSnap, tournamentSnap, teamSnap] = [
+      await (transaction.get(attemptRef)),
+      await (transaction.get(tournamentRef)),
+      await (transaction.get(teamRef))
+    ] as const;
     const attempt = attemptSnap.data() ?? {}, tournament = tournamentSnap.data() ?? {}, team = teamSnap.data() ?? {};
     const roster = strings(attempt.rosterUserIds);
     if (!attemptSnap.exists || attempt.tournamentId !== payment.tournamentId || attempt.teamId !== payment.teamId || !roster.includes(String(payment.userId)) || !strings(attempt.paymentIds).includes(paymentId)) throw error("Team payment association is invalid.", "TEAM_PAYMENT_REFERENCE_MISMATCH");
-    const [payments, memberships, accounts] = await Promise.all([
-      transaction.getAll(...strings(attempt.paymentIds).map(id => db.collection("tournamentEntryPayments").doc(id))),
-      transaction.getAll(...roster.map(id => db.collection("tournamentTeamMemberships").doc(`${payment.tournamentId}_${id}`))),
-      transaction.getAll(...roster.map(id => db.collection("users").doc(id)))
-    ]);
+    const [payments, memberships, accounts] = [
+      await (transaction.getAll(...strings(attempt.paymentIds).map(id => db.collection("tournamentEntryPayments").doc(id)))),
+      await (transaction.getAll(...roster.map(id => db.collection("tournamentTeamMemberships").doc(`${payment.tournamentId}_${id}`)))),
+      await (transaction.getAll(...roster.map(id => db.collection("users").doc(id))))
+    ] as const;
     const confirmedCount = Number(tournament.participantCount ?? 0);
     const valid = tournamentSnap.exists && teamSnap.exists && tournament.productPolicyVersion === TOURNAMENT_PRODUCT_POLICY
       && tournament.status === "registration_open" && tournament.paymentActivationEnabled === true && !tournament.financialHold && !team.slotReservedAt

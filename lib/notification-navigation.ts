@@ -18,7 +18,11 @@ function safeId(value: unknown) {
 
 export function safeNotificationActionUrl(value: unknown) {
   const path = text(value);
-  return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") ? path.slice(0, 500) : null;
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") || /[\u0000-\u0020\u007f]/.test(path) || path.length > 500) return null;
+  try {
+    const url = new URL(path, "https://challenge-suite.invalid"), decoded = decodeURIComponent(url.pathname);
+    return url.origin === "https://challenge-suite.invalid" && !decoded.startsWith("//") && !decoded.includes("\\") ? path : null;
+  } catch { return null; }
 }
 
 /** Existing authenticated edit routes; publication still requires server approval. */

@@ -28,6 +28,9 @@ process.env.STRIPE_SECRET_KEY ??= "sk_test_deterministic_p0_regressions";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_deterministic_p0_regressions";
 
 const tests = [
+  "scripts/test-notification-completion-emulator.mjs",
+  "scripts/test-notification-inbox-emulator.mjs",
+  "scripts/test-normal-notification-reminders-emulator.mjs",
   "scripts/test-normal-base-prize-policy.mjs",
   "scripts/test-normal-review-funding-emulator.mjs",
   "scripts/test-normal-paid-entry-emulator.mjs",

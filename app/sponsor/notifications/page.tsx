@@ -1,2 +1,3 @@
-﻿import { SponsorNotificationsPage } from "@/components/sponsor/sponsor-operations-pages";
-export default function Page() { return <SponsorNotificationsPage />; }
+import { redirect } from "next/navigation";
+/** All authorized workspaces use the person's shared inbox. */
+export default function Page() { redirect("/notifications"); }

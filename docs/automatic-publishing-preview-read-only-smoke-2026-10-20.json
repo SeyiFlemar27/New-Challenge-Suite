@@ -1,0 +1,71 @@
+{
+  "origin": "https://challenge-suite-kmt9ic0gd-seyiflemar27s-projects.vercel.app",
+  "readOnly": true,
+  "environment": "preview",
+  "shortLivedIdentityUsed": true,
+  "credentialsPrinted": false,
+  "productionMutations": 0,
+  "expectedCommit": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "results": [
+    {
+      "label": "Homepage",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Login",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Explore",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Sponsor application",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Enterprise contact",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Admin verification shell",
+      "status": 200,
+      "protectionPage": false,
+      "html": true,
+      "bodyNonempty": true,
+      "applicationUnavailable": false
+    },
+    {
+      "label": "Explore backend availability",
+      "status": 200,
+      "protectionPage": false,
+      "html": false,
+      "bodyNonempty": true,
+      "applicationUnavailable": true,
+      "backendAvailable": false,
+      "applicationOk": true,
+      "returnedChallengeCount": 0
+    }
+  ],
+  "verifiedAt": "2026-10-20T16:50:44.228Z"
+}

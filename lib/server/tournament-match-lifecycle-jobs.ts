@@ -1,3 +1,4 @@
+import { deliverVoterNotifications } from "@/lib/server/voter-notifications";
 import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { processTournamentLifecycleAction } from "@/lib/server/tournament-lifecycle-scheduler";
@@ -8,6 +9,7 @@ import { queueTournamentSubmissionReminders } from "@/lib/server/tournament-subm
 import { reconcileAutomaticIndividualSettlement } from "@/lib/server/individual-automatic-settlement";
 import { processIndividualCancellationRefunds } from "@/lib/server/individual-tournament-cancellation";
 import { escalateOverdueIndividualReviews } from "@/lib/server/individual-review-escalation";
+import { recoverNotificationDeliveries } from "@/lib/server/notifications";
 
 const REVIEW_RECHECK_MS = 5 * 60_000;
 const TERMINAL_MATCH_STATES = new Set(["confirmed", "forfeit", "bye", "completed", "held", "double_forfeit_hold"]);
@@ -54,6 +56,7 @@ export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tourname
   for (const snapshot of matchesSnapshot.docs) {
     const match = { id: snapshot.id, ...snapshot.data() } as LifecycleMatch;
     const status = String(match.status ?? "");
+    if (status === "voting_open") await deliverVoterNotifications(db, { kind: "match", id: match.id, tournamentId }, "reminder", now).catch(() => undefined);
     if (TERMINAL_MATCH_STATES.has(status)) { skipped += 1; continue; }
     const isSubmission = ["submissions_open", "submission_review"].includes(status);
     const isVoting = status === "voting_open" || status === "voting_closed";
@@ -69,6 +72,10 @@ export async function ensureTournamentMatchLifecycleJobs(db: Firestore, tourname
       const currentDeadline = isoOrNull(isSubmission ? current.submissionDeadlineAt : current.votingClosesAt);
       if (currentDeadline !== deadlineAt) return null;
       let runAt = deadlineAt;
+      if (status === "submissions_open" || status === "voting_open") {
+        const reminderTimes = (status === "voting_open" ? [1] : [6, 1]).map(hours => Date.parse(deadlineAt) - hours * 3600000).filter(time => time > now.getTime());
+        if (reminderTimes.length) runAt = new Date(Math.min(...reminderTimes)).toISOString();
+      }
       let persistNextCheckAt: string | null = null;
       if (status === "submission_review" && Date.parse(deadlineAt) <= now.getTime()) {
         const existingCheck = isoOrNull(current.nextLifecycleCheckAt);
@@ -240,6 +247,7 @@ export async function processTournamentMatchLifecycleJobById(db: Firestore, jobI
 }
 
 export async function processTournamentMatchLifecycleJobs(db: Firestore, now = new Date(), limit = 25) {
+  await recoverNotificationDeliveries(db).catch(() => undefined);
   const dueJobs = await db.collection("tournamentJobs")
     .where("status", "==", "pending")
     .where("type", "==", "process_tournament_match_lifecycle")

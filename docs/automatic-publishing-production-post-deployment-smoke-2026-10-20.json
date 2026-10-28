@@ -1,0 +1,177 @@
+{
+  "checkedAt": "2026-10-20T17:58:32.917Z",
+  "candidate": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "origin": "https://www.challengesuite.com",
+  "readOnlyAcceptance": true,
+  "applicationRecordsCreated": 0,
+  "authenticatedActions": 0,
+  "financialOperationsInvoked": 0,
+  "anonymousPostProbes": "Authentication-first routes only; no credentials, existing IDs or worker identity supplied.",
+  "tournamentPublicRecords": 0,
+  "results": [
+    {
+      "label": "Homepage",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Login",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Explore",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Sponsor application",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Enterprise contact",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Public Explore API",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Explore refresh",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Public Tournament listing",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Live Event operational configuration",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Existing public detail API",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Existing public detail page",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Existing authorized public image through server Storage adapter",
+      "status": 200,
+      "passed": true,
+      "backendUnavailable": false,
+      "imageContentType": "image/png",
+      "nonempty": true
+    },
+    {
+      "label": "Creator drafts requires authentication",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Votes requires authentication",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Admin moderation requires authentication",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Protected runtime diagnostic requires authentication",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false,
+      "method": "POST",
+      "focusedVerificationAt": "2026-10-20T18:00:08.349Z"
+    },
+    {
+      "label": "Challenge publishing rejects anonymous request before mutation",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Tournament publishing rejects anonymous request before mutation",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Tournament join rejects anonymous request before mutation",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Tournament worker rejects anonymous request before mutation",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Tournament reconciler rejects anonymous request before mutation",
+      "status": 401,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Direct challenges client reads denied",
+      "status": 403,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Direct submissions client reads denied",
+      "status": 403,
+      "passed": true,
+      "backendUnavailable": false
+    },
+    {
+      "label": "Direct votes client reads denied",
+      "status": 403,
+      "passed": true,
+      "backendUnavailable": false
+    }
+  ],
+  "passed": 24,
+  "failed": 0,
+  "skipped": 0,
+  "limitations": [
+    "No successful authenticated Publish or media upload performed.",
+    "No full provider acceptance or worker dispatch performed.",
+    "Global concurrent Production writes cannot be excluded by this smoke test."
+  ],
+  "correctedHarnessFailure": {
+    "method": "GET",
+    "status": 405,
+    "cause": "POST-only route; unsupported-method test expectation was incorrect"
+  },
+  "initialRunEvidence": "automatic-publishing-production-initial-smoke-2026-10-20.json",
+  "finalizedAt": "2026-10-20T18:00:08.349Z",
+  "runComposition": "23 successful initial checks plus one corrected focused POST authorization check; not a fresh full 24-check rerun."
+}

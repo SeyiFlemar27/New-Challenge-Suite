@@ -356,10 +356,10 @@ await configureLiveEventReminders(db,{eventId:reminderId,actorId:owner.uid,hours
 equal((await db.collection('challenges').doc(reminderId).get()).data().liveEventReminderHours,[1],'owner reminder controls persist canonical settings');
 await assert.rejects(()=>configureLiveEventReminders(db,{eventId:reminderId,actorId:owner.uid,hours:[12]}));count++;
 const seededReminders=(await db.collection('liveEventAnnouncements').where('eventId','==',reminderId).get()).docs;
-equal(seededReminders.length,1,'only enabled reminder windows are seeded');
+equal(seededReminders.length,2,'essential 24-hour and one-hour in-app windows remain seeded independently of email controls');
 await configureLiveEventReminders(db,{eventId:reminderId,actorId:owner.uid,hours:[]});
 await expandLiveEventAnnouncement(db,seededReminders[0].id,Date.parse(reminderEvent.startsAt)-3600000);
-equal((await seededReminders[0].ref.get()).data().status,'cancelled','disabled reminders are checked again by the worker');
+equal((await seededReminders[0].ref.get()).data().status,'queued','disabled optional email does not cancel essential in-app reminders');
 const withdrawId=`${id}_withdraw`,withdrawUser=`withdraw_${id}`;
 await db.collection('users').doc(withdrawUser).set({accountStatus:'active',role:'user'});
 await db.collection('liveEvents').doc(withdrawId).set({...event,id:withdrawId,isLiveEvent:true,hostOperations:{...event.hostOperations,schemaVersion:2,physicalJudgeCount:1,winnerCount:1}});

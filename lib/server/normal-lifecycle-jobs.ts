@@ -1,7 +1,9 @@
+import { deliverVoterNotifications } from "@/lib/server/voter-notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import { isEnteredParticipantStatus } from "@/lib/server/submission-lifecycle";
 import { normalModerationPending, normalTimestamp, normalVotingSchedule, NORMAL_APPEAL_WINDOW_MS, NORMAL_REVIEW_ESCALATION_MS } from "@/lib/server/normal-lifecycle-policy";
 import { queueNormalLifecycleRefunds } from "@/lib/server/normal-refunds";
+import { queueNormalSubmissionReminders, queueNormalCorrectionReminder } from "@/lib/server/normal-submission-reminders";
 
 const terminal = new Set(["draft", "pending_review", "cancelled", "canceled", "paused", "completed", "winners_announced"]);
 
@@ -10,6 +12,7 @@ export async function processNormalChallengeLifecycle(db: Firestore, challengeId
   const now = clock instanceof Date ? clock : clock();
   const challengeRef = db.collection("challenges").doc(challengeId);
   const initial = await challengeRef.get();
+  await deliverVoterNotifications(db, { kind: "challenge", id: challengeId }, "reminder", now).catch(() => undefined);
   if (initial.exists && initial.data()?.normalLifecyclePolicyVersion === 1) await queueNormalLifecycleRefunds(db, challengeId, now);
   if (!initial.exists || initial.data()?.builderVersion !== "normal_v3" || initial.data()?.normalLifecyclePolicyVersion !== 1 || terminal.has(String(initial.data()?.status))) return { skipped: true };
   const submissions = await db.collection("submissions").where("challengeId", "==", challengeId).get();
@@ -46,7 +49,8 @@ export async function processNormalChallengeLifecycle(db: Firestore, challengeId
       }
     });
   }
-  return db.runTransaction(async transaction => {
+  for (const document of submissions.docs) await queueNormalCorrectionReminder(db, challengeId, document.id, now);
+  const outcome = await db.runTransaction(async transaction => {
     const [snap, entries, participants, votes] = await Promise.all([
       transaction.get(challengeRef), transaction.get(db.collection("submissions").where("challengeId", "==", challengeId)), transaction.get(db.collection("challengeParticipants").where("challengeId", "==", challengeId)), transaction.get(db.collection("votes").where("challengeId", "==", challengeId)),
     ]);
@@ -61,6 +65,7 @@ export async function processNormalChallengeLifecycle(db: Firestore, challengeId
       if (challenge.status !== status) {
         transaction.update(challengeRef, { status, lifecycleStatus: status, updatedAt: iso });
         transaction.set(db.collection("normalLifecycleEvents").doc(`${challengeId}_${status}`), { challengeId, action: status, actorId: "system_normal_lifecycle", createdAt: iso }, { merge: true });
+        if (status === "submission_open") transaction.set(db.collection("normalNotificationOutbox").doc(`${challengeId}_submission_open`), { challengeId, creatorId: challenge.creatorId ?? challenge.ownerId ?? null, type: "normal_submission_open", title: "Submissions are open", message: "Your challenge submission window is now open. Review its requirements and deadline.", status: "pending", cursor: null, createdAt: iso });
       }
       return { waiting: "submission_deadline" };
     }
@@ -119,4 +124,6 @@ export async function processNormalChallengeLifecycle(db: Firestore, challengeId
     });
     return { noWinners: !candidates.length, candidateCount: candidates.length };
   });
+  await queueNormalSubmissionReminders(db, challengeId, now);
+  return outcome;
 }

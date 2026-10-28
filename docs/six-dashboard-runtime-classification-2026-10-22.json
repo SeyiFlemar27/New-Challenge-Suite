@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-10-21T23:25:17.386Z",
+  "readOnly": true,
+  "entries": [
+    {
+      "keys": [
+        "id",
+        "timestamp",
+        "deploymentId",
+        "projectId",
+        "level",
+        "message",
+        "source",
+        "domain",
+        "requestMethod",
+        "requestPath",
+        "responseStatusCode",
+        "environment",
+        "branch",
+        "cache",
+        "cacheReason",
+        "traceId",
+        "logs"
+      ],
+      "message": "(node:8) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    },
+    {
+      "keys": [
+        "id",
+        "timestamp",
+        "deploymentId",
+        "projectId",
+        "level",
+        "message",
+        "source",
+        "domain",
+        "requestMethod",
+        "requestPath",
+        "responseStatusCode",
+        "environment",
+        "branch",
+        "cache",
+        "cacheReason",
+        "traceId",
+        "logs"
+      ],
+      "message": "(node:8) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    },
+    {
+      "keys": [
+        "id",
+        "timestamp",
+        "deploymentId",
+        "projectId",
+        "level",
+        "message",
+        "source",
+        "domain",
+        "requestMethod",
+        "requestPath",
+        "responseStatusCode",
+        "environment",
+        "branch",
+        "cache",
+        "cacheReason",
+        "traceId",
+        "logs"
+      ],
+      "message": "(node:8) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    },
+    {
+      "keys": [
+        "id",
+        "timestamp",
+        "deploymentId",
+        "projectId",
+        "level",
+        "message",
+        "source",
+        "domain",
+        "requestMethod",
+        "requestPath",
+        "responseStatusCode",
+        "environment",
+        "branch",
+        "cache",
+        "cacheReason",
+        "traceId",
+        "logs"
+      ],
+      "message": "(node:8) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    }
+  ]
+}

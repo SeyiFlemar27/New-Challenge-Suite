@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { normalTimestamp } from "@/lib/server/normal-lifecycle-policy";
 export type NormalRefundCause = "not_submitted" | "voluntary_withdrawal" | "disqualification" | "approved_cancellation";
@@ -152,6 +153,8 @@ export async function reconcileNormalRefund(db: Firestore, input: { refundCaseId
       transaction.set(db.collection("challengeParticipants").doc(`${record.challengeId}_${payment.userId}`), { entryPaymentStatus: "refunded", entryRefundConfirmedAt: iso, updatedAt: iso }, { merge: true });
     }
     transaction.create(db.collection("challengeFinancialLedger").doc(`normal_refund_${caseRef.id}`), { id: `normal_refund_${caseRef.id}`, challengeId: record.challengeId, userId: payment.userId ?? payment.sponsorId ?? null, purpose: "refund", sourceType: collection, sourceResource: `${collection}/${record.paymentId}`, amountCents: input.amountCents, currency: input.currency, direction: "debit_reversal", status: "confirmed", provider: "stripe", providerReference: input.providerRefundId, immutable: true, createdAt: iso });
+    const refundRecipient = payment.userId ?? payment.sponsorUserId;
+    if (typeof refundRecipient === "string" && refundRecipient) queueInAppNotification(db, transaction, { eventId: `normal_refund_${caseRef.id}`, userId: refundRecipient, type: "refund_completed", title: "Refund confirmed", message: "The payment provider confirmed the refund and its source record was reconciled. Your original financial history is preserved.", actionUrl: "/wallet", createdAt: iso });
     transaction.create(db.collection("auditLogs").doc(`normal_refund_confirmed_${caseRef.id}`), { actorId: "provider_refund_confirmation", action: "normal.refund_reconciled", targetId: caseRef.id, challengeId: record.challengeId, reason: record.reason, providerReference: input.providerRefundId, amountCents: input.amountCents, completedPayoutsPreserved: true, createdAt: iso });
     return { reconciled: true, duplicate: false };
   });

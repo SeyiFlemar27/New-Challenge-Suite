@@ -54,24 +54,26 @@ export async function expandLiveEventAnnouncement(db: Firestore, id: string, now
     const {event}=await readLiveEvent(db,tx,String(notice.eventId));
     const enabledHours = Array.isArray(event.liveEventReminderHours) ? event.liveEventReminderHours : [24,1];
     const reminderHours = (eventTime(notice.sourceStartsAt)-eventTime(notice.runAt))/3600000;
-    if(event.status==="cancelled"||notice.type==="reminder"&&(!enabledHours.includes(reminderHours)||eventTime(notice.sourceStartsAt)!==eventTime(event.startsAt)||now>=eventTime(event.startsAt))){tx.update(ref,{status:"cancelled",reason:"event_schedule_changed_or_notice_stale"});return {queued:0,complete:true};}
+    if(event.status==="cancelled"||notice.type==="reminder"&&(eventTime(notice.sourceStartsAt)!==eventTime(event.startsAt)||now>=eventTime(event.startsAt))){tx.update(ref,{status:"cancelled",reason:"event_schedule_changed_or_notice_stale"});return {queued:0,complete:true};}
     let query = db.collection("liveEventBookings").where("eventId", "==", notice.eventId).orderBy(FieldPath.documentId()).limit(50);
     if (typeof notice.cursor === "string") query = query.startAfter(notice.cursor);
     const bookings = await tx.get(query);
     const audienceSnapshotAt = notice.audienceSnapshotAt ?? new Date(now).toISOString();
     const eligible = bookings.docs.filter(row => row.data().status === "confirmed" && row.data().activeTicketCount !== 0 && eventTime(row.data().confirmedAt ?? row.data().createdAt) <= eventTime(audienceSnapshotAt) && (notice.audience === "all" || (notice.audience === "competitors" ? row.data().kind === "competitor" : row.data().kind === "audience")));
     const recipients = [...new Map(eligible.map(row => [String(row.data().email).toLowerCase(), row])).values()];
-    const targets = await Promise.all(recipients.map(async row => {
-      const value = row.data(), outbox = db.collection("liveEventEmailOutbox").doc(`announcement_${id}_${hash(String(value.email).toLowerCase())}`);
-      const [previous, preferences] = await Promise.all([tx.get(outbox), tx.get(db.collection("notificationPreferences").doc(value.guestSession?guestEventPreferenceId(String(notice.eventId),String(value.userId)):String(value.userId)))]);
-      const emailAllowed = value.guestSession ? guestEventEmailAllowed(value,preferences.data(),String(notice.eventId)) : preferences.data()?.email === true && preferences.data()?.events !== false;
-      return { row, value, outbox, previous, emailAllowed };
-    }));
+    const descriptors = recipients.map(row => ({ row, value: row.data(), outbox: db.collection("liveEventEmailOutbox").doc(`announcement_${id}_${hash(String(row.data().email).toLowerCase())}`), preferences: db.collection("notificationPreferences").doc(row.data().guestSession ? guestEventPreferenceId(String(notice.eventId), String(row.data().userId)) : String(row.data().userId)), inbox: db.collection("notifications").doc(`live_announcement_${id}_${row.data().userId}`) }));
+    const states = descriptors.length ? await tx.getAll(...descriptors.flatMap(row => [row.outbox, row.preferences, row.inbox])) : [];
+    const targets = descriptors.map((row, index) => {
+      const previous = states[index * 3], storedPreferences = states[index * 3 + 1].data(), preferences = storedPreferences ?? {}, existing = states[index * 3 + 2];
+      const emailAllowed = (row.value.guestSession ? guestEventEmailAllowed(row.value, storedPreferences, String(notice.eventId)) : preferences.email === true && preferences.events !== false) && (notice.type !== "reminder" || enabledHours.includes(reminderHours));
+      return { ...row, previous, existing, emailAllowed, inAppAllowed: notice.type === "reminder" || preferences.promotions === true };
+    });
     const iso = new Date(now).toISOString(); let queued = 0;
+    const writtenInboxes = new Set<string>();
     for (const target of targets) {
       if (target.previous.exists) continue;
       tx.create(target.outbox, { eventId: notice.eventId, bookingId: target.row.id, userId: target.value.userId, type: "announcement", announcementId: id, title: notice.title, message: notice.message, status: target.emailAllowed ? "pending" : "skipped", reason: target.emailAllowed ? null : "email_preference_not_enabled", createdAt: iso });
-      if (!target.value.guestSession) tx.set(db.collection("notifications").doc(`live_announcement_${id}_${target.value.userId}`), { userId: target.value.userId, type: "live_event_announcement", title: notice.title, message: notice.message, actionUrl: `/live-events/${notice.eventId}`, read: false, createdAt: iso });
+      if (!target.value.guestSession && target.inAppAllowed && !target.existing.exists && !writtenInboxes.has(target.inbox.id)) { tx.create(target.inbox, { userId: target.value.userId, type: notice.type === "reminder" ? "live_event_reminder" : "live_event_announcement", essential: notice.type === "reminder", title: notice.title, message: notice.message, actionUrl: `/live-events/${notice.eventId}`, read: false, status: "unread", createdAt: iso }); writtenInboxes.add(target.inbox.id); }
       queued++;
     }
     const complete = bookings.size < 50;

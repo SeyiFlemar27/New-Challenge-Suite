@@ -23,10 +23,7 @@ export async function prepareEnterpriseActiveChallengeSlot(
 
   const quotaRef = db.collection("enterpriseChallengeQuotas").doc(organizationId);
   const reservationRef = db.collection("enterpriseChallengeReservations").doc(challengeId);
-  const [quotaSnap, reservationSnap] = await Promise.all([
-    transaction.get(quotaRef),
-    transaction.get(reservationRef),
-  ]);
+  const [quotaSnap, reservationSnap] = await transaction.getAll(quotaRef, reservationRef);
 
   // Bootstrap the counter from the authoritative legacy challenge records once. The
   // quota document is read and written in this transaction, serializing first writers.
@@ -88,10 +85,7 @@ export async function prepareEnterpriseActiveChallengeRelease(
   if (!organizationId) return { apply: () => undefined };
   const quotaRef = db.collection("enterpriseChallengeQuotas").doc(organizationId);
   const reservationRef = db.collection("enterpriseChallengeReservations").doc(challengeId);
-  const [quotaSnap, reservationSnap] = await Promise.all([
-    transaction.get(quotaRef),
-    transaction.get(reservationRef),
-  ]);
+  const [quotaSnap, reservationSnap] = await transaction.getAll(quotaRef, reservationRef);
   const data = reservationSnap.data();
   if (!reservationSnap.exists || data?.status !== "active" || data?.organizationId !== organizationId) {
     return { apply: () => undefined };

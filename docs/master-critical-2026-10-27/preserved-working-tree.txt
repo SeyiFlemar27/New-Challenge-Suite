@@ -1,0 +1,225 @@
+ M app/api/admin/tournaments/[id]/route.ts
+ M app/api/challenges/[id]/route.ts
+ M app/api/explore/challenges/route.ts
+ M app/api/private-challenges/[id]/access/route.ts
+ M app/api/tournaments/[id]/manage/actions/route.ts
+ M app/api/tournaments/[id]/route.ts
+ M app/api/tournaments/[id]/submissions/[submissionId]/media/route.ts
+ M app/api/tournaments/[id]/submissions/route.ts
+ M app/api/tournaments/[id]/votes/route.ts
+ M app/challenges/[id]/page.tsx
+ M app/challenges/page.tsx
+ M app/explore/page.tsx
+ M app/live-events/[id]/page.tsx
+ M app/my-challenges/page.tsx
+ M app/private/preview/[id]/page.tsx
+ M app/tournaments/[id]/matches/[matchId]/page.tsx
+ M app/tournaments/[id]/me/page.tsx
+ M app/tournaments/[id]/page.tsx
+ M app/tournaments/[id]/results/page.tsx
+ M components/admin/admin-tournament-decisions.tsx
+ M components/app-shell.tsx
+ M components/mobile-footer.tsx
+ M components/private-access-manager.tsx
+ M components/sponsor/sponsor-shell.tsx
+ M components/tournament-detail-content.tsx
+ M components/tournament-match-actions.tsx
+ M lib/account-routing.ts
+ M lib/media-upload-paths.ts
+ M lib/media-upload.ts
+ M lib/private-challenge-policy.ts
+ M lib/server/challenge-settlement.ts
+ M lib/server/normal-email.ts
+ M lib/server/private-access-management.ts
+ M lib/server/tournament-draft-adoption.ts
+ M lib/server/tournament-lifecycle-scheduler.ts
+ M lib/server/tournament-match-lifecycle-jobs.ts
+ M lib/server/tournament-notifications.ts
+ M lib/server/tournament-operations.ts
+ M lib/server/tournament-paid-entry.ts
+ M lib/server/tournament-public.ts
+ M lib/server/tournament-result-confirmation.ts
+ M lib/server/tournament-settlement-policy.ts
+ M lib/server/tournament-settlement.ts
+ M lib/server/tournament-validation.ts
+ M lib/server/tournaments.ts
+ M lib/tournament-types.ts
+ M next-env.d.ts
+ M scripts/qa/dashboard-auth-journeys.mjs
+ M scripts/qa/dashboard-redesign-journeys.mjs
+ M scripts/qa/run-p1-browser-e2e.mjs
+ M scripts/run-isolated-p0-emulators.mjs
+ M scripts/run-local-verification-suite.mjs
+ M scripts/run-media-publish-emulators.cjs
+ M scripts/run-p0-emulator-regressions.mjs
+ M scripts/test-automatic-voting-emulator.mjs
+ M scripts/test-dashboard-auth-routing.mjs
+ M scripts/test-private-v2-access-emulator.mjs
+ M scripts/test-tournament-complete-lifecycles-emulator.mjs
+ M scripts/test-tournament-new-policy.mjs
+ M scripts/test-tournament-settlement-allocation.mjs
+ M scripts/test-tournament-submission-media-emulator.mjs
+ M tsconfig.json
+ M tsconfig.tsbuildinfo
+?? .pnpm-store/
+?? app/api/me/
+?? automatic-publishing-cloud-audit-after-stop.json
+?? automatic-publishing-cloud-audit-read-only.json
+?? automatic-publishing-cloud-inventory-before-env.json
+?? automatic-publishing-final-cloud-read-only.json
+?? automatic-publishing-final-query-probes.json
+?? automatic-publishing-final-stage-paths.txt
+?? automatic-publishing-index-conflict-read-only.json
+?? automatic-publishing-index-groups-preflight.json
+?? automatic-publishing-production-indexes-final.json
+?? automatic-publishing-production-indexes.json
+?? automatic-publishing-query-index-probes-ready.json
+?? automatic-publishing-query-index-probes.json
+?? automatic-publishing-tournament-query-inventory.txt
+?? automatic-publishing-tournament-server-query-inventory.txt
+?? components/explore-challenge-card.tsx
+?? components/my-tournaments.tsx
+?? components/private-detail-actions.tsx
+?? components/private-locked-detail.tsx
+?? dashboard-master-resume-inventory-20261026.txt
+?? docs/automatic-publishing-final-deployment-status-2026-10-20.json
+?? docs/automatic-publishing-final-release-execution-2026-10-20.md
+?? docs/automatic-publishing-preview-configuration-request-2026-10-20.md
+?? docs/automatic-publishing-preview-read-only-smoke-2026-10-20.json
+?? docs/automatic-publishing-production-build-progress-2026-10-20.json
+?? docs/automatic-publishing-production-data-compatibility-2026-10-20.json
+?? docs/automatic-publishing-production-deployment-report-2026-10-20.md
+?? docs/automatic-publishing-production-deployment-verification-2026-10-20.json
+?? docs/automatic-publishing-production-error-log-classification-2026-10-20.json
+?? docs/automatic-publishing-production-execution-cloud-preflight-2026-10-20.json
+?? docs/automatic-publishing-production-execution-gates-2026-10-20.json
+?? docs/automatic-publishing-production-focused-auth-smoke-2026-10-20.json
+?? docs/automatic-publishing-production-initial-smoke-2026-10-20.json
+?? docs/automatic-publishing-production-only-acceptance-exception-2026-10-20.md
+?? docs/automatic-publishing-production-post-deployment-disabled-state-2026-10-20.json
+?? docs/automatic-publishing-production-post-deployment-smoke-2026-10-20.json
+?? docs/automatic-publishing-production-runtime-log-review-2026-10-20.json
+?? docs/challenge-suite-staging-firebase-proposal-2026-10-20.md
+?? docs/challenge-suite-staging-preprovision-verification-2026-10-20.json
+?? docs/challenge-suite-staging-preview-metadata-2026-10-20.json
+?? docs/challenge-suite-staging-proposed-indexes-2026-10-20.json
+?? docs/challenge-suite-staging-provisioning-approval-2026-10-20.md
+?? docs/dashboard-admin-authority-read-only-2026-10-21.json
+?? docs/dashboard-admin-deployed-2026-10-21.json
+?? docs/dashboard-admin-deployment-progress-2026-10-21.json
+?? docs/dashboard-admin-production-smoke-2026-10-21.json
+?? docs/dashboard-admin-routing-read-only-2026-10-21.json
+?? docs/dashboard-admin-runtime-logs-2026-10-21.json
+?? docs/dashboard-auth-build-progress-2026-10-21.json
+?? docs/dashboard-auth-deployed-2026-10-21.json
+?? docs/dashboard-auth-deployment-progress-2026-10-21.json
+?? docs/dashboard-auth-production-release-2026-10-21.md
+?? docs/dashboard-auth-production-smoke-2026-10-21.json
+?? docs/dashboard-auth-rollback-2026-10-21.json
+?? docs/dashboard-auth-runtime-logs-2026-10-21.json
+?? docs/dashboard-sponsor-deployed-2026-10-21.json
+?? docs/dashboard-sponsor-live-deployed-2026-10-21.json
+?? docs/dashboard-sponsor-live-production-smoke-2026-10-21.json
+?? docs/dashboard-sponsor-live-runtime-logs-2026-10-21.json
+?? docs/dashboard-sponsor-preflight-2026-10-21.json
+?? docs/explore-details-tournament-continuation-2026-10-27.md
+?? docs/explore-details-tournament-execution-ledger-2026-10-22.md
+?? docs/explore-details-tournament-resume-2026-10-26.md
+?? docs/master-continuation-2026-10-27/
+?? docs/master-critical-2026-10-27/
+?? docs/master-critical-continuation-2026-10-27.md
+?? docs/master-recovery-snapshot-2026-10-26.json
+?? docs/master-requirement-code-checklist-2026-10-26.md
+?? docs/master-resume-2026-10-26/
+?? docs/six-dashboard-committed-files-2026-10-22.json
+?? docs/six-dashboard-final-polish-production-release-2026-10-22.md
+?? docs/six-dashboard-git-deployment-observation-2026-10-21.json
+?? docs/six-dashboard-production-smoke-2026-10-21.json
+?? docs/six-dashboard-release-deployed-2026-10-21.json
+?? docs/six-dashboard-runtime-classification-2026-10-22.json
+?? docs/six-dashboard-runtime-logs-2026-10-21.json
+?? docs/sponsor-entry-exact-sha-production-deployment-request-2026-10-21.json
+?? docs/sponsor-entry-git-deployment-observation-2026-10-21.json
+?? docs/sponsor-entry-production-deployment-created-2026-10-21.json
+?? docs/sponsor-entry-production-release-2026-10-21.md
+?? docs/sponsor-entry-release-status-2026-10-21.md
+?? lib/explore-card-policy.ts
+?? lib/individual-tournament-policy.ts
+?? lib/server/individual-automatic-settlement.ts
+?? lib/server/individual-match-review.ts
+?? lib/server/individual-settlement-clearance.ts
+?? lib/server/individual-tournament-cancellation.ts
+?? lib/server/individual-tournament-disqualification.ts
+?? lib/server/public-creator.ts
+?? lib/server/tournament-bracket-recovery.ts
+?? lib/server/tournament-submission-reminders.ts
+?? lib/server/tournament-submission-visibility.ts
+?? lib/tournament-participant-view.ts
+?? lib/tournament-results-view.ts
+?? lint-batch5b-baseline.json
+?? lint-batch5b-current.json
+?? lint-batch5b-group2.json
+?? lint-batch5b-progress.json
+?? lint-batch5b-progress2.json
+?? lint-batch5b-targeted.json
+?? lint-escaping-targeted.json
+?? master-continuation-initial-inventory-20261026.txt
+?? scripts/audit-publication-failures-read-only.mjs
+?? scripts/audit-release-query-indexes-read-only.mjs
+?? scripts/audit-tournament-backlog-read-only.mjs
+?? scripts/audit-tournament-cloud-read-only.mjs
+?? scripts/check-tournament-probe-identity-permission-read-only.mjs
+?? scripts/classify-production-error-log-read-only.mjs
+?? scripts/create-approved-paused-tournament-scheduler.mjs
+?? scripts/create-approved-release-indexes.mjs
+?? scripts/diagnose-google-storage-transports.mjs
+?? scripts/diagnose-production-storage-read-only.mjs
+?? scripts/inspect-final-monitoring-integrations-read-only.mjs
+?? scripts/inspect-final-vercel-release-read-only.mjs
+?? scripts/inspect-production-build-progress-read-only.mjs
+?? scripts/inspect-production-release-runtime-logs-read-only.mjs
+?? scripts/inspect-production-rollout-read-only.mjs
+?? scripts/inspect-release-deployments-read-only.mjs
+?? scripts/inspect-staging-preview-metadata-read-only.mjs
+?? scripts/prepare-final-release-file-inventory.mjs
+?? scripts/provision-approved-tournament-foundation.mjs
+?? scripts/publish-approved-firestore-privacy-rules.mjs
+?? scripts/qa/audit-admin-authority-read-only.mjs
+?? scripts/qa/audit-admin-routing-read-only.mjs
+?? scripts/qa/classify-six-dashboard-runtime-read-only.mjs
+?? scripts/qa/inspect-admin-routing-runtime-read-only.mjs
+?? scripts/qa/inspect-sponsor-entry-runtime-read-only.mjs
+?? scripts/qa/inspect-sponsor-live-runtime-read-only.mjs
+?? scripts/qa/master-detail-journeys.mjs
+?? scripts/qa/master-participant-journeys.mjs
+?? scripts/qa/smoke-admin-routing-production-read-only.mjs
+?? scripts/qa/smoke-sponsor-entry-production-read-only.mjs
+?? scripts/qa/smoke-sponsor-live-production-read-only.mjs
+?? scripts/qa/verify-admin-routing-release-read-only.mjs
+?? scripts/qa/verify-sponsor-entry-release-read-only.mjs
+?? scripts/qa/verify-sponsor-live-release-read-only.mjs
+?? scripts/sanitize-vercel-deployment-inspection.mjs
+?? scripts/smoke-production-release-acceptance-read-only.mjs
+?? scripts/smoke-protected-preview-read-only.mjs
+?? scripts/snapshot-master-implementation.mjs
+?? scripts/stage-approved-tournament-production-env.mjs
+?? scripts/test-explore-card-policy.mjs
+?? scripts/test-individual-automatic-settlement-emulator.mjs
+?? scripts/test-individual-cancellation-emulator.mjs
+?? scripts/test-individual-recovery-emulator.mjs
+?? scripts/test-individual-tournament-bracket-matrix.mjs
+?? scripts/test-individual-tournament-foundation.mjs
+?? scripts/test-individual-tournament-policy.mjs
+?? scripts/test-my-tournaments-emulator.mjs
+?? scripts/test-tournament-media-visibility-emulator.mjs
+?? scripts/test-tournament-participant-view.mjs
+?? scripts/test-tournament-results-view.mjs
+?? scripts/test-tournament-submission-visibility.mjs
+?? scripts/test-tournament-upload-path-identifiers.mjs
+?? scripts/verify-final-release-infrastructure-read-only.mjs
+?? scripts/verify-production-diagnostic-auth-read-only.mjs
+?? scripts/verify-production-disabled-state-read-only.mjs
+?? scripts/verify-production-environment-read-only.mjs
+?? scripts/verify-production-release-data-compatibility-read-only.mjs
+?? scripts/verify-production-release-gates-read-only.mjs
+?? scripts/verify-staging-preprovision-read-only.mjs

@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-20T17:57:54.922Z",
+  "readOnly": true,
+  "id": "dpl_9NY3gfa9Zq2omWAYbbvogemU8h4r",
+  "url": "challenge-suite-btmgx2xap-seyiflemar27s-projects.vercel.app",
+  "state": "READY",
+  "target": "production",
+  "projectId": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+  "branch": "main",
+  "aliases": [
+    "www.challengesuite.com",
+    "challenge-suite.vercel.app",
+    "challengesuite.com",
+    "challenge-suite-seyiflemar27s-projects.vercel.app",
+    "challenge-suite-git-main-seyiflemar27s-projects.vercel.app"
+  ],
+  "alias": {
+    "hostname": "www.challengesuite.com",
+    "deploymentId": "dpl_9NY3gfa9Zq2omWAYbbvogemU8h4r"
+  },
+  "dns": {
+    "cnameUnavailable": true,
+    "ipv4Unavailable": true,
+    "httpsResolver": {
+      "httpStatus": 200,
+      "dnsStatus": 0,
+      "answerCount": 3,
+      "ipv4AnswerCount": 2
+    }
+  },
+  "exactSourceMatches": true,
+  "domainMatches": true,
+  "productionMutations": 0
+}

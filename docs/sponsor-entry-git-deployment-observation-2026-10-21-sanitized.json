@@ -1,0 +1,44 @@
+{
+  "checkedAt": "2026-10-21T15:19:46.5626938Z",
+  "candidate": "f7f6674fabb19802a19800d5a1a93c2a67248d36",
+  "projectId": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "candidateDeploymentFound": false,
+  "deployments": [
+    {
+      "url": "challenge-suite-8bpruqvtk-seyiflemar27s-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "sha": "ffed366635b35c32e1af99881c1d045ec1020f26",
+      "branch": "main"
+    },
+    {
+      "url": "challenge-suite-1ixzfnhgu-seyiflemar27s-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "sha": "0eb6f7819a703d88dc9edab30d581564367df5bc",
+      "branch": "main"
+    },
+    {
+      "url": "challenge-suite-btmgx2xap-seyiflemar27s-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+      "branch": "main"
+    },
+    {
+      "url": "challenge-suite-kmt9ic0gd-seyiflemar27s-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "sha": "3203f4a42877d70b0b58aaa4ec4243897c5f66e4",
+      "branch": "codex/automatic-publishing-exception-moderation"
+    },
+    {
+      "url": "challenge-suite-h6p98hg17-seyiflemar27s-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "sha": "4e0c5cee1c012361f492fd37a50518194fd909d6",
+      "branch": "main"
+    }
+  ],
+  "privateAccountIdentifiersOmitted": true
+}

@@ -1,0 +1,1387 @@
+{
+  "runs": [
+    {
+      "log": "notification-completion-full-backend-20261028.log",
+      "command": "CHALLENGE_SUITE_CONTINUE_REGRESSIONS=true; node scripts/run-isolated-p0-emulators.mjs <firebase-tools>",
+      "exitCode": 1,
+      "passed": 80,
+      "total": 81,
+      "failed": 1,
+      "suites": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "exitCode": 1
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "exitCode": 0
+        }
+      ],
+      "failures": [
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "startedAt": "2026-10-28T10:12:38.584Z",
+          "completedAt": "2026-10-28T10:12:44.801Z",
+          "exitCode": 1,
+          "errorCode": null
+        }
+      ],
+      "exitEvidence": "Complete runner final failure list; every other completed child exited zero."
+    },
+    {
+      "log": "notification-full-backend-valid-fixtures-20261028.log",
+      "command": "CHALLENGE_SUITE_CONTINUE_REGRESSIONS=true; node scripts/run-isolated-p0-emulators.mjs <firebase-tools>",
+      "exitCode": 1,
+      "passed": 79,
+      "total": 81,
+      "failed": 2,
+      "suites": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "exitCode": 1
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "exitCode": 1
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "exitCode": 0
+        }
+      ],
+      "failures": [
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T10:40:22.452Z",
+          "completedAt": "2026-10-28T10:40:40.129Z",
+          "exitCode": 1,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "startedAt": "2026-10-28T10:46:24.668Z",
+          "completedAt": "2026-10-28T10:46:38.844Z",
+          "exitCode": 1,
+          "errorCode": null
+        }
+      ],
+      "exitEvidence": "Complete runner final failure list; every other completed child exited zero."
+    },
+    {
+      "log": "notification-full-backend-transaction-order-20261028.log",
+      "command": "CHALLENGE_SUITE_CONTINUE_REGRESSIONS=true; node scripts/run-isolated-p0-emulators.mjs <firebase-tools>",
+      "exitCode": 1,
+      "passed": 80,
+      "total": 81,
+      "failed": 1,
+      "suites": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "exitCode": 1
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "exitCode": 0
+        }
+      ],
+      "failures": [
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T11:12:06.105Z",
+          "completedAt": "2026-10-28T11:12:21.762Z",
+          "exitCode": 1,
+          "errorCode": null
+        }
+      ],
+      "exitEvidence": "Complete runner final failure list; every other completed child exited zero."
+    },
+    {
+      "log": "notification-full-backend-final-snapshot-20261028.log",
+      "command": "CHALLENGE_SUITE_CONTINUE_REGRESSIONS=true; node scripts/run-isolated-p0-emulators.mjs <firebase-tools>",
+      "exitCode": 1,
+      "passed": 80,
+      "total": 81,
+      "failed": 1,
+      "suites": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "exitCode": 1
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "exitCode": 0
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "exitCode": 0
+        }
+      ],
+      "failures": [
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "startedAt": "2026-10-28T11:44:22.131Z",
+          "completedAt": "2026-10-28T11:45:18.443Z",
+          "exitCode": 1,
+          "errorCode": null
+        }
+      ],
+      "exitEvidence": "Complete runner final failure list; every other completed child exited zero."
+    }
+  ]
+}

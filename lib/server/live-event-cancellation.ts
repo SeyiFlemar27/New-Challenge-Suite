@@ -70,9 +70,10 @@ export async function processLiveEventCancellation(db:Firestore,eventId:string){
     await db.runTransaction(async tx=>{
       const outbox=db.collection("liveEventEmailOutbox").doc(`cancel_${ticket.bookingId}`),previous=await tx.get(outbox);
       if(previous.exists)return;
+      const inbox=db.collection("notifications").doc(`live_cancel_${eventId}_${ticket.userId}`),existingInbox=await tx.get(inbox);
       const now=new Date().toISOString();
       tx.create(outbox,{eventId,bookingId:ticket.bookingId,userId:ticket.userId,type:"event_cancellation",title:`${String(event.title)} has been cancelled`,message:"The organizer cancelled this event. Your tickets cannot be used. Confirmed refundable payments are queued for return through the original payment method where supported. A pending or reviewed refund is not a completed refund; check your booking or contact Support for its status.",status:"pending",createdAt:now});
-      if(!booking.guestSession)tx.set(db.collection("notifications").doc(`live_cancel_${eventId}_${ticket.userId}`),{userId:ticket.userId,type:"live_event_cancelled",title:"Your event has been cancelled",message:"Check your booking and any refund status before making further arrangements.",actionUrl:`/live-events/${eventId}`,read:false,createdAt:now});
+      if(!booking.guestSession&&!existingInbox.exists)tx.create(inbox,{userId:ticket.userId,type:"live_event_cancelled",essential:true,title:"Your event has been cancelled",message:"Check your booking and any refund status before making further arrangements.",actionUrl:`/live-events/${eventId}`,read:false,status:"unread",createdAt:now});
     });
   }
   const complete=tickets.size<40&&funding.complete;

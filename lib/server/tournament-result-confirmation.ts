@@ -1,3 +1,4 @@
+import { deliverVoterNotifications, queueVoterAudience } from "@/lib/server/voter-notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import type { RequestUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/responses";
@@ -161,13 +162,15 @@ async function confirmResult(db: Firestore, id: string, body: Record<string, unk
         if (!voteOutcome.tied && voteOutcome.winnerParticipantId !== winnerParticipantId) throw Object.assign(new Error("The selected winner does not match the verified public vote result."), { code: "TOURNAMENT_VOTE_RESULT_MISMATCH" });
       }
     }
+    const resultConfirmedAt = new Date().toISOString();
+    if (result.status === "confirmed") queueVoterAudience(db, transaction, { kind: "match", id: match.id, tournamentId: id }, resultConfirmedAt);
     transaction.set(db.collection("tournamentMatches").doc(match.id), {
       winnerParticipantId,
       loserParticipantId,
       resultStatus: result.status,
       status: "confirmed",
       ...(publicVotingMatch && voteOutcome ? { verifiedVoteCountA: voteOutcome.votesA, verifiedVoteCountB: voteOutcome.votesB, verifiedVoteTotal: voteOutcome.totalVotes } : {}),
-      confirmedAt: new Date().toISOString(),
+      confirmedAt: resultConfirmedAt,
       confirmedBy: user.uid
     }, { merge: true });
     const submissionDurationMs = Number(currentTournament.submissionDurationHours ?? 48) * 60 * 60 * 1000;
@@ -216,5 +219,6 @@ async function confirmResult(db: Firestore, id: string, body: Record<string, unk
     if (failure.code) return fail(failure.message, 409, undefined, failure.code);
     throw error;
   }
+  await deliverVoterNotifications(db, { kind: "match", id: matchId, tournamentId: id }, "results").catch(() => undefined);
   return ok({ result, advancement, voteOutcome, grandFinalResetRequired: requiresGrandFinalReset }, requiresGrandFinalReset ? "A Grand Final reset is required because both finalists now have one loss." : "Tournament result confirmed server-side. Payout remains admin and ledger-gated.");
 }

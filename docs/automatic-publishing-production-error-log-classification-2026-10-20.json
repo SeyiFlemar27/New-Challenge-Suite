@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-20T18:03:12.603Z",
+  "rows": [
+    {
+      "keys": [
+        "id",
+        "timestamp",
+        "deploymentId",
+        "projectId",
+        "level",
+        "message",
+        "source",
+        "domain",
+        "requestMethod",
+        "requestPath",
+        "responseStatusCode",
+        "environment",
+        "branch",
+        "cache",
+        "cacheReason",
+        "traceId",
+        "logs"
+      ],
+      "level": "error",
+      "statusCode": 200,
+      "requestMethod": "GET",
+      "route": "/api/challenge-media",
+      "messageType": "string",
+      "arrayFields": [
+        {
+          "field": "logs",
+          "count": 1,
+          "sampleKeys": [
+            "level",
+            "message"
+          ]
+        }
+      ],
+      "matchingSourceLogLabels": [],
+      "recognizedMarkers": []
+    }
+  ],
+  "rawMessagesOmitted": true,
+  "safeErrorSignatures": [
+    {
+      "statusCode": 200,
+      "matches": [
+        "DeprecationWarning",
+        "DEP0169",
+        "url.parse()"
+      ],
+      "dictionaryWords": []
+    }
+  ]
+}

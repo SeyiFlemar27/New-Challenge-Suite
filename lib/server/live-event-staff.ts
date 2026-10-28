@@ -17,7 +17,7 @@ export async function manageLiveEventStaff(db:Firestore,input:{eventId:string;ac
     if(input.action==="invite"&&existing.status==="active")throw new LiveEventPolicyError("STAFF_ALREADY_ACTIVE");
     tx.set(ref,{eventId:input.eventId,userId:input.userId,permission:"check_in",status,updatedAt:iso,updatedBy:input.actorId,expiresAt:event.endsAt},{merge:true});
     tx.create(audit,{actorId:input.actorId,action:`live_event.staff_${input.action}`,eventId:input.eventId,targetId:input.userId,before:existing.status??null,after:status,reason:input.reason,createdAt:iso});
-    if(input.action==="invite")tx.set(db.collection("notifications").doc(`event_staff_${ref.id}`),{userId:input.userId,type:"live_event_staff_invitation",title:"You're invited to help with event check-in",message:"Accept the invitation to verify tickets and confirm arrivals for this event only.",actionUrl:`/live-events/${input.eventId}/check-in`,read:false,createdAt:iso});
+    if(input.action==="invite")tx.create(db.collection("notifications").doc(`event_staff_${audit.id}`),{userId:input.userId,type:"live_event_staff_invitation",title:"You're invited to help with event check-in",message:"Accept the invitation to verify tickets and confirm arrivals for this event only.",actionUrl:`/live-events/${input.eventId}/check-in`,read:false,createdAt:iso});
     return {status,repeated:false};
   });
 }

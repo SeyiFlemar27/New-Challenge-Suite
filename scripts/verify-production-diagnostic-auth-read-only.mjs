@@ -1,0 +1,9 @@
+import fs from 'node:fs';
+const source='docs/automatic-publishing-production-post-deployment-smoke-2026-10-20.json',original=JSON.parse(fs.readFileSync(source));
+if(original.failed!==1||original.results.find(r=>r.passed===false)?.status!==405)throw Error('UNEXPECTED_INITIAL_FAILURE');
+fs.copyFileSync(source,'docs/automatic-publishing-production-initial-smoke-2026-10-20.json');
+const r=await fetch('https://www.challengesuite.com/api/admin/tournament-runtime-verification',{method:'POST',headers:{'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(30000)});await r.arrayBuffer();
+const focused={checkedAt:new Date().toISOString(),readOnlyAcceptance:true,recordsCreated:0,correctedMethod:'POST',status:r.status,passed:r.status===401,originalFailure:{method:'GET',status:405,cause:'POST-only route; unsupported-method test expectation was incorrect'},sourceReviewedAuthenticationBeforeWrites:true};
+fs.writeFileSync('docs/automatic-publishing-production-focused-auth-smoke-2026-10-20.json',JSON.stringify(focused,null,2)+'\n');
+if(focused.passed){original.results=original.results.map(x=>x.label==='Protected runtime diagnostic requires authentication'?{...x,status:r.status,passed:true,method:'POST',focusedVerificationAt:focused.checkedAt}:x);original.passed=original.results.filter(x=>x.passed).length;original.failed=original.results.filter(x=>x.passed===false).length;original.correctedHarnessFailure=focused.originalFailure;original.initialRunEvidence='automatic-publishing-production-initial-smoke-2026-10-20.json';original.finalizedAt=focused.checkedAt;original.runComposition='23 successful initial checks plus one corrected focused POST authorization check; not a fresh full 24-check rerun.';fs.writeFileSync(source,JSON.stringify(original,null,2)+'\n');}
+console.log(JSON.stringify(focused,null,2));if(!focused.passed)process.exitCode=1;

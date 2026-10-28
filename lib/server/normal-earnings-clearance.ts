@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import { normalTimestamp } from "@/lib/server/normal-lifecycle-policy";
 export const NORMAL_EARNINGS_CLEARANCE_MS = 72 * 60 * 60_000;
@@ -24,6 +25,7 @@ export async function clearNormalChallengeEarnings(db: Firestore, challengeId: s
       const iso = now.toISOString();
       transaction.update(walletRef, { [bucket]: Number(wallet[bucket]) - amount, availableBalanceCents: Number(wallet.availableBalanceCents ?? 0) + amount, updatedAt: iso });
       transaction.update(credit.ref, { status: "available", balanceBucket: "available", availableAmountCents: amount, reservedAmountCents: 0, availableAt: iso, updatedAt: iso });
+      if (typeof source.userId === "string" && source.userId) queueInAppNotification(db, transaction, { eventId: `normal_clearance_${credit.id}`, userId: source.userId, type: "prize_cleared", title: "Earnings clearance recorded", message: "Eligible funds moved to your available wallet balance. Withdrawal still requires its separate authorization checks; no payout was executed.", actionUrl: "/wallet", createdAt: iso });
       transaction.create(db.collection("auditLogs").doc(`normal_clearance_${credit.id}`), { action: "normal.earning_cleared", actorId: "system_normal_lifecycle", userId: source.userId, challengeId, targetId: credit.id, amountCents: amount, before: { status: source.status }, after: { status: "available" }, providerPayoutExecuted: false, createdAt: iso });
       return true;
     });

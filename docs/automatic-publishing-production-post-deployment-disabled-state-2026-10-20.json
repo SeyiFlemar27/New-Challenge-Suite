@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-20T17:59:31.930Z",
+  "readOnly": true,
+  "productionMutations": 0,
+  "schedulerState": "PAUSED",
+  "queueEmpty": true,
+  "flags": [
+    {
+      "name": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "literalFalse": true
+    },
+    {
+      "name": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "literalFalse": true
+    }
+  ],
+  "liveEventAvailability": {
+    "creatorFundingAvailable": false,
+    "paidCheckoutAvailable": false,
+    "sponsorFundingAvailable": false,
+    "externalPayoutExecutionAvailable": false
+  },
+  "liveEventFinancialOperationsDisabled": true,
+  "passed": true
+}

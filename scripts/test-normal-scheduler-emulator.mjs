@@ -31,9 +31,14 @@ try {
   equal((await job.get()).data().status, "pending", "interrupted worker can recover after lease expiry");
   const event = db.collection("normalNotificationOutbox").doc(id);
   await event.set({ challengeId: id, creatorId: `${id}_creator`, type: "normal_voting_schedule", title: "Fixture voting", message: "Fixture full voting window", status: "pending", cursor: null });
+  await db.collection("challenges").doc(id).set({ creatorId: `${id}_creator`, status: "active", visibility: "public" });
+  await db.collection("users").doc(`${id}_creator`).set({ role: "creator", status: "active" });
   const batch = db.batch();
   for (let index = 0; index < 205; index++) batch.set(db.collection("challengeParticipants").doc(`${id}_${String(index).padStart(3, "0")}`), { challengeId: id, userId: `${id}_user_${index}`, status: "active" });
   await batch.commit();
+  const accounts = db.batch();
+  for (let index = 0; index < 205; index++) accounts.set(db.collection("users").doc(`${id}_user_${index}`), { role: "user", status: "active" });
+  await accounts.commit();
   let delivered = 0;
   for (let page = 0; page < 3; page++) delivered += (await deliverNormalNotificationOutbox(db, id)).delivered;
   equal(delivered, 206, "bounded fanout reaches every participant and creator");

@@ -11,8 +11,8 @@ export function seedLiveEventJobs(db: Firestore, tx: Transaction, eventId: strin
   wakeLiveEventJob(db, tx, eventId, createdAt);
   const start = eventTime(event.startsAt);
   if (!Number.isFinite(start)) return;
-  const configured = Array.isArray(event.liveEventReminderHours) ? event.liveEventReminderHours : [24, 1];
-  for (const hours of [24,1].filter(value => configured.includes(value))) {
+  // Essential in-app reminders cannot be disabled by legacy email preferences.
+  for (const hours of [24,1]) {
     const runAt = new Date(start - hours * 3600000).toISOString();
     if (eventTime(runAt) <= now) continue;
     const id = `reminder_${createHash("sha256").update(`${eventId}:${start}:${hours}`).digest("hex")}`;

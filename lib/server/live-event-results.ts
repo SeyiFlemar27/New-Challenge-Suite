@@ -9,7 +9,7 @@ export async function recordPhysicalEventResults(db: Firestore, input: PhysicalR
   if (input.reason.trim().length < 5 || input.reason.length > 1000 || !/^[a-zA-Z0-9_-]{8,100}$/.test(input.requestKey)) throw new LiveEventPolicyError("CONFIRMATION_REASON_REQUIRED", 422);
   const actionRef = db.collection("liveEventResultActions").doc(createHash("sha256").update(`${input.eventId}:${input.requestKey}`).digest("hex"));
   const fingerprint = createHash("sha256").update(JSON.stringify(input)).digest("hex");
-  return db.runTransaction(async tx => {
+  const outcome = await db.runTransaction(async tx => {
     const [{ event, ref, challengeRef, challengeExists }, previous] = await Promise.all([readLiveEvent(db, tx, input.eventId), tx.get(actionRef)]);
     if (previous.exists) { if (previous.data()?.fingerprint !== fingerprint) throw new LiveEventPolicyError("RESULT_REFERENCE_REUSED"); return { version: previous.data()?.version, repeated: true }; }
     const now = input.now ?? Date.now(), iso = new Date(now).toISOString();
@@ -39,7 +39,7 @@ export async function recordPhysicalEventResults(db: Firestore, input: PhysicalR
       const published = ranking.slice(0,winners).map((row,index)=>({userId:row.userId,score:row.score,placement:index+1}));
       // This records verified sporting outcomes only; it never invents a settled money transfer.
       patch = { physicalResultsVersion: version + 1, physicalJudgeCountLocked: judges, publishedPhysicalResults: published, resultsPublishedAt: iso, resultsPublishedBy: input.actorId, eventPrizeSettlementStatus: "awaiting_financial_verification", updatedAt: iso };
-      for (const row of published) tx.create(db.collection("notifications").doc(`live_result_${input.eventId}_${row.userId}`), { userId:row.userId,type:"live_event_result",title:"Your event results are ready",message:"The organizer has announced the physical competition results.",actionUrl:`/live-events/${input.eventId}`,read:false,createdAt:iso });
+      tx.create(db.collection("notificationAudienceProgress").doc(`live_results_${actionRef.id}`), { context: { kind: "live_results", id: input.eventId }, mode: "results", version: iso, status: "pending", createdAt: iso, updatedAt: iso });
       tx.create(db.collection("auditLogs").doc(`live_results_${actionRef.id}`), { actorId:input.actorId,action:"live_event.results_announced",eventId:input.eventId,before:{version},after:{version:version+1,results:published},reason:input.reason,createdAt:iso });
     }
     tx.update(ref, patch);
@@ -47,4 +47,9 @@ export async function recordPhysicalEventResults(db: Firestore, input: PhysicalR
     tx.create(actionRef,{eventId:input.eventId,actorId:input.actorId,fingerprint,version:version+1,createdAt:iso});
     return {version:version+1,repeated:false};
   });
+  if (input.action === "announce") {
+    const { deliverLiveEventResults } = await import("@/lib/server/live-event-result-notifications");
+    await deliverLiveEventResults(db, `live_results_${actionRef.id}`, new Date(input.now ?? Date.now())).catch(() => undefined);
+  }
+  return outcome;
 }

@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { wakeNormalLifecycleJob } from "@/lib/server/normal-lifecycle-outbox";
 import { dispatchConfiguredNormalLifecycle } from "@/lib/server/normal-lifecycle-scheduler";
@@ -612,6 +613,7 @@ export async function PATCH(request: Request) {
             metadata: { reason, reviewOnly: true, manualStatusUpdateOnly: true, externalPayoutExecuted: false }, createdAt: now
           });
         }
+        if (typeof record.userId === "string" && record.userId) queueInAppNotification(db, transaction, { eventId: `withdrawal_${id}_${action}_${status}`, userId: record.userId, type: "withdrawal_status", title: "Withdrawal record updated", message: `Your withdrawal record is now ${status}. Open Wallet Activity for its evidence, review status and any remaining processing. This notification does not execute a provider transfer.`, actionUrl: "/wallet", createdAt: now });
         transaction.create(db.collection("auditLogs").doc(`${id}_${action}_${status}`), { actorId: user.uid, actorType: "admin", action: `withdrawal.${action}`, targetId: id, reason: reason || note || "Withdrawal reviewed.", before: { status: previousStatus }, after: { status, payoutExecuted: false }, createdAt: now });
       });
     } else if (type === "challenge") {
@@ -665,6 +667,7 @@ export async function PATCH(request: Request) {
             if (!reason || parsed.body?.confirmed !== true) throw new Error("CONFIRMATION_AND_REASON_REQUIRED");
             if (latestChallenge.effectiveVotingStartsAt || latestChallenge.winnersApprovedAt) throw new Error("ORDINARY_CANCELLATION_AFTER_VOTING_PROHIBITED");
             Object.assign(update, { status: "cancelled", lifecycleStatus: "cancelled", approvedCancellationAt: now, approvedCancellationBy: user.uid, cancellationReason: reason, cancelledAt: now });
+            transaction.create(db.collection("normalNotificationOutbox").doc(`${id}_cancelled_${now}`), { challengeId: id, type: "challenge_cancelled", title: "Challenge cancelled", message: "Admin recorded the authorized cancellation. Any eligible refund remains subject to its own verified outcome.", status: "pending", createdAt: now });
           }
           if (action === "approve") {
             const required = Math.round(Number(latestChallenge.prizeValue ?? 0) * 100);

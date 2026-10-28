@@ -1,0 +1,144 @@
+{
+  "checkedAt": "2026-10-21T23:06:50.011Z",
+  "sha": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "origin": "https://www.challengesuite.com",
+  "productionRecordsCreated": 0,
+  "authenticatedActions": 0,
+  "financialOperationsInvoked": 0,
+  "results": [
+    {
+      "label": "Homepage",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Login",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Host protected page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Personal protected page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Explore",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Sponsor application",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Enterprise contact",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Explore API",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Explore refresh",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Sponsor introduction",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Sponsor onboarding protected page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Sponsor setup rejects anonymous request",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Sponsor profile requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Tournament listing",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Live Event operational config",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Existing public detail API",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Existing public detail page",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "label": "Profile bootstrap requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Creator dashboard requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Admin moderation requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Enterprise workspace requires authentication",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Server session rejects anonymous request",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Challenge publish rejects anonymous request",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Tournament worker rejects anonymous request",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "label": "Tournament recovery rejects anonymous request",
+      "status": 401,
+      "passed": true
+    }
+  ],
+  "passed": 25,
+  "failed": 0,
+  "skipped": 0,
+  "liveEventFinancialOperationsDisabled": true,
+  "limitations": [
+    "No authenticated Host or other account journey is certified by these anonymous probes.",
+    "No successful production publication, payment, upload or worker dispatch performed.",
+    "Cannot exclude concurrent unrelated user writes or provider operations."
+  ]
+}

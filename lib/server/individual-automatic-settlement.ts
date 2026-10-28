@@ -1,3 +1,4 @@
+import { queueInAppNotification } from "@/lib/server/notifications";
 import type { Firestore } from "firebase-admin/firestore";
 import { isIndividualTournamentPolicy } from "@/lib/individual-tournament-policy";
 import { assertIndividualSettlementClearance } from "@/lib/server/individual-settlement-clearance";
@@ -31,6 +32,7 @@ export async function clearIndividualTournamentEarnings(db: Firestore, tournamen
       if (!wallet.exists || wallet.data()?.currency !== "USD" || !Number.isSafeInteger(amount) || amount <= 0 || !Number.isSafeInteger(pending) || pending < amount || !Number.isSafeInteger(available) || available < 0 || !Number.isSafeInteger(available + amount)) throw new Error("INDIVIDUAL_CLEARANCE_BALANCE_RECONCILIATION_REQUIRED");
       transaction.update(wallet.ref, { pendingBalanceCents: pending - amount, availableBalanceCents: available + amount, updatedAt: now.toISOString() });
       transaction.update(credit.ref, { status: "available", balanceBucket: "available", availableAmountCents: amount, reservedAmountCents: 0, availableAt: now.toISOString(), updatedAt: now.toISOString() });
+      if (typeof source.userId === "string" && source.userId) queueInAppNotification(db, transaction, { eventId: `individual_clearance_${credit.id}`, userId: source.userId, type: "prize_cleared", title: "Tournament prize clearance recorded", message: "Verified eligible prize funds moved to your available wallet balance. Withdrawal remains separately authorized; no external payout was executed.", actionUrl: "/wallet", createdAt: now.toISOString() });
       transaction.create(db.collection("auditLogs").doc(`individual_clearance_${credit.id}`), { action: "individual.earning_cleared", actorId: "system_individual_settlement", userId: source.userId, tournamentId, targetId: credit.id, amountCents: amount, externalPayoutExecuted: false, createdAt: now.toISOString() });
       return true;
     });

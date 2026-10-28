@@ -5,7 +5,7 @@ import { createAuditLogRecord } from "@/lib/server/audit";
 import { operationalTaskId } from "@/lib/server/admin-operations";
 import { requireAdminPermission } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { supportNotificationRecord } from "@/lib/server/support-tickets";
+
 import { dispatchSupportEmailOutbox, supportEmailContent } from "@/lib/server/support-email";
 import { normalizeSupportTicketStatus } from "@/lib/support/catalog";
 
@@ -28,8 +28,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
   const messageRef = ticketRef.collection("messages").doc(messageId);
   const outboxRef = db.collection("supportEmailOutbox").doc(`support_reply_${messageId}`);
   const auditRef = db.collection("auditLogs").doc(`support_reply_${messageId}`);
-  const notificationId = `support_admin_reply_${createHash("sha256").update(messageId).digest("hex")}`;
-  const notificationRef = db.collection("notifications").doc(notificationId);
   const now = new Date().toISOString();
   let email = "";
   let ticketNumber = "";
@@ -45,7 +43,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
       ticketNumber = String(ticket.ticketNumber ?? ticketId);
       if (!messageSnap.exists) {
         transaction.create(messageRef, { id: messageId, authorType: "admin", authorId: user!.uid, visibility: "customer", body: parsed.data.message, createdAt: now, emailDeliveryStatus: "waiting_configuration" });
-        if (typeof ticket.userId === "string" && ticket.userId) transaction.create(notificationRef, supportNotificationRecord({ id: notificationId, userId: ticket.userId, type: "support_admin_reply", title: "Support replied", message: `Challenge Suite Support replied to ticket ${ticketNumber}.`, ticketId, createdAt: now }));
         transaction.set(ticketRef, { ...(currentStatus === "waiting_for_you" ? { status: "in_review" } : {}), lastAdminResponseAt: now, lastActivityAt: now, updatedAt: now, version: Number(ticket.version ?? 0) + 1 }, { merge: true });
         if (currentStatus === "waiting_for_you") transaction.set(db.collection("adminActionTasks").doc(operationalTaskId("support_ticket", ticketId)), { state: "in_progress", updatedAt: now }, { merge: true });
       } else duplicate = true;

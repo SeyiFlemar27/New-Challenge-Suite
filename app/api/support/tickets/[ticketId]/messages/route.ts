@@ -3,7 +3,7 @@ import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 import { operationalTaskId } from "@/lib/server/admin-operations";
 import { requireRequestUser } from "@/lib/server/auth";
 import { fail, ok, readJson, serverError, serverUnavailable, validationError } from "@/lib/server/responses";
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, mayReopenSupportTicket, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled, supportNotificationRecord } from "@/lib/server/support-tickets";
+import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_COUNT, SUPPORT_ATTACHMENT_TYPES, mayReopenSupportTicket, supportAttachmentBytesMatchType, supportAttachmentUploadsEnabled } from "@/lib/server/support-tickets";
 import { normalizeSupportTicketStatus } from "@/lib/support/catalog";
 
 export const dynamic = "force-dynamic";
@@ -43,8 +43,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
   const key = request.headers.get("idempotency-key")?.trim() || createHash("sha256").update(`${user!.uid}:${ticketId}:${body}`).digest("hex");
   const messageId = `user_${createHash("sha256").update(key).digest("hex")}`;
   const ticketRef = db.collection("supportTickets").doc(ticketId); const messageRef = ticketRef.collection("messages").doc(messageId);
-  const notificationId = `support_customer_reply_${createHash("sha256").update(messageId).digest("hex")}`;
-  const notificationRef = db.collection("notifications").doc(notificationId);
   try {
     const now = new Date().toISOString(); let duplicate = false;
     await db.runTransaction(async (transaction) => {
@@ -57,7 +55,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
       const wasResolved = status === "resolved";
       const nextStatus = wasResolved ? "open" : status === "waiting_for_you" ? "in_review" : status;
       transaction.create(messageRef, { id: messageId, authorType: "customer", authorId: user!.uid, visibility: "customer", body, attachmentPaths: paths, attachments, createdAt: now, idempotencyKeyHash: createHash("sha256").update(key).digest("hex") });
-      transaction.create(notificationRef, supportNotificationRecord({ id: notificationId, userId: user!.uid, type: wasResolved ? "support_ticket_reopened" : "support_customer_reply_saved", title: wasResolved ? "Support request reopened" : "Reply added", message: wasResolved ? "Your response reopened this request for Support." : "Your message was added to the Support conversation.", ticketId, createdAt: now }));
       transaction.set(ticketRef, { status: nextStatus, reopenedAt: wasResolved ? now : ticket.reopenedAt ?? null, lastCustomerResponseAt: now, lastActivityAt: now, updatedAt: now, version: Number(ticket.version ?? 0) + 1, resolvedAt: wasResolved ? null : ticket.resolvedAt ?? null, reopenUntil: wasResolved ? null : ticket.reopenUntil ?? null, attachments: [...(Array.isArray(ticket.attachments) ? ticket.attachments : []), ...attachments] }, { merge: true });
       const taskRef = db.collection("adminActionTasks").doc(operationalTaskId("support_ticket", ticketId));
       transaction.set(taskRef, { state: "in_progress", updatedAt: now, lastCustomerResponseAt: now }, { merge: true });

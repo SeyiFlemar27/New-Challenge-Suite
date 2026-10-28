@@ -1,0 +1,267 @@
+{
+  "log": "notification-specific-browser-canonical-text-20261028.log",
+  "processExitCode": 1,
+  "authenticationDiagnosticsOmitted": true,
+  "passed": 0,
+  "failed": 8,
+  "skipped": 26,
+  "assertions": 38,
+  "results": [
+    {
+      "name": "Notification acceptance: competitor shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Creator Plan\n\nDiscover more ways to create and manage your challenges.\n\nExplore Creator Plan\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your account settings and any",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: creator shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nCreator Studio\n\nMAIN\n\nCreator Studio\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\nSubmissions\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Host Plan\n\nExplore more tools for hosting competitions and live events.\n\nExplore Host Plan\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your acco",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: host shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nHost Control Center\n\nMAIN\n\nHost Control Center\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\nSubmissions\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: sponsor shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nBrand Command Center\n\nOVERVIEW\n\nSponsor Dashboard\nCampaigns\nProposals\n\nDISCOVER\n\nCreators\nChallenges\nSaved\n\nBILLING\n\nSponsor Reports\nWallet & Payments\nPlans\nBilling\nSettings\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: enterprise shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nEnterprise Workspace\n\nMAIN\n\nEnterprise Studio\nExplore\nSaved\n\nOPERATIONS\n\nOfficial Challenges\nAssigned to Me\n\nPERFORMANCE\n\nFinance\n\nACCOUNT\n\nProfile\nSettings\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: admin shared inbox, settings and responsive states",
+      "status": "FAIL",
+      "assertions": 6,
+      "message": "\u001b[31mTimed out 15000ms waiting for \u001b[39mexpect(locator).not.toBeVisible()\n\nLocator: getByRole('dialog', { name: 'Notifications', exact: true })\nExpected: not visible\nReceived: visible\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Notifications', exact: true })\u001b[22m\n\u001b[2m    18 × locator resolved to <section role=\"dialog\" aria-label=\"Notifications\" class=\"fixed inset-x-3 bottom-3 z-[90] max-h-[78dvh] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:w-[min(92vw,400px)]\">…</section>\u001b[22m\n\u001b[2m       - unexpected value \"visible\"\u001b[22m\n; actual notification page /notifications: Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\n1\nNotifications\n\n1 unread\n\nMark all as read\n\nAccount security update\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nJust now\nView all notifications\nSettings\nJA\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\nJust now\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: pagination, complete mark-all and retrieval states",
+      "status": "FAIL",
+      "assertions": 0,
+      "message": "Competitor journey prerequisite failed",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Notification acceptance: quiet automatic refresh, priority and account isolation",
+      "status": "FAIL",
+      "assertions": 0,
+      "message": "Competitor prerequisite failed",
+      "pageState": {
+        "url": "http://127.0.0.1:56560/explore?page=1",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\n\nJA\n\nCHALLENGE SUITE\n\nExplore Challenges\nEnter Invitation Code\n\n3 challenges on this page\n\nSearch\nTYPE\nAll types\nStandard\nPrivate\nLive Events\nTournaments\nCATEGORY\nAll categories\nFitness\nGaming\nDesign & Creative\nMusic Making\nPhotography\nFood\nEducation\nBusiness\nDevelopment & IT\nFashion & Modelling\nSTAGE\nActive stages\nRegistration\nSubmissions\nVoting\nVoting closed\nCompleted\nENTRY\nAny entry\nFree\nPaid entry\nSORT\nNewest\nMost joined\nEnding soon\nBROWSE\nTournament\nJourney Individual Tournament\n\nJourney creator\n\n0 joined\nArt\nView Tournament\nPrivate Challenge\nLocked Art Opportunity\n\nJourney creator\n\nArt\nRequest Access\nNormal Challenge\nAutumn Portrait Challenge 0a5af1\n\nJourney creator\n\n0 joined\nPhotography\n\nRegistration ends 29 Oct, 11:45\n\nJoin Challenge\nPrevious\nPage 1\nNext\nCompleted Tournaments\n\nExplore verified outcomes, brackets and Tournament history.\n\nNo completed Tournaments match these filters."
+      }
+    },
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    }
+  ],
+  "sourceStable": true,
+  "initialSourceFingerprint": "62d250aeaae81df6132d3bf9da3b2b8f1bc76d8512c2375ef9bbcf6fefe4681a",
+  "finalSourceFingerprint": "62d250aeaae81df6132d3bf9da3b2b8f1bc76d8512c2375ef9bbcf6fefe4681a",
+  "pageErrorCount": 0,
+  "screenshots": [
+    "failure-1.png",
+    "failure-2.png",
+    "failure-3.png",
+    "failure-4.png",
+    "failure-5.png",
+    "failure-6.png",
+    "failure-7.png",
+    "failure-8.png",
+    "notification-admin-failure.png",
+    "notification-competitor-failure.png",
+    "notification-creator-failure.png",
+    "notification-enterprise-failure.png",
+    "notification-host-failure.png",
+    "notification-sponsor-failure.png"
+  ]
+}

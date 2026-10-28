@@ -12,14 +12,17 @@ export async function expandLiveEventUpdate(db:Firestore,id:string){
     const bookings=await tx.get(query);
     const recipients=bookings.docs.filter(row=>["confirmed","admission_revoked"].includes(String(row.data().status))&&eventTime(row.data().createdAt)<=eventTime(update.publishedAt));
     const targets=await Promise.all(recipients.map(async booking=>{const outbox=db.collection("liveEventEmailOutbox").doc(`update_${id}_${booking.id}`);return{booking,outbox,previous:await tx.get(outbox)};}));
+    const inboxRefs=targets.map(target=>db.collection("notifications").doc(`live_update_${id}_${target.booking.data().userId}`));
+    const inboxes=inboxRefs.length?await tx.getAll(...inboxRefs):[];
     const now=new Date().toISOString();
-    for(const target of targets){
+    const writtenInboxes=new Set<string>();
+    for(const [index,target] of targets.entries()){
       if(target.previous.exists)continue;
       const source=target.booking.data();
       if(eventTime(source.materialChangePublishedAt)>eventTime(update.publishedAt))continue;
       tx.create(target.outbox,{eventId:update.eventId,bookingId:target.booking.id,userId:source.userId,type:"material_event_update",title:update.title,message:`${String(update.message)} Open the event to review the changes and refund options. Material-change refunds can be requested within seven days of notification or before the revised event begins, whichever is earlier.`,status:"pending",createdAt:now});
       if(source.materialChangeUpdateId!==id||!source.materialChangeNotifiedAt)tx.update(target.booking.ref,{materialChangeUpdateId:id,materialChangePublishedAt:update.publishedAt,materialChangeNoticeStatus:"queued",materialChangeNotifiedAt:null,updatedAt:now});
-      if(!source.guestSession)tx.set(db.collection("notifications").doc(`live_update_${id}_${source.userId}`),{userId:source.userId,type:"live_event_material_change",title:update.title,message:update.message,actionUrl:`/live-events/${update.eventId}`,read:false,createdAt:now});
+      if(!source.guestSession&&!inboxes[index].exists&&!writtenInboxes.has(inboxRefs[index].id)){tx.create(inboxRefs[index],{userId:source.userId,type:"live_event_material_change",essential:true,title:update.title,message:update.message,actionUrl:`/live-events/${update.eventId}`,read:false,status:"unread",createdAt:now});writtenInboxes.add(inboxRefs[index].id);}
     }
     const complete=bookings.size<50;
     tx.update(ref,{cursor:bookings.docs.at(-1)?.id??update.cursor??null,status:complete?"notifications_queued":"pending_notification",updatedAt:now});

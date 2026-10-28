@@ -1,0 +1,358 @@
+{
+  "log": "notification-final-unfiltered-browser-20261028.log",
+  "processExitCode": 1,
+  "authenticationDiagnosticsOmitted": true,
+  "passed": 47,
+  "failed": 5,
+  "skipped": 0,
+  "assertions": 497,
+  "results": [
+    {
+      "name": "Notification acceptance: competitor shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Notification acceptance: creator shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Notification acceptance: host shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Notification acceptance: sponsor shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 16
+    },
+    {
+      "name": "Notification acceptance: enterprise shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Notification acceptance: admin shared inbox, settings and responsive states",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Notification acceptance: pagination, complete mark-all and retrieval states",
+      "status": "FAIL",
+      "assertions": 28,
+      "message": "chronological continuation contains older real events",
+      "pageState": {
+        "url": "http://127.0.0.1:63955/notifications",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Creator Plan\n\nDiscover more ways to create and manage your challenges.\n\nExplore Creator Plan\n\n28\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\n\nLoading your updates…\n\nPrevious\nPage 2\nNext"
+      }
+    },
+    {
+      "name": "Notification acceptance: quiet automatic refresh, priority and account isolation",
+      "status": "FAIL",
+      "assertions": 1,
+      "message": "\u001b[31mTimed out 75000ms waiting for \u001b[39mexpect(locator).toHaveAccessibleName(expected)\n\nLocator: getByRole('button', { name: /^Open notifications/ })\nExpected string: \"Open notifications, 1 unread\"\nReceived string: \"Open notifications, 29 unread\"\nCall log:\n\u001b[2m  - locator._expect with timeout 75000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /^Open notifications/ })\u001b[22m\n\u001b[2m    63 × locator resolved to <button type=\"button\" aria-expanded=\"false\" aria-haspopup=\"dialog\" aria-label=\"Open notifications, 28 unread\" class=\"relative flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-500 h-11 w-11 px-0\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"Open notifications, 28 unread\"\u001b[22m\n\u001b[2m    15 × locator resolved to <button type=\"button\" aria-expanded=\"false\" aria-haspopup=\"dialog\" aria-label=\"Open notifications, 29 unread\" class=\"relative flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:border-amber-400 focus-visible:outline-2 focus-visible:outline-amber-500 h-11 w-11 px-0\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"Open notifications, 29 unread\"\u001b[22m\n",
+      "pageState": {
+        "url": "http://127.0.0.1:63955/notifications",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Creator Plan\n\nDiscover more ways to create and manage your challenges.\n\nExplore Creator Plan\n\nPriority update: Account security update\n\n29\nJN\nNotifications\n\nYour important updates, together in one place.\n\nMark All As Read\nAll updates\nUnread\nNotification settings\n\nYour latest 12 months of in-app updates. Older updates are archived; official records are preserved.\n\nCategory \nAll categories\nChallenges and events\nPayments and wallet\nAccount and security\nOptional updates\nAccount Security UpdateUnread\n1 min ago\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read\nAccount Security UpdateUnread\n1 min ago\n\nAn authorized account control was updated. Review your account settings and any verification or access requirements.\n\nView update\nMark as read\nAccount Security UpdateUnread\n1 min ago\n\nAn authorized account control was updated. Review your account settings and any verification o"
+      }
+    },
+    {
+      "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: intentional Admin access preserves personal default and server authorization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Free default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator default login under delayed profile",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Host default login under delayed profile",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Dashboard stability: Host onboarding default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Restricted default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Dashboard stability: Host legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Dashboard stability: Host logout and login again enters Host directly",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: requested action and unsafe redirects",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: verified email required before dashboard",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: protected direct navigation preserves action query at login",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 12
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 10
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "FAIL",
+      "assertions": 13,
+      "message": "locator._expect: Error: strict mode violation: getByRole('status') resolved to 2 elements:\n    1) <p role=\"status\" class=\"sr-only\" aria-live=\"polite\"></p> aka getByRole('status').filter({ hasText: /^$/ })\n    2) <p role=\"status\" class=\"text-sm\" aria-live=\"polite\">Invitation revealed for authorized sharing only.</p> aka getByText('Invitation revealed for')\n\nCall log:\n\u001b[2m  - locator._expect with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('status')\u001b[22m\n",
+      "pageState": {
+        "url": "http://127.0.0.1:63955/challenges/PP6DawBHhgOnEk6vUpg5/access",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nCreator Studio\n\nMAIN\n\nCreator Studio\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\nSubmissions\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Host Plan\n\nExplore more tools for hosting competitions and live events.\n\nExplore Host Plan\n\n2\nJM\nBack to Challenge\nPrivate Challenge Access\nShare & Manage Access\n\nControl private viewing access and review requests. Access does not reserve a place or join the challenge.\n\nAccess granted\nPending requests\nInvitation\nJoined participants\nAccess Granted — Separate From Joining\n\nA grant permits private viewing. Joining and any payment are checked separately.\n\nNo access grants on this page.\n\nPrevious Grants\nNext Grants\nAccess Requests\n\nNo access requests.\n\nPrevious Requests\nNext Requests\nJoined Participants\n\nNo joined participants. Invitation redeemers are not listed.\n\nPrevious Participants\nNext Participants\nInvitation & Visibility\nReveal Code\nCopy Code\nRegenerate Code\n\nRegeneration invalidates the previous credential. Existing access and joined participants are preserved.\n\nRevealed Invitation Code\nHide Invitation\nMake Visible On Explore\n\nVisibili"
+      }
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "PASS",
+      "assertions": 36
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "PASS",
+      "assertions": 4
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "PASS",
+      "assertions": 6
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "FAIL",
+      "assertions": 2,
+      "message": "locator.waitFor: Error: strict mode violation: getByRole('status') resolved to 2 elements:\n    1) <p role=\"status\" class=\"sr-only\" aria-live=\"polite\"></p> aka getByRole('status').filter({ hasText: /^$/ })\n    2) <p role=\"status\" class=\"mt-3 rounded-[8px] bg-emerald-950/40 p-3 text-sm font-bold text-emerald-200\">Tournament registration confirmed.</p> aka getByText('Tournament registration')\n\nCall log:\n\u001b[2m  - waiting for getByRole('status') to be visible\u001b[22m\n",
+      "pageState": {
+        "url": "http://127.0.0.1:63955/tournaments/journey_6f5bc2aaa37e477099c8b4108643c394_tournament/join",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nFree Dashboard\n\nMAIN\n\nHome\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Creator Plan\n\nDiscover more ways to create and manage your challenges.\n\nExplore Creator Plan\n\n2\nJP\nJoin Tournament\n\nRegistration is finalized by server-side eligibility, capacity, duplicate, invitation, KYC, and rules checks.\n\nJourney Individual Tournament\nEligible - Registration open\n\nOpen now\n\nEligible - Profile complete\n\nVerified when joining server-side\n\nEligible - Verification required\n\nKYC is checked server-side when required\n\nOnly provider-confirmed payments create registrations. An active checkout reserves a bracket slot for ten minutes.\n\nRegistration\n\nTournament registration confirmed.\n\nBack To Tournament"
+      }
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "PASS",
+      "assertions": 21
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "PASS",
+      "assertions": 15
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "FAIL",
+      "assertions": 20,
+      "message": "the official winner receives an in-app notification",
+      "pageState": {
+        "url": "http://127.0.0.1:63955/live-events/physical_journey_6f5bc2aaa37e477099c8b4108643c394/manage",
+        "body": "Skip to Main Content\n\nCHALLENGE SUITE\n\nCreator Starter\n\nMAIN\n\nCreator Starter\nExplore\nSaved\n\nCREATE\n\nChallenge Studio\n\nCHALLENGES\n\nMy Challenges\nMy Entries\n\nFINANCE & REWARDS\n\nEarnings\nRewards\nDoroCoins\n\nACCOUNT\n\nProfile\nSettings\nExplore Creator Plan\n\nDiscover more ways to create and manage your challenges.\n\nExplore Creator Plan\n\n1\nJC\nManage Event\n\nPhysical judging 6f5bc2aaa37e477099c8b4108643c394\n\nView Event\nOverview\nGuests & Competitors\nCheck-In\nMessages\nTickets & Earnings\nResults\nEvent Details\nRecord Physical Judges' Scores\n\nEnter every judge's confirmed score out of 10, separated by commas. Only eligible competitors who have arrived can be scored. Ties require another assessment at the venue.\n\nReason for this results action\nSecond Competitor\nPhysical judge scores for Second competitor\nSave Confirmed Scores\nFirst Competitor\nPhysical judge scores for First competitor\nSave Confirmed Scores\nReview And Announce Results\n\nPrize funds remain held until financial verification. Announcing results never claims a payout was completed.\n\nResults announced."
+      }
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "PASS",
+      "assertions": 17
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "PASS",
+      "assertions": 9
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 11
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "PASS",
+      "assertions": 18
+    }
+  ],
+  "sourceStable": true,
+  "initialSourceFingerprint": "73e920859bc314874966e5e4ece83e23ce7a712f1c9c7b82d7b96892765064db",
+  "finalSourceFingerprint": "73e920859bc314874966e5e4ece83e23ce7a712f1c9c7b82d7b96892765064db",
+  "pageErrorCount": 0,
+  "screenshots": [
+    "admin-mobile.png",
+    "automatic-attendance_only-public.png",
+    "automatic-normal-public.png",
+    "automatic-physical_competition-public.png",
+    "automatic-private-public.png",
+    "automatic-tournament-public.png",
+    "creator-explore-desktop.png",
+    "failure-32.png",
+    "failure-40.png",
+    "failure-47.png",
+    "failure-7.png",
+    "failure-8.png",
+    "host-routing-desktop.png",
+    "host-routing-mobile.png",
+    "live-event-admin-financial-review.png",
+    "live-event-creator-earnings-clearance.png",
+    "live-event-paginated-roster.png",
+    "live-event-reviewed-reschedule.png",
+    "live-event-v2-builder-attendance_only-draft.png",
+    "live-event-v2-builder-physical_competition-draft.png",
+    "live-event-v2-desktop.png",
+    "live-event-v2-mobile.png",
+    "normal-builder-mobile.png",
+    "normal-builder-tablet.png",
+    "normal-challenge-join-mobile.png",
+    "notification-admin-desktop.png",
+    "notification-admin-empty.png",
+    "notification-admin-mobile.png",
+    "notification-admin-tablet.png",
+    "notification-competitor-desktop.png",
+    "notification-competitor-empty.png",
+    "notification-competitor-mobile.png",
+    "notification-competitor-tablet.png",
+    "notification-creator-desktop.png",
+    "notification-creator-empty.png",
+    "notification-creator-mobile.png",
+    "notification-creator-tablet.png",
+    "notification-enterprise-desktop.png",
+    "notification-enterprise-empty.png",
+    "notification-enterprise-mobile.png",
+    "notification-enterprise-tablet.png",
+    "notification-host-desktop.png",
+    "notification-host-empty.png",
+    "notification-host-mobile.png",
+    "notification-host-tablet.png",
+    "notification-sponsor-desktop.png",
+    "notification-sponsor-empty.png",
+    "notification-sponsor-mobile.png",
+    "notification-sponsor-tablet.png",
+    "private-access-mobile.png",
+    "private-code-prepared.png",
+    "support-admin-ticket.png",
+    "support-customer-ticket.png",
+    "tournament-bracket-desktop.png",
+    "tournament-bracket-mobile.png",
+    "tournament-match-verified-mobile.png"
+  ]
+}
