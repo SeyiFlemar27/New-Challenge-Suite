@@ -4,7 +4,7 @@
   "head": "ccf39f987a1bea52bad13f4090bf5ff6ea29e7c5",
   "originMain": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
   "releaseBlocked": true,
-  "stagingPerformed": false,
+  "stagingPerformed": true,
   "selfHashOmitted": true,
   "files": [
     {
@@ -3380,8 +3380,8 @@
       "tracked": false,
       "disposition": "include",
       "reason": "Project specification, implementation report or sanitized acceptance evidence",
-      "bytes": 15119,
-      "sha256": "00f861435277e65cd6d738a8d12750cb1e0eea477e1dddb3c6872632af8d64e0"
+      "bytes": 17893,
+      "sha256": "3f540cb7905517d272eea733e52cd0bb5199423cd440a3e8e7ddae5aa5a56a40"
     },
     {
       "path": "docs/notification-existing-browser-results-2026-10-28.json",
@@ -4557,7 +4557,7 @@
       "disposition": "include",
       "reason": "Project specification, implementation report or sanitized acceptance evidence",
       "bytes": 10651,
-      "sha256": "1563af2a38c43f8d4f1ff79955df0cac81edad185c9c6bb0955cfbd33c999a45"
+      "sha256": "c1fadc0edc983173b7010fe194e88905977ae03db2c0242b58a233c65173c852"
     },
     {
       "path": "docs/notification-regression-phase-a-2026-10-28.json",
@@ -5759,5 +5759,16 @@
       "bytes": 1414,
       "sha256": "bfd195b6836f9da939114e91c6ec1556a2b802435c5b1c4104abcaf211516bf5"
     }
-  ]
+  ],
+  "localSourceCommit": "7592ef44d3d3a5a10a42c8c7f07159af538c7e7f",
+  "pushPerformed": false,
+  "finalReconciliation": {
+    "unaccountedLegitimateSourceFiles": [],
+    "remainingGeneratedTrackedFiles": [
+      "next-env.d.ts",
+      "tsconfig.json",
+      "tsconfig.tsbuildinfo"
+    ],
+    "remoteMain": "f6bcadb3f197d1a7f0f9341e340419775a781a9b"
+  }
 }
