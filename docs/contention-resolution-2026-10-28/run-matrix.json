@@ -1,0 +1,2499 @@
+[
+  {
+    "log": "contention-cancellation-cli15341-20261028.log",
+    "logSha256": "2e050b4c3dfb0afefb994b1da6da55df5fdc632d18d55f4c50fd0d32e7a3a438",
+    "result": {
+      "project": "demo-p0-1793194643917",
+      "selected": "scripts/test-individual-cancellation-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:39:46.679Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-gk1Vdp\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-cancellation-current-1-20261028.log",
+    "logSha256": "46fed7d4ee05329500f8a2ea456ec6b8d1a329254cf88b7d63a633f8bf06c45e",
+    "result": {
+      "project": "demo-p0-1793192461831",
+      "selected": "scripts/test-individual-cancellation-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:03:15.697Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-WPSPbl\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-cancellation-sdk9-20261028.log",
+    "logSha256": "e4d2811c891f4406ec8b40282b1f9a7cd3af1bbfd9612505d0a56ace931be1c0",
+    "result": {
+      "project": "demo-p0-1793195003808",
+      "selected": "scripts/test-individual-cancellation-emulator.mjs",
+      "exitCode": 2,
+      "completedAt": "2026-10-28T13:46:34.220Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-bi8JBm\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-cancellation-sdk9-isolated-20261028.log",
+    "logSha256": "e0037499aa0e93f5462ca2d5c158bb7c8b5aaeca2307ffe2b95eb2b5eba526e3",
+    "result": {
+      "project": "demo-p0-1793195285700",
+      "selected": "scripts/test-individual-cancellation-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:50:18.326Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-BCVyS0\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-final-backend-20261028.log",
+    "logSha256": "6d39d7ad890e5672ac33be43f8002a3d518b607741ca5c2ad925060ec089d7fe",
+    "result": null,
+    "suites": {
+      "complete": false,
+      "total": 82,
+      "results": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "startedAt": "2026-10-28T16:47:19.450Z",
+          "completedAt": "2026-10-28T16:47:48.756Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "startedAt": "2026-10-28T16:47:48.758Z",
+          "completedAt": "2026-10-28T16:47:54.601Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "startedAt": "2026-10-28T16:47:54.602Z",
+          "completedAt": "2026-10-28T16:47:59.471Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "startedAt": "2026-10-28T16:47:59.474Z",
+          "completedAt": "2026-10-28T16:48:00.913Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "startedAt": "2026-10-28T16:48:00.914Z",
+          "completedAt": "2026-10-28T16:48:11.171Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T16:48:11.173Z",
+          "completedAt": "2026-10-28T16:48:33.821Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T16:48:33.823Z",
+          "completedAt": "2026-10-28T16:48:46.723Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T16:48:46.725Z",
+          "completedAt": "2026-10-28T16:49:08.348Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T16:49:08.357Z",
+          "completedAt": "2026-10-28T16:49:18.808Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "startedAt": "2026-10-28T16:49:18.810Z",
+          "completedAt": "2026-10-28T16:49:35.677Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "startedAt": "2026-10-28T16:49:35.678Z",
+          "completedAt": "2026-10-28T16:49:40.579Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "startedAt": "2026-10-28T16:49:40.583Z",
+          "completedAt": "2026-10-28T16:49:55.040Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "startedAt": "2026-10-28T16:49:55.056Z",
+          "completedAt": "2026-10-28T16:49:55.759Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "startedAt": "2026-10-28T16:49:55.760Z",
+          "completedAt": "2026-10-28T16:49:56.620Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "startedAt": "2026-10-28T16:49:56.622Z",
+          "completedAt": "2026-10-28T16:49:59.100Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "startedAt": "2026-10-28T16:49:59.101Z",
+          "completedAt": "2026-10-28T16:50:01.696Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "startedAt": "2026-10-28T16:50:01.697Z",
+          "completedAt": "2026-10-28T16:50:07.960Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T16:50:07.961Z",
+          "completedAt": "2026-10-28T16:50:21.563Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T16:50:21.564Z",
+          "completedAt": "2026-10-28T16:50:28.135Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "startedAt": "2026-10-28T16:50:28.136Z",
+          "completedAt": "2026-10-28T16:50:33.798Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "startedAt": "2026-10-28T16:50:33.800Z",
+          "completedAt": "2026-10-28T16:50:39.107Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "startedAt": "2026-10-28T16:50:39.109Z",
+          "completedAt": "2026-10-28T16:50:50.004Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "startedAt": "2026-10-28T16:50:50.005Z",
+          "completedAt": "2026-10-28T16:50:50.333Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "startedAt": "2026-10-28T16:50:50.335Z",
+          "completedAt": "2026-10-28T16:50:57.073Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "startedAt": "2026-10-28T16:50:57.076Z",
+          "completedAt": "2026-10-28T16:50:57.704Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "startedAt": "2026-10-28T16:50:57.705Z",
+          "completedAt": "2026-10-28T16:51:04.552Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "startedAt": "2026-10-28T16:51:04.553Z",
+          "completedAt": "2026-10-28T16:51:12.933Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "startedAt": "2026-10-28T16:51:12.937Z",
+          "completedAt": "2026-10-28T16:51:21.548Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "startedAt": "2026-10-28T16:51:21.559Z",
+          "completedAt": "2026-10-28T16:51:21.851Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "startedAt": "2026-10-28T16:51:21.859Z",
+          "completedAt": "2026-10-28T16:51:23.114Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "startedAt": "2026-10-28T16:51:23.115Z",
+          "completedAt": "2026-10-28T16:51:31.784Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "startedAt": "2026-10-28T16:51:31.786Z",
+          "completedAt": "2026-10-28T16:51:32.075Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "startedAt": "2026-10-28T16:51:32.082Z",
+          "completedAt": "2026-10-28T16:51:32.382Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "startedAt": "2026-10-28T16:51:32.384Z",
+          "completedAt": "2026-10-28T16:51:50.124Z",
+          "exitCode": 1,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T16:51:50.134Z",
+          "completedAt": "2026-10-28T16:52:08.645Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "startedAt": "2026-10-28T16:52:08.652Z",
+          "completedAt": "2026-10-28T16:52:20.321Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "startedAt": "2026-10-28T16:52:20.322Z",
+          "completedAt": "2026-10-28T16:52:28.632Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "startedAt": "2026-10-28T16:52:28.632Z",
+          "completedAt": "2026-10-28T16:52:38.087Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "startedAt": "2026-10-28T16:52:38.089Z",
+          "completedAt": "2026-10-28T16:52:45.805Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "startedAt": "2026-10-28T16:52:45.808Z",
+          "completedAt": "2026-10-28T16:52:51.014Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "startedAt": "2026-10-28T16:52:51.118Z",
+          "completedAt": "2026-10-28T16:53:01.766Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "startedAt": "2026-10-28T16:53:01.768Z",
+          "completedAt": "2026-10-28T16:53:09.698Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "startedAt": "2026-10-28T16:53:09.700Z",
+          "completedAt": "2026-10-28T16:53:16.169Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "startedAt": "2026-10-28T16:53:16.171Z",
+          "completedAt": "2026-10-28T16:53:16.421Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "startedAt": "2026-10-28T16:53:16.422Z",
+          "completedAt": "2026-10-28T16:53:16.728Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "startedAt": "2026-10-28T16:53:16.730Z",
+          "completedAt": "2026-10-28T16:53:17.030Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "startedAt": "2026-10-28T16:53:17.031Z",
+          "completedAt": "2026-10-28T16:53:38.929Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "startedAt": "2026-10-28T16:53:38.931Z",
+          "completedAt": "2026-10-28T16:53:39.153Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "startedAt": "2026-10-28T16:53:39.154Z",
+          "completedAt": "2026-10-28T16:53:57.188Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "startedAt": "2026-10-28T16:53:57.190Z",
+          "completedAt": "2026-10-28T16:54:03.172Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "startedAt": "2026-10-28T16:54:03.173Z",
+          "completedAt": "2026-10-28T16:54:17.136Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "startedAt": "2026-10-28T16:54:17.141Z",
+          "completedAt": "2026-10-28T16:54:26.270Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "startedAt": "2026-10-28T16:54:26.272Z",
+          "completedAt": "2026-10-28T16:54:35.363Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "startedAt": "2026-10-28T16:54:35.366Z",
+          "completedAt": "2026-10-28T16:54:36.200Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "startedAt": "2026-10-28T16:54:36.202Z",
+          "completedAt": "2026-10-28T16:54:36.588Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "startedAt": "2026-10-28T16:54:36.590Z",
+          "completedAt": "2026-10-28T16:54:42.098Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "startedAt": "2026-10-28T16:54:42.100Z",
+          "completedAt": "2026-10-28T16:54:47.354Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "startedAt": "2026-10-28T16:54:47.356Z",
+          "completedAt": "2026-10-28T16:54:48.494Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "startedAt": "2026-10-28T16:54:48.499Z",
+          "completedAt": "2026-10-28T16:54:53.569Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "startedAt": "2026-10-28T16:54:53.571Z",
+          "completedAt": "2026-10-28T16:55:13.806Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "startedAt": "2026-10-28T16:55:13.808Z",
+          "completedAt": "2026-10-28T16:55:41.925Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "startedAt": "2026-10-28T16:55:41.929Z",
+          "completedAt": "2026-10-28T16:55:49.098Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "startedAt": "2026-10-28T16:55:49.099Z",
+          "completedAt": "2026-10-28T16:56:09.151Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T16:56:09.160Z",
+          "completedAt": "2026-10-28T16:56:27.817Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "startedAt": "2026-10-28T16:56:27.822Z",
+          "completedAt": "2026-10-28T16:56:53.461Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "startedAt": "2026-10-28T16:56:53.465Z",
+          "completedAt": "2026-10-28T16:57:14.277Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "startedAt": "2026-10-28T16:57:14.280Z",
+          "completedAt": "2026-10-28T16:57:14.851Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T16:57:14.854Z",
+          "completedAt": "2026-10-28T16:57:31.907Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "startedAt": "2026-10-28T16:57:31.909Z",
+          "completedAt": "2026-10-28T16:57:40.609Z",
+          "exitCode": 0,
+          "errorCode": null
+        }
+      ]
+    }
+  },
+  {
+    "log": "contention-final-browser-20261028.log",
+    "logSha256": "35970bc307ca9a043f9c59e1afd260b9e23b666ef10aea9a925b9efbdcbd790e",
+    "result": null,
+    "suites": null
+  },
+  {
+    "log": "contention-full-backend-cli15341-20261028.log",
+    "logSha256": "6609d04985e6bdbea6be1ed52fb07f175a5522820fef7ede9666a06f9ff9e3e6",
+    "result": {
+      "project": "demo-p0-1793194491836",
+      "selected": "scripts/run-p0-emulator-regressions.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:49:19.088Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-tAHTKV\\firebase.json"
+    },
+    "suites": {
+      "complete": true,
+      "total": 81,
+      "results": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "startedAt": "2026-10-28T13:35:22.293Z",
+          "completedAt": "2026-10-28T13:35:39.506Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "startedAt": "2026-10-28T13:35:39.507Z",
+          "completedAt": "2026-10-28T13:35:43.818Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "startedAt": "2026-10-28T13:35:43.818Z",
+          "completedAt": "2026-10-28T13:35:49.391Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "startedAt": "2026-10-28T13:35:49.392Z",
+          "completedAt": "2026-10-28T13:35:50.545Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:35:50.546Z",
+          "completedAt": "2026-10-28T13:35:59.799Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:35:59.800Z",
+          "completedAt": "2026-10-28T13:36:16.095Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:36:16.096Z",
+          "completedAt": "2026-10-28T13:36:27.205Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:36:27.208Z",
+          "completedAt": "2026-10-28T13:36:50.117Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:36:50.118Z",
+          "completedAt": "2026-10-28T13:36:54.816Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "startedAt": "2026-10-28T13:36:54.816Z",
+          "completedAt": "2026-10-28T13:37:04.365Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "startedAt": "2026-10-28T13:37:04.366Z",
+          "completedAt": "2026-10-28T13:37:05.883Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "startedAt": "2026-10-28T13:37:05.883Z",
+          "completedAt": "2026-10-28T13:37:12.815Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "startedAt": "2026-10-28T13:37:12.815Z",
+          "completedAt": "2026-10-28T13:37:13.091Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "startedAt": "2026-10-28T13:37:13.092Z",
+          "completedAt": "2026-10-28T13:37:13.459Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "startedAt": "2026-10-28T13:37:13.460Z",
+          "completedAt": "2026-10-28T13:37:14.420Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "startedAt": "2026-10-28T13:37:14.421Z",
+          "completedAt": "2026-10-28T13:37:15.462Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:37:15.463Z",
+          "completedAt": "2026-10-28T13:37:19.607Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:37:19.608Z",
+          "completedAt": "2026-10-28T13:37:30.324Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:37:30.325Z",
+          "completedAt": "2026-10-28T13:37:34.885Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "startedAt": "2026-10-28T13:37:34.886Z",
+          "completedAt": "2026-10-28T13:37:39.134Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "startedAt": "2026-10-28T13:37:39.134Z",
+          "completedAt": "2026-10-28T13:37:43.298Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:37:43.299Z",
+          "completedAt": "2026-10-28T13:37:49.883Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "startedAt": "2026-10-28T13:37:49.884Z",
+          "completedAt": "2026-10-28T13:37:50.085Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "startedAt": "2026-10-28T13:37:50.085Z",
+          "completedAt": "2026-10-28T13:37:56.586Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "startedAt": "2026-10-28T13:37:56.601Z",
+          "completedAt": "2026-10-28T13:37:57.292Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "startedAt": "2026-10-28T13:37:57.293Z",
+          "completedAt": "2026-10-28T13:38:03.425Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "startedAt": "2026-10-28T13:38:03.426Z",
+          "completedAt": "2026-10-28T13:38:09.328Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:38:09.329Z",
+          "completedAt": "2026-10-28T13:38:15.701Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "startedAt": "2026-10-28T13:38:15.703Z",
+          "completedAt": "2026-10-28T13:38:15.990Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "startedAt": "2026-10-28T13:38:15.992Z",
+          "completedAt": "2026-10-28T13:38:17.379Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "startedAt": "2026-10-28T13:38:17.382Z",
+          "completedAt": "2026-10-28T13:38:21.459Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "startedAt": "2026-10-28T13:38:21.460Z",
+          "completedAt": "2026-10-28T13:38:21.722Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "startedAt": "2026-10-28T13:38:21.723Z",
+          "completedAt": "2026-10-28T13:38:22.001Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "startedAt": "2026-10-28T13:38:22.002Z",
+          "completedAt": "2026-10-28T13:38:40.986Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:38:40.987Z",
+          "completedAt": "2026-10-28T13:38:52.144Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "startedAt": "2026-10-28T13:38:52.145Z",
+          "completedAt": "2026-10-28T13:39:01.125Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "startedAt": "2026-10-28T13:39:01.125Z",
+          "completedAt": "2026-10-28T13:39:08.202Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "startedAt": "2026-10-28T13:39:08.205Z",
+          "completedAt": "2026-10-28T13:39:15.073Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "startedAt": "2026-10-28T13:39:15.073Z",
+          "completedAt": "2026-10-28T13:39:21.280Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "startedAt": "2026-10-28T13:39:21.282Z",
+          "completedAt": "2026-10-28T13:39:25.959Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "startedAt": "2026-10-28T13:39:25.960Z",
+          "completedAt": "2026-10-28T13:39:34.402Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "startedAt": "2026-10-28T13:39:34.403Z",
+          "completedAt": "2026-10-28T13:39:39.975Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "startedAt": "2026-10-28T13:39:39.976Z",
+          "completedAt": "2026-10-28T13:39:44.499Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "startedAt": "2026-10-28T13:39:44.505Z",
+          "completedAt": "2026-10-28T13:39:44.650Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "startedAt": "2026-10-28T13:39:44.650Z",
+          "completedAt": "2026-10-28T13:39:44.812Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "startedAt": "2026-10-28T13:39:44.813Z",
+          "completedAt": "2026-10-28T13:39:44.977Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "startedAt": "2026-10-28T13:39:44.977Z",
+          "completedAt": "2026-10-28T13:39:55.834Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "startedAt": "2026-10-28T13:39:55.835Z",
+          "completedAt": "2026-10-28T13:39:55.974Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:39:55.974Z",
+          "completedAt": "2026-10-28T13:40:09.899Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "startedAt": "2026-10-28T13:40:09.899Z",
+          "completedAt": "2026-10-28T13:40:14.743Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "startedAt": "2026-10-28T13:40:14.744Z",
+          "completedAt": "2026-10-28T13:40:21.340Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "startedAt": "2026-10-28T13:40:21.343Z",
+          "completedAt": "2026-10-28T13:40:25.853Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "startedAt": "2026-10-28T13:40:25.854Z",
+          "completedAt": "2026-10-28T13:40:30.568Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "startedAt": "2026-10-28T13:40:30.569Z",
+          "completedAt": "2026-10-28T13:40:30.983Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "startedAt": "2026-10-28T13:40:30.985Z",
+          "completedAt": "2026-10-28T13:40:31.280Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "startedAt": "2026-10-28T13:40:31.281Z",
+          "completedAt": "2026-10-28T13:40:35.604Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "startedAt": "2026-10-28T13:40:35.605Z",
+          "completedAt": "2026-10-28T13:40:39.604Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "startedAt": "2026-10-28T13:40:39.605Z",
+          "completedAt": "2026-10-28T13:40:39.865Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "startedAt": "2026-10-28T13:40:39.866Z",
+          "completedAt": "2026-10-28T13:40:41.432Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "startedAt": "2026-10-28T13:40:41.432Z",
+          "completedAt": "2026-10-28T13:40:56.605Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "startedAt": "2026-10-28T13:40:56.606Z",
+          "completedAt": "2026-10-28T13:41:07.287Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:41:07.288Z",
+          "completedAt": "2026-10-28T13:41:12.248Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "startedAt": "2026-10-28T13:41:12.248Z",
+          "completedAt": "2026-10-28T13:41:35.856Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:41:35.857Z",
+          "completedAt": "2026-10-28T13:41:43.513Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "startedAt": "2026-10-28T13:41:43.516Z",
+          "completedAt": "2026-10-28T13:41:54.321Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "startedAt": "2026-10-28T13:41:54.322Z",
+          "completedAt": "2026-10-28T13:42:09.136Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "startedAt": "2026-10-28T13:42:09.142Z",
+          "completedAt": "2026-10-28T13:42:09.419Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:42:09.419Z",
+          "completedAt": "2026-10-28T13:42:19.156Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "startedAt": "2026-10-28T13:42:19.157Z",
+          "completedAt": "2026-10-28T13:42:24.884Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "startedAt": "2026-10-28T13:42:24.885Z",
+          "completedAt": "2026-10-28T13:42:30.762Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "startedAt": "2026-10-28T13:42:30.763Z",
+          "completedAt": "2026-10-28T13:42:38.863Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "startedAt": "2026-10-28T13:42:38.863Z",
+          "completedAt": "2026-10-28T13:44:20.438Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "startedAt": "2026-10-28T13:44:20.439Z",
+          "completedAt": "2026-10-28T13:45:47.384Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "startedAt": "2026-10-28T13:45:47.386Z",
+          "completedAt": "2026-10-28T13:45:53.901Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "startedAt": "2026-10-28T13:45:53.902Z",
+          "completedAt": "2026-10-28T13:46:28.892Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "startedAt": "2026-10-28T13:46:28.894Z",
+          "completedAt": "2026-10-28T13:47:03.143Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:47:03.144Z",
+          "completedAt": "2026-10-28T13:47:12.783Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "startedAt": "2026-10-28T13:47:12.784Z",
+          "completedAt": "2026-10-28T13:48:48.052Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "startedAt": "2026-10-28T13:48:48.056Z",
+          "completedAt": "2026-10-28T13:49:00.509Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "startedAt": "2026-10-28T13:49:00.509Z",
+          "completedAt": "2026-10-28T13:49:07.500Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "startedAt": "2026-10-28T13:49:07.508Z",
+          "completedAt": "2026-10-28T13:49:17.874Z",
+          "exitCode": 0,
+          "errorCode": null
+        }
+      ]
+    }
+  },
+  {
+    "log": "contention-full-backend-cli15341-repeat-20261028.log",
+    "logSha256": "83c7805510e3c19d60ac63b32a43b3da902c4392f19b3f8dbe9efef8dc5b976a",
+    "result": {
+      "project": "demo-p0-1793195457069",
+      "selected": "scripts/run-p0-emulator-regressions.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T14:06:14.372Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-N7vyLG\\firebase.json"
+    },
+    "suites": {
+      "complete": true,
+      "total": 81,
+      "results": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:25.446Z",
+          "completedAt": "2026-10-28T13:51:37.355Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:37.358Z",
+          "completedAt": "2026-10-28T13:51:43.858Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:43.859Z",
+          "completedAt": "2026-10-28T13:51:48.926Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "startedAt": "2026-10-28T13:51:48.927Z",
+          "completedAt": "2026-10-28T13:51:49.866Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:49.868Z",
+          "completedAt": "2026-10-28T13:52:00.499Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:00.501Z",
+          "completedAt": "2026-10-28T13:52:17.448Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:17.449Z",
+          "completedAt": "2026-10-28T13:52:30.561Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:30.563Z",
+          "completedAt": "2026-10-28T13:52:51.418Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:51.421Z",
+          "completedAt": "2026-10-28T13:52:56.752Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:56.753Z",
+          "completedAt": "2026-10-28T13:53:06.120Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "startedAt": "2026-10-28T13:53:06.121Z",
+          "completedAt": "2026-10-28T13:53:07.761Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "startedAt": "2026-10-28T13:53:07.762Z",
+          "completedAt": "2026-10-28T13:53:13.882Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "startedAt": "2026-10-28T13:53:13.889Z",
+          "completedAt": "2026-10-28T13:53:14.378Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "startedAt": "2026-10-28T13:53:14.379Z",
+          "completedAt": "2026-10-28T13:53:14.966Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "startedAt": "2026-10-28T13:53:14.967Z",
+          "completedAt": "2026-10-28T13:53:16.361Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "startedAt": "2026-10-28T13:53:16.362Z",
+          "completedAt": "2026-10-28T13:53:17.765Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:53:17.771Z",
+          "completedAt": "2026-10-28T13:53:22.055Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:53:22.056Z",
+          "completedAt": "2026-10-28T13:53:36.672Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:53:36.673Z",
+          "completedAt": "2026-10-28T13:53:41.941Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "startedAt": "2026-10-28T13:53:41.942Z",
+          "completedAt": "2026-10-28T13:53:46.288Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "startedAt": "2026-10-28T13:53:46.290Z",
+          "completedAt": "2026-10-28T13:53:51.497Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:53:51.498Z",
+          "completedAt": "2026-10-28T13:54:02.538Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "startedAt": "2026-10-28T13:54:02.541Z",
+          "completedAt": "2026-10-28T13:54:02.836Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "startedAt": "2026-10-28T13:54:02.837Z",
+          "completedAt": "2026-10-28T13:54:11.992Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "startedAt": "2026-10-28T13:54:11.995Z",
+          "completedAt": "2026-10-28T13:54:12.713Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "startedAt": "2026-10-28T13:54:12.715Z",
+          "completedAt": "2026-10-28T13:54:20.905Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "startedAt": "2026-10-28T13:54:20.907Z",
+          "completedAt": "2026-10-28T13:54:29.207Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:54:29.211Z",
+          "completedAt": "2026-10-28T13:54:35.631Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "startedAt": "2026-10-28T13:54:35.632Z",
+          "completedAt": "2026-10-28T13:54:35.773Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "startedAt": "2026-10-28T13:54:35.774Z",
+          "completedAt": "2026-10-28T13:54:36.221Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "startedAt": "2026-10-28T13:54:36.222Z",
+          "completedAt": "2026-10-28T13:54:39.386Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "startedAt": "2026-10-28T13:54:39.387Z",
+          "completedAt": "2026-10-28T13:54:39.657Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "startedAt": "2026-10-28T13:54:39.658Z",
+          "completedAt": "2026-10-28T13:54:39.829Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "startedAt": "2026-10-28T13:54:39.830Z",
+          "completedAt": "2026-10-28T13:54:54.460Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:54:54.463Z",
+          "completedAt": "2026-10-28T13:55:07.323Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "startedAt": "2026-10-28T13:55:07.324Z",
+          "completedAt": "2026-10-28T13:55:16.275Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "startedAt": "2026-10-28T13:55:16.277Z",
+          "completedAt": "2026-10-28T13:55:24.721Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "startedAt": "2026-10-28T13:55:24.722Z",
+          "completedAt": "2026-10-28T13:55:36.836Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "startedAt": "2026-10-28T13:55:36.839Z",
+          "completedAt": "2026-10-28T13:55:46.630Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "startedAt": "2026-10-28T13:55:46.632Z",
+          "completedAt": "2026-10-28T13:55:53.289Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "startedAt": "2026-10-28T13:55:53.290Z",
+          "completedAt": "2026-10-28T13:56:02.238Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "startedAt": "2026-10-28T13:56:02.240Z",
+          "completedAt": "2026-10-28T13:56:08.445Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "startedAt": "2026-10-28T13:56:08.446Z",
+          "completedAt": "2026-10-28T13:56:13.492Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "startedAt": "2026-10-28T13:56:13.493Z",
+          "completedAt": "2026-10-28T13:56:13.791Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "startedAt": "2026-10-28T13:56:13.793Z",
+          "completedAt": "2026-10-28T13:56:14.129Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "startedAt": "2026-10-28T13:56:14.132Z",
+          "completedAt": "2026-10-28T13:56:14.473Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "startedAt": "2026-10-28T13:56:14.474Z",
+          "completedAt": "2026-10-28T13:56:36.438Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "startedAt": "2026-10-28T13:56:36.441Z",
+          "completedAt": "2026-10-28T13:56:36.809Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:56:36.812Z",
+          "completedAt": "2026-10-28T13:56:55.099Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "startedAt": "2026-10-28T13:56:55.115Z",
+          "completedAt": "2026-10-28T13:57:04.964Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "startedAt": "2026-10-28T13:57:04.966Z",
+          "completedAt": "2026-10-28T13:57:14.286Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "startedAt": "2026-10-28T13:57:14.287Z",
+          "completedAt": "2026-10-28T13:57:19.148Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "startedAt": "2026-10-28T13:57:19.150Z",
+          "completedAt": "2026-10-28T13:57:26.970Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "startedAt": "2026-10-28T13:57:26.971Z",
+          "completedAt": "2026-10-28T13:57:27.819Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "startedAt": "2026-10-28T13:57:27.820Z",
+          "completedAt": "2026-10-28T13:57:28.315Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:28.317Z",
+          "completedAt": "2026-10-28T13:57:33.254Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:33.256Z",
+          "completedAt": "2026-10-28T13:57:38.294Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "startedAt": "2026-10-28T13:57:38.295Z",
+          "completedAt": "2026-10-28T13:57:38.748Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "startedAt": "2026-10-28T13:57:38.749Z",
+          "completedAt": "2026-10-28T13:57:41.622Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:41.623Z",
+          "completedAt": "2026-10-28T13:58:01.820Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:01.821Z",
+          "completedAt": "2026-10-28T13:58:10.484Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:10.485Z",
+          "completedAt": "2026-10-28T13:58:15.837Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:15.838Z",
+          "completedAt": "2026-10-28T13:58:28.337Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:28.338Z",
+          "completedAt": "2026-10-28T13:58:40.865Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:40.865Z",
+          "completedAt": "2026-10-28T13:58:48.767Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:48.768Z",
+          "completedAt": "2026-10-28T13:59:04.896Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "startedAt": "2026-10-28T13:59:04.897Z",
+          "completedAt": "2026-10-28T13:59:05.424Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:05.426Z",
+          "completedAt": "2026-10-28T13:59:16.256Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:16.257Z",
+          "completedAt": "2026-10-28T13:59:22.461Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:22.463Z",
+          "completedAt": "2026-10-28T13:59:30.158Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:30.158Z",
+          "completedAt": "2026-10-28T13:59:41.953Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:41.960Z",
+          "completedAt": "2026-10-28T14:01:29.135Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "startedAt": "2026-10-28T14:01:29.138Z",
+          "completedAt": "2026-10-28T14:02:59.517Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "startedAt": "2026-10-28T14:02:59.519Z",
+          "completedAt": "2026-10-28T14:03:04.695Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "startedAt": "2026-10-28T14:03:04.696Z",
+          "completedAt": "2026-10-28T14:03:36.169Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "startedAt": "2026-10-28T14:03:36.171Z",
+          "completedAt": "2026-10-28T14:04:08.224Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T14:04:08.230Z",
+          "completedAt": "2026-10-28T14:04:20.045Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "startedAt": "2026-10-28T14:04:20.045Z",
+          "completedAt": "2026-10-28T14:05:49.025Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "startedAt": "2026-10-28T14:05:49.026Z",
+          "completedAt": "2026-10-28T14:06:00.310Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "startedAt": "2026-10-28T14:06:00.311Z",
+          "completedAt": "2026-10-28T14:06:04.919Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "startedAt": "2026-10-28T14:06:04.920Z",
+          "completedAt": "2026-10-28T14:06:13.354Z",
+          "exitCode": 0,
+          "errorCode": null
+        }
+      ]
+    }
+  },
+  {
+    "log": "contention-full-backend-current-20261028.log",
+    "logSha256": "1b67b72768c67b9bddc594f2333a3d07e3bcd7da7f88ea51ca0f0f8d9d37f19d",
+    "result": {
+      "project": "demo-p0-1793194068762",
+      "selected": "scripts/run-p0-emulator-regressions.mjs",
+      "exitCode": 1,
+      "completedAt": "2026-10-28T13:29:19.314Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-oBTYOD\\firebase.json"
+    },
+    "suites": {
+      "complete": false,
+      "total": 81,
+      "results": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "startedAt": "2026-10-28T13:28:14.160Z",
+          "completedAt": "2026-10-28T13:28:37.413Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "startedAt": "2026-10-28T13:28:37.414Z",
+          "completedAt": "2026-10-28T13:28:41.621Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "startedAt": "2026-10-28T13:28:41.622Z",
+          "completedAt": "2026-10-28T13:28:45.709Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "startedAt": "2026-10-28T13:28:45.709Z",
+          "completedAt": "2026-10-28T13:28:46.333Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:28:46.333Z",
+          "completedAt": "2026-10-28T13:28:56.210Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:28:56.211Z",
+          "completedAt": "2026-10-28T13:29:18.348Z",
+          "exitCode": 1,
+          "errorCode": null
+        }
+      ]
+    }
+  },
+  {
+    "log": "contention-full-backend-current-complete-20261028.log",
+    "logSha256": "ba6a6fa4a37c2b0182b9087167d7b21c6ca575cba634a65a177002d75575a401",
+    "result": {
+      "project": "demo-p0-1793194902032",
+      "selected": "scripts/run-p0-emulator-regressions.mjs",
+      "exitCode": 2,
+      "completedAt": "2026-10-28T13:44:38.231Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-hjOtkm\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-full-backend-current-isolated-20261028.log",
+    "logSha256": "16cbc90d6c34f4f3795f0f13a7119f16da37b021dfd26d1f04034417cd405326",
+    "result": {
+      "project": "demo-p0-1793195369044",
+      "selected": "scripts/run-p0-emulator-regressions.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T14:04:54.369Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-Np1nNx\\firebase.json"
+    },
+    "suites": {
+      "complete": true,
+      "total": 81,
+      "results": [
+        {
+          "test": "scripts/test-notification-completion-emulator.mjs",
+          "startedAt": "2026-10-28T13:49:50.678Z",
+          "completedAt": "2026-10-28T13:50:02.560Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-notification-inbox-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:02.562Z",
+          "completedAt": "2026-10-28T13:50:07.133Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-notification-reminders-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:07.134Z",
+          "completedAt": "2026-10-28T13:50:11.624Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-base-prize-policy.mjs",
+          "startedAt": "2026-10-28T13:50:11.625Z",
+          "completedAt": "2026-10-28T13:50:12.257Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-review-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:12.259Z",
+          "completedAt": "2026-10-28T13:50:25.064Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:25.065Z",
+          "completedAt": "2026-10-28T13:50:40.334Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:40.334Z",
+          "completedAt": "2026-10-28T13:50:49.998Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-financial-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:50:49.999Z",
+          "completedAt": "2026-10-28T13:51:11.523Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:11.525Z",
+          "completedAt": "2026-10-28T13:51:16.668Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-scheduler-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:16.668Z",
+          "completedAt": "2026-10-28T13:51:27.162Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-normal-qualified-prizes.mjs",
+          "startedAt": "2026-10-28T13:51:27.163Z",
+          "completedAt": "2026-10-28T13:51:29.492Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-edit-handler-emulator.mjs",
+          "startedAt": "2026-10-28T13:51:29.493Z",
+          "completedAt": "2026-10-28T13:51:37.590Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-submission-resubmission-policy.mjs",
+          "startedAt": "2026-10-28T13:51:37.592Z",
+          "completedAt": "2026-10-28T13:51:38.313Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-reservation-policy.mjs",
+          "startedAt": "2026-10-28T13:51:38.314Z",
+          "completedAt": "2026-10-28T13:51:39.027Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-exposure.mjs",
+          "startedAt": "2026-10-28T13:51:39.028Z",
+          "completedAt": "2026-10-28T13:51:40.945Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-revenue-foundation-ownership.mjs",
+          "startedAt": "2026-10-28T13:51:40.947Z",
+          "completedAt": "2026-10-28T13:51:43.591Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-pool-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:51:43.592Z",
+          "completedAt": "2026-10-28T13:51:48.980Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-prize-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:51:48.982Z",
+          "completedAt": "2026-10-28T13:52:01.224Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-active-cap-concurrency.mjs",
+          "startedAt": "2026-10-28T13:52:01.225Z",
+          "completedAt": "2026-10-28T13:52:07.497Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-review-authorization.mjs",
+          "startedAt": "2026-10-28T13:52:07.519Z",
+          "completedAt": "2026-10-28T13:52:12.644Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-refund-settlement-lock.mjs",
+          "startedAt": "2026-10-28T13:52:12.645Z",
+          "completedAt": "2026-10-28T13:52:16.702Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:52:16.706Z",
+          "completedAt": "2026-10-28T13:52:25.685Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-storage-rules-document-access-limit.mjs",
+          "startedAt": "2026-10-28T13:52:25.687Z",
+          "completedAt": "2026-10-28T13:52:25.908Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-delivery-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:25.909Z",
+          "completedAt": "2026-10-28T13:52:34.175Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-media-serialization.mjs",
+          "startedAt": "2026-10-28T13:52:34.177Z",
+          "completedAt": "2026-10-28T13:52:34.859Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-comments-route.mjs",
+          "startedAt": "2026-10-28T13:52:34.861Z",
+          "completedAt": "2026-10-28T13:52:41.156Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-challenge-leaderboard-emulator.mjs",
+          "startedAt": "2026-10-28T13:52:41.157Z",
+          "completedAt": "2026-10-28T13:52:47.093Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-upload-storage-rules.mjs",
+          "startedAt": "2026-10-28T13:52:47.094Z",
+          "completedAt": "2026-10-28T13:52:53.833Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-ownership-migration.mjs",
+          "startedAt": "2026-10-28T13:52:53.834Z",
+          "completedAt": "2026-10-28T13:52:54.065Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-authoritative-media-verification.mjs",
+          "startedAt": "2026-10-28T13:52:54.066Z",
+          "completedAt": "2026-10-28T13:52:54.824Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-verification-reuse.mjs",
+          "startedAt": "2026-10-28T13:52:54.825Z",
+          "completedAt": "2026-10-28T13:52:56.594Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-method-enforcement.mjs",
+          "startedAt": "2026-10-28T13:52:56.594Z",
+          "completedAt": "2026-10-28T13:52:56.828Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-proposal-retirement.mjs",
+          "startedAt": "2026-10-28T13:52:56.829Z",
+          "completedAt": "2026-10-28T13:52:57.088Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-payment-return-routes.mjs",
+          "startedAt": "2026-10-28T13:52:57.089Z",
+          "completedAt": "2026-10-28T13:53:11.347Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-paid-entry-emulator.mjs",
+          "startedAt": "2026-10-28T13:53:11.348Z",
+          "completedAt": "2026-10-28T13:53:28.830Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-cloud-tasks.mjs",
+          "startedAt": "2026-10-28T13:53:28.830Z",
+          "completedAt": "2026-10-28T13:53:37.206Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-runtime-verification-emulator.mjs",
+          "startedAt": "2026-10-28T13:53:37.206Z",
+          "completedAt": "2026-10-28T13:53:43.864Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-sponsor-disputes-emulator.mjs",
+          "startedAt": "2026-10-28T13:53:43.865Z",
+          "completedAt": "2026-10-28T13:53:53.395Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-stripe-webhook-route-paid-vote.mjs",
+          "startedAt": "2026-10-28T13:53:53.401Z",
+          "completedAt": "2026-10-28T13:54:03.885Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-enterprise-finance-route.mjs",
+          "startedAt": "2026-10-28T13:54:03.888Z",
+          "completedAt": "2026-10-28T13:54:12.543Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-access-requests-route.mjs",
+          "startedAt": "2026-10-28T13:54:12.544Z",
+          "completedAt": "2026-10-28T13:54:23.175Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-privacy-route.mjs",
+          "startedAt": "2026-10-28T13:54:23.178Z",
+          "completedAt": "2026-10-28T13:54:31.465Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-persistence-route.mjs",
+          "startedAt": "2026-10-28T13:54:31.467Z",
+          "completedAt": "2026-10-28T13:54:36.919Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-auth-session-cookie-refresh-without-login-loop.mjs",
+          "startedAt": "2026-10-28T13:54:36.920Z",
+          "completedAt": "2026-10-28T13:54:37.096Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-lifecycle-contracts.mjs",
+          "startedAt": "2026-10-28T13:54:37.096Z",
+          "completedAt": "2026-10-28T13:54:37.537Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-management-ui-contracts.mjs",
+          "startedAt": "2026-10-28T13:54:37.538Z",
+          "completedAt": "2026-10-28T13:54:37.740Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-route.mjs",
+          "startedAt": "2026-10-28T13:54:37.741Z",
+          "completedAt": "2026-10-28T13:54:50.923Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-voting-judging.mjs",
+          "startedAt": "2026-10-28T13:54:50.924Z",
+          "completedAt": "2026-10-28T13:54:51.092Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-sponsor-agreement-lifecycle.mjs",
+          "startedAt": "2026-10-28T13:54:51.092Z",
+          "completedAt": "2026-10-28T13:55:08.820Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-settlement-blocks-pending-sponsor-reservations.mjs",
+          "startedAt": "2026-10-28T13:55:08.822Z",
+          "completedAt": "2026-10-28T13:55:14.619Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-discovery-analytics-scalability.mjs",
+          "startedAt": "2026-10-28T13:55:14.621Z",
+          "completedAt": "2026-10-28T13:55:22.474Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-dedicated-discovery-pagination.mjs",
+          "startedAt": "2026-10-28T13:55:22.476Z",
+          "completedAt": "2026-10-28T13:55:27.538Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-admin-support-workflows.mjs",
+          "startedAt": "2026-10-28T13:55:27.539Z",
+          "completedAt": "2026-10-28T13:55:36.902Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-new-policy.mjs",
+          "startedAt": "2026-10-28T13:55:36.907Z",
+          "completedAt": "2026-10-28T13:55:37.801Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-route-policy.mjs",
+          "startedAt": "2026-10-28T13:55:37.802Z",
+          "completedAt": "2026-10-28T13:55:38.267Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-draft-adoption-emulator.mjs",
+          "startedAt": "2026-10-28T13:55:38.268Z",
+          "completedAt": "2026-10-28T13:55:43.583Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-public-team-emulator.mjs",
+          "startedAt": "2026-10-28T13:55:43.591Z",
+          "completedAt": "2026-10-28T13:55:50.336Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination.mjs",
+          "startedAt": "2026-10-28T13:55:50.338Z",
+          "completedAt": "2026-10-28T13:55:51.065Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-allocation.mjs",
+          "startedAt": "2026-10-28T13:55:51.066Z",
+          "completedAt": "2026-10-28T13:55:54.544Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-vote-pagination-emulator.mjs",
+          "startedAt": "2026-10-28T13:55:54.545Z",
+          "completedAt": "2026-10-28T13:56:12.175Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-automatic-results-emulator.mjs",
+          "startedAt": "2026-10-28T13:56:12.177Z",
+          "completedAt": "2026-10-28T13:56:23.744Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-creator-funding-emulator.mjs",
+          "startedAt": "2026-10-28T13:56:23.750Z",
+          "completedAt": "2026-10-28T13:56:29.344Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-member-payments-emulator.mjs",
+          "startedAt": "2026-10-28T13:56:29.346Z",
+          "completedAt": "2026-10-28T13:56:45.743Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T13:56:45.754Z",
+          "completedAt": "2026-10-28T13:56:55.629Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-submission-media-emulator.mjs",
+          "startedAt": "2026-10-28T13:56:55.638Z",
+          "completedAt": "2026-10-28T13:57:17.293Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-automatic-voting-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:17.294Z",
+          "completedAt": "2026-10-28T13:57:31.128Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-cutoff.mjs",
+          "startedAt": "2026-10-28T13:57:31.131Z",
+          "completedAt": "2026-10-28T13:57:31.580Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-sponsor-lifecycle-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:31.581Z",
+          "completedAt": "2026-10-28T13:57:44.495Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-notifications-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:44.497Z",
+          "completedAt": "2026-10-28T13:57:58.276Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-first-voting-cutoff-emulator.mjs",
+          "startedAt": "2026-10-28T13:57:58.277Z",
+          "completedAt": "2026-10-28T13:58:03.509Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-team-entitlements-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:03.510Z",
+          "completedAt": "2026-10-28T13:58:11.798Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-tournament-complete-lifecycles-emulator.mjs",
+          "startedAt": "2026-10-28T13:58:11.799Z",
+          "completedAt": "2026-10-28T13:59:56.373Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-live-event-admission-emulator.mjs",
+          "startedAt": "2026-10-28T13:59:56.396Z",
+          "completedAt": "2026-10-28T14:01:38.621Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-media-publish-handlers-emulator.mjs",
+          "startedAt": "2026-10-28T14:01:38.630Z",
+          "completedAt": "2026-10-28T14:01:45.009Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-publishing-review-emulator.mjs",
+          "startedAt": "2026-10-28T14:01:45.010Z",
+          "completedAt": "2026-10-28T14:02:16.782Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-recovery-emulator.mjs",
+          "startedAt": "2026-10-28T14:02:16.800Z",
+          "completedAt": "2026-10-28T14:02:50.617Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-automatic-settlement-emulator.mjs",
+          "startedAt": "2026-10-28T14:02:50.618Z",
+          "completedAt": "2026-10-28T14:03:03.843Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-cancellation-emulator.mjs",
+          "startedAt": "2026-10-28T14:03:03.843Z",
+          "completedAt": "2026-10-28T14:04:27.704Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-individual-correction-emulator.mjs",
+          "startedAt": "2026-10-28T14:04:27.705Z",
+          "completedAt": "2026-10-28T14:04:39.479Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-my-tournaments-emulator.mjs",
+          "startedAt": "2026-10-28T14:04:39.485Z",
+          "completedAt": "2026-10-28T14:04:44.273Z",
+          "exitCode": 0,
+          "errorCode": null
+        },
+        {
+          "test": "scripts/test-private-v2-access-emulator.mjs",
+          "startedAt": "2026-10-28T14:04:44.274Z",
+          "completedAt": "2026-10-28T14:04:53.082Z",
+          "exitCode": 0,
+          "errorCode": null
+        }
+      ]
+    }
+  },
+  {
+    "log": "contention-integrity-121-20261028.log",
+    "logSha256": "19dda4a629eb4f143663130cae665e23892f500e303e5c9ec1ce31e5d6dfe702",
+    "result": {
+      "project": "demo-p0-1793195815833",
+      "selected": "scripts/test-firestore-conflict-integrity-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:57:53.921Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-BmISE2\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-integrity-122-20261028.log",
+    "logSha256": "7b0b54c33e2fae97347cab9b7c6afdd297037ba07403e78ee19eacbc0272a9c4",
+    "result": {
+      "project": "demo-p0-1793195776261",
+      "selected": "scripts/test-firestore-conflict-integrity-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:57:10.507Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-8U0yU5\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-cli15224-sdk9-1-20261028.log",
+    "logSha256": "a80cacd550c2e4d504d6d4412ab7a69ac8b0e8ca4999be7b147eb5f1df3dd148",
+    "result": null,
+    "suites": null
+  },
+  {
+    "log": "contention-native-cli15224-sdk9-retry-20261028.log",
+    "logSha256": "6a992693d73f37e272182ca94cf86d7b1f8e0ff6adeb31c12e57ed9ade08136a",
+    "result": {
+      "project": "demo-p0-1793193769716",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:24:58.021Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-JmWthc\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-cli15341-sdk7-1-20261028.log",
+    "logSha256": "ec0f0e17bf7f07813dac5c3a527499601cea96c51b414e9594c1feeaa8557d43",
+    "result": {
+      "project": "demo-p0-1793192584621",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 2,
+      "completedAt": "2026-10-28T13:07:01.604Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-dgm4vL\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-cli15341-sdk7-200-20261028.log",
+    "logSha256": "1a51b513c263414beeae228315a7b61b7721d7eace9e50c6ddcbe9b515ed02cd",
+    "result": {
+      "project": "demo-p0-1793195502876",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T14:04:59.689Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-wR0Jzr\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-cli15341-sdk7-retry-20261028.log",
+    "logSha256": "4f02b14cab78b72687681e698339e6bde4f7f6b936f216f6e7052c41dc68d91f",
+    "result": {
+      "project": "demo-p0-1793193623898",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:32:40.710Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-rPw512\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-current-1-20261028.log",
+    "logSha256": "2c744348b87f0ac28102f1f2972768f3a811206f9f86f6fe3f9373e8e12e2c76",
+    "result": {
+      "project": "demo-p0-1793192295345",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:00:41.806Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-W0Aeqb\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-current-2-20261028.log",
+    "logSha256": "fa439f4dc5d6f1ee3ebbdca5143264eac3420a1af911a447a9c816a43fa6e1e7",
+    "result": {
+      "project": "demo-p0-1793192584942",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:05:09.660Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-Y3jOPM\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-current-200-20261028.log",
+    "logSha256": "457f9b095fadf626e5ef7a23dfd933cf9f288e34801c5c2bee628562f8c9b995",
+    "result": {
+      "project": "demo-p0-1793195963910",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 1,
+      "completedAt": "2026-10-28T14:03:23.265Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-VIOyuI\\firebase.json"
+    },
+    "suites": null
+  },
+  {
+    "log": "contention-native-current-3-20261028.log",
+    "logSha256": "102be47d51591f3681fcba4bfca11286b1dcedfeed4ae32279b3daea6893bb86",
+    "result": {
+      "project": "demo-p0-1793193874023",
+      "selected": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "exitCode": 0,
+      "completedAt": "2026-10-28T13:26:50.843Z",
+      "configPath": "C:\\Users\\seyia\\AppData\\Local\\Temp\\challenge-suite-p0-isolated-GgU7qV\\firebase.json"
+    },
+    "suites": null
+  }
+]

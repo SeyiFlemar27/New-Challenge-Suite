@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getStripe } from "@/lib/stripe";
 import { writeAuditLog } from "@/lib/server/audit";
@@ -32,7 +33,15 @@ async function handleLiveEventRefund(request:Request,db:NonNullable<ReturnType<t
 }
 
 const PAYMENT_COLLECTIONS = ["challengeEntryPayments", "paidVotePurchases", "sponsorContributions", "creatorPrizeFundingPayments", "predictionPayments", "doroCoinPurchases", "tournamentEntryPayments"] as const;
-const createSchema = z.object({ paymentCollection: z.enum(PAYMENT_COLLECTIONS), paymentId: z.string().min(1).max(180), reason: z.string().trim().min(8).max(1000) });
+const createSchema = z.object({
+  paymentCollection: z.enum(PAYMENT_COLLECTIONS),
+  paymentId: z.string().min(1).max(1500).refine(value =>
+    Buffer.from(value, "utf8").toString("utf8") === value && !value.includes("/") && value !== "." && value !== ".." && !/^__.*__$/.test(value),
+  "Payment reference must be a single valid document ID."),
+  reason: z.string().trim().min(8).max(1000),
+}).refine(value => Buffer.byteLength(`refund_refund_${value.paymentCollection}_${value.paymentId}`, "utf8") <= 1500
+  && `refund_${value.paymentCollection}_${value.paymentId}`.length <= 500,
+  "Payment reference exceeds the refund ledger or provider metadata limit.");
 const executeSchema = z.object({ refundCaseId: z.string().min(1), action: z.enum(["approve", "reject", "execute"]), reason: z.string().trim().min(8).max(1000),confirmed:z.boolean().optional() });
 
 export async function GET(request: Request) { const { response } = await requireAdminPermission(request, "refunds.request"); if (response) return response; const db = getAdminDb(); if (!db) return serverUnavailable("Refunds"); const snap = await db.collection("refundCases").orderBy("createdAt", "desc").limit(200).get(); const result=ok({ refunds: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),partialRefundsEnabled:false,liveEventRefundExecutionAvailable:process.env.LIVE_EVENT_AUTOMATIC_REFUNDS_ENABLED==="true"&&Boolean(getStripe()),hasMore:snap.size===200 });result.headers.set("Cache-Control","private, no-store");return result; }
@@ -110,7 +119,7 @@ export async function PATCH(request: Request) {
     }
     let result: Awaited<ReturnType<typeof stripe.refunds.create>>;
     try {
-      result = await stripe.refunds.create({ payment_intent: paymentIntent, reason: "requested_by_customer", metadata: record.normalLifecyclePolicyVersion === 1 ? { refundCaseId: ref.id } : { refundCaseId: ref.id, adminReason: parsed.data.reason.slice(0, 450) } }, { idempotencyKey: `challenge-suite-refund-${ref.id}` });
+      result = await stripe.refunds.create({ payment_intent: paymentIntent, reason: "requested_by_customer", metadata: record.normalLifecyclePolicyVersion === 1 ? { refundCaseId: ref.id } : { refundCaseId: ref.id, adminReason: parsed.data.reason.slice(0, 450) } }, { idempotencyKey: ref.id.length + "challenge-suite-refund-".length <= 255 ? `challenge-suite-refund-${ref.id}` : `challenge-suite-refund-sha256-${createHash("sha256").update(ref.id).digest("hex")}` });
     } catch (error) {
       if (enterpriseRefundClaim) await releaseEnterpriseRefundLock(db, { refundCaseId: ref.id, challengeId: enterpriseRefundClaim.challengeId, refundStatus: "approved", providerStatus: "provider_call_failed", now });
       throw error;

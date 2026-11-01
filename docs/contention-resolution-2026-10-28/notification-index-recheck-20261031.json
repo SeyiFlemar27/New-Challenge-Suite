@@ -1,0 +1,180 @@
+{
+  "checkedAt": "2026-10-31T21:52:52.444Z",
+  "project": "challenge-suite",
+  "readOnly": true,
+  "analyze": false,
+  "documentQueriesExecuted": 0,
+  "productionWrites": 0,
+  "results": [
+    {
+      "name": "statusHistory",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, status ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "readHistory",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, read ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "history",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "unreadHistory",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, status ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        },
+        {
+          "properties": "(userId ASC, read ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "unreadCount",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, status ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        },
+        {
+          "properties": "(userId ASC, read ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "archivedUnreadCount",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, status ASC, read ASC, createdAt DESC, __name__ DESC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "markAllPage",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "inboxRecovery",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(status ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        },
+        {
+          "query_scope": "Collection",
+          "properties": "(status ASC, __name__ ASC)"
+        }
+      ]
+    },
+    {
+      "name": "audienceRecovery",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(status ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "normalRecovery",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(status ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "normalAudience",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "query_scope": "Collection",
+          "properties": "(challengeId ASC, __name__ ASC)"
+        }
+      ]
+    },
+    {
+      "name": "voterChallengePage",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(challengeId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "voterMatchPage",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(matchId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "personalParticipant",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        },
+        {
+          "properties": "(challengeId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        }
+      ]
+    },
+    {
+      "name": "tournamentParticipant",
+      "status": "PLANNED",
+      "indexesUsed": [
+        {
+          "properties": "(userId ASC, __name__ ASC)",
+          "query_scope": "Collection"
+        },
+        {
+          "query_scope": "Collection",
+          "properties": "(tournamentId ASC, __name__ ASC)"
+        }
+      ]
+    }
+  ]
+}

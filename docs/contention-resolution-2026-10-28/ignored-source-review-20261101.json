@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-01T09:27:51.810Z",
+  "directories": [
+    "app",
+    "components",
+    "lib",
+    "hooks",
+    "scripts",
+    "public",
+    "docs"
+  ],
+  "ignoredPaths": 0,
+  "possibleSource": []
+}

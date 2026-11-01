@@ -1,0 +1,4306 @@
+{
+  "capturedAt": "2026-11-01T15:46:09.725Z",
+  "head": "8199cd7cc8ced7240ae03e805f24d8fd0c8ab9b6",
+  "originMain": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "localCommits": [
+    "8199cd7cc8ced7240ae03e805f24d8fd0c8ab9b6 docs: record notification acceptance and blocked main release",
+    "7592ef44d3d3a5a10a42c8c7f07159af538c7e7f feat: preserve notification completion and master work with contention release gate open",
+    "ccf39f987a1bea52bad13f4090bf5ff6ea29e7c5 wip: preserve master implementation and global tournament priority"
+  ],
+  "files": [
+    {
+      "path": ".pnpm-store/v11/index.db",
+      "disposition": "exclude",
+      "reason": "Dependency cache",
+      "bytes": 8192,
+      "sha256": "cb4cd49317fcfe8e3fe2ebfdcb656a4372fd3c43f236cd708c8468ad68057395"
+    },
+    {
+      "path": "app/api/admin/refunds/route.ts",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 27022,
+      "sha256": "507a71ff2cbf515dd46a67ffe12e106b05921285570fecb958fc299a0932f6c3"
+    },
+    {
+      "path": "automatic-publishing-cloud-audit-after-stop.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 6195,
+      "sha256": "2d05cf7032381c0a36e9fdd77e2530da605732333a02dd43060301b45926ab0a"
+    },
+    {
+      "path": "automatic-publishing-cloud-audit-read-only.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 6054,
+      "sha256": "5ba7de4b91a8acc8dfbd588a204feee7a032579722829f6ae421538c13bf3f64"
+    },
+    {
+      "path": "automatic-publishing-cloud-inventory-before-env.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 7683,
+      "sha256": "59ec815723524bfe4045f757643f5914ee733056cd1a380cd275392ac4679e99"
+    },
+    {
+      "path": "automatic-publishing-final-cloud-read-only.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 7683,
+      "sha256": "59ec815723524bfe4045f757643f5914ee733056cd1a380cd275392ac4679e99"
+    },
+    {
+      "path": "automatic-publishing-final-query-probes.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 8907,
+      "sha256": "9aedce06037ca6795de66a678302e510756a2c84c11706d158deff8bb9cdb173"
+    },
+    {
+      "path": "automatic-publishing-final-stage-paths.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 5764,
+      "sha256": "d86f652c2eacc7331542d072bd1bf724a6f41b1cf0da62543f5ca1f963390ad8"
+    },
+    {
+      "path": "automatic-publishing-index-conflict-read-only.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 10763,
+      "sha256": "5e4a8610154547efe7d8526e119bfcb9e2a25e133f488b6b87b3ccbc8d838ad5"
+    },
+    {
+      "path": "automatic-publishing-index-groups-preflight.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 30462,
+      "sha256": "de942d24bfaf37f35d36c124f1a0fba60489d8884cfff76f2e815ee4c399457d"
+    },
+    {
+      "path": "automatic-publishing-production-indexes-final.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 12497,
+      "sha256": "698bc5e0d487c0a9b8ac93d7a7077bcb611225aa928f6c4510560c7ef3ea47d1"
+    },
+    {
+      "path": "automatic-publishing-production-indexes.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 8501,
+      "sha256": "6cfc5459be39c507d20b90ab3b339fa319abf6bc89f0d187c8f7f20815e1cf33"
+    },
+    {
+      "path": "automatic-publishing-query-index-probes-ready.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 8907,
+      "sha256": "0781ea4642907b26f46971c8c4fa207660d1ca317e139c3e43a3f2d087fa4b31"
+    },
+    {
+      "path": "automatic-publishing-query-index-probes.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 9275,
+      "sha256": "515b5eef22dc1b444a1d7c69060fcf118dba58600582a833f1d48ece34648183"
+    },
+    {
+      "path": "automatic-publishing-tournament-query-inventory.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 6638,
+      "sha256": "dfc786d60558eae65ccc70ad6af2f05a2686fd2b9dc19f199338874860f72e69"
+    },
+    {
+      "path": "automatic-publishing-tournament-server-query-inventory.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 9674,
+      "sha256": "ad48e6d4627d133fdcc4e30d4bde61afdbd70b7a65ec056637a80fb044b6f20e"
+    },
+    {
+      "path": "contention-backend-final-20261101.exit",
+      "disposition": "exclude",
+      "reason": "Preserved local execution artifact; sanitized results are included in docs",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "contention-browser-final-20261031.exit",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 3,
+      "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+    },
+    {
+      "path": "contention-browser-final-exits-20261101.json",
+      "disposition": "exclude",
+      "reason": "Preserved local execution artifact; sanitized results are included in docs",
+      "bytes": 348,
+      "sha256": "f63e34d45b63badcf5a840ab5f9ba4be3c0396ba1ecbf6ee0e6ebe3ef85cc089"
+    },
+    {
+      "path": "contention-final-inventory-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 4896,
+      "sha256": "48ba1a970ef15658a2a929c1cfa1d77d9a316124db493cf21059441ce3eab52b"
+    },
+    {
+      "path": "contention-git-integrity-20261101.exit",
+      "disposition": "exclude",
+      "reason": "Preserved local execution artifact; sanitized results are included in docs",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "contention-initial-inventory-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 3674,
+      "sha256": "5caf7df0ef0272ed4717ad17a52f74c1ebbd44ba29add454d7532ad9e82a3362"
+    },
+    {
+      "path": "contention-lint-final-20261031.exit",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "contention-private-indexes-20261031.json",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 15393,
+      "sha256": "d4c90976d5ba8e465dd77c5f5df39799bcc2a4e9eca6633561923f14fe4b478b"
+    },
+    {
+      "path": "contention-private-vercel-project-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 43605,
+      "sha256": "120e690ac975f3c95f83af188ad8d034fe523df7984bbf35130ab515f8a9ee46"
+    },
+    {
+      "path": "contention-private-vercel-project-20261031.json",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 43605,
+      "sha256": "120e690ac975f3c95f83af188ad8d034fe523df7984bbf35130ab515f8a9ee46"
+    },
+    {
+      "path": "contention-repeat-exits-20261101.json",
+      "disposition": "exclude",
+      "reason": "Preserved local execution artifact; sanitized results are included in docs",
+      "bytes": 179,
+      "sha256": "140db4cf60b2e01b6cc72068fa9b5524d06b770abfacd4e57e74e23e506c9d07"
+    },
+    {
+      "path": "contention-static-provider-bounds-20261031.json",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 38,
+      "sha256": "0c710af99dcc4e8d4b3e355fe6d0cd83137e1287a8fb1d416992dc9c85fd4e56"
+    },
+    {
+      "path": "contention-typecheck-final-20261031.exit",
+      "disposition": "exclude",
+      "reason": "Local execution log, private inventory or temporary exit accounting; sanitized evidence retained in docs",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "dashboard-master-resume-inventory-20261026.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 7109,
+      "sha256": "b0a6cc168cf465d83ec897b1144e2de6e93a17e8a76230934216466d01389b3d"
+    },
+    {
+      "path": "docs/automatic-publishing-production-execution-cloud-preflight-2026-10-20.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 7837,
+      "sha256": "e1058d05f61b175632fd0d6f3cf20b72aec26a213817edecd611c07ad0fff035"
+    },
+    {
+      "path": "docs/automatic-publishing-production-runtime-log-review-2026-10-20.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 735,
+      "sha256": "bfefe1d009ac605e19209361aaf57a30b0f14fad2d1164ecd0aa0767343eb1f2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/admin-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 20346,
+      "sha256": "c28d09e6b0c992eb354d6ddc751ef9ea2aa506914555dbc9a7ed676dc90d3da3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/automatic-attendance_only-public.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 168596,
+      "sha256": "86d4e182084bc302a047c2d5cb5af4b120839cebaa512e64b5652f3b3aa75677"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/automatic-normal-public.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 215276,
+      "sha256": "7f98b05a57aaed728545eec7b8bda68212c07e4b8288c9bf23caf10545e3e1df"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/automatic-physical_competition-public.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 179548,
+      "sha256": "d15696b59d61bf3807c7d0b6d6cefae1f8ed9336f91a62e803cff3c424f9dc05"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/automatic-private-public.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 104325,
+      "sha256": "491f5281f1391b72accc5e3ce5f1c19c83bbdd137e9fba3944456f162c273832"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/automatic-tournament-public.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 179598,
+      "sha256": "cf438e2418bfbb24bcb600df29ec101572bd3d928bfb997ed0d7a6dd0f212d54"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/creator-explore-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 136472,
+      "sha256": "1a7c4063c6efb44b393ffaa7b8924e3a662b9f6684b0f9e50a4cb65bc117bf7d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/host-routing-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 288123,
+      "sha256": "13095eccbc1f1227c4d7dd723322aa3785a893832549e695c490b0663a5a1b33"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/host-routing-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 288217,
+      "sha256": "85a3a746685e7cc7501b5dc92bb289cb2db2bfd0e9116fb3c2885ec98146fb49"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-admin-financial-review.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 244305,
+      "sha256": "17884e207547b203c50a218eb17cbe6e1be63be28a1a587885544b4806707283"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-creator-earnings-clearance.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 178374,
+      "sha256": "c5c8af26d56e027e8c605ae5fa1ee859502265b79ddb7e6160b3ffe5f09722e4"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-paginated-roster.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 96320,
+      "sha256": "c42d4f449b3706c2dea4439471dac1e3bbd5298e9d7e1b309bc7e27f447e2bdd"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-physical-results.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 177514,
+      "sha256": "90b50d463c119127959d154644da3beef0a9a19ca256bf7ee2cda08b5410c02a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-registration-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 80897,
+      "sha256": "6a651f65fd1dd36c996afe3d7b897de656b3ff7b4e2b5fdd997961637f5195d1"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-reviewed-reschedule.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 286705,
+      "sha256": "a36b6a66b2fc81e69e7c183e8b69a7a44ef69ccef3f81955c6b6f5b38705b5ac"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-v2-builder-attendance_only-draft.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 183745,
+      "sha256": "c2cd686037803a42d2bdc76522fc16b7ae5dcf0b58a30f2e34c2e102d2dad30c"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-v2-builder-physical_competition-draft.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 183745,
+      "sha256": "c2cd686037803a42d2bdc76522fc16b7ae5dcf0b58a30f2e34c2e102d2dad30c"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-v2-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 239376,
+      "sha256": "06b8bad4a1955533f25c2f148e152789b9bd2abbc9d928fdd549072cd53e6ca6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/live-event-v2-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 241397,
+      "sha256": "19141ef897318ec6d8112ecbcc2e132d02c4efe19b8dcd5f781e46e9b99ea88a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/normal-builder-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 114434,
+      "sha256": "0b3d25a254683bfce60a34af49854526d2b18aad4a9bac0e5797653d8b6d4f62"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/normal-builder-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 126893,
+      "sha256": "28520295dbdd5dd534c8121013fe6be2bd8f15e83f67b5fd3ead0d885a821348"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/normal-challenge-join-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 112394,
+      "sha256": "4fe26fcaaa75033f7feb915bd9a7da97834642220de894ddc1c343f71ca5630b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-admin-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 106005,
+      "sha256": "2b002ec7df0edc04ce6f65616e59b1bb8fd54f9cc126b08bf6e01851c6ed2d22"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-admin-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 96067,
+      "sha256": "a0c9550cf7fa83b3663cf1ce9b494599d21adb76146ee6d209ee1d5f276888a7"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-admin-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 86314,
+      "sha256": "99fe777a14b1db03685b0037dd4d76db03179401d61bca2d35e6e4e638a4a8de"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-admin-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 107375,
+      "sha256": "c6531810d9be5c8ef0dc32640389cf585127571a2cd7d434842e63b71a0f7ea2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-competitor-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 112034,
+      "sha256": "162a06d13080725462cad380da1d8d8a36872f71d5e4bba331cc74961dfaf0b6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-competitor-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 102069,
+      "sha256": "54da4356f61be08c1ef22d041a78d9a5d4415c4a0cea5fbc774d0084498f6e24"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-competitor-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 86251,
+      "sha256": "9f8a413c4658a4a093864807c0d015ec2f572c19def701fb63df60d357129542"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-competitor-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 107380,
+      "sha256": "4cb2475c952125182565000a46c6d3dd17f8c4afd3c900d97178db93456080a2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-creator-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 113801,
+      "sha256": "a031842992a6cbf36e5911420899d51df23b165180c8b6e4c4d8f5bbd1347578"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-creator-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 103915,
+      "sha256": "96876afdd35fbb96812dd43cf09e50375ccb0abe7871ebf8d38e7cc20a660d8e"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-creator-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 86251,
+      "sha256": "9f8a413c4658a4a093864807c0d015ec2f572c19def701fb63df60d357129542"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-creator-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 107375,
+      "sha256": "c6531810d9be5c8ef0dc32640389cf585127571a2cd7d434842e63b71a0f7ea2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-enterprise-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 99773,
+      "sha256": "b9df09044fc25638ea95fbab24dffe9af462915b5ee5dc916d2ec5e29034c605"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-enterprise-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 90167,
+      "sha256": "4f3a0da3a8e641d96f2fc66d3cac1373d065103aa5695bca7d768c67b33da7cd"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-enterprise-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 80718,
+      "sha256": "b129421347e136f6952e5ed793354954e3493a38331cd7567297b6e7f24395fb"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-enterprise-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 102025,
+      "sha256": "8facaac67b94868a5c886cef94ed096a9d0b42e5a7beb0a6b1b62918d5d2dd17"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-filtered-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 104468,
+      "sha256": "d34f6332449e6267bf2672e21094cb00a9b69b4a8928a231a5f219191d173ea0"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-host-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 110555,
+      "sha256": "3483fdd80327b60692df4fd0d8a6808656a5fac21d7b9b6b0d7244702316fa61"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-host-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 100586,
+      "sha256": "2fcfc8cf33db023ac8f21d350f7cd1bd2ef9bc44bec2370a5bb5145d53ac8c70"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-host-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 86251,
+      "sha256": "9f8a413c4658a4a093864807c0d015ec2f572c19def701fb63df60d357129542"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-host-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 107380,
+      "sha256": "4cb2475c952125182565000a46c6d3dd17f8c4afd3c900d97178db93456080a2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-retrieval-error.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 103401,
+      "sha256": "b384b543a74206d240a514bb3caa283b1353be36dd031e968500f6c9dc5ddfa4"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-sponsor-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 105652,
+      "sha256": "356f521c753b4aef4a21e46b3333db5548362f7e430d74577fb47730243f06e8"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-sponsor-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 95685,
+      "sha256": "c1a7b8d44bec1539787e30f832c3a03e251a1f4dc311fc4ff13536a696fa2fff"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-sponsor-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 86251,
+      "sha256": "9f8a413c4658a4a093864807c0d015ec2f572c19def701fb63df60d357129542"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-sponsor-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 107375,
+      "sha256": "c6531810d9be5c8ef0dc32640389cf585127571a2cd7d434842e63b71a0f7ea2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/notification-switched-account-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 102118,
+      "sha256": "c35cfd5f351fa75cdab556b46304d0b53e7d2930d2a5a202779ab8a799b6c144"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/private-access-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 165718,
+      "sha256": "4e007097c52218b0ffe52bbcee8f635851f8b0f7848a5c88f89d4521e453606b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/private-code-prepared.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 222601,
+      "sha256": "2d588338e707fd8d89930b427208cd721c38c8e2e2edb6a7d9b2f68a21e3ac1a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/results-sanitized.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 8560,
+      "sha256": "d21929b8e11508c876c736feffba372ba362b21beccb13719e7a529c0141a1c2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/support-admin-ticket.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 271781,
+      "sha256": "33d2945f5792b04005883c3452880e7d3857ff76a37a16fa25af37b5bdef0cd3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/support-customer-ticket.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 153340,
+      "sha256": "38b1bf05991160ba6204828ee4bcc9ce54e27e0f1bc7c713773756b4683643fc"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/tournament-bracket-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 199725,
+      "sha256": "fa377054fb8113f03b1789c41c8331ea7aafcb2ec22646824eb46117bca12052"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/tournament-bracket-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 153600,
+      "sha256": "460bc0b832d7f5a056937fe17c2b67c85f5354b0cc4e0eebdf715ece116c12bc"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/browser-20261101/tournament-match-verified-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 90856,
+      "sha256": "b540e83b13297145813351ebfa89ed7cf1ef2cc58ea20cc096478260e891ce9d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/admin-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 263834,
+      "sha256": "e4401d3a15a66f39114e52a57d88b762828cfb872cd3a456869db1d8f8f459ee"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/admin-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 253442,
+      "sha256": "2b07d108642c85b95ec14b2f921c25a08ac210e9d0168c5b578530f1f6382880"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/admin-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 233950,
+      "sha256": "993fcfb465060685e0093860563ba048c9477b778226e568865593f11e85deb3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/admin-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 219576,
+      "sha256": "e3c943cbc70237eff5bdb2f0865fbb7f1001994f06e01ee739589bd9f67f363a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/creator-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 341957,
+      "sha256": "41ee5e550ab18ab32593b0cd89157a9ec8df74ae171fff857dac4150cd3e7514"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/creator-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 257629,
+      "sha256": "35606c3d10405a38d4573fd09a49f54558469d2a5dbec79a41a947c1c0a4ffbb"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/creator-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 305281,
+      "sha256": "ab4bf9239e5d1d4ac606a3da06928ca15e8587ce4e6380fb937049332d86681b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/creator-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 257881,
+      "sha256": "427877000f13d67fa8e8d940c2f6c618f4b05bca6543809551d28903136f216d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/enterprise-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 304452,
+      "sha256": "a0f4697677216eca1730517ecd84268060197f26ad10e55c58268f76ee6d452b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/enterprise-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 242962,
+      "sha256": "9c12e396a2f1ccfb4dc2db0872c97518b23e0c48d6fd84c7bdb77624e9b791e3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/enterprise-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 292026,
+      "sha256": "f0595d1c1fe8966bc5def2261e9f0afc964a85eaf96cbcf46d7ef093924b9142"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/enterprise-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 230027,
+      "sha256": "e5d39c72f9de7191364f7f0ff8a077603edc4edc86838bdf799f5f3ab62d71eb"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/free-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 338339,
+      "sha256": "ef76e1ecf94a10fd90e3076f99efc94318b9990522cbe7ecb29f30d5ae1f758a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/free-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 257032,
+      "sha256": "b8c927e3cd2fb95692ab2b4874cbbeb342a3d62ce3cba9c4986fe42e61248dc3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/free-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 302361,
+      "sha256": "a428d32017c8857c9ea32c1d2b8c963a8c523122182f78105500a31e948f45b9"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/free-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 255380,
+      "sha256": "8f66fddf5d46a4710b4221e77553583c66894396ebe6de49906d12e6adc2aa9b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 342335,
+      "sha256": "c1a328229fa9d04a1047939ae7ddc72e6b43dc3d48ff2a9a311972fe8a9859ac"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 283993,
+      "sha256": "a65feba64ecdfc4d50255609e34b759a1e5fbf34728aacc34548208b8ed9ad60"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 330674,
+      "sha256": "dbd2f62c588ac521327d4ff9674a967f43ccf4fbf399d2fe5c19e532855d7700"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 266016,
+      "sha256": "4d3c4670c55c9116d46619a95f6ab44f63bfb8b30cc51fcc918045938dd23cd7"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-routing-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 288123,
+      "sha256": "13095eccbc1f1227c4d7dd723322aa3785a893832549e695c490b0663a5a1b33"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/host-routing-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 288217,
+      "sha256": "85a3a746685e7cc7501b5dc92bb289cb2db2bfd0e9116fb3c2885ec98146fb49"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/results-sanitized.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 9619,
+      "sha256": "e731bfa3e7d5074878ce5fc0a039d6d5d2227d591241a8f6f86046a012dc042c"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/sponsor-after-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 301887,
+      "sha256": "32d1539c37b27be0cb300e58e466e5feb3aec3bb9efa58b2b717a654a8d3663d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/sponsor-after-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 248887,
+      "sha256": "27a9f379654dbabecffeee44a394beb304537c96b35fa27f80b18dbfbd75bc45"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/sponsor-after-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 281860,
+      "sha256": "cb3a558cf1624eeda9ecbc8cd89f020424d5c1d621cd93a7af60a66c1b03c3c6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/dashboards-20261101/sponsor-after-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 267432,
+      "sha256": "fce0ef660bf2e25284f7cfad299fdccca5e197ef966021981568678200ad332e"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/final-command-results-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 2548,
+      "sha256": "4a1372f48d5e6ca6d4274efd7db9c038ce12fdaab2f0c566f980564d7c171e91"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/ignored-source-review-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 208,
+      "sha256": "0c41d6edbf87e5757fe7d75bcfa3c0075dfcb3268bf7616bf3cb4d9d9137bb46"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/local-reconciliation-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 116717,
+      "sha256": null
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-admin-review-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 299538,
+      "sha256": "3badade308c646021113c3582e9ebf5460ae480d2040b405bc4e802cce66caba"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-admin-review-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 302975,
+      "sha256": "2a81284bf7461d6cddbead7af7a989860534e93d6aa666297057092a6ec47d40"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-admin-review-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 305570,
+      "sha256": "477ded3b43c1f0f847ee6d8679614414b78ecb4a3ce71342dae5f67fb94e3d6c"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-attendance_only-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 150961,
+      "sha256": "0d95fd4e6ac43018f92be8289ddf201bc9644ad9a3f21fe339c3c2114edcffd9"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-attendance_only-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 130347,
+      "sha256": "5948a06d8bfe299ed6a52b6117fee685190e5d7318da46a40d0be981a2c58f79"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-attendance_only-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 141051,
+      "sha256": "c668a9b93240d2680c4e6edd211a8144e84cca2971a3e58f49acd1b1f0e0bf6b"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-explore-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 204305,
+      "sha256": "601baa2e76aa5b101b64c76b01ed55f2e2d9bea5064e38a8297bd9eaeac00310"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-explore-empty.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 83345,
+      "sha256": "77bf7256fe6ba59f7cca017404b47aa827f2453c421483ec4388eeb5b1b559a1"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-explore-error.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 94213,
+      "sha256": "1e959d1d991ab1e5f3bff2731cd66090a81270dd986b805c439c13ae4e43d15e"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-explore-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 222361,
+      "sha256": "a918aa82f19f5ca7ac8a32ed15631134687ee7380d23ec9fa4a3c0f72f4099c6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-explore-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 220363,
+      "sha256": "1f9d4c199be9dbc722529250d4e19778077824f193d4cd8718d79a607318e3c8"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-global-priority-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 225790,
+      "sha256": "1278d4e6195b94dcc85efc3aed2e16b6cb950a595166a5f8d920a6d36edad833"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-match-automatic-submission-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 198298,
+      "sha256": "959eeed3613b5e24d927265b5851cd4990d39a8fae55b30d9de11540dbd4c896"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-match-voting-navigation-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 159572,
+      "sha256": "4e4dd8232186d87debd81292220bf00acba184832b4e5e160ab51e655fd74ce3"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-normal-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 309038,
+      "sha256": "0d0e6572c2f08d26d356296fcd0d4f45c2826efe6d16333ccd733907b3f3cac6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-normal-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 223089,
+      "sha256": "f8a3108fa8f6859a711b8f05bb7cf9a4b45a9476390fb055b78ac9ad3c433cf2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-normal-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 339810,
+      "sha256": "921a4d84329f54b5e718dda89caee0c923a983f34d0ef15a6accb535ae090979"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-participation-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 111722,
+      "sha256": "b0eff9cdf2ee6502737bb6b6813d67c37e1ef1cbefa1287d08c385733e006c5d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-participation-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 80972,
+      "sha256": "5b4ba8de5edb17369efceeee8c7998b4e65ed19b669ebda75bf3a797cd90349d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-participation-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 89426,
+      "sha256": "e90c680900188d70527e1201cce6c7e108eb6e4014f0a15e335bfb4162f74867"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-physical_competition-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 173458,
+      "sha256": "c968bac58f307ff4fc65fb1a86cf6c98d02776182b244c98900343db5a03ead0"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-physical_competition-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 153499,
+      "sha256": "fa7153bc3617e49310fc7dc438acb7ee6e1d33384fc0620409559536066f3079"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-physical_competition-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 161386,
+      "sha256": "7881ae51e885713bd5dad349b0e933c06908c78a0be57f34a479c5413daabde2"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 113631,
+      "sha256": "cd684008b052d67043ce267d16dde79793f20ea1bc2b86548d8a9865abaa0321"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-manage-access-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 187136,
+      "sha256": "f6cf4150d8b6de9323921bc966e85429193e65f0dce24fa8690050d9500e9b08"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-manage-access-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 155774,
+      "sha256": "ed008707cc718a26a09a4bbbb5daf02e3d2e91364555130077aaaecfbf348959"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-manage-access-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 163872,
+      "sha256": "fe50b53d3b57d300482dfb2bd1634b16352e230810c3cd04bdef4b723eb04505"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 101403,
+      "sha256": "a6c247303a63eea3e2d6e5616dc6ec34946555888bc154cea6e1f82b725207bd"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 111684,
+      "sha256": "81eaa4a3212e0bd0fd0990ef44f7f254a68143722fcbc2e9ca7487d450e4c45d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-unlocked-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 234208,
+      "sha256": "f0bd76d01c4739dbfb3f4144e5dc90df9b815976b5d75e6d5cc26d26c6c7cef9"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-unlocked-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 186196,
+      "sha256": "7ebb467500312fd7132a0b63423cc2e81aafbe24939353ad2812a971f241f99f"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-private-unlocked-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 209918,
+      "sha256": "0789cfe75d0807ac31bb4ecfc9922aa75e2e2b6bdd6e6718c5413bf24e034b74"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-tournament-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 171084,
+      "sha256": "c360c5dc8dd0454bf5dd04fdbe558a7151fed75ecb1422ae653d6771d653ef68"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-tournament-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 149848,
+      "sha256": "ce75a695290a7c9d38c48c4cfabf5cec3d98eae0ca56e4b9250581a748c0fa65"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-tournament-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 169029,
+      "sha256": "3508def3282532ce9266e2879412e486702d943c1e4483f278a8b688f30ad13d"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-winners-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 130079,
+      "sha256": "a639a70d2a1401cdacb2c37d17dcf2f8940466c677fb8e25aaf24700e6bcfbf7"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-winners-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 131437,
+      "sha256": "31ec22a9c52e9d23f66c84d5f68fd5da3a7c5887a59622bf466f994efb3d3ec0"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-winners-recorded-allocation-desktop.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 136622,
+      "sha256": "e0f6e3c31537c053a8d9a2224dd22518b32b03ecb78798c04bad6176c8a88c79"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-winners-tablet.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 122771,
+      "sha256": "169058e1494f6ee7cc94ee4c2d4a02e161bc49b593c222f93861c2481ed703b1"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/master-withdrawal-mobile.png",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 112567,
+      "sha256": "35cdcf2c4448ba686a41f2a716a4a54c20efd9c00c5bc4942a0ef3bdfd0bee7a"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/master-20261101/results-sanitized.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 8234,
+      "sha256": "d78a7cca573221e543bd759afe22edc49334b7565c6704d075ed828247205dc6"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-cli15224-sdk9-1.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 25539,
+      "sha256": "cc21245d3f66604ad29ee06b245da8cc2f81dc91746d707579f33a8d12efce92"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-cli15341-sdk7-1.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 25857,
+      "sha256": "0883d1c46cbd2b70f77a31249875a90738a25e4dd61a81d2a67538826e2cc4f9"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-cli15341-sdk7-200.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 252679,
+      "sha256": "654299da4114bbb53bfac49a360191d7df9bb2c9f7f1fe7a9d40ee9a33d211f5"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-current-1.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 25857,
+      "sha256": "a40061824b99f9131b71ea59543b2826124a8921942e6d6faab44c1e24980530"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-current-2.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 25858,
+      "sha256": "97317c985956b1ddecc7c3f02d608454fb5d09697ac1a706bd9c8ff9890fb4ee"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-current-200.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 56936,
+      "sha256": "40469b84f7e9079d966fb48b419a1e182cbfb6c088284dd5dc383cee0c4931da"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-current-3.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 26815,
+      "sha256": "f925370b100e097aebe9a9a233e03042a82a6c3f4aab57765946309b0546f675"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/native-final-200-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 237390,
+      "sha256": "bc2919c44448fe8b0ccf4b0a5e1a0ce3386682f43e5bf084cc3a3a953f6e6f13"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/notification-index-recheck-20261031.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 4234,
+      "sha256": "43631723401681210aa55aade8d355144cf24d4b8d9d8ee28b6e31c544698de8"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/notification-index-recheck.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 4234,
+      "sha256": "6d1eb2b02ea3e69ace5b3cfaebff76d600aaea796624fa6093a2bf76fed5849f"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/notification-index-states-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 2506,
+      "sha256": "186636f3115b7f175788dfdea6343dda9874bac085a0a9187d7081538149ac93"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/notification-index-states.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 2433,
+      "sha256": "3248f9f1b49c974e081d341f94b470fc1173a30d6a62ae884213c26e05fffdcc"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/production-before-20261031.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 1189,
+      "sha256": "a4767c144bd3f8cc69a9ee14efc5bfebafcde254febff669b96ba8a99598ff3c"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/production-before.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 1095,
+      "sha256": "291748a7f3fb002b7d10c1ed9ecbb30015866d3225abdd8393bb34f8ebc5ff96"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/production-provider-gates-20261101.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 769,
+      "sha256": "e270176f436fad7215edf8c18066560e56a6908b7761f1c32b68e68c86d073a1"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/run-matrix-final.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 178150,
+      "sha256": "5e6fd4cf13d2551a78e8741465692d6cac34161ee1aab3ac19288af7487457fd"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/run-matrix.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 88885,
+      "sha256": "51bdbe2a5c670776b77fbac3a7d37bc91026f9e9e01ae88623e2cc1d6eb0a021"
+    },
+    {
+      "path": "docs/contention-resolution-2026-10-28/unpushed-files-before.txt",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 56042,
+      "sha256": "01cd5376cd07c0ebf1d60783d385cc3b66ac14a9ee7127ab43d7e26dd6c5ef6d"
+    },
+    {
+      "path": "docs/dashboard-admin-runtime-logs-2026-10-21.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 831,
+      "sha256": "883fe954a8075caf8dcb386f5424fbb86a51b4f3f68d7a5ddbc0346e82f6987f"
+    },
+    {
+      "path": "docs/dashboard-auth-runtime-logs-2026-10-21.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 831,
+      "sha256": "9475d6bde26b726b5f101550d26b41350ab16cd5d7559fa0bf74d1faf9199b6d"
+    },
+    {
+      "path": "docs/dashboard-sponsor-live-runtime-logs-2026-10-21.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 831,
+      "sha256": "a6acabf21eb5028eeb516f76fe3a6241141a548a9dae3d226f765805a4836310"
+    },
+    {
+      "path": "docs/firestore-contention-final-acceptance-2026-10-31.md",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 5290,
+      "sha256": "350cd3ce4aac6cd807920f98c76ddd72ee74d3fae8e913880af78ab715475e38"
+    },
+    {
+      "path": "docs/firestore-contention-release-2026-10-28.md",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 8654,
+      "sha256": "baf4a7b1b2cf80747510fa9215c0fcce49a9b70bc55a8200b2d74a0a6ea26c62"
+    },
+    {
+      "path": "docs/firestore-contention-release-handover-2026-11-01.md",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 10345,
+      "sha256": "b60cb667164f8c9a82816dfd46044deaa591401b9ab568938005a0642f788fcf"
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 38913,
+      "sha256": "68e804bcf1fac68c95e14cb007388f22b8011f3f54a924f1b9f63f75e0e46e9c"
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 23314,
+      "sha256": "36970ee6d44b13f121bdc14c9138d828be6ff0c7d6b1cc4d1033ca732eb50d6b"
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 102808,
+      "sha256": "d11fdb9eb357228c22646c3d7aad735d5db090a3c66c498ef74178010c262278"
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 35467,
+      "sha256": "2cd3038c91df8e61596a760c998fd8e19a1f57370695e249468b7bb0751ddcbb"
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 37654,
+      "sha256": "d68f040c5e501f55cb934352f1cfe23dd64e8c64860500471b32b59d2fa31b11"
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 22631,
+      "sha256": "52a4b6978d76697b1864a895c4f72cc8cf08a9ff0e7535bfe0118f9fcafce72f"
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 35016,
+      "sha256": "ff58d723f18f416eb1d00ab058af9a37a954f730150fa571e458b6dd4bcd0fe5"
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 28508,
+      "sha256": "2c3287374c00487dea7122f515e85f60178ab2aa33ca536cc5f8befdaa13b9c5"
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 33628,
+      "sha256": "6ea3809ac238362a3f871b82a31f43fcfb150648309472f79b74c8b0055c4fc0"
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 33119,
+      "sha256": "f8eeef56efceeda0b058650bd2deb7cc8a91122f34873716fe854b4ead486cd3"
+    },
+    {
+      "path": "docs/master-recovery-snapshot-2026-10-26.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 213,
+      "sha256": "d982b6b5ef045a0310b0da36b249d3306fdae4ba7fa4cb750a147488b0735cd1"
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/results.json",
+      "disposition": "exclude",
+      "reason": "Raw browser authentication diagnostics; separate sanitized results retained",
+      "bytes": 23312,
+      "sha256": "cba12db978abc4d0d06c94a4fc412e4957cd9103c5025b3d4cc75f6d84ad6928"
+    },
+    {
+      "path": "docs/six-dashboard-runtime-logs-2026-10-21.json",
+      "disposition": "exclude",
+      "reason": "Raw private operational/recovery metadata; retained locally",
+      "bytes": 835,
+      "sha256": "a60c6390dd36eb27e36c7744fb7927b1a46689d1a33d9fc49abd1b7d6426f518"
+    },
+    {
+      "path": "docs/sponsor-entry-git-deployment-observation-2026-10-21.json",
+      "disposition": "exclude",
+      "reason": "Raw deployment creator account UID; sanitized evidence included",
+      "bytes": 1663,
+      "sha256": "ead0ca8edde3e2dd3727e534b2325e9139ead6b0ec0875527e8aa4d6ecebf5d7"
+    },
+    {
+      "path": "lint-batch5b-baseline.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 1458031,
+      "sha256": "13dc19babefc8bddf8d295729888f1abd21db7815246b860cd02d70020fcb1ba"
+    },
+    {
+      "path": "lint-batch5b-current.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 1115850,
+      "sha256": "f40d4c8243fd7768f8b104d34d9845af14824fa71f43b61d74e7b1ecb83c3da1"
+    },
+    {
+      "path": "lint-batch5b-group2.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 27819,
+      "sha256": "bde204c5b550cf1c9af05762c2831ea8c1a8b0bde4627a6fb4f873001f96ac77"
+    },
+    {
+      "path": "lint-batch5b-progress.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 1344315,
+      "sha256": "df778447760420f1f14da89cd91b504be22d89f364073bd51b7d87b66de19ec3"
+    },
+    {
+      "path": "lint-batch5b-progress2.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 1189757,
+      "sha256": "098e4bfc88adcc4121d556bd074677cc549bb889c814b938c3d3bc730c9b8833"
+    },
+    {
+      "path": "lint-batch5b-targeted.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 235333,
+      "sha256": "662b5b5088e59aff081bdcc9492917e220838fa63278ee2470635a678a1e18e3"
+    },
+    {
+      "path": "lint-escaping-targeted.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 144088,
+      "sha256": "65bc3552f2de278d3baa3691372c18b4b4b4f55a2caadbe2987e54876673e226"
+    },
+    {
+      "path": "master-completion-acceptance-static-exits-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 52,
+      "sha256": "6b93c516175d94061b8237db60ee9b1a21fc71a52f7deb5bf3ffd8cb266517c2"
+    },
+    {
+      "path": "master-completion-browser-exit-codes-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 43,
+      "sha256": "2908ded4614709bf460091b7bea6144dcfe27a4c4a8e2988fb20dc2aeecb9d50"
+    },
+    {
+      "path": "master-completion-browser-final-exits-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 35,
+      "sha256": "96f2a496e1e384f27afa1d4d641eb1b8656858d62d66059317b314b4eb1450ae"
+    },
+    {
+      "path": "master-completion-current-static-escalated-exits-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 38,
+      "sha256": "6e7b836353387a48cb679e21ec9b8c3502f4f69750b1e30271f89eda862872e6"
+    },
+    {
+      "path": "master-completion-current-static-exits-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 38,
+      "sha256": "1190d506a0d9aefc1a519600420f84986db731100dbc921f6a6f48383af83471"
+    },
+    {
+      "path": "master-continuation-initial-inventory-20261026.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 8550,
+      "sha256": "a8fe021177fee50fd065d0699b6542be8f29a9ce96cd22aee4869cdce1761717"
+    },
+    {
+      "path": "master-github-excluded-files-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 35470,
+      "sha256": "d81a303b811c5e5022bbeab113a0e9d869923b12e3bfdc4262d5b0367c6c902a"
+    },
+    {
+      "path": "master-github-final-static-exits-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 52,
+      "sha256": "25f190c3e6a1dde45e9311edb30a3ecf93865b0b7f4c9eeb6b5e8a65b59ef622"
+    },
+    {
+      "path": "master-github-inventory-20261027.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 28638,
+      "sha256": "ab1c7d76d725b72660331c7fc9abc2ec6d04abbe73552aec6c2b82bb3ca17821"
+    },
+    {
+      "path": "master-github-stage-paths-20261027.nul",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 10991,
+      "sha256": "6d757910a46187a6c2314a4dab5a7fb2527cd89435c40740712be1d5c621f929"
+    },
+    {
+      "path": "master-github-vercel-deployments-post-push-private-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 51571,
+      "sha256": "f13a1c01cfc89a7a1b3aac9d7ccf9536a79bdb9aa2baffc6f37201e26acef7f0"
+    },
+    {
+      "path": "master-github-vercel-post-push-private-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 43605,
+      "sha256": "120e690ac975f3c95f83af188ad8d034fe523df7984bbf35130ab515f8a9ee46"
+    },
+    {
+      "path": "master-github-vercel-project-private-20261027.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 43605,
+      "sha256": "120e690ac975f3c95f83af188ad8d034fe523df7984bbf35130ab515f8a9ee46"
+    },
+    {
+      "path": "next-env.d.ts",
+      "disposition": "exclude",
+      "reason": "Preserved machine-generated Next/TypeScript state",
+      "bytes": 284,
+      "sha256": "e3369a97f3cdc0b38d0bc6cab65b863ae6e6c4bae3979fd8abe3e1c8db1a2a7e"
+    },
+    {
+      "path": "notification-all-untracked-review-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 34913,
+      "sha256": "3181f8732859160cdaeb23bcc34ac1cfabdfb9485e09399245c239039a7d96c2"
+    },
+    {
+      "path": "notification-candidate-identity-review-20261028.json",
+      "disposition": "exclude",
+      "reason": "Preserved local privacy-scan inventory",
+      "bytes": 120,
+      "sha256": "f1974fa75cd8e9217990ec5628b532a697c73a1a33360b287ad4fa5b40cfff25"
+    },
+    {
+      "path": "notification-candidate-secret-review-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 39,
+      "sha256": "fd6d8f782eb0c3b77220cc23d9980e86523ba410970a13e5886c432f933a3df5"
+    },
+    {
+      "path": "notification-current-untracked-inventory-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 34372,
+      "sha256": "c410da27223257de2475ee58837ed34e537fff07eaf86b7bf57334d9d665b2d4"
+    },
+    {
+      "path": "notification-document-personal-data-review-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "notification-ignored-source-review-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "notification-ignored-work-review-20261028.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "notification-json-private-key-review-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 10015,
+      "sha256": "de86339a32bad8938408e00ae0883ed16ad07fbb3c5f788d8050c283938fa033"
+    },
+    {
+      "path": "notification-production-database-private-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 799,
+      "sha256": "57f359fe97bdb34c8934c2c190be81cdf9b8246e5cde4a35b0beefd8693b1051"
+    },
+    {
+      "path": "notification-production-indexes-private-20261028.json",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 13690,
+      "sha256": "ae08e4e34ea1f42e5dc985cfd71a7bdefff05cba28c95084275f78a0c0b6d924"
+    },
+    {
+      "path": "notification-reviewed-stage-paths-20261028.nul",
+      "disposition": "exclude",
+      "reason": "Historical temporary explicit staging path list",
+      "bytes": 45680,
+      "sha256": "2ebce97b9be104bd72a08dde9c563a3d8ffcdf99a1ef319295d679edd20fe6c0"
+    },
+    {
+      "path": "notification-stabilization-inventory-20261027.txt",
+      "disposition": "exclude",
+      "reason": "Local generated diagnostics/private operational inventory or staging manifest; concise relevant historical static reports copied into docs",
+      "bytes": 24453,
+      "sha256": "7b2bd0b72e95a2fa2780e96de4f5266f69aa41253e6b5458cb60fd604df30230"
+    },
+    {
+      "path": "scripts/firebase-emulator-toolchain.json",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 183,
+      "sha256": "553302734c5787cc3031e72cc6e98e96e8bf982e0243612b0868eb5639cdf55d"
+    },
+    {
+      "path": "scripts/run-isolated-p0-emulators.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 6931,
+      "sha256": "ea8a41cd5ba9da75ef3d1c6c9fdb5f97e4666258ad7590ae1964318c84ec88de"
+    },
+    {
+      "path": "scripts/run-local-verification-suite.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 2188,
+      "sha256": "c4d43e9cf011dd30434c1dbcb1f84c6790ea91e9e7f7ee99950854049155b2b1"
+    },
+    {
+      "path": "scripts/run-p0-emulator-regressions.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 7444,
+      "sha256": "85c82408ef0147acbbf4da5ab614cd70f128d20d211a3f72f358c3137d44f7b2"
+    },
+    {
+      "path": "scripts/run-verified-emulator-suite.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 2561,
+      "sha256": "dc37681e764810165d22b405bf1f9307ea34eb08117c4936588db0a65f3bb933"
+    },
+    {
+      "path": "scripts/test-firestore-conflict-integrity-emulator.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 1883,
+      "sha256": "7740644a693eb701bfc43bd44a81ea35c79cb64d9e61f90908360f99d4f492b3"
+    },
+    {
+      "path": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 5791,
+      "sha256": "b717ef643ab091e5dbb2e336cfee604744924528820ec57d25b19f6940064b80"
+    },
+    {
+      "path": "scripts/test-payment-return-routes.mjs",
+      "disposition": "include",
+      "reason": "Reviewed authorized implementation, tests, documentation or sanitized acceptance evidence",
+      "bytes": 66758,
+      "sha256": "67dc5c397a1ee46ff5cd78b6317fda352bee718fe335f9b0de5dad81a42d1774"
+    },
+    {
+      "path": "tsconfig.json",
+      "disposition": "exclude",
+      "reason": "Preserved machine-generated Next/TypeScript state",
+      "bytes": 1786,
+      "sha256": "9ca71aa65deacbed6725842e61fe4fbbfac835f7da39e91e2a2d92d699228753"
+    },
+    {
+      "path": "tsconfig.tsbuildinfo",
+      "disposition": "exclude",
+      "reason": "Preserved machine-generated Next/TypeScript state",
+      "bytes": 4102283,
+      "sha256": "444a8a1c83aea47637e3f3f0960853ba4a041364c7342053e21ec96a82ade259"
+    }
+  ],
+  "priorIncludedFiles": [
+    {
+      "path": "app/api/admin/cases/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/admin/operations/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/admin/people/users/[uid]/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/admin/support/tickets/[ticketId]/messages/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/challenges/[id]/lifecycle/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/notifications/[id]/read/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/notifications/preferences/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/notifications/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/sponsor/notifications/preferences/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/submissions/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/support/tickets/[ticketId]/messages/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/api/support/tickets/route.ts",
+      "unchanged": true
+    },
+    {
+      "path": "app/notifications/page.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "app/settings/[section]/page.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "app/sponsor/notifications/page.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "components/notification-bell.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "components/notification-preferences.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "components/sponsor/sponsor-operations-pages.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-final-deployment-status-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-final-release-execution-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-preview-configuration-request-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-preview-read-only-smoke-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-build-progress-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-data-compatibility-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-deployment-report-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-deployment-verification-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-error-log-classification-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-execution-gates-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-focused-auth-smoke-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-initial-smoke-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-only-acceptance-exception-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-post-deployment-disabled-state-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/automatic-publishing-production-post-deployment-smoke-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/challenge-suite-staging-firebase-proposal-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/challenge-suite-staging-preprovision-verification-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/challenge-suite-staging-preview-metadata-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/challenge-suite-staging-proposed-indexes-2026-10-20.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/challenge-suite-staging-provisioning-approval-2026-10-20.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-admin-authority-read-only-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-admin-deployed-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-admin-deployment-progress-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-admin-production-smoke-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-admin-routing-read-only-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-build-progress-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-deployed-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-deployment-progress-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-production-release-2026-10-21.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-production-smoke-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-auth-rollback-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-sponsor-deployed-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-sponsor-live-deployed-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-sponsor-live-production-smoke-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/dashboard-sponsor-preflight-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-browser-summary.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-admin-review-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-admin-review-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-admin-review-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-manage-access-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-manage-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-manage-access-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-unlocked-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-unlocked-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-private-unlocked-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/master-withdrawal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-full-p0-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-static-exits.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-final-validation-exits.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/d27-stable-exits.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/admin-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/admin-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/admin-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/admin-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/creator-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/creator-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/creator-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/creator-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/enterprise-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/enterprise-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/enterprise-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/enterprise-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/free-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/free-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/free-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/free-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-routing-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/host-routing-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/sponsor-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/sponsor-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/sponsor-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/dashboard-preservation/sponsor-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/final-full-p0-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/final-static-exits.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/admin-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/automatic-attendance_only-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/automatic-normal-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/automatic-physical_competition-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/automatic-private-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/automatic-tournament-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/creator-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/host-routing-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/host-routing-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-admin-financial-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-creator-earnings-clearance.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-paginated-roster.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-physical-results.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-registration-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-reviewed-reschedule.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-v2-builder-attendance_only-draft.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-v2-builder-physical_competition-draft.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-v2-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/live-event-v2-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/normal-builder-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/normal-builder-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/normal-challenge-join-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/private-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/private-code-prepared.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/support-admin-ticket.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/support-customer-ticket.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/tournament-bracket-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/tournament-bracket-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/full-browser/tournament-match-verified-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/lifecycle-exits.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-admin-review-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-admin-review-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-admin-review-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-manage-access-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-manage-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-manage-access-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-unlocked-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-unlocked-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-private-unlocked-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-admin-review-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-admin-review-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-admin-review-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-manage-access-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-manage-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-manage-access-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-unlocked-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-unlocked-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-private-unlocked-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/master-withdrawal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/master-final-browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/recovery-verification.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/source-integrity-final.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-completion-2026-10-27/source-inventory.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/details/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/final-acceptance/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-continuation-2026-10-27/participant/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/preserved-working-tree.txt",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-critical-2026-10-27/stable-browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-github-push-handover-2026-10-27.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-github-push-handover-2026-10-27.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/admin-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/admin-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/admin-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/admin-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/creator-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/creator-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/creator-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/creator-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/enterprise-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/enterprise-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/enterprise-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/enterprise-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/free-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/free-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/free-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/free-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-routing-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/host-routing-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/sponsor-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/sponsor-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/sponsor-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/master-resume-2026-10-26/dashboard-baseline/sponsor-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-complete-local-file-review-2026-10-28.json",
+      "unchanged": false
+    },
+    {
+      "path": "docs/notification-completion-release-acceptance-2026-10-28.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-existing-browser-results-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/admin-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/automatic-attendance_only-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/automatic-normal-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/automatic-physical_competition-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/automatic-private-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/automatic-tournament-public.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/creator-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/host-routing-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/host-routing-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-admin-financial-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-creator-earnings-clearance.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-paginated-roster.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-physical-results.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-registration-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-reviewed-reschedule.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-v2-builder-attendance_only-draft.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-v2-builder-physical_competition-draft.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-v2-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/live-event-v2-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/normal-builder-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/normal-builder-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/normal-challenge-join-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-admin-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-admin-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-admin-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-admin-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-competitor-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-competitor-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-competitor-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-competitor-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-creator-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-creator-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-creator-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-creator-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-enterprise-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-enterprise-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-enterprise-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-enterprise-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-filtered-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-host-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-host-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-host-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-host-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-retrieval-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-sponsor-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-sponsor-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-sponsor-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-sponsor-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/notification-switched-account-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/private-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/private-code-prepared.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/support-admin-ticket.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/support-customer-ticket.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/tournament-bracket-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/tournament-bracket-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/browser/tournament-match-verified-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/admin-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/admin-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/admin-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/admin-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/creator-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/creator-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/creator-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/creator-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/enterprise-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/enterprise-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/enterprise-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/enterprise-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/free-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/free-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/free-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/free-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-routing-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/host-routing-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/sponsor-after-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/sponsor-after-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/sponsor-after-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/dashboards/sponsor-after-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-1/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-2/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-3/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-4/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-5/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/failed-browser-6/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-completion-acceptance-static-exits-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-completion-browser-exit-codes-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-completion-browser-final-exits-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-completion-current-static-escalated-exits-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-completion-current-static-exits-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/historical-verification/master-github-final-static-exits-20261027.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-admin-review-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-admin-review-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-admin-review-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-attendance_only-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-attendance_only-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-attendance_only-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-explore-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-explore-empty.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-explore-error.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-explore-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-explore-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-global-priority-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-match-automatic-submission-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-match-voting-navigation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-normal-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-normal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-normal-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-participation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-participation-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-participation-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-physical_competition-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-physical_competition-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-physical_competition-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-manage-access-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-manage-access-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-manage-access-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-unlocked-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-unlocked-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-private-unlocked-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-tournament-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-tournament-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-tournament-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-winners-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-winners-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-winners-recorded-allocation-desktop.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-winners-tablet.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/master-withdrawal-mobile.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/master/results-sanitized.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-2026-10-28/static-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-final-backend-runs-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-index-analysis-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-index-approval-2026-10-28.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-index-execution-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-index-minimal-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-index-proposal-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-modified-tracked-files-2026-10-28.txt",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-production-preflight-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-regression-phase-a-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-regression-phase-b-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-source-inventory-2026-10-28.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-stabilization-audit-2026-10-27.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/notification-stabilization-release-gates-2026-10-28.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-committed-files-2026-10-22.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-final-polish-production-release-2026-10-22.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-git-deployment-observation-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-production-smoke-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-release-deployed-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/six-dashboard-runtime-classification-2026-10-22.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/sponsor-entry-exact-sha-production-deployment-request-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/sponsor-entry-production-deployment-created-2026-10-21.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/sponsor-entry-production-release-2026-10-21.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/sponsor-entry-release-status-2026-10-21.md",
+      "unchanged": true
+    },
+    {
+      "path": "firestore.indexes.json",
+      "unchanged": true
+    },
+    {
+      "path": "lib/hooks/use-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/notification-navigation.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/notification-policy.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/admin-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/challenge-settlement.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/enterprise-active-challenge-limit.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/enterprise-prize-exposure.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/individual-automatic-settlement.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/individual-prize-correction.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-admission.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-cancellation.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-communications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-job-outbox.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-jobs.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-payments.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-result-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-results.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-staff.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/live-event-updates.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/monetization-payments.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-earnings-clearance.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-lifecycle-jobs.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-lifecycle-scheduler.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-refunds.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/normal-submission-reminders.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/support-tickets.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-match-lifecycle-jobs.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-paid-entry.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-result-confirmation.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-submission-reminders.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/tournament-team-entry.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/voter-notifications.ts",
+      "unchanged": true
+    },
+    {
+      "path": "lib/server/withdrawals.ts",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/audit-publication-failures-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/audit-release-query-indexes-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/audit-tournament-backlog-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/audit-tournament-cloud-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/check-tournament-probe-identity-permission-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/classify-production-error-log-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/create-approved-notification-indexes.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/create-approved-paused-tournament-scheduler.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/create-approved-release-indexes.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/diagnose-google-storage-transports.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/diagnose-production-storage-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-final-monitoring-integrations-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-final-vercel-release-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-notification-production-preflight-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-production-build-progress-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-production-release-runtime-logs-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-production-rollout-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-release-deployments-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/inspect-staging-preview-metadata-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/prepare-final-release-file-inventory.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/provision-approved-tournament-foundation.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/publish-approved-firestore-privacy-rules.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/audit-admin-authority-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/audit-admin-routing-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/classify-six-dashboard-runtime-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/inspect-admin-routing-runtime-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/inspect-sponsor-entry-runtime-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/inspect-sponsor-live-runtime-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/notification-journeys.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/run-p1-browser-e2e.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/smoke-admin-routing-production-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/smoke-sponsor-entry-production-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/smoke-sponsor-live-production-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/verify-admin-routing-release-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/verify-sponsor-entry-release-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/qa/verify-sponsor-live-release-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/run-isolated-p0-emulators.mjs",
+      "unchanged": false
+    },
+    {
+      "path": "scripts/run-local-verification-suite.mjs",
+      "unchanged": false
+    },
+    {
+      "path": "scripts/run-p0-emulator-regressions.mjs",
+      "unchanged": false
+    },
+    {
+      "path": "scripts/sanitize-vercel-deployment-inspection.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/smoke-production-release-acceptance-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/smoke-protected-preview-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/snapshot-master-implementation.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/stage-approved-tournament-production-env.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-backend-stabilization-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "unchanged": false
+    },
+    {
+      "path": "scripts/test-individual-cancellation-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-live-event-admission-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-normal-notification-reminders-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-normal-scheduler-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-notification-completion-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-notification-inbox-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-tournament-notifications-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/test-tournament-paid-entry-emulator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-final-release-infrastructure-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-notification-indexes-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-production-diagnostic-auth-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-production-disabled-state-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-production-environment-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-production-release-data-compatibility-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-production-release-gates-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/verify-staging-preprovision-read-only.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/sponsor-entry-git-deployment-observation-2026-10-21-sanitized.json",
+      "unchanged": true
+    }
+  ],
+  "selfHashOmitted": true
+}

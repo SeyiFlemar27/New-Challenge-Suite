@@ -1,0 +1,101 @@
+{
+  "checkedAt": "2026-11-01T09:02:42.08Z",
+  "project": "challenge-suite",
+  "database": "(default)",
+  "collectionGroup": "notifications",
+  "readOnly": true,
+  "indexes": [
+    {
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgOjXh4EK",
+      "queryScope": "COLLECTION",
+      "state": "READY",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjmiJEK",
+      "queryScope": "COLLECTION",
+      "state": "READY",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgPigw5IK",
+      "queryScope": "COLLECTION",
+      "state": "READY",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjFx5sK",
+      "queryScope": "COLLECTION",
+      "state": "READY",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ]
+}

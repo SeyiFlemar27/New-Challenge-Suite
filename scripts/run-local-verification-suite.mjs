@@ -14,7 +14,7 @@ allowed.push("scripts/test-individual-cancellation-emulator.mjs");
 allowed.push("scripts/test-tournament-submission-media-emulator.mjs");
 allowed.push("scripts/test-automatic-voting-emulator.mjs");
 allowed.push("scripts/test-individual-correction-emulator.mjs");
-allowed.push("scripts/test-firestore-transaction-runtime-emulator.mjs");
+allowed.push("scripts/test-firestore-conflict-integrity-emulator.mjs", "scripts/test-firestore-transaction-runtime-emulator.mjs");
 allowed.push("scripts/test-backend-stabilization-emulator.mjs");
 allowed.push("scripts/test-notification-inbox-emulator.mjs");
 allowed.push("scripts/test-normal-notification-reminders-emulator.mjs");

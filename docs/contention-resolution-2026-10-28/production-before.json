@@ -1,0 +1,46 @@
+{
+  "project": "prj_RuZ2HwHUfOxCubMH1EfvB4Bkm6RX",
+  "name": "challenge-suite",
+  "repository": "SeyiFlemar27/New-Challenge-Suite",
+  "productionBranch": "main",
+  "deploymentId": "dpl_DtepZCxm8w1hXGDYmmYZmQy5zuf5",
+  "commit": "f6bcadb3f197d1a7f0f9341e340419775a781a9b",
+  "status": "READY",
+  "aliases": [
+    "www.challengesuite.com",
+    "challenge-suite.vercel.app",
+    "challengesuite.com",
+    "challenge-suite-seyiflemar27s-projects.vercel.app",
+    "challenge-suite-git-main-seyiflemar27s-projects.vercel.app"
+  ],
+  "flags": [
+    {
+      "key": "NORMAL_LIFECYCLE_SCHEDULER_ENABLED",
+      "value": "true",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NORMAL_AUTOMATIC_REFUNDS_ENABLED",
+      "value": "false",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+      "value": "false",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+      "value": "false",
+      "target": [
+        "production"
+      ]
+    }
+  ]
+}

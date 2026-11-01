@@ -1,0 +1,2565 @@
+{
+  "node": "v24.17.0",
+  "project": "demo-p0-1793195963910",
+  "alternateSdk": false,
+  "rounds": [
+    {
+      "round": 0,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 5,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 6,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 7,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 8,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 9,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 10,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 11,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 12,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 13,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 14,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 15,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 16,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 17,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 18,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 19,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 20,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 21,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 22,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 23,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 24,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 25,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 26,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 27,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 28,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 29,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 30,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 31,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 32,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 33,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 34,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 35,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 36,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 37,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 38,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 39,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 41,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 42,
+      "results": [
+        {
+          "status": "fulfilled"
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    },
+    {
+      "round": 43,
+      "results": [
+        {
+          "status": "rejected",
+          "code": 3,
+          "message": "3 INVALID_ARGUMENT: Transaction is invalid or closed."
+        },
+        {
+          "status": "fulfilled"
+        }
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "round": 0,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:38.945Z"
+    },
+    {
+      "round": 0,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:38.945Z"
+    },
+    {
+      "round": 0,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:42.227Z"
+    },
+    {
+      "round": 0,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:42.369Z",
+      "idempotent": true
+    },
+    {
+      "round": 1,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:42.487Z"
+    },
+    {
+      "round": 1,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:42.487Z"
+    },
+    {
+      "round": 1,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:45.591Z",
+      "idempotent": true
+    },
+    {
+      "round": 2,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:45.654Z"
+    },
+    {
+      "round": 2,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:45.656Z"
+    },
+    {
+      "round": 2,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:48.264Z"
+    },
+    {
+      "round": 2,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:48.417Z",
+      "idempotent": true
+    },
+    {
+      "round": 3,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:48.474Z"
+    },
+    {
+      "round": 3,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:48.474Z"
+    },
+    {
+      "round": 3,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:51.242Z"
+    },
+    {
+      "round": 3,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:51.825Z",
+      "idempotent": true
+    },
+    {
+      "round": 4,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:51.892Z"
+    },
+    {
+      "round": 4,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:51.892Z"
+    },
+    {
+      "round": 4,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:54.842Z"
+    },
+    {
+      "round": 4,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:55.308Z",
+      "idempotent": true
+    },
+    {
+      "round": 5,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:55.365Z"
+    },
+    {
+      "round": 5,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:55.365Z"
+    },
+    {
+      "round": 5,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:58.064Z"
+    },
+    {
+      "round": 5,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:00:58.842Z",
+      "idempotent": true
+    },
+    {
+      "round": 6,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:58.912Z"
+    },
+    {
+      "round": 6,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:00:58.912Z"
+    },
+    {
+      "round": 6,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:01.589Z"
+    },
+    {
+      "round": 6,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:02.229Z",
+      "idempotent": true
+    },
+    {
+      "round": 7,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:02.283Z"
+    },
+    {
+      "round": 7,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:02.284Z"
+    },
+    {
+      "round": 7,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:05.521Z"
+    },
+    {
+      "round": 7,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:05.558Z"
+    },
+    {
+      "round": 7,
+      "workerId": "B",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:09.457Z",
+      "idempotent": true
+    },
+    {
+      "round": 8,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:09.504Z"
+    },
+    {
+      "round": 8,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:09.504Z"
+    },
+    {
+      "round": 8,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:12.785Z",
+      "idempotent": true
+    },
+    {
+      "round": 9,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:12.850Z"
+    },
+    {
+      "round": 9,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:12.850Z"
+    },
+    {
+      "round": 9,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:15.487Z"
+    },
+    {
+      "round": 9,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:15.986Z",
+      "idempotent": true
+    },
+    {
+      "round": 10,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:16.038Z"
+    },
+    {
+      "round": 10,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:16.039Z"
+    },
+    {
+      "round": 10,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:19.335Z",
+      "idempotent": true
+    },
+    {
+      "round": 11,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:19.403Z"
+    },
+    {
+      "round": 11,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:19.403Z"
+    },
+    {
+      "round": 11,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:22.835Z",
+      "idempotent": true
+    },
+    {
+      "round": 12,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:22.898Z"
+    },
+    {
+      "round": 12,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:22.898Z"
+    },
+    {
+      "round": 12,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:25.652Z"
+    },
+    {
+      "round": 12,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:25.934Z",
+      "idempotent": true
+    },
+    {
+      "round": 13,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:26.002Z"
+    },
+    {
+      "round": 13,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:26.002Z"
+    },
+    {
+      "round": 13,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:29.217Z"
+    },
+    {
+      "round": 13,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:29.484Z",
+      "idempotent": true
+    },
+    {
+      "round": 14,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:29.549Z"
+    },
+    {
+      "round": 14,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:29.550Z"
+    },
+    {
+      "round": 14,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:32.398Z"
+    },
+    {
+      "round": 14,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:32.512Z",
+      "idempotent": true
+    },
+    {
+      "round": 15,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:32.582Z"
+    },
+    {
+      "round": 15,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:32.583Z"
+    },
+    {
+      "round": 15,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:35.793Z"
+    },
+    {
+      "round": 15,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:35.880Z",
+      "idempotent": true
+    },
+    {
+      "round": 16,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:35.942Z"
+    },
+    {
+      "round": 16,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:35.943Z"
+    },
+    {
+      "round": 16,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:38.666Z"
+    },
+    {
+      "round": 16,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:38.666Z"
+    },
+    {
+      "round": 16,
+      "workerId": "B",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:41.997Z"
+    },
+    {
+      "round": 16,
+      "workerId": "A",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:42.878Z",
+      "idempotent": true
+    },
+    {
+      "round": 17,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:42.946Z"
+    },
+    {
+      "round": 17,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:42.946Z"
+    },
+    {
+      "round": 17,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:46.229Z"
+    },
+    {
+      "round": 17,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:46.496Z",
+      "idempotent": true
+    },
+    {
+      "round": 18,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:46.545Z"
+    },
+    {
+      "round": 18,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:46.545Z"
+    },
+    {
+      "round": 18,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:49.295Z"
+    },
+    {
+      "round": 18,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:49.995Z",
+      "idempotent": true
+    },
+    {
+      "round": 19,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:50.029Z"
+    },
+    {
+      "round": 19,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:50.029Z"
+    },
+    {
+      "round": 19,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:53.112Z",
+      "idempotent": true
+    },
+    {
+      "round": 20,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:53.161Z"
+    },
+    {
+      "round": 20,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:53.161Z"
+    },
+    {
+      "round": 20,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:56.149Z"
+    },
+    {
+      "round": 20,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:56.595Z",
+      "idempotent": true
+    },
+    {
+      "round": 21,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:56.644Z"
+    },
+    {
+      "round": 21,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:56.644Z"
+    },
+    {
+      "round": 21,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:01:59.727Z",
+      "idempotent": true
+    },
+    {
+      "round": 22,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:59.761Z"
+    },
+    {
+      "round": 22,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:01:59.761Z"
+    },
+    {
+      "round": 22,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:02.411Z"
+    },
+    {
+      "round": 22,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:02.894Z",
+      "idempotent": true
+    },
+    {
+      "round": 23,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:02.942Z"
+    },
+    {
+      "round": 23,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:02.942Z"
+    },
+    {
+      "round": 23,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:05.552Z"
+    },
+    {
+      "round": 23,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:05.660Z",
+      "idempotent": true
+    },
+    {
+      "round": 24,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:05.726Z"
+    },
+    {
+      "round": 24,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:05.727Z"
+    },
+    {
+      "round": 24,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:08.515Z"
+    },
+    {
+      "round": 24,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:09.226Z",
+      "idempotent": true
+    },
+    {
+      "round": 25,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:09.259Z"
+    },
+    {
+      "round": 25,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:09.259Z"
+    },
+    {
+      "round": 25,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:12.443Z"
+    },
+    {
+      "round": 25,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:12.607Z",
+      "idempotent": true
+    },
+    {
+      "round": 26,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:12.659Z"
+    },
+    {
+      "round": 26,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:12.659Z"
+    },
+    {
+      "round": 26,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:15.524Z",
+      "idempotent": true
+    },
+    {
+      "round": 27,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:15.621Z"
+    },
+    {
+      "round": 27,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:15.621Z"
+    },
+    {
+      "round": 27,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:18.758Z"
+    },
+    {
+      "round": 27,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:18.758Z"
+    },
+    {
+      "round": 27,
+      "workerId": "A",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:21.875Z"
+    },
+    {
+      "round": 27,
+      "workerId": "B",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:22.258Z",
+      "idempotent": true
+    },
+    {
+      "round": 28,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:22.289Z"
+    },
+    {
+      "round": 28,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:22.289Z"
+    },
+    {
+      "round": 28,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:25.460Z",
+      "idempotent": true
+    },
+    {
+      "round": 29,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:25.522Z"
+    },
+    {
+      "round": 29,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:25.523Z"
+    },
+    {
+      "round": 29,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:28.241Z",
+      "idempotent": true
+    },
+    {
+      "round": 30,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:28.305Z"
+    },
+    {
+      "round": 30,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:28.305Z"
+    },
+    {
+      "round": 30,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:31.005Z"
+    },
+    {
+      "round": 30,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:31.704Z",
+      "idempotent": true
+    },
+    {
+      "round": 31,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:31.739Z"
+    },
+    {
+      "round": 31,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:31.739Z"
+    },
+    {
+      "round": 31,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:34.621Z"
+    },
+    {
+      "round": 31,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:35.139Z",
+      "idempotent": true
+    },
+    {
+      "round": 32,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:35.188Z"
+    },
+    {
+      "round": 32,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:35.188Z"
+    },
+    {
+      "round": 32,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:38.135Z"
+    },
+    {
+      "round": 32,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:38.353Z",
+      "idempotent": true
+    },
+    {
+      "round": 33,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:38.411Z"
+    },
+    {
+      "round": 33,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:38.411Z"
+    },
+    {
+      "round": 33,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:41.203Z"
+    },
+    {
+      "round": 33,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:41.270Z",
+      "idempotent": true
+    },
+    {
+      "round": 34,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:41.303Z"
+    },
+    {
+      "round": 34,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:41.303Z"
+    },
+    {
+      "round": 34,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:44.254Z",
+      "idempotent": true
+    },
+    {
+      "round": 35,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:44.319Z"
+    },
+    {
+      "round": 35,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:44.320Z"
+    },
+    {
+      "round": 35,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:46.884Z"
+    },
+    {
+      "round": 35,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:47.817Z",
+      "idempotent": true
+    },
+    {
+      "round": 36,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:47.851Z"
+    },
+    {
+      "round": 36,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:47.851Z"
+    },
+    {
+      "round": 36,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:50.551Z"
+    },
+    {
+      "round": 36,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:50.969Z",
+      "idempotent": true
+    },
+    {
+      "round": 37,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:51.018Z"
+    },
+    {
+      "round": 37,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:51.018Z"
+    },
+    {
+      "round": 37,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:54.218Z",
+      "idempotent": true
+    },
+    {
+      "round": 38,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:54.268Z"
+    },
+    {
+      "round": 38,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:54.268Z"
+    },
+    {
+      "round": 38,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:02:56.868Z",
+      "idempotent": true
+    },
+    {
+      "round": 39,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:56.900Z"
+    },
+    {
+      "round": 39,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:02:56.900Z"
+    },
+    {
+      "round": 39,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:03:00.266Z",
+      "idempotent": true
+    },
+    {
+      "round": 40,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:00.316Z"
+    },
+    {
+      "round": 40,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:00.316Z"
+    },
+    {
+      "round": 40,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:02.899Z"
+    },
+    {
+      "round": 40,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:03:03.749Z",
+      "idempotent": true
+    },
+    {
+      "round": 41,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:03.782Z"
+    },
+    {
+      "round": 41,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:03.782Z"
+    },
+    {
+      "round": 41,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:06.829Z"
+    },
+    {
+      "round": 41,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:03:07.014Z",
+      "idempotent": true
+    },
+    {
+      "round": 42,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:07.046Z"
+    },
+    {
+      "round": 42,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:07.047Z"
+    },
+    {
+      "round": 42,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:09.664Z"
+    },
+    {
+      "round": 42,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant"
+      ],
+      "startedAt": "2026-10-28T14:03:10.380Z",
+      "idempotent": true
+    },
+    {
+      "round": 43,
+      "workerId": "A",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:10.431Z"
+    },
+    {
+      "round": 43,
+      "workerId": "B",
+      "attempt": 1,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:10.432Z"
+    },
+    {
+      "round": 43,
+      "workerId": "B",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:13.131Z"
+    },
+    {
+      "round": 43,
+      "workerId": "A",
+      "attempt": 2,
+      "operations": [
+        "getAll shared + participant",
+        "query participants"
+      ],
+      "startedAt": "2026-10-28T14:03:13.177Z",
+      "failure": {
+        "operation": "query participants",
+        "code": 3,
+        "message": "3 INVALID_ARGUMENT: Transaction is invalid or closed."
+      }
+    },
+    {
+      "round": 43,
+      "workerId": "B",
+      "attempt": 3,
+      "operations": [
+        "getAll shared + participant",
+        "query participants",
+        "query payments",
+        "getAll refund",
+        "writes queued; native commit follows"
+      ],
+      "startedAt": "2026-10-28T14:03:16.681Z"
+    }
+  ]
+}

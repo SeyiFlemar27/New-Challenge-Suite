@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-10-28T16:58:19.494Z",
+  "readOnly": true,
+  "indexes": [
+    {
+      "density": "SPARSE_ALL",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgOjXh4EK",
+      "queryScope": "COLLECTION",
+      "state": "READY"
+    },
+    {
+      "density": "SPARSE_ALL",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjmiJEK",
+      "queryScope": "COLLECTION",
+      "state": "READY"
+    },
+    {
+      "density": "SPARSE_ALL",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgPigw5IK",
+      "queryScope": "COLLECTION",
+      "state": "READY"
+    },
+    {
+      "density": "SPARSE_ALL",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "name": "projects/challenge-suite/databases/(default)/collectionGroups/notifications/indexes/CICAgJjFx5sK",
+      "queryScope": "COLLECTION",
+      "state": "READY"
+    }
+  ]
+}

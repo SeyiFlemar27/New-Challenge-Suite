@@ -1,0 +1,288 @@
+{
+  "passed": 24,
+  "failed": 0,
+  "skipped": 26,
+  "assertions": 175,
+  "results": [
+    {
+      "name": "Dashboard redesign: free",
+      "status": "PASS",
+      "assertions": 22
+    },
+    {
+      "name": "Dashboard redesign: creator",
+      "status": "PASS",
+      "assertions": 18
+    },
+    {
+      "name": "Dashboard redesign: host",
+      "status": "PASS",
+      "assertions": 18
+    },
+    {
+      "name": "Dashboard redesign: enterprise",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Dashboard redesign: sponsor",
+      "status": "PASS",
+      "assertions": 21
+    },
+    {
+      "name": "Dashboard redesign: admin",
+      "status": "PASS",
+      "assertions": 20
+    },
+    {
+      "name": "Dashboard stability: actual provider rejects stale identity responses and clears cached account data",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: intentional Admin access preserves personal default and server authorization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Free default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator default login under delayed profile",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Host default login under delayed profile",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Dashboard stability: Host onboarding default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Restricted default login under delayed profile",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 3
+    },
+    {
+      "name": "Dashboard stability: Host legacy Admin flag default login under delayed profile",
+      "status": "PASS",
+      "assertions": 7
+    },
+    {
+      "name": "Dashboard stability: Host logout and login again enters Host directly",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: Creator upgrade refresh and membership pending recovery",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: profile failure retains retry and never falls back to Free",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: requested action and unsafe redirects",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: verified email required before dashboard",
+      "status": "PASS",
+      "assertions": 1
+    },
+    {
+      "name": "Dashboard stability: protected direct navigation preserves action query at login",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Become a Sponsor starts setup without changing personal identity or privileges",
+      "status": "PASS",
+      "assertions": 8
+    },
+    {
+      "name": "Dashboard stability: Sponsor panel entry for personal legacy Admin capability and pending organization",
+      "status": "PASS",
+      "assertions": 2
+    },
+    {
+      "name": "Dashboard stability: Sponsor Enterprise Admin and workspace switching",
+      "status": "PASS",
+      "assertions": 5
+    },
+    {
+      "name": "Automatic publication: normal upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: private upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: tournament upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: attendance_only upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Automatic publication: physical_competition upload, save, restore, Publish and public refresh",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Media publication and private credential preparation, reveal and copy",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Normal Builder seven-step frontend, optional fields, creator funding and safe draft exit",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Creator login establishes a server session and Explore renders API-backed challenge",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Private requester submits access request through UI and persisted request is pending",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Challenge owner approves access request through owner UI and grant persists",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Participant joins a free Normal Challenge through the UI and Firestore records one participant",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Sponsor opportunity discovery and Enterprise finance routes render for authorized workspaces",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament V3 seven-step draft, verified review media and accessible 128-slot bracket",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Individual Tournament registration and physical Live Event registration persist from browser forms",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament Match upload, replacement, Admin moderation, free and DoroCoin votes and verified result",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Admin, wallet, challenge builders, Tournament, and Live Event journeys render without client exceptions",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Tournament runtime verification Admin controls create, inspect and clean only an isolated synthetic run",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Customer Support ticket creation, Admin primary confirmation and reply persist through browser controls",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Public and participant journeys remain usable at mobile viewport",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event Attendance Only creator earnings approval, clearance and owner visibility",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event physical competition registration, arrival, judging and public results",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event grouped venue and check-in reschedule requires actual Admin approval",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event financial Admin evidence, approval and held-credit safeguards",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 attendance_only builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 physical_competition builder draft, media and automatic publication",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    },
+    {
+      "name": "Live Event V2 signed-out details and verified guest multiple-ticket booking",
+      "status": "SKIP",
+      "assertions": 0,
+      "message": "Filtered out by CHALLENGE_SUITE_E2E_JOURNEY."
+    }
+  ],
+  "pageErrors": [],
+  "sourceStable": true,
+  "initialSourceFingerprint": "6dda6c0bc490b4905161ef0b0384f43282935522466ed7307d2dd77a9eafc57f",
+  "finalSourceFingerprint": "6dda6c0bc490b4905161ef0b0384f43282935522466ed7307d2dd77a9eafc57f"
+}

@@ -175,6 +175,8 @@ try {
     providerRefundCalls += 1;
     assert.match(String(params.payment_intent), new RegExp(`^pi_${runId}_`));
     assert.ok(options.idempotencyKey);
+    assert.ok(options.idempotencyKey.length <= 255, "Refund retry key respects the real provider limit");
+    assert.ok(params.metadata.refundCaseId.length <= 500, "Refund metadata respects the real provider limit");
     providerRefundIdempotencyKeys.push(options.idempotencyKey);
     if (failNextProviderRefund) {
       failNextProviderRefund = false;
@@ -277,6 +279,13 @@ try {
   const promoAudit = await db.collection("auditLogs").where("targetId", "==", challengeId).where("action", "==", "enterprise.prize_promotional_funding_confirmed").get();
   assert.equal(promoAudit.docs.some((doc) => doc.data().actorId === adminUserId && Boolean(doc.data().reason)), true);
   const { POST: createRefundCase, PATCH: updateRefundCase } = await import("../app/api/admin/refunds/route.ts");
+  for (const paymentId of ["nested/payment", ".", "..", "__reserved__", "x".repeat(1500), "é".repeat(750)]) {
+    const invalid = await createRefundCase(new Request("http://localhost/api/admin/refunds", {
+      method: "POST", headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ paymentCollection: "sponsorContributions", paymentId, reason: "Verify invalid reference rejection" }),
+    }));
+    assert.equal(invalid.status, 400, "Malformed or oversized derived refund IDs must be rejected before database access");
+  }
   async function executeAdminRefund(paymentCollection, paymentId, label, { failOnce = false, failLocalFinalizeOnce = false } = {}) {
     const created = await createRefundCase(new Request("http://localhost/api/admin/refunds", {
       method: "POST", headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
@@ -475,12 +484,13 @@ try {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   });
   const sponsorCheckout = await createSponsorCheckout(new Request("http://localhost/api/sponsor/challenges/test/funding-checkout", {
-    method: "POST", headers: { authorization: `Bearer ${sponsorToken}`, "content-type": "application/json", "idempotency-key": `${runId}_sponsor_key` },
+    method: "POST", headers: { authorization: `Bearer ${sponsorToken}`, "content-type": "application/json", "idempotency-key": `${runId}_sponsor_key_long_reference_acceptance` },
     body: JSON.stringify({ agreementId: sponsorAgreementId }),
   }), { params: Promise.resolve({ id: sponsorChallengeId }) });
   assert.equal(sponsorCheckout.status, 200, await sponsorCheckout.clone().text());
   const sponsorCheckoutBody = await sponsorCheckout.json();
   sponsorContributionId = sponsorCheckoutBody.data?.sponsorContributionId ?? sponsorCheckoutBody.sponsorContributionId;
+  assert.ok(sponsorContributionId.length > 180, "Exercise the real generated Sponsor payment reference beyond the former refund-route limit");
   const pendingSponsorFunding = (await db.collection("sponsorContributions").doc(sponsorContributionId).get()).data();
   assert.equal(pendingSponsorFunding.status, "pending");
   assert.equal(pendingSponsorFunding.sponsorId, sponsorOrgId);

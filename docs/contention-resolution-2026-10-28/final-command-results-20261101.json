@@ -1,0 +1,86 @@
+{
+  "checkedAt": "2026-11-01T09:28:52.774Z",
+  "commands": [
+    {
+      "command": "pnpm.cmd typecheck",
+      "exitCode": 0,
+      "evidence": "contention-typecheck-provider-bounds-20261031.log"
+    },
+    {
+      "command": "pnpm.cmd lint",
+      "exitCode": 0,
+      "evidence": "contention-lint-provider-bounds-20261031.log"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1> scripts/test-firestore-transaction-runtime-emulator.mjs",
+      "environment": {
+        "CHALLENGE_SUITE_CONTENTION_ROUNDS": "200"
+      },
+      "exitCode": 0,
+      "evidence": "contention-native-final-20261101.log"
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1> scripts/test-automatic-publishing-emulator.mjs",
+      "runs": 2,
+      "assertionsEach": 225,
+      "exitCodes": [
+        0,
+        0
+      ]
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1>",
+      "exitCode": 0,
+      "passed": 82,
+      "total": 82,
+      "evidence": "contention-backend-final-20261101.log"
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1> scripts/qa/run-p1-browser-e2e.mjs",
+      "exitCode": 0,
+      "passed": 52,
+      "total": 52,
+      "assertions": 534,
+      "filtered": false,
+      "productionBuild": "Fresh isolated webpack production build completed before browser journeys",
+      "evidence": "browser-20261101/results-sanitized.json"
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1> scripts/qa/run-p1-browser-e2e.mjs",
+      "environment": {
+        "CHALLENGE_SUITE_E2E_JOURNEY": "master acceptance"
+      },
+      "exitCode": 0,
+      "passed": 14,
+      "assertions": 100,
+      "filtered": true,
+      "skipped": 26,
+      "sourceStable": true
+    },
+    {
+      "command": "node scripts/run-verified-emulator-suite.mjs <CLI15.34.1> scripts/qa/run-p1-browser-e2e.mjs",
+      "environment": {
+        "CHALLENGE_SUITE_E2E_JOURNEY": "dashboard redesign"
+      },
+      "exitCode": 0,
+      "passed": 24,
+      "assertions": 175,
+      "filtered": true,
+      "skipped": 26,
+      "sourceStable": true
+    },
+    {
+      "command": "git fsck --connectivity-only --no-dangling",
+      "exitCode": 0
+    }
+  ],
+  "limitations": [
+    "No live provider financial operations",
+    "No real Firestore contention writes",
+    "Authenticated Production acceptance not established by emulators"
+  ]
+}

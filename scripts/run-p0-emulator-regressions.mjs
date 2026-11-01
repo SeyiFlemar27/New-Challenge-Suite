@@ -112,6 +112,7 @@ const tests = [
 ];
 
 const results = [];
+tests.push("scripts/test-firestore-conflict-integrity-emulator.mjs");
 function recordResults(complete) { if (process.env.CHALLENGE_SUITE_TEST_RESULTS_PATH) writeFileSync(process.env.CHALLENGE_SUITE_TEST_RESULTS_PATH, JSON.stringify({ complete, total: tests.length, results }, null, 2)); }
 recordResults(false);
 for (const test of tests) {

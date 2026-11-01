@@ -1,0 +1,37 @@
+[
+  {
+    "key": "NORMAL_EMAIL_DELIVERY_ENABLED",
+    "configured": true,
+    "enabled": false
+  },
+  {
+    "key": "TOURNAMENT_EMAIL_DELIVERY_ENABLED",
+    "configured": false,
+    "enabled": false
+  },
+  {
+    "key": "SUPPORT_EMAIL_DELIVERY_ENABLED",
+    "configured": false,
+    "enabled": false
+  },
+  {
+    "key": "LIVE_EVENT_AUTOMATIC_REFUNDS_ENABLED",
+    "configured": false,
+    "enabled": false
+  },
+  {
+    "key": "NORMAL_AUTOMATIC_REFUNDS_ENABLED",
+    "configured": true,
+    "enabled": false
+  },
+  {
+    "key": "TOURNAMENT_ACTIVATION_SCHEDULER_ENABLED",
+    "configured": true,
+    "enabled": false
+  },
+  {
+    "key": "TOURNAMENT_MATCH_LIFECYCLE_SCHEDULER_ENABLED",
+    "configured": true,
+    "enabled": false
+  }
+]
